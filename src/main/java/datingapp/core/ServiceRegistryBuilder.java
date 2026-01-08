@@ -52,6 +52,7 @@ public final class ServiceRegistryBuilder {
                 userStatsStorage, platformStatsStorage);
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage);
         ProfilePreviewService profilePreviewService = new ProfilePreviewService();
+        DailyLimitService dailyLimitService = new DailyLimitService(likeStorage, config);
 
         return new ServiceRegistry(
                 config,
@@ -69,7 +70,8 @@ public final class ServiceRegistryBuilder {
                 sessionService,
                 statsService,
                 matchQualityService,
-                profilePreviewService);
+                profilePreviewService,
+                dailyLimitService);
     }
 
     /**

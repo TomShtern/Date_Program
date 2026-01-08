@@ -18,6 +18,7 @@ import datingapp.core.AppConfig;
 import datingapp.core.Block;
 import datingapp.core.BlockStorage;
 import datingapp.core.CandidateFinderService;
+import datingapp.core.DailyLimitService;
 import datingapp.core.Dealbreakers;
 import datingapp.core.GeoUtils;
 import datingapp.core.Lifestyle;
@@ -160,6 +161,10 @@ public class Main {
         return services.getProfilePreviewService();
     }
 
+    private static DailyLimitService dailyLimitService() {
+        return services.getDailyLimitService();
+    }
+
     private static void printMenu() {
         logger.info(SEPARATOR_LINE);
         logger.info("         DATING APP - PHASE 0.5");
@@ -174,6 +179,14 @@ public class Main {
                             session.getLikeCount(),
                             session.getPassCount(),
                             session.getFormattedDuration()));
+            // Show daily likes (Phase 1)
+            DailyLimitService.DailyStatus dailyStatus = dailyLimitService().getStatus(currentUser.getId());
+            if (dailyStatus.hasUnlimitedLikes()) {
+                logger.info("  💝 Daily Likes: unlimited");
+            } else {
+                logger.info("  💝 Daily Likes: {}/{} remaining",
+                        dailyStatus.likesRemaining(), services.getConfig().dailyLikeLimit());
+            }
 
         } else {
             logger.info("  Current User: [None]");
@@ -475,6 +488,13 @@ public class Main {
         }
 
         Like.Direction direction = action.equals("l") ? Like.Direction.LIKE : Like.Direction.PASS;
+
+        // Check daily limit before recording a like (Phase 1)
+        if (direction == Like.Direction.LIKE && !dailyLimitService().canLike(currentUser.getId())) {
+            showDailyLimitReached();
+            return false;
+        }
+
         Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
         Optional<Match> match = matchingService().recordLike(like);
 
@@ -487,6 +507,30 @@ public class Main {
             logger.info("👋 Passed.\n");
         }
         return true;
+    }
+
+    /**
+     * Show daily limit reached screen.
+     */
+    private static void showDailyLimitReached() {
+        DailyLimitService.DailyStatus status = dailyLimitService().getStatus(currentUser.getId());
+        String timeUntilReset = DailyLimitService.formatDuration(dailyLimitService().getTimeUntilReset());
+
+        logger.info("\n" + SEPARATOR_LINE);
+        logger.info("         💔 DAILY LIMIT REACHED");
+        logger.info(SEPARATOR_LINE);
+        logger.info("");
+        logger.info("   You've used all {} likes for today!", status.likesUsed());
+        logger.info("");
+        logger.info("   Resets in: {}", timeUntilReset);
+        logger.info("");
+        logger.info("   Tips for tomorrow:");
+        logger.info("   • Take time to read profiles");
+        logger.info("   • Quality over quantity");
+        logger.info("   • Check your matches!");
+        logger.info("");
+        readLine("   [Press Enter to return to menu]");
+        logger.info(SEPARATOR_LINE + "\n");
     }
 
     // === 5. VIEW MATCHES ===

@@ -180,5 +180,15 @@ class Round2BugInvestigationTest {
                     .filter(l -> l.whoLikes().equals(fromUserId) && l.whoGotLiked().equals(toUserId))
                     .findFirst();
         }
+
+        @Override
+        public int countLikesToday(UUID userId, java.time.Instant startOfDay) {
+            return 0;
+        }
+
+        @Override
+        public int countPassesToday(UUID userId, java.time.Instant startOfDay) {
+            return 0;
+        }
     }
 }

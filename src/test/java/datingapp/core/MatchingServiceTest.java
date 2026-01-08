@@ -202,6 +202,16 @@ class MatchingServiceTest {
             return Optional.ofNullable(likes.get(key(fromUserId, toUserId)));
         }
 
+        @Override
+        public int countLikesToday(UUID userId, java.time.Instant startOfDay) {
+            return 0;
+        }
+
+        @Override
+        public int countPassesToday(UUID userId, java.time.Instant startOfDay) {
+            return 0;
+        }
+
         private String key(UUID from, UUID to) {
             return from.toString() + "->" + to.toString();
         }

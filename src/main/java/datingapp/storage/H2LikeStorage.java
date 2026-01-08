@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -211,6 +212,56 @@ public class H2LikeStorage implements LikeStorage {
 
         } catch (SQLException e) {
             throw new StorageException("Failed to count mutual likes", e);
+        }
+    }
+
+    // === Daily Limit Methods (Phase 1) ===
+
+    @Override
+    public int countLikesToday(UUID userId, Instant startOfDay) {
+        String sql = """
+                SELECT COUNT(*) FROM likes
+                WHERE who_likes = ? AND direction = 'LIKE' AND created_at >= ?
+                """;
+
+        try (Connection conn = dbManager.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setObject(1, userId);
+            stmt.setTimestamp(2, Timestamp.from(startOfDay));
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+            return 0;
+
+        } catch (SQLException e) {
+            throw new StorageException("Failed to count likes today", e);
+        }
+    }
+
+    @Override
+    public int countPassesToday(UUID userId, Instant startOfDay) {
+        String sql = """
+                SELECT COUNT(*) FROM likes
+                WHERE who_likes = ? AND direction = 'PASS' AND created_at >= ?
+                """;
+
+        try (Connection conn = dbManager.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setObject(1, userId);
+            stmt.setTimestamp(2, Timestamp.from(startOfDay));
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+            return 0;
+
+        } catch (SQLException e) {
+            throw new StorageException("Failed to count passes today", e);
         }
     }
 }

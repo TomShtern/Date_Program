@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: datingapp.core.MatchQualityServiceTest$HighlightTests
 -------------------------------------------------------------------------------
-Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.108 s -- in datingapp.core.MatchQualityServiceTest$HighlightTests
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in datingapp.core.MatchQualityServiceTest$HighlightTests

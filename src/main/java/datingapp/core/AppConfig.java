@@ -1,6 +1,7 @@
 package datingapp.core;
 
 import java.time.Duration;
+import java.time.ZoneId;
 
 /**
  * Centralized, immutable application configuration.
@@ -13,9 +14,11 @@ import java.time.Duration;
  */
 public record AppConfig(
         int autoBanThreshold, // Number of reports before auto-ban
-        int dailyLikeLimit, // Max likes per day (Phase 3)
-        int dailySuperLikeLimit, // Max super likes per day (Phase 3)
-        int maxInterests, // Max interests per user (Phase 2)
+        int dailyLikeLimit, // Max likes per day (-1 = unlimited)
+        int dailySuperLikeLimit, // Max super likes per day
+        int dailyPassLimit, // Max passes per day (-1 = unlimited)
+        ZoneId userTimeZone, // Timezone for daily limit reset at midnight
+        int maxInterests, // Max interests per user
         int maxPhotos, // Max photos per user
         int maxBioLength, // Max bio length
         int maxReportDescLength, // Max report description length
@@ -32,6 +35,8 @@ public record AppConfig(
                 3, // autoBanThreshold
                 100, // dailyLikeLimit
                 1, // dailySuperLikeLimit
+                -1, // dailyPassLimit (-1 = unlimited)
+                ZoneId.systemDefault(), // userTimeZone
                 5, // maxInterests
                 2, // maxPhotos
                 500, // maxBioLength
@@ -40,6 +45,20 @@ public record AppConfig(
                 500, // maxSwipesPerSession
                 30.0 // suspiciousSwipeVelocity
         );
+    }
+
+    /**
+     * Check if passes are unlimited.
+     */
+    public boolean hasUnlimitedPasses() {
+        return dailyPassLimit < 0;
+    }
+
+    /**
+     * Check if likes are unlimited.
+     */
+    public boolean hasUnlimitedLikes() {
+        return dailyLikeLimit < 0;
     }
 
     /**
@@ -60,6 +79,8 @@ public record AppConfig(
         private int autoBanThreshold = 3;
         private int dailyLikeLimit = 100;
         private int dailySuperLikeLimit = 1;
+        private int dailyPassLimit = -1;
+        private ZoneId userTimeZone = ZoneId.systemDefault();
         private int maxInterests = 5;
         private int maxPhotos = 2;
         private int maxBioLength = 500;
@@ -80,6 +101,16 @@ public record AppConfig(
 
         public Builder dailySuperLikeLimit(int v) {
             this.dailySuperLikeLimit = v;
+            return this;
+        }
+
+        public Builder dailyPassLimit(int v) {
+            this.dailyPassLimit = v;
+            return this;
+        }
+
+        public Builder userTimeZone(ZoneId v) {
+            this.userTimeZone = v;
             return this;
         }
 
@@ -123,6 +154,8 @@ public record AppConfig(
                     autoBanThreshold,
                     dailyLikeLimit,
                     dailySuperLikeLimit,
+                    dailyPassLimit,
+                    userTimeZone,
                     maxInterests,
                     maxPhotos,
                     maxBioLength,

@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -51,4 +52,18 @@ public interface LikeStorage {
      * Count mutual likes (users this person liked who also liked them back).
      */
     int countMutualLikes(UUID userId);
+
+    // === Daily Limit Methods (Phase 1) ===
+
+    /**
+     * Count likes given by user since the specified start of day.
+     * Used for daily limit enforcement.
+     */
+    int countLikesToday(UUID userId, Instant startOfDay);
+
+    /**
+     * Count passes given by user since the specified start of day.
+     * Used for daily limit enforcement.
+     */
+    int countPassesToday(UUID userId, Instant startOfDay);
 }

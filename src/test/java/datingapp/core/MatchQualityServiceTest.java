@@ -303,5 +303,15 @@ class MatchQualityServiceTest {
         public int countMutualLikes(UUID userId) {
             return 0;
         }
+
+        @Override
+        public int countLikesToday(UUID userId, java.time.Instant startOfDay) {
+            return 0;
+        }
+
+        @Override
+        public int countPassesToday(UUID userId, java.time.Instant startOfDay) {
+            return 0;
+        }
     }
 }

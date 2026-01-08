@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: datingapp.storage.H2StorageIntegrationTest$UserStorageTests
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.974 s -- in datingapp.storage.H2StorageIntegrationTest$UserStorageTests

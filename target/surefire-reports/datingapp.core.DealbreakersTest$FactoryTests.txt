@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: datingapp.core.DealbreakersTest$FactoryTests
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in datingapp.core.DealbreakersTest$FactoryTests
