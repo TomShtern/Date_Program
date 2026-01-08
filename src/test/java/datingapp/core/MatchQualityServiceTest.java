@@ -313,5 +313,10 @@ class MatchQualityServiceTest {
         public int countPassesToday(UUID userId, java.time.Instant startOfDay) {
             return 0;
         }
+
+        @Override
+        public void delete(UUID likeId) {
+            likes.values().removeIf(like -> like.id().equals(likeId));
+        }
     }
 }

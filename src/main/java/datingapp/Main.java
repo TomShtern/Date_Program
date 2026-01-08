@@ -36,6 +36,7 @@ import datingapp.core.ServiceRegistry;
 import datingapp.core.ServiceRegistryBuilder;
 import datingapp.core.SessionService;
 import datingapp.core.StatsService;
+import datingapp.core.UndoService;
 import datingapp.core.User;
 import datingapp.core.UserStats;
 import datingapp.core.UserStorage;
@@ -163,6 +164,10 @@ public class Main {
 
     private static DailyLimitService dailyLimitService() {
         return services.getDailyLimitService();
+    }
+
+    private static UndoService undoService() {
+        return services.getUndoService();
     }
 
     private static void printMenu() {
@@ -506,6 +511,13 @@ public class Main {
         } else {
             logger.info("👋 Passed.\n");
         }
+
+        // Record for undo (Phase 1)
+        undoService().recordSwipe(currentUser.getId(), like, match);
+
+        // Offer undo if available
+        promptUndo(candidate.getName());
+
         return true;
     }
 
@@ -531,6 +543,39 @@ public class Main {
         logger.info("");
         readLine("   [Press Enter to return to menu]");
         logger.info(SEPARATOR_LINE + "\n");
+    }
+
+    /**
+     * Prompt user to undo their last swipe if undo is available.
+     * Shows real-time countdown and handles user response.
+     * (Phase 1 - Undo Last Swipe feature)
+     */
+    private static void promptUndo(String candidateName) {
+        if (!undoService().canUndo(currentUser.getId())) {
+            return; // No undo available
+        }
+
+        // Show countdown prompt with real-time calculation
+        int secondsLeft = undoService().getSecondsRemaining(currentUser.getId());
+        String prompt = String.format("⏪ Undo last swipe? (%ds remaining) (Y/N): ", secondsLeft);
+        String response = readLine(prompt).toLowerCase();
+
+        if (response.equals("y")) {
+            UndoService.UndoResult result = undoService().undo(currentUser.getId());
+
+            if (result.success()) {
+                String directionStr = result.undoneSwipe().direction() == Like.Direction.LIKE ? "like" : "pass";
+                logger.info("\n✅ Undone! Your {} on {} has been reversed.", directionStr, candidateName);
+
+                if (result.matchDeleted()) {
+                    logger.info("   (The match was also removed)\n");
+                } else {
+                    logger.info("");
+                }
+            } else {
+                logger.info("\n❌ {}\n", result.message());
+            }
+        }
     }
 
     // === 5. VIEW MATCHES ===

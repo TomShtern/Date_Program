@@ -212,6 +212,11 @@ class MatchingServiceTest {
             return 0;
         }
 
+        @Override
+        public void delete(UUID likeId) {
+            likes.values().removeIf(like -> like.id().equals(likeId));
+        }
+
         private String key(UUID from, UUID to) {
             return from.toString() + "->" + to.toString();
         }
@@ -252,6 +257,11 @@ class MatchingServiceTest {
             return matches.values().stream()
                     .filter(m -> m.involves(userId))
                     .toList();
+        }
+
+        @Override
+        public void delete(String matchId) {
+            matches.remove(matchId);
         }
     }
 }

@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: datingapp.core.UserTest
 -------------------------------------------------------------------------------
-Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in datingapp.core.UserTest
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s -- in datingapp.core.UserTest

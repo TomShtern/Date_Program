@@ -217,4 +217,25 @@ public class H2MatchStorage implements MatchStorage {
                 endedAtTs != null ? endedAtTs.toInstant() : null,
                 endedBy);
     }
+
+    // === Undo Methods (Phase 1) ===
+
+    @Override
+    public void delete(String matchId) {
+        String sql = "DELETE FROM matches WHERE id = ?";
+
+        try (Connection conn = dbManager.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, matchId);
+            int rowsAffected = stmt.executeUpdate();
+
+            if (rowsAffected == 0) {
+                throw new StorageException("Match not found for deletion: " + matchId);
+            }
+
+        } catch (SQLException e) {
+            throw new StorageException("Failed to delete match: " + matchId, e);
+        }
+    }
 }

@@ -341,6 +341,11 @@ class DailyLimitServiceTest {
                     .count();
         }
 
+        @Override
+        public void delete(UUID likeId) {
+            likes.values().removeIf(like -> like.id().equals(likeId));
+        }
+
         private String key(UUID from, UUID to) {
             return from + "->" + to;
         }

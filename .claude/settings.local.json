@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Skill(feature-dev:feature-dev)",
+      "Bash(mvn clean compile test:*)"
     ]
-  }
+  },
+  "outputStyle": "Explanatory"
 }

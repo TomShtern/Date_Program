@@ -264,4 +264,25 @@ public class H2LikeStorage implements LikeStorage {
             throw new StorageException("Failed to count passes today", e);
         }
     }
+
+    // === Undo Methods (Phase 1) ===
+
+    @Override
+    public void delete(UUID likeId) {
+        String sql = "DELETE FROM likes WHERE id = ?";
+
+        try (Connection conn = dbManager.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setObject(1, likeId);
+            int rowsAffected = stmt.executeUpdate();
+
+            if (rowsAffected == 0) {
+                throw new StorageException("Like not found for deletion: " + likeId);
+            }
+
+        } catch (SQLException e) {
+            throw new StorageException("Failed to delete like: " + likeId, e);
+        }
+    }
 }

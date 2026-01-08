@@ -39,4 +39,14 @@ public interface MatchStorage {
      * Gets ALL matches for a given user (including ended ones).
      */
     List<Match> getAllMatchesFor(UUID userId);
+
+    // === Undo Methods (Phase 1) ===
+
+    /**
+     * Delete a match by ID.
+     * Used for undo functionality when undoing a like that created a match.
+     *
+     * @param matchId the ID of the match to delete
+     */
+    void delete(String matchId);
 }

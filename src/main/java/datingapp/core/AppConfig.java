@@ -25,7 +25,9 @@ public record AppConfig(
         // Session tracking (Phase 0.5b)
         int sessionTimeoutMinutes, // Minutes of inactivity before session ends
         int maxSwipesPerSession, // Anti-bot: max swipes in single session
-        double suspiciousSwipeVelocity // Anti-bot: swipes/min threshold for warning
+        double suspiciousSwipeVelocity, // Anti-bot: swipes/min threshold for warning
+        // Undo feature (Phase 1)
+        int undoWindowSeconds // Time window for undo in seconds (30)
 ) {
     /**
      * Default configuration values.
@@ -43,7 +45,8 @@ public record AppConfig(
                 500, // maxReportDescLength
                 5, // sessionTimeoutMinutes
                 500, // maxSwipesPerSession
-                30.0 // suspiciousSwipeVelocity
+                30.0, // suspiciousSwipeVelocity
+                30 // undoWindowSeconds
         );
     }
 
@@ -88,6 +91,7 @@ public record AppConfig(
         private int sessionTimeoutMinutes = 5;
         private int maxSwipesPerSession = 500;
         private double suspiciousSwipeVelocity = 30.0;
+        private int undoWindowSeconds = 30;
 
         public Builder autoBanThreshold(int v) {
             this.autoBanThreshold = v;
@@ -149,6 +153,11 @@ public record AppConfig(
             return this;
         }
 
+        public Builder undoWindowSeconds(int v) {
+            this.undoWindowSeconds = v;
+            return this;
+        }
+
         public AppConfig build() {
             return new AppConfig(
                     autoBanThreshold,
@@ -162,7 +171,8 @@ public record AppConfig(
                     maxReportDescLength,
                     sessionTimeoutMinutes,
                     maxSwipesPerSession,
-                    suspiciousSwipeVelocity);
+                    suspiciousSwipeVelocity,
+                    undoWindowSeconds);
         }
     }
 }

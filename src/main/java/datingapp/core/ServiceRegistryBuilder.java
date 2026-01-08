@@ -53,6 +53,7 @@ public final class ServiceRegistryBuilder {
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage);
         ProfilePreviewService profilePreviewService = new ProfilePreviewService();
         DailyLimitService dailyLimitService = new DailyLimitService(likeStorage, config);
+        UndoService undoService = new UndoService(likeStorage, matchStorage, config);
 
         return new ServiceRegistry(
                 config,
@@ -71,7 +72,8 @@ public final class ServiceRegistryBuilder {
                 statsService,
                 matchQualityService,
                 profilePreviewService,
-                dailyLimitService);
+                dailyLimitService,
+                undoService);
     }
 
     /**

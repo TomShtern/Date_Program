@@ -66,4 +66,14 @@ public interface LikeStorage {
      * Used for daily limit enforcement.
      */
     int countPassesToday(UUID userId, Instant startOfDay);
+
+    // === Undo Methods (Phase 1) ===
+
+    /**
+     * Delete a like by ID.
+     * Used for undo functionality.
+     *
+     * @param likeId the ID of the like to delete
+     */
+    void delete(UUID likeId);
 }

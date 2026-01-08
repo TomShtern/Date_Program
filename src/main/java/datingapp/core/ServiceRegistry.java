@@ -35,6 +35,7 @@ public class ServiceRegistry {
     private final MatchQualityService matchQualityService; // Phase 0.5b
     private final ProfilePreviewService profilePreviewService; // Phase 1
     private final DailyLimitService dailyLimitService; // Phase 1
+    private final UndoService undoService; // Phase 1
 
     /**
      * Package-private constructor - use ServiceRegistryBuilder to create.
@@ -55,7 +56,8 @@ public class ServiceRegistry {
             StatsService statsService,
             MatchQualityService matchQualityService,
             ProfilePreviewService profilePreviewService,
-            DailyLimitService dailyLimitService) {
+            DailyLimitService dailyLimitService,
+            UndoService undoService) {
         this.config = Objects.requireNonNull(config);
         this.userStorage = Objects.requireNonNull(userStorage);
         this.likeStorage = Objects.requireNonNull(likeStorage);
@@ -73,6 +75,7 @@ public class ServiceRegistry {
         this.matchQualityService = Objects.requireNonNull(matchQualityService);
         this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
         this.dailyLimitService = Objects.requireNonNull(dailyLimitService);
+        this.undoService = Objects.requireNonNull(undoService);
     }
 
     // === Getters ===
@@ -143,5 +146,9 @@ public class ServiceRegistry {
 
     public DailyLimitService getDailyLimitService() {
         return dailyLimitService;
+    }
+
+    public UndoService getUndoService() {
+        return undoService;
     }
 }

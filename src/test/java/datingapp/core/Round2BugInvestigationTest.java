@@ -91,6 +91,11 @@ class Round2BugInvestigationTest {
                 public List<Match> getAllMatchesFor(UUID userId) {
                     return List.of();
                 }
+
+                @Override
+                public void delete(String matchId) {
+                    existing.remove(matchId);
+                }
             };
 
             MatchingService service = new MatchingService(likeStorage, raceConditionStorage);
@@ -189,6 +194,11 @@ class Round2BugInvestigationTest {
         @Override
         public int countPassesToday(UUID userId, java.time.Instant startOfDay) {
             return 0;
+        }
+
+        @Override
+        public void delete(UUID likeId) {
+            likes.removeIf(like -> like.id().equals(likeId));
         }
     }
 }
