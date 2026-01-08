@@ -1,0 +1,69 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< com.datingapp:dating-app >----------------------
+[INFO] Building Dating App 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ dating-app ---
+[INFO] skip non existing resourceDirectory C:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.12.1:compile (default-compile) @ dating-app ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ dating-app ---
+[INFO] skip non existing resourceDirectory C:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.12.1:testCompile (default-testCompile) @ dating-app ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ dating-app ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running datingapp.core.CandidateFinderTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.107 s -- in datingapp.core.CandidateFinderTest
+[INFO] Running datingapp.core.GeoUtilsTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in datingapp.core.GeoUtilsTest
+[INFO] Running datingapp.core.MatchTest
+[ERROR] Tests run: 4, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 0.038 s <<< FAILURE! -- in datingapp.core.MatchTest
+[ERROR] datingapp.core.MatchTest.userAIsAlwaysSmaller -- Time elapsed: 0.010 s <<< ERROR!
+java.lang.NumberFormatException: Error at index 0 in: "zzzzzzz"
+	at java.base/java.lang.NumberFormatException.forCharSequence(NumberFormatException.java:83)
+	at java.base/java.lang.Long.parseLong(Long.java:790)
+	at java.base/java.util.UUID.fromString1(UUID.java:285)
+	at java.base/java.util.UUID.fromString(UUID.java:260)
+	at datingapp.core.MatchTest.userAIsAlwaysSmaller(MatchTest.java:31)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[INFO] Running datingapp.core.UserTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in datingapp.core.UserTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Errors: 
+[ERROR]   MatchTest.userAIsAlwaysSmaller:31 ╗ NumberFormat Error at index 0 in: "zzzzzzz"
+[INFO] 
+[ERROR] Tests run: 20, Failures: 0, Errors: 1, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.084 s
+[INFO] Finished at: 2026-01-07T22:18:21+02:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project dating-app: 
+[ERROR] 
+[ERROR] Please refer to C:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

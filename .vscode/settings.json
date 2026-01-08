@@ -1,0 +1,6 @@
+{
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.settings.url": ".vscode/eclipse-settings.prefs",
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.errors.incompleteClasspath.severity": "ignore"
+}

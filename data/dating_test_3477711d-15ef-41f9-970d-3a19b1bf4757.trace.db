@@ -1,0 +1,49 @@
+2026-01-08 02:38:29.694197+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
+MERGE INTO users (id, name, bio, birth_date, gender, interested_in, lat, lon,
+                  max_distance_km, min_age, max_age, photo_urls, state, created_at, updated_at)
+KEY (id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ [42104-224]
+2026-01-08 02:38:34.751260+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
+MERGE INTO users (id, name, bio, birth_date, gender, interested_in, lat, lon,
+                  max_distance_km, min_age, max_age, photo_urls, state, created_at, updated_at)
+KEY (id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ [42104-224]
+2026-01-08 02:38:39.388620+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
+MERGE INTO users (id, name, bio, birth_date, gender, interested_in, lat, lon,
+                  max_distance_km, min_age, max_age, photo_urls, state, created_at, updated_at)
+KEY (id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ [42104-224]
+2026-01-08 02:38:44.033368+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
+MERGE INTO users (id, name, bio, birth_date, gender, interested_in, lat, lon,
+                  max_distance_km, min_age, max_age, photo_urls, state, created_at, updated_at)
+KEY (id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ [42104-224]
+2026-01-08 02:38:49.087114+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
+MERGE INTO users (id, name, bio, birth_date, gender, interested_in, lat, lon,
+                  max_distance_km, min_age, max_age, photo_urls, state, created_at, updated_at)
+KEY (id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ [42104-224]
+2026-01-08 02:38:53.728979+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
+MERGE INTO users (id, name, bio, birth_date, gender, interested_in, lat, lon,
+                  max_distance_km, min_age, max_age, photo_urls, state, created_at, updated_at)
+KEY (id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ [42104-224]
+2026-01-08 02:38:58.792490+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
+MERGE INTO users (id, name, bio, birth_date, gender, interested_in, lat, lon,
+                  max_distance_km, min_age, max_age, photo_urls, state, created_at, updated_at)
+KEY (id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ [42104-224]
