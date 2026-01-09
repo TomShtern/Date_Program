@@ -2,6 +2,7 @@ package datingapp.core;
 
 import java.time.LocalDate;
 import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -85,6 +86,72 @@ class UserTest {
         user.addPhotoUrl("photo2.jpg");
 
         assertThrows(IllegalArgumentException.class, () -> user.addPhotoUrl("photo3.jpg"));
+    }
+
+    @Test
+    @DisplayName("New user has no interests")
+    void newUserHasNoInterests() {
+        User user = new User(UUID.randomUUID(), "John");
+        assertTrue(user.getInterests().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Set and get interests")
+    void setAndGetInterests() {
+        User user = new User(UUID.randomUUID(), "Alice");
+        Set<Interest> interests = EnumSet.of(Interest.HIKING, Interest.COFFEE);
+        user.setInterests(interests);
+
+        assertEquals(2, user.getInterests().size());
+        assertTrue(user.getInterests().contains(Interest.HIKING));
+        assertTrue(user.getInterests().contains(Interest.COFFEE));
+    }
+
+    @Test
+    @DisplayName("Adding interest beyond limit throws exception")
+    void addingInterestBeyondLimitThrowsException() {
+        User user = new User(UUID.randomUUID(), "Bob");
+        for (int i = 0; i < Interest.MAX_PER_USER; i++) {
+            user.addInterest(Interest.values()[i]);
+        }
+
+        assertThrows(IllegalArgumentException.class, () -> user.addInterest(Interest.TRAVEL));
+    }
+
+    @Test
+    @DisplayName("Removing interest")
+    void removingInterest() {
+        User user = new User(UUID.randomUUID(), "Charlie");
+        user.addInterest(Interest.HIKING);
+        assertTrue(user.getInterests().contains(Interest.HIKING));
+
+        user.removeInterest(Interest.HIKING);
+        assertFalse(user.getInterests().contains(Interest.HIKING));
+    }
+
+    @Test
+    @DisplayName("Setting interests to null is treated as empty")
+    void setInterests_null_treatedAsEmpty() {
+        User user = new User(UUID.randomUUID(), "Dave");
+        user.setInterests(EnumSet.of(Interest.HIKING));
+        assertEquals(1, user.getInterests().size());
+
+        user.setInterests(null);
+        assertTrue(user.getInterests().isEmpty());
+    }
+
+    @Test
+    @DisplayName("getInterests returns defensive copy")
+    void getInterests_returnsDefensiveCopy() {
+        User user = new User(UUID.randomUUID(), "Eve");
+        user.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE));
+
+        Set<Interest> retrieved = user.getInterests();
+        retrieved.add(Interest.TRAVEL); // Modify the retrieved set
+
+        // Original should not be affected
+        assertEquals(2, user.getInterests().size());
+        assertFalse(user.getInterests().contains(Interest.TRAVEL));
     }
 
     private User createCompleteUser(String name) {

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
  * Tests for MatchQuality record.
  */
 @DisplayName("MatchQuality Tests")
+@SuppressWarnings("unused") // IDE false positives for @Nested classes
 class MatchQualityTest {
 
     private static final String MATCH_ID = "test-match-id";

@@ -1,6 +1,7 @@
 package datingapp.core;
 
 import java.time.LocalDate;
+import java.util.EnumSet;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,6 +37,7 @@ class ProfilePreviewServiceTest {
         fullUser.setDrinking(Lifestyle.Drinking.SOCIALLY);
         fullUser.setWantsKids(Lifestyle.WantsKids.SOMEDAY);
         fullUser.setLookingFor(Lifestyle.LookingFor.LONG_TERM);
+        fullUser.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL));
         fullUser.setLocation(40.7128, -74.0060);
 
         minimalUser = new User(UUID.randomUUID(), "Simple Bob");
@@ -103,6 +105,23 @@ class ProfilePreviewServiceTest {
         // 2 Photos
         user.addPhotoUrl("http://img.com/2.jpg");
         assertFalse(hasTip(user, "Add a second photo"), "2 photos should satisfy all photo tips");
+    }
+
+    @Test
+    void generateTips_interestCountLogic() {
+        User user = new User(UUID.randomUUID(), "Interest Tester");
+
+        // 0 Interests
+        assertTrue(hasTip(user, "Add at least " + Interest.MIN_FOR_COMPLETE), "0 interests should prompt to add some");
+
+        // 1 Interest
+        user.addInterest(Interest.HIKING);
+        assertTrue(hasTip(user, "Add 2 more interest"), "1 interest should prompt for more");
+
+        // 3 Interests (MIN_FOR_COMPLETE)
+        user.addInterest(Interest.COFFEE);
+        user.addInterest(Interest.TRAVEL);
+        assertFalse(hasTip(user, "Add more interest"), "3 interests should satisfy minimum");
     }
 
     @Test

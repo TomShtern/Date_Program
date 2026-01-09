@@ -12,7 +12,33 @@ public class DatabaseManager {
 
     private static String jdbcUrl = "jdbc:h2:./data/dating;AUTO_SERVER=TRUE";
     private static final String USER = "sa";
-    private static final String PASSWORD = "changeit";
+
+    // Password is determined at connection time based on JDBC URL
+    // This allows tests to set a different URL before password is resolved
+
+    private static String getPassword() {
+        return getConfiguredPassword();
+    }
+
+    private static String getConfiguredPassword() {
+        // Test databases don't require authentication
+        if (isTestUrl(jdbcUrl)) {
+            return "";
+        }
+
+        // Production databases require environment variable
+        String envPassword = System.getenv("DATING_APP_DB_PASSWORD");
+        if (envPassword == null || envPassword.isEmpty()) {
+            throw new IllegalStateException(
+                "Database password must be provided via DATING_APP_DB_PASSWORD environment variable"
+            );
+        }
+        return envPassword;
+    }
+
+    private static boolean isTestUrl(String url) {
+        return url.contains("dating_test") || url.contains(":memory:");
+    }
 
     private static DatabaseManager instance;
     private boolean initialized = false;
@@ -43,7 +69,7 @@ public class DatabaseManager {
         if (!initialized) {
             initializeSchema();
         }
-        return DriverManager.getConnection(jdbcUrl, USER, PASSWORD);
+        return DriverManager.getConnection(jdbcUrl, USER, getPassword());
     }
 
     /**
@@ -54,7 +80,7 @@ public class DatabaseManager {
             return;
         }
 
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, USER, PASSWORD);
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, USER, getPassword());
                 Statement stmt = conn.createStatement()) {
 
             // Users table
@@ -90,30 +116,13 @@ public class DatabaseManager {
                         db_education VARCHAR(200),
                         db_min_height_cm INT,
                         db_max_height_cm INT,
-                        db_max_age_diff INT
+                        db_max_age_diff INT,
+                        interests VARCHAR(500)
                     )
                     """);
 
             // Add columns for existing databases (Phase 0.5b migration)
-            // These will be ignored if columns already exist
-            try {
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS smoking VARCHAR(20)");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS drinking VARCHAR(20)");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS wants_kids VARCHAR(20)");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS looking_for VARCHAR(20)");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS education VARCHAR(20)");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS height_cm INT");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_smoking VARCHAR(100)");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_drinking VARCHAR(100)");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_wants_kids VARCHAR(100)");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_looking_for VARCHAR(100)");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_education VARCHAR(200)");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_min_height_cm INT");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_max_height_cm INT");
-                stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_max_age_diff INT");
-            } catch (SQLException e) {
-                // Column already exists, ignore
-            }
+            migrateSchemaColumns(stmt);
 
             // Likes table
             stmt.execute("""
@@ -215,6 +224,33 @@ public class DatabaseManager {
             stmt.execute(
                     "CREATE INDEX IF NOT EXISTS idx_platform_stats_computed_at ON platform_stats(computed_at DESC)");
 
+            // Daily pick views table (Phase 1)
+            stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS daily_pick_views (
+                        user_id UUID NOT NULL,
+                        viewed_date DATE NOT NULL,
+                        viewed_at TIMESTAMP NOT NULL,
+                        PRIMARY KEY (user_id, viewed_date)
+                    )
+                    """);
+
+            // Daily pick views index
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_daily_pick_views_date ON daily_pick_views(viewed_date)");
+
+            // User achievements table (Phase 1)
+            stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS user_achievements (
+                        id UUID PRIMARY KEY,
+                        user_id UUID NOT NULL,
+                        achievement VARCHAR(50) NOT NULL,
+                        unlocked_at TIMESTAMP NOT NULL,
+                        UNIQUE (user_id, achievement)
+                    )
+                    """);
+
+            // User achievements index
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_achievements_user_id ON user_achievements(user_id)");
+
             initialized = true;
 
         } catch (SQLException e) {
@@ -223,10 +259,36 @@ public class DatabaseManager {
     }
 
     /**
+     * Migrates schema by adding new columns for existing databases.
+     * Uses IF NOT EXISTS to safely handle already-migrated databases.
+     */
+    private void migrateSchemaColumns(Statement stmt) {
+        try {
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS smoking VARCHAR(20)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS drinking VARCHAR(20)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS wants_kids VARCHAR(20)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS looking_for VARCHAR(20)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS education VARCHAR(20)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS height_cm INT");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_smoking VARCHAR(100)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_drinking VARCHAR(100)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_wants_kids VARCHAR(100)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_looking_for VARCHAR(100)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_education VARCHAR(200)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_min_height_cm INT");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_max_height_cm INT");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_max_age_diff INT");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS interests VARCHAR(500)");
+        } catch (SQLException e) {
+            // Column already exists or other non-critical error, ignore
+        }
+    }
+
+    /**
      * Shuts down the database gracefully.
      */
     public void shutdown() {
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, USER, PASSWORD);
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, USER, getPassword());
                 Statement stmt = conn.createStatement()) {
             stmt.execute("SHUTDOWN");
         } catch (SQLException e) {

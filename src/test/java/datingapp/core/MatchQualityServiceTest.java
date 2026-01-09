@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
  * Tests for MatchQualityService.
  */
 @DisplayName("MatchQualityService Tests")
+@SuppressWarnings("unused") // IDE false positives for @Nested classes and @BeforeEach
 class MatchQualityServiceTest {
 
     private MatchQualityService service;
@@ -115,6 +116,89 @@ class MatchQualityServiceTest {
             MatchQuality quality = service.computeQuality(match, alice.getId());
 
             assertEquals(0.5, quality.lifestyleScore());
+        }
+
+        @Test
+        @DisplayName("Identical interests give perfect interest score")
+        void identicalInterestsGivePerfectScore() {
+            User alice = createUser("Alice", 25, 32.0, 34.0);
+            User bob = createUser("Bob", 26, 32.0, 34.0);
+
+            alice.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE));
+            bob.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE));
+
+            userStorage.save(alice);
+            userStorage.save(bob);
+
+            Match match = Match.create(alice.getId(), bob.getId());
+            addMutualLikes(alice.getId(), bob.getId());
+
+            MatchQuality quality = service.computeQuality(match, alice.getId());
+
+            assertEquals(1.0, quality.interestScore());
+            assertTrue(quality.highlights().stream().anyMatch(h -> h.contains("You share 2 interests")));
+        }
+
+        @Test
+        @DisplayName("Partial interest overlap calculates correctly")
+        void partialInterestOverlapCalculatesCorrectly() {
+            User alice = createUser("Alice", 25, 32.0, 34.0);
+            User bob = createUser("Bob", 26, 32.0, 34.0);
+
+            alice.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL));
+            bob.setInterests(EnumSet.of(Interest.HIKING, Interest.MOVIES, Interest.TRAVEL));
+
+            userStorage.save(alice);
+            userStorage.save(bob);
+
+            Match match = Match.create(alice.getId(), bob.getId());
+            addMutualLikes(alice.getId(), bob.getId());
+
+            MatchQuality quality = service.computeQuality(match, alice.getId());
+
+            // 2 shared / 3 min = 0.666
+            assertEquals(0.666, quality.interestScore(), 0.001);
+            assertTrue(quality.highlights().stream().anyMatch(h -> h.contains("You share 2 interests")));
+        }
+
+        @Test
+        @DisplayName("No shared interests gives zero score")
+        void noSharedInterestsGivesZeroScore() {
+            User alice = createUser("Alice", 25, 32.0, 34.0);
+            User bob = createUser("Bob", 26, 32.0, 34.0);
+
+            alice.setInterests(EnumSet.of(Interest.HIKING));
+            bob.setInterests(EnumSet.of(Interest.COOKING));
+
+            userStorage.save(alice);
+            userStorage.save(bob);
+
+            Match match = Match.create(alice.getId(), bob.getId());
+            addMutualLikes(alice.getId(), bob.getId());
+
+            MatchQuality quality = service.computeQuality(match, alice.getId());
+
+            assertEquals(0.0, quality.interestScore());
+        }
+
+        @Test
+        @DisplayName("One user missing interests gives penalty score")
+        void oneUserMissingInterestsGivesPenalty() {
+            User alice = createUser("Alice", 25, 32.0, 34.0);
+            User bob = createUser("Bob", 26, 32.0, 34.0);
+
+            alice.setInterests(EnumSet.of(Interest.HIKING));
+            // Bob has none
+
+            userStorage.save(alice);
+            userStorage.save(bob);
+
+            Match match = Match.create(alice.getId(), bob.getId());
+            addMutualLikes(alice.getId(), bob.getId());
+
+            MatchQuality quality = service.computeQuality(match, alice.getId());
+
+            assertEquals(0.3, quality.interestScore());
         }
     }
 

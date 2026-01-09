@@ -81,6 +81,7 @@ public class ProfilePreviewService {
         checkField("Drinking", user.getDrinking() != null, filled, missing);
         checkField("Kids Stance", user.getWantsKids() != null, filled, missing);
         checkField("Looking For", user.getLookingFor() != null, filled, missing);
+        checkField("Interests", user.getInterests().size() >= Interest.MIN_FOR_COMPLETE, filled, missing);
 
         int total = filled.size() + missing.size();
         int percentage = total > 0 ? (filled.size() * 100) / total : 0;
@@ -138,6 +139,16 @@ public class ProfilePreviewService {
         // Age range tips
         if (user.getMaxAge() - user.getMinAge() < 5) {
             tips.add("🎂 A wider age range gives you more potential matches");
+        }
+
+        // Interest tips
+        int interestCount = user.getInterests().size();
+        if (interestCount == 0) {
+            tips.add("🎯 Add at least " + Interest.MIN_FOR_COMPLETE +
+                    " interests - profiles with shared interests get more matches");
+        } else if (interestCount < Interest.MIN_FOR_COMPLETE) {
+            int needed = Interest.MIN_FOR_COMPLETE - interestCount;
+            tips.add("🎯 Add " + needed + " more interest(s) to complete your profile");
         }
 
         return tips;

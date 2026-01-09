@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
  * Tests for MatchQualityConfig record.
  */
 @DisplayName("MatchQualityConfig Tests")
+@SuppressWarnings("unused") // IDE false positives for @Nested classes
 class MatchQualityConfigTest {
 
     @Nested

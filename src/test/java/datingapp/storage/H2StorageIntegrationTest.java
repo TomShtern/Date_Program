@@ -3,6 +3,7 @@ package datingapp.storage;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 import datingapp.core.Block;
+import datingapp.core.Interest;
 import datingapp.core.Like;
 import datingapp.core.Match;
 import datingapp.core.User;
@@ -76,6 +78,24 @@ class H2StorageIntegrationTest {
             assertEquals(original.getMinAge(), loaded.getMinAge());
             assertEquals(original.getMaxAge(), loaded.getMaxAge());
             assertEquals(original.getState(), loaded.getState());
+            assertEquals(original.getInterests(), loaded.getInterests());
+        }
+
+        @Test
+        @DisplayName("Interests survive round-trip to database")
+        void interestsRoundTrip() {
+            User user = createCompleteUser("InterestsTest_" + UUID.randomUUID());
+            Set<Interest> interests = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL);
+            user.setInterests(interests);
+
+            userStorage.save(user);
+            User loaded = userStorage.get(user.getId());
+
+            assertNotNull(loaded.getInterests());
+            assertEquals(3, loaded.getInterests().size());
+            assertTrue(loaded.getInterests().contains(Interest.HIKING));
+            assertTrue(loaded.getInterests().contains(Interest.COFFEE));
+            assertTrue(loaded.getInterests().contains(Interest.TRAVEL));
         }
 
         @Test

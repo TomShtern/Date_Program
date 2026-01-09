@@ -3,11 +3,9 @@ package datingapp.core;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -60,9 +58,10 @@ public class MatchQualityService {
         int ageDiff = Math.abs(me.getAge() - them.getAge());
         double ageScore = calculateAgeScore(ageDiff, me, them);
 
-        // Interest Score (placeholder - interests feature not yet implemented)
-        List<String> sharedInterests = findSharedInterests(me, them);
-        double interestScore = calculateInterestScore(sharedInterests, me, them);
+        // Interest Score
+        InterestMatcher.MatchResult interestMatch = InterestMatcher.compare(me.getInterests(), them.getInterests());
+        double interestScore = calculateInterestScore(interestMatch, me, them);
+        List<String> sharedInterests = InterestMatcher.formatAsList(interestMatch.shared());
 
         // Lifestyle Score
         List<String> lifestyleMatches = findLifestyleMatches(me, them);
@@ -134,42 +133,17 @@ public class MatchQualityService {
         return Math.max(0.0, 1.0 - normalizedDiff);
     }
 
-    private double calculateInterestScore(List<String> shared, User me, User them) {
+    private double calculateInterestScore(InterestMatcher.MatchResult match, User me, User them) {
         // If neither has interests, neutral score
-        Set<String> myInterests = getInterestNames(me);
-        Set<String> theirInterests = getInterestNames(them);
-
-        if (myInterests.isEmpty() && theirInterests.isEmpty()) {
+        if (me.getInterests().isEmpty() && them.getInterests().isEmpty()) {
             return 0.5; // Unknown = neutral
         }
 
-        if (myInterests.isEmpty() || theirInterests.isEmpty()) {
+        if (me.getInterests().isEmpty() || them.getInterests().isEmpty()) {
             return 0.3; // One has interests, other doesn't
         }
 
-        // Jaccard similarity: intersection / union
-        Set<String> union = new HashSet<>(myInterests);
-        union.addAll(theirInterests);
-
-        return (double) shared.size() / union.size();
-    }
-
-    @SuppressWarnings("java:S1172") // User parameter reserved for future Interests feature
-    private Set<String> getInterestNames(User user) {
-        // Note: When Interests feature is implemented (PRD 0.5 Part 2.1), use actual
-        // interests
-        // For now, return empty set - interest score will be neutral (0.5)
-        return Set.of();
-    }
-
-    private List<String> findSharedInterests(User me, User them) {
-        Set<String> myInterests = getInterestNames(me);
-        Set<String> theirInterests = getInterestNames(them);
-
-        Set<String> shared = new HashSet<>(myInterests);
-        shared.retainAll(theirInterests);
-
-        return new ArrayList<>(shared);
+        return match.overlapRatio();
     }
 
     private double calculateLifestyleScore(User me, User them) {
@@ -325,10 +299,11 @@ public class MatchQualityService {
         // Interest highlights
         if (!sharedInterests.isEmpty()) {
             if (sharedInterests.size() == 1) {
-                highlights.add("You both enjoy " + sharedInterests.getFirst());
+                highlights.add("You both enjoy " + sharedInterests.get(0));
             } else {
-                String interestList = String.join(", ", sharedInterests);
-                highlights.add("You share " + sharedInterests.size() + " interests: " + interestList);
+                InterestMatcher.MatchResult result = InterestMatcher.compare(me.getInterests(), them.getInterests());
+                highlights.add("You share " + sharedInterests.size() + " interests: "
+                        + InterestMatcher.formatSharedInterests(result.shared()));
             }
         }
 

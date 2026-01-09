@@ -25,6 +25,8 @@ public class ServiceRegistry {
     private final SwipeSessionStorage sessionStorage; // Phase 0.5b
     private final UserStatsStorage userStatsStorage; // Phase 0.5b
     private final PlatformStatsStorage platformStatsStorage; // Phase 0.5b
+    private final DailyPickStorage dailyPickStorage; // Phase 1
+    private final UserAchievementStorage userAchievementStorage; // Phase 1
 
     // Services
     private final CandidateFinderService candidateFinder;
@@ -36,6 +38,8 @@ public class ServiceRegistry {
     private final ProfilePreviewService profilePreviewService; // Phase 1
     private final DailyLimitService dailyLimitService; // Phase 1
     private final UndoService undoService; // Phase 1
+    private final DailyPickService dailyPickService; // Phase 1
+    private final AchievementService achievementService; // Phase 1
 
     /**
      * Package-private constructor - use ServiceRegistryBuilder to create.
@@ -49,6 +53,8 @@ public class ServiceRegistry {
             SwipeSessionStorage sessionStorage,
             UserStatsStorage userStatsStorage,
             PlatformStatsStorage platformStatsStorage,
+            DailyPickStorage dailyPickStorage,
+            UserAchievementStorage userAchievementStorage,
             CandidateFinderService candidateFinder,
             MatchingService matchingService,
             ReportService reportService,
@@ -57,7 +63,9 @@ public class ServiceRegistry {
             MatchQualityService matchQualityService,
             ProfilePreviewService profilePreviewService,
             DailyLimitService dailyLimitService,
-            UndoService undoService) {
+            UndoService undoService,
+            DailyPickService dailyPickService,
+            AchievementService achievementService) {
         this.config = Objects.requireNonNull(config);
         this.userStorage = Objects.requireNonNull(userStorage);
         this.likeStorage = Objects.requireNonNull(likeStorage);
@@ -67,6 +75,8 @@ public class ServiceRegistry {
         this.sessionStorage = Objects.requireNonNull(sessionStorage);
         this.userStatsStorage = Objects.requireNonNull(userStatsStorage);
         this.platformStatsStorage = Objects.requireNonNull(platformStatsStorage);
+        this.dailyPickStorage = Objects.requireNonNull(dailyPickStorage);
+        this.userAchievementStorage = Objects.requireNonNull(userAchievementStorage);
         this.candidateFinder = Objects.requireNonNull(candidateFinder);
         this.matchingService = Objects.requireNonNull(matchingService);
         this.reportService = Objects.requireNonNull(reportService);
@@ -76,6 +86,8 @@ public class ServiceRegistry {
         this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
         this.dailyLimitService = Objects.requireNonNull(dailyLimitService);
         this.undoService = Objects.requireNonNull(undoService);
+        this.dailyPickService = Objects.requireNonNull(dailyPickService);
+        this.achievementService = Objects.requireNonNull(achievementService);
     }
 
     // === Getters ===
@@ -150,5 +162,21 @@ public class ServiceRegistry {
 
     public UndoService getUndoService() {
         return undoService;
+    }
+
+    public DailyPickStorage getDailyPickStorage() {
+        return dailyPickStorage;
+    }
+
+    public DailyPickService getDailyPickService() {
+        return dailyPickService;
+    }
+
+    public UserAchievementStorage getUserAchievementStorage() {
+        return userAchievementStorage;
+    }
+
+    public AchievementService getAchievementService() {
+        return achievementService;
     }
 }

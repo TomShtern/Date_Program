@@ -2,11 +2,13 @@ package datingapp.core;
 
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.H2BlockStorage;
+import datingapp.storage.H2DailyPickViewStorage;
 import datingapp.storage.H2LikeStorage;
 import datingapp.storage.H2MatchStorage;
 import datingapp.storage.H2PlatformStatsStorage;
 import datingapp.storage.H2ReportStorage;
 import datingapp.storage.H2SwipeSessionStorage;
+import datingapp.storage.H2UserAchievementStorage;
 import datingapp.storage.H2UserStatsStorage;
 import datingapp.storage.H2UserStorage;
 
@@ -41,6 +43,7 @@ public final class ServiceRegistryBuilder {
         SwipeSessionStorage sessionStorage = new H2SwipeSessionStorage(dbManager);
         UserStatsStorage userStatsStorage = new H2UserStatsStorage(dbManager);
         PlatformStatsStorage platformStatsStorage = new H2PlatformStatsStorage(dbManager);
+        DailyPickStorage dailyPickStorage = new H2DailyPickViewStorage(dbManager);
 
         // Services
         CandidateFinderService candidateFinder = new CandidateFinder();
@@ -54,6 +57,14 @@ public final class ServiceRegistryBuilder {
         ProfilePreviewService profilePreviewService = new ProfilePreviewService();
         DailyLimitService dailyLimitService = new DailyLimitService(likeStorage, config);
         UndoService undoService = new UndoService(likeStorage, matchStorage, config);
+        DailyPickService dailyPickService = new DailyPickService(
+                userStorage, likeStorage, blockStorage, dailyPickStorage, config);
+
+        // Achievement System (Phase 1)
+        UserAchievementStorage userAchievementStorage = new H2UserAchievementStorage(dbManager);
+        AchievementService achievementService = new AchievementService(
+                userAchievementStorage, matchStorage, likeStorage, userStorage,
+                reportStorage, profilePreviewService);
 
         return new ServiceRegistry(
                 config,
@@ -65,6 +76,8 @@ public final class ServiceRegistryBuilder {
                 sessionStorage,
                 userStatsStorage,
                 platformStatsStorage,
+                dailyPickStorage,
+                userAchievementStorage,
                 candidateFinder,
                 matchingService,
                 reportService,
@@ -73,7 +86,9 @@ public final class ServiceRegistryBuilder {
                 matchQualityService,
                 profilePreviewService,
                 dailyLimitService,
-                undoService);
+                undoService,
+                dailyPickService,
+                achievementService);
     }
 
     /**

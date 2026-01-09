@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
  * Unit tests for DailyLimitService.
  * Uses in-memory mock storage for isolated testing.
  */
+@SuppressWarnings("unused") // IDE false positives for @Nested classes and @BeforeEach
 class DailyLimitServiceTest {
 
     private InMemoryLikeStorage likeStorage;

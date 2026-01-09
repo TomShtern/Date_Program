@@ -18,6 +18,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import datingapp.core.Dealbreakers;
+import datingapp.core.Interest;
 import datingapp.core.Lifestyle;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
@@ -40,9 +41,9 @@ public class H2UserStorage implements UserStorage {
                                   max_distance_km, min_age, max_age, photo_urls, state, created_at, updated_at,
                                   smoking, drinking, wants_kids, looking_for, education, height_cm,
                                   db_smoking, db_drinking, db_wants_kids, db_looking_for, db_education,
-                                  db_min_height_cm, db_max_height_cm, db_max_age_diff)
+                                  db_min_height_cm, db_max_height_cm, db_max_age_diff, interests)
                 KEY (id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
 
         try (Connection conn = dbManager.getConnection();
@@ -99,6 +100,8 @@ public class H2UserStorage implements UserStorage {
             } else {
                 stmt.setNull(29, Types.INTEGER);
             }
+
+            stmt.setString(30, serializeInterests(user.getInterests()));
 
             stmt.executeUpdate();
 
@@ -175,8 +178,11 @@ public class H2UserStorage implements UserStorage {
         var createdAt = rs.getTimestamp("created_at").toInstant();
         var updatedAt = rs.getTimestamp("updated_at").toInstant();
 
-        User user = new User(id, name, bio, birthDate, gender, interestedIn, lat, lon,
-                maxDistanceKm, minAge, maxAge, photoUrls, state, createdAt, updatedAt);
+        String interestsStr = rs.getString("interests");
+        Set<Interest> interests = parseInterests(interestsStr);
+
+        User user = User.fromDatabase(id, name, bio, birthDate, gender, interestedIn, lat, lon,
+                maxDistanceKm, minAge, maxAge, photoUrls, state, createdAt, updatedAt, interests);
 
         // Map lifestyle fields (Phase 0.5b)
         String smokingStr = rs.getString("smoking");
@@ -299,7 +305,33 @@ public class H2UserStorage implements UserStorage {
         if (str == null || str.isBlank()) {
             return new ArrayList<>();
         }
-        // Split by pipe delimiter (not comma, since URLs can contain commas)
         return new ArrayList<>(Arrays.asList(str.split("\\|")));
+    }
+
+    private Set<Interest> parseInterests(String csv) {
+        if (csv == null || csv.isBlank()) {
+            return EnumSet.noneOf(Interest.class);
+        }
+        Set<Interest> result = EnumSet.noneOf(Interest.class);
+        for (String s : csv.split(",")) {
+            String trimmed = s.trim();
+            if (!trimmed.isEmpty()) {
+                try {
+                    result.add(Interest.valueOf(trimmed));
+                } catch (IllegalArgumentException e) {
+                    // Skip invalid interests
+                }
+            }
+        }
+        return result;
+    }
+
+    private String serializeInterests(Set<Interest> interests) {
+        if (interests == null || interests.isEmpty()) {
+            return null;
+        }
+        return interests.stream()
+                .map(Interest::name)
+                .collect(Collectors.joining(","));
     }
 }

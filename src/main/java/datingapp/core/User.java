@@ -58,44 +58,67 @@ public class User {
     // Dealbreakers (Phase 0.5b)
     private Dealbreakers dealbreakers;
 
+    // Interests (Phase 1 feature)
+    private Set<Interest> interests = EnumSet.noneOf(Interest.class);
+
     /**
      * Creates a new incomplete user with just an ID and name.
+     * Timestamps are set to current time.
      */
     public User(UUID id, String name) {
+        this(id, name, Instant.now());
+    }
+
+    /**
+     * Private constructor for full initialization.
+     * Used by public constructor and fromDatabase() factory method.
+     */
+    private User(UUID id, String name, Instant createdAt) {
         this.id = Objects.requireNonNull(id, "id cannot be null");
         this.name = Objects.requireNonNull(name, "name cannot be null");
+        this.createdAt = createdAt;
+        this.updatedAt = createdAt;
+
+        // Initialize mutable fields with defaults
         this.interestedIn = EnumSet.noneOf(Gender.class);
         this.photoUrls = new ArrayList<>();
         this.maxDistanceKm = 50;
         this.minAge = 18;
         this.maxAge = 99;
         this.state = State.INCOMPLETE;
-        this.createdAt = Instant.now();
-        this.updatedAt = this.createdAt;
+        this.interests = EnumSet.noneOf(Interest.class);
     }
 
     /**
-     * Full constructor for loading from database.
+     * Factory method for loading a user from the database.
+     * All 16 parameters are needed to fully reconstruct a user record from storage.
+     * This method encapsulates the database-to-domain conversion logic.
      */
-    public User(UUID id, String name, String bio, LocalDate birthDate, Gender gender,
+    @SuppressWarnings("too-many-parameters")
+    public static User fromDatabase(UUID id, String name, String bio, LocalDate birthDate, Gender gender,
             Set<Gender> interestedIn, double lat, double lon, int maxDistanceKm,
             int minAge, int maxAge, List<String> photoUrls, State state,
-            Instant createdAt, Instant updatedAt) {
-        this.id = Objects.requireNonNull(id);
-        this.name = name;
-        this.bio = bio;
-        this.birthDate = birthDate;
-        this.gender = gender;
-        this.interestedIn = interestedIn != null ? EnumSet.copyOf(interestedIn) : EnumSet.noneOf(Gender.class);
-        this.lat = lat;
-        this.lon = lon;
-        this.maxDistanceKm = maxDistanceKm;
-        this.minAge = minAge;
-        this.maxAge = maxAge;
-        this.photoUrls = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
-        this.state = state;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
+            Instant createdAt, Instant updatedAt, Set<Interest> interests) {
+
+        // Initialize via private constructor with database-provided createdAt
+        User user = new User(id, name, createdAt);
+
+        // Override fields with database values
+        user.bio = bio;
+        user.birthDate = birthDate;
+        user.gender = gender;
+        user.interestedIn = interestedIn != null ? EnumSet.copyOf(interestedIn) : EnumSet.noneOf(Gender.class);
+        user.lat = lat;
+        user.lon = lon;
+        user.maxDistanceKm = maxDistanceKm;
+        user.minAge = minAge;
+        user.maxAge = maxAge;
+        user.photoUrls = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
+        user.state = state;
+        user.updatedAt = updatedAt;  // Override the createdAt timestamp with actual database value
+        user.interests = interests != null ? EnumSet.copyOf(interests) : EnumSet.noneOf(Interest.class);
+
+        return user;
     }
 
     // Getters
@@ -191,6 +214,17 @@ public class User {
      */
     public Dealbreakers getDealbreakers() {
         return dealbreakers != null ? dealbreakers : Dealbreakers.none();
+    }
+
+    /**
+     * Returns the user's interests as a defensive copy.
+     *
+     * @return set of interests (never null, may be empty)
+     */
+    public Set<Interest> getInterests() {
+        return interests.isEmpty()
+                ? EnumSet.noneOf(Interest.class)
+                : EnumSet.copyOf(interests);
     }
 
     /**
@@ -316,6 +350,53 @@ public class User {
     public void setDealbreakers(Dealbreakers dealbreakers) {
         this.dealbreakers = dealbreakers;
         touch();
+    }
+
+    /**
+     * Sets the user's interests.
+     * Maximum of {@link Interest#MAX_PER_USER} interests allowed.
+     *
+     * @param interests set of interests (null treated as empty)
+     * @throws IllegalArgumentException if more than MAX_PER_USER interests
+     */
+    public void setInterests(Set<Interest> interests) {
+        if (interests != null && interests.size() > Interest.MAX_PER_USER) {
+            throw new IllegalArgumentException(
+                    "Maximum " + Interest.MAX_PER_USER + " interests allowed, got " + interests.size());
+        }
+        this.interests = (interests == null || interests.isEmpty())
+                ? EnumSet.noneOf(Interest.class)
+                : EnumSet.copyOf(interests);
+        touch();
+    }
+
+    /**
+     * Adds a single interest to the user's profile.
+     *
+     * @param interest the interest to add
+     * @throws IllegalArgumentException if adding would exceed MAX_PER_USER
+     */
+    public void addInterest(Interest interest) {
+        if (interest == null) {
+            return;
+        }
+        if (interests.size() >= Interest.MAX_PER_USER && !interests.contains(interest)) {
+            throw new IllegalArgumentException(
+                    "Maximum " + Interest.MAX_PER_USER + " interests allowed");
+        }
+        interests.add(interest);
+        touch();
+    }
+
+    /**
+     * Removes an interest from the user's profile.
+     *
+     * @param interest the interest to remove
+     */
+    public void removeInterest(Interest interest) {
+        if (interest != null && interests.remove(interest)) {
+            touch();
+        }
     }
 
     // State transitions
