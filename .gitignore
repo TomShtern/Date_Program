@@ -16,8 +16,13 @@
 *.tar.gz
 *.rar
 
-# JVM crash logs
+# JVM crash logs & heap dumps & profiling
 hs_err_pid*
+*.hprof
+*.dmp
+*.stackdump
+replay_pid*
+*.jfr
 
 # Maven
 target/
@@ -29,6 +34,11 @@ pom.xml.versionsBackup
 pom.xml.next
 buildNumber.properties
 .mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+.mvn/.mvn-wrapper
+settings-security.xml
+.m2/repository/
 
 # Generated sources
 generated-sources/
@@ -46,10 +56,17 @@ target/classes/
 *.ipr
 *.iws
 .vscode/
+.vscode-insiders/
 .settings/
 .project
 .classpath
+.classpath.generated
+.factorypath
 out/
+
+# JDT Language Server (critical for Java in VS Code)
+.jdtls/
+.jdt/
 
 # Eclipse metadata
 .metadata/
@@ -67,9 +84,14 @@ build/
 
 # OS generated files
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
 Thumbs.db
 desktop.ini
 ehthumbs.db
+$RECYCLE.BIN/
+.directory
 
 # Environment and secret files
 .env
@@ -78,11 +100,31 @@ ehthumbs.db
 *.pem
 *.key
 *.p12
+*.jks
+*.pfx
+*.keystore
+
+# Database files (H2, SQLite, etc.)
+*.h2.db
+*.trace.db
+*.sqlite
+*.db
+
+# Code coverage & analysis
+coverage/
+jacoco/
+.sonar/
+.sonarlint/
+site/
+
+# Temporary & backup files
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+*.orig
 
 # Workspace-specific build/test outputs
 compile_output.txt
 test_output.txt
-
-# Misc
-*.class
-*.log
