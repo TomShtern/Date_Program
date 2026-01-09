@@ -40,15 +40,9 @@ buildNumber.properties
 settings-security.xml
 .m2/repository/
 
-# Generated sources
+# Generated sources (covered by target/ but included for completeness)
 generated-sources/
 generated-test-sources/
-target/generated-sources/
-target/generated-test-sources/
-
-# Test / compiled classes
-target/test-classes/
-target/classes/
 
 # IDE / editor files
 .idea/
