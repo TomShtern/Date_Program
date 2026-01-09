@@ -1,0 +1,88 @@
+# .gitignore for Java / Maven projects
+# Excludes build artifacts, IDE files, OS files, and common secrets
+
+# Compiled class files
+*.class
+
+# Log files
+*.log
+
+# Package files
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# JVM crash logs
+hs_err_pid*
+
+# Maven
+target/
+dependency-reduced-pom.xml
+release.properties
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+buildNumber.properties
+.mvn/timing.properties
+
+# Generated sources
+generated-sources/
+generated-test-sources/
+target/generated-sources/
+target/generated-test-sources/
+
+# Test / compiled classes
+target/test-classes/
+target/classes/
+
+# IDE / editor files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+out/
+
+# Eclipse metadata
+.metadata/
+bin/
+
+# NetBeans
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+
+# Gradle
+.gradle/
+build/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# Environment and secret files
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+
+# Workspace-specific build/test outputs
+compile_output.txt
+test_output.txt
+
+# Misc
+*.class
+*.log
