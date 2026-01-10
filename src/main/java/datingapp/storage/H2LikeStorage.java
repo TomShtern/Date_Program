@@ -1,5 +1,7 @@
 package datingapp.storage;
 
+import datingapp.core.Like;
+import datingapp.core.LikeStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -11,94 +13,93 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import datingapp.core.Like;
-import datingapp.core.LikeStorage;
-
-/**
- * H2 implementation of LikeStorage.
- */
+/** H2 implementation of LikeStorage. */
 public class H2LikeStorage implements LikeStorage {
 
-    private final DatabaseManager dbManager;
+  private final DatabaseManager dbManager;
 
-    public H2LikeStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
-    }
+  public H2LikeStorage(DatabaseManager dbManager) {
+    this.dbManager = dbManager;
+  }
 
-    @Override
-    public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-        String sql = """
+  @Override
+  public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
+    String sql =
+        """
                 SELECT id, who_likes, who_got_liked, direction, created_at
                 FROM likes WHERE who_likes = ? AND who_got_liked = ?
                 """;
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, fromUserId);
-            stmt.setObject(2, toUserId);
-            ResultSet rs = stmt.executeQuery();
+      stmt.setObject(1, fromUserId);
+      stmt.setObject(2, toUserId);
+      ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                return Optional.of(new Like(
-                        rs.getObject("id", UUID.class),
-                        rs.getObject("who_likes", UUID.class),
-                        rs.getObject("who_got_liked", UUID.class),
-                        Like.Direction.valueOf(rs.getString("direction")),
-                        rs.getTimestamp("created_at").toInstant()));
-            }
-            return Optional.empty();
+      if (rs.next()) {
+        return Optional.of(
+            new Like(
+                rs.getObject("id", UUID.class),
+                rs.getObject("who_likes", UUID.class),
+                rs.getObject("who_got_liked", UUID.class),
+                Like.Direction.valueOf(rs.getString("direction")),
+                rs.getTimestamp("created_at").toInstant()));
+      }
+      return Optional.empty();
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to get like", e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to get like", e);
     }
+  }
 
-    @Override
-    public void save(Like like) {
-        String sql = """
+  @Override
+  public void save(Like like) {
+    String sql =
+        """
                 INSERT INTO likes (id, who_likes, who_got_liked, direction, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """;
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, like.id());
-            stmt.setObject(2, like.whoLikes());
-            stmt.setObject(3, like.whoGotLiked());
-            stmt.setString(4, like.direction().name());
-            stmt.setTimestamp(5, Timestamp.from(like.createdAt()));
+      stmt.setObject(1, like.id());
+      stmt.setObject(2, like.whoLikes());
+      stmt.setObject(3, like.whoGotLiked());
+      stmt.setString(4, like.direction().name());
+      stmt.setTimestamp(5, Timestamp.from(like.createdAt()));
 
-            stmt.executeUpdate();
+      stmt.executeUpdate();
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to save like: " + like.id(), e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to save like: " + like.id(), e);
     }
+  }
 
-    @Override
-    public boolean exists(UUID from, UUID to) {
-        String sql = "SELECT 1 FROM likes WHERE who_likes = ? AND who_got_liked = ?";
+  @Override
+  public boolean exists(UUID from, UUID to) {
+    String sql = "SELECT 1 FROM likes WHERE who_likes = ? AND who_got_liked = ?";
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, from);
-            stmt.setObject(2, to);
-            ResultSet rs = stmt.executeQuery();
+      stmt.setObject(1, from);
+      stmt.setObject(2, to);
+      ResultSet rs = stmt.executeQuery();
 
-            return rs.next();
+      return rs.next();
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to check like exists", e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to check like exists", e);
     }
+  }
 
-    @Override
-    public boolean mutualLikeExists(UUID a, UUID b) {
-        // Check if BOTH users have LIKED (not passed) each other
-        String sql = """
+  @Override
+  public boolean mutualLikeExists(UUID a, UUID b) {
+    // Check if BOTH users have LIKED (not passed) each other
+    String sql =
+        """
                 SELECT COUNT(*) FROM likes l1
                 JOIN likes l2 ON l1.who_likes = l2.who_got_liked
                              AND l1.who_got_liked = l2.who_likes
@@ -106,92 +107,93 @@ public class H2LikeStorage implements LikeStorage {
                   AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
                 """;
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, a);
-            stmt.setObject(2, b);
-            ResultSet rs = stmt.executeQuery();
+      stmt.setObject(1, a);
+      stmt.setObject(2, b);
+      ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                return rs.getInt(1) > 0;
-            }
-            return false;
+      if (rs.next()) {
+        return rs.getInt(1) > 0;
+      }
+      return false;
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to check mutual like", e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to check mutual like", e);
     }
+  }
 
-    @Override
-    public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-        String sql = "SELECT who_got_liked FROM likes WHERE who_likes = ?";
-        Set<UUID> result = new HashSet<>();
+  @Override
+  public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
+    String sql = "SELECT who_got_liked FROM likes WHERE who_likes = ?";
+    Set<UUID> result = new HashSet<>();
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, userId);
-            ResultSet rs = stmt.executeQuery();
+      stmt.setObject(1, userId);
+      ResultSet rs = stmt.executeQuery();
 
-            while (rs.next()) {
-                result.add(rs.getObject("who_got_liked", UUID.class));
-            }
-            return result;
+      while (rs.next()) {
+        result.add(rs.getObject("who_got_liked", UUID.class));
+      }
+      return result;
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to get liked user IDs", e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to get liked user IDs", e);
     }
+  }
 
-    // === Statistics Methods (Phase 0.5b) ===
+  // === Statistics Methods (Phase 0.5b) ===
 
-    @Override
-    public int countByDirection(UUID userId, Like.Direction direction) {
-        String sql = "SELECT COUNT(*) FROM likes WHERE who_likes = ? AND direction = ?";
+  @Override
+  public int countByDirection(UUID userId, Like.Direction direction) {
+    String sql = "SELECT COUNT(*) FROM likes WHERE who_likes = ? AND direction = ?";
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, userId);
-            stmt.setString(2, direction.name());
-            ResultSet rs = stmt.executeQuery();
+      stmt.setObject(1, userId);
+      stmt.setString(2, direction.name());
+      ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-            return 0;
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      return 0;
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to count likes by direction", e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to count likes by direction", e);
     }
+  }
 
-    @Override
-    public int countReceivedByDirection(UUID userId, Like.Direction direction) {
-        String sql = "SELECT COUNT(*) FROM likes WHERE who_got_liked = ? AND direction = ?";
+  @Override
+  public int countReceivedByDirection(UUID userId, Like.Direction direction) {
+    String sql = "SELECT COUNT(*) FROM likes WHERE who_got_liked = ? AND direction = ?";
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, userId);
-            stmt.setString(2, direction.name());
-            ResultSet rs = stmt.executeQuery();
+      stmt.setObject(1, userId);
+      stmt.setString(2, direction.name());
+      ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-            return 0;
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      return 0;
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to count received likes by direction", e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to count received likes by direction", e);
     }
+  }
 
-    @Override
-    public int countMutualLikes(UUID userId) {
-        // Count users that userId LIKED who also LIKED userId back
-        String sql = """
+  @Override
+  public int countMutualLikes(UUID userId) {
+    // Count users that userId LIKED who also LIKED userId back
+    String sql =
+        """
                 SELECT COUNT(*) FROM likes l1
                 JOIN likes l2 ON l1.who_likes = l2.who_got_liked
                              AND l1.who_got_liked = l2.who_likes
@@ -199,90 +201,92 @@ public class H2LikeStorage implements LikeStorage {
                   AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
                 """;
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, userId);
-            ResultSet rs = stmt.executeQuery();
+      stmt.setObject(1, userId);
+      ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-            return 0;
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      return 0;
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to count mutual likes", e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to count mutual likes", e);
     }
+  }
 
-    // === Daily Limit Methods (Phase 1) ===
+  // === Daily Limit Methods (Phase 1) ===
 
-    @Override
-    public int countLikesToday(UUID userId, Instant startOfDay) {
-        String sql = """
+  @Override
+  public int countLikesToday(UUID userId, Instant startOfDay) {
+    String sql =
+        """
                 SELECT COUNT(*) FROM likes
                 WHERE who_likes = ? AND direction = 'LIKE' AND created_at >= ?
                 """;
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, userId);
-            stmt.setTimestamp(2, Timestamp.from(startOfDay));
-            ResultSet rs = stmt.executeQuery();
+      stmt.setObject(1, userId);
+      stmt.setTimestamp(2, Timestamp.from(startOfDay));
+      ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-            return 0;
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      return 0;
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to count likes today", e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to count likes today", e);
     }
+  }
 
-    @Override
-    public int countPassesToday(UUID userId, Instant startOfDay) {
-        String sql = """
+  @Override
+  public int countPassesToday(UUID userId, Instant startOfDay) {
+    String sql =
+        """
                 SELECT COUNT(*) FROM likes
                 WHERE who_likes = ? AND direction = 'PASS' AND created_at >= ?
                 """;
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, userId);
-            stmt.setTimestamp(2, Timestamp.from(startOfDay));
-            ResultSet rs = stmt.executeQuery();
+      stmt.setObject(1, userId);
+      stmt.setTimestamp(2, Timestamp.from(startOfDay));
+      ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-            return 0;
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      return 0;
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to count passes today", e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to count passes today", e);
     }
+  }
 
-    // === Undo Methods (Phase 1) ===
+  // === Undo Methods (Phase 1) ===
 
-    @Override
-    public void delete(UUID likeId) {
-        String sql = "DELETE FROM likes WHERE id = ?";
+  @Override
+  public void delete(UUID likeId) {
+    String sql = "DELETE FROM likes WHERE id = ?";
 
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, likeId);
-            int rowsAffected = stmt.executeUpdate();
+      stmt.setObject(1, likeId);
+      int rowsAffected = stmt.executeUpdate();
 
-            if (rowsAffected == 0) {
-                throw new StorageException("Like not found for deletion: " + likeId);
-            }
+      if (rowsAffected == 0) {
+        throw new StorageException("Like not found for deletion: " + likeId);
+      }
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to delete like: " + likeId, e);
-        }
+    } catch (SQLException e) {
+      throw new StorageException("Failed to delete like: " + likeId, e);
     }
+  }
 }

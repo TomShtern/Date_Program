@@ -3,180 +3,177 @@ package datingapp.core;
 import java.util.Objects;
 
 /**
- * Central registry holding all storage and service instances.
- * Provides a single point of access for all application components.
+ * Central registry holding all storage and service instances. Provides a single point of access for
+ * all application components.
  *
- * This pattern enables:
- * - Easy testing with mock implementations
- * - Swapping storage backends (H2 -> PostgreSQL)
- * - Adding new services without modifying Main
+ * <p>This pattern enables: - Easy testing with mock implementations - Swapping storage backends (H2
+ * -> PostgreSQL) - Adding new services without modifying Main
  */
 public class ServiceRegistry {
 
-    // Configuration
-    private final AppConfig config;
+  // Configuration
+  private final AppConfig config;
 
-    // Storage layer
-    private final UserStorage userStorage;
-    private final LikeStorage likeStorage;
-    private final MatchStorage matchStorage;
-    private final BlockStorage blockStorage;
-    private final ReportStorage reportStorage;
-    private final SwipeSessionStorage sessionStorage; // Phase 0.5b
-    private final UserStatsStorage userStatsStorage; // Phase 0.5b
-    private final PlatformStatsStorage platformStatsStorage; // Phase 0.5b
-    private final DailyPickStorage dailyPickStorage; // Phase 1
-    private final UserAchievementStorage userAchievementStorage; // Phase 1
+  // Storage layer
+  private final UserStorage userStorage;
+  private final LikeStorage likeStorage;
+  private final MatchStorage matchStorage;
+  private final BlockStorage blockStorage;
+  private final ReportStorage reportStorage;
+  private final SwipeSessionStorage sessionStorage; // Phase 0.5b
+  private final UserStatsStorage userStatsStorage; // Phase 0.5b
+  private final PlatformStatsStorage platformStatsStorage; // Phase 0.5b
+  private final DailyPickStorage dailyPickStorage; // Phase 1
+  private final UserAchievementStorage userAchievementStorage; // Phase 1
 
-    // Services
-    private final CandidateFinderService candidateFinder;
-    private final MatchingService matchingService;
-    private final ReportService reportService;
-    private final SessionService sessionService; // Phase 0.5b
-    private final StatsService statsService; // Phase 0.5b
-    private final MatchQualityService matchQualityService; // Phase 0.5b
-    private final ProfilePreviewService profilePreviewService; // Phase 1
-    private final DailyLimitService dailyLimitService; // Phase 1
-    private final UndoService undoService; // Phase 1
-    private final DailyPickService dailyPickService; // Phase 1
-    private final AchievementService achievementService; // Phase 1
+  // Services
+  private final CandidateFinderService candidateFinder;
+  private final MatchingService matchingService;
+  private final ReportService reportService;
+  private final SessionService sessionService; // Phase 0.5b
+  private final StatsService statsService; // Phase 0.5b
+  private final MatchQualityService matchQualityService; // Phase 0.5b
+  private final ProfilePreviewService profilePreviewService; // Phase 1
+  private final DailyLimitService dailyLimitService; // Phase 1
+  private final UndoService undoService; // Phase 1
+  private final DailyPickService dailyPickService; // Phase 1
+  private final AchievementService achievementService; // Phase 1
 
-    /**
-     * Package-private constructor - use ServiceRegistryBuilder to create.
-     */
-    ServiceRegistry(AppConfig config,
-            UserStorage userStorage,
-            LikeStorage likeStorage,
-            MatchStorage matchStorage,
-            BlockStorage blockStorage,
-            ReportStorage reportStorage,
-            SwipeSessionStorage sessionStorage,
-            UserStatsStorage userStatsStorage,
-            PlatformStatsStorage platformStatsStorage,
-            DailyPickStorage dailyPickStorage,
-            UserAchievementStorage userAchievementStorage,
-            CandidateFinderService candidateFinder,
-            MatchingService matchingService,
-            ReportService reportService,
-            SessionService sessionService,
-            StatsService statsService,
-            MatchQualityService matchQualityService,
-            ProfilePreviewService profilePreviewService,
-            DailyLimitService dailyLimitService,
-            UndoService undoService,
-            DailyPickService dailyPickService,
-            AchievementService achievementService) {
-        this.config = Objects.requireNonNull(config);
-        this.userStorage = Objects.requireNonNull(userStorage);
-        this.likeStorage = Objects.requireNonNull(likeStorage);
-        this.matchStorage = Objects.requireNonNull(matchStorage);
-        this.blockStorage = Objects.requireNonNull(blockStorage);
-        this.reportStorage = Objects.requireNonNull(reportStorage);
-        this.sessionStorage = Objects.requireNonNull(sessionStorage);
-        this.userStatsStorage = Objects.requireNonNull(userStatsStorage);
-        this.platformStatsStorage = Objects.requireNonNull(platformStatsStorage);
-        this.dailyPickStorage = Objects.requireNonNull(dailyPickStorage);
-        this.userAchievementStorage = Objects.requireNonNull(userAchievementStorage);
-        this.candidateFinder = Objects.requireNonNull(candidateFinder);
-        this.matchingService = Objects.requireNonNull(matchingService);
-        this.reportService = Objects.requireNonNull(reportService);
-        this.sessionService = Objects.requireNonNull(sessionService);
-        this.statsService = Objects.requireNonNull(statsService);
-        this.matchQualityService = Objects.requireNonNull(matchQualityService);
-        this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
-        this.dailyLimitService = Objects.requireNonNull(dailyLimitService);
-        this.undoService = Objects.requireNonNull(undoService);
-        this.dailyPickService = Objects.requireNonNull(dailyPickService);
-        this.achievementService = Objects.requireNonNull(achievementService);
-    }
+  /** Package-private constructor - use ServiceRegistryBuilder to create. */
+  ServiceRegistry(
+      AppConfig config,
+      UserStorage userStorage,
+      LikeStorage likeStorage,
+      MatchStorage matchStorage,
+      BlockStorage blockStorage,
+      ReportStorage reportStorage,
+      SwipeSessionStorage sessionStorage,
+      UserStatsStorage userStatsStorage,
+      PlatformStatsStorage platformStatsStorage,
+      DailyPickStorage dailyPickStorage,
+      UserAchievementStorage userAchievementStorage,
+      CandidateFinderService candidateFinder,
+      MatchingService matchingService,
+      ReportService reportService,
+      SessionService sessionService,
+      StatsService statsService,
+      MatchQualityService matchQualityService,
+      ProfilePreviewService profilePreviewService,
+      DailyLimitService dailyLimitService,
+      UndoService undoService,
+      DailyPickService dailyPickService,
+      AchievementService achievementService) {
+    this.config = Objects.requireNonNull(config);
+    this.userStorage = Objects.requireNonNull(userStorage);
+    this.likeStorage = Objects.requireNonNull(likeStorage);
+    this.matchStorage = Objects.requireNonNull(matchStorage);
+    this.blockStorage = Objects.requireNonNull(blockStorage);
+    this.reportStorage = Objects.requireNonNull(reportStorage);
+    this.sessionStorage = Objects.requireNonNull(sessionStorage);
+    this.userStatsStorage = Objects.requireNonNull(userStatsStorage);
+    this.platformStatsStorage = Objects.requireNonNull(platformStatsStorage);
+    this.dailyPickStorage = Objects.requireNonNull(dailyPickStorage);
+    this.userAchievementStorage = Objects.requireNonNull(userAchievementStorage);
+    this.candidateFinder = Objects.requireNonNull(candidateFinder);
+    this.matchingService = Objects.requireNonNull(matchingService);
+    this.reportService = Objects.requireNonNull(reportService);
+    this.sessionService = Objects.requireNonNull(sessionService);
+    this.statsService = Objects.requireNonNull(statsService);
+    this.matchQualityService = Objects.requireNonNull(matchQualityService);
+    this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
+    this.dailyLimitService = Objects.requireNonNull(dailyLimitService);
+    this.undoService = Objects.requireNonNull(undoService);
+    this.dailyPickService = Objects.requireNonNull(dailyPickService);
+    this.achievementService = Objects.requireNonNull(achievementService);
+  }
 
-    // === Getters ===
+  // === Getters ===
 
-    public AppConfig getConfig() {
-        return config;
-    }
+  public AppConfig getConfig() {
+    return config;
+  }
 
-    public UserStorage getUserStorage() {
-        return userStorage;
-    }
+  public UserStorage getUserStorage() {
+    return userStorage;
+  }
 
-    public LikeStorage getLikeStorage() {
-        return likeStorage;
-    }
+  public LikeStorage getLikeStorage() {
+    return likeStorage;
+  }
 
-    public MatchStorage getMatchStorage() {
-        return matchStorage;
-    }
+  public MatchStorage getMatchStorage() {
+    return matchStorage;
+  }
 
-    public BlockStorage getBlockStorage() {
-        return blockStorage;
-    }
+  public BlockStorage getBlockStorage() {
+    return blockStorage;
+  }
 
-    public ReportStorage getReportStorage() {
-        return reportStorage;
-    }
+  public ReportStorage getReportStorage() {
+    return reportStorage;
+  }
 
-    public SwipeSessionStorage getSessionStorage() {
-        return sessionStorage;
-    }
+  public SwipeSessionStorage getSessionStorage() {
+    return sessionStorage;
+  }
 
-    public UserStatsStorage getUserStatsStorage() {
-        return userStatsStorage;
-    }
+  public UserStatsStorage getUserStatsStorage() {
+    return userStatsStorage;
+  }
 
-    public PlatformStatsStorage getPlatformStatsStorage() {
-        return platformStatsStorage;
-    }
+  public PlatformStatsStorage getPlatformStatsStorage() {
+    return platformStatsStorage;
+  }
 
-    public CandidateFinderService getCandidateFinder() {
-        return candidateFinder;
-    }
+  public CandidateFinderService getCandidateFinder() {
+    return candidateFinder;
+  }
 
-    public MatchingService getMatchingService() {
-        return matchingService;
-    }
+  public MatchingService getMatchingService() {
+    return matchingService;
+  }
 
-    public ReportService getReportService() {
-        return reportService;
-    }
+  public ReportService getReportService() {
+    return reportService;
+  }
 
-    public SessionService getSessionService() {
-        return sessionService;
-    }
+  public SessionService getSessionService() {
+    return sessionService;
+  }
 
-    public StatsService getStatsService() {
-        return statsService;
-    }
+  public StatsService getStatsService() {
+    return statsService;
+  }
 
-    public MatchQualityService getMatchQualityService() {
-        return matchQualityService;
-    }
+  public MatchQualityService getMatchQualityService() {
+    return matchQualityService;
+  }
 
-    public ProfilePreviewService getProfilePreviewService() {
-        return profilePreviewService;
-    }
+  public ProfilePreviewService getProfilePreviewService() {
+    return profilePreviewService;
+  }
 
-    public DailyLimitService getDailyLimitService() {
-        return dailyLimitService;
-    }
+  public DailyLimitService getDailyLimitService() {
+    return dailyLimitService;
+  }
 
-    public UndoService getUndoService() {
-        return undoService;
-    }
+  public UndoService getUndoService() {
+    return undoService;
+  }
 
-    public DailyPickStorage getDailyPickStorage() {
-        return dailyPickStorage;
-    }
+  public DailyPickStorage getDailyPickStorage() {
+    return dailyPickStorage;
+  }
 
-    public DailyPickService getDailyPickService() {
-        return dailyPickService;
-    }
+  public DailyPickService getDailyPickService() {
+    return dailyPickService;
+  }
 
-    public UserAchievementStorage getUserAchievementStorage() {
-        return userAchievementStorage;
-    }
+  public UserAchievementStorage getUserAchievementStorage() {
+    return userAchievementStorage;
+  }
 
-    public AchievementService getAchievementService() {
-        return achievementService;
-    }
+  public AchievementService getAchievementService() {
+    return achievementService;
+  }
 }

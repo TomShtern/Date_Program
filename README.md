@@ -20,6 +20,15 @@ To run the full test suite (99 tests):
 mvn clean test
 ```
 
+## Code formatting (Spotless) 🔧
+We use Spotless (com.diffplug.spotless:spotless-maven-plugin v3.1.0) with `google-java-format` (v1.19.1) to keep code style consistent.
+
+- Format locally: `mvn spotless:apply`
+- Verify in CI: `mvn spotless:check` (bound to `verify` by default)
+- Optional: install pre-push hook: `mvn spotless:install-git-pre-push-hook`
+
+Note: The first-time run may reformat many files; review `git diff` before committing.
+
 ## Important Configuration
 
 ### Database
