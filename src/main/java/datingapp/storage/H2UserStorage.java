@@ -39,9 +39,12 @@ public class H2UserStorage implements UserStorage {
                                   max_distance_km, min_age, max_age, photo_urls, state, created_at, updated_at,
                                   smoking, drinking, wants_kids, looking_for, education, height_cm,
                                   db_smoking, db_drinking, db_wants_kids, db_looking_for, db_education,
-                                  db_min_height_cm, db_max_height_cm, db_max_age_diff, interests)
+                                  db_min_height_cm, db_max_height_cm, db_max_age_diff, interests,
+                                  email, phone, is_verified, verification_method,
+                                  verification_code, verification_sent_at, verified_at)
                 KEY (id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?)
                 """;
 
     try (Connection conn = dbManager.getConnection();
@@ -100,6 +103,21 @@ public class H2UserStorage implements UserStorage {
       }
 
       stmt.setString(30, serializeInterests(user.getInterests()));
+
+      // Verification fields (Phase 2)
+      stmt.setString(31, user.getEmail());
+      stmt.setString(32, user.getPhone());
+      stmt.setObject(33, user.isVerified());
+      stmt.setString(
+          34, user.getVerificationMethod() != null ? user.getVerificationMethod().name() : null);
+      stmt.setString(35, user.getVerificationCode());
+      stmt.setTimestamp(
+          36,
+          user.getVerificationSentAt() != null
+              ? Timestamp.from(user.getVerificationSentAt())
+              : null);
+      stmt.setTimestamp(
+          37, user.getVerifiedAt() != null ? Timestamp.from(user.getVerifiedAt()) : null);
 
       stmt.executeUpdate();
 
@@ -179,6 +197,24 @@ public class H2UserStorage implements UserStorage {
     String interestsStr = rs.getString("interests");
     Set<Interest> interests = parseInterests(interestsStr);
 
+    String email = rs.getString("email");
+    String phone = rs.getString("phone");
+    Boolean isVerified = (Boolean) rs.getObject("is_verified");
+
+    String verificationMethodStr = rs.getString("verification_method");
+    User.VerificationMethod verificationMethod =
+        verificationMethodStr != null
+            ? User.VerificationMethod.valueOf(verificationMethodStr)
+            : null;
+
+    String verificationCode = rs.getString("verification_code");
+
+    Timestamp verificationSentAtTs = rs.getTimestamp("verification_sent_at");
+    var verificationSentAt = verificationSentAtTs != null ? verificationSentAtTs.toInstant() : null;
+
+    Timestamp verifiedAtTs = rs.getTimestamp("verified_at");
+    var verifiedAt = verifiedAtTs != null ? verifiedAtTs.toInstant() : null;
+
     User user =
         User.fromDatabase(
             id,
@@ -196,7 +232,14 @@ public class H2UserStorage implements UserStorage {
             state,
             createdAt,
             updatedAt,
-            interests);
+            interests,
+            email,
+            phone,
+            isVerified,
+            verificationMethod,
+            verificationCode,
+            verificationSentAt,
+            verifiedAt);
 
     // Map lifestyle fields (Phase 0.5b)
     String smokingStr = rs.getString("smoking");

@@ -9,6 +9,7 @@ import java.sql.Statement;
 public class DatabaseManager {
 
   private static String jdbcUrl = "jdbc:h2:./data/dating;AUTO_SERVER=TRUE";
+  private static final String DEFAULT_DEV_PASSWORD = "dev";
   private static final String USER = "sa";
 
   // Password is determined at connection time based on JDBC URL
@@ -19,22 +20,32 @@ public class DatabaseManager {
   }
 
   private static String getConfiguredPassword() {
-    // Test databases don't require authentication
+    // Allow a password override via env var.
+    String envPassword = System.getenv("DATING_APP_DB_PASSWORD");
+    if (envPassword != null && !envPassword.isEmpty()) {
+      return envPassword;
+    }
+
+    // Test databases don't require authentication.
     if (isTestUrl(jdbcUrl)) {
       return "";
     }
 
-    // Production databases require environment variable
-    String envPassword = System.getenv("DATING_APP_DB_PASSWORD");
-    if (envPassword == null || envPassword.isEmpty()) {
-      throw new IllegalStateException(
-          "Database password must be provided via DATING_APP_DB_PASSWORD environment variable");
+    // Dev/local default: use a stable password so the on-disk DB can be reopened.
+    if (isLocalFileUrl(jdbcUrl)) {
+      return DEFAULT_DEV_PASSWORD;
     }
-    return envPassword;
+
+    throw new IllegalStateException(
+        "Database password must be provided via DATING_APP_DB_PASSWORD environment variable");
   }
 
   private static boolean isTestUrl(String url) {
-    return url.contains("dating_test") || url.contains(":memory:");
+    return url.contains("test") || url.contains(":mem:");
+  }
+
+  private static boolean isLocalFileUrl(String url) {
+    return url.startsWith("jdbc:h2:./") || url.startsWith("jdbc:h2:.\\");
   }
 
   private static DatabaseManager instance;
@@ -284,6 +295,14 @@ public class DatabaseManager {
       stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_max_height_cm INT");
       stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_max_age_diff INT");
       stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS interests VARCHAR(500)");
+      // Profile verification fields (Phase 2)
+      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(200)");
+      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50)");
+      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN");
+      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_method VARCHAR(10)");
+      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code VARCHAR(10)");
+      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_sent_at TIMESTAMP");
+      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP");
     } catch (SQLException e) {
       // Column already exists or other non-critical error, ignore
     }

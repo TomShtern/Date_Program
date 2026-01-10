@@ -176,6 +176,11 @@ class MatchingServiceTest {
     }
 
     @Override
+    public Set<UUID> getUserIdsWhoLiked(UUID userId) {
+      return Collections.emptySet();
+    }
+
+    @Override
     public boolean mutualLikeExists(UUID user1, UUID user2) {
       return exists(user1, user2) && exists(user2, user1);
     }

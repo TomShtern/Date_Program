@@ -145,6 +145,59 @@ public class H2LikeStorage implements LikeStorage {
     }
   }
 
+  @Override
+  public Set<UUID> getUserIdsWhoLiked(UUID userId) {
+    String sql = "SELECT who_likes FROM likes WHERE who_got_liked = ? AND direction = 'LIKE'";
+    Set<UUID> result = new HashSet<>();
+
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+      stmt.setObject(1, userId);
+      ResultSet rs = stmt.executeQuery();
+
+      while (rs.next()) {
+        result.add(rs.getObject("who_likes", UUID.class));
+      }
+      return result;
+
+    } catch (SQLException e) {
+      throw new StorageException("Failed to get users who liked", e);
+    }
+  }
+
+  @Override
+  public java.util.Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
+    String sql =
+        """
+                SELECT who_likes, MAX(created_at) AS liked_at
+                FROM likes
+                WHERE who_got_liked = ? AND direction = 'LIKE'
+                GROUP BY who_likes
+                """;
+
+    java.util.Map<UUID, Instant> result = new java.util.HashMap<>();
+
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+      stmt.setObject(1, userId);
+      ResultSet rs = stmt.executeQuery();
+
+      while (rs.next()) {
+        UUID whoLikes = rs.getObject("who_likes", UUID.class);
+        Timestamp likedAt = rs.getTimestamp("liked_at");
+        if (whoLikes != null && likedAt != null) {
+          result.put(whoLikes, likedAt.toInstant());
+        }
+      }
+      return result;
+
+    } catch (SQLException e) {
+      throw new StorageException("Failed to get liker timestamps", e);
+    }
+  }
+
   // === Statistics Methods (Phase 0.5b) ===
 
   @Override

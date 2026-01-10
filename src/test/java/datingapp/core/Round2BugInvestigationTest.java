@@ -165,6 +165,11 @@ class Round2BugInvestigationTest {
     }
 
     @Override
+    public java.util.Set<UUID> getUserIdsWhoLiked(UUID userId) {
+      return java.util.Set.of();
+    }
+
+    @Override
     public int countByDirection(UUID userId, Like.Direction direction) {
       return 0;
     }

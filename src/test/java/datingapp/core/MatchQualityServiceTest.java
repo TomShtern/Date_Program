@@ -369,6 +369,11 @@ class MatchQualityServiceTest {
     }
 
     @Override
+    public Set<UUID> getUserIdsWhoLiked(UUID userId) {
+      return Set.of();
+    }
+
+    @Override
     public int countByDirection(UUID userId, Like.Direction direction) {
       return 0;
     }

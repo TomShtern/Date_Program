@@ -299,6 +299,11 @@ class DailyLimitServiceTest {
     }
 
     @Override
+    public Set<UUID> getUserIdsWhoLiked(UUID userId) {
+      return Set.of();
+    }
+
+    @Override
     public int countByDirection(UUID userId, Like.Direction direction) {
       return (int)
           likes.values().stream()

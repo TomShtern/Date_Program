@@ -2,18 +2,24 @@ package datingapp;
 
 import datingapp.cli.CliConstants;
 import datingapp.cli.InputReader;
+import datingapp.cli.LikerBrowserHandler;
 import datingapp.cli.MatchingHandler;
 import datingapp.cli.ProfileHandler;
+import datingapp.cli.ProfileNotesHandler;
+import datingapp.cli.ProfileVerificationHandler;
 import datingapp.cli.SafetyHandler;
 import datingapp.cli.StatsHandler;
 import datingapp.cli.UserManagementHandler;
 import datingapp.cli.UserSession;
 import datingapp.core.AppConfig;
 import datingapp.core.DailyLimitService;
+import datingapp.core.LikerBrowserService;
+import datingapp.core.ProfileCompletionService;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.ServiceRegistryBuilder;
 import datingapp.core.SessionService;
 import datingapp.core.User;
+import datingapp.core.VerificationService;
 import datingapp.storage.DatabaseManager;
 import java.util.Scanner;
 import org.slf4j.Logger;
@@ -39,6 +45,9 @@ public class Main {
   private static MatchingHandler matchingHandler;
   private static SafetyHandler safetyHandler;
   private static StatsHandler statsHandler;
+  private static ProfileNotesHandler profileNotesHandler;
+  private static ProfileVerificationHandler profileVerificationHandler;
+  private static LikerBrowserHandler likerBrowserHandler;
 
   public static void main(String[] args) {
     try (Scanner scanner = new Scanner(System.in)) {
@@ -63,6 +72,10 @@ public class Main {
           case "9" -> statsHandler.viewStatistics();
           case "10" -> profileHandler.previewProfile();
           case "11" -> statsHandler.viewAchievements();
+          case "12" -> profileNotesHandler.viewAllNotes();
+          case "13" -> viewProfileScore();
+          case "14" -> profileVerificationHandler.verifyProfile();
+          case "15" -> likerBrowserHandler.browseWhoLikedMe();
           case "0" -> {
             running = false;
             logger.info("\n👋 Goodbye!\n");
@@ -100,7 +113,22 @@ public class Main {
             userSession,
             inputReader);
 
-    matchingHandler = new MatchingHandler(services, userSession, inputReader);
+    matchingHandler =
+        new MatchingHandler(
+            services.getCandidateFinder(),
+            services.getMatchingService(),
+            services.getLikeStorage(),
+            services.getMatchStorage(),
+            services.getBlockStorage(),
+            services.getDailyLimitService(),
+            services.getDailyPickService(),
+            services.getUndoService(),
+            services.getMatchQualityService(),
+            services.getUserStorage(),
+            services.getAchievementService(),
+            services.getProfileViewStorage(),
+            userSession,
+            inputReader);
 
     safetyHandler =
         new SafetyHandler(
@@ -114,6 +142,25 @@ public class Main {
     statsHandler =
         new StatsHandler(
             services.getStatsService(), services.getAchievementService(), userSession, inputReader);
+
+    profileNotesHandler =
+        new ProfileNotesHandler(
+            services.getProfileNoteStorage(), services.getUserStorage(), userSession, inputReader);
+
+    profileVerificationHandler =
+        new ProfileVerificationHandler(
+            services.getUserStorage(), new VerificationService(), userSession, inputReader);
+
+    likerBrowserHandler =
+        new LikerBrowserHandler(
+            new LikerBrowserService(
+                services.getLikeStorage(),
+                services.getUserStorage(),
+                services.getMatchStorage(),
+                services.getBlockStorage()),
+            services.getMatchingService(),
+            userSession,
+            inputReader);
   }
 
   private static void printMenu() {
@@ -166,8 +213,49 @@ public class Main {
     logger.info("  9. 📊 View my statistics");
     logger.info("  10. 👤 Preview my profile");
     logger.info("  11. 🏆 View achievements");
+    logger.info("  12. 📝 My profile notes");
+    logger.info("  13. 📊 Profile completion score");
+    logger.info("  14. ✅ Verify my profile");
+    logger.info("  15. 💌 Who liked me");
     logger.info("  0. Exit");
     logger.info(CliConstants.SEPARATOR_LINE + "\n");
+  }
+
+  private static void viewProfileScore() {
+    if (userSession.getCurrentUser() == null) {
+      logger.info(CliConstants.PLEASE_SELECT_USER);
+      return;
+    }
+
+    User currentUser = userSession.getCurrentUser();
+    ProfileCompletionService.CompletionResult result =
+        ProfileCompletionService.calculate(currentUser);
+
+    logger.info("\n───────────────────────────────────────");
+    logger.info("      📊 PROFILE COMPLETION SCORE");
+    logger.info("───────────────────────────────────────\n");
+
+    logger.info("  {} {}% {}", result.getTierEmoji(), result.score(), result.tier());
+    logger.info("  {}", ProfileCompletionService.renderProgressBar(result.score(), 25));
+    logger.info("");
+
+    // Category breakdown
+    for (ProfileCompletionService.CategoryBreakdown cat : result.breakdown()) {
+      logger.info("  {} - {}%", cat.category(), cat.score());
+      logger.info("    {}", ProfileCompletionService.renderProgressBar(cat.score(), 15));
+      if (!cat.missingItems().isEmpty()) {
+        cat.missingItems().forEach(m -> logger.info("    ⚪ {}", m));
+      }
+    }
+
+    // Next steps
+    if (!result.nextSteps().isEmpty()) {
+      logger.info("\n  💡 NEXT STEPS:");
+      result.nextSteps().forEach(s -> logger.info("    {}", s));
+    }
+
+    logger.info("");
+    inputReader.readLine("  [Press Enter to return to menu]");
   }
 
   private static void shutdown() {

@@ -23,6 +23,12 @@ public interface LikeStorage {
   /** Gets all user IDs that the given user has liked or passed. */
   Set<UUID> getLikedOrPassedUserIds(UUID userId);
 
+  /** Gets all user IDs that liked the given user (direction=LIKE). */
+  Set<UUID> getUserIdsWhoLiked(UUID userId);
+
+  /** Returns like timestamps for each user who liked the given user (direction=LIKE). */
+  java.util.Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId);
+
   // === Statistics Methods (Phase 0.5b) ===
 
   /** Count likes/passes GIVEN BY a user with specific direction. */

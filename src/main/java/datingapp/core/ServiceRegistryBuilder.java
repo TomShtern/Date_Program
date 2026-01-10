@@ -6,6 +6,8 @@ import datingapp.storage.H2DailyPickViewStorage;
 import datingapp.storage.H2LikeStorage;
 import datingapp.storage.H2MatchStorage;
 import datingapp.storage.H2PlatformStatsStorage;
+import datingapp.storage.H2ProfileNoteStorage;
+import datingapp.storage.H2ProfileViewStorage;
 import datingapp.storage.H2ReportStorage;
 import datingapp.storage.H2SwipeSessionStorage;
 import datingapp.storage.H2UserAchievementStorage;
@@ -76,6 +78,10 @@ public final class ServiceRegistryBuilder {
             reportStorage,
             profilePreviewService);
 
+    // Profile Views & Notes (Phase 1.5)
+    ProfileViewStorage profileViewStorage = new H2ProfileViewStorage(dbManager);
+    ProfileNoteStorage profileNoteStorage = new H2ProfileNoteStorage(dbManager);
+
     return new ServiceRegistry(
         config,
         userStorage,
@@ -88,6 +94,8 @@ public final class ServiceRegistryBuilder {
         platformStatsStorage,
         dailyPickStorage,
         userAchievementStorage,
+        profileViewStorage,
+        profileNoteStorage,
         candidateFinder,
         matchingService,
         reportService,

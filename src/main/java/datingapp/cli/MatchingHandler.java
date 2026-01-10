@@ -15,7 +15,7 @@ import datingapp.core.MatchQuality;
 import datingapp.core.MatchQualityService;
 import datingapp.core.MatchStorage;
 import datingapp.core.MatchingService;
-import datingapp.core.ServiceRegistry;
+import datingapp.core.ProfileViewStorage;
 import datingapp.core.UndoService;
 import datingapp.core.User;
 import datingapp.core.UserAchievement;
@@ -40,24 +40,39 @@ public class MatchingHandler {
   private final DailyPickService dailyPickService;
   private final UndoService undoService;
   private final MatchQualityService matchQualityService;
-  private final UserStorage userStorage; // Needed for fetching candidate/match user details
+  private final UserStorage userStorage;
   private final AchievementService achievementService;
+  private final ProfileViewStorage profileViewStorage;
   private final UserSession userSession;
   private final InputReader inputReader;
 
   public MatchingHandler(
-      ServiceRegistry services, UserSession userSession, InputReader inputReader) {
-    this.candidateFinderService = services.getCandidateFinder();
-    this.matchingService = services.getMatchingService();
-    this.likeStorage = services.getLikeStorage();
-    this.matchStorage = services.getMatchStorage();
-    this.blockStorage = services.getBlockStorage();
-    this.dailyLimitService = services.getDailyLimitService();
-    this.dailyPickService = services.getDailyPickService();
-    this.undoService = services.getUndoService();
-    this.matchQualityService = services.getMatchQualityService();
-    this.userStorage = services.getUserStorage();
-    this.achievementService = services.getAchievementService();
+      CandidateFinderService candidateFinderService,
+      MatchingService matchingService,
+      LikeStorage likeStorage,
+      MatchStorage matchStorage,
+      BlockStorage blockStorage,
+      DailyLimitService dailyLimitService,
+      DailyPickService dailyPickService,
+      UndoService undoService,
+      MatchQualityService matchQualityService,
+      UserStorage userStorage,
+      AchievementService achievementService,
+      ProfileViewStorage profileViewStorage,
+      UserSession userSession,
+      InputReader inputReader) {
+    this.candidateFinderService = candidateFinderService;
+    this.matchingService = matchingService;
+    this.likeStorage = likeStorage;
+    this.matchStorage = matchStorage;
+    this.blockStorage = blockStorage;
+    this.dailyLimitService = dailyLimitService;
+    this.dailyPickService = dailyPickService;
+    this.undoService = undoService;
+    this.matchQualityService = matchQualityService;
+    this.userStorage = userStorage;
+    this.achievementService = achievementService;
+    this.profileViewStorage = profileViewStorage;
     this.userSession = userSession;
     this.inputReader = inputReader;
   }
@@ -106,13 +121,21 @@ public class MatchingHandler {
   }
 
   private boolean processCandidateInteraction(User candidate, User currentUser) {
+    // Record this profile view
+    profileViewStorage.recordView(currentUser.getId(), candidate.getId());
+
     double distance =
         GeoUtils.distanceKm(
             currentUser.getLat(), currentUser.getLon(),
             candidate.getLat(), candidate.getLon());
 
     logger.info(CliConstants.BOX_TOP);
-    logger.info("│ 💝 {}, {} years old", candidate.getName(), candidate.getAge());
+    logger.info(
+        "│ 💝 {}{}{}, {} years old",
+        candidate.getName(),
+        candidate.isVerified() ? " " : "",
+        candidate.isVerified() ? "✅ Verified" : "",
+        candidate.getAge());
     if (logger.isInfoEnabled()) {
       logger.info("│ 📍 {} km away", String.format("%.1f", distance));
     }
@@ -120,11 +143,17 @@ public class MatchingHandler {
         CliConstants.PROFILE_BIO_FORMAT,
         candidate.getBio() != null ? candidate.getBio() : "(no bio)");
 
+    // Enhanced Mutual Interests Badge
     InterestMatcher.MatchResult matchResult =
         InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
-    if (!matchResult.shared().isEmpty()) {
+    if (matchResult.hasSharedInterests()) {
+      String badge = getMutualInterestsBadge(matchResult.sharedCount());
       logger.info(
-          "│ ✨ You both like: {}", InterestMatcher.formatSharedInterests(matchResult.shared()));
+          "│ {} {} shared interest{}: {}",
+          badge,
+          matchResult.sharedCount(),
+          matchResult.sharedCount() > 1 ? "s" : "",
+          InterestMatcher.formatSharedInterests(matchResult.shared()));
     }
 
     logger.info(CliConstants.BOX_BOTTOM);
@@ -193,11 +222,13 @@ public class MatchingHandler {
 
       if (otherUser != null && logger.isInfoEnabled()) {
         MatchQuality quality = matchQualityService.computeQuality(match, currentUser.getId());
+        String verifiedBadge = Boolean.TRUE.equals(otherUser.isVerified()) ? " ✅ Verified" : "";
         logger.info(
-            "  {}. {} {}, {}         {} {}%",
+            "  {}. {} {}{}, {}         {} {}%",
             i + 1,
             quality.getStarDisplay(),
             otherUser.getName(),
+            verifiedBadge,
             otherUser.getAge(),
             " ".repeat(Math.max(0, 10 - otherUser.getName().length())),
             quality.compatibilityScore());
@@ -507,6 +538,22 @@ public class MatchingHandler {
             "  ✨ {} - {}", ua.achievement().getDisplayName(), ua.achievement().getDescription());
       }
       logger.info("");
+    }
+  }
+
+  /**
+   * Returns an emoji badge based on the number of shared interests. More matches = more exciting
+   * badge!
+   */
+  private String getMutualInterestsBadge(int sharedCount) {
+    if (sharedCount >= 5) {
+      return "🎯🔥"; // Perfect match
+    } else if (sharedCount >= 3) {
+      return "🎯✨"; // Great match
+    } else if (sharedCount >= 2) {
+      return "🎯"; // Good match
+    } else {
+      return "✨"; // Some shared interests
     }
   }
 }

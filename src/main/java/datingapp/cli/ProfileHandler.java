@@ -95,7 +95,9 @@ public class ProfileHandler {
 
     // Card display
     logger.info(CliConstants.BOX_TOP);
-    logger.info("│ 💝 {}, {} years old", currentUser.getName(), currentUser.getAge());
+    String verifiedBadge = Boolean.TRUE.equals(currentUser.isVerified()) ? " ✅ Verified" : "";
+    logger.info(
+        "│ 💝 {}, {} years old{}", currentUser.getName(), currentUser.getAge(), verifiedBadge);
     logger.info("│ 📍 Location: {}, {}", currentUser.getLat(), currentUser.getLon());
     String bio = preview.displayBio();
     if (bio.length() > 50) {

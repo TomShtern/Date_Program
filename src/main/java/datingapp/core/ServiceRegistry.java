@@ -25,6 +25,8 @@ public class ServiceRegistry {
   private final PlatformStatsStorage platformStatsStorage; // Phase 0.5b
   private final DailyPickStorage dailyPickStorage; // Phase 1
   private final UserAchievementStorage userAchievementStorage; // Phase 1
+  private final ProfileViewStorage profileViewStorage; // Phase 1.5 - view counter
+  private final ProfileNoteStorage profileNoteStorage; // Phase 1.5 - private notes
 
   // Services
   private final CandidateFinderService candidateFinder;
@@ -52,6 +54,8 @@ public class ServiceRegistry {
       PlatformStatsStorage platformStatsStorage,
       DailyPickStorage dailyPickStorage,
       UserAchievementStorage userAchievementStorage,
+      ProfileViewStorage profileViewStorage,
+      ProfileNoteStorage profileNoteStorage,
       CandidateFinderService candidateFinder,
       MatchingService matchingService,
       ReportService reportService,
@@ -74,6 +78,8 @@ public class ServiceRegistry {
     this.platformStatsStorage = Objects.requireNonNull(platformStatsStorage);
     this.dailyPickStorage = Objects.requireNonNull(dailyPickStorage);
     this.userAchievementStorage = Objects.requireNonNull(userAchievementStorage);
+    this.profileViewStorage = Objects.requireNonNull(profileViewStorage);
+    this.profileNoteStorage = Objects.requireNonNull(profileNoteStorage);
     this.candidateFinder = Objects.requireNonNull(candidateFinder);
     this.matchingService = Objects.requireNonNull(matchingService);
     this.reportService = Objects.requireNonNull(reportService);
@@ -175,5 +181,13 @@ public class ServiceRegistry {
 
   public AchievementService getAchievementService() {
     return achievementService;
+  }
+
+  public ProfileViewStorage getProfileViewStorage() {
+    return profileViewStorage;
+  }
+
+  public ProfileNoteStorage getProfileNoteStorage() {
+    return profileNoteStorage;
   }
 }

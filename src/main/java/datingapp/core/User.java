@@ -31,6 +31,17 @@ public class User {
     BANNED
   }
 
+  /**
+   * Represents the verification method used to verify a profile.
+   *
+   * <p>NOTE: Currently simulated - email/phone not sent externally. Future enhancement: integrate
+   * real email/SMS service for actual code delivery.
+   */
+  public enum VerificationMethod {
+    EMAIL,
+    PHONE
+  }
+
   private final UUID id;
   private String name;
   private String bio;
@@ -60,6 +71,15 @@ public class User {
 
   // Interests (Phase 1 feature)
   private Set<Interest> interests = EnumSet.noneOf(Interest.class);
+
+  // Verification fields (Phase 2 feature)
+  private String email;
+  private String phone;
+  private Boolean isVerified;
+  private VerificationMethod verificationMethod;
+  private String verificationCode;
+  private Instant verificationSentAt;
+  private Instant verifiedAt;
 
   /** Creates a new incomplete user with just an ID and name. Timestamps are set to current time. */
   public User(UUID id, String name) {
@@ -108,12 +128,17 @@ public class User {
       State state,
       Instant createdAt,
       Instant updatedAt,
-      Set<Interest> interests) {
+      Set<Interest> interests,
+      String email,
+      String phone,
+      Boolean isVerified,
+      VerificationMethod verificationMethod,
+      String verificationCode,
+      Instant verificationSentAt,
+      Instant verifiedAt) {
 
-    // Initialize via private constructor with database-provided createdAt
     User user = new User(id, name, createdAt);
 
-    // Override fields with database values
     user.bio = bio;
     user.birthDate = birthDate;
     user.gender = gender;
@@ -126,8 +151,16 @@ public class User {
     user.maxAge = maxAge;
     user.photoUrls = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
     user.state = state;
-    user.updatedAt = updatedAt; // Override the createdAt timestamp with actual database value
+    user.updatedAt = updatedAt;
     user.interests = interests != null ? EnumSet.copyOf(interests) : EnumSet.noneOf(Interest.class);
+
+    user.email = email;
+    user.phone = phone;
+    user.isVerified = isVerified;
+    user.verificationMethod = verificationMethod;
+    user.verificationCode = verificationCode;
+    user.verificationSentAt = verificationSentAt;
+    user.verifiedAt = verifiedAt;
 
     return user;
   }
@@ -242,6 +275,35 @@ public class User {
     return Period.between(birthDate, LocalDate.now()).getYears();
   }
 
+  // Verification getters (Phase 2 feature)
+  public Boolean isVerified() {
+    return isVerified;
+  }
+
+  public VerificationMethod getVerificationMethod() {
+    return verificationMethod;
+  }
+
+  public String getVerificationCode() {
+    return verificationCode;
+  }
+
+  public Instant getVerificationSentAt() {
+    return verificationSentAt;
+  }
+
+  public Instant getVerifiedAt() {
+    return verifiedAt;
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public String getPhone() {
+    return phone;
+  }
+
   // Setters (with updatedAt)
 
   public void setName(String name) {
@@ -251,6 +313,38 @@ public class User {
 
   public void setBio(String bio) {
     this.bio = bio;
+    touch();
+  }
+
+  public void setEmail(String email) {
+    this.email = email;
+    touch();
+  }
+
+  public void setPhone(String phone) {
+    this.phone = phone;
+    touch();
+  }
+
+  public void startVerification(VerificationMethod method, String verificationCode) {
+    this.verificationMethod = Objects.requireNonNull(method, "method cannot be null");
+    this.verificationCode =
+        Objects.requireNonNull(verificationCode, "verificationCode cannot be null");
+    this.verificationSentAt = Instant.now();
+    touch();
+  }
+
+  public void markVerified() {
+    this.isVerified = true;
+    this.verifiedAt = Instant.now();
+    this.verificationCode = null;
+    this.verificationSentAt = null;
+    touch();
+  }
+
+  public void clearVerificationAttempt() {
+    this.verificationCode = null;
+    this.verificationSentAt = null;
     touch();
   }
 
