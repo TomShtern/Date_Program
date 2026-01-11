@@ -7,8 +7,65 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Finds candidate users for matching based on preferences and filters. Pure Java - no framework
- * dependencies.
+ * Finds candidate users for matching based on preferences and filters.
+ *
+ * <p><strong>Architectural Note:</strong> This class intentionally stays in the {@code core/}
+ * package (not {@code service/}) because it is a <strong>pure stateless algorithm</strong> with
+ * zero infrastructure dependencies. Unlike services that depend on storage interfaces or maintain
+ * state, CandidateFinder is a pure function: {@code (User, List<User>, Set<UUID>) -> List<User>}.
+ *
+ * <h3>Why This Design?</h3>
+ *
+ * <ul>
+ *   <li><strong>Zero Framework Dependencies:</strong> Operates only on in-memory collections passed
+ *       by callers. Never queries storage directly, maintaining the "core stays pure" architectural
+ *       rule.
+ *   <li><strong>Strategy Pattern:</strong> Implements {@link CandidateFinderService} interface to
+ *       allow future algorithm swapping (e.g., ML-based ranking, A/B testing different filters).
+ *       The interface enables easy mocking in tests.
+ *   <li><strong>Stateless Transform:</strong> No mutable state, no persistence concerns. Each call
+ *       is independent and deterministic given the same inputs.
+ *   <li><strong>Performance:</strong> Operates on in-memory lists for speed. Callers are
+ *       responsible for fetching active users from storage and passing them in.
+ * </ul>
+ *
+ * <h3>Naming Rationale</h3>
+ *
+ * <p>This class does NOT follow the {@code *Service} naming convention (e.g., {@code
+ * MatchingService}, {@code DailyLimitService}) because it is not a service in the architectural
+ * sense. Services in this codebase:
+ *
+ * <ul>
+ *   <li>Depend on storage interfaces (e.g., {@code UserStorage}, {@code LikeStorage})
+ *   <li>Manage state or coordinate persistence operations
+ *   <li>Handle business workflows with side effects
+ * </ul>
+ *
+ * <p>CandidateFinder is a pure filter/transform utility, more similar to {@code GeoUtils} or {@code
+ * InterestMatcher} than to services like {@code MatchingService}. The {@code Finder} suffix
+ * emphasizes its role as a stateless search algorithm.
+ *
+ * <h3>Related Naming Inconsistencies</h3>
+ *
+ * <p>For historical consistency, {@code DealbreakersEvaluator} and {@code InterestMatcher} should
+ * also be renamed to follow either the {@code *Service} pattern or remain as utilities. This is
+ * tracked in <a href="file:///DEVELOPMENT_PLAN.md">DEVELOPMENT_PLAN.md</a> items #6 and #15.
+ *
+ * <h3>Future Improvements</h3>
+ *
+ * <ul>
+ *   <li><strong>Pagination:</strong> Currently returns all matches in memory. Future versions could
+ *       support cursor-based pagination for large result sets.
+ *   <li><strong>Caching Layer:</strong> Filter results could be cached (Redis/in-memory) to avoid
+ *       recomputing for repeated queries.
+ *   <li><strong>Scoring/Ranking:</strong> Beyond distance sorting, could incorporate match quality
+ *       scores for intelligent ranking.
+ * </ul>
+ *
+ * @see CandidateFinderService
+ * @see DealbreakersEvaluator
+ * @see InterestMatcher
+ * @see GeoUtils
  */
 public class CandidateFinder implements CandidateFinderService {
 

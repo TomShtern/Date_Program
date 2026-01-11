@@ -403,6 +403,19 @@ class AchievementServiceTest {
     }
 
     @Override
+    public java.util.Map<UUID, java.time.Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
+      java.util.Map<UUID, java.time.Instant> result = new java.util.HashMap<>();
+      for (List<Like> likeList : likes.values()) {
+        for (Like like : likeList) {
+          if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
+            result.put(like.whoLikes(), like.createdAt());
+          }
+        }
+      }
+      return result;
+    }
+
+    @Override
     public int countByDirection(UUID userId, Like.Direction direction) {
       return (int)
           likes.getOrDefault(userId, List.of()).stream()

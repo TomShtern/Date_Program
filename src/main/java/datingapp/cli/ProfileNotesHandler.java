@@ -49,9 +49,9 @@ public class ProfileNotesHandler {
     User currentUser = userSession.getCurrentUser();
     Optional<ProfileNote> existingNote = profileNoteStorage.get(currentUser.getId(), subjectId);
 
-    logger.info("\n───────────────────────────────────────");
+    logger.info("\n" + CliConstants.MENU_DIVIDER);
     logger.info("       📝 NOTES ABOUT {}", subjectName.toUpperCase());
-    logger.info("───────────────────────────────────────");
+    logger.info(CliConstants.MENU_DIVIDER);
 
     if (existingNote.isPresent()) {
       logger.info("\nCurrent note:");
@@ -156,9 +156,9 @@ public class ProfileNotesHandler {
     User currentUser = userSession.getCurrentUser();
     List<ProfileNote> notes = profileNoteStorage.getAllByAuthor(currentUser.getId());
 
-    logger.info("\n───────────────────────────────────────");
+    logger.info("\n" + CliConstants.MENU_DIVIDER);
     logger.info("         📝 MY PROFILE NOTES");
-    logger.info("───────────────────────────────────────\n");
+    logger.info(CliConstants.MENU_DIVIDER + "\n");
 
     if (notes.isEmpty()) {
       logger.info("You haven't added any notes yet.");

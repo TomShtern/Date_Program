@@ -24,11 +24,6 @@ public class SafetyHandler {
   private final UserSession userSession;
   private final InputReader inputReader;
 
-  private static final String PLEASE_SELECT_USER = "\n⚠️  Please select or create a user first.\n";
-  private static final String CANCELLED = "Cancelled.\n";
-  private static final String BLOCK_PREFIX = "Block ";
-  private static final String CONFIRM_SUFFIX = "? (y/n): ";
-
   public SafetyHandler(
       UserStorage userStorage,
       BlockStorage blockStorage,
@@ -46,11 +41,11 @@ public class SafetyHandler {
 
   public void blockUser() {
     if (!userSession.isLoggedIn()) {
-      logger.info(PLEASE_SELECT_USER);
+      logger.info(CliConstants.PLEASE_SELECT_USER);
       return;
     }
 
-    logger.info("\n--- Block a User ---\n");
+    logger.info(CliConstants.HEADER_BLOCK_USER);
 
     User currentUser = userSession.getCurrentUser();
     List<User> allUsers = userStorage.findAll();
@@ -76,12 +71,14 @@ public class SafetyHandler {
     try {
       int idx = Integer.parseInt(input) - 1;
       if (idx < 0 || idx >= blockableUsers.size()) {
-        if (idx != -1) logger.info(CliConstants.INVALID_INPUT_MSG);
+        if (idx != -1) logger.info(CliConstants.INVALID_INPUT);
         return;
       }
 
       User toBlock = blockableUsers.get(idx);
-      String confirm = inputReader.readLine(BLOCK_PREFIX + toBlock.getName() + CONFIRM_SUFFIX);
+      String confirm =
+          inputReader.readLine(
+              CliConstants.BLOCK_PREFIX + toBlock.getName() + CliConstants.CONFIRM_SUFFIX);
       if (confirm.equalsIgnoreCase("y")) {
         Block block = Block.create(currentUser.getId(), toBlock.getId());
         blockStorage.save(block);
@@ -100,16 +97,16 @@ public class SafetyHandler {
 
         logger.info("🚫 Blocked {}.\n", toBlock.getName());
       } else {
-        logger.info(CANCELLED);
+        logger.info(CliConstants.CANCELLED);
       }
     } catch (NumberFormatException e) {
-      logger.info(CliConstants.INVALID_INPUT_MSG);
+      logger.info(CliConstants.INVALID_INPUT);
     }
   }
 
   public void reportUser() {
     if (!userSession.isLoggedIn()) {
-      logger.info(PLEASE_SELECT_USER);
+      logger.info(CliConstants.PLEASE_SELECT_USER);
       return;
     }
 
@@ -119,7 +116,7 @@ public class SafetyHandler {
       return;
     }
 
-    logger.info("\n--- Report a User ---\n");
+    logger.info(CliConstants.HEADER_REPORT_USER);
 
     List<User> allUsers = userStorage.findAll();
     List<User> reportableUsers =
@@ -163,7 +160,7 @@ public class SafetyHandler {
     try {
       int idx = Integer.parseInt(input) - 1;
       if (idx < 0 || idx >= reportableUsers.size()) {
-        if (idx != -1) logger.info(CliConstants.INVALID_INPUT_MSG);
+        if (idx != -1) logger.info(CliConstants.INVALID_INPUT);
         return null;
       }
       return reportableUsers.get(idx);

@@ -170,6 +170,17 @@ class Round2BugInvestigationTest {
     }
 
     @Override
+    public java.util.Map<UUID, java.time.Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
+      java.util.Map<UUID, java.time.Instant> result = new java.util.HashMap<>();
+      for (Like like : likes) {
+        if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
+          result.put(like.whoLikes(), like.createdAt());
+        }
+      }
+      return result;
+    }
+
+    @Override
     public int countByDirection(UUID userId, Like.Direction direction) {
       return 0;
     }

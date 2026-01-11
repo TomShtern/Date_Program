@@ -3,7 +3,8 @@
     "allow": [
       "Bash(mkdir:*)",
       "Skill(feature-dev:feature-dev)",
-      "Bash(mvn clean compile test:*)"
+      "Bash(mvn clean compile test:*)",
+      "Bash(mvn test:*)"
     ]
   },
   "outputStyle": "Explanatory"

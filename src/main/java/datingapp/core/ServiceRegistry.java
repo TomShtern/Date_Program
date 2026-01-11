@@ -3,10 +3,13 @@ package datingapp.core;
 import java.util.Objects;
 
 /**
- * Central registry holding all storage and service instances. Provides a single point of access for
+ * Central registry holding all storage and service instances. Provides a single
+ * point of access for
  * all application components.
  *
- * <p>This pattern enables: - Easy testing with mock implementations - Swapping storage backends (H2
+ * <p>
+ * This pattern enables: - Easy testing with mock implementations - Swapping
+ * storage backends (H2
  * -> PostgreSQL) - Adding new services without modifying Main
  */
 public class ServiceRegistry {
@@ -27,6 +30,8 @@ public class ServiceRegistry {
   private final UserAchievementStorage userAchievementStorage; // Phase 1
   private final ProfileViewStorage profileViewStorage; // Phase 1.5 - view counter
   private final ProfileNoteStorage profileNoteStorage; // Phase 1.5 - private notes
+  private final ConversationStorage conversationStorage; // Messaging
+  private final MessageStorage messageStorage; // Messaging
 
   // Services
   private final CandidateFinderService candidateFinder;
@@ -40,6 +45,7 @@ public class ServiceRegistry {
   private final UndoService undoService; // Phase 1
   private final DailyPickService dailyPickService; // Phase 1
   private final AchievementService achievementService; // Phase 1
+  private final MessagingService messagingService; // Messaging
 
   /** Package-private constructor - use ServiceRegistryBuilder to create. */
   ServiceRegistry(
@@ -56,6 +62,8 @@ public class ServiceRegistry {
       UserAchievementStorage userAchievementStorage,
       ProfileViewStorage profileViewStorage,
       ProfileNoteStorage profileNoteStorage,
+      ConversationStorage conversationStorage,
+      MessageStorage messageStorage,
       CandidateFinderService candidateFinder,
       MatchingService matchingService,
       ReportService reportService,
@@ -66,7 +74,8 @@ public class ServiceRegistry {
       DailyLimitService dailyLimitService,
       UndoService undoService,
       DailyPickService dailyPickService,
-      AchievementService achievementService) {
+      AchievementService achievementService,
+      MessagingService messagingService) {
     this.config = Objects.requireNonNull(config);
     this.userStorage = Objects.requireNonNull(userStorage);
     this.likeStorage = Objects.requireNonNull(likeStorage);
@@ -80,6 +89,8 @@ public class ServiceRegistry {
     this.userAchievementStorage = Objects.requireNonNull(userAchievementStorage);
     this.profileViewStorage = Objects.requireNonNull(profileViewStorage);
     this.profileNoteStorage = Objects.requireNonNull(profileNoteStorage);
+    this.conversationStorage = Objects.requireNonNull(conversationStorage);
+    this.messageStorage = Objects.requireNonNull(messageStorage);
     this.candidateFinder = Objects.requireNonNull(candidateFinder);
     this.matchingService = Objects.requireNonNull(matchingService);
     this.reportService = Objects.requireNonNull(reportService);
@@ -91,6 +102,7 @@ public class ServiceRegistry {
     this.undoService = Objects.requireNonNull(undoService);
     this.dailyPickService = Objects.requireNonNull(dailyPickService);
     this.achievementService = Objects.requireNonNull(achievementService);
+    this.messagingService = Objects.requireNonNull(messagingService);
   }
 
   // === Getters ===
@@ -189,5 +201,17 @@ public class ServiceRegistry {
 
   public ProfileNoteStorage getProfileNoteStorage() {
     return profileNoteStorage;
+  }
+
+  public ConversationStorage getConversationStorage() {
+    return conversationStorage;
+  }
+
+  public MessageStorage getMessageStorage() {
+    return messageStorage;
+  }
+
+  public MessagingService getMessagingService() {
+    return messagingService;
   }
 }

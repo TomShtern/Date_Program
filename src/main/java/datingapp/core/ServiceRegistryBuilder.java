@@ -2,9 +2,11 @@ package datingapp.core;
 
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.H2BlockStorage;
+import datingapp.storage.H2ConversationStorage;
 import datingapp.storage.H2DailyPickViewStorage;
 import datingapp.storage.H2LikeStorage;
 import datingapp.storage.H2MatchStorage;
+import datingapp.storage.H2MessageStorage;
 import datingapp.storage.H2PlatformStatsStorage;
 import datingapp.storage.H2ProfileNoteStorage;
 import datingapp.storage.H2ProfileViewStorage;
@@ -15,9 +17,12 @@ import datingapp.storage.H2UserStatsStorage;
 import datingapp.storage.H2UserStorage;
 
 /**
- * Builder for creating ServiceRegistry instances with different storage backends.
+ * Builder for creating ServiceRegistry instances with different storage
+ * backends.
  *
- * <p>Extension point: Add new build methods for different backends: - buildPostgres(config,
+ * <p>
+ * Extension point: Add new build methods for different backends: -
+ * buildPostgres(config,
  * connectionPool) - buildInMemory(config) // for testing
  */
 public final class ServiceRegistryBuilder {
@@ -30,7 +35,7 @@ public final class ServiceRegistryBuilder {
    * Builds a ServiceRegistry with H2 database storage.
    *
    * @param dbManager The H2 database manager
-   * @param config Application configuration
+   * @param config    Application configuration
    * @return Fully wired ServiceRegistry
    */
   public static ServiceRegistry buildH2(DatabaseManager dbManager, AppConfig config) {
@@ -48,39 +53,41 @@ public final class ServiceRegistryBuilder {
     // Services
     CandidateFinderService candidateFinder = new CandidateFinder();
     SessionService sessionService = new SessionService(sessionStorage, config);
-    MatchingService matchingService =
-        new MatchingService(likeStorage, matchStorage, sessionService);
-    ReportService reportService =
-        new ReportService(reportStorage, userStorage, blockStorage, config);
-    StatsService statsService =
-        new StatsService(
-            likeStorage,
-            matchStorage,
-            blockStorage,
-            reportStorage,
-            userStatsStorage,
-            platformStatsStorage);
+    MatchingService matchingService = new MatchingService(likeStorage, matchStorage, sessionService);
+    ReportService reportService = new ReportService(reportStorage, userStorage, blockStorage, config);
+    StatsService statsService = new StatsService(
+        likeStorage,
+        matchStorage,
+        blockStorage,
+        reportStorage,
+        userStatsStorage,
+        platformStatsStorage);
     MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage);
     ProfilePreviewService profilePreviewService = new ProfilePreviewService();
     DailyLimitService dailyLimitService = new DailyLimitService(likeStorage, config);
     UndoService undoService = new UndoService(likeStorage, matchStorage, config);
-    DailyPickService dailyPickService =
-        new DailyPickService(userStorage, likeStorage, blockStorage, dailyPickStorage, config);
+    DailyPickService dailyPickService = new DailyPickService(userStorage, likeStorage, blockStorage, dailyPickStorage,
+        config);
 
     // Achievement System (Phase 1)
     UserAchievementStorage userAchievementStorage = new H2UserAchievementStorage(dbManager);
-    AchievementService achievementService =
-        new AchievementService(
-            userAchievementStorage,
-            matchStorage,
-            likeStorage,
-            userStorage,
-            reportStorage,
-            profilePreviewService);
+    AchievementService achievementService = new AchievementService(
+        userAchievementStorage,
+        matchStorage,
+        likeStorage,
+        userStorage,
+        reportStorage,
+        profilePreviewService);
 
     // Profile Views & Notes (Phase 1.5)
     ProfileViewStorage profileViewStorage = new H2ProfileViewStorage(dbManager);
     ProfileNoteStorage profileNoteStorage = new H2ProfileNoteStorage(dbManager);
+
+    // Messaging (Phase 2)
+    ConversationStorage conversationStorage = new H2ConversationStorage(dbManager);
+    MessageStorage messageStorage = new H2MessageStorage(dbManager);
+    MessagingService messagingService = new MessagingService(conversationStorage, messageStorage, matchStorage,
+        userStorage);
 
     return new ServiceRegistry(
         config,
@@ -96,6 +103,8 @@ public final class ServiceRegistryBuilder {
         userAchievementStorage,
         profileViewStorage,
         profileNoteStorage,
+        conversationStorage,
+        messageStorage,
         candidateFinder,
         matchingService,
         reportService,
@@ -106,7 +115,8 @@ public final class ServiceRegistryBuilder {
         dailyLimitService,
         undoService,
         dailyPickService,
-        achievementService);
+        achievementService,
+        messagingService);
   }
 
   /** Builds a ServiceRegistry with H2 database and default configuration. */
@@ -114,7 +124,10 @@ public final class ServiceRegistryBuilder {
     return buildH2(dbManager, AppConfig.defaults());
   }
 
-  /** Builds an in-memory ServiceRegistry for testing. Uses the same H2 in-memory mode. */
+  /**
+   * Builds an in-memory ServiceRegistry for testing. Uses the same H2 in-memory
+   * mode.
+   */
   public static ServiceRegistry buildInMemory(AppConfig config) {
     return buildH2(DatabaseManager.getInstance(), config);
   }

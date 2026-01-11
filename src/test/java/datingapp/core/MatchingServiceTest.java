@@ -181,6 +181,17 @@ class MatchingServiceTest {
     }
 
     @Override
+    public java.util.Map<UUID, java.time.Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
+      java.util.Map<UUID, java.time.Instant> result = new java.util.HashMap<>();
+      for (Like like : likes.values()) {
+        if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
+          result.put(like.whoLikes(), like.createdAt());
+        }
+      }
+      return result;
+    }
+
+    @Override
     public boolean mutualLikeExists(UUID user1, UUID user2) {
       return exists(user1, user2) && exists(user2, user1);
     }

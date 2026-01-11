@@ -186,7 +186,7 @@ public class ProfileHandler {
   }
 
   private void promptGender(User currentUser) {
-    logger.info("\nGender options: 1=MALE, 2=FEMALE, 3=OTHER");
+    logger.info("\n" + CliConstants.GENDER_OPTIONS);
     String genderChoice = inputReader.readLine("Your gender (1/2/3): ");
     User.Gender gender =
         switch (genderChoice) {
@@ -199,8 +199,7 @@ public class ProfileHandler {
   }
 
   private void promptInterestedIn(User currentUser) {
-    logger.info("\nInterested in (comma-separated, e.g., 1,2):");
-    logger.info("  1=MALE, 2=FEMALE, 3=OTHER");
+    logger.info("\n" + CliConstants.INTERESTED_IN_PROMPT);
     String interestedStr = inputReader.readLine("Your preferences: ");
     Set<User.Gender> interestedIn = parseGenderSet(interestedStr);
     if (!interestedIn.isEmpty()) currentUser.setInterestedIn(interestedIn);
@@ -226,7 +225,7 @@ public class ProfileHandler {
   }
 
   private void promptInterests(User currentUser) {
-    logger.info("\n--- Interests & Hobbies (max 10) ---");
+    logger.info("\n" + CliConstants.HEADER_INTERESTS_HOBBIES);
     Set<Interest> selected = currentUser.getInterests();
 
     boolean editing = true;
@@ -338,7 +337,7 @@ public class ProfileHandler {
   }
 
   private void promptLifestyle(User currentUser) {
-    logger.info("\n--- Lifestyle (optional, helps with matching) ---\n");
+    logger.info("\n" + CliConstants.HEADER_LIFESTYLE + "\n");
 
     String heightStr = inputReader.readLine("Height in cm (e.g., 175, or Enter to skip): ");
     if (!heightStr.isBlank()) {
@@ -427,7 +426,7 @@ public class ProfileHandler {
   }
 
   private void displayDealbreakerMenu() {
-    logger.info("───────────────────────────────────────");
+    logger.info(CliConstants.MENU_DIVIDER);
     logger.info("  1. Set smoking dealbreaker");
     logger.info("  2. Set drinking dealbreaker");
     logger.info("  3. Set kids stance dealbreaker");
@@ -436,7 +435,7 @@ public class ProfileHandler {
     logger.info("  6. Set max age difference");
     logger.info("  7. Clear all dealbreakers");
     logger.info("  0. Cancel");
-    logger.info("───────────────────────────────────────\n");
+    logger.info(CliConstants.MENU_DIVIDER + "\n");
   }
 
   // Note: I am copying the logic from Main.java for dealbreakers

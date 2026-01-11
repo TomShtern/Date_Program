@@ -95,7 +95,7 @@ public class MatchingHandler {
       showDailyPick(dailyPick.get(), currentUser);
     }
 
-    logger.info("\n--- Browse Candidates ---\n");
+    logger.info("\nCliConstants.HEADER_BROWSE_CANDIDATES\n");
 
     List<User> activeUsers = userStorage.findActive();
     Set<UUID> alreadyInteracted = likeStorage.getLikedOrPassedUserIds(currentUser.getId());
@@ -158,10 +158,10 @@ public class MatchingHandler {
 
     logger.info(CliConstants.BOX_BOTTOM);
 
-    String action = inputReader.readLine("  [L]ike / [P]ass / [Q]uit browsing: ").toLowerCase();
+    String action = inputReader.readLine("CliConstants.PROMPT_LIKE_PASS_QUIT").toLowerCase();
 
     if (action.equals("q")) {
-      logger.info("\nStopping browse.\n");
+      logger.info("CliConstants.MSG_STOPPING_BROWSE");
       return false;
     }
 
@@ -236,8 +236,8 @@ public class MatchingHandler {
       }
     }
 
-    logger.info("\n───────────────────────────────────────");
-    logger.info("  [V]iew details / [U]nmatch / [B]lock / [Enter] to go back");
+    logger.info("CliConstants.MENU_DIVIDER_WITH_NEWLINES");
+    logger.info("  CliConstants.PROMPT_VIEW_UNMATCH_BLOCK");
     String action = inputReader.readLine("\nYour choice: ").toLowerCase();
 
     switch (action) {
@@ -266,8 +266,8 @@ public class MatchingHandler {
 
       displayMatchQuality(otherUser, quality);
 
-      logger.info("\n───────────────────────────────────────");
-      logger.info("  (U)nmatch  (B)lock  (Enter to go back)");
+      logger.info("CliConstants.MENU_DIVIDER_WITH_NEWLINES");
+      logger.info("CliConstants.PROMPT_UNMATCH_BLOCK_BACK");
       String action = inputReader.readLine("  Your choice: ").toLowerCase();
 
       handleMatchDetailAction(action, match, otherUser, otherUserId, currentUser);
@@ -470,7 +470,7 @@ public class MatchingHandler {
     logger.info("  This pick resets tomorrow at midnight!");
     logger.info("");
 
-    String action = inputReader.readLine("  [L]ike / [P]ass / [S]kip for now: ").toLowerCase();
+    String action = inputReader.readLine("CliConstants.PROMPT_LIKE_PASS_SKIP").toLowerCase();
 
     if (action.equals("s")) {
       logger.info("  👋 You can see this pick again later today.\n");

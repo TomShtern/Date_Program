@@ -303,6 +303,16 @@ class DailyPickServiceTest {
     }
 
     @Override
+    public java.util.Map<UUID, java.time.Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
+      return likes.stream()
+          .filter(l -> l.whoGotLiked().equals(userId))
+          .filter(l -> l.direction() == Like.Direction.LIKE)
+          .collect(
+              java.util.stream.Collectors.toMap(
+                  Like::whoLikes, Like::createdAt, (existing, replacement) -> existing));
+    }
+
+    @Override
     public int countByDirection(UUID userId, Like.Direction direction) {
       return (int)
           likes.stream()
