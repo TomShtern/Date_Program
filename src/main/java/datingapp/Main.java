@@ -1,10 +1,5 @@
 package datingapp;
 
-import java.util.Scanner;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import datingapp.cli.CliConstants;
 import datingapp.cli.InputReader;
 import datingapp.cli.LikerBrowserHandler;
@@ -27,10 +22,12 @@ import datingapp.core.SessionService;
 import datingapp.core.User;
 import datingapp.core.VerificationService;
 import datingapp.storage.DatabaseManager;
+import java.util.Scanner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Console-based dating app - Phase 0.5. Main entry point with interactive menu.
- * Refactored to
+ * Console-based dating app - Phase 0.5. Main entry point with interactive menu. Refactored to
  * delegate logic to specialized handlers.
  */
 public class Main {
@@ -111,55 +108,62 @@ public class Main {
     // Initialize Handlers
     userHandler = new UserManagementHandler(services.getUserStorage(), userSession, inputReader);
 
-    profileHandler = new ProfileHandler(
-        services.getUserStorage(),
-        services.getProfilePreviewService(),
-        services.getAchievementService(),
-        userSession,
-        inputReader);
-
-    matchingHandler = new MatchingHandler(
-        services.getCandidateFinder(),
-        services.getMatchingService(),
-        services.getLikeStorage(),
-        services.getMatchStorage(),
-        services.getBlockStorage(),
-        services.getDailyLimitService(),
-        services.getDailyPickService(),
-        services.getUndoService(),
-        services.getMatchQualityService(),
-        services.getUserStorage(),
-        services.getAchievementService(),
-        services.getProfileViewStorage(),
-        userSession,
-        inputReader);
-
-    safetyHandler = new SafetyHandler(
-        services.getUserStorage(),
-        services.getBlockStorage(),
-        services.getMatchStorage(),
-        services.getReportService(),
-        userSession,
-        inputReader);
-
-    statsHandler = new StatsHandler(
-        services.getStatsService(), services.getAchievementService(), userSession, inputReader);
-
-    profileNotesHandler = new ProfileNotesHandler(
-        services.getProfileNoteStorage(), services.getUserStorage(), userSession, inputReader);
-
-    profileVerificationHandler = new ProfileVerificationHandler(
-        services.getUserStorage(), new VerificationService(), userSession, inputReader);
-
-    likerBrowserHandler = new LikerBrowserHandler(
-        new LikerBrowserService(
-            services.getLikeStorage(),
+    profileHandler =
+        new ProfileHandler(
             services.getUserStorage(),
+            services.getProfilePreviewService(),
+            services.getAchievementService(),
+            userSession,
+            inputReader);
+
+    matchingHandler =
+        new MatchingHandler(
+            services.getCandidateFinder(),
+            services.getMatchingService(),
+            services.getLikeStorage(),
             services.getMatchStorage(),
-            services.getBlockStorage()),
-        services.getMatchingService(),
-        userSession,
-        inputReader);
+            services.getBlockStorage(),
+            services.getDailyLimitService(),
+            services.getDailyPickService(),
+            services.getUndoService(),
+            services.getMatchQualityService(),
+            services.getUserStorage(),
+            services.getAchievementService(),
+            services.getProfileViewStorage(),
+            userSession,
+            inputReader);
+
+    safetyHandler =
+        new SafetyHandler(
+            services.getUserStorage(),
+            services.getBlockStorage(),
+            services.getMatchStorage(),
+            services.getReportService(),
+            userSession,
+            inputReader);
+
+    statsHandler =
+        new StatsHandler(
+            services.getStatsService(), services.getAchievementService(), userSession, inputReader);
+
+    profileNotesHandler =
+        new ProfileNotesHandler(
+            services.getProfileNoteStorage(), services.getUserStorage(), userSession, inputReader);
+
+    profileVerificationHandler =
+        new ProfileVerificationHandler(
+            services.getUserStorage(), new VerificationService(), userSession, inputReader);
+
+    likerBrowserHandler =
+        new LikerBrowserHandler(
+            new LikerBrowserService(
+                services.getLikeStorage(),
+                services.getUserStorage(),
+                services.getMatchStorage(),
+                services.getBlockStorage()),
+            services.getMatchingService(),
+            userSession,
+            inputReader);
 
     messagingHandler = new MessagingHandler(services, inputReader, userSession);
   }
@@ -179,12 +183,13 @@ public class Main {
       sessionService
           .getCurrentSession(currentUser.getId())
           .ifPresent(
-              session -> logger.info(
-                  "  Session: {} swipes ({} likes, {} passes) | {} elapsed",
-                  session.getSwipeCount(),
-                  session.getLikeCount(),
-                  session.getPassCount(),
-                  session.getFormattedDuration()));
+              session ->
+                  logger.info(
+                      "  Session: {} swipes ({} likes, {} passes) | {} elapsed",
+                      session.getSwipeCount(),
+                      session.getLikeCount(),
+                      session.getPassCount(),
+                      session.getFormattedDuration()));
 
       // Show daily likes
       DailyLimitService dailyLimitService = services.getDailyLimitService();
@@ -231,7 +236,8 @@ public class Main {
     }
 
     User currentUser = userSession.getCurrentUser();
-    ProfileCompletionService.CompletionResult result = ProfileCompletionService.calculate(currentUser);
+    ProfileCompletionService.CompletionResult result =
+        ProfileCompletionService.calculate(currentUser);
 
     logger.info("\n───────────────────────────────────────");
     logger.info("      📊 PROFILE COMPLETION SCORE");

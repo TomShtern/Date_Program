@@ -3,13 +3,10 @@ package datingapp.core;
 import java.util.Objects;
 
 /**
- * Central registry holding all storage and service instances. Provides a single
- * point of access for
+ * Central registry holding all storage and service instances. Provides a single point of access for
  * all application components.
  *
- * <p>
- * This pattern enables: - Easy testing with mock implementations - Swapping
- * storage backends (H2
+ * <p>This pattern enables: - Easy testing with mock implementations - Swapping storage backends (H2
  * -> PostgreSQL) - Adding new services without modifying Main
  */
 public class ServiceRegistry {
