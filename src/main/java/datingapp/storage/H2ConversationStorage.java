@@ -151,30 +151,32 @@ public class H2ConversationStorage implements ConversationStorage {
 
   @Override
   public void updateReadTimestamp(String conversationId, UUID userId, Instant timestamp) {
-    // First, determine if userId is userA or userB
-    Optional<Conversation> convoOpt = get(conversationId);
-    if (convoOpt.isEmpty()) {
-      throw new StorageException("Conversation not found: " + conversationId);
-    }
-
-    Conversation convo = convoOpt.get();
-    String column;
-    if (convo.getUserA().equals(userId)) {
-      column = "user_a_last_read_at";
-    } else if (convo.getUserB().equals(userId)) {
-      column = "user_b_last_read_at";
-    } else {
-      throw new IllegalArgumentException("User is not part of this conversation");
-    }
-
-    String sql = "UPDATE conversations SET " + column + " = ? WHERE id = ?";
+    // Single query with CASE/WHEN to update the correct column based on userId
+    String sql =
+        """
+                UPDATE conversations
+                SET user_a_last_read_at = CASE WHEN user_a = ? THEN ? ELSE user_a_last_read_at END,
+                    user_b_last_read_at = CASE WHEN user_b = ? THEN ? ELSE user_b_last_read_at END
+                WHERE id = ? AND (user_a = ? OR user_b = ?)
+                """;
 
     try (Connection conn = dbManager.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-      stmt.setTimestamp(1, Timestamp.from(timestamp));
-      stmt.setString(2, conversationId);
-      stmt.executeUpdate();
+      Timestamp ts = Timestamp.from(timestamp);
+      stmt.setObject(1, userId);
+      stmt.setTimestamp(2, ts);
+      stmt.setObject(3, userId);
+      stmt.setTimestamp(4, ts);
+      stmt.setString(5, conversationId);
+      stmt.setObject(6, userId);
+      stmt.setObject(7, userId);
+
+      int rowsUpdated = stmt.executeUpdate();
+      if (rowsUpdated == 0) {
+        throw new StorageException(
+            "Conversation not found or user is not a participant: " + conversationId);
+      }
 
     } catch (SQLException e) {
       throw new StorageException("Failed to update read timestamp: " + conversationId, e);

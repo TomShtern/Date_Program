@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,9 +33,9 @@ public class MessagingHandler {
   private final UserSession session;
 
   public MessagingHandler(ServiceRegistry registry, InputReader input, UserSession session) {
-    this.registry = registry;
-    this.input = input;
-    this.session = session;
+    this.registry = Objects.requireNonNull(registry, "registry cannot be null");
+    this.input = Objects.requireNonNull(input, "input cannot be null");
+    this.session = Objects.requireNonNull(session, "session cannot be null");
   }
 
   /** Shows the conversation list and handles navigation. */
@@ -177,7 +178,9 @@ public class MessagingHandler {
           offset = 0;
           showOlder = false;
         }
-        case CONTINUE -> {}
+        case CONTINUE -> {
+          /* No action needed, continue conversation loop */
+        }
       }
     }
   }

@@ -256,6 +256,270 @@ class MessagingServiceTest {
     }
   }
 
+  @Nested
+  @DisplayName("markAsRead")
+  class MarkAsRead {
+
+    @Test
+    @DisplayName("should update read timestamp")
+    void updateReadTimestamp() {
+      Match match = Match.create(userA, userB);
+      matchStorage.save(match);
+
+      // Send message from A to B
+      messagingService.sendMessage(userA, userB, "Hello!");
+      String conversationId = Conversation.generateId(userA, userB);
+
+      // Mark as read for userB
+      messagingService.markAsRead(userB, conversationId);
+
+      // Verify timestamp was updated
+      Conversation convo = conversationStorage.get(conversationId).orElseThrow();
+      assertNotNull(convo.getLastReadAt(userB));
+    }
+
+    @Test
+    @DisplayName("should ignore non-participant")
+    void ignoreNonParticipant() {
+      Match match = Match.create(userA, userB);
+      matchStorage.save(match);
+
+      messagingService.sendMessage(userA, userB, "Hello!");
+      String conversationId = Conversation.generateId(userA, userB);
+
+      // userC is not part of the conversation - should not throw
+      messagingService.markAsRead(userC, conversationId);
+
+      // Verify conversation still exists and is unchanged
+      assertTrue(conversationStorage.get(conversationId).isPresent());
+    }
+  }
+
+  @Nested
+  @DisplayName("getUnreadCount")
+  class GetUnreadCount {
+
+    @Test
+    @DisplayName("should return correct count for unread messages")
+    void returnCorrectCount() throws InterruptedException {
+      Match match = Match.create(userA, userB);
+      matchStorage.save(match);
+
+      // Send 3 messages from A to B
+      messagingService.sendMessage(userA, userB, "Message 1");
+      Thread.sleep(10);
+      messagingService.sendMessage(userA, userB, "Message 2");
+      Thread.sleep(10);
+      messagingService.sendMessage(userA, userB, "Message 3");
+
+      String conversationId = Conversation.generateId(userA, userB);
+      int unreadForB = messagingService.getUnreadCount(userB, conversationId);
+
+      assertEquals(3, unreadForB);
+    }
+
+    @Test
+    @DisplayName("should return 0 after marking as read")
+    void returnZeroAfterRead() throws InterruptedException {
+      Match match = Match.create(userA, userB);
+      matchStorage.save(match);
+
+      messagingService.sendMessage(userA, userB, "Hello!");
+      Thread.sleep(10);
+      String conversationId = Conversation.generateId(userA, userB);
+
+      // Mark as read
+      messagingService.markAsRead(userB, conversationId);
+
+      // Wait a bit to ensure timestamp is in the past
+      Thread.sleep(10);
+
+      // Count should be 0 now (no messages after the read timestamp)
+      int unreadForB = messagingService.getUnreadCount(userB, conversationId);
+      assertEquals(0, unreadForB);
+    }
+
+    @Test
+    @DisplayName("should return 0 for empty conversation")
+    void returnZeroForEmpty() {
+      Match match = Match.create(userA, userB);
+      matchStorage.save(match);
+
+      // Create conversation but don't send any messages
+      Conversation convo = messagingService.getOrCreateConversation(userA, userB);
+
+      int unread = messagingService.getUnreadCount(userB, convo.getId());
+      assertEquals(0, unread);
+    }
+
+    @Test
+    @DisplayName("should not count own messages as unread")
+    void notCountOwnMessages() throws InterruptedException {
+      Match match = Match.create(userA, userB);
+      matchStorage.save(match);
+
+      // A sends 2 messages, B sends 1 message
+      messagingService.sendMessage(userA, userB, "From A - 1");
+      Thread.sleep(10);
+      messagingService.sendMessage(userB, userA, "From B");
+      Thread.sleep(10);
+      messagingService.sendMessage(userA, userB, "From A - 2");
+
+      String conversationId = Conversation.generateId(userA, userB);
+
+      // B should see 2 unread (from A), A should see 1 unread (from B)
+      assertEquals(2, messagingService.getUnreadCount(userB, conversationId));
+      assertEquals(1, messagingService.getUnreadCount(userA, conversationId));
+    }
+  }
+
+  @Nested
+  @DisplayName("getTotalUnreadCount")
+  class GetTotalUnreadCount {
+
+    @Test
+    @DisplayName("should aggregate across conversations")
+    void aggregateAcrossConversations() throws InterruptedException {
+      // Create matches: A-B and A-C
+      Match matchAB = Match.create(userA, userB);
+      Match matchAC = Match.create(userA, userC);
+      matchStorage.save(matchAB);
+      matchStorage.save(matchAC);
+
+      // B sends 2 messages to A
+      messagingService.sendMessage(userB, userA, "From B - 1");
+      Thread.sleep(10);
+      messagingService.sendMessage(userB, userA, "From B - 2");
+
+      // C sends 3 messages to A
+      Thread.sleep(10);
+      messagingService.sendMessage(userC, userA, "From C - 1");
+      Thread.sleep(10);
+      messagingService.sendMessage(userC, userA, "From C - 2");
+      Thread.sleep(10);
+      messagingService.sendMessage(userC, userA, "From C - 3");
+
+      int totalUnread = messagingService.getTotalUnreadCount(userA);
+      assertEquals(5, totalUnread);
+    }
+
+    @Test
+    @DisplayName("should return 0 for user with no conversations")
+    void returnZeroForNoConversations() {
+      int totalUnread = messagingService.getTotalUnreadCount(userA);
+      assertEquals(0, totalUnread);
+    }
+  }
+
+  @Nested
+  @DisplayName("getConversations")
+  class GetConversations {
+
+    @Test
+    @DisplayName("should return sorted by most recent")
+    void returnSortedByMostRecent() throws InterruptedException {
+      Match matchAB = Match.create(userA, userB);
+      Match matchAC = Match.create(userA, userC);
+      matchStorage.save(matchAB);
+      matchStorage.save(matchAC);
+
+      // Send older message to B, newer to C
+      messagingService.sendMessage(userA, userB, "Older");
+      Thread.sleep(20);
+      messagingService.sendMessage(userA, userC, "Newer");
+
+      List<MessagingService.ConversationPreview> previews =
+          messagingService.getConversations(userA);
+
+      assertEquals(2, previews.size());
+      // C conversation should be first (more recent)
+      assertEquals(userC, previews.get(0).otherUser().getId());
+      assertEquals(userB, previews.get(1).otherUser().getId());
+    }
+
+    @Test
+    @DisplayName("should include unread counts")
+    void includeUnreadCounts() throws InterruptedException {
+      Match match = Match.create(userA, userB);
+      matchStorage.save(match);
+
+      // B sends 3 messages to A
+      messagingService.sendMessage(userB, userA, "1");
+      Thread.sleep(10);
+      messagingService.sendMessage(userB, userA, "2");
+      Thread.sleep(10);
+      messagingService.sendMessage(userB, userA, "3");
+
+      List<MessagingService.ConversationPreview> previews =
+          messagingService.getConversations(userA);
+
+      assertEquals(1, previews.size());
+      assertEquals(3, previews.get(0).unreadCount());
+    }
+
+    @Test
+    @DisplayName("should include last message")
+    void includeLastMessage() throws InterruptedException {
+      Match match = Match.create(userA, userB);
+      matchStorage.save(match);
+
+      messagingService.sendMessage(userA, userB, "First");
+      Thread.sleep(10);
+      messagingService.sendMessage(userB, userA, "Last message");
+
+      List<MessagingService.ConversationPreview> previews =
+          messagingService.getConversations(userA);
+
+      assertEquals(1, previews.size());
+      assertTrue(previews.get(0).lastMessage().isPresent());
+      assertEquals("Last message", previews.get(0).lastMessage().get().content());
+    }
+
+    @Test
+    @DisplayName("should return empty for user with no conversations")
+    void returnEmptyForNoConversations() {
+      List<MessagingService.ConversationPreview> previews =
+          messagingService.getConversations(userA);
+
+      assertTrue(previews.isEmpty());
+    }
+  }
+
+  @Nested
+  @DisplayName("getOrCreateConversation")
+  class GetOrCreateConversation {
+
+    @Test
+    @DisplayName("should create if not exists")
+    void createIfNotExists() {
+      String conversationId = Conversation.generateId(userA, userB);
+      assertTrue(conversationStorage.get(conversationId).isEmpty());
+
+      Conversation convo = messagingService.getOrCreateConversation(userA, userB);
+
+      assertNotNull(convo);
+      assertTrue(conversationStorage.get(conversationId).isPresent());
+    }
+
+    @Test
+    @DisplayName("should return existing if exists")
+    void returnExistingIfExists() {
+      // Create conversation first via sending message
+      Match match = Match.create(userA, userB);
+      matchStorage.save(match);
+      messagingService.sendMessage(userA, userB, "Hello!");
+
+      String conversationId = Conversation.generateId(userA, userB);
+      Conversation existing = conversationStorage.get(conversationId).orElseThrow();
+
+      // Get or create should return the same one
+      Conversation returned = messagingService.getOrCreateConversation(userA, userB);
+
+      assertEquals(existing.getId(), returned.getId());
+      assertEquals(existing.getCreatedAt(), returned.getCreatedAt());
+    }
+  }
+
   // ===== In-Memory Test Implementations =====
 
   static class InMemoryConversationStorage implements ConversationStorage {
@@ -355,6 +619,14 @@ class MessagingServiceTest {
     @Override
     public void deleteByConversation(String conversationId) {
       messagesByConvo.remove(conversationId);
+    }
+
+    @Override
+    public int countMessagesNotFromSender(String conversationId, UUID senderId) {
+      return (int)
+          messagesByConvo.getOrDefault(conversationId, List.of()).stream()
+              .filter(m -> !m.senderId().equals(senderId))
+              .count();
     }
   }
 

@@ -3,6 +3,7 @@ package datingapp.core;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /** Storage interface for Message entities. Defined in core, implemented in storage layer. */
 public interface MessageStorage {
@@ -44,6 +45,16 @@ public interface MessageStorage {
    * @return The count of messages after the timestamp
    */
   int countMessagesAfter(String conversationId, Instant after);
+
+  /**
+   * Counts messages in a conversation not sent by the specified user. Used for initial unread count
+   * when user has never read the conversation.
+   *
+   * @param conversationId The conversation to count messages for
+   * @param senderId The user whose messages to exclude
+   * @return Count of messages from other participants
+   */
+  int countMessagesNotFromSender(String conversationId, UUID senderId);
 
   /**
    * Deletes all messages for a conversation. Called when conversation is deleted.

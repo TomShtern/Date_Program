@@ -3,6 +3,7 @@ package datingapp.core;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,10 +23,11 @@ public class MessagingService {
       MessageStorage messageStorage,
       MatchStorage matchStorage,
       UserStorage userStorage) {
-    this.conversationStorage = conversationStorage;
-    this.messageStorage = messageStorage;
-    this.matchStorage = matchStorage;
-    this.userStorage = userStorage;
+    this.conversationStorage =
+        Objects.requireNonNull(conversationStorage, "conversationStorage cannot be null");
+    this.messageStorage = Objects.requireNonNull(messageStorage, "messageStorage cannot be null");
+    this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
+    this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
   }
 
   /**
@@ -84,6 +86,9 @@ public class MessagingService {
 
     // Update conversation's last message timestamp
     conversationStorage.updateLastMessageAt(conversationId, message.createdAt());
+
+    // Update sender's lastActiveAt (Phase 3.1 feature)
+    userStorage.save(sender);
 
     return SendResult.success(message);
   }
@@ -225,10 +230,7 @@ public class MessagingService {
 
   /** Counts messages not sent by the given user (for initial unread count). */
   private int countMessagesNotFromUser(String conversationId, UUID userId) {
-    // Get all messages and count those not from userId
-    // This is inefficient but simple - could add a storage method for this
-    List<Message> messages = messageStorage.getMessages(conversationId, 1000, 0);
-    return (int) messages.stream().filter(m -> !m.senderId().equals(userId)).count();
+    return messageStorage.countMessagesNotFromSender(conversationId, userId);
   }
 
   // === Data Transfer Objects ===

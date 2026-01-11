@@ -39,10 +39,27 @@ public class H2MessageStorage implements MessageStorage {
         "CREATE INDEX IF NOT EXISTS idx_messages_conversation_created "
             + "ON messages(conversation_id, created_at)";
 
+    // FK constraint added separately - will fail gracefully if conversations table doesn't exist
+    // or if constraint already exists. This enables cascade delete when conversations are deleted.
+    String addFkConstraint =
+        """
+                ALTER TABLE messages ADD CONSTRAINT IF NOT EXISTS fk_messages_conversation
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+                """;
+
     try (Connection conn = dbManager.getConnection();
         var stmt = conn.createStatement()) {
       stmt.execute(createTableSql);
       stmt.execute(index);
+
+      // Try to add FK constraint - ignore errors if conversations table doesn't exist yet
+      // or if constraint already exists. The application handles cleanup via deleteByConversation.
+      try {
+        stmt.execute(addFkConstraint);
+      } catch (SQLException fkError) {
+        // FK constraint failed (conversations table may not exist yet) - this is OK
+        // as the application handles cascade delete manually via deleteByConversation()
+      }
     } catch (SQLException e) {
       throw new StorageException("Failed to create messages schema", e);
     }
@@ -172,6 +189,32 @@ public class H2MessageStorage implements MessageStorage {
 
     } catch (SQLException e) {
       throw new StorageException("Failed to count unread messages: " + conversationId, e);
+    }
+  }
+
+  @Override
+  public int countMessagesNotFromSender(String conversationId, UUID senderId) {
+    String sql =
+        """
+                SELECT COUNT(*) FROM messages
+                WHERE conversation_id = ?
+                AND sender_id != ?
+                """;
+
+    try (Connection conn = dbManager.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+      stmt.setString(1, conversationId);
+      stmt.setObject(2, senderId);
+      ResultSet rs = stmt.executeQuery();
+
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      return 0;
+
+    } catch (SQLException e) {
+      throw new StorageException("Failed to count messages not from sender: " + conversationId, e);
     }
   }
 

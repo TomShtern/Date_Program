@@ -6,13 +6,17 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Block;
+import datingapp.core.Conversation;
 import datingapp.core.Interest;
 import datingapp.core.Like;
 import datingapp.core.Match;
+import datingapp.core.Message;
 import datingapp.core.User;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeAll;
@@ -33,6 +37,8 @@ class H2StorageIntegrationTest {
   private static H2LikeStorage likeStorage;
   private static H2MatchStorage matchStorage;
   private static H2BlockStorage blockStorage;
+  private static H2ConversationStorage conversationStorage;
+  private static H2MessageStorage messageStorage;
 
   @BeforeAll
   static void setUpOnce() {
@@ -44,6 +50,8 @@ class H2StorageIntegrationTest {
     likeStorage = new H2LikeStorage(dbManager);
     matchStorage = new H2MatchStorage(dbManager);
     blockStorage = new H2BlockStorage(dbManager);
+    conversationStorage = new H2ConversationStorage(dbManager);
+    messageStorage = new H2MessageStorage(dbManager);
   }
 
   @org.junit.jupiter.api.AfterAll
@@ -312,6 +320,277 @@ class H2StorageIntegrationTest {
 
       assertFalse(
           likeStorage.mutualLikeExists(userA.getId(), userB.getId()), "PASS should break mutual");
+    }
+  }
+
+  @Nested
+  @DisplayName("H2ConversationStorage round-trip")
+  class ConversationStorageTests {
+
+    @Test
+    @DisplayName("Conversation survives save and get")
+    void conversationRoundTrip() {
+      User userA = createCompleteUser("ConvA_" + UUID.randomUUID());
+      User userB = createCompleteUser("ConvB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      Optional<Conversation> loaded = conversationStorage.get(conversation.getId());
+
+      assertTrue(loaded.isPresent());
+      assertEquals(conversation.getId(), loaded.get().getId());
+      assertEquals(conversation.getUserA(), loaded.get().getUserA());
+      assertEquals(conversation.getUserB(), loaded.get().getUserB());
+    }
+
+    @Test
+    @DisplayName("getByUsers finds existing conversation")
+    void getByUsersFindsConversation() {
+      User userA = createCompleteUser("ByUsersA_" + UUID.randomUUID());
+      User userB = createCompleteUser("ByUsersB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      // Order should not matter
+      Optional<Conversation> found1 = conversationStorage.getByUsers(userA.getId(), userB.getId());
+      Optional<Conversation> found2 = conversationStorage.getByUsers(userB.getId(), userA.getId());
+
+      assertTrue(found1.isPresent());
+      assertTrue(found2.isPresent());
+      assertEquals(conversation.getId(), found1.get().getId());
+      assertEquals(conversation.getId(), found2.get().getId());
+    }
+
+    @Test
+    @DisplayName("getConversationsFor returns sorted by lastMessageAt")
+    void getConversationsForSortedByLastMessage() {
+      User user = createCompleteUser("SortUser_" + UUID.randomUUID());
+      User partner1 = createCompleteUser("SortPartner1_" + UUID.randomUUID());
+      User partner2 = createCompleteUser("SortPartner2_" + UUID.randomUUID());
+      userStorage.save(user);
+      userStorage.save(partner1);
+      userStorage.save(partner2);
+
+      Conversation conv1 = Conversation.create(user.getId(), partner1.getId());
+      Conversation conv2 = Conversation.create(user.getId(), partner2.getId());
+      conversationStorage.save(conv1);
+      conversationStorage.save(conv2);
+
+      // Update conv1 to have more recent lastMessageAt
+      conversationStorage.updateLastMessageAt(conv1.getId(), Instant.now());
+
+      List<Conversation> conversations = conversationStorage.getConversationsFor(user.getId());
+
+      assertTrue(conversations.size() >= 2);
+      // Most recent first
+      int index1 = -1, index2 = -1;
+      for (int i = 0; i < conversations.size(); i++) {
+        if (conversations.get(i).getId().equals(conv1.getId())) index1 = i;
+        if (conversations.get(i).getId().equals(conv2.getId())) index2 = i;
+      }
+      assertTrue(index1 < index2, "conv1 should come before conv2 (more recent)");
+    }
+
+    @Test
+    @DisplayName("updateReadTimestamp updates correctly")
+    void updateReadTimestampWorks() {
+      User userA = createCompleteUser("ReadA_" + UUID.randomUUID());
+      User userB = createCompleteUser("ReadB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      Instant now = Instant.now();
+      conversationStorage.updateReadTimestamp(conversation.getId(), userA.getId(), now);
+
+      Optional<Conversation> loaded = conversationStorage.get(conversation.getId());
+      assertTrue(loaded.isPresent());
+      // Use getLastReadAt(userId) which handles the userA/userB mapping correctly
+      assertNotNull(loaded.get().getLastReadAt(userA.getId()));
+    }
+
+    @Test
+    @DisplayName("delete removes conversation")
+    void deleteRemovesConversation() {
+      User userA = createCompleteUser("DelA_" + UUID.randomUUID());
+      User userB = createCompleteUser("DelB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      conversationStorage.delete(conversation.getId());
+
+      Optional<Conversation> loaded = conversationStorage.get(conversation.getId());
+      assertFalse(loaded.isPresent());
+    }
+  }
+
+  @Nested
+  @DisplayName("H2MessageStorage round-trip")
+  class MessageStorageTests {
+
+    @Test
+    @DisplayName("Message survives save and get")
+    void messageRoundTrip() {
+      User userA = createCompleteUser("MsgA_" + UUID.randomUUID());
+      User userB = createCompleteUser("MsgB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      Message message = Message.create(conversation.getId(), userA.getId(), "Hello!");
+      messageStorage.save(message);
+
+      List<Message> messages = messageStorage.getMessages(conversation.getId(), 10, 0);
+
+      assertEquals(1, messages.size());
+      assertEquals(message.id(), messages.get(0).id());
+      assertEquals("Hello!", messages.get(0).content());
+      assertEquals(userA.getId(), messages.get(0).senderId());
+    }
+
+    @Test
+    @DisplayName("Pagination with limit and offset works")
+    void paginationWorks() {
+      User userA = createCompleteUser("PageA_" + UUID.randomUUID());
+      User userB = createCompleteUser("PageB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      // Send 5 messages
+      for (int i = 1; i <= 5; i++) {
+        messageStorage.save(Message.create(conversation.getId(), userA.getId(), "Message " + i));
+      }
+
+      List<Message> firstPage = messageStorage.getMessages(conversation.getId(), 2, 0);
+      List<Message> secondPage = messageStorage.getMessages(conversation.getId(), 2, 2);
+
+      assertEquals(2, firstPage.size());
+      assertEquals(2, secondPage.size());
+      // Ensure no overlap
+      assertFalse(firstPage.get(0).id().equals(secondPage.get(0).id()));
+    }
+
+    @Test
+    @DisplayName("countMessages returns correct count")
+    void countMessagesWorks() {
+      User userA = createCompleteUser("CountA_" + UUID.randomUUID());
+      User userB = createCompleteUser("CountB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      assertEquals(0, messageStorage.countMessages(conversation.getId()));
+
+      messageStorage.save(Message.create(conversation.getId(), userA.getId(), "One"));
+      messageStorage.save(Message.create(conversation.getId(), userB.getId(), "Two"));
+      messageStorage.save(Message.create(conversation.getId(), userA.getId(), "Three"));
+
+      assertEquals(3, messageStorage.countMessages(conversation.getId()));
+    }
+
+    @Test
+    @DisplayName("countMessagesAfter counts only messages after timestamp")
+    void countMessagesAfterWorks() {
+      User userA = createCompleteUser("AfterA_" + UUID.randomUUID());
+      User userB = createCompleteUser("AfterB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      // Take marker well in the past to ensure all messages are after it
+      Instant marker = Instant.now().minusSeconds(1);
+      messageStorage.save(Message.create(conversation.getId(), userA.getId(), "Message 1"));
+      messageStorage.save(Message.create(conversation.getId(), userB.getId(), "Message 2"));
+
+      // Both messages should be after the marker
+      int afterCount = messageStorage.countMessagesAfter(conversation.getId(), marker);
+      assertEquals(2, afterCount, "Both messages should be after the marker");
+    }
+
+    @Test
+    @DisplayName("countMessagesNotFromSender excludes sender messages")
+    void countMessagesNotFromSenderWorks() {
+      User userA = createCompleteUser("NotFromA_" + UUID.randomUUID());
+      User userB = createCompleteUser("NotFromB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      messageStorage.save(Message.create(conversation.getId(), userA.getId(), "From A"));
+      messageStorage.save(Message.create(conversation.getId(), userA.getId(), "From A again"));
+      messageStorage.save(Message.create(conversation.getId(), userB.getId(), "From B"));
+
+      // Count messages NOT from userA (should be 1 - from userB)
+      int count = messageStorage.countMessagesNotFromSender(conversation.getId(), userA.getId());
+      assertEquals(1, count);
+
+      // Count messages NOT from userB (should be 2 - both from userA)
+      count = messageStorage.countMessagesNotFromSender(conversation.getId(), userB.getId());
+      assertEquals(2, count);
+    }
+
+    @Test
+    @DisplayName("getLatestMessage returns most recent")
+    void getLatestMessageWorks() {
+      User userA = createCompleteUser("LatestA_" + UUID.randomUUID());
+      User userB = createCompleteUser("LatestB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      messageStorage.save(Message.create(conversation.getId(), userA.getId(), "First"));
+      messageStorage.save(Message.create(conversation.getId(), userB.getId(), "Second"));
+      messageStorage.save(Message.create(conversation.getId(), userA.getId(), "Third"));
+
+      Optional<Message> latest = messageStorage.getLatestMessage(conversation.getId());
+
+      assertTrue(latest.isPresent());
+      assertEquals("Third", latest.get().content());
+    }
+
+    @Test
+    @DisplayName("deleteByConversation removes all messages")
+    void deleteByConversationWorks() {
+      User userA = createCompleteUser("DelMsgA_" + UUID.randomUUID());
+      User userB = createCompleteUser("DelMsgB_" + UUID.randomUUID());
+      userStorage.save(userA);
+      userStorage.save(userB);
+
+      Conversation conversation = Conversation.create(userA.getId(), userB.getId());
+      conversationStorage.save(conversation);
+
+      messageStorage.save(Message.create(conversation.getId(), userA.getId(), "One"));
+      messageStorage.save(Message.create(conversation.getId(), userB.getId(), "Two"));
+
+      assertEquals(2, messageStorage.countMessages(conversation.getId()));
+
+      messageStorage.deleteByConversation(conversation.getId());
+
+      assertEquals(0, messageStorage.countMessages(conversation.getId()));
     }
   }
 
