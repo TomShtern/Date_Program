@@ -1,15 +1,14 @@
 package datingapp.ui.controller;
 
-import java.net.URL;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.ResourceBundle;
-
 import datingapp.core.Message;
 import datingapp.core.MessagingService.ConversationPreview;
 import datingapp.ui.NavigationService;
 import datingapp.ui.ViewFactory;
 import datingapp.ui.viewmodel.ChatViewModel;
+import java.net.URL;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ResourceBundle;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;

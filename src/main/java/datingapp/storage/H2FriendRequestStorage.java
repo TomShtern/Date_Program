@@ -1,5 +1,8 @@
 package datingapp.storage;
 
+import datingapp.core.FriendRequest;
+import datingapp.core.FriendRequestStatus;
+import datingapp.core.FriendRequestStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -10,10 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-
-import datingapp.core.FriendRequest;
-import datingapp.core.FriendRequestStatus;
-import datingapp.core.FriendRequestStorage;
 
 /** H2 implementation of FriendRequestStorage. */
 public class H2FriendRequestStorage implements FriendRequestStorage {
@@ -26,7 +25,8 @@ public class H2FriendRequestStorage implements FriendRequestStorage {
     }
 
     private void ensureSchema() {
-        String tableSql = """
+        String tableSql =
+                """
                 CREATE TABLE IF NOT EXISTS friend_requests (
                     id UUID PRIMARY KEY,
                     from_user_id UUID NOT NULL,
@@ -42,7 +42,8 @@ public class H2FriendRequestStorage implements FriendRequestStorage {
         // WHERE)
         // Uniqueness for pending requests is enforced in application logic via
         // getPendingBetween()
-        String indexSql = """
+        String indexSql =
+                """
                 CREATE INDEX IF NOT EXISTS idx_friend_req_users
                 ON friend_requests(from_user_id, to_user_id, status)
                 """;
@@ -59,7 +60,8 @@ public class H2FriendRequestStorage implements FriendRequestStorage {
 
     @Override
     public void save(FriendRequest request) {
-        String sql = """
+        String sql =
+                """
                 INSERT INTO friend_requests (id, from_user_id, to_user_id, created_at, status, responded_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """;
@@ -87,7 +89,8 @@ public class H2FriendRequestStorage implements FriendRequestStorage {
 
     @Override
     public void update(FriendRequest request) {
-        String sql = """
+        String sql =
+                """
                 UPDATE friend_requests SET status = ?, responded_at = ?
                 WHERE id = ?
                 """;
@@ -132,7 +135,8 @@ public class H2FriendRequestStorage implements FriendRequestStorage {
 
     @Override
     public Optional<FriendRequest> getPendingBetween(UUID user1, UUID user2) {
-        String sql = """
+        String sql =
+                """
                 SELECT * FROM friend_requests
                 WHERE ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?))
                 AND status = 'PENDING'

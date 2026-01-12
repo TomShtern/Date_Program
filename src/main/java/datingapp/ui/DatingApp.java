@@ -1,14 +1,13 @@
 package datingapp.ui;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.ServiceRegistryBuilder;
 import datingapp.storage.DatabaseManager;
 import javafx.application.Application;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Main JavaFX Application entry point for the Dating App.
