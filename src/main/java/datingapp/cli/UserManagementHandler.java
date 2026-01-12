@@ -9,64 +9,63 @@ import org.slf4j.LoggerFactory;
 
 /** Handles user creation and selection operations in the CLI. */
 public class UserManagementHandler {
-  private static final Logger logger = LoggerFactory.getLogger(UserManagementHandler.class);
-  private final UserStorage userStorage;
-  private final UserSession userSession;
-  private final InputReader inputReader;
+    private static final Logger logger = LoggerFactory.getLogger(UserManagementHandler.class);
+    private final UserStorage userStorage;
+    private final UserSession userSession;
+    private final InputReader inputReader;
 
-  public UserManagementHandler(
-      UserStorage userStorage, UserSession userSession, InputReader inputReader) {
-    this.userStorage = userStorage;
-    this.userSession = userSession;
-    this.inputReader = inputReader;
-  }
-
-  /** Creates a new user and sets them as the current user. */
-  public void createUser() {
-    logger.info("\n--- Create New User ---\n");
-
-    String name = inputReader.readLine("Enter your name: ");
-    if (name.isBlank()) {
-      logger.info("❌ Name cannot be empty.\n");
-      return;
+    public UserManagementHandler(UserStorage userStorage, UserSession userSession, InputReader inputReader) {
+        this.userStorage = userStorage;
+        this.userSession = userSession;
+        this.inputReader = inputReader;
     }
 
-    User user = new User(UUID.randomUUID(), name);
-    userStorage.save(user);
-    userSession.setCurrentUser(user);
+    /** Creates a new user and sets them as the current user. */
+    public void createUser() {
+        logger.info("\n--- Create New User ---\n");
 
-    logger.info("\n✅ User created! ID: {}", user.getId());
-    logger.info("   Status: {} (Complete your profile to become ACTIVE)\n", user.getState());
-  }
-
-  /** Displays all users and allows selection of one as the current user. */
-  public void selectUser() {
-    logger.info("\n--- Select User ---\n");
-
-    List<User> users = userStorage.findAll();
-    if (users.isEmpty()) {
-      logger.info("No users found. Create one first!\n");
-      return;
-    }
-
-    for (int i = 0; i < users.size(); i++) {
-      User u = users.get(i);
-      logger.info("  {}. {} ({})", i + 1, u.getName(), u.getState());
-    }
-
-    String input = inputReader.readLine("\nSelect user number (or 0 to cancel): ");
-    try {
-      int idx = Integer.parseInt(input) - 1;
-      if (idx < 0 || idx >= users.size()) {
-        if (idx != -1) {
-          logger.info("\n❌ Invalid selection.\n");
+        String name = inputReader.readLine("Enter your name: ");
+        if (name.isBlank()) {
+            logger.info("❌ Name cannot be empty.\n");
+            return;
         }
-        return;
-      }
-      userSession.setCurrentUser(users.get(idx));
-      logger.info("\n✅ Selected: {}\n", userSession.getCurrentUser().getName());
-    } catch (NumberFormatException e) {
-      logger.info("❌ Invalid input.\n");
+
+        User user = new User(UUID.randomUUID(), name);
+        userStorage.save(user);
+        userSession.setCurrentUser(user);
+
+        logger.info("\n✅ User created! ID: {}", user.getId());
+        logger.info("   Status: {} (Complete your profile to become ACTIVE)\n", user.getState());
     }
-  }
+
+    /** Displays all users and allows selection of one as the current user. */
+    public void selectUser() {
+        logger.info("\n--- Select User ---\n");
+
+        List<User> users = userStorage.findAll();
+        if (users.isEmpty()) {
+            logger.info("No users found. Create one first!\n");
+            return;
+        }
+
+        for (int i = 0; i < users.size(); i++) {
+            User u = users.get(i);
+            logger.info("  {}. {} ({})", i + 1, u.getName(), u.getState());
+        }
+
+        String input = inputReader.readLine("\nSelect user number (or 0 to cancel): ");
+        try {
+            int idx = Integer.parseInt(input) - 1;
+            if (idx < 0 || idx >= users.size()) {
+                if (idx != -1) {
+                    logger.info("\n❌ Invalid selection.\n");
+                }
+                return;
+            }
+            userSession.setCurrentUser(users.get(idx));
+            logger.info("\n✅ Selected: {}\n", userSession.getCurrentUser().getName());
+        } catch (NumberFormatException e) {
+            logger.info("❌ Invalid input.\n");
+        }
+    }
 }

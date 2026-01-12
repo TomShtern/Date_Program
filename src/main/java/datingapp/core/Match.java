@@ -2,6 +2,7 @@ package datingapp.core;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -13,190 +14,237 @@ import java.util.UUID;
  */
 public class Match {
 
-  /** Represents the current state of a match. */
-  public enum State {
-    ACTIVE, // Both users are matched
-    UNMATCHED, // One user ended the match
-    BLOCKED // One user blocked the other
-  }
-
-  private final String id;
-  private final UUID userA;
-  private final UUID userB;
-  private final Instant createdAt;
-  private State state;
-  private Instant endedAt; // When match was ended (nullable)
-  private UUID endedBy; // Who ended it (nullable)
-
-  /** Full constructor for reconstitution from storage. */
-  public Match(
-      String id,
-      UUID userA,
-      UUID userB,
-      Instant createdAt,
-      State state,
-      Instant endedAt,
-      UUID endedBy) {
-    Objects.requireNonNull(id, "id cannot be null");
-    Objects.requireNonNull(userA, "userA cannot be null");
-    Objects.requireNonNull(userB, "userB cannot be null");
-    Objects.requireNonNull(createdAt, "createdAt cannot be null");
-    Objects.requireNonNull(state, "state cannot be null");
-
-    if (userA.equals(userB)) {
-      throw new IllegalArgumentException("Cannot match with yourself");
+    /** Represents the current state of a match. */
+    public enum State {
+        ACTIVE, // Both users are matched
+        FRIENDS, // Mutual transition to platonic friendship
+        UNMATCHED, // One user ended the match
+        GRACEFUL_EXIT, // One user ended the match kindly
+        BLOCKED // One user blocked the other
     }
 
-    // Validate ordering
-    if (userA.toString().compareTo(userB.toString()) > 0) {
-      throw new IllegalArgumentException("userA must be lexicographically smaller than userB");
+    private final String id;
+    private final UUID userA;
+    private final UUID userB;
+    private final Instant createdAt;
+    private State state;
+    private Instant endedAt; // When match was ended (nullable)
+    private UUID endedBy; // Who ended it (nullable)
+    private ArchiveReason endReason; // Why it ended (nullable)
+
+    /** Full constructor for reconstitution from storage. */
+    public Match(
+            String id,
+            UUID userA,
+            UUID userB,
+            Instant createdAt,
+            State state,
+            Instant endedAt,
+            UUID endedBy,
+            ArchiveReason endReason) {
+        Objects.requireNonNull(id, "id cannot be null");
+        Objects.requireNonNull(userA, "userA cannot be null");
+        Objects.requireNonNull(userB, "userB cannot be null");
+        Objects.requireNonNull(createdAt, "createdAt cannot be null");
+        Objects.requireNonNull(state, "state cannot be null");
+
+        if (userA.equals(userB)) {
+            throw new IllegalArgumentException("Cannot match with yourself");
+        }
+
+        // Validate ordering
+        if (userA.toString().compareTo(userB.toString()) > 0) {
+            throw new IllegalArgumentException("userA must be lexicographically smaller than userB");
+        }
+
+        this.id = id;
+        this.userA = userA;
+        this.userB = userB;
+        this.createdAt = createdAt;
+        this.state = state;
+        this.endedAt = endedAt;
+        this.endedBy = endedBy;
+        this.endReason = endReason;
     }
 
-    this.id = id;
-    this.userA = userA;
-    this.userB = userB;
-    this.createdAt = createdAt;
-    this.state = state;
-    this.endedAt = endedAt;
-    this.endedBy = endedBy;
-  }
+    /**
+     * Creates a new Match with deterministic ID based on sorted user UUIDs. Starts in ACTIVE state.
+     *
+     * @param a First user UUID
+     * @param b Second user UUID
+     * @return A new Match with proper ordering and deterministic ID
+     */
+    public static Match create(UUID a, UUID b) {
+        Objects.requireNonNull(a, "a cannot be null");
+        Objects.requireNonNull(b, "b cannot be null");
 
-  /**
-   * Creates a new Match with deterministic ID based on sorted user UUIDs. Starts in ACTIVE state.
-   *
-   * @param a First user UUID
-   * @param b Second user UUID
-   * @return A new Match with proper ordering and deterministic ID
-   */
-  public static Match create(UUID a, UUID b) {
-    Objects.requireNonNull(a, "a cannot be null");
-    Objects.requireNonNull(b, "b cannot be null");
+        if (a.equals(b)) {
+            throw new IllegalArgumentException("Cannot match with yourself");
+        }
 
-    if (a.equals(b)) {
-      throw new IllegalArgumentException("Cannot match with yourself");
+        String firstUserId = a.toString();
+        String secondUserId = b.toString();
+
+        UUID userA;
+        UUID userB;
+        if (firstUserId.compareTo(secondUserId) < 0) {
+            userA = a;
+            userB = b;
+        } else {
+            userA = b;
+            userB = a;
+        }
+
+        String id = userA.toString() + "_" + userB.toString();
+        return new Match(id, userA, userB, Instant.now(), State.ACTIVE, null, null, null);
     }
 
-    String firstUserId = a.toString();
-    String secondUserId = b.toString();
+    /** Generates the deterministic match ID for two user UUIDs. */
+    public static String generateId(UUID a, UUID b) {
+        String firstUserId = a.toString();
+        String secondUserId = b.toString();
 
-    UUID userA;
-    UUID userB;
-    if (firstUserId.compareTo(secondUserId) < 0) {
-      userA = a;
-      userB = b;
-    } else {
-      userA = b;
-      userB = a;
+        if (firstUserId.compareTo(secondUserId) < 0) {
+            return firstUserId + "_" + secondUserId;
+        } else {
+            return secondUserId + "_" + firstUserId;
+        }
     }
 
-    String id = userA.toString() + "_" + userB.toString();
-    return new Match(id, userA, userB, Instant.now(), State.ACTIVE, null, null);
-  }
-
-  /** Generates the deterministic match ID for two user UUIDs. */
-  public static String generateId(UUID a, UUID b) {
-    String firstUserId = a.toString();
-    String secondUserId = b.toString();
-
-    if (firstUserId.compareTo(secondUserId) < 0) {
-      return firstUserId + "_" + secondUserId;
-    } else {
-      return secondUserId + "_" + firstUserId;
+    /** Unmatch - ends the match. Can only be done from ACTIVE state. */
+    public void unmatch(UUID userId) {
+        if (this.state != State.ACTIVE) {
+            throw new IllegalStateException("Match is not active");
+        }
+        if (!involves(userId)) {
+            throw new IllegalArgumentException("User is not part of this match");
+        }
+        this.state = State.UNMATCHED;
+        this.endedAt = Instant.now();
+        this.endedBy = userId;
+        this.endReason = ArchiveReason.UNMATCH;
     }
-  }
 
-  /** Unmatch - ends the match. Can only be done from ACTIVE state. */
-  public void unmatch(UUID userId) {
-    if (this.state != State.ACTIVE) {
-      throw new IllegalStateException("Match is not active");
+    /** Block - ends the match due to blocking. */
+    public void block(UUID userId) {
+        if (!involves(userId)) {
+            throw new IllegalArgumentException("User is not part of this match");
+        }
+        // Can block even if not active (defensive)
+        this.state = State.BLOCKED;
+        this.endedAt = Instant.now();
+        this.endedBy = userId;
+        this.endReason = ArchiveReason.BLOCK;
     }
-    if (!involves(userId)) {
-      throw new IllegalArgumentException("User is not part of this match");
+
+    /** transitionToFriends - transitions the match to FRIENDS state. */
+    public void transitionToFriends(UUID initiatorId) {
+        if (!isValidTransition(this.state, State.FRIENDS)) {
+            throw new IllegalStateException("Cannot transition to FRIENDS from " + state);
+        }
+        this.state = State.FRIENDS;
+        // We don't set endedAt/endedBy because the relationship is still "active" in a
+        // new way
     }
-    this.state = State.UNMATCHED;
-    this.endedAt = Instant.now();
-    this.endedBy = userId;
-  }
 
-  /** Block - ends the match due to blocking. */
-  public void block(UUID userId) {
-    if (!involves(userId)) {
-      throw new IllegalArgumentException("User is not part of this match");
+    /** gracefulExit - ends the match kindly. */
+    public void gracefulExit(UUID initiatorId) {
+        if (!isValidTransition(this.state, State.GRACEFUL_EXIT)) {
+            throw new IllegalStateException("Cannot transition to GRACEFUL_EXIT from " + state);
+        }
+        this.state = State.GRACEFUL_EXIT;
+        this.endedAt = Instant.now();
+        this.endedBy = initiatorId;
+        this.endReason = ArchiveReason.GRACEFUL_EXIT;
     }
-    // Can block even if not active (defensive)
-    this.state = State.BLOCKED;
-    this.endedAt = Instant.now();
-    this.endedBy = userId;
-  }
 
-  /** Checks if the match is currently active. */
-  public boolean isActive() {
-    return this.state == State.ACTIVE;
-  }
-
-  /** Checks if this match involves the given user. */
-  public boolean involves(UUID userId) {
-    return userA.equals(userId) || userB.equals(userId);
-  }
-
-  /** Gets the other user in this match. */
-  public UUID getOtherUser(UUID userId) {
-    if (userA.equals(userId)) {
-      return userB;
-    } else if (userB.equals(userId)) {
-      return userA;
+    private boolean isValidTransition(State from, State to) {
+        return switch (from) {
+            case ACTIVE -> Set.of(State.FRIENDS, State.UNMATCHED, State.GRACEFUL_EXIT, State.BLOCKED)
+                    .contains(to);
+            case FRIENDS -> Set.of(State.UNMATCHED, State.GRACEFUL_EXIT, State.BLOCKED)
+                    .contains(to);
+            case UNMATCHED, GRACEFUL_EXIT, BLOCKED -> false;
+        };
     }
-    throw new IllegalArgumentException("User is not part of this match");
-  }
 
-  // Getters
-  public String getId() {
-    return id;
-  }
-
-  public UUID getUserA() {
-    return userA;
-  }
-
-  public UUID getUserB() {
-    return userB;
-  }
-
-  public Instant getCreatedAt() {
-    return createdAt;
-  }
-
-  public State getState() {
-    return state;
-  }
-
-  public Instant getEndedAt() {
-    return endedAt;
-  }
-
-  public UUID getEndedBy() {
-    return endedBy;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
+    /** Checks if the match allows messaging. */
+    public boolean canMessage() {
+        return this.state == State.ACTIVE || this.state == State.FRIENDS;
     }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
+
+    /** Checks if the match is currently active. */
+    public boolean isActive() {
+        return this.state == State.ACTIVE;
     }
-    Match match = (Match) o;
-    return Objects.equals(id, match.id);
-  }
 
-  @Override
-  public int hashCode() {
-    return Objects.hash(id);
-  }
+    /** Checks if this match involves the given user. */
+    public boolean involves(UUID userId) {
+        return userA.equals(userId) || userB.equals(userId);
+    }
 
-  @Override
-  public String toString() {
-    return "Match{id='" + id + "', state=" + state + "}";
-  }
+    /** Gets the other user in this match. */
+    public UUID getOtherUser(UUID userId) {
+        if (userA.equals(userId)) {
+            return userB;
+        } else if (userB.equals(userId)) {
+            return userA;
+        }
+        throw new IllegalArgumentException("User is not part of this match");
+    }
+
+    // Getters
+    public String getId() {
+        return id;
+    }
+
+    public UUID getUserA() {
+        return userA;
+    }
+
+    public UUID getUserB() {
+        return userB;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public State getState() {
+        return state;
+    }
+
+    public Instant getEndedAt() {
+        return endedAt;
+    }
+
+    public UUID getEndedBy() {
+        return endedBy;
+    }
+
+    public ArchiveReason getEndReason() {
+        return endReason;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        Match match = (Match) o;
+        return Objects.equals(id, match.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    @Override
+    public String toString() {
+        return "Match{id='" + id + "', state=" + state + "}";
+    }
 }

@@ -11,204 +11,232 @@ import java.util.Objects;
  */
 public class ServiceRegistry {
 
-  // Configuration
-  private final AppConfig config;
+    // Configuration
+    private final AppConfig config;
 
-  // Storage layer
-  private final UserStorage userStorage;
-  private final LikeStorage likeStorage;
-  private final MatchStorage matchStorage;
-  private final BlockStorage blockStorage;
-  private final ReportStorage reportStorage;
-  private final SwipeSessionStorage sessionStorage; // Phase 0.5b
-  private final UserStatsStorage userStatsStorage; // Phase 0.5b
-  private final PlatformStatsStorage platformStatsStorage; // Phase 0.5b
-  private final DailyPickStorage dailyPickStorage; // Phase 1
-  private final UserAchievementStorage userAchievementStorage; // Phase 1
-  private final ProfileViewStorage profileViewStorage; // Phase 1.5 - view counter
-  private final ProfileNoteStorage profileNoteStorage; // Phase 1.5 - private notes
-  private final ConversationStorage conversationStorage; // Messaging
-  private final MessageStorage messageStorage; // Messaging
+    // Storage layer
+    private final UserStorage userStorage;
+    private final LikeStorage likeStorage;
+    private final MatchStorage matchStorage;
+    private final BlockStorage blockStorage;
+    private final ReportStorage reportStorage;
+    private final SwipeSessionStorage sessionStorage; // Phase 0.5b
+    private final UserStatsStorage userStatsStorage; // Phase 0.5b
+    private final PlatformStatsStorage platformStatsStorage; // Phase 0.5b
+    private final DailyPickStorage dailyPickStorage; // Phase 1
+    private final UserAchievementStorage userAchievementStorage; // Phase 1
+    private final ProfileViewStorage profileViewStorage; // Phase 1.5 - view counter
+    private final ProfileNoteStorage profileNoteStorage; // Phase 1.5 - private notes
+    private final ConversationStorage conversationStorage; // Messaging
+    private final MessageStorage messageStorage; // Messaging
+    private final FriendRequestStorage friendRequestStorage; // Phase 2
+    private final NotificationStorage notificationStorage; // Phase 3
 
-  // Services
-  private final CandidateFinderService candidateFinder;
-  private final MatchingService matchingService;
-  private final ReportService reportService;
-  private final SessionService sessionService; // Phase 0.5b
-  private final StatsService statsService; // Phase 0.5b
-  private final MatchQualityService matchQualityService; // Phase 0.5b
-  private final ProfilePreviewService profilePreviewService; // Phase 1
-  private final DailyLimitService dailyLimitService; // Phase 1
-  private final UndoService undoService; // Phase 1
-  private final DailyPickService dailyPickService; // Phase 1
-  private final AchievementService achievementService; // Phase 1
-  private final MessagingService messagingService; // Messaging
+    // Services
+    private final CandidateFinderService candidateFinder;
+    private final MatchingService matchingService;
+    private final ReportService reportService;
+    private final SessionService sessionService; // Phase 0.5b
+    private final StatsService statsService; // Phase 0.5b
+    private final MatchQualityService matchQualityService; // Phase 0.5b
+    private final ProfilePreviewService profilePreviewService; // Phase 1
+    private final DailyLimitService dailyLimitService; // Phase 1
+    private final UndoService undoService; // Phase 1
+    private final DailyPickService dailyPickService; // Phase 1
+    private final AchievementService achievementService; // Phase 1
+    private final MessagingService messagingService; // Messaging
+    private final RelationshipTransitionService relationshipTransitionService; // Phase 2/3
+    private final PaceCompatibilityService paceCompatibilityService; // Phase 1
 
-  /** Package-private constructor - use ServiceRegistryBuilder to create. */
-  ServiceRegistry(
-      AppConfig config,
-      UserStorage userStorage,
-      LikeStorage likeStorage,
-      MatchStorage matchStorage,
-      BlockStorage blockStorage,
-      ReportStorage reportStorage,
-      SwipeSessionStorage sessionStorage,
-      UserStatsStorage userStatsStorage,
-      PlatformStatsStorage platformStatsStorage,
-      DailyPickStorage dailyPickStorage,
-      UserAchievementStorage userAchievementStorage,
-      ProfileViewStorage profileViewStorage,
-      ProfileNoteStorage profileNoteStorage,
-      ConversationStorage conversationStorage,
-      MessageStorage messageStorage,
-      CandidateFinderService candidateFinder,
-      MatchingService matchingService,
-      ReportService reportService,
-      SessionService sessionService,
-      StatsService statsService,
-      MatchQualityService matchQualityService,
-      ProfilePreviewService profilePreviewService,
-      DailyLimitService dailyLimitService,
-      UndoService undoService,
-      DailyPickService dailyPickService,
-      AchievementService achievementService,
-      MessagingService messagingService) {
-    this.config = Objects.requireNonNull(config);
-    this.userStorage = Objects.requireNonNull(userStorage);
-    this.likeStorage = Objects.requireNonNull(likeStorage);
-    this.matchStorage = Objects.requireNonNull(matchStorage);
-    this.blockStorage = Objects.requireNonNull(blockStorage);
-    this.reportStorage = Objects.requireNonNull(reportStorage);
-    this.sessionStorage = Objects.requireNonNull(sessionStorage);
-    this.userStatsStorage = Objects.requireNonNull(userStatsStorage);
-    this.platformStatsStorage = Objects.requireNonNull(platformStatsStorage);
-    this.dailyPickStorage = Objects.requireNonNull(dailyPickStorage);
-    this.userAchievementStorage = Objects.requireNonNull(userAchievementStorage);
-    this.profileViewStorage = Objects.requireNonNull(profileViewStorage);
-    this.profileNoteStorage = Objects.requireNonNull(profileNoteStorage);
-    this.conversationStorage = Objects.requireNonNull(conversationStorage);
-    this.messageStorage = Objects.requireNonNull(messageStorage);
-    this.candidateFinder = Objects.requireNonNull(candidateFinder);
-    this.matchingService = Objects.requireNonNull(matchingService);
-    this.reportService = Objects.requireNonNull(reportService);
-    this.sessionService = Objects.requireNonNull(sessionService);
-    this.statsService = Objects.requireNonNull(statsService);
-    this.matchQualityService = Objects.requireNonNull(matchQualityService);
-    this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
-    this.dailyLimitService = Objects.requireNonNull(dailyLimitService);
-    this.undoService = Objects.requireNonNull(undoService);
-    this.dailyPickService = Objects.requireNonNull(dailyPickService);
-    this.achievementService = Objects.requireNonNull(achievementService);
-    this.messagingService = Objects.requireNonNull(messagingService);
-  }
+    /** Package-private constructor - use ServiceRegistryBuilder to create. */
+    ServiceRegistry(
+            AppConfig config,
+            UserStorage userStorage,
+            LikeStorage likeStorage,
+            MatchStorage matchStorage,
+            BlockStorage blockStorage,
+            ReportStorage reportStorage,
+            SwipeSessionStorage sessionStorage,
+            UserStatsStorage userStatsStorage,
+            PlatformStatsStorage platformStatsStorage,
+            DailyPickStorage dailyPickStorage,
+            UserAchievementStorage userAchievementStorage,
+            ProfileViewStorage profileViewStorage,
+            ProfileNoteStorage profileNoteStorage,
+            ConversationStorage conversationStorage,
+            MessageStorage messageStorage,
+            FriendRequestStorage friendRequestStorage,
+            NotificationStorage notificationStorage,
+            CandidateFinderService candidateFinder,
+            MatchingService matchingService,
+            ReportService reportService,
+            SessionService sessionService,
+            StatsService statsService,
+            MatchQualityService matchQualityService,
+            ProfilePreviewService profilePreviewService,
+            DailyLimitService dailyLimitService,
+            UndoService undoService,
+            DailyPickService dailyPickService,
+            AchievementService achievementService,
+            MessagingService messagingService,
+            RelationshipTransitionService relationshipTransitionService,
+            PaceCompatibilityService paceCompatibilityService) {
+        this.config = Objects.requireNonNull(config);
+        this.userStorage = Objects.requireNonNull(userStorage);
+        this.likeStorage = Objects.requireNonNull(likeStorage);
+        this.matchStorage = Objects.requireNonNull(matchStorage);
+        this.blockStorage = Objects.requireNonNull(blockStorage);
+        this.reportStorage = Objects.requireNonNull(reportStorage);
+        this.sessionStorage = Objects.requireNonNull(sessionStorage);
+        this.userStatsStorage = Objects.requireNonNull(userStatsStorage);
+        this.platformStatsStorage = Objects.requireNonNull(platformStatsStorage);
+        this.dailyPickStorage = Objects.requireNonNull(dailyPickStorage);
+        this.userAchievementStorage = Objects.requireNonNull(userAchievementStorage);
+        this.profileViewStorage = Objects.requireNonNull(profileViewStorage);
+        this.profileNoteStorage = Objects.requireNonNull(profileNoteStorage);
+        this.conversationStorage = Objects.requireNonNull(conversationStorage);
+        this.messageStorage = Objects.requireNonNull(messageStorage);
+        this.friendRequestStorage = Objects.requireNonNull(friendRequestStorage);
+        this.notificationStorage = Objects.requireNonNull(notificationStorage);
+        this.candidateFinder = Objects.requireNonNull(candidateFinder);
+        this.matchingService = Objects.requireNonNull(matchingService);
+        this.reportService = Objects.requireNonNull(reportService);
+        this.sessionService = Objects.requireNonNull(sessionService);
+        this.statsService = Objects.requireNonNull(statsService);
+        this.matchQualityService = Objects.requireNonNull(matchQualityService);
+        this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
+        this.dailyLimitService = Objects.requireNonNull(dailyLimitService);
+        this.undoService = Objects.requireNonNull(undoService);
+        this.dailyPickService = Objects.requireNonNull(dailyPickService);
+        this.achievementService = Objects.requireNonNull(achievementService);
+        this.messagingService = Objects.requireNonNull(messagingService);
+        this.relationshipTransitionService = Objects.requireNonNull(relationshipTransitionService);
+        this.paceCompatibilityService = Objects.requireNonNull(paceCompatibilityService);
+    }
 
-  // === Getters ===
+    // === Getters ===
 
-  public AppConfig getConfig() {
-    return config;
-  }
+    public AppConfig getConfig() {
+        return config;
+    }
 
-  public UserStorage getUserStorage() {
-    return userStorage;
-  }
+    public UserStorage getUserStorage() {
+        return userStorage;
+    }
 
-  public LikeStorage getLikeStorage() {
-    return likeStorage;
-  }
+    public LikeStorage getLikeStorage() {
+        return likeStorage;
+    }
 
-  public MatchStorage getMatchStorage() {
-    return matchStorage;
-  }
+    public MatchStorage getMatchStorage() {
+        return matchStorage;
+    }
 
-  public BlockStorage getBlockStorage() {
-    return blockStorage;
-  }
+    public BlockStorage getBlockStorage() {
+        return blockStorage;
+    }
 
-  public ReportStorage getReportStorage() {
-    return reportStorage;
-  }
+    public ReportStorage getReportStorage() {
+        return reportStorage;
+    }
 
-  public SwipeSessionStorage getSessionStorage() {
-    return sessionStorage;
-  }
+    public SwipeSessionStorage getSessionStorage() {
+        return sessionStorage;
+    }
 
-  public UserStatsStorage getUserStatsStorage() {
-    return userStatsStorage;
-  }
+    public UserStatsStorage getUserStatsStorage() {
+        return userStatsStorage;
+    }
 
-  public PlatformStatsStorage getPlatformStatsStorage() {
-    return platformStatsStorage;
-  }
+    public PlatformStatsStorage getPlatformStatsStorage() {
+        return platformStatsStorage;
+    }
 
-  public CandidateFinderService getCandidateFinder() {
-    return candidateFinder;
-  }
+    public CandidateFinderService getCandidateFinder() {
+        return candidateFinder;
+    }
 
-  public MatchingService getMatchingService() {
-    return matchingService;
-  }
+    public MatchingService getMatchingService() {
+        return matchingService;
+    }
 
-  public ReportService getReportService() {
-    return reportService;
-  }
+    public ReportService getReportService() {
+        return reportService;
+    }
 
-  public SessionService getSessionService() {
-    return sessionService;
-  }
+    public SessionService getSessionService() {
+        return sessionService;
+    }
 
-  public StatsService getStatsService() {
-    return statsService;
-  }
+    public StatsService getStatsService() {
+        return statsService;
+    }
 
-  public MatchQualityService getMatchQualityService() {
-    return matchQualityService;
-  }
+    public MatchQualityService getMatchQualityService() {
+        return matchQualityService;
+    }
 
-  public ProfilePreviewService getProfilePreviewService() {
-    return profilePreviewService;
-  }
+    public ProfilePreviewService getProfilePreviewService() {
+        return profilePreviewService;
+    }
 
-  public DailyLimitService getDailyLimitService() {
-    return dailyLimitService;
-  }
+    public DailyLimitService getDailyLimitService() {
+        return dailyLimitService;
+    }
 
-  public UndoService getUndoService() {
-    return undoService;
-  }
+    public UndoService getUndoService() {
+        return undoService;
+    }
 
-  public DailyPickStorage getDailyPickStorage() {
-    return dailyPickStorage;
-  }
+    public DailyPickStorage getDailyPickStorage() {
+        return dailyPickStorage;
+    }
 
-  public DailyPickService getDailyPickService() {
-    return dailyPickService;
-  }
+    public DailyPickService getDailyPickService() {
+        return dailyPickService;
+    }
 
-  public UserAchievementStorage getUserAchievementStorage() {
-    return userAchievementStorage;
-  }
+    public UserAchievementStorage getUserAchievementStorage() {
+        return userAchievementStorage;
+    }
 
-  public AchievementService getAchievementService() {
-    return achievementService;
-  }
+    public AchievementService getAchievementService() {
+        return achievementService;
+    }
 
-  public ProfileViewStorage getProfileViewStorage() {
-    return profileViewStorage;
-  }
+    public ProfileViewStorage getProfileViewStorage() {
+        return profileViewStorage;
+    }
 
-  public ProfileNoteStorage getProfileNoteStorage() {
-    return profileNoteStorage;
-  }
+    public ProfileNoteStorage getProfileNoteStorage() {
+        return profileNoteStorage;
+    }
 
-  public ConversationStorage getConversationStorage() {
-    return conversationStorage;
-  }
+    public ConversationStorage getConversationStorage() {
+        return conversationStorage;
+    }
 
-  public MessageStorage getMessageStorage() {
-    return messageStorage;
-  }
+    public MessageStorage getMessageStorage() {
+        return messageStorage;
+    }
 
-  public MessagingService getMessagingService() {
-    return messagingService;
-  }
+    public MessagingService getMessagingService() {
+        return messagingService;
+    }
+
+    public FriendRequestStorage getFriendRequestStorage() {
+        return friendRequestStorage;
+    }
+
+    public NotificationStorage getNotificationStorage() {
+        return notificationStorage;
+    }
+
+    public RelationshipTransitionService getRelationshipTransitionService() {
+        return relationshipTransitionService;
+    }
+
+    public PaceCompatibilityService getPaceCompatibilityService() {
+        return paceCompatibilityService;
+    }
 }

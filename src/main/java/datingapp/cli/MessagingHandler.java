@@ -22,404 +22,392 @@ import org.slf4j.LoggerFactory;
 /** Handler for messaging functionality in the CLI. */
 public class MessagingHandler {
 
-  private static final Logger logger = LoggerFactory.getLogger(MessagingHandler.class);
-  private static final int MESSAGES_PER_PAGE = 20;
-  private static final int PREVIEW_MAX_LENGTH = 28;
-  private static final DateTimeFormatter TIME_FORMATTER =
-      DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
+    private static final Logger logger = LoggerFactory.getLogger(MessagingHandler.class);
+    private static final int MESSAGES_PER_PAGE = 20;
+    private static final int PREVIEW_MAX_LENGTH = 28;
+    private static final DateTimeFormatter TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
 
-  private final ServiceRegistry registry;
-  private final InputReader input;
-  private final UserSession session;
+    private final ServiceRegistry registry;
+    private final InputReader input;
+    private final UserSession session;
 
-  public MessagingHandler(ServiceRegistry registry, InputReader input, UserSession session) {
-    this.registry = Objects.requireNonNull(registry, "registry cannot be null");
-    this.input = Objects.requireNonNull(input, "input cannot be null");
-    this.session = Objects.requireNonNull(session, "session cannot be null");
-  }
-
-  /** Shows the conversation list and handles navigation. */
-  public void showConversations() {
-    User currentUser = session.getCurrentUser();
-    if (currentUser == null) {
-      logger.info(CliConstants.PLEASE_SELECT_USER);
-      return;
+    public MessagingHandler(ServiceRegistry registry, InputReader input, UserSession session) {
+        this.registry = Objects.requireNonNull(registry, "registry cannot be null");
+        this.input = Objects.requireNonNull(input, "input cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
-    MessagingService messagingService = registry.getMessagingService();
-    List<ConversationPreview> previews = messagingService.getConversations(currentUser.getId());
-
-    while (true) {
-      printConversationListHeader();
-
-      if (previews.isEmpty()) {
-        printEmptyConversations();
-        return;
-      }
-
-      displayConversationPreviews(previews);
-      String choice = input.readLine("> ").trim();
-
-      if (choice.equalsIgnoreCase("b") || choice.isEmpty()) {
-        return;
-      }
-
-      previews = handleConversationSelection(choice, previews, currentUser, messagingService);
-    }
-  }
-
-  /** Prints the header for the conversation list. */
-  private void printConversationListHeader() {
-    logger.info("\n{}", CliConstants.SEPARATOR_LINE);
-    logger.info("       💬 YOUR CONVERSATIONS");
-    logger.info("{}", CliConstants.SEPARATOR_LINE);
-  }
-
-  /** Prints a message when there are no conversations. */
-  private void printEmptyConversations() {
-    logger.info("\n  No conversations yet.");
-    logger.info("  Start by matching with someone and send a message!\n");
-    logger.info("{}", CliConstants.MENU_DIVIDER);
-    logger.info("[B] Back");
-    input.readLine("> ");
-  }
-
-  /**
-   * Displays the list of conversation previews.
-   *
-   * @param previews The list of conversation previews to display
-   */
-  private void displayConversationPreviews(List<ConversationPreview> previews) {
-    for (int i = 0; i < previews.size(); i++) {
-      displayConversationPreview(i + 1, previews.get(i));
-    }
-
-    int totalUnread = previews.stream().mapToInt(ConversationPreview::unreadCount).sum();
-    if (totalUnread > 0) {
-      logger.info("\nTotal unread: {} message(s)", totalUnread);
-    }
-
-    logger.info("{}", CliConstants.MENU_DIVIDER);
-    logger.info("[#] Select conversation  [B] Back");
-  }
-
-  /**
-   * Handles the user's selection of a conversation from the list.
-   *
-   * @param choice The user's input choice
-   * @param previews The current list of conversation previews
-   * @param currentUser The current user
-   * @param messagingService The messaging service
-   * @return Updated list of conversation previews
-   */
-  private List<ConversationPreview> handleConversationSelection(
-      String choice,
-      List<ConversationPreview> previews,
-      User currentUser,
-      MessagingService messagingService) {
-    try {
-      int idx = Integer.parseInt(choice) - 1;
-      if (idx >= 0 && idx < previews.size()) {
-        showConversation(currentUser, previews.get(idx));
-        return messagingService.getConversations(currentUser.getId());
-      } else {
-        logger.info(CliConstants.INVALID_SELECTION);
-      }
-    } catch (NumberFormatException e) {
-      logger.info(CliConstants.INVALID_INPUT);
-    }
-    return previews;
-  }
-
-  /** Displays a single conversation preview in the list. */
-  private void displayConversationPreview(int index, ConversationPreview preview) {
-    String name = preview.otherUser().getName();
-    String unreadStr = preview.unreadCount() > 0 ? " (" + preview.unreadCount() + " new)" : "";
-    String timeAgo = formatTimeAgo(preview.conversation().getLastMessageAt());
-
-    logger.info("{}. {}{} · {}", index, name, unreadStr, timeAgo);
-
-    preview
-        .lastMessage()
-        .ifPresent(
-            msg -> {
-              String content = truncateMessage(msg.content(), PREVIEW_MAX_LENGTH);
-              logger.info("   \"{}\"", content);
-            });
-    logger.info("");
-  }
-
-  /** Shows a single conversation with messages. */
-  private void showConversation(User currentUser, ConversationPreview preview) {
-    MessagingService messagingService = registry.getMessagingService();
-    MatchStorage matchStorage = registry.getMatchStorage();
-    Conversation conversation = preview.conversation();
-    User otherUser = preview.otherUser();
-
-    messagingService.markAsRead(currentUser.getId(), conversation.getId());
-
-    int offset = 0;
-    boolean showOlder = false;
-
-    while (true) {
-      List<Message> messages =
-          messagingService.getMessages(
-              currentUser.getId(), otherUser.getId(), MESSAGES_PER_PAGE + offset, 0);
-
-      String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-      Optional<Match> matchOpt = matchStorage.get(matchId);
-      boolean canMessage = matchOpt.isPresent() && matchOpt.get().isActive();
-
-      printConversationHeader(otherUser.getName(), canMessage);
-      printMessages(messages, currentUser, showOlder);
-      printConversationFooter(canMessage, messages.size() >= MESSAGES_PER_PAGE && offset == 0);
-
-      String userInput = input.readLine("> ").trim();
-
-      if (userInput.isEmpty()) {
-        continue;
-      }
-
-      ConversationAction action =
-          processConversationInput(userInput, canMessage, currentUser, otherUser, messagingService);
-      switch (action) {
-        case EXIT -> {
-          return;
+    /** Shows the conversation list and handles navigation. */
+    public void showConversations() {
+        User currentUser = session.getCurrentUser();
+        if (currentUser == null) {
+            logger.info(CliConstants.PLEASE_SELECT_USER);
+            return;
         }
-        case SHOW_OLDER -> {
-          offset += MESSAGES_PER_PAGE;
-          showOlder = true;
+
+        MessagingService messagingService = registry.getMessagingService();
+        List<ConversationPreview> previews = messagingService.getConversations(currentUser.getId());
+
+        while (true) {
+            printConversationListHeader();
+
+            if (previews.isEmpty()) {
+                printEmptyConversations();
+                return;
+            }
+
+            displayConversationPreviews(previews);
+            String choice = input.readLine("> ").trim();
+
+            if (choice.equalsIgnoreCase("b") || choice.isEmpty()) {
+                return;
+            }
+
+            previews = handleConversationSelection(choice, previews, currentUser, messagingService);
         }
-        case REFRESH -> {
-          offset = 0;
-          showOlder = false;
+    }
+
+    /** Prints the header for the conversation list. */
+    private void printConversationListHeader() {
+        logger.info("\n{}", CliConstants.SEPARATOR_LINE);
+        logger.info("       💬 YOUR CONVERSATIONS");
+        logger.info("{}", CliConstants.SEPARATOR_LINE);
+    }
+
+    /** Prints a message when there are no conversations. */
+    private void printEmptyConversations() {
+        logger.info("\n  No conversations yet.");
+        logger.info("  Start by matching with someone and send a message!\n");
+        logger.info("{}", CliConstants.MENU_DIVIDER);
+        logger.info("[B] Back");
+        input.readLine("> ");
+    }
+
+    /**
+     * Displays the list of conversation previews.
+     *
+     * @param previews The list of conversation previews to display
+     */
+    private void displayConversationPreviews(List<ConversationPreview> previews) {
+        for (int i = 0; i < previews.size(); i++) {
+            displayConversationPreview(i + 1, previews.get(i));
         }
-        case CONTINUE -> {
-          /* No action needed, continue conversation loop */
+
+        int totalUnread =
+                previews.stream().mapToInt(ConversationPreview::unreadCount).sum();
+        if (totalUnread > 0) {
+            logger.info("\nTotal unread: {} message(s)", totalUnread);
         }
-        default -> {
-          /* Unknown action - do nothing */
+
+        logger.info("{}", CliConstants.MENU_DIVIDER);
+        logger.info("[#] Select conversation  [B] Back");
+    }
+
+    /**
+     * Handles the user's selection of a conversation from the list.
+     *
+     * @param choice The user's input choice
+     * @param previews The current list of conversation previews
+     * @param currentUser The current user
+     * @param messagingService The messaging service
+     * @return Updated list of conversation previews
+     */
+    private List<ConversationPreview> handleConversationSelection(
+            String choice, List<ConversationPreview> previews, User currentUser, MessagingService messagingService) {
+        try {
+            int idx = Integer.parseInt(choice) - 1;
+            if (idx >= 0 && idx < previews.size()) {
+                showConversation(currentUser, previews.get(idx));
+                return messagingService.getConversations(currentUser.getId());
+            } else {
+                logger.info(CliConstants.INVALID_SELECTION);
+            }
+        } catch (NumberFormatException e) {
+            logger.info(CliConstants.INVALID_INPUT);
         }
-      }
-    }
-  }
-
-  private enum ConversationAction {
-    EXIT,
-    SHOW_OLDER,
-    REFRESH,
-    CONTINUE
-  }
-
-  /**
-   * Prints the header for a conversation view.
-   *
-   * @param otherUserName The name of the other user in the conversation
-   * @param canMessage Whether the user can send messages in this conversation
-   */
-  private void printConversationHeader(String otherUserName, boolean canMessage) {
-    logger.info("\n{}", CliConstants.SEPARATOR_LINE);
-    logger.info("       💬 Conversation with {}", otherUserName);
-    if (!canMessage) {
-      logger.info("       ⚠️  Match ended - read only");
-    }
-    logger.info("{}", CliConstants.SEPARATOR_LINE);
-  }
-
-  /**
-   * Prints the messages in a conversation.
-   *
-   * @param messages The list of messages to print
-   * @param currentUser The current user
-   * @param showOlder Whether to show older messages
-   */
-  private void printMessages(List<Message> messages, User currentUser, boolean showOlder) {
-    if (messages.isEmpty()) {
-      logger.info("\n  No messages yet. Start the conversation!");
-    } else {
-      int start = showOlder ? 0 : Math.max(0, messages.size() - MESSAGES_PER_PAGE);
-      for (int i = start; i < messages.size(); i++) {
-        displayMessage(messages.get(i), currentUser);
-      }
-    }
-  }
-
-  /**
-   * Prints the footer for a conversation view.
-   *
-   * @param canMessage Whether the user can send messages
-   * @param hasMoreMessages Whether there are more messages to show
-   */
-  private void printConversationFooter(boolean canMessage, boolean hasMoreMessages) {
-    if (hasMoreMessages) {
-      logger.info("\n  [Type /older to see older messages]");
+        return previews;
     }
 
-    logger.info("{}", CliConstants.MENU_DIVIDER);
-    if (canMessage) {
-      logger.info("Commands: /back  /older  /block  /unmatch");
-      logger.info("\nType your message:");
-    } else {
-      logger.info("[B] Back");
-    }
-  }
+    /** Displays a single conversation preview in the list. */
+    private void displayConversationPreview(int index, ConversationPreview preview) {
+        String name = preview.otherUser().getName();
+        String unreadStr = preview.unreadCount() > 0 ? " (" + preview.unreadCount() + " new)" : "";
+        String timeAgo = formatTimeAgo(preview.conversation().getLastMessageAt());
 
-  /**
-   * Processes user input in a conversation.
-   *
-   * @param userInput The user's input
-   * @param canMessage Whether the user can send messages
-   * @param currentUser The current user
-   * @param otherUser The other user in the conversation
-   * @param messagingService The messaging service
-   * @return The action to take based on the input
-   */
-  private ConversationAction processConversationInput(
-      String userInput,
-      boolean canMessage,
-      User currentUser,
-      User otherUser,
-      MessagingService messagingService) {
+        logger.info("{}. {}{} · {}", index, name, unreadStr, timeAgo);
 
-    if (userInput.equalsIgnoreCase("/back") || userInput.equalsIgnoreCase("b")) {
-      return ConversationAction.EXIT;
+        preview.lastMessage().ifPresent(msg -> {
+            String content = truncateMessage(msg.content(), PREVIEW_MAX_LENGTH);
+            logger.info("   \"{}\"", content);
+        });
+        logger.info("");
     }
 
-    if (userInput.equalsIgnoreCase("/older")) {
-      return ConversationAction.SHOW_OLDER;
+    /** Shows a single conversation with messages. */
+    private void showConversation(User currentUser, ConversationPreview preview) {
+        MessagingService messagingService = registry.getMessagingService();
+        MatchStorage matchStorage = registry.getMatchStorage();
+        Conversation conversation = preview.conversation();
+        User otherUser = preview.otherUser();
+
+        messagingService.markAsRead(currentUser.getId(), conversation.getId());
+
+        int offset = 0;
+        boolean showOlder = false;
+
+        while (true) {
+            List<Message> messages =
+                    messagingService.getMessages(currentUser.getId(), otherUser.getId(), MESSAGES_PER_PAGE + offset, 0);
+
+            String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
+            Optional<Match> matchOpt = matchStorage.get(matchId);
+            boolean canMessage = matchOpt.isPresent() && matchOpt.get().isActive();
+
+            printConversationHeader(otherUser.getName(), canMessage);
+            printMessages(messages, currentUser, showOlder);
+            printConversationFooter(canMessage, messages.size() >= MESSAGES_PER_PAGE && offset == 0);
+
+            String userInput = input.readLine("> ").trim();
+
+            if (userInput.isEmpty()) {
+                continue;
+            }
+
+            ConversationAction action =
+                    processConversationInput(userInput, canMessage, currentUser, otherUser, messagingService);
+            switch (action) {
+                case EXIT -> {
+                    return;
+                }
+                case SHOW_OLDER -> {
+                    offset += MESSAGES_PER_PAGE;
+                    showOlder = true;
+                }
+                case REFRESH -> {
+                    offset = 0;
+                    showOlder = false;
+                }
+                case CONTINUE -> {
+                    /* No action needed, continue conversation loop */
+                }
+                default -> {
+                    /* Unknown action - do nothing */
+                }
+            }
+        }
     }
 
-    if (!canMessage) {
-      logger.info("\n⚠️  Cannot send messages - match has ended.");
-      return ConversationAction.CONTINUE;
+    private enum ConversationAction {
+        EXIT,
+        SHOW_OLDER,
+        REFRESH,
+        CONTINUE
     }
 
-    if (userInput.equalsIgnoreCase("/block")) {
-      if (confirmAction("Block " + otherUser.getName())) {
-        blockUser(currentUser, otherUser);
-        return ConversationAction.EXIT;
-      }
-      return ConversationAction.CONTINUE;
+    /**
+     * Prints the header for a conversation view.
+     *
+     * @param otherUserName The name of the other user in the conversation
+     * @param canMessage Whether the user can send messages in this conversation
+     */
+    private void printConversationHeader(String otherUserName, boolean canMessage) {
+        logger.info("\n{}", CliConstants.SEPARATOR_LINE);
+        logger.info("       💬 Conversation with {}", otherUserName);
+        if (!canMessage) {
+            logger.info("       ⚠️  Match ended - read only");
+        }
+        logger.info("{}", CliConstants.SEPARATOR_LINE);
     }
 
-    if (userInput.equalsIgnoreCase("/unmatch")) {
-      if (confirmAction("Unmatch from " + otherUser.getName())) {
-        unmatchUser(currentUser, otherUser);
-        return ConversationAction.EXIT;
-      }
-      return ConversationAction.CONTINUE;
+    /**
+     * Prints the messages in a conversation.
+     *
+     * @param messages The list of messages to print
+     * @param currentUser The current user
+     * @param showOlder Whether to show older messages
+     */
+    private void printMessages(List<Message> messages, User currentUser, boolean showOlder) {
+        if (messages.isEmpty()) {
+            logger.info("\n  No messages yet. Start the conversation!");
+        } else {
+            int start = showOlder ? 0 : Math.max(0, messages.size() - MESSAGES_PER_PAGE);
+            for (int i = start; i < messages.size(); i++) {
+                displayMessage(messages.get(i), currentUser);
+            }
+        }
     }
 
-    // Send message
-    SendResult result =
-        messagingService.sendMessage(currentUser.getId(), otherUser.getId(), userInput);
+    /**
+     * Prints the footer for a conversation view.
+     *
+     * @param canMessage Whether the user can send messages
+     * @param hasMoreMessages Whether there are more messages to show
+     */
+    private void printConversationFooter(boolean canMessage, boolean hasMoreMessages) {
+        if (hasMoreMessages) {
+            logger.info("\n  [Type /older to see older messages]");
+        }
 
-    if (result.success()) {
-      logger.info("\n✓ Message sent");
-      return ConversationAction.REFRESH;
-    } else {
-      logger.info("\n❌ {}", result.errorMessage());
-      return ConversationAction.CONTINUE;
-    }
-  }
-
-  /** Displays a single message. */
-  private void displayMessage(Message message, User currentUser) {
-    boolean isFromMe = message.senderId().equals(currentUser.getId());
-    String sender = isFromMe ? "You" : "Them";
-    String timestamp = TIME_FORMATTER.format(message.createdAt());
-
-    logger.info("\n   [{}] {}:", timestamp, sender);
-    logger.info("   {}", message.content());
-  }
-
-  /** Formats a timestamp as relative time (e.g., "5m ago"). */
-  private String formatTimeAgo(Instant timestamp) {
-    if (timestamp == null) {
-      return "never";
+        logger.info("{}", CliConstants.MENU_DIVIDER);
+        if (canMessage) {
+            logger.info("Commands: /back  /older  /block  /unmatch");
+            logger.info("\nType your message:");
+        } else {
+            logger.info("[B] Back");
+        }
     }
 
-    Duration duration = Duration.between(timestamp, Instant.now());
+    /**
+     * Processes user input in a conversation.
+     *
+     * @param userInput The user's input
+     * @param canMessage Whether the user can send messages
+     * @param currentUser The current user
+     * @param otherUser The other user in the conversation
+     * @param messagingService The messaging service
+     * @return The action to take based on the input
+     */
+    private ConversationAction processConversationInput(
+            String userInput, boolean canMessage, User currentUser, User otherUser, MessagingService messagingService) {
 
-    if (duration.toMinutes() < 60) {
-      return duration.toMinutes() + "m ago";
-    } else if (duration.toHours() < 24) {
-      return duration.toHours() + "h ago";
-    } else if (duration.toDays() < 7) {
-      return duration.toDays() + "d ago";
-    } else {
-      return DateTimeFormatter.ofPattern("MMM d")
-          .withZone(ZoneId.systemDefault())
-          .format(timestamp);
+        if (userInput.equalsIgnoreCase("/back") || userInput.equalsIgnoreCase("b")) {
+            return ConversationAction.EXIT;
+        }
+
+        if (userInput.equalsIgnoreCase("/older")) {
+            return ConversationAction.SHOW_OLDER;
+        }
+
+        if (!canMessage) {
+            logger.info("\n⚠️  Cannot send messages - match has ended.");
+            return ConversationAction.CONTINUE;
+        }
+
+        if (userInput.equalsIgnoreCase("/block")) {
+            if (confirmAction("Block " + otherUser.getName())) {
+                blockUser(currentUser, otherUser);
+                return ConversationAction.EXIT;
+            }
+            return ConversationAction.CONTINUE;
+        }
+
+        if (userInput.equalsIgnoreCase("/unmatch")) {
+            if (confirmAction("Unmatch from " + otherUser.getName())) {
+                unmatchUser(currentUser, otherUser);
+                return ConversationAction.EXIT;
+            }
+            return ConversationAction.CONTINUE;
+        }
+
+        // Send message
+        SendResult result = messagingService.sendMessage(currentUser.getId(), otherUser.getId(), userInput);
+
+        if (result.success()) {
+            logger.info("\n✓ Message sent");
+            return ConversationAction.REFRESH;
+        } else {
+            logger.info("\n❌ {}", result.errorMessage());
+            return ConversationAction.CONTINUE;
+        }
     }
-  }
 
-  /** Truncates a message for preview. */
-  private String truncateMessage(String message, int maxLen) {
-    if (message == null) {
-      return "";
-    }
-    message = message.replace('\n', ' ').replace('\r', ' ');
-    if (message.length() <= maxLen) {
-      return message;
-    }
-    return message.substring(0, maxLen - 3) + "...";
-  }
+    /** Displays a single message. */
+    private void displayMessage(Message message, User currentUser) {
+        boolean isFromMe = message.senderId().equals(currentUser.getId());
+        String sender = isFromMe ? "You" : "Them";
+        String timestamp = TIME_FORMATTER.format(message.createdAt());
 
-  /** Asks for confirmation of an action. */
-  private boolean confirmAction(String action) {
-    String response = input.readLine("\n" + action + "? (y/n): ").trim().toLowerCase();
-    return response.equals("y") || response.equals("yes");
-  }
-
-  /** Blocks another user. */
-  private void blockUser(User currentUser, User otherUser) {
-    datingapp.core.Block block =
-        datingapp.core.Block.create(currentUser.getId(), otherUser.getId());
-    registry.getBlockStorage().save(block);
-
-    String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-    Optional<Match> matchOpt = registry.getMatchStorage().get(matchId);
-    if (matchOpt.isPresent()) {
-      Match match = matchOpt.get();
-      if (match.isActive()) {
-        match.block(currentUser.getId());
-        registry.getMatchStorage().update(match);
-      }
+        logger.info("\n   [{}] {}:", timestamp, sender);
+        logger.info("   {}", message.content());
     }
 
-    logger.info("\n✓ {} has been blocked.", otherUser.getName());
-  }
+    /** Formats a timestamp as relative time (e.g., "5m ago"). */
+    private String formatTimeAgo(Instant timestamp) {
+        if (timestamp == null) {
+            return "never";
+        }
 
-  /** Unmatches from another user. */
-  private void unmatchUser(User currentUser, User otherUser) {
-    String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-    Optional<Match> matchOpt = registry.getMatchStorage().get(matchId);
+        Duration duration = Duration.between(timestamp, Instant.now());
 
-    if (matchOpt.isPresent()) {
-      Match match = matchOpt.get();
-      if (match.isActive()) {
-        match.unmatch(currentUser.getId());
-        registry.getMatchStorage().update(match);
-        logger.info("\n✓ Unmatched from {}.", otherUser.getName());
-      } else {
-        logger.info("\n⚠️  Match is already ended.");
-      }
-    } else {
-      logger.info("\n⚠️  No match found.");
+        if (duration.toMinutes() < 60) {
+            return duration.toMinutes() + "m ago";
+        } else if (duration.toHours() < 24) {
+            return duration.toHours() + "h ago";
+        } else if (duration.toDays() < 7) {
+            return duration.toDays() + "d ago";
+        } else {
+            return DateTimeFormatter.ofPattern("MMM d")
+                    .withZone(ZoneId.systemDefault())
+                    .format(timestamp);
+        }
     }
-  }
 
-  /**
-   * Returns the total unread count for menu display.
-   *
-   * @return The number of unread messages across all conversations
-   */
-  public int getTotalUnreadCount() {
-    User currentUser = session.getCurrentUser();
-    if (currentUser == null) {
-      return 0;
+    /** Truncates a message for preview. */
+    private String truncateMessage(String message, int maxLen) {
+        if (message == null) {
+            return "";
+        }
+        message = message.replace('\n', ' ').replace('\r', ' ');
+        if (message.length() <= maxLen) {
+            return message;
+        }
+        return message.substring(0, maxLen - 3) + "...";
     }
-    return registry.getMessagingService().getTotalUnreadCount(currentUser.getId());
-  }
+
+    /** Asks for confirmation of an action. */
+    private boolean confirmAction(String action) {
+        String response = input.readLine("\n" + action + "? (y/n): ").trim().toLowerCase();
+        return response.equals("y") || response.equals("yes");
+    }
+
+    /** Blocks another user. */
+    private void blockUser(User currentUser, User otherUser) {
+        datingapp.core.Block block = datingapp.core.Block.create(currentUser.getId(), otherUser.getId());
+        registry.getBlockStorage().save(block);
+
+        String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
+        Optional<Match> matchOpt = registry.getMatchStorage().get(matchId);
+        if (matchOpt.isPresent()) {
+            Match match = matchOpt.get();
+            if (match.isActive()) {
+                match.block(currentUser.getId());
+                registry.getMatchStorage().update(match);
+            }
+        }
+
+        logger.info("\n✓ {} has been blocked.", otherUser.getName());
+    }
+
+    /** Unmatches from another user. */
+    private void unmatchUser(User currentUser, User otherUser) {
+        String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
+        Optional<Match> matchOpt = registry.getMatchStorage().get(matchId);
+
+        if (matchOpt.isPresent()) {
+            Match match = matchOpt.get();
+            if (match.isActive()) {
+                match.unmatch(currentUser.getId());
+                registry.getMatchStorage().update(match);
+                logger.info("\n✓ Unmatched from {}.", otherUser.getName());
+            } else {
+                logger.info("\n⚠️  Match is already ended.");
+            }
+        } else {
+            logger.info("\n⚠️  No match found.");
+        }
+    }
+
+    /**
+     * Returns the total unread count for menu display.
+     *
+     * @return The number of unread messages across all conversations
+     */
+    public int getTotalUnreadCount() {
+        User currentUser = session.getCurrentUser();
+        if (currentUser == null) {
+            return 0;
+        }
+        return registry.getMessagingService().getTotalUnreadCount(currentUser.getId());
+    }
 }

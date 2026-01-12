@@ -11,114 +11,114 @@ import org.slf4j.LoggerFactory;
 
 /** Handler for browsing users who have liked the current user's profile. */
 public class LikerBrowserHandler {
-  private static final Logger logger = LoggerFactory.getLogger(LikerBrowserHandler.class);
+    private static final Logger logger = LoggerFactory.getLogger(LikerBrowserHandler.class);
 
-  private final LikerBrowserService likerBrowserService;
-  private final MatchingService matchingService;
-  private final UserSession userSession;
-  private final InputReader inputReader;
+    private final LikerBrowserService likerBrowserService;
+    private final MatchingService matchingService;
+    private final UserSession userSession;
+    private final InputReader inputReader;
 
-  /** Creates a new LikerBrowserHandler with the required dependencies. */
-  public LikerBrowserHandler(
-      LikerBrowserService likerBrowserService,
-      MatchingService matchingService,
-      UserSession userSession,
-      InputReader inputReader) {
-    this.likerBrowserService = Objects.requireNonNull(likerBrowserService);
-    this.matchingService = Objects.requireNonNull(matchingService);
-    this.userSession = Objects.requireNonNull(userSession);
-    this.inputReader = Objects.requireNonNull(inputReader);
-  }
-
-  /** Displays a list of users who have liked the current user and allows interaction. */
-  public void browseWhoLikedMe() {
-    if (!userSession.isLoggedIn()) {
-      logger.info(CliConstants.PLEASE_SELECT_USER);
-      return;
+    /** Creates a new LikerBrowserHandler with the required dependencies. */
+    public LikerBrowserHandler(
+            LikerBrowserService likerBrowserService,
+            MatchingService matchingService,
+            UserSession userSession,
+            InputReader inputReader) {
+        this.likerBrowserService = Objects.requireNonNull(likerBrowserService);
+        this.matchingService = Objects.requireNonNull(matchingService);
+        this.userSession = Objects.requireNonNull(userSession);
+        this.inputReader = Objects.requireNonNull(inputReader);
     }
 
-    User currentUser = userSession.getCurrentUser();
-    List<LikerBrowserService.PendingLiker> likers =
-        likerBrowserService.findPendingLikersWithTimes(currentUser.getId());
-
-    if (likers.isEmpty()) {
-      logger.info("\nNo new likes yet.\n");
-      return;
-    }
-
-    logger.info("\n--- Who Liked Me ({} pending) ---\n", likers.size());
-
-    for (LikerBrowserService.PendingLiker liker : likers) {
-      showCard(liker);
-      logger.info("1. Like back");
-      logger.info("2. Pass");
-      logger.info("0. Stop\n");
-
-      String choice = inputReader.readLine("Choice: ");
-      switch (choice) {
-        case "1" -> handleSwipe(currentUser, liker.user(), Like.Direction.LIKE);
-        case "2" -> handleSwipe(currentUser, liker.user(), Like.Direction.PASS);
-        case "0" -> {
-          return;
+    /** Displays a list of users who have liked the current user and allows interaction. */
+    public void browseWhoLikedMe() {
+        if (!userSession.isLoggedIn()) {
+            logger.info(CliConstants.PLEASE_SELECT_USER);
+            return;
         }
-        default -> {
-          logger.info(CliConstants.INVALID_SELECTION);
-          continue;
+
+        User currentUser = userSession.getCurrentUser();
+        List<LikerBrowserService.PendingLiker> likers =
+                likerBrowserService.findPendingLikersWithTimes(currentUser.getId());
+
+        if (likers.isEmpty()) {
+            logger.info("\nNo new likes yet.\n");
+            return;
         }
-      }
+
+        logger.info("\n--- Who Liked Me ({} pending) ---\n", likers.size());
+
+        for (LikerBrowserService.PendingLiker liker : likers) {
+            showCard(liker);
+            logger.info("1. Like back");
+            logger.info("2. Pass");
+            logger.info("0. Stop\n");
+
+            String choice = inputReader.readLine("Choice: ");
+            switch (choice) {
+                case "1" -> handleSwipe(currentUser, liker.user(), Like.Direction.LIKE);
+                case "2" -> handleSwipe(currentUser, liker.user(), Like.Direction.PASS);
+                case "0" -> {
+                    return;
+                }
+                default -> {
+                    logger.info(CliConstants.INVALID_SELECTION);
+                    continue;
+                }
+            }
+        }
+
+        logger.info("\nEnd of list.\n");
     }
 
-    logger.info("\nEnd of list.\n");
-  }
-
-  private void showCard(LikerBrowserService.PendingLiker pending) {
-    User user = pending.user();
-    String verifiedBadge = Boolean.TRUE.equals(user.isVerified()) ? " ✅ Verified" : "";
-    String likedAgo = formatTimeAgo(pending.likedAt());
-    logger.info(CliConstants.BOX_TOP);
-    logger.info("│ 💝 {}, {} years old{}", user.getName(), user.getAge(), verifiedBadge);
-    logger.info("│ 🕒 Liked you {}", likedAgo);
-    logger.info("│ 📍 Location: {}, {}", user.getLat(), user.getLon());
-    String bio = user.getBio() == null ? "" : user.getBio();
-    if (bio.length() > 50) {
-      bio = bio.substring(0, 47) + "...";
-    }
-    logger.info(CliConstants.PROFILE_BIO_FORMAT, bio);
-    logger.info(CliConstants.BOX_BOTTOM);
-    logger.info("");
-  }
-
-  private void handleSwipe(User currentUser, User other, Like.Direction direction) {
-    matchingService.recordLike(Like.create(currentUser.getId(), other.getId(), direction));
-    logger.info("✅ Saved.\n");
-  }
-
-  private String formatTimeAgo(java.time.Instant likedAt) {
-    if (likedAt == null) {
-      return "(unknown)";
+    private void showCard(LikerBrowserService.PendingLiker pending) {
+        User user = pending.user();
+        String verifiedBadge = Boolean.TRUE.equals(user.isVerified()) ? " ✅ Verified" : "";
+        String likedAgo = formatTimeAgo(pending.likedAt());
+        logger.info(CliConstants.BOX_TOP);
+        logger.info("│ 💝 {}, {} years old{}", user.getName(), user.getAge(), verifiedBadge);
+        logger.info("│ 🕒 Liked you {}", likedAgo);
+        logger.info("│ 📍 Location: {}, {}", user.getLat(), user.getLon());
+        String bio = user.getBio() == null ? "" : user.getBio();
+        if (bio.length() > 50) {
+            bio = bio.substring(0, 47) + "...";
+        }
+        logger.info(CliConstants.PROFILE_BIO_FORMAT, bio);
+        logger.info(CliConstants.BOX_BOTTOM);
+        logger.info("");
     }
 
-    java.time.Duration duration = java.time.Duration.between(likedAt, java.time.Instant.now());
-    if (duration.isNegative()) {
-      duration = java.time.Duration.ZERO;
+    private void handleSwipe(User currentUser, User other, Like.Direction direction) {
+        matchingService.recordLike(Like.create(currentUser.getId(), other.getId(), direction));
+        logger.info("✅ Saved.\n");
     }
 
-    long seconds = duration.getSeconds();
-    if (seconds < 60) {
-      return seconds + "s ago";
-    }
+    private String formatTimeAgo(java.time.Instant likedAt) {
+        if (likedAt == null) {
+            return "(unknown)";
+        }
 
-    long minutes = seconds / 60;
-    if (minutes < 60) {
-      return minutes + "m ago";
-    }
+        java.time.Duration duration = java.time.Duration.between(likedAt, java.time.Instant.now());
+        if (duration.isNegative()) {
+            duration = java.time.Duration.ZERO;
+        }
 
-    long hours = minutes / 60;
-    if (hours < 24) {
-      return hours + "h ago";
-    }
+        long seconds = duration.getSeconds();
+        if (seconds < 60) {
+            return seconds + "s ago";
+        }
 
-    long days = hours / 24;
-    return days + "d ago";
-  }
+        long minutes = seconds / 60;
+        if (minutes < 60) {
+            return minutes + "m ago";
+        }
+
+        long hours = minutes / 60;
+        if (hours < 24) {
+            return hours + "h ago";
+        }
+
+        long days = hours / 24;
+        return days + "d ago";
+    }
 }

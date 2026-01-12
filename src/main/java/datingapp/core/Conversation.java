@@ -12,194 +12,257 @@ import java.util.UUID;
  */
 public class Conversation {
 
-  private final String id;
-  private final UUID userA; // Lexicographically smaller
-  private final UUID userB; // Lexicographically larger
-  private final Instant createdAt;
-  private Instant lastMessageAt;
-  private Instant userAReadAt;
-  private Instant userBReadAt;
+    private final String id;
+    private final UUID userA; // Lexicographically smaller
+    private final UUID userB; // Lexicographically larger
+    private final Instant createdAt;
+    private Instant lastMessageAt;
+    private Instant userAReadAt;
+    private Instant userBReadAt;
+    private Instant archivedAt;
+    private ArchiveReason archiveReason;
+    private boolean visibleToUserA = true;
+    private boolean visibleToUserB = true;
 
-  /** Full constructor for reconstitution from storage. */
-  public Conversation(
-      String id,
-      UUID userA,
-      UUID userB,
-      Instant createdAt,
-      Instant lastMessageAt,
-      Instant userAReadAt,
-      Instant userBReadAt) {
-    Objects.requireNonNull(id, "id cannot be null");
-    Objects.requireNonNull(userA, "userA cannot be null");
-    Objects.requireNonNull(userB, "userB cannot be null");
-    Objects.requireNonNull(createdAt, "createdAt cannot be null");
+    public Conversation(
+            String id,
+            UUID userA,
+            UUID userB,
+            Instant createdAt,
+            Instant lastMessageAt,
+            Instant userAReadAt,
+            Instant userBReadAt,
+            Instant archivedAt,
+            ArchiveReason archiveReason,
+            boolean visibleToUserA,
+            boolean visibleToUserB) {
+        Objects.requireNonNull(id, "id cannot be null");
+        Objects.requireNonNull(userA, "userA cannot be null");
+        Objects.requireNonNull(userB, "userB cannot be null");
+        Objects.requireNonNull(createdAt, "createdAt cannot be null");
 
-    if (userA.equals(userB)) {
-      throw new IllegalArgumentException("Cannot have conversation with yourself");
+        if (userA.equals(userB)) {
+            throw new IllegalArgumentException("Cannot have conversation with yourself");
+        }
+
+        // Validate ordering
+        if (userA.toString().compareTo(userB.toString()) > 0) {
+            throw new IllegalArgumentException("userA must be lexicographically smaller than userB");
+        }
+
+        this.id = id;
+        this.userA = userA;
+        this.userB = userB;
+        this.createdAt = createdAt;
+        this.lastMessageAt = lastMessageAt;
+        this.userAReadAt = userAReadAt;
+        this.userBReadAt = userBReadAt;
+        this.archivedAt = archivedAt;
+        this.archiveReason = archiveReason;
+        this.visibleToUserA = visibleToUserA;
+        this.visibleToUserB = visibleToUserB;
     }
 
-    // Validate ordering
-    if (userA.toString().compareTo(userB.toString()) > 0) {
-      throw new IllegalArgumentException("userA must be lexicographically smaller than userB");
+    /**
+     * Creates a new Conversation with deterministic ID based on sorted user UUIDs.
+     *
+     * @param a First user UUID
+     * @param b Second user UUID
+     * @return A new Conversation with proper ordering and deterministic ID
+     */
+    public static Conversation create(UUID a, UUID b) {
+        Objects.requireNonNull(a, "a cannot be null");
+        Objects.requireNonNull(b, "b cannot be null");
+
+        if (a.equals(b)) {
+            throw new IllegalArgumentException("Cannot have conversation with yourself");
+        }
+
+        String userAString = a.toString();
+        String userBString = b.toString();
+
+        UUID userA;
+        UUID userB;
+        if (userAString.compareTo(userBString) < 0) {
+            userA = a;
+            userB = b;
+        } else {
+            userA = b;
+            userB = a;
+        }
+
+        String id = userA.toString() + "_" + userB.toString();
+        Instant now = Instant.now();
+        return new Conversation(id, userA, userB, now, null, null, null, null, null, true, true);
     }
 
-    this.id = id;
-    this.userA = userA;
-    this.userB = userB;
-    this.createdAt = createdAt;
-    this.lastMessageAt = lastMessageAt;
-    this.userAReadAt = userAReadAt;
-    this.userBReadAt = userBReadAt;
-  }
+    /** Generates the deterministic conversation ID for two user UUIDs. */
+    public static String generateId(UUID a, UUID b) {
+        String userAString = a.toString();
+        String userBString = b.toString();
 
-  /**
-   * Creates a new Conversation with deterministic ID based on sorted user UUIDs.
-   *
-   * @param a First user UUID
-   * @param b Second user UUID
-   * @return A new Conversation with proper ordering and deterministic ID
-   */
-  public static Conversation create(UUID a, UUID b) {
-    Objects.requireNonNull(a, "a cannot be null");
-    Objects.requireNonNull(b, "b cannot be null");
-
-    if (a.equals(b)) {
-      throw new IllegalArgumentException("Cannot have conversation with yourself");
+        if (userAString.compareTo(userBString) < 0) {
+            return userAString + "_" + userBString;
+        } else {
+            return userBString + "_" + userAString;
+        }
     }
 
-    String userAString = a.toString();
-    String userBString = b.toString();
-
-    UUID userA;
-    UUID userB;
-    if (userAString.compareTo(userBString) < 0) {
-      userA = a;
-      userB = b;
-    } else {
-      userA = b;
-      userB = a;
+    /** Checks if this conversation involves the given user. */
+    public boolean involves(UUID userId) {
+        return userA.equals(userId) || userB.equals(userId);
     }
 
-    String id = userA.toString() + "_" + userB.toString();
-    Instant now = Instant.now();
-    return new Conversation(id, userA, userB, now, null, null, null);
-  }
-
-  /** Generates the deterministic conversation ID for two user UUIDs. */
-  public static String generateId(UUID a, UUID b) {
-    String userAString = a.toString();
-    String userBString = b.toString();
-
-    if (userAString.compareTo(userBString) < 0) {
-      return userAString + "_" + userBString;
-    } else {
-      return userBString + "_" + userAString;
+    /** Gets the other user in this conversation. */
+    public UUID getOtherUser(UUID userId) {
+        if (userA.equals(userId)) {
+            return userB;
+        } else if (userB.equals(userId)) {
+            return userA;
+        }
+        throw new IllegalArgumentException("User is not part of this conversation");
     }
-  }
 
-  /** Checks if this conversation involves the given user. */
-  public boolean involves(UUID userId) {
-    return userA.equals(userId) || userB.equals(userId);
-  }
-
-  /** Gets the other user in this conversation. */
-  public UUID getOtherUser(UUID userId) {
-    if (userA.equals(userId)) {
-      return userB;
-    } else if (userB.equals(userId)) {
-      return userA;
+    /** Updates the last message timestamp. */
+    public void updateLastMessageAt(Instant timestamp) {
+        Objects.requireNonNull(timestamp, "timestamp cannot be null");
+        this.lastMessageAt = timestamp;
     }
-    throw new IllegalArgumentException("User is not part of this conversation");
-  }
 
-  /** Updates the last message timestamp. */
-  public void updateLastMessageAt(Instant timestamp) {
-    Objects.requireNonNull(timestamp, "timestamp cannot be null");
-    this.lastMessageAt = timestamp;
-  }
+    /**
+     * Updates the read timestamp for a specific user.
+     *
+     * @param userId The user who read the conversation
+     * @param timestamp When they last read it
+     */
+    public void updateReadTimestamp(UUID userId, Instant timestamp) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(timestamp, "timestamp cannot be null");
 
-  /**
-   * Updates the read timestamp for a specific user.
-   *
-   * @param userId The user who read the conversation
-   * @param timestamp When they last read it
-   */
-  public void updateReadTimestamp(UUID userId, Instant timestamp) {
-    Objects.requireNonNull(userId, "userId cannot be null");
-    Objects.requireNonNull(timestamp, "timestamp cannot be null");
-
-    if (userA.equals(userId)) {
-      this.userAReadAt = timestamp;
-    } else if (userB.equals(userId)) {
-      this.userBReadAt = timestamp;
-    } else {
-      throw new IllegalArgumentException("User is not part of this conversation");
+        if (userA.equals(userId)) {
+            this.userAReadAt = timestamp;
+        } else if (userB.equals(userId)) {
+            this.userBReadAt = timestamp;
+        } else {
+            throw new IllegalArgumentException("User is not part of this conversation");
+        }
     }
-  }
 
-  /**
-   * Gets the last read timestamp for a specific user.
-   *
-   * @param userId The user to get the read timestamp for
-   * @return The last read timestamp, or null if never read
-   */
-  public Instant getLastReadAt(UUID userId) {
-    if (userA.equals(userId)) {
-      return userAReadAt;
-    } else if (userB.equals(userId)) {
-      return userBReadAt;
+    /**
+     * Gets the last read timestamp for a specific user.
+     *
+     * @param userId The user to get the read timestamp for
+     * @return The last read timestamp, or null if never read
+     */
+    public Instant getLastReadAt(UUID userId) {
+        if (userA.equals(userId)) {
+            return userAReadAt;
+        } else if (userB.equals(userId)) {
+            return userBReadAt;
+        }
+        throw new IllegalArgumentException("User is not part of this conversation");
     }
-    throw new IllegalArgumentException("User is not part of this conversation");
-  }
 
-  // Getters
-  public String getId() {
-    return id;
-  }
-
-  public UUID getUserA() {
-    return userA;
-  }
-
-  public UUID getUserB() {
-    return userB;
-  }
-
-  public Instant getCreatedAt() {
-    return createdAt;
-  }
-
-  public Instant getLastMessageAt() {
-    return lastMessageAt;
-  }
-
-  public Instant getUserAReadAt() {
-    return userAReadAt;
-  }
-
-  public Instant getUserBReadAt() {
-    return userBReadAt;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
+    // Getters
+    public String getId() {
+        return id;
     }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
+
+    public UUID getUserA() {
+        return userA;
     }
-    Conversation that = (Conversation) o;
-    return Objects.equals(id, that.id);
-  }
 
-  @Override
-  public int hashCode() {
-    return Objects.hash(id);
-  }
+    public UUID getUserB() {
+        return userB;
+    }
 
-  @Override
-  public String toString() {
-    return "Conversation{id='" + id + "', lastMessageAt=" + lastMessageAt + "}";
-  }
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getLastMessageAt() {
+        return lastMessageAt;
+    }
+
+    public Instant getUserAReadAt() {
+        return userAReadAt;
+    }
+
+    public Instant getUserBReadAt() {
+        return userBReadAt;
+    }
+
+    public Instant getArchivedAt() {
+        return archivedAt;
+    }
+
+    public ArchiveReason getArchiveReason() {
+        return archiveReason;
+    }
+
+    public boolean isVisibleToUserA() {
+        return visibleToUserA;
+    }
+
+    public boolean isVisibleToUserB() {
+        return visibleToUserB;
+    }
+
+    /**
+     * Archives the conversation for both users.
+     *
+     * @param reason The reason for archiving
+     */
+    public void archive(ArchiveReason reason) {
+        this.archivedAt = Instant.now();
+        this.archiveReason = reason;
+    }
+
+    /**
+     * Sets the visibility for a specific user.
+     *
+     * @param userId The user to set visibility for
+     * @param visible Whether it should be visible
+     */
+    public void setVisibility(UUID userId, boolean visible) {
+        if (userA.equals(userId)) {
+            this.visibleToUserA = visible;
+        } else if (userB.equals(userId)) {
+            this.visibleToUserB = visible;
+        } else {
+            throw new IllegalArgumentException("User is not part of this conversation");
+        }
+    }
+
+    /** Checks if the conversation is visible to the given user. */
+    public boolean isVisibleTo(UUID userId) {
+        if (userA.equals(userId)) {
+            return visibleToUserA;
+        } else if (userB.equals(userId)) {
+            return visibleToUserB;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        Conversation that = (Conversation) o;
+        return Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    @Override
+    public String toString() {
+        return "Conversation{id='" + id + "', lastMessageAt=" + lastMessageAt + "}";
+    }
 }
