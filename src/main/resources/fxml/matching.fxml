@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.StackPane?>
+
+<BorderPane prefHeight="700.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21"
+    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.MatchingController">
+
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="20.0"
+            style="-fx-background-color: -fx-surface-dark; -fx-padding: 15;">
+            <Button onAction="#handleBack" style="-fx-background-color: transparent;" text="← Back" />
+            <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Discover" />
+        </HBox>
+    </top>
+
+    <center>
+        <StackPane>
+            <!-- Candidate Card -->
+            <VBox fx:id="candidateCard" alignment="TOP_CENTER" maxWidth="400.0" spacing="0.0"
+                styleClass="card">
+                <StackPane prefHeight="350.0"
+                    style="-fx-background-color: #2a2a40; -fx-background-radius: 20 20 0 0;">
+                    <Label style="-fx-text-fill: -fx-text-secondary;" text="[Photo Placeholder]" />
+                </StackPane>
+
+                <VBox spacing="10.0" style="-fx-padding: 20;">
+                    <HBox alignment="CENTER_LEFT">
+                        <Label fx:id="nameLabel" style="-fx-font-size: 24px; -fx-font-weight: bold;"
+                            text="Sarah, 28" />
+                        <HBox alignment="CENTER_RIGHT" HBox.hgrow="ALWAYS">
+                            <Label fx:id="matchScoreLabel"
+                                style="-fx-text-fill: -fx-accent-super; -fx-font-weight: bold;"
+                                text="92% Match" />
+                        </HBox>
+                    </HBox>
+
+                    <Label fx:id="distanceLabel" style="-fx-text-fill: -fx-text-secondary;"
+                        text="📍 3km away" />
+
+                    <Label fx:id="bioLabel" prefHeight="80.0" wrapText="true"
+                        text="Lover of hiking, coding and good coffee. Always looking for the next adventure!" />
+                </VBox>
+            </VBox>
+
+            <!-- Error State: No More Candidates -->
+            <VBox fx:id="noCandidatesContainer" alignment="CENTER" spacing="20.0" visible="false">
+                <Label style="-fx-font-size: 20px;" text="No more people around you!" />
+                <Label style="-fx-text-fill: -fx-text-secondary;"
+                    text="Try expanding your preferences or check back later." />
+                <Button onAction="#handleBack" text="Return to Dashboard" />
+            </VBox>
+        </StackPane>
+    </center>
+
+    <bottom>
+        <HBox alignment="CENTER" spacing="30.0" style="-fx-padding: 30;">
+            <Button fx:id="undoButton" onAction="#handleUndo"
+                style="-fx-background-color: #333; -fx-shape: 'M 10 10 L 20 20 M 20 10 L 10 20'; -fx-min-width: 50; -fx-min-height: 50; -fx-background-radius: 50;"
+                text="↩️" />
+
+            <Button onAction="#handlePass"
+                style="-fx-background-color: -fx-accent-pass; -fx-min-width: 70; -fx-min-height: 70; -fx-background-radius: 50; -fx-font-size: 24px;"
+                text="❌" />
+
+            <Button onAction="#handleLike"
+                style="-fx-background-color: -fx-accent-like; -fx-min-width: 70; -fx-min-height: 70; -fx-background-radius: 50; -fx-font-size: 24px;"
+                text="❤️" />
+
+            <Button
+                style="-fx-background-color: #333; -fx-min-width: 50; -fx-min-height: 50; -fx-background-radius: 50;"
+                text="⭐" />
+        </HBox>
+    </bottom>
+
+</BorderPane>

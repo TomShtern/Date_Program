@@ -26,6 +26,7 @@ class RelationshipTransitionServiceTest {
     private final UUID aliceId = UUID.randomUUID();
     private final UUID bobId = UUID.randomUUID();
 
+    @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
         matchStorage = new InMemoryMatchStorage();
@@ -56,6 +57,7 @@ class RelationshipTransitionServiceTest {
     @DisplayName("Cannot request friend zone if no active match")
     void requestFriendZoneNoMatch() {
         UUID charlieId = UUID.randomUUID();
+        // noinspection ThrowableNotThrown - intentionally ignoring return value
         assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(aliceId, charlieId));
     }
 
@@ -63,6 +65,7 @@ class RelationshipTransitionServiceTest {
     @DisplayName("Cannot request twice if one is pending")
     void requestFriendZoneDuplicate() {
         service.requestFriendZone(aliceId, bobId);
+        // noinspection ThrowableNotThrown - intentionally ignoring return value
         assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(aliceId, bobId));
     }
 
@@ -85,6 +88,7 @@ class RelationshipTransitionServiceTest {
     @DisplayName("Only target user can accept")
     void acceptFriendZoneWrongUser() {
         FriendRequest request = service.requestFriendZone(aliceId, bobId);
+        // noinspection ThrowableNotThrown - intentionally ignoring return value
         assertThrows(TransitionValidationException.class, () -> service.acceptFriendZone(request.id(), aliceId));
     }
 
@@ -244,10 +248,14 @@ class RelationshipTransitionServiceTest {
         }
 
         @Override
-        public void updateLastMessageAt(String id, java.time.Instant ts) {}
+        public void updateLastMessageAt(String id, java.time.Instant ts) {
+            // No-op: mock stub for testing
+        }
 
         @Override
-        public void updateReadTimestamp(String id, UUID u, java.time.Instant ts) {}
+        public void updateReadTimestamp(String id, UUID u, java.time.Instant ts) {
+            // No-op: mock stub for testing
+        }
 
         @Override
         public void archive(String id, ArchiveReason r) {
@@ -255,10 +263,14 @@ class RelationshipTransitionServiceTest {
         }
 
         @Override
-        public void setVisibility(String id, UUID u, boolean v) {}
+        public void setVisibility(String id, UUID u, boolean v) {
+            // No-op: mock stub for testing
+        }
 
         @Override
-        public void delete(String id) {}
+        public void delete(String id) {
+            // No-op: mock stub for testing
+        }
 
         private final java.util.Set<String> archived = new java.util.HashSet<>();
 
@@ -278,7 +290,9 @@ class RelationshipTransitionServiceTest {
         }
 
         @Override
-        public void markAsRead(UUID id) {}
+        public void markAsRead(UUID id) {
+            // No-op: mock stub for testing
+        }
 
         @Override
         public List<Notification> getForUser(UUID userId, boolean unreadOnly) {
@@ -291,9 +305,13 @@ class RelationshipTransitionServiceTest {
         }
 
         @Override
-        public void delete(UUID id) {}
+        public void delete(UUID id) {
+            // No-op: mock stub for testing
+        }
 
         @Override
-        public void deleteOldNotifications(java.time.Instant before) {}
+        public void deleteOldNotifications(java.time.Instant before) {
+            // No-op: mock stub for testing
+        }
     }
 }

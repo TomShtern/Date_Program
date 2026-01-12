@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="700.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21"
+    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.DashboardController">
+
+    <!-- Top Header -->
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="header-bar">
+            <Label fx:id="userNameLabel" styleClass="subheading" text="User Name" />
+            <HBox alignment="CENTER_RIGHT" HBox.hgrow="ALWAYS" spacing="15.0">
+                <Label fx:id="statusLabel" styleClass="text-secondary" text="Likes: 0/50" />
+                <Button onAction="#handleLogout" styleClass="button-danger" text="Logout" />
+            </HBox>
+        </HBox>
+    </top>
+
+    <!-- Center Content: Grid of Main Features -->
+    <center>
+        <VBox alignment="CENTER" spacing="30.0">
+            <padding>
+                <Insets bottom="40.0" left="40.0" right="40.0" top="30.0" />
+            </padding>
+
+            <Label styleClass="heading" text="Dashboard" />
+
+            <GridPane hgap="20.0" vgap="20.0" alignment="CENTER">
+                <columnConstraints>
+                    <ColumnConstraints hgrow="SOMETIMES" minWidth="160.0" prefWidth="180.0" />
+                    <ColumnConstraints hgrow="SOMETIMES" minWidth="160.0" prefWidth="180.0" />
+                </columnConstraints>
+
+                <Button onAction="#handleBrowse" maxHeight="140.0" maxWidth="Infinity"
+                    prefHeight="140.0" styleClass="dashboard-card" text="🔥 Browse"
+                    GridPane.columnIndex="0" GridPane.rowIndex="0" />
+
+                <Button onAction="#handleMatches" maxHeight="140.0" maxWidth="Infinity"
+                    prefHeight="140.0" styleClass="dashboard-card" text="❤️ Matches"
+                    GridPane.columnIndex="1" GridPane.rowIndex="0" />
+
+                <Button onAction="#handleChat" maxHeight="140.0" maxWidth="Infinity"
+                    prefHeight="140.0" styleClass="dashboard-card" text="💬 Chat"
+                    GridPane.columnIndex="0" GridPane.rowIndex="1" />
+
+                <Button onAction="#handleProfile" maxHeight="140.0" maxWidth="Infinity"
+                    prefHeight="140.0" styleClass="dashboard-card" text="👤 Profile"
+                    GridPane.columnIndex="1" GridPane.rowIndex="1" />
+            </GridPane>
+
+            <!-- Daily Pick Teaser -->
+            <VBox styleClass="card" spacing="10.0" prefWidth="400.0" alignment="CENTER_LEFT">
+                <Label style="-fx-font-weight: bold; -fx-font-size: 16px;" text="🌟 DAILY PICK" />
+                <Label fx:id="dailyPickLabel" styleClass="text-secondary"
+                    text="Loading your daily pick..." />
+                <Button onAction="#handleViewDailyPick" text="View Profile" />
+            </VBox>
+        </VBox>
+    </center>
+
+    <!-- Right Sidebar: Achievements & Quick Stats -->
+    <right>
+        <VBox spacing="20.0" styleClass="sidebar" prefWidth="240.0">
+            <Label styleClass="subheading" text="🏆 Achievements" />
+            <ListView fx:id="achievementsListView" prefHeight="150.0" />
+
+            <Label styleClass="subheading" text="📊 Quick Stats" />
+            <VBox spacing="8.0">
+                <HBox spacing="10.0">
+                    <Label text="Matches:" />
+                    <Label fx:id="totalMatchesLabel" styleClass="accent-success" text="0" />
+                </HBox>
+                <HBox spacing="10.0">
+                    <Label text="Profile:" />
+                    <Label fx:id="completionLabel" text="0%" />
+                </HBox>
+                <Button onAction="#handleStats" styleClass="button-transparent"
+                    text="→ View All Stats" />
+            </VBox>
+        </VBox>
+    </right>
+
+</BorderPane>

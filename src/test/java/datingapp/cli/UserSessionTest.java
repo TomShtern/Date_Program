@@ -24,11 +24,13 @@ class UserSessionTest {
 
     private UserSession userSession;
 
+    @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
         userSession = new UserSession();
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("Session State Management")
     class SessionState {
@@ -64,6 +66,7 @@ class UserSessionTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("Login State Checks")
     class LoginState {

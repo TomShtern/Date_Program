@@ -1,0 +1,524 @@
+/* ============================================
+   Dating App Theme - Modern Dark Design
+   ============================================ */
+
+.root {
+    /* Color Palette */
+    -fx-primary: #667eea;
+    -fx-primary-dark: #764ba2;
+    -fx-background-dark: #1a1a2e;
+    -fx-surface-dark: #16213e;
+    -fx-card-background: #0f3460;
+    -fx-text-primary: #ffffff;
+    -fx-text-secondary: #a0a0a0;
+    -fx-accent-like: #ff6b6b;
+    -fx-accent-pass: #4ecdc4;
+    -fx-accent-super: #ffd93d;
+    -fx-success: #2ecc71;
+    -fx-warning: #f39c12;
+    -fx-danger: #e74c3c;
+
+    /* Typography */
+    -fx-font-family: "Segoe UI", "Roboto", sans-serif;
+    -fx-font-size: 14px;
+
+    /* Base background */
+    -fx-background-color: -fx-background-dark;
+}
+
+/* ============================================
+   Typography
+   ============================================ */
+.label {
+    -fx-text-fill: -fx-text-primary;
+}
+
+.heading {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-text-primary;
+}
+
+.subheading {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-text-primary;
+}
+
+.text-secondary {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+.button {
+    -fx-background-color: linear-gradient(to bottom right, -fx-primary, -fx-primary-dark);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 12 24;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+
+.button:hover {
+    -fx-background-color: linear-gradient(to bottom right, derive(-fx-primary, 10%), derive(-fx-primary-dark, 10%));
+    -fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.4), 10, 0, 0, 3);
+}
+
+.button:pressed {
+    -fx-background-color: linear-gradient(to bottom right, derive(-fx-primary, -10%), derive(-fx-primary-dark, -10%));
+}
+
+.button:disabled {
+    -fx-opacity: 0.5;
+    -fx-cursor: default;
+}
+
+.button-secondary {
+    -fx-background-color: -fx-surface-dark;
+    -fx-text-fill: -fx-text-primary;
+    -fx-border-color: #444;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+}
+
+.button-secondary:hover {
+    -fx-background-color: derive(-fx-surface-dark, 20%);
+    -fx-border-color: -fx-primary;
+}
+
+.button-danger {
+    -fx-background-color: -fx-danger;
+}
+
+.button-danger:hover {
+    -fx-background-color: derive(-fx-danger, 10%);
+}
+
+.button-transparent {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-padding: 8 16;
+}
+
+.button-transparent:hover {
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* ============================================
+   Form Controls
+   ============================================ */
+.text-field,
+.text-area {
+    -fx-background-color: -fx-surface-dark;
+    -fx-text-fill: white;
+    -fx-prompt-text-fill: -fx-text-secondary;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: #333;
+    -fx-border-width: 1;
+    -fx-padding: 10;
+}
+
+.text-field:focused,
+.text-area:focused {
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.3), 5, 0, 0, 0);
+}
+
+.text-area {
+    -fx-wrap-text: true;
+}
+
+.text-area .content {
+    -fx-background-color: -fx-surface-dark;
+}
+
+/* ============================================
+   Lists
+   ============================================ */
+.list-view {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.list-view .scroll-bar {
+    -fx-background-color: transparent;
+}
+
+.list-view .scroll-bar .thumb {
+    -fx-background-color: #444;
+    -fx-background-radius: 4;
+}
+
+.list-cell {
+    -fx-background-color: -fx-surface-dark;
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-padding: 12 16;
+    -fx-background-insets: 2 4;
+}
+
+.list-cell:empty {
+    -fx-background-color: transparent;
+}
+
+.list-cell:filled:hover {
+    -fx-background-color: derive(-fx-surface-dark, 15%);
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: linear-gradient(to right, -fx-primary, -fx-primary-dark);
+}
+
+.list-cell:filled:selected:hover {
+    -fx-background-color: linear-gradient(to right, derive(-fx-primary, 10%), derive(-fx-primary-dark, 10%));
+}
+
+/* ============================================
+   Cards
+   ============================================ */
+.card {
+    -fx-background-color: -fx-card-background;
+    -fx-background-radius: 16;
+    -fx-padding: 20;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 15, 0, 0, 5);
+}
+
+.card:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 20, 0, 0, 8);
+}
+
+/* ============================================
+   Dashboard Cards
+   ============================================ */
+.dashboard-card {
+    -fx-background-color: -fx-surface-dark;
+    -fx-border-color: #333;
+    -fx-border-width: 2;
+    -fx-border-radius: 16;
+    -fx-background-radius: 16;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+}
+
+.dashboard-card:hover {
+    -fx-background-color: #2a2a45;
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.3), 10, 0, 0, 3);
+}
+
+.dashboard-card:pressed {
+    -fx-background-color: #252540;
+}
+
+/* ============================================
+   Login Screen
+   ============================================ */
+.login-container {
+    -fx-background-color: -fx-background-dark;
+}
+
+.login-title {
+    -fx-font-size: 36px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.user-list-cell {
+    -fx-font-size: 15px;
+}
+
+/* ============================================
+   Swipe Card (Matching Screen)
+   ============================================ */
+.swipe-card {
+    -fx-background-color: -fx-card-background;
+    -fx-background-radius: 20;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 20, 0, 0, 8);
+}
+
+.swipe-card-photo {
+    -fx-background-color: #2a2a40;
+    -fx-background-radius: 20 20 0 0;
+}
+
+.action-button {
+    -fx-background-radius: 50;
+    -fx-min-width: 60;
+    -fx-min-height: 60;
+    -fx-max-width: 60;
+    -fx-max-height: 60;
+    -fx-font-size: 24px;
+    -fx-cursor: hand;
+}
+
+.action-button-like {
+    -fx-background-color: -fx-accent-like;
+    -fx-min-width: 70;
+    -fx-min-height: 70;
+    -fx-max-width: 70;
+    -fx-max-height: 70;
+}
+
+.action-button-pass {
+    -fx-background-color: -fx-accent-pass;
+    -fx-min-width: 70;
+    -fx-min-height: 70;
+    -fx-max-width: 70;
+    -fx-max-height: 70;
+}
+
+.action-button-undo {
+    -fx-background-color: #444;
+    -fx-min-width: 50;
+    -fx-min-height: 50;
+    -fx-max-width: 50;
+    -fx-max-height: 50;
+}
+
+.action-button-super {
+    -fx-background-color: -fx-accent-super;
+    -fx-min-width: 50;
+    -fx-min-height: 50;
+    -fx-max-width: 50;
+    -fx-max-height: 50;
+}
+
+/* ============================================
+   Match Popup
+   ============================================ */
+.match-popup {
+    -fx-background-color: rgba(0, 0, 0, 0.9);
+}
+
+.match-popup-content {
+    -fx-background-color: linear-gradient(to bottom, -fx-primary, -fx-primary-dark);
+    -fx-background-radius: 20;
+    -fx-padding: 40;
+}
+
+.match-title {
+    -fx-font-size: 42px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+/* ============================================
+   Chat / Messaging
+   ============================================ */
+.chat-header {
+    -fx-background-color: -fx-surface-dark;
+    -fx-padding: 15;
+    -fx-border-color: #333;
+    -fx-border-width: 0 0 1 0;
+}
+
+.message-bubble {
+    -fx-background-radius: 16;
+    -fx-padding: 10 14;
+    -fx-max-width: 280;
+}
+
+.message-sent {
+    -fx-background-color: linear-gradient(to right, -fx-primary, -fx-primary-dark);
+    -fx-text-fill: white;
+}
+
+.message-received {
+    -fx-background-color: -fx-surface-dark;
+    -fx-text-fill: white;
+}
+
+.message-input-area {
+    -fx-background-color: -fx-surface-dark;
+    -fx-border-color: #333;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 15;
+}
+
+.conversation-item {
+    -fx-padding: 12 16;
+}
+
+.conversation-unread {
+    -fx-font-weight: bold;
+}
+
+/* ============================================
+   Stats Cards
+   ============================================ */
+.stat-card {
+    -fx-background-color: -fx-card-background;
+    -fx-background-radius: 12;
+    -fx-padding: 20;
+    -fx-alignment: center;
+}
+
+.stat-number {
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.stat-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* ============================================
+   Achievement Badge
+   ============================================ */
+.achievement-badge {
+    -fx-background-color: -fx-surface-dark;
+    -fx-background-radius: 12;
+    -fx-padding: 12 16;
+    -fx-border-color: -fx-accent-super;
+    -fx-border-width: 2;
+    -fx-border-radius: 12;
+}
+
+/* ============================================
+   Scroll Panes
+   ============================================ */
+.scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane>.viewport {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane .scroll-bar:vertical,
+.scroll-pane .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane .scroll-bar .thumb {
+    -fx-background-color: #444;
+    -fx-background-radius: 4;
+}
+
+.scroll-pane .scroll-bar .thumb:hover {
+    -fx-background-color: #555;
+}
+
+/* ============================================
+   Dialogs
+   ============================================ */
+.dialog-pane {
+    -fx-background-color: -fx-surface-dark;
+    -fx-padding: 20;
+}
+
+.dialog-pane>.button-bar>.container {
+    -fx-background-color: -fx-surface-dark;
+}
+
+.dialog-pane .header-panel {
+    -fx-background-color: -fx-card-background;
+}
+
+.dialog-pane .content {
+    -fx-padding: 20;
+}
+
+/* ============================================
+   Accent Colors
+   ============================================ */
+.accent-like {
+    -fx-background-color: -fx-accent-like;
+}
+
+.accent-pass {
+    -fx-background-color: -fx-accent-pass;
+}
+
+.accent-super {
+    -fx-text-fill: -fx-accent-super;
+}
+
+.accent-success {
+    -fx-text-fill: -fx-success;
+}
+
+.accent-warning {
+    -fx-text-fill: -fx-warning;
+}
+
+.accent-danger {
+    -fx-text-fill: -fx-danger;
+}
+
+/* ============================================
+   Containers
+   ============================================ */
+.content-container {
+    -fx-background-color: -fx-background-dark;
+}
+
+.sidebar {
+    -fx-background-color: -fx-surface-dark;
+    -fx-padding: 20;
+}
+
+.header-bar {
+    -fx-background-color: -fx-surface-dark;
+    -fx-padding: 15 20;
+    -fx-border-color: #333;
+    -fx-border-width: 0 0 1 0;
+}
+
+/* ============================================
+   Empty States
+   ============================================ */
+.empty-state {
+    -fx-alignment: center;
+    -fx-spacing: 15;
+}
+
+.empty-state-icon {
+    -fx-font-size: 48px;
+}
+
+.empty-state-text {
+    -fx-font-size: 18px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* ============================================
+   Notification Badge
+   ============================================ */
+.notification-badge {
+    -fx-background-color: -fx-accent-like;
+    -fx-background-radius: 10;
+    -fx-padding: 2 6;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+/* ============================================
+   Progress Indicators
+   ============================================ */
+.progress-bar {
+    -fx-background-color: -fx-surface-dark;
+    -fx-background-radius: 4;
+}
+
+.progress-bar .bar {
+    -fx-background-color: linear-gradient(to right, -fx-primary, -fx-primary-dark);
+    -fx-background-radius: 4;
+    -fx-padding: 4;
+}
+
+.progress-bar .track {
+    -fx-background-color: #333;
+    -fx-background-radius: 4;
+}

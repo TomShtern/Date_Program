@@ -14,11 +14,13 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Bug investigation tests - these tests expose bugs in the codebase. Tests marked as "BUG" are
+ * Bug investigation tests - these tests expose bugs in the codebase. Tests
+ * marked as "BUG" are
  * expected to fail until the bug is fixed.
  */
 class BugInvestigationTest {
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("BUG 1: User.getInterestedIn() empty set")
     class DataIntegrityBugs {
@@ -60,6 +62,7 @@ class BugInvestigationTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("BUG 2: Match consistency - missing location check in isComplete")
     class PaginationBugs {
@@ -90,6 +93,7 @@ class BugInvestigationTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("BUG 3: Edge cases in age calculation")
     class StateTransitionBugs {
@@ -138,6 +142,7 @@ class BugInvestigationTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("BUG 4: Match unmatch race condition")
     class MatchingServiceBugs {
@@ -159,6 +164,7 @@ class BugInvestigationTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("BUG 5: CandidateFinder edge cases")
     class CandidateFinderBugs {

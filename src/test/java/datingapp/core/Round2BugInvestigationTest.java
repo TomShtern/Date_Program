@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 /** Round 2 bug investigation tests. */
 class Round2BugInvestigationTest {
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("BUG: CandidateFinder filters validity")
     class CandidateFinderFilters {
@@ -41,6 +42,7 @@ class Round2BugInvestigationTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("BUG: MatchingService Concurrency")
     class MatchingServiceConcurrency {

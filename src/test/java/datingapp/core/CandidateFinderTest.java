@@ -18,6 +18,7 @@ class CandidateFinderTest {
     private CandidateFinder finder;
     private User seeker;
 
+    @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
         finder = new CandidateFinder();

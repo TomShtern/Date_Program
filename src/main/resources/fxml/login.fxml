@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox fx:id="root" alignment="CENTER" prefHeight="700.0" prefWidth="500.0" spacing="30.0"
+    styleClass="login-container" xmlns="http://javafx.com/javafx/21"
+    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.LoginController">
+
+    <padding>
+        <Insets bottom="50.0" left="50.0" right="50.0" top="50.0" />
+    </padding>
+
+    <!-- Header Section -->
+    <VBox alignment="CENTER" spacing="10.0">
+        <Label styleClass="login-title" text="🌹 Dating App" />
+        <Label styleClass="text-secondary" text="Find your perfect match" />
+    </VBox>
+
+    <!-- User Selection Section -->
+    <VBox spacing="10.0" VBox.vgrow="ALWAYS">
+        <Label styleClass="subheading" text="Select Account" />
+        <ListView fx:id="userListView" minHeight="250.0" VBox.vgrow="ALWAYS" />
+    </VBox>
+
+    <!-- Actions Section -->
+    <VBox spacing="15.0">
+        <Button fx:id="loginButton" maxWidth="Infinity" onAction="#handleLogin"
+            text="Log In" />
+
+        <HBox alignment="CENTER" spacing="10.0">
+            <Label styleClass="text-secondary" text="Don't have an account?" />
+            <Button fx:id="createAccountButton" onAction="#handleCreateAccount"
+                styleClass="button-transparent" text="Create New" />
+        </HBox>
+    </VBox>
+
+</VBox>

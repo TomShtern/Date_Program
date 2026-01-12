@@ -13,7 +13,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** Extended unit tests for Match domain model, focusing on state transitions. */
+/**
+ * Extended unit tests for Match domain model, focusing on state transitions.
+ */
 class MatchStateTest {
 
     @Nested

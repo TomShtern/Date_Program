@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane prefHeight="700.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21"
+    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.ChatController">
+
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="20.0"
+            style="-fx-background-color: -fx-surface-dark; -fx-padding: 15;">
+            <Button onAction="#handleBack" style="-fx-background-color: transparent;" text="← Back" />
+            <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Messages" />
+        </HBox>
+    </top>
+
+    <left>
+        <VBox prefWidth="300.0" spacing="10.0"
+            style="-fx-background-color: -fx-surface-dark; -fx-border-color: #333; -fx-border-width: 0 1 0 0;">
+            <padding>
+                <Insets bottom="10" left="10" right="10" top="10" />
+            </padding>
+            <Label style="-fx-font-weight: bold; -fx-text-fill: -fx-text-secondary;"
+                text="CONVERSATIONS" />
+            <ListView fx:id="conversationListView" VBox.vgrow="ALWAYS" />
+        </VBox>
+    </left>
+
+    <center>
+        <StackPane>
+            <!-- Chat Container -->
+            <VBox fx:id="chatContainer" spacing="0.0">
+                <HBox alignment="CENTER_LEFT" prefHeight="60.0"
+                    style="-fx-background-color: -fx-surface-dark; -fx-padding: 0 20; -fx-border-color: #333; -fx-border-width: 0 0 1 0;">
+                    <Label fx:id="chatHeaderLabel"
+                        style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Sarah" />
+                </HBox>
+
+                <ListView fx:id="messageListView" VBox.vgrow="ALWAYS"
+                    style="-fx-background-color: -fx-background-dark; -fx-padding: 10;" />
+
+                <HBox spacing="10.0"
+                    style="-fx-padding: 15; -fx-background-color: -fx-surface-dark; -fx-border-color: #333; -fx-border-width: 1 0 0 0;">
+                    <TextArea fx:id="messageArea" prefHeight="50.0" promptText="Type a message..."
+                        wrapText="true" HBox.hgrow="ALWAYS" />
+                    <Button fx:id="sendButton" onAction="#handleSendMessage" prefHeight="50.0"
+                        prefWidth="80.0" text="Send" />
+                </HBox>
+            </VBox>
+
+            <!-- Empty State -->
+            <VBox fx:id="emptyStateContainer" alignment="CENTER" spacing="15.0">
+                <Label style="-fx-font-size: 40px;" text="💬" />
+                <Label style="-fx-font-size: 18px; -fx-text-fill: -fx-text-secondary;"
+                    text="Select a conversation to start chatting" />
+            </VBox>
+        </StackPane>
+    </center>
+
+</BorderPane>

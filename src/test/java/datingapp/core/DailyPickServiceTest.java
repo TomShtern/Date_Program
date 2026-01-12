@@ -24,6 +24,7 @@ class DailyPickServiceTest {
     private InMemoryDailyPickStorage dailyPickStorage;
     private AppConfig config;
 
+    @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
         userStorage = new InMemoryUserStorage();

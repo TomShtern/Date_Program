@@ -30,6 +30,7 @@ class ReportServiceTest {
     private User activeReporter;
     private User reportedUser;
 
+    @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
 
@@ -47,6 +48,7 @@ class ReportServiceTest {
         userStorage.save(reportedUser);
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("Successful Reports")
     class SuccessfulReports {
@@ -85,6 +87,7 @@ class ReportServiceTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("Auto-Ban Logic")
     class AutoBanLogic {
@@ -132,6 +135,7 @@ class ReportServiceTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("Validation Errors")
     class ValidationErrors {
