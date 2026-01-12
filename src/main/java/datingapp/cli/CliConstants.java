@@ -1,5 +1,6 @@
 package datingapp.cli;
 
+/** Constants for CLI display elements including separators, box characters, and messages. */
 public class CliConstants {
   private CliConstants() {} // Prevent instantiation
 

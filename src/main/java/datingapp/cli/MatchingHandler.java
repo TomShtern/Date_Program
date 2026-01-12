@@ -28,6 +28,10 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Handler for matching-related CLI operations. Manages swiping, match discovery, daily picks, and
+ * match quality display.
+ */
 public class MatchingHandler {
   private static final Logger logger = LoggerFactory.getLogger(MatchingHandler.class);
 
@@ -77,6 +81,10 @@ public class MatchingHandler {
     this.inputReader = inputReader;
   }
 
+  /**
+   * Displays the candidate browsing interface, showing potential matches to the user. Handles daily
+   * picks, candidate filtering, and user interactions (like/pass).
+   */
   public void browseCandidates() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);
@@ -195,6 +203,10 @@ public class MatchingHandler {
     return true;
   }
 
+  /**
+   * Displays the user's active matches with compatibility scores and options to view details,
+   * unmatch, or block matches.
+   */
   public void viewMatches() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);
@@ -414,6 +426,12 @@ public class MatchingHandler {
     }
   }
 
+  /**
+   * Displays a message when the user has reached their daily like limit, showing remaining time
+   * until reset and tips for better matching.
+   *
+   * @param currentUser The user who reached the limit
+   */
   private void showDailyLimitReached(User currentUser) {
     DailyLimitService.DailyStatus status = dailyLimitService.getStatus(currentUser.getId());
     String timeUntilReset = DailyLimitService.formatDuration(dailyLimitService.getTimeUntilReset());

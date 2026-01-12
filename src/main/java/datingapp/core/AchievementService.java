@@ -39,13 +39,27 @@ public class AchievementService {
   public record AchievementProgress(
       Achievement achievement, int current, int target, boolean unlocked) {
 
+    /**
+     * Gets the progress percentage (0-100).
+     *
+     * @return The progress percentage
+     */
     public int getProgressPercent() {
-      if (unlocked || target == 0) return 100;
+      if (unlocked || target == 0) {
+        return 100;
+      }
       return Math.min(100, (current * 100) / target);
     }
 
+    /**
+     * Gets a display string for the progress.
+     *
+     * @return The progress display string
+     */
     public String getProgressDisplay() {
-      if (unlocked) return "✓ Unlocked";
+      if (unlocked) {
+        return "✓ Unlocked";
+      }
       return current + "/" + target;
     }
   }
@@ -59,7 +73,9 @@ public class AchievementService {
   public List<UserAchievement> checkAndUnlock(UUID userId) {
     List<UserAchievement> newlyUnlocked = new ArrayList<>();
     User user = userStorage.get(userId);
-    if (user == null) return newlyUnlocked;
+    if (user == null) {
+      return newlyUnlocked;
+    }
 
     // Check each achievement
     for (Achievement achievement : Achievement.values()) {
@@ -79,11 +95,18 @@ public class AchievementService {
     return achievementStorage.getUnlocked(userId);
   }
 
-  /** Get progress for all achievements (both locked and unlocked). */
+  /**
+   * Get progress for all achievements (both locked and unlocked).
+   *
+   * @param userId The user ID
+   * @return List of achievement progress
+   */
   public List<AchievementProgress> getProgress(UUID userId) {
     List<AchievementProgress> progress = new ArrayList<>();
     User user = userStorage.get(userId);
-    if (user == null) return progress;
+    if (user == null) {
+      return progress;
+    }
 
     for (Achievement achievement : Achievement.values()) {
       boolean unlocked = achievementStorage.hasAchievement(userId, achievement);
@@ -176,7 +199,9 @@ public class AchievementService {
 
   private boolean isSelective(UUID userId) {
     int totalSwipes = getTotalSwipes(userId);
-    if (totalSwipes < 50) return false;
+    if (totalSwipes < 50) {
+      return false;
+    }
     int likes = likeStorage.countByDirection(userId, Like.Direction.LIKE);
     double likeRatio = (double) likes / totalSwipes;
     return likeRatio < 0.20;
@@ -184,7 +209,9 @@ public class AchievementService {
 
   private boolean isOpenMinded(UUID userId) {
     int totalSwipes = getTotalSwipes(userId);
-    if (totalSwipes < 50) return false;
+    if (totalSwipes < 50) {
+      return false;
+    }
     int likes = likeStorage.countByDirection(userId, Like.Direction.LIKE);
     double likeRatio = (double) likes / totalSwipes;
     return likeRatio > 0.60;
@@ -214,11 +241,21 @@ public class AchievementService {
 
   private int getLifestyleFieldCount(User user) {
     int count = 0;
-    if (user.getSmoking() != null) count++;
-    if (user.getDrinking() != null) count++;
-    if (user.getWantsKids() != null) count++;
-    if (user.getLookingFor() != null) count++;
-    if (user.getHeightCm() != null) count++;
+    if (user.getSmoking() != null) {
+      count++;
+    }
+    if (user.getDrinking() != null) {
+      count++;
+    }
+    if (user.getWantsKids() != null) {
+      count++;
+    }
+    if (user.getLookingFor() != null) {
+      count++;
+    }
+    if (user.getHeightCm() != null) {
+      count++;
+    }
     return count;
   }
 

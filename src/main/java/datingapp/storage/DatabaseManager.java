@@ -122,7 +122,15 @@ public class DatabaseManager {
                         db_min_height_cm INT,
                         db_max_height_cm INT,
                         db_max_age_diff INT,
-                        interests VARCHAR(500)
+                        interests VARCHAR(500),
+                        -- Profile verification fields (Phase 2)
+                        email VARCHAR(200),
+                        phone VARCHAR(50),
+                        is_verified BOOLEAN,
+                        verification_method VARCHAR(10),
+                        verification_code VARCHAR(10),
+                        verification_sent_at TIMESTAMP,
+                        verified_at TIMESTAMP
                     )
                     """);
 
@@ -182,9 +190,11 @@ public class DatabaseManager {
       stmt.execute("CREATE INDEX IF NOT EXISTS idx_matches_user_b ON matches(user_b)");
       stmt.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON swipe_sessions(user_id)");
       stmt.execute(
-          "CREATE INDEX IF NOT EXISTS idx_sessions_user_active ON swipe_sessions(user_id, state)");
+          "CREATE INDEX IF NOT EXISTS idx_sessions_user_active ON "
+              + "swipe_sessions(user_id, state)");
       stmt.execute(
-          "CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON swipe_sessions(user_id, started_at)");
+          "CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON "
+              + "swipe_sessions(user_id, started_at)");
 
       // User stats snapshots table (Phase 0.5b)
       stmt.execute(
@@ -232,9 +242,11 @@ public class DatabaseManager {
       // Stats indexes
       stmt.execute("CREATE INDEX IF NOT EXISTS idx_user_stats_user_id ON user_stats(user_id)");
       stmt.execute(
-          "CREATE INDEX IF NOT EXISTS idx_user_stats_computed_at ON user_stats(user_id, computed_at DESC)");
+          "CREATE INDEX IF NOT EXISTS idx_user_stats_computed ON "
+              + "user_stats(user_id, computed_at DESC)");
       stmt.execute(
-          "CREATE INDEX IF NOT EXISTS idx_platform_stats_computed_at ON platform_stats(computed_at DESC)");
+          "CREATE INDEX IF NOT EXISTS idx_platform_stats_computed_at ON "
+              + "platform_stats(computed_at DESC)");
 
       // Daily pick views table (Phase 1)
       stmt.execute(
@@ -278,34 +290,30 @@ public class DatabaseManager {
    * Migrates schema by adding new columns for existing databases. Uses IF NOT EXISTS to safely
    * handle already-migrated databases.
    */
-  private void migrateSchemaColumns(Statement stmt) {
-    try {
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS smoking VARCHAR(20)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS drinking VARCHAR(20)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS wants_kids VARCHAR(20)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS looking_for VARCHAR(20)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS education VARCHAR(20)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS height_cm INT");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_smoking VARCHAR(100)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_drinking VARCHAR(100)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_wants_kids VARCHAR(100)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_looking_for VARCHAR(100)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_education VARCHAR(200)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_min_height_cm INT");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_max_height_cm INT");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_max_age_diff INT");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS interests VARCHAR(500)");
-      // Profile verification fields (Phase 2)
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(200)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_method VARCHAR(10)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code VARCHAR(10)");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_sent_at TIMESTAMP");
-      stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP");
-    } catch (SQLException e) {
-      // Column already exists or other non-critical error, ignore
-    }
+  private void migrateSchemaColumns(Statement stmt) throws SQLException {
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS smoking VARCHAR(20)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS drinking VARCHAR(20)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS wants_kids VARCHAR(20)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS looking_for VARCHAR(20)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS education VARCHAR(20)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS height_cm INT");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_smoking VARCHAR(100)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_drinking VARCHAR(100)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_wants_kids VARCHAR(100)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_looking_for VARCHAR(100)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_education VARCHAR(200)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_min_height_cm INT");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_max_height_cm INT");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_max_age_diff INT");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS interests VARCHAR(500)");
+    // Profile verification fields (Phase 2)
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(200)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_method VARCHAR(10)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code VARCHAR(10)");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_sent_at TIMESTAMP");
+    stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP");
   }
 
   /** Shuts down the database gracefully. */

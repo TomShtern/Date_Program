@@ -66,6 +66,7 @@ public record AppConfig(
     return new Builder();
   }
 
+  /** Builder for creating AppConfig instances with custom values. */
   public static class Builder {
     private int autoBanThreshold = 3;
     private int dailyLikeLimit = 100;

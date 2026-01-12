@@ -77,7 +77,7 @@ public enum Achievement {
     return threshold;
   }
 
-  /** Get formatted display string: "💫 First Spark" */
+  /** Get formatted display string: "💫 First Spark". */
   public String getFormattedDisplay() {
     return icon + " " + displayName;
   }

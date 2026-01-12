@@ -69,8 +69,8 @@ public class H2ConversationStorage implements ConversationStorage {
       stmt.setObject(3, conversation.getUserB());
       stmt.setTimestamp(4, Timestamp.from(conversation.getCreatedAt()));
       setNullableTimestamp(stmt, 5, conversation.getLastMessageAt());
-      setNullableTimestamp(stmt, 6, conversation.getUserALastReadAt());
-      setNullableTimestamp(stmt, 7, conversation.getUserBLastReadAt());
+      setNullableTimestamp(stmt, 6, conversation.getUserAReadAt());
+      setNullableTimestamp(stmt, 7, conversation.getUserBReadAt());
 
       stmt.executeUpdate();
 
@@ -201,8 +201,8 @@ public class H2ConversationStorage implements ConversationStorage {
 
   private Conversation mapRow(ResultSet rs) throws SQLException {
     Timestamp lastMsgAt = rs.getTimestamp("last_message_at");
-    Timestamp userAReadAt = rs.getTimestamp("user_a_last_read_at");
-    Timestamp userBReadAt = rs.getTimestamp("user_b_last_read_at");
+    Timestamp userAReadTime = rs.getTimestamp("user_a_last_read_at");
+    Timestamp userBReadTime = rs.getTimestamp("user_b_last_read_at");
 
     return new Conversation(
         rs.getString("id"),
@@ -210,8 +210,8 @@ public class H2ConversationStorage implements ConversationStorage {
         rs.getObject("user_b", UUID.class),
         rs.getTimestamp("created_at").toInstant(),
         lastMsgAt != null ? lastMsgAt.toInstant() : null,
-        userAReadAt != null ? userAReadAt.toInstant() : null,
-        userBReadAt != null ? userBReadAt.toInstant() : null);
+        userAReadTime != null ? userAReadTime.toInstant() : null,
+        userBReadTime != null ? userBReadTime.toInstant() : null);
   }
 
   private void setNullableTimestamp(PreparedStatement stmt, int index, Instant instant)

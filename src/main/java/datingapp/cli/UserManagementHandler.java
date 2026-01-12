@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Handles user creation and selection operations in the CLI. */
 public class UserManagementHandler {
   private static final Logger logger = LoggerFactory.getLogger(UserManagementHandler.class);
   private final UserStorage userStorage;
@@ -20,6 +21,7 @@ public class UserManagementHandler {
     this.inputReader = inputReader;
   }
 
+  /** Creates a new user and sets them as the current user. */
   public void createUser() {
     logger.info("\n--- Create New User ---\n");
 
@@ -37,6 +39,7 @@ public class UserManagementHandler {
     logger.info("   Status: {} (Complete your profile to become ACTIVE)\n", user.getState());
   }
 
+  /** Displays all users and allows selection of one as the current user. */
   public void selectUser() {
     logger.info("\n--- Select User ---\n");
 
@@ -55,7 +58,9 @@ public class UserManagementHandler {
     try {
       int idx = Integer.parseInt(input) - 1;
       if (idx < 0 || idx >= users.size()) {
-        if (idx != -1) logger.info("\n❌ Invalid selection.\n");
+        if (idx != -1) {
+          logger.info("\n❌ Invalid selection.\n");
+        }
         return;
       }
       userSession.setCurrentUser(users.get(idx));

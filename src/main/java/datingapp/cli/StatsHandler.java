@@ -9,6 +9,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Handles display of user statistics and achievements in the CLI. */
 public class StatsHandler {
   private static final Logger logger = LoggerFactory.getLogger(StatsHandler.class);
 
@@ -28,6 +29,7 @@ public class StatsHandler {
     this.inputReader = inputReader;
   }
 
+  /** Displays comprehensive user statistics including activity, matches, and scores. */
   public void viewStatistics() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);
@@ -120,6 +122,7 @@ public class StatsHandler {
     inputReader.readLine("Press Enter to return...");
   }
 
+  /** Displays all unlocked achievements for the current user. */
   public void viewAchievements() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);
@@ -130,7 +133,7 @@ public class StatsHandler {
     checkAndDisplayNewAchievements(userSession.getCurrentUser());
 
     User currentUser = userSession.getCurrentUser();
-    List<UserAchievement> unlocked = achievementService.getUnlocked(currentUser.getId());
+    final List<UserAchievement> unlocked = achievementService.getUnlocked(currentUser.getId());
 
     logger.info("\n" + CliConstants.SEPARATOR_LINE);
     logger.info("CliConstants.HEADER_YOUR_ACHIEVEMENTS");
@@ -155,6 +158,7 @@ public class StatsHandler {
     inputReader.readLine("Press Enter to return...");
   }
 
+  /** Checks for new achievements and displays them if any were unlocked. */
   private void checkAndDisplayNewAchievements(User currentUser) {
     List<UserAchievement> newAchievements = achievementService.checkAndUnlock(currentUser.getId());
     if (!newAchievements.isEmpty()) {

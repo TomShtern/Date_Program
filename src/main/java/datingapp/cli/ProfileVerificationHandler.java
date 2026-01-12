@@ -7,6 +7,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Handler for profile verification via email or phone. */
 public class ProfileVerificationHandler {
   private static final Logger logger = LoggerFactory.getLogger(ProfileVerificationHandler.class);
 
@@ -26,6 +27,7 @@ public class ProfileVerificationHandler {
     this.inputReader = Objects.requireNonNull(inputReader);
   }
 
+  /** Starts the profile verification flow for the current user. */
   public void verifyProfile() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);
@@ -55,6 +57,12 @@ public class ProfileVerificationHandler {
     }
   }
 
+  /**
+   * Starts the verification process for a user using the specified method.
+   *
+   * @param user The user to verify
+   * @param method The verification method (email or phone)
+   */
   private void startVerification(User user, User.VerificationMethod method) {
     if (method == User.VerificationMethod.EMAIL) {
       String email = inputReader.readLine("Email: ");

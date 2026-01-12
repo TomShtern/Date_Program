@@ -13,6 +13,7 @@ import java.util.UUID;
  */
 public class Match {
 
+  /** Represents the current state of a match. */
   public enum State {
     ACTIVE, // Both users are matched
     UNMATCHED, // One user ended the match
@@ -75,11 +76,12 @@ public class Match {
       throw new IllegalArgumentException("Cannot match with yourself");
     }
 
-    String aStr = a.toString();
-    String bStr = b.toString();
+    String firstUserId = a.toString();
+    String secondUserId = b.toString();
 
-    UUID userA, userB;
-    if (aStr.compareTo(bStr) < 0) {
+    UUID userA;
+    UUID userB;
+    if (firstUserId.compareTo(secondUserId) < 0) {
       userA = a;
       userB = b;
     } else {
@@ -93,13 +95,13 @@ public class Match {
 
   /** Generates the deterministic match ID for two user UUIDs. */
   public static String generateId(UUID a, UUID b) {
-    String aStr = a.toString();
-    String bStr = b.toString();
+    String firstUserId = a.toString();
+    String secondUserId = b.toString();
 
-    if (aStr.compareTo(bStr) < 0) {
-      return aStr + "_" + bStr;
+    if (firstUserId.compareTo(secondUserId) < 0) {
+      return firstUserId + "_" + secondUserId;
     } else {
-      return bStr + "_" + aStr;
+      return secondUserId + "_" + firstUserId;
     }
   }
 
@@ -178,8 +180,12 @@ public class Match {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
     Match match = (Match) o;
     return Objects.equals(id, match.id);
   }

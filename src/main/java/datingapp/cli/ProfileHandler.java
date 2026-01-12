@@ -17,6 +17,10 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Handler for profile-related CLI operations. Manages profile completion, preview, and dealbreaker
+ * settings.
+ */
 public class ProfileHandler {
   private static final Logger logger = LoggerFactory.getLogger(ProfileHandler.class);
   private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -43,6 +47,10 @@ public class ProfileHandler {
     this.inputReader = inputReader;
   }
 
+  /**
+   * Guides the user through completing their profile with prompts for all required fields. Attempts
+   * to activate the profile if complete.
+   */
   public void completeProfile() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);
@@ -76,6 +84,10 @@ public class ProfileHandler {
     checkAndDisplayNewAchievements(currentUser);
   }
 
+  /**
+   * Displays a preview of how the user's profile appears to other users, including completeness
+   * percentage and improvement tips.
+   */
   public void previewProfile() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);
@@ -140,6 +152,10 @@ public class ProfileHandler {
     inputReader.readLine("  [Press Enter to return to menu]");
   }
 
+  /**
+   * Allows the user to configure their dealbreakers - hard filters that exclude potential matches
+   * based on lifestyle preferences.
+   */
   public void setDealbreakers() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);
@@ -158,6 +174,11 @@ public class ProfileHandler {
 
   // --- Helper Methods ---
 
+  /**
+   * Checks for newly unlocked achievements and displays them to the user.
+   *
+   * @param currentUser The user to check achievements for
+   */
   private void checkAndDisplayNewAchievements(User currentUser) {
     List<UserAchievement> newAchievements = achievementService.checkAndUnlock(currentUser.getId());
     if (!newAchievements.isEmpty()) {
@@ -170,9 +191,16 @@ public class ProfileHandler {
     }
   }
 
+  /**
+   * Prompts the user to enter their bio/description.
+   *
+   * @param currentUser The user whose bio is being set
+   */
   private void promptBio(User currentUser) {
     String bio = inputReader.readLine("Bio (short description): ");
-    if (!bio.isBlank()) currentUser.setBio(bio);
+    if (!bio.isBlank()) {
+      currentUser.setBio(bio);
+    }
   }
 
   private void promptBirthDate(User currentUser) {
@@ -185,6 +213,11 @@ public class ProfileHandler {
     }
   }
 
+  /**
+   * Prompts the user to select their gender from available options.
+   *
+   * @param currentUser The user whose gender is being set
+   */
   private void promptGender(User currentUser) {
     logger.info("\n" + CliConstants.GENDER_OPTIONS);
     String genderChoice = inputReader.readLine("Your gender (1/2/3): ");
@@ -195,21 +228,27 @@ public class ProfileHandler {
           case "3" -> User.Gender.OTHER;
           default -> null;
         };
-    if (gender != null) currentUser.setGender(gender);
+    if (gender != null) {
+      currentUser.setGender(gender);
+    }
   }
 
   private void promptInterestedIn(User currentUser) {
     logger.info("\n" + CliConstants.INTERESTED_IN_PROMPT);
     String interestedStr = inputReader.readLine("Your preferences: ");
     Set<User.Gender> interestedIn = parseGenderSet(interestedStr);
-    if (!interestedIn.isEmpty()) currentUser.setInterestedIn(interestedIn);
+    if (!interestedIn.isEmpty()) {
+      currentUser.setInterestedIn(interestedIn);
+    }
   }
 
   // Quick fix: implementing parseGenderSet helper here as MainUtils is not
   // created yet
   private Set<User.Gender> parseGenderSet(String input) {
     Set<User.Gender> result = java.util.EnumSet.noneOf(User.Gender.class);
-    if (input == null || input.isBlank()) return result;
+    if (input == null || input.isBlank()) {
+      return result;
+    }
 
     for (String part : input.split(",")) {
       switch (part.trim()) {
@@ -224,6 +263,11 @@ public class ProfileHandler {
     return result;
   }
 
+  /**
+   * Prompts the user to select their interests from categorized options.
+   *
+   * @param currentUser The user whose interests are being set
+   */
   private void promptInterests(User currentUser) {
     logger.info("\n" + CliConstants.HEADER_INTERESTS_HOBBIES);
     Set<Interest> selected = currentUser.getInterests();
@@ -257,6 +301,11 @@ public class ProfileHandler {
     currentUser.setInterests(selected);
   }
 
+  /**
+   * Prompts the user to add interests from a specific category.
+   *
+   * @param selected The current set of selected interests to modify
+   */
   private void addInterestByCategory(Set<Interest> selected) {
     Interest.Category[] categories = Interest.Category.values();
     for (int i = 0; i < categories.length; i++) {
@@ -266,7 +315,9 @@ public class ProfileHandler {
     String input = inputReader.readLine("\nSelect category (or 0 to cancel): ");
     try {
       int catIdx = Integer.parseInt(input) - 1;
-      if (catIdx < 0 || catIdx >= categories.length) return;
+      if (catIdx < 0 || catIdx >= categories.length) {
+        return;
+      }
 
       Interest.Category cat = categories[catIdx];
       List<Interest> options = Interest.byCategory(cat);
@@ -292,11 +343,16 @@ public class ProfileHandler {
           logger.info("❌ Limit reached.\n");
         }
       }
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException ignored) {
       logger.info(CliConstants.INVALID_INPUT);
     }
   }
 
+  /**
+   * Prompts the user to enter their location coordinates.
+   *
+   * @param currentUser The user whose location is being set
+   */
   private void promptLocation(User currentUser) {
     String latStr = inputReader.readLine("\nLatitude (e.g., 32.0853): ");
     String lonStr = inputReader.readLine("Longitude (e.g., 34.7818): ");
@@ -309,6 +365,11 @@ public class ProfileHandler {
     }
   }
 
+  /**
+   * Prompts the user to set their matching preferences (distance and age range).
+   *
+   * @param currentUser The user whose preferences are being set
+   */
   private void promptPreferences(User currentUser) {
     String distStr = inputReader.readLine("Max distance (km, default 50): ");
     try {
@@ -336,6 +397,11 @@ public class ProfileHandler {
     }
   }
 
+  /**
+   * Prompts the user to enter their lifestyle preferences (smoking, drinking, etc.).
+   *
+   * @param currentUser The user whose lifestyle preferences are being set
+   */
   private void promptLifestyle(User currentUser) {
     logger.info("\n" + CliConstants.HEADER_LIFESTYLE + "\n");
 
@@ -357,7 +423,9 @@ public class ProfileHandler {
           case "3" -> Lifestyle.Smoking.REGULARLY;
           default -> null;
         };
-    if (smoking != null) currentUser.setSmoking(smoking);
+    if (smoking != null) {
+      currentUser.setSmoking(smoking);
+    }
 
     logger.info("Drinking: 1=Never, 2=Socially, 3=Regularly, 0=Skip");
     String drinkingChoice = inputReader.readLine(PROMPT_CHOICE);
@@ -368,7 +436,9 @@ public class ProfileHandler {
           case "3" -> Lifestyle.Drinking.REGULARLY;
           default -> null;
         };
-    if (drinking != null) currentUser.setDrinking(drinking);
+    if (drinking != null) {
+      currentUser.setDrinking(drinking);
+    }
 
     logger.info("Kids: 1=Don't want, 2=Open to it, 3=Want someday, 4=Have kids, 0=Skip");
     String kidsChoice = inputReader.readLine(PROMPT_CHOICE);
@@ -380,7 +450,9 @@ public class ProfileHandler {
           case "4" -> Lifestyle.WantsKids.HAS_KIDS;
           default -> null;
         };
-    if (wantsKids != null) currentUser.setWantsKids(wantsKids);
+    if (wantsKids != null) {
+      currentUser.setWantsKids(wantsKids);
+    }
 
     logger.info("Looking for: 1=Casual, 2=Short-term, 3=Long-term, 4=Marriage, 5=Unsure, 0=Skip");
     String lookingForChoice = inputReader.readLine(PROMPT_CHOICE);
@@ -393,7 +465,9 @@ public class ProfileHandler {
           case "5" -> Lifestyle.LookingFor.UNSURE;
           default -> null;
         };
-    if (lookingFor != null) currentUser.setLookingFor(lookingFor);
+    if (lookingFor != null) {
+      currentUser.setLookingFor(lookingFor);
+    }
   }
 
   // --- Dealbreaker Helpers ---
@@ -407,18 +481,24 @@ public class ProfileHandler {
     Dealbreakers current = currentUser.getDealbreakers();
     if (current.hasAnyDealbreaker()) {
       logger.info("Current dealbreakers:");
-      if (current.hasSmokingDealbreaker())
+      if (current.hasSmokingDealbreaker()) {
         logger.info("  - Smoking: {}", current.acceptableSmoking());
-      if (current.hasDrinkingDealbreaker())
+      }
+      if (current.hasDrinkingDealbreaker()) {
         logger.info("  - Drinking: {}", current.acceptableDrinking());
-      if (current.hasKidsDealbreaker())
+      }
+      if (current.hasKidsDealbreaker()) {
         logger.info("  - Kids stance: {}", current.acceptableKidsStance());
-      if (current.hasLookingForDealbreaker())
+      }
+      if (current.hasLookingForDealbreaker()) {
         logger.info("  - Looking for: {}", current.acceptableLookingFor());
-      if (current.hasHeightDealbreaker())
+      }
+      if (current.hasHeightDealbreaker()) {
         logger.info("  - Height: {} - {} cm", current.minHeightCm(), current.maxHeightCm());
-      if (current.hasAgeDealbreaker())
+      }
+      if (current.hasAgeDealbreaker()) {
         logger.info("  - Max age diff: {} years", current.maxAgeDifference());
+      }
       logger.info("");
     } else {
       logger.info("No dealbreakers set (showing everyone).\n");
@@ -599,70 +679,110 @@ public class ProfileHandler {
   // They are copied from Main.java but slightly cleaned up if possible.
 
   private void copyExceptSmoking(Dealbreakers.Builder b, Dealbreakers c) {
-    if (c.hasDrinkingDealbreaker())
+    if (c.hasDrinkingDealbreaker()) {
       b.acceptDrinking(c.acceptableDrinking().toArray(Lifestyle.Drinking[]::new));
-    if (c.hasKidsDealbreaker())
+    }
+    if (c.hasKidsDealbreaker()) {
       b.acceptKidsStance(c.acceptableKidsStance().toArray(Lifestyle.WantsKids[]::new));
-    if (c.hasLookingForDealbreaker())
+    }
+    if (c.hasLookingForDealbreaker()) {
       b.acceptLookingFor(c.acceptableLookingFor().toArray(Lifestyle.LookingFor[]::new));
-    if (c.hasHeightDealbreaker()) b.heightRange(c.minHeightCm(), c.maxHeightCm());
-    if (c.hasAgeDealbreaker()) b.maxAgeDifference(c.maxAgeDifference());
+    }
+    if (c.hasHeightDealbreaker()) {
+      b.heightRange(c.minHeightCm(), c.maxHeightCm());
+    }
+    if (c.hasAgeDealbreaker()) {
+      b.maxAgeDifference(c.maxAgeDifference());
+    }
   }
 
   private void copyExceptDrinking(Dealbreakers.Builder b, Dealbreakers c) {
-    if (c.hasSmokingDealbreaker())
+    if (c.hasSmokingDealbreaker()) {
       b.acceptSmoking(c.acceptableSmoking().toArray(Lifestyle.Smoking[]::new));
-    if (c.hasKidsDealbreaker())
+    }
+    if (c.hasKidsDealbreaker()) {
       b.acceptKidsStance(c.acceptableKidsStance().toArray(Lifestyle.WantsKids[]::new));
-    if (c.hasLookingForDealbreaker())
+    }
+    if (c.hasLookingForDealbreaker()) {
       b.acceptLookingFor(c.acceptableLookingFor().toArray(Lifestyle.LookingFor[]::new));
-    if (c.hasHeightDealbreaker()) b.heightRange(c.minHeightCm(), c.maxHeightCm());
-    if (c.hasAgeDealbreaker()) b.maxAgeDifference(c.maxAgeDifference());
+    }
+    if (c.hasHeightDealbreaker()) {
+      b.heightRange(c.minHeightCm(), c.maxHeightCm());
+    }
+    if (c.hasAgeDealbreaker()) {
+      b.maxAgeDifference(c.maxAgeDifference());
+    }
   }
 
   private void copyExceptKids(Dealbreakers.Builder b, Dealbreakers c) {
-    if (c.hasSmokingDealbreaker())
+    if (c.hasSmokingDealbreaker()) {
       b.acceptSmoking(c.acceptableSmoking().toArray(Lifestyle.Smoking[]::new));
-    if (c.hasDrinkingDealbreaker())
+    }
+    if (c.hasDrinkingDealbreaker()) {
       b.acceptDrinking(c.acceptableDrinking().toArray(Lifestyle.Drinking[]::new));
-    if (c.hasLookingForDealbreaker())
+    }
+    if (c.hasLookingForDealbreaker()) {
       b.acceptLookingFor(c.acceptableLookingFor().toArray(Lifestyle.LookingFor[]::new));
-    if (c.hasHeightDealbreaker()) b.heightRange(c.minHeightCm(), c.maxHeightCm());
-    if (c.hasAgeDealbreaker()) b.maxAgeDifference(c.maxAgeDifference());
+    }
+    if (c.hasHeightDealbreaker()) {
+      b.heightRange(c.minHeightCm(), c.maxHeightCm());
+    }
+    if (c.hasAgeDealbreaker()) {
+      b.maxAgeDifference(c.maxAgeDifference());
+    }
   }
 
   private void copyExceptLookingFor(Dealbreakers.Builder b, Dealbreakers c) {
-    if (c.hasSmokingDealbreaker())
+    if (c.hasSmokingDealbreaker()) {
       b.acceptSmoking(c.acceptableSmoking().toArray(Lifestyle.Smoking[]::new));
-    if (c.hasDrinkingDealbreaker())
+    }
+    if (c.hasDrinkingDealbreaker()) {
       b.acceptDrinking(c.acceptableDrinking().toArray(Lifestyle.Drinking[]::new));
-    if (c.hasKidsDealbreaker())
+    }
+    if (c.hasKidsDealbreaker()) {
       b.acceptKidsStance(c.acceptableKidsStance().toArray(Lifestyle.WantsKids[]::new));
-    if (c.hasHeightDealbreaker()) b.heightRange(c.minHeightCm(), c.maxHeightCm());
-    if (c.hasAgeDealbreaker()) b.maxAgeDifference(c.maxAgeDifference());
+    }
+    if (c.hasHeightDealbreaker()) {
+      b.heightRange(c.minHeightCm(), c.maxHeightCm());
+    }
+    if (c.hasAgeDealbreaker()) {
+      b.maxAgeDifference(c.maxAgeDifference());
+    }
   }
 
   private void copyExceptHeight(Dealbreakers.Builder b, Dealbreakers c) {
-    if (c.hasSmokingDealbreaker())
+    if (c.hasSmokingDealbreaker()) {
       b.acceptSmoking(c.acceptableSmoking().toArray(Lifestyle.Smoking[]::new));
-    if (c.hasDrinkingDealbreaker())
+    }
+    if (c.hasDrinkingDealbreaker()) {
       b.acceptDrinking(c.acceptableDrinking().toArray(Lifestyle.Drinking[]::new));
-    if (c.hasKidsDealbreaker())
+    }
+    if (c.hasKidsDealbreaker()) {
       b.acceptKidsStance(c.acceptableKidsStance().toArray(Lifestyle.WantsKids[]::new));
-    if (c.hasLookingForDealbreaker())
+    }
+    if (c.hasLookingForDealbreaker()) {
       b.acceptLookingFor(c.acceptableLookingFor().toArray(Lifestyle.LookingFor[]::new));
-    if (c.hasAgeDealbreaker()) b.maxAgeDifference(c.maxAgeDifference());
+    }
+    if (c.hasAgeDealbreaker()) {
+      b.maxAgeDifference(c.maxAgeDifference());
+    }
   }
 
   private void copyExceptAge(Dealbreakers.Builder b, Dealbreakers c) {
-    if (c.hasSmokingDealbreaker())
+    if (c.hasSmokingDealbreaker()) {
       b.acceptSmoking(c.acceptableSmoking().toArray(Lifestyle.Smoking[]::new));
-    if (c.hasDrinkingDealbreaker())
+    }
+    if (c.hasDrinkingDealbreaker()) {
       b.acceptDrinking(c.acceptableDrinking().toArray(Lifestyle.Drinking[]::new));
-    if (c.hasKidsDealbreaker())
+    }
+    if (c.hasKidsDealbreaker()) {
       b.acceptKidsStance(c.acceptableKidsStance().toArray(Lifestyle.WantsKids[]::new));
-    if (c.hasLookingForDealbreaker())
+    }
+    if (c.hasLookingForDealbreaker()) {
       b.acceptLookingFor(c.acceptableLookingFor().toArray(Lifestyle.LookingFor[]::new));
-    if (c.hasHeightDealbreaker()) b.heightRange(c.minHeightCm(), c.maxHeightCm());
+    }
+    if (c.hasHeightDealbreaker()) {
+      b.heightRange(c.minHeightCm(), c.maxHeightCm());
+    }
   }
 }

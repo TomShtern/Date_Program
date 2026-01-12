@@ -7,11 +7,33 @@ A command-line based dating application refactored for clean architecture and st
 ### Prerequisites
 - Java 21+
 - Maven
+- **Windows 11**: UTF-8 console encoding (see below)
+
+### Windows 11 Setup (REQUIRED)
+
+**Enable UTF-8 in PowerShell/CMD** to display emojis correctly:
+
+```powershell
+chcp 65001
+```
+
+Then run the application. Or set permanently:
+1. Run `intl.cpl`
+2. Administrative → Change system locale
+3. Check "Beta: Use Unicode UTF-8 for worldwide language support"
+4. Restart
 
 ### Running the Application
-To run the main application:
+
+**Option 1: Via Maven** (may have input buffering)
 ```bash
 mvn compile exec:java
+```
+
+**Option 2: Via JAR** (recommended for better terminal support)
+```bash
+mvn package
+java -jar target/dating-app-1.0.0-shaded.jar
 ```
 
 ### Running Tests

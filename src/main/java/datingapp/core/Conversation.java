@@ -17,8 +17,8 @@ public class Conversation {
   private final UUID userB; // Lexicographically larger
   private final Instant createdAt;
   private Instant lastMessageAt;
-  private Instant userALastReadAt;
-  private Instant userBLastReadAt;
+  private Instant userAReadAt;
+  private Instant userBReadAt;
 
   /** Full constructor for reconstitution from storage. */
   public Conversation(
@@ -27,8 +27,8 @@ public class Conversation {
       UUID userB,
       Instant createdAt,
       Instant lastMessageAt,
-      Instant userALastReadAt,
-      Instant userBLastReadAt) {
+      Instant userAReadAt,
+      Instant userBReadAt) {
     Objects.requireNonNull(id, "id cannot be null");
     Objects.requireNonNull(userA, "userA cannot be null");
     Objects.requireNonNull(userB, "userB cannot be null");
@@ -48,8 +48,8 @@ public class Conversation {
     this.userB = userB;
     this.createdAt = createdAt;
     this.lastMessageAt = lastMessageAt;
-    this.userALastReadAt = userALastReadAt;
-    this.userBLastReadAt = userBLastReadAt;
+    this.userAReadAt = userAReadAt;
+    this.userBReadAt = userBReadAt;
   }
 
   /**
@@ -67,12 +67,12 @@ public class Conversation {
       throw new IllegalArgumentException("Cannot have conversation with yourself");
     }
 
-    String aStr = a.toString();
-    String bStr = b.toString();
+    String userAString = a.toString();
+    String userBString = b.toString();
 
     UUID userA;
     UUID userB;
-    if (aStr.compareTo(bStr) < 0) {
+    if (userAString.compareTo(userBString) < 0) {
       userA = a;
       userB = b;
     } else {
@@ -87,13 +87,13 @@ public class Conversation {
 
   /** Generates the deterministic conversation ID for two user UUIDs. */
   public static String generateId(UUID a, UUID b) {
-    String aStr = a.toString();
-    String bStr = b.toString();
+    String userAString = a.toString();
+    String userBString = b.toString();
 
-    if (aStr.compareTo(bStr) < 0) {
-      return aStr + "_" + bStr;
+    if (userAString.compareTo(userBString) < 0) {
+      return userAString + "_" + userBString;
     } else {
-      return bStr + "_" + aStr;
+      return userBString + "_" + userAString;
     }
   }
 
@@ -129,9 +129,9 @@ public class Conversation {
     Objects.requireNonNull(timestamp, "timestamp cannot be null");
 
     if (userA.equals(userId)) {
-      this.userALastReadAt = timestamp;
+      this.userAReadAt = timestamp;
     } else if (userB.equals(userId)) {
-      this.userBLastReadAt = timestamp;
+      this.userBReadAt = timestamp;
     } else {
       throw new IllegalArgumentException("User is not part of this conversation");
     }
@@ -145,9 +145,9 @@ public class Conversation {
    */
   public Instant getLastReadAt(UUID userId) {
     if (userA.equals(userId)) {
-      return userALastReadAt;
+      return userAReadAt;
     } else if (userB.equals(userId)) {
-      return userBLastReadAt;
+      return userBReadAt;
     }
     throw new IllegalArgumentException("User is not part of this conversation");
   }
@@ -173,18 +173,22 @@ public class Conversation {
     return lastMessageAt;
   }
 
-  public Instant getUserALastReadAt() {
-    return userALastReadAt;
+  public Instant getUserAReadAt() {
+    return userAReadAt;
   }
 
-  public Instant getUserBLastReadAt() {
-    return userBLastReadAt;
+  public Instant getUserBReadAt() {
+    return userBReadAt;
   }
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
     Conversation that = (Conversation) o;
     return Objects.equals(id, that.id);
   }

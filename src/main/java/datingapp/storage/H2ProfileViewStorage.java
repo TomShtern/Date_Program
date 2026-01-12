@@ -34,7 +34,8 @@ public class H2ProfileViewStorage implements ProfileViewStorage {
                     PRIMARY KEY (viewer_id, viewed_id, viewed_at)
                 );
                 CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_id ON profile_views(viewed_id);
-                CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_at ON profile_views(viewed_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_at ON
+                    profile_views(viewed_at DESC);
                 """;
 
     try (Connection conn = db.getConnection();

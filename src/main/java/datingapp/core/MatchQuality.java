@@ -67,19 +67,35 @@ public record MatchQuality(
 
   /** Get star rating (1-5 stars based on compatibility). */
   public int getStarRating() {
-    if (compatibilityScore >= 90) return 5;
-    if (compatibilityScore >= 75) return 4;
-    if (compatibilityScore >= 60) return 3;
-    if (compatibilityScore >= 40) return 2;
+    if (compatibilityScore >= 90) {
+      return 5;
+    }
+    if (compatibilityScore >= 75) {
+      return 4;
+    }
+    if (compatibilityScore >= 60) {
+      return 3;
+    }
+    if (compatibilityScore >= 40) {
+      return 2;
+    }
     return 1;
   }
 
   /** Get compatibility label. */
   public String getCompatibilityLabel() {
-    if (compatibilityScore >= 90) return "Excellent Match";
-    if (compatibilityScore >= 75) return "Great Match";
-    if (compatibilityScore >= 60) return "Good Match";
-    if (compatibilityScore >= 40) return "Fair Match";
+    if (compatibilityScore >= 90) {
+      return "Excellent Match";
+    }
+    if (compatibilityScore >= 75) {
+      return "Great Match";
+    }
+    if (compatibilityScore >= 60) {
+      return "Good Match";
+    }
+    if (compatibilityScore >= 40) {
+      return "Fair Match";
+    }
     return "Low Compatibility";
   }
 

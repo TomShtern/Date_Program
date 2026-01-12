@@ -68,12 +68,14 @@ public class MessagingHandler {
     }
   }
 
+  /** Prints the header for the conversation list. */
   private void printConversationListHeader() {
     logger.info("\n{}", CliConstants.SEPARATOR_LINE);
     logger.info("       💬 YOUR CONVERSATIONS");
     logger.info("{}", CliConstants.SEPARATOR_LINE);
   }
 
+  /** Prints a message when there are no conversations. */
   private void printEmptyConversations() {
     logger.info("\n  No conversations yet.");
     logger.info("  Start by matching with someone and send a message!\n");
@@ -82,6 +84,11 @@ public class MessagingHandler {
     input.readLine("> ");
   }
 
+  /**
+   * Displays the list of conversation previews.
+   *
+   * @param previews The list of conversation previews to display
+   */
   private void displayConversationPreviews(List<ConversationPreview> previews) {
     for (int i = 0; i < previews.size(); i++) {
       displayConversationPreview(i + 1, previews.get(i));
@@ -96,6 +103,15 @@ public class MessagingHandler {
     logger.info("[#] Select conversation  [B] Back");
   }
 
+  /**
+   * Handles the user's selection of a conversation from the list.
+   *
+   * @param choice The user's input choice
+   * @param previews The current list of conversation previews
+   * @param currentUser The current user
+   * @param messagingService The messaging service
+   * @return Updated list of conversation previews
+   */
   private List<ConversationPreview> handleConversationSelection(
       String choice,
       List<ConversationPreview> previews,
@@ -181,6 +197,9 @@ public class MessagingHandler {
         case CONTINUE -> {
           /* No action needed, continue conversation loop */
         }
+        default -> {
+          /* Unknown action - do nothing */
+        }
       }
     }
   }
@@ -192,6 +211,12 @@ public class MessagingHandler {
     CONTINUE
   }
 
+  /**
+   * Prints the header for a conversation view.
+   *
+   * @param otherUserName The name of the other user in the conversation
+   * @param canMessage Whether the user can send messages in this conversation
+   */
   private void printConversationHeader(String otherUserName, boolean canMessage) {
     logger.info("\n{}", CliConstants.SEPARATOR_LINE);
     logger.info("       💬 Conversation with {}", otherUserName);
@@ -201,6 +226,13 @@ public class MessagingHandler {
     logger.info("{}", CliConstants.SEPARATOR_LINE);
   }
 
+  /**
+   * Prints the messages in a conversation.
+   *
+   * @param messages The list of messages to print
+   * @param currentUser The current user
+   * @param showOlder Whether to show older messages
+   */
   private void printMessages(List<Message> messages, User currentUser, boolean showOlder) {
     if (messages.isEmpty()) {
       logger.info("\n  No messages yet. Start the conversation!");
@@ -212,6 +244,12 @@ public class MessagingHandler {
     }
   }
 
+  /**
+   * Prints the footer for a conversation view.
+   *
+   * @param canMessage Whether the user can send messages
+   * @param hasMoreMessages Whether there are more messages to show
+   */
   private void printConversationFooter(boolean canMessage, boolean hasMoreMessages) {
     if (hasMoreMessages) {
       logger.info("\n  [Type /older to see older messages]");
@@ -226,6 +264,16 @@ public class MessagingHandler {
     }
   }
 
+  /**
+   * Processes user input in a conversation.
+   *
+   * @param userInput The user's input
+   * @param canMessage Whether the user can send messages
+   * @param currentUser The current user
+   * @param otherUser The other user in the conversation
+   * @param messagingService The messaging service
+   * @return The action to take based on the input
+   */
   private ConversationAction processConversationInput(
       String userInput,
       boolean canMessage,
@@ -362,7 +410,11 @@ public class MessagingHandler {
     }
   }
 
-  /** Returns the total unread count for menu display. */
+  /**
+   * Returns the total unread count for menu display.
+   *
+   * @return The number of unread messages across all conversations
+   */
   public int getTotalUnreadCount() {
     User currentUser = session.getCurrentUser();
     if (currentUser == null) {

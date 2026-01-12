@@ -124,7 +124,8 @@ public class H2SwipeSessionStorage implements SwipeSessionStorage {
   @Override
   public List<SwipeSession> getSessionsInRange(UUID userId, Instant start, Instant end) {
     String sql =
-        "SELECT * FROM swipe_sessions WHERE user_id = ? AND started_at >= ? AND started_at <= ? ORDER BY started_at DESC";
+        "SELECT * FROM swipe_sessions WHERE user_id = ? AND started_at >= ? AND "
+            + "started_at <= ? ORDER BY started_at DESC";
     List<SwipeSession> sessions = new ArrayList<>();
 
     try (Connection conn = dbManager.getConnection();

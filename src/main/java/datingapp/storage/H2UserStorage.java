@@ -36,15 +36,15 @@ public class H2UserStorage implements UserStorage {
     String sql =
         """
                 MERGE INTO users (id, name, bio, birth_date, gender, interested_in, lat, lon,
-                                  max_distance_km, min_age, max_age, photo_urls, state, created_at, updated_at,
-                                  smoking, drinking, wants_kids, looking_for, education, height_cm,
-                                  db_smoking, db_drinking, db_wants_kids, db_looking_for, db_education,
-                                  db_min_height_cm, db_max_height_cm, db_max_age_diff, interests,
-                                  email, phone, is_verified, verification_method,
+                                  max_distance_km, min_age, max_age, photo_urls, state, created_at,
+                                  updated_at, smoking, drinking, wants_kids, looking_for, education,
+                                  height_cm, db_smoking, db_drinking, db_wants_kids, db_looking_for,
+                                  db_education, db_min_height_cm, db_max_height_cm, db_max_age_diff,
+                                  interests, email, phone, is_verified, verification_method,
                                   verification_code, verification_sent_at, verified_at)
                 KEY (id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
 
     try (Connection conn = dbManager.getConnection();
@@ -282,6 +282,21 @@ public class H2UserStorage implements UserStorage {
   }
 
   private Dealbreakers mapDealbreakers(ResultSet rs) throws SQLException {
+    Integer dbMinHeight = rs.getInt("db_min_height_cm");
+    if (rs.wasNull()) {
+      dbMinHeight = null;
+    }
+
+    Integer dbMaxHeight = rs.getInt("db_max_height_cm");
+    if (rs.wasNull()) {
+      dbMaxHeight = null;
+    }
+
+    Integer dbMaxAgeDiff = rs.getInt("db_max_age_diff");
+    if (rs.wasNull()) {
+      dbMaxAgeDiff = null;
+    }
+
     Set<Lifestyle.Smoking> dbSmoking =
         parseEnumSet(rs.getString("db_smoking"), Lifestyle.Smoking.class);
     Set<Lifestyle.Drinking> dbDrinking =
@@ -292,15 +307,6 @@ public class H2UserStorage implements UserStorage {
         parseEnumSet(rs.getString("db_looking_for"), Lifestyle.LookingFor.class);
     Set<Lifestyle.Education> dbEducation =
         parseEnumSet(rs.getString("db_education"), Lifestyle.Education.class);
-
-    Integer dbMinHeight = rs.getInt("db_min_height_cm");
-    if (rs.wasNull()) dbMinHeight = null;
-
-    Integer dbMaxHeight = rs.getInt("db_max_height_cm");
-    if (rs.wasNull()) dbMaxHeight = null;
-
-    Integer dbMaxAgeDiff = rs.getInt("db_max_age_diff");
-    if (rs.wasNull()) dbMaxAgeDiff = null;
 
     return new Dealbreakers(
         dbSmoking,

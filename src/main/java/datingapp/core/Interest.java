@@ -10,9 +10,9 @@ import java.util.Objects;
  * <p>Usage example:
  *
  * <pre>
- * Set<Interest> interests = EnumSet.of(Interest.HIKING, Interest.COFFEE);
+ * Set&lt;Interest&gt; interests = EnumSet.of(Interest.HIKING, Interest.COFFEE);
  * Interest.Category cat = Interest.HIKING.getCategory(); // OUTDOORS
- * List<Interest> outdoorInterests = Interest.byCategory(Interest.Category.OUTDOORS);
+ * List&lt;Interest&gt; outdoorInterests = Interest.byCategory(Interest.Category.OUTDOORS);
  * </pre>
  */
 public enum Interest {
@@ -77,12 +77,12 @@ public enum Interest {
 
   /** Interest categories for organized display. */
   public enum Category {
-    OUTDOORS("\ud83c\udfd5\ufe0f Outdoors"),
-    ARTS("\ud83c\udfa8 Arts & Culture"),
-    FOOD("\ud83c\udf73 Food & Drink"),
-    SPORTS("\ud83c\udfc3 Sports & Fitness"),
-    TECH("\ud83c\udfae Games & Tech"),
-    SOCIAL("\ud83c\udf89 Social");
+    OUTDOORS("🏕️ Outdoors"),
+    ARTS("🎨 Arts & Culture"),
+    FOOD("🍳 Food & Drink"),
+    SPORTS("🏃 Sports & Fitness"),
+    TECH("🎮 Games & Tech"),
+    SOCIAL("🎉 Social");
 
     private final String displayName;
 

@@ -51,7 +51,6 @@ public class LikerBrowserService {
     List<PendingLiker> result = new ArrayList<>();
     for (var entry : likeTimes.entrySet()) {
       UUID likerId = entry.getKey();
-      java.time.Instant likedAt = entry.getValue();
 
       if (alreadyInteracted.contains(likerId)) {
         continue;
@@ -68,6 +67,7 @@ public class LikerBrowserService {
         continue;
       }
 
+      java.time.Instant likedAt = entry.getValue();
       result.add(new PendingLiker(liker, likedAt));
     }
 
@@ -75,5 +75,6 @@ public class LikerBrowserService {
     return result;
   }
 
+  /** Represents a user who liked the current user but hasn't been responded to yet. */
   public record PendingLiker(User user, java.time.Instant likedAt) {}
 }

@@ -239,6 +239,7 @@ public class MessagingService {
   public record SendResult(
       boolean success, Message message, String errorMessage, ErrorCode errorCode) {
 
+    /** Error codes for message sending failures. */
     public enum ErrorCode {
       NO_ACTIVE_MATCH,
       USER_NOT_FOUND,

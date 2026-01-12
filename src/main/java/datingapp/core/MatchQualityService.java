@@ -107,8 +107,12 @@ public class MatchQualityService {
   // === Score Calculation Methods ===
 
   private double calculateDistanceScore(double distanceKm, int maxDistanceKm) {
-    if (distanceKm <= 1) return 1.0; // Very close
-    if (distanceKm >= maxDistanceKm) return 0.0; // At limit
+    if (distanceKm <= 1) {
+      return 1.0; // Very close
+    }
+    if (distanceKm >= maxDistanceKm) {
+      return 0.0; // At limit
+    }
 
     // Linear decay from 1.0 to 0.0
     return 1.0 - (distanceKm / maxDistanceKm);
@@ -116,14 +120,18 @@ public class MatchQualityService {
 
   private double calculateAgeScore(int ageDiff, User me, User them) {
     // Perfect score if within 2 years
-    if (ageDiff <= 2) return 1.0;
+    if (ageDiff <= 2) {
+      return 1.0;
+    }
 
     // Calculate how well they fit in each other's ranges
     int myRange = me.getMaxAge() - me.getMinAge();
     int theirRange = them.getMaxAge() - them.getMinAge();
     int avgRange = (myRange + theirRange) / 2;
 
-    if (avgRange == 0) return 1.0; // No range = no penalty
+    if (avgRange == 0) {
+      return 1.0; // No range = no penalty
+    }
 
     // Score based on how close to ideal vs range
     double normalizedDiff = (double) ageDiff / avgRange;
@@ -150,13 +158,17 @@ public class MatchQualityService {
     // Smoking
     if (me.getSmoking() != null && them.getSmoking() != null) {
       total++;
-      if (me.getSmoking() == them.getSmoking()) matches++;
+      if (me.getSmoking() == them.getSmoking()) {
+        matches++;
+      }
     }
 
     // Drinking
     if (me.getDrinking() != null && them.getDrinking() != null) {
       total++;
-      if (me.getDrinking() == them.getDrinking()) matches++;
+      if (me.getDrinking() == them.getDrinking()) {
+        matches++;
+      }
     }
 
     // Wants Kids
@@ -170,20 +182,28 @@ public class MatchQualityService {
     // Looking For
     if (me.getLookingFor() != null && them.getLookingFor() != null) {
       total++;
-      if (me.getLookingFor() == them.getLookingFor()) matches++;
+      if (me.getLookingFor() == them.getLookingFor()) {
+        matches++;
+      }
     }
 
     // If no lifestyle data, return neutral
-    if (total == 0) return 0.5;
+    if (total == 0) {
+      return 0.5;
+    }
 
     return (double) matches / total;
   }
 
   private boolean areKidsStancesCompatible(Lifestyle.WantsKids a, Lifestyle.WantsKids b) {
     // Compatible if same
-    if (a == b) return true;
+    if (a == b) {
+      return true;
+    }
     // OPEN is compatible with everything
-    if (a == Lifestyle.WantsKids.OPEN || b == Lifestyle.WantsKids.OPEN) return true;
+    if (a == Lifestyle.WantsKids.OPEN || b == Lifestyle.WantsKids.OPEN) {
+      return true;
+    }
     // SOMEDAY and HAS_KIDS are compatible
     return (a == Lifestyle.WantsKids.SOMEDAY && b == Lifestyle.WantsKids.HAS_KIDS)
         || (a == Lifestyle.WantsKids.HAS_KIDS && b == Lifestyle.WantsKids.SOMEDAY);
@@ -256,15 +276,25 @@ public class MatchQualityService {
     long hours = timeBetween.toHours();
 
     // Within 1 hour = excellent
-    if (hours < 1) return 1.0;
+    if (hours < 1) {
+      return 1.0;
+    }
     // Within 24 hours = great
-    if (hours < 24) return 0.9;
+    if (hours < 24) {
+      return 0.9;
+    }
     // Within 3 days = good
-    if (hours < 72) return 0.7;
+    if (hours < 72) {
+      return 0.7;
+    }
     // Within a week = okay
-    if (hours < 168) return 0.5;
+    if (hours < 168) {
+      return 0.5;
+    }
     // Within a month = low
-    if (hours < 720) return 0.3;
+    if (hours < 720) {
+      return 0.3;
+    }
     // Longer = very low
     return 0.1;
   }

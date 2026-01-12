@@ -2,6 +2,7 @@ package datingapp.cli;
 
 import datingapp.core.User;
 
+/** Tracks the currently logged-in user for the CLI session. */
 public class UserSession {
   private User currentUser;
 

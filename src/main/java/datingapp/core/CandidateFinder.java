@@ -103,7 +103,7 @@ public class CandidateFinder implements CandidateFinderService {
 
   /**
    * Checks if gender preferences match both ways: - Seeker is interested in candidate's gender -
-   * Candidate is interested in seeker's gender
+   * Candidate is interested in seeker's gender.
    */
   private boolean hasMatchingGenderPreferences(User seeker, User candidate) {
     if (seeker.getGender() == null || candidate.getGender() == null) {
@@ -121,7 +121,7 @@ public class CandidateFinder implements CandidateFinderService {
 
   /**
    * Checks if age preferences match both ways: - Candidate's age is within seeker's age range -
-   * Seeker's age is within candidate's age range
+   * Seeker's age is within candidate's age range.
    */
   private boolean hasMatchingAgePreferences(User seeker, User candidate) {
     int seekerAge = seeker.getAge();

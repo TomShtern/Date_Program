@@ -149,11 +149,21 @@ public class ProfilePreviewService {
 
   private int countLifestyleFields(User user) {
     int count = 0;
-    if (user.getSmoking() != null) count++;
-    if (user.getDrinking() != null) count++;
-    if (user.getWantsKids() != null) count++;
-    if (user.getLookingFor() != null) count++;
-    if (user.getHeightCm() != null) count++;
+    if (user.getSmoking() != null) {
+      count++;
+    }
+    if (user.getDrinking() != null) {
+      count++;
+    }
+    if (user.getWantsKids() != null) {
+      count++;
+    }
+    if (user.getLookingFor() != null) {
+      count++;
+    }
+    if (user.getHeightCm() != null) {
+      count++;
+    }
     return count;
   }
 

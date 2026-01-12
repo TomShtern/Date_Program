@@ -47,11 +47,12 @@ public class ProfileNotesHandler {
     }
 
     User currentUser = userSession.getCurrentUser();
-    Optional<ProfileNote> existingNote = profileNoteStorage.get(currentUser.getId(), subjectId);
 
     logger.info("\n" + CliConstants.MENU_DIVIDER);
     logger.info("       📝 NOTES ABOUT {}", subjectName.toUpperCase());
     logger.info(CliConstants.MENU_DIVIDER);
+
+    Optional<ProfileNote> existingNote = profileNoteStorage.get(currentUser.getId(), subjectId);
 
     if (existingNote.isPresent()) {
       logger.info("\nCurrent note:");
@@ -79,6 +80,13 @@ public class ProfileNotesHandler {
     }
   }
 
+  /**
+   * Adds a new note for a user.
+   *
+   * @param authorId The ID of the user creating the note
+   * @param subjectId The ID of the user the note is about
+   * @param subjectName The name of the user the note is about
+   */
   private void addNote(UUID authorId, UUID subjectId, String subjectName) {
     logger.info("\nEnter your note about {} (max {} chars):", subjectName, ProfileNote.MAX_LENGTH);
     logger.info("Examples: \"Met at coffee shop\", \"Loves hiking\", \"Dinner Thursday 7pm\"");
@@ -106,6 +114,13 @@ public class ProfileNotesHandler {
     }
   }
 
+  /**
+   * Edits an existing note.
+   *
+   * @param authorId The ID of the user editing the note
+   * @param subjectId The ID of the user the note is about
+   * @param existing The existing note to edit
+   */
   private void editNote(UUID authorId, UUID subjectId, ProfileNote existing) {
     logger.info("\nCurrent note: \"{}\"\n", existing.content());
     logger.info("Enter new note (or press Enter to keep current):");
@@ -133,6 +148,13 @@ public class ProfileNotesHandler {
     }
   }
 
+  /**
+   * Deletes a note about a user.
+   *
+   * @param authorId The ID of the user who wrote the note
+   * @param subjectId The ID of the user the note is about
+   * @param subjectName The name of the user the note is about
+   */
   private void deleteNote(UUID authorId, UUID subjectId, String subjectName) {
     String confirm = inputReader.readLine("Delete note about " + subjectName + "? (y/n): ");
     if (confirm.equalsIgnoreCase("y")) {
@@ -154,11 +176,12 @@ public class ProfileNotesHandler {
     }
 
     User currentUser = userSession.getCurrentUser();
-    List<ProfileNote> notes = profileNoteStorage.getAllByAuthor(currentUser.getId());
 
     logger.info("\n" + CliConstants.MENU_DIVIDER);
     logger.info("         📝 MY PROFILE NOTES");
     logger.info(CliConstants.MENU_DIVIDER + "\n");
+
+    List<ProfileNote> notes = profileNoteStorage.getAllByAuthor(currentUser.getId());
 
     if (notes.isEmpty()) {
       logger.info("You haven't added any notes yet.");

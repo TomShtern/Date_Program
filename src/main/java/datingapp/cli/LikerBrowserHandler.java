@@ -9,6 +9,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Handler for browsing users who have liked the current user's profile. */
 public class LikerBrowserHandler {
   private static final Logger logger = LoggerFactory.getLogger(LikerBrowserHandler.class);
 
@@ -17,6 +18,7 @@ public class LikerBrowserHandler {
   private final UserSession userSession;
   private final InputReader inputReader;
 
+  /** Creates a new LikerBrowserHandler with the required dependencies. */
   public LikerBrowserHandler(
       LikerBrowserService likerBrowserService,
       MatchingService matchingService,
@@ -28,6 +30,7 @@ public class LikerBrowserHandler {
     this.inputReader = Objects.requireNonNull(inputReader);
   }
 
+  /** Displays a list of users who have liked the current user and allows interaction. */
   public void browseWhoLikedMe() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);

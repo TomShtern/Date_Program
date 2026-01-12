@@ -14,6 +14,14 @@ public record Block(
     UUID blockedId, // User who got blocked
     Instant createdAt) {
 
+  /**
+   * Creates a Block record with validation.
+   *
+   * @param id the unique identifier for this block
+   * @param blockerId the user who initiated the block
+   * @param blockedId the user who got blocked
+   * @param createdAt when the block was created
+   */
   public Block {
     Objects.requireNonNull(id, "id cannot be null");
     Objects.requireNonNull(blockerId, "blockerId cannot be null");

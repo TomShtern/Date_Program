@@ -43,9 +43,18 @@ class H2StorageIntegrationTest {
   @BeforeAll
   static void setUpOnce() {
 
-    DatabaseManager.setJdbcUrl("jdbc:h2:./data/dating_test_" + UUID.randomUUID());
+    DatabaseManager.setJdbcUrl("jdbc:h2:./data/dating_test");
     DatabaseManager.resetInstance();
     dbManager = DatabaseManager.getInstance();
+
+    // Clean database by dropping all tables to ensure fresh schema
+    try (var conn = dbManager.getConnection();
+        var stmt = conn.createStatement()) {
+      stmt.execute("DROP ALL OBJECTS");
+    } catch (Exception e) {
+      // Ignore errors if tables don't exist yet
+    }
+
     userStorage = new H2UserStorage(dbManager);
     likeStorage = new H2LikeStorage(dbManager);
     matchStorage = new H2MatchStorage(dbManager);

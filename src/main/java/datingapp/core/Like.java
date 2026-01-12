@@ -16,6 +16,15 @@ public record Like(
     PASS
   }
 
+  /**
+   * Creates a Like record with validation.
+   *
+   * @param id the unique identifier for this like
+   * @param whoLikes the user who performed the like/pass action
+   * @param whoGotLiked the user who received the like/pass action
+   * @param direction whether this is a LIKE or PASS
+   * @param createdAt when the action was performed
+   */
   public Like {
     Objects.requireNonNull(id, "id cannot be null");
     Objects.requireNonNull(whoLikes, "whoLikes cannot be null");

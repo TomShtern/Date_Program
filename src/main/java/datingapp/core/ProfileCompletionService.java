@@ -39,12 +39,12 @@ public final class ProfileCompletionService {
       List<CategoryBreakdown> breakdown,
       List<String> nextSteps) {
 
-    /** Returns a formatted display string like "78% Silver" */
+    /** Returns a formatted display string like "78% Silver". */
     public String getDisplayString() {
       return score + "% " + tier;
     }
 
-    /** Returns an emoji for the tier */
+    /** Returns an emoji for the tier. */
     public String getTierEmoji() {
       return switch (tier) {
         case "Diamond" -> "💎";
@@ -74,8 +74,6 @@ public final class ProfileCompletionService {
    * @return the completion result with breakdown
    */
   public static CompletionResult calculate(User user) {
-    List<CategoryBreakdown> breakdown = new ArrayList<>();
-    List<String> nextSteps = new ArrayList<>();
     int totalPoints = 0;
     int earnedPoints = 0;
 
@@ -94,6 +92,7 @@ public final class ProfileCompletionService {
 
     // Bio (10 pts)
     totalPoints += 10;
+    List<String> nextSteps = new ArrayList<>();
     if (user.getBio() != null && !user.getBio().isBlank()) {
       earnedPoints += 10;
       basicFilled.add("Bio");
@@ -143,6 +142,7 @@ public final class ProfileCompletionService {
         basicFilled.isEmpty()
             ? 0
             : (basicFilled.size() * 100) / (basicFilled.size() + basicMissing.size());
+    List<CategoryBreakdown> breakdown = new ArrayList<>();
     breakdown.add(new CategoryBreakdown("Basic Info", basicScore, basicFilled, basicMissing));
 
     // === INTERESTS (20 points max) ===
@@ -285,10 +285,18 @@ public final class ProfileCompletionService {
   }
 
   private static String calculateTier(int score) {
-    if (score >= 90) return "Diamond";
-    if (score >= 75) return "Gold";
-    if (score >= 50) return "Silver";
-    if (score >= 25) return "Bronze";
+    if (score >= 90) {
+      return "Diamond";
+    }
+    if (score >= 75) {
+      return "Gold";
+    }
+    if (score >= 50) {
+      return "Silver";
+    }
+    if (score >= 25) {
+      return "Bronze";
+    }
     return "Starter";
   }
 

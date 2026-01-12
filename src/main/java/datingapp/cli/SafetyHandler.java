@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Handles user blocking and reporting operations in the CLI. */
 public class SafetyHandler {
   private static final Logger logger = LoggerFactory.getLogger(SafetyHandler.class);
 
@@ -39,6 +40,7 @@ public class SafetyHandler {
     this.inputReader = inputReader;
   }
 
+  /** Allows the current user to block another user. */
   public void blockUser() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);
@@ -71,7 +73,9 @@ public class SafetyHandler {
     try {
       int idx = Integer.parseInt(input) - 1;
       if (idx < 0 || idx >= blockableUsers.size()) {
-        if (idx != -1) logger.info(CliConstants.INVALID_INPUT);
+        if (idx != -1) {
+          logger.info(CliConstants.INVALID_INPUT);
+        }
         return;
       }
 
@@ -104,6 +108,7 @@ public class SafetyHandler {
     }
   }
 
+  /** Allows the current user to report another user for violations. */
   public void reportUser() {
     if (!userSession.isLoggedIn()) {
       logger.info(CliConstants.PLEASE_SELECT_USER);
@@ -128,13 +133,19 @@ public class SafetyHandler {
     }
 
     User toReport = selectReportCandidate(reportableUsers);
-    if (toReport == null) return;
+    if (toReport == null) {
+      return;
+    }
 
     Report.Reason reason = selectReportReason();
-    if (reason == null) return;
+    if (reason == null) {
+      return;
+    }
 
     String description = inputReader.readLine("Additional details (optional, max 500 chars): ");
-    if (description.isBlank()) description = null;
+    if (description.isBlank()) {
+      description = null;
+    }
 
     ReportService.ReportResult result =
         reportService.report(currentUser.getId(), toReport.getId(), reason, description);
@@ -150,6 +161,7 @@ public class SafetyHandler {
     }
   }
 
+  /** Displays reportable users and prompts for selection. */
   private User selectReportCandidate(List<User> reportableUsers) {
     for (int i = 0; i < reportableUsers.size(); i++) {
       User u = reportableUsers.get(i);
@@ -160,7 +172,9 @@ public class SafetyHandler {
     try {
       int idx = Integer.parseInt(input) - 1;
       if (idx < 0 || idx >= reportableUsers.size()) {
-        if (idx != -1) logger.info(CliConstants.INVALID_INPUT);
+        if (idx != -1) {
+          logger.info(CliConstants.INVALID_INPUT);
+        }
         return null;
       }
       return reportableUsers.get(idx);
@@ -170,6 +184,11 @@ public class SafetyHandler {
     }
   }
 
+  /**
+   * Prompts the user to select a reason for reporting.
+   *
+   * @return The selected report reason, or null if invalid
+   */
   private Report.Reason selectReportReason() {
     logger.info("\nReason for report:");
     Report.Reason[] reasons = Report.Reason.values();
