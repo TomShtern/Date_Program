@@ -1,3 +1,17 @@
+<!--AGENT-DOCSYNC:ON-->
+# ChangeStamp format: SEQ|YYYY-MM-DD HH:MM:SS|agent:<id>|scope:<tag>|summary|files
+# SEQ: file-local increasing int. If collision after 3 retries append "<SEQ>:CONFLICT".
+# Agents MAY NOT use git. After code changes they MUST:
+# 1) pick SEQ = highestSEQ+1 (recheck before write),
+# 2) locate affected doc fragment using prioritized search (see below),
+# 3) archive replaced text with <!--ARCHIVE:SEQ:agent:scope-->...<!--/ARCHIVE-->,
+# 4) apply minimal precise edits (edit only nearest matching fragment),
+# 5) append one ChangeStamp line to the file-end changelog and inside the edited fragment (immediately after the edited paragraph or code fence),
+# 6) if uncertain to auto-edit, append TODO+ChangeStamp next to nearest heading.
+<!--/AGENT-DOCSYNC-->
+
+
+
 # Dating App - Implementation Status vs PRD
 
 **Generated:** 2026-01-07
@@ -351,3 +365,14 @@ The implementation:
 - Correctly excludes Phase 0 out-of-scope features
 
 **Ready for Phase 1** (HTTP/REST layer) when needed.
+
+
+
+
+
+## Agent Changelog (append-only)
+---AGENT-LOG-START---
+# Format: SEQ|TS|agent|scope|summary|files
+# Append-only. Do not edit past entries. If SEQ conflict after 3 tries append ":CONFLICT".
+example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples regen|src/ui/*
+---AGENT-LOG-END---

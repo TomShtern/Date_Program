@@ -1,3 +1,18 @@
+<!--AGENT-DOCSYNC:ON-->
+# ChangeStamp format: SEQ|YYYY-MM-DD HH:MM:SS|agent:<id>|scope:<tag>|summary|files
+# SEQ: file-local increasing int. If collision after 3 retries append "<SEQ>:CONFLICT".
+# Agents MAY NOT use git. After code changes they MUST:
+# 1) pick SEQ = highestSEQ+1 (recheck before write),
+# 2) locate affected doc fragment using prioritized search (see below),
+# 3) archive replaced text with <!--ARCHIVE:SEQ:agent:scope-->...<!--/ARCHIVE-->,
+# 4) apply minimal precise edits (edit only nearest matching fragment),
+# 5) append one ChangeStamp line to the file-end changelog and inside the edited fragment (immediately after the edited paragraph or code fence),
+# 6) if uncertain to auto-edit, append TODO+ChangeStamp next to nearest heading.
+<!--/AGENT-DOCSYNC-->
+
+
+
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -29,7 +44,7 @@ java -jar target/dating-app-1.0.0.jar
 
 ## Architecture
 
-This is a **Phase 2.0** console-based dating app using Java 21, Maven, and H2 embedded database. The project has evolved from basic matching to include sophisticated engagement tracking, quality scoring, gamification, interests matching, serendipitous discovery, user safety features, profile quality systems, verification workflows, **and a full-featured messaging system enabling matched users to communicate**.
+This is a **Phase 2.1** console-based dating app using Java 21, Maven, and H2 embedded database. The project has evolved from basic matching to include sophisticated engagement tracking, quality scoring, gamification, interests matching, serendipitous discovery, user safety features, profile quality systems, verification workflows, **messaging system enabling matched users to communicate, relationship transitions (Friend Zone/Graceful Exit), notifications, and pace compatibility matching**.
 
 > **For AI Agents**: See [`AGENTS.md`](./AGENTS.md) for comprehensive development guidelines including coding standards, testing patterns, and quality tools configuration.
 
@@ -48,7 +63,7 @@ cli/        Console UI handlers (separated from Main.java)
 **Domain Models** (in `core/`):
 - `User` - Mutable entity with state machine: `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`. Now includes interests set (max 10), verification status, and profile completeness metrics
 - `Like` - Immutable record with `LIKE` or `PASS` direction and timestamp
-- `Match` - Mutable entity with state machine: `ACTIVE → UNMATCHED | BLOCKED`. Deterministic ID (sorted UUID concatenation)
+- `Match` - Mutable entity with state machine: `ACTIVE → FRIENDS | UNMATCHED | GRACEFUL_EXIT | BLOCKED`. Deterministic ID (sorted UUID concatenation)
 - `Block` - Immutable record for bidirectional blocking (when A blocks B, neither can see the other)
 - `Report` - Immutable record with reason enum (SPAM, HARASSMENT, FAKE_PROFILE, etc.)
 - `SwipeSession` - Mutable entity tracking continuous swiping activity with state machine: `ACTIVE → COMPLETED`
@@ -58,8 +73,12 @@ cli/        Console UI handlers (separated from Main.java)
 - `Achievement` - Enum of 11 gamification achievements across 4 categories (MATCHING, BEHAVIOR, PROFILE, SAFETY)
 - `UserAchievement` - Immutable record linking users to unlocked achievements with timestamps
 - `ProfileNote` - Immutable record for private notes about other users (max 500 chars)
-- `Conversation` - Mutable entity with deterministic ID (userA_userB), per-user read timestamps ✨ NEW
-- `Message` - Immutable record with max 1000 chars, timestamp, sender reference ✨ NEW
+- `Conversation` - Mutable entity with deterministic ID (userA_userB), per-user read timestamps
+- `Message` - Immutable record with max 1000 chars, timestamp, sender reference
+- `FriendRequest` - Immutable record for Friend Zone requests with status tracking ✨ NEW
+- `Notification` - Immutable record for user notifications with type and metadata ✨ NEW
+- `PacePreferences` - Immutable record tracking messaging frequency, time to first date, communication style, and depth preference ✨ NEW
+- `PacePreferences` fields: `messagingFrequency`, `timeToFirstDate`, `communicationStyle`, `depthPreference`
 
 **Core Services** (in `core/`):
 - `CandidateFinder` - Multi-stage filter pipeline: not-self, ACTIVE state, no prior interaction, mutual gender preferences, mutual age preferences, within distance, dealbreakers evaluation. Sorts by distance.
@@ -84,7 +103,11 @@ cli/        Console UI handlers (separated from Main.java)
 - `VerificationService` - Profile verification workflow management
 
 **Phase 2.0 Services** (in `core/`):
-- `MessagingService` - Full-featured messaging system with authorization checks, conversation management, unread tracking ✨ NEW
+- `MessagingService` - Full-featured messaging system with authorization checks, conversation management, unread tracking
+
+**Phase 2.1 Services** (in `core/`):
+- `PaceCompatibilityService` - Calculates compatibility scores (0-100) based on messaging frequency, time to first date, communication style, and depth preferences ✨ NEW
+- `RelationshipTransitionService` - Manages relationship lifecycle transitions: Friend Zone requests and Graceful Exit ✨ NEW
 
 **Storage Interfaces** (defined in `core/`, implemented in `storage/`):
 - `UserStorage`, `LikeStorage`, `MatchStorage`, `BlockStorage`, `ReportStorage`
@@ -94,8 +117,10 @@ cli/        Console UI handlers (separated from Main.java)
 - `DailyPickStorage` - Tracks daily pick view history per user
 - `ProfileNoteStorage` - Private notes CRUD operations
 - `ProfileViewStorage` - Profile view history tracking
-- `ConversationStorage` - Conversation CRUD with user-based queries and timestamp updates ✨ NEW
-- `MessageStorage` - Message CRUD with pagination, counting, and cascade deletion ✨ NEW
+- `ConversationStorage` - Conversation CRUD with user-based queries and timestamp updates
+- `MessageStorage` - Message CRUD with pagination, counting, and cascade deletion
+- `FriendRequestStorage` - Friend request CRUD with status tracking and user queries ✨ NEW
+- `NotificationStorage` - Notification CRUD with user-based queries and read status tracking ✨ NEW
 
 **CLI Layer** (in `cli/`):
 - `Main` - Orchestrator with menu loop and dependency wiring (in `datingapp/` package)
@@ -107,7 +132,8 @@ cli/        Console UI handlers (separated from Main.java)
 - `ProfileNotesHandler` - Private note-taking for profiles
 - `LikerBrowserHandler` - Browse incoming likes
 - `ProfileVerificationHandler` - Profile verification UI
-- `MessagingHandler` - Conversation list, message view, send/receive UI ✨ NEW
+- `MessagingHandler` - Conversation list, message view, send/receive UI
+- `RelationshipHandler` - Friend Zone requests, notifications, and relationship transitions UI ✨ NEW
 - `UserSession` - Tracks currently logged-in user
 - `InputReader` - I/O abstraction over Scanner
 - `CliConstants` - UI string constants and formatting
@@ -123,6 +149,16 @@ cli/        Console UI handlers (separated from Main.java)
 - `DatabaseManager` - Singleton managing H2 connections and schema initialization
 - `H2*Storage` classes - JDBC implementations of storage interfaces
 - Data persists to `./data/dating.mv.db`
+
+**UI Layer** (in `ui/`) - ✨ NEW Experimental Framework
+- `DatingApp` - New application entry point for potential web/Flet UI
+- `NavigationService` - Routing and navigation between views
+- `UISession` - Session management for UI state
+- `ViewFactory` - Factory for creating view instances
+- `ViewModelFactory` - Factory for creating view model instances
+- `controller/` package - Controller classes for handling UI interactions
+- `viewmodel/` package - ViewModel classes for managing UI state
+- **Status**: In development, architecture framework laid but not fully integrated with existing CLI
 
 ### Enhanced Data Flow
 
@@ -277,14 +313,15 @@ cli/        Console UI handlers (separated from Main.java)
 - Also calculates Jaccard Index for reference: `shared / union`
 - Highlights shared interests in match quality display
 
-## Recent Updates (Updated: 2026-01-11 - Latest Commits: 28940f3, de20d44, 33f8568)
+## Recent Updates (Updated: 2026-01-12 - Latest Commits: Multiple Phase 2.1 additions)
 
-### 🚀 Phase 2.0: Messaging System (Latest) ✨ NEW
+### 🚀 Phase 2.0: Messaging System ✨
 
 **Commits:** `33f8568 (messaging 1)`, `de20d44 (messaging 1.1)`, `28940f3 (messaging 1.2)`
-**Status:** Production-ready with 28 unit tests passing, integration tests pending
+**Status:** Production-ready with 28 unit tests passing, integration tests passing
 **Design Doc:** [`docs/MESSAGING_SYSTEM_DESIGN.md`](./docs/MESSAGING_SYSTEM_DESIGN.md)
 **Review:** [`docs/messaging-code-review.md`](./docs/messaging-code-review.md)
+**Audit Report:** [`docs/MESSAGING_FEATURE_AUDIT.md`](./docs/MESSAGING_FEATURE_AUDIT.md)
 
 The messaging system enables matched users to communicate via text messages, completing the core dating app experience loop: discover → match → message → connect.
 
@@ -385,6 +422,123 @@ CREATE TABLE messages (
 - **Code Review:** Excellent - 0 critical issues, 3 low-priority suggestions
 - **Test Success Rate:** 100% (28/28 unit tests + 12/12 integration tests passing)
 - **Design Document Fidelity:** 95% - All core features implemented, minor optional items deferred
+
+---
+
+### 🚀 Phase 2.1: Relationship Transitions & Pace Matching (Latest) ✨ NEW
+
+**Status:** In development with core features implemented
+**Design Doc:** See analysis docs in `docs/` folder
+
+The Phase 2.1 update introduces sophisticated relationship lifecycle management and personality-driven compatibility matching beyond simple attribute overlap.
+
+**Core Components:**
+
+**1. Relationship Transitions System:**
+- **Friend Zone Workflow**: Users can request transitioning a romantic match to a platonic friendship
+  - `RelationshipTransitionService` - Core business logic for friend zone and graceful exit flows
+  - `FriendRequest` domain model - Immutable record tracking request status and timestamps
+  - `FriendRequestStatus` enum: `PENDING`, `ACCEPTED`, `DECLINED`, `EXPIRED`
+  - `FriendRequestStorage` interface - CRUD with user-based queries
+  - `H2FriendRequestStorage` - Full JDBC implementation with unique constraint on (from_user, to_user)
+- **Graceful Exit**: Users can end a match gracefully, transitioning to `GRACEFUL_EXIT` state
+- **Match State Extension**: Matches now support new states:
+  - `FRIENDS` - Accepted friend zone transition (mutual decision to be platonic)
+  - `GRACEFUL_EXIT` - One user ended match kindly
+  - `ACTIVE`, `UNMATCHED`, `BLOCKED` - Existing states preserved
+- **RelationshipHandler** - CLI interface for initiating and responding to friend zone requests (Menu Option 18)
+
+**2. Notifications System:**
+- **Notification** domain model - Immutable record with type, title, message, metadata, and read status
+- **NotificationType** enum: `MATCH_FOUND`, `NEW_MESSAGE`, `FRIEND_REQUEST`, `FRIEND_REQUEST_ACCEPTED`, `GRACEFUL_EXIT`
+- **NotificationStorage** interface - User-based queries, read status tracking, deletion
+- **H2NotificationStorage** - Full JDBC implementation with indexes on user_id and created_at
+- **RelationshipHandler** - Displays notifications in CLI (Menu Option 17)
+- **Use Cases**: Friend zone requests, new matches, incoming messages
+
+**3. Pace Compatibility Matching:**
+- **PaceCompatibilityService** - Calculates compatibility (0-100) across 4 dimensions
+- **PacePreferences** record - Immutable configuration for relationship pace expectations:
+  - `messagingFrequency` (enum: RARELY, OFTEN, CONSTANTLY, WILDCARD) - How often users prefer to communicate
+  - `timeToFirstDate` (enum: QUICKLY, FEW_DAYS, WEEKS, MONTHS, WILDCARD) - Expectations for first in-person meeting
+  - `communicationStyle` (enum: TEXT_ONLY, VOICE_NOTES, VIDEO_CALLS, IN_PERSON_ONLY, MIX_OF_EVERYTHING) - Preferred communication medium
+  - `depthPreference` (enum: SMALL_TALK, DEEP_CHAT, EXISTENTIAL, DEPENDS_ON_VIBE) - Desired relationship depth (DEPENDS_ON_VIBE acts as wildcard)
+
+**Compatibility Scoring Algorithm:**
+- 4-dimension scoring with wildcard handling (25 points per dimension, max 100)
+- Some enums include "wildcard" values (e.g., `MIX_OF_EVERYTHING`, `DEPENDS_ON_VIBE`) that auto-match any preference
+- Score of -1 indicates incomplete preferences (used to hide pace scoring until both users fill profiles)
+- Low compatibility threshold (< 50) flags potential pace mismatches early
+
+**Integration:**
+- User model extended with `pacePreferences` field (nullable initially)
+- `ProfileHandler` extended to collect pace preferences during profile completion
+- Pace scoring can be integrated into `MatchQualityService` for comprehensive match quality calculation
+- Notifications created when friend zone requests or graceful exits occur
+
+**New Enums Supporting Phase 2.1:**
+- `ArchiveReason` - Tracks why conversations/matches were archived (FRIEND_ZONE, GRACEFUL_EXIT, UNMATCH, BLOCK) ✨
+- `MessagingFrequency` - Preference for message cadence (RARELY, OFTEN, CONSTANTLY, WILDCARD)
+- `TimeToFirstDate` - Expectation timeline (QUICKLY, FEW_DAYS, WEEKS, MONTHS, WILDCARD)
+- `CommunicationStyle` - Preferred interaction medium (TEXT_ONLY, VOICE_NOTES, VIDEO_CALLS, IN_PERSON_ONLY, MIX_OF_EVERYTHING)
+- `DepthPreference` - Relationship depth expectation (SMALL_TALK, DEEP_CHAT, EXISTENTIAL, DEPENDS_ON_VIBE)
+- `FriendRequestStatus` - Request lifecycle (PENDING, ACCEPTED, DECLINED, EXPIRED)
+- `NotificationType` - Notification categorization (MATCH_FOUND, NEW_MESSAGE, FRIEND_REQUEST, FRIEND_REQUEST_ACCEPTED, GRACEFUL_EXIT)
+
+**Database Schema Updates for Phase 2.1:**
+```sql
+-- Friend requests table
+CREATE TABLE friend_requests (
+    id UUID PRIMARY KEY,
+    from_user_id UUID NOT NULL,
+    to_user_id UUID NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    responded_at TIMESTAMP,
+    UNIQUE (from_user_id, to_user_id)
+);
+
+-- Notifications table
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message VARCHAR(1000),
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL,
+    data JSON
+);
+
+-- Pace preferences (denormalized into users table or separate table)
+ALTER TABLE users ADD COLUMN messaging_frequency VARCHAR(20);
+ALTER TABLE users ADD COLUMN time_to_first_date VARCHAR(20);
+ALTER TABLE users ADD COLUMN communication_style VARCHAR(20);
+ALTER TABLE users ADD COLUMN depth_preference VARCHAR(20);
+
+-- Match state extension
+-- Match states: ACTIVE, FRIENDS (platonic friendship after friend zone acceptance), UNMATCHED, GRACEFUL_EXIT, BLOCKED
+```
+
+**Menu Integration:**
+- Option 17: `🔔 Notifications` - View and manage user notifications
+- Option 18: `🤝 Friend Requests` - View pending friend zone requests and respond
+
+**Key Design Decisions:**
+| Decision | Rationale |
+|----------|-----------|
+| Notifications stored separately | Decouples notification history from events, enables read status tracking |
+| FriendRequest immutability | Simplifies status transitions, matches industry patterns for request workflows |
+| Pace preferences nullable in User | Allows gradual adoption, backward compatible with existing users |
+| Wildcard enums in pace matching | Prevents artificial incompatibility, supports flexible users |
+| FRIEND_ZONE as match state | Preserves conversation history while semantically marking transition |
+
+**Known Limitations & Future Work:**
+- Notifications are created but not "delivered" (no email/push - stored in DB only)
+- Pace preferences not yet visible in candidate browsing results
+- Friend zone acceptance doesn't auto-create platonic friendship label
+- No archiving system yet (ArchiveReason enum exists but functionality pending)
+- Graceful exit doesn't provide detailed reason tracking (future enhancement)
 
 ---
 
@@ -535,8 +689,12 @@ CREATE TABLE messages (
 - `profile_views` table tracking viewer_id, viewed_user_id, view timestamps
 - Verification status columns in `users` table for profile verification workflows
 - Profile completeness scoring fields in `users` table
-- **NEW**: `conversations` table with unique constraint on (user_a, user_b), per-user read timestamps ✨
-- **NEW**: `messages` table with foreign key to conversations (CASCADE DELETE), indexed on (conversation_id, created_at) ✨
+- `conversations` table with unique constraint on (user_a, user_b), per-user read timestamps
+- `messages` table with foreign key to conversations (CASCADE DELETE), indexed on (conversation_id, created_at)
+- **NEW**: `friend_requests` table with status tracking (PENDING, ACCEPTED, REJECTED) ✨
+- **NEW**: `notifications` table with type, title, message, metadata, and read status ✨
+- **NEW**: `pace_preferences` table (or denormalized in users table) with messaging frequency, time to first date, communication style, and depth preference ✨
+- **NEW**: Match state extended with FRIENDS (platonic friendship) and GRACEFUL_EXIT states for relationship transitions ✨
 
 ## Testing
 
@@ -555,11 +713,14 @@ Tests are in `src/test/java/datingapp/`:
   - `ProfileCompletionServiceTest` - Profile quality scoring
   - `LikerBrowserServiceTest` - Incoming likes browsing
   - **Phase 2.0 Tests:**
-    - `MessageTest` - Immutable record validation, content trimming, length limits ✨ NEW
-    - `ConversationTest` - Deterministic ID generation, user queries, timestamp management ✨ NEW
-    - `MessagingServiceTest` - 28 tests covering all public methods with in-memory mocks ✨ NEW
+    - `MessageTest` - Immutable record validation, content trimming, length limits
+    - `ConversationTest` - Deterministic ID generation, user queries, timestamp management
+    - `MessagingServiceTest` - 28 tests covering all public methods with in-memory mocks
       - SendMessage (9 tests), GetMessages (2), CanMessage (3), MarkAsRead (2)
       - GetUnreadCount (4), GetTotalUnreadCount (2), GetConversations (4), GetOrCreateConversation (2)
+  - **Phase 2.1 Tests:** ✨ NEW
+    - `PaceCompatibilityServiceTest` - Compatibility score calculation across 4 dimensions with wildcard handling
+    - `RelationshipTransitionServiceTest` - Friend zone request workflows and graceful exit transitions
 - `storage/` - Integration tests for H2 storage implementations
   - `H2ProfileNoteStorageTest` - Profile notes CRUD operations
   - `H2ProfileViewStorageTest` - Profile view tracking
@@ -584,21 +745,24 @@ Tests use JUnit 5 with nested test classes for logical grouping. Phase 2.0 messa
 - **Custom Interests**: Users cannot add custom interests beyond the 37 predefined
 - **Photo Storage**: Photo URLs are strings, no actual image upload/storage
 - **Advanced Undo**: Only last swipe is undoable; no multi-step undo history
-- **Real-Time Notifications**: Match creation is synchronous, no push notifications
+- **Real-Time Notifications**: Notifications stored in DB but not delivered (no email/push) ✨ Phase 2.1
 - **Pagination**: Candidate lists return all results, no cursor-based pagination
-- **Achievement Notifications**: No in-app notification when achievements unlock
+- **Achievement Notifications**: No in-app notification when achievements unlock (notification system exists but not integrated)
 - **Daily Pick History**: Cannot review previous daily picks
 - **Profile Note Editing**: Notes are create/delete only, no inline editing yet
 - **Advanced Analytics**: Profile view data collected but not yet exposed in UI
 - **Verification Automation**: Verification process requires manual intervention
-- **Messaging Achievements**: No achievements triggered by messaging activity (first message, N messages sent) ✨ NEW
-- **Message Reactions**: No emoji reactions or message interactions beyond text ✨ NEW
-- **Read Receipts**: No indication of when recipient read message ✨ NEW
-- **Typing Indicators**: No "user is typing..." feature ✨ NEW
-- **Message Editing**: Cannot edit sent messages ✨ NEW
-- **Message Deletion**: Cannot delete individual messages ✨ NEW
-- **Message Search**: No full-text search within conversations ✨ NEW
-- **lastActiveAt Update**: User's `lastActiveAt` not updated on message send ✨ NEW
+- **Pace Preferences in Candidate Browsing**: Pace compatibility calculated but not shown in candidate list UI ✨ Phase 2.1
+- **Platonic Friendship Labels**: Friend zone acceptance doesn't create visible friendship tier yet ✨ Phase 2.1
+- **Conversation Archiving**: ArchiveReason enum exists but archiving functionality pending ✨ Phase 2.1
+- **Messaging Achievements**: No achievements triggered by messaging activity (first message, N messages sent)
+- **Message Reactions**: No emoji reactions or message interactions beyond text
+- **Read Receipts**: No indication of when recipient read message
+- **Typing Indicators**: No "user is typing..." feature
+- **Message Editing**: Cannot edit sent messages
+- **Message Deletion**: Cannot delete individual messages
+- **Message Search**: No full-text search within conversations
+- **lastActiveAt Update**: User's `lastActiveAt` not updated on message send
 
 ### Production Readiness Gaps
 - Undo deletions should use database transactions
@@ -612,11 +776,16 @@ Tests use JUnit 5 with nested test classes for logical grouping. Phase 2.0 messa
 - Profile view analytics aggregation should use materialized views
 - Verification workflows need audit trail and admin review queue
 - Profile completeness scoring should be denormalized for query performance
-- **NEW**: Message delivery should use pub/sub for real-time updates ✨
-- **NEW**: Conversation unread counts could be denormalized to conversation table for performance ✨
-- **NEW**: Message content should be sanitized for XSS when moving to web UI ✨
-- **NEW**: Rate limiting needed on message sends (e.g., 100 messages/hour per user) ✨
-- **NEW**: Message storage could benefit from partitioning by date for scalability ✨
+- Message delivery should use pub/sub for real-time updates
+- Conversation unread counts could be denormalized to conversation table for performance
+- Message content should be sanitized for XSS when moving to web UI
+- Rate limiting needed on message sends (e.g., 100 messages/hour per user)
+- Message storage could benefit from partitioning by date for scalability
+- **Phase 2.1**: Notifications need delivery mechanism (email/push) beyond database storage ✨
+- **Phase 2.1**: Pace compatibility should be surfaced in candidate browsing and match quality scores ✨
+- **Phase 2.1**: Friend zone transitions should create visible relationship state in UI ✨
+- **Phase 2.1**: Conversation archiving system needs implementation with reason tracking ✨
+- **UI Layer**: New ui/ package architecture needs completion and integration with CLI/services ✨
 
 ## Documentation & Resources
 
@@ -642,6 +811,8 @@ Tests use JUnit 5 with nested test classes for logical grouping. Phase 2.0 messa
 - **`docs/Agent-Readiness-Documentation.md`** - AI agent integration guidelines
 - **`docs/agent-readiness-improvement-plan.md`** - Plan for enhancing agent capabilities
 - **`.github/copilot-instructions.md`** - GitHub Copilot configuration for this project
+- **`docs/BIG_PICTURE_ANALYSIS_2026-01-12.md`** (Generated 2026-01-12) - Comprehensive analysis of feature gaps, UX issues, and production readiness gaps ✨ NEW
+- **`docs/TESTING_REPL_DESIGN.md`** - Testing architecture and REPL-based test framework design ✨ NEW
 
 ### Design Documents
 - **`docs/completed-plans/`** - Completed feature design documents:
@@ -660,3 +831,13 @@ Tests use JUnit 5 with nested test classes for logical grouping. Phase 2.0 messa
 - **`docs/plans/MESSAGING_COMPLETION_PLAN.md`** (777 lines) - Completion roadmap with remaining gaps ✨ NEW
 
 > **Quick Navigation**: Start with `README.md` for overview → `CLAUDE.md` (this file) for architecture → `AGENTS.md` for development guidelines → `docs/architecture.md` for visual diagrams
+
+
+
+
+## Agent Changelog (append-only)
+---AGENT-LOG-START---
+# Format: SEQ|TS|agent|scope|summary|files
+# Append-only. Do not edit past entries. If SEQ conflict after 3 tries append ":CONFLICT".
+example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples regen|src/ui/*
+---AGENT-LOG-END---

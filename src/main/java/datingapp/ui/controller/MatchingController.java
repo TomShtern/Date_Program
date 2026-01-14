@@ -1,12 +1,16 @@
 package datingapp.ui.controller;
 
+import java.net.URL;
+import java.util.ResourceBundle;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import datingapp.core.Match;
 import datingapp.core.User;
 import datingapp.ui.NavigationService;
 import datingapp.ui.ViewFactory;
 import datingapp.ui.viewmodel.MatchingViewModel;
-import java.net.URL;
-import java.util.ResourceBundle;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Pos;
@@ -16,8 +20,6 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Matching screen (matching.fxml).

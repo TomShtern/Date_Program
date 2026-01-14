@@ -122,3 +122,9 @@ site/
 # Workspace-specific build/test outputs
 compile_output.txt
 test_output.txt
+
+# Claude Artifacts
+cUserstom7sAppDataLocalTempclaude-*
+
+# Agent Skills
+.agent/

@@ -5,7 +5,10 @@
       "Skill(feature-dev:feature-dev)",
       "Bash(mvn clean compile test:*)",
       "Bash(mvn test:*)",
-      "Skill(superpowers:brainstorming)"
+      "Skill(superpowers:brainstorming)",
+      "Bash(ls:*)",
+      "Bash(xargs basename:*)",
+      "Bash(xargs:*)"
     ]
   },
   "outputStyle": "Explanatory"
