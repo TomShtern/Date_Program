@@ -4,12 +4,14 @@ import datingapp.core.ServiceRegistry;
 import datingapp.ui.controller.ChatController;
 import datingapp.ui.controller.DashboardController;
 import datingapp.ui.controller.LoginController;
+import datingapp.ui.controller.MatchesController;
 import datingapp.ui.controller.MatchingController;
 import datingapp.ui.controller.ProfileController;
 import datingapp.ui.controller.StatsController;
 import datingapp.ui.viewmodel.ChatViewModel;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import datingapp.ui.viewmodel.LoginViewModel;
+import datingapp.ui.viewmodel.MatchesViewModel;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import datingapp.ui.viewmodel.StatsViewModel;
@@ -32,6 +34,7 @@ public class ViewModelFactory {
     private DashboardViewModel dashboardViewModel;
     private ProfileViewModel profileViewModel;
     private MatchingViewModel matchingViewModel;
+    private MatchesViewModel matchesViewModel;
     private ChatViewModel chatViewModel;
     private StatsViewModel statsViewModel;
 
@@ -60,6 +63,10 @@ public class ViewModelFactory {
 
         if (controllerClass == MatchingController.class) {
             return new MatchingController(getMatchingViewModel());
+        }
+
+        if (controllerClass == MatchesController.class) {
+            return new MatchesController(getMatchesViewModel());
         }
 
         if (controllerClass == ChatController.class) {
@@ -130,6 +137,13 @@ public class ViewModelFactory {
         return matchingViewModel;
     }
 
+    public MatchesViewModel getMatchesViewModel() {
+        if (matchesViewModel == null) {
+            matchesViewModel = new MatchesViewModel(services.getMatchStorage(), services.getUserStorage());
+        }
+        return matchesViewModel;
+    }
+
     public ChatViewModel getChatViewModel() {
         if (chatViewModel == null) {
             // ChatViewModel takes only MessagingService
@@ -157,6 +171,7 @@ public class ViewModelFactory {
         profileViewModel = null;
         matchingViewModel = null;
         chatViewModel = null;
+        matchesViewModel = null;
         statsViewModel = null;
     }
 }

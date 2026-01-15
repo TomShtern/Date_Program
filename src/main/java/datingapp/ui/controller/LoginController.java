@@ -4,6 +4,7 @@ import datingapp.core.User;
 import datingapp.core.User.Gender;
 import datingapp.ui.NavigationService;
 import datingapp.ui.ViewFactory;
+import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.LoginViewModel;
 import java.net.URL;
 import java.util.Optional;
@@ -12,6 +13,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
@@ -23,7 +25,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +38,7 @@ public class LoginController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
 
     @FXML
-    private VBox root;
+    private javafx.scene.layout.StackPane rootPane;
 
     @FXML
     private ListView<User> userListView;
@@ -59,28 +61,7 @@ public class LoginController implements Initializable {
         userListView.setItems(viewModel.getUsers());
 
         // Custom cell factory to show user name, status, and completion
-        userListView.setCellFactory(lv -> new ListCell<>() {
-            @Override
-            protected void updateItem(User user, boolean empty) {
-                super.updateItem(user, empty);
-                if (empty || user == null) {
-                    setText(null);
-                    setGraphic(null);
-                } else {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(user.getName());
-                    sb.append(", ").append(user.getAge());
-                    sb.append(" (").append(user.getState()).append(")");
-
-                    if (Boolean.TRUE.equals(user.isVerified())) {
-                        sb.append(" ✓");
-                    }
-
-                    setText(sb.toString());
-                    getStyleClass().add("user-list-cell");
-                }
-            }
-        });
+        userListView.setCellFactory(lv -> new UserListCell());
 
         // Listen for selection changes
         userListView
@@ -96,9 +77,53 @@ public class LoginController implements Initializable {
             userListView.getSelectionModel().selectFirst();
         }
 
+        // Apply fade-in animation
+        UiAnimations.fadeIn(rootPane, 800);
+
         // Suppress unused warnings for FXML-injected fields
-        if (root != null && createAccountButton != null) {
+        if (rootPane != null && createAccountButton != null) {
             // Fields are used by FXML
+        }
+    }
+
+    /** Custom list cell for displaying user accounts with avatar icons. */
+    private static class UserListCell extends ListCell<User> {
+        private final HBox container = new HBox(15);
+        private final org.kordamp.ikonli.javafx.FontIcon avatarIcon =
+                new org.kordamp.ikonli.javafx.FontIcon("mdi2a-account-circle");
+        private final VBox textBox = new VBox(2);
+        private final Label nameLabel = new Label();
+        private final Label detailsLabel = new Label();
+
+        public UserListCell() {
+            avatarIcon.setIconSize(32);
+            avatarIcon.getStyleClass().add("icon-primary");
+            nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 15px;");
+            detailsLabel.getStyleClass().add("text-secondary");
+            detailsLabel.setStyle("-fx-font-size: 12px;");
+            textBox.getChildren().addAll(nameLabel, detailsLabel);
+            container.setAlignment(Pos.CENTER_LEFT);
+            container.setPadding(new Insets(8, 12, 8, 12));
+            container.getChildren().addAll(avatarIcon, textBox);
+        }
+
+        @Override
+        protected void updateItem(User user, boolean empty) {
+            super.updateItem(user, empty);
+            if (empty || user == null) {
+                setGraphic(null);
+            } else {
+                nameLabel.setText(user.getName() + ", " + user.getAge());
+
+                StringBuilder sb = new StringBuilder();
+                sb.append(user.getState());
+                if (Boolean.TRUE.equals(user.isVerified())) {
+                    sb.append(" • Verified ✓");
+                }
+                detailsLabel.setText(sb.toString());
+
+                setGraphic(container);
+            }
         }
     }
 
@@ -122,7 +147,7 @@ public class LoginController implements Initializable {
         // Create the dialog
         Dialog<User> dialog = new Dialog<>();
         dialog.setTitle("Create New Account");
-        dialog.setHeaderText("Enter your details to create an account");
+        dialog.setHeaderText(null); // No header for cleaner look
 
         // Apply dark styling to dialog
         dialog.getDialogPane()
@@ -134,46 +159,72 @@ public class LoginController implements Initializable {
         ButtonType createButtonType = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(createButtonType, ButtonType.CANCEL);
 
-        // Create the form
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(20, 20, 10, 10));
+        // Create the form with VBox for better spacing
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(30, 40, 20, 40));
+        content.setStyle("-fx-background-color: -fx-surface-dark;");
 
+        // Title
+        Label titleLabel = new Label("Create New Account");
+        titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-text-primary;");
+
+        // Name field
+        VBox nameBox = new VBox(8);
+        Label nameLabel = new Label("Name:");
+        nameLabel.setStyle("-fx-text-fill: -fx-text-secondary;");
         TextField nameField = new TextField();
-        nameField.setPromptText("Your name");
-        nameField.setPrefWidth(200);
+        nameField.setPromptText("Enter your name");
+        nameField.setPrefWidth(280);
+        nameField.setStyle("-fx-background-color: -fx-surface-elevated; -fx-text-fill: white; "
+                + "-fx-prompt-text-fill: -fx-text-muted; -fx-background-radius: 8;");
+        nameBox.getChildren().addAll(nameLabel, nameField);
 
+        // Age spinner
+        VBox ageBox = new VBox(8);
+        Label ageLabel = new Label("Age:");
+        ageLabel.setStyle("-fx-text-fill: -fx-text-secondary;");
         Spinner<Integer> ageSpinner = new Spinner<>();
         ageSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(18, 100, 25));
         ageSpinner.setEditable(true);
-        ageSpinner.setPrefWidth(100);
+        ageSpinner.setPrefWidth(120);
+        ageBox.getChildren().addAll(ageLabel, ageSpinner);
 
+        // Gender combo
+        VBox genderBox = new VBox(8);
+        Label genderLabel = new Label("Gender:");
+        genderLabel.setStyle("-fx-text-fill: -fx-text-secondary;");
         ComboBox<Gender> genderCombo = new ComboBox<>();
         genderCombo.getItems().addAll(Gender.values());
         genderCombo.setValue(Gender.OTHER);
-        genderCombo.setPrefWidth(150);
+        genderCombo.setPrefWidth(200);
+        genderCombo.setStyle("-fx-background-color: #1e293b; -fx-background-radius: 8;");
+        genderCombo.setCellFactory(lv -> createStyledCell());
+        genderCombo.setButtonCell(createStyledCell());
+        genderBox.getChildren().addAll(genderLabel, genderCombo);
 
+        // Interested In combo
+        VBox interestedBox = new VBox(8);
+        Label interestedLabel = new Label("Interested In:");
+        interestedLabel.setStyle("-fx-text-fill: -fx-text-secondary;");
         ComboBox<Gender> interestedInCombo = new ComboBox<>();
         interestedInCombo.getItems().addAll(Gender.values());
         interestedInCombo.setValue(Gender.OTHER);
-        interestedInCombo.setPrefWidth(150);
+        interestedInCombo.setPrefWidth(200);
+        interestedInCombo.setStyle("-fx-background-color: #1e293b; -fx-background-radius: 8;");
+        interestedInCombo.setCellFactory(lv -> createStyledCell());
+        interestedInCombo.setButtonCell(createStyledCell());
+        interestedBox.getChildren().addAll(interestedLabel, interestedInCombo);
 
+        // Error label
         Label errorLabel = new Label();
-        errorLabel.setStyle("-fx-text-fill: #ff6b6b;");
+        errorLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 13px;");
         errorLabel.textProperty().bind(viewModel.errorMessageProperty());
 
-        grid.add(new Label("Name:"), 0, 0);
-        grid.add(nameField, 1, 0);
-        grid.add(new Label("Age:"), 0, 1);
-        grid.add(ageSpinner, 1, 1);
-        grid.add(new Label("Gender:"), 0, 2);
-        grid.add(genderCombo, 1, 2);
-        grid.add(new Label("Interested In:"), 0, 3);
-        grid.add(interestedInCombo, 1, 3);
-        grid.add(errorLabel, 0, 4, 2, 1);
+        content.getChildren().addAll(titleLabel, nameBox, ageBox, genderBox, interestedBox, errorLabel);
 
-        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setMinWidth(360);
+        dialog.getDialogPane().setMinHeight(450);
 
         // Enable/disable create button based on input
         Button createButton = (Button) dialog.getDialogPane().lookupButton(createButtonType);
@@ -211,5 +262,24 @@ public class LoginController implements Initializable {
 
         // Clear form on close
         viewModel.clearCreateForm();
+    }
+
+    /**
+     * Creates a styled ListCell for ComboBox dropdowns with dark theme colors.
+     */
+    private ListCell<Gender> createStyledCell() {
+        return new ListCell<>() {
+            @Override
+            protected void updateItem(Gender item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("-fx-background-color: #1e293b;");
+                } else {
+                    setText(item.name());
+                    setStyle("-fx-background-color: #1e293b; -fx-text-fill: white; -fx-padding: 8 12;");
+                }
+            }
+        };
     }
 }

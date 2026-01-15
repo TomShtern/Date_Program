@@ -4,6 +4,7 @@ import datingapp.core.Match;
 import datingapp.core.User;
 import datingapp.ui.NavigationService;
 import datingapp.ui.ViewFactory;
+import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -15,6 +16,7 @@ import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +27,9 @@ import org.slf4j.LoggerFactory;
  */
 public class MatchingController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(MatchingController.class);
+
+    @FXML
+    private javafx.scene.layout.BorderPane rootPane;
 
     @FXML
     private VBox candidateCard;
@@ -48,6 +53,9 @@ public class MatchingController implements Initializable {
     @SuppressWarnings("unused")
     private Button undoButton;
 
+    @FXML
+    private HBox actionButtonsContainer;
+
     private final MatchingViewModel viewModel;
 
     public MatchingController(MatchingViewModel viewModel) {
@@ -61,9 +69,17 @@ public class MatchingController implements Initializable {
 
         // Bind visibility to hasMoreCandidates
         candidateCard.visibleProperty().bind(viewModel.hasMoreCandidatesProperty());
+        candidateCard.managedProperty().bind(viewModel.hasMoreCandidatesProperty());
         noCandidatesContainer
                 .visibleProperty()
                 .bind(viewModel.hasMoreCandidatesProperty().not());
+        noCandidatesContainer
+                .managedProperty()
+                .bind(viewModel.hasMoreCandidatesProperty().not());
+
+        // Hide action buttons when no candidates
+        actionButtonsContainer.visibleProperty().bind(viewModel.hasMoreCandidatesProperty());
+        actionButtonsContainer.managedProperty().bind(viewModel.hasMoreCandidatesProperty());
 
         // Update UI when current candidate changes
         viewModel.currentCandidateProperty().addListener((obs, oldVal, newVal) -> {
@@ -76,6 +92,9 @@ public class MatchingController implements Initializable {
                 showMatchPopup(newVal, viewModel.lastMatchProperty().get());
             }
         });
+
+        // Apply fade-in animation
+        UiAnimations.fadeIn(rootPane, 800);
 
         updateCandidateUI(viewModel.currentCandidateProperty().get());
 
@@ -117,17 +136,21 @@ public class MatchingController implements Initializable {
         content.setAlignment(Pos.CENTER);
         content.setStyle("-fx-padding: 40;");
 
-        Label heartEmoji = new Label("💕");
-        heartEmoji.setStyle("-fx-font-size: 48px;");
-
         Label titleLabel = new Label("It's a Match!");
-        titleLabel.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-super;");
+        titleLabel.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-super;");
+
+        org.kordamp.ikonli.javafx.FontIcon heartIcon = new org.kordamp.ikonli.javafx.FontIcon("mdi2h-heart-pulse");
+        heartIcon.setIconSize(80);
+        heartIcon.setIconColor(javafx.scene.paint.Color.web("#f43f5e")); // Rose 500
 
         Label messageLabel = new Label("You and " + matchedUser.getName() + " liked each other!");
-        messageLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: -fx-text-secondary;");
+        messageLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: -fx-text-secondary;");
 
-        content.getChildren().addAll(heartEmoji, titleLabel, messageLabel);
+        content.getChildren().addAll(heartIcon, titleLabel, messageLabel);
         dialog.getDialogPane().setContent(content);
+
+        // Add entry animation to the dialog content
+        UiAnimations.fadeIn(content, 600);
 
         // Add buttons
         ButtonType sendMessageBtn = new ButtonType("Send Message", ButtonBar.ButtonData.OK_DONE);
@@ -136,7 +159,8 @@ public class MatchingController implements Initializable {
 
         // Style buttons
         Button sendBtn = (Button) dialog.getDialogPane().lookupButton(sendMessageBtn);
-        sendBtn.setStyle("-fx-background-color: -fx-accent-super; -fx-text-fill: white;");
+        sendBtn.getStyleClass().add("button");
+        sendBtn.setStyle("-fx-background-color: -fx-accent-super;");
 
         dialog.showAndWait().ifPresent(response -> {
             if (response == sendMessageBtn) {
@@ -170,5 +194,29 @@ public class MatchingController implements Initializable {
     @SuppressWarnings("unused")
     private void handleBack() {
         NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+    }
+
+    @FXML
+    @SuppressWarnings("unused")
+    private void handleExpandPreferences() {
+        logger.info("User clicked Expand Preferences - navigating to Profile settings");
+        // TODO: Navigate to filter/preferences screen when implemented
+        // For now, navigate to Profile where they can update preferences
+        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.PROFILE);
+    }
+
+    @FXML
+    @SuppressWarnings("unused")
+    private void handleCheckLikes() {
+        logger.info("User clicked Check Likes - navigating to Matches");
+        // Navigate to Matches screen where they can see who liked them
+        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.MATCHES);
+    }
+
+    @FXML
+    @SuppressWarnings("unused")
+    private void handleImproveProfile() {
+        logger.info("User clicked Improve Profile - navigating to Profile");
+        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.PROFILE);
     }
 }

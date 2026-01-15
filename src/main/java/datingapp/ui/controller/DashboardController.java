@@ -3,6 +3,7 @@ package datingapp.ui.controller;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UISession;
 import datingapp.ui.ViewFactory;
+import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -19,6 +20,9 @@ import org.slf4j.LoggerFactory;
  */
 public class DashboardController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(DashboardController.class);
+
+    @FXML
+    private javafx.scene.layout.BorderPane rootPane;
 
     @FXML
     private Label userNameLabel;
@@ -58,6 +62,9 @@ public class DashboardController implements Initializable {
             achievementsListView.setItems(viewModel.getRecentAchievements());
         }
 
+        // Apply fade-in animation
+        UiAnimations.fadeIn(rootPane, 800);
+
         // Load initial data
         viewModel.refresh();
     }
@@ -72,9 +79,8 @@ public class DashboardController implements Initializable {
     @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleMatches() {
-        // For now, navigate to Chat which shows matches
-        logger.info("Navigating to Chat/Matches screen");
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.CHAT);
+        logger.info("Navigating to Matches screen");
+        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.MATCHES);
     }
 
     @SuppressWarnings("unused") // Called by FXML

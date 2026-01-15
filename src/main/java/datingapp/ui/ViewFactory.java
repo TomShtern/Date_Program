@@ -10,6 +10,7 @@ public class ViewFactory {
         DASHBOARD("/fxml/dashboard.fxml"),
         PROFILE("/fxml/profile.fxml"),
         MATCHING("/fxml/matching.fxml"),
+        MATCHES("/fxml/matches.fxml"),
         CHAT("/fxml/chat.fxml"),
         STATS("/fxml/stats.fxml");
 

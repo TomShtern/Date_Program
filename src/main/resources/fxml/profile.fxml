@@ -3,68 +3,133 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane prefHeight="700.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/21"
-    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.ProfileController">
+<BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="700.0"
+    xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="datingapp.ui.controller.ProfileController">
+  <!-- Top Header -->
+  <top>
+    <HBox alignment="CENTER_LEFT" spacing="16" styleClass="header-bar">
+      <Button onAction="#handleBack" styleClass="button-transparent">
+        <graphic>
+          <FontIcon iconLiteral="mdi2c-chevron-left" iconSize="28" iconColor="white"/>
+        </graphic>
+      </Button>
+      <Label styleClass="subheading" text="Edit Profile"/>
+      <Region HBox.hgrow="ALWAYS"/>
+      <!-- Profile Completion Badge -->
+      <VBox alignment="CENTER" spacing="2">
+        <Label fx:id="completionLabel" styleClass="notification-badge"
+                    style="-fx-font-size: 13px; -fx-padding: 6 12;" text="20%"/>
+        <Label style="-fx-font-size: 10px; -fx-text-fill: #94a3b8;" text="complete"/>
+      </VBox>
+    </HBox>
+  </top>
 
-    <!-- Top Header -->
-    <top>
-        <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="header-bar">
-            <Button onAction="#handleBack" styleClass="button-transparent" text="← Back" />
-            <Label styleClass="subheading" text="Edit Profile" />
-            <HBox alignment="CENTER_RIGHT" HBox.hgrow="ALWAYS">
-                <Label fx:id="completionLabel" styleClass="text-secondary" text="--" />
-            </HBox>
-        </HBox>
-    </top>
-
-    <!-- Center Content: Profile Form -->
-    <center>
-        <VBox spacing="20.0" styleClass="content-container">
-            <padding>
-                <Insets bottom="30.0" left="40.0" right="40.0" top="30.0" />
-            </padding>
-
-            <!-- User Name (read-only display) -->
-            <VBox spacing="5.0">
-                <Label styleClass="subheading" text="Profile" />
-                <Label fx:id="nameLabel" style="-fx-font-size: 24px; -fx-font-weight: bold;" text="User Name" />
+  <!-- Center Content - Scrollable Profile Form -->
+  <center>
+    <ScrollPane fitToWidth="true" styleClass="transparent-scroll">
+      <VBox spacing="24" styleClass="profile-hero">
+        <padding>
+          <Insets bottom="40" left="50" right="50" top="20"/>
+        </padding>
+        <!-- Avatar Section - Enhanced with glow ring -->
+        <VBox alignment="CENTER" spacing="16">
+          <StackPane styleClass="profile-avatar-container">
+            <!-- Outer glow ring -->
+            <StackPane styleClass="profile-glow-ring"/>
+            <!-- Inner avatar circle -->
+            <StackPane styleClass="profile-avatar-inner">
+              <FontIcon iconLiteral="mdi2a-account" iconSize="56" iconColor="#94a3b8"/>
+            </StackPane>
+            <!-- Camera button overlay -->
+            <VBox alignment="BOTTOM_RIGHT">
+              <padding>
+                <Insets right="5" bottom="5"/>
+              </padding>
+              <StackPane styleClass="profile-camera-btn">
+                <FontIcon iconLiteral="mdi2c-camera" iconSize="18" iconColor="white"/>
+              </StackPane>
             </VBox>
-
-            <!-- Bio -->
-            <VBox spacing="8.0">
-                <Label style="-fx-font-weight: bold;" text="Bio" />
-                <TextArea fx:id="bioArea" prefHeight="120.0" promptText="Tell others about yourself..."
-                    wrapText="true" />
-            </VBox>
-
-            <!-- Location -->
-            <VBox spacing="8.0">
-                <Label style="-fx-font-weight: bold;" text="Location (Latitude, Longitude)" />
-                <TextField fx:id="locationField" promptText="e.g. 40.7128, -74.0060" />
-            </VBox>
-
-            <!-- Interests (read-only for now, would need a better picker) -->
-            <VBox spacing="8.0">
-                <Label style="-fx-font-weight: bold;" text="Interests" />
-                <TextField fx:id="interestsField" promptText="Your interests (read-only)" editable="false"/>
-                <Label styleClass="text-secondary" text="Edit interests via CLI for now" />
-            </VBox>
-
-            <!-- Action Buttons -->
-            <HBox alignment="CENTER_RIGHT" spacing="15.0">
-                <VBox.margin>
-                    <Insets top="20.0" />
-                </VBox.margin>
-                <Button onAction="#handleCancel" styleClass="button-secondary" text="Cancel" />
-                <Button onAction="#handleSave" text="Save Changes" />
-            </HBox>
+          </StackPane>
+          <Label fx:id="nameLabel" styleClass="profile-name" text="User Name"/>
         </VBox>
-    </center>
+        <!-- Decorative separator -->
+        <Region styleClass="profile-separator" prefHeight="1"/>
+        <!-- About Me Section -->
+        <VBox styleClass="section-glass-card" spacing="12">
+          <HBox styleClass="section-header" alignment="CENTER_LEFT">
+            <StackPane styleClass="section-icon-container">
+              <FontIcon iconLiteral="mdi2a-account-edit" iconSize="20" iconColor="#a78bfa"/>
+            </StackPane>
+            <Label styleClass="section-title" text="About Me"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <!-- Character counter -->
+            <Label fx:id="charCountLabel" styleClass="char-counter" text="0/500"/>
+          </HBox>
+          <TextArea fx:id="bioArea" prefHeight="100" promptText="Tell others about yourself..."
+                        wrapText="true" styleClass="bio-textarea"/>
+        </VBox>
+        <!-- Location Section -->
+        <VBox styleClass="section-glass-card" spacing="12">
+          <HBox styleClass="section-header">
+            <StackPane styleClass="section-icon-container">
+              <FontIcon iconLiteral="mdi2m-map-marker" iconSize="20" iconColor="#f472b6"/>
+            </StackPane>
+            <Label styleClass="section-title" text="Location"/>
+          </HBox>
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <FontIcon iconLiteral="mdi2m-map-marker-outline" iconSize="20" iconColor="#64748b"/>
+            <TextField fx:id="locationField" promptText="e.g. 40.7128, -74.0060"
+                            HBox.hgrow="ALWAYS"/>
+          </HBox>
+        </VBox>
+        <!-- Interests Section -->
+        <VBox styleClass="section-glass-card" spacing="12">
+          <HBox styleClass="section-header" alignment="CENTER_LEFT">
+            <StackPane styleClass="section-icon-container">
+              <FontIcon iconLiteral="mdi2h-heart-multiple" iconSize="20" iconColor="#fb923c"/>
+            </StackPane>
+            <Label styleClass="section-title" text="Interests"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label styleClass="text-secondary" style="-fx-font-size: 11px;" text="Read-only"/>
+          </HBox>
+          <!-- Interest chips display -->
+          <FlowPane fx:id="interestsFlow" styleClass="interests-container" hgap="10" vgap="10">
+            <Label styleClass="interest-chip" text="No interests set"/>
+          </FlowPane>
+          <!-- Hidden field for binding -->
+          <TextField fx:id="interestsField" visible="false" managed="false"/>
+          <HBox alignment="CENTER_LEFT" spacing="8">
+            <FontIcon iconLiteral="mdi2i-information-outline" iconSize="14" iconColor="#64748b"/>
+            <Label styleClass="text-secondary" style="-fx-font-size: 12px;" text="Edit interests in Settings"/>
+          </HBox>
+        </VBox>
+        <!-- Spacer to ensure scroll content doesn't overlap with sticky footer -->
+        <Region prefHeight="80"/>
+      </VBox>
+    </ScrollPane>
+  </center>
 
+  <!-- Sticky Action Footer -->
+  <bottom>
+    <VBox styleClass="sticky-footer" spacing="12">
+      <Button onAction="#handleSave" text="Save Changes" styleClass="cta-primary-full">
+        <graphic>
+          <FontIcon iconLiteral="mdi2c-content-save-outline" iconSize="20" iconColor="white"/>
+        </graphic>
+      </Button>
+      <Button onAction="#handleCancel" text="Cancel" styleClass="button-ghost-full"/>
+    </VBox>
+  </bottom>
 </BorderPane>

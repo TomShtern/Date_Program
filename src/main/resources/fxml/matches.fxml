@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="900.0"
+    xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="datingapp.ui.controller.MatchesController">
+  <!-- Header with Heart Icon and Match Count Badge -->
+  <top>
+    <HBox alignment="CENTER_LEFT" spacing="16" styleClass="header-bar">
+      <Button onAction="#handleBack" styleClass="button-transparent">
+        <graphic>
+          <FontIcon iconLiteral="mdi2c-chevron-left" iconSize="28" iconColor="white"/>
+        </graphic>
+      </Button>
+      <FontIcon iconLiteral="mdi2h-heart-multiple" iconSize="26" iconColor="#f43f5e" styleClass="matches-header-icon"/>
+      <Label styleClass="subheading" text="Your Matches"/>
+      <Region HBox.hgrow="ALWAYS"/>
+      <!-- Match Count Badge -->
+      <HBox alignment="CENTER" styleClass="matches-count-badge">
+        <FontIcon iconLiteral="mdi2h-heart" iconSize="14" iconColor="#f43f5e"/>
+        <Label fx:id="matchCountLabel" style="-fx-text-fill: #f43f5e; -fx-font-weight: 600; -fx-font-size: 13px;" text="0">
+          <HBox.margin>
+            <Insets left="6"/>
+          </HBox.margin>
+        </Label>
+      </HBox>
+    </HBox>
+  </top>
+
+  <!-- Main Content -->
+  <center>
+    <ScrollPane fitToWidth="true" styleClass="transparent-scroll">
+      <VBox spacing="24" alignment="TOP_CENTER">
+        <padding>
+          <Insets bottom="40" left="50" right="50" top="30"/>
+        </padding>
+        <!-- Gradient Decorative Separator -->
+        <Region styleClass="matches-separator" prefHeight="1"/>
+        <!-- Match Cards Grid (Populated dynamically) -->
+        <FlowPane fx:id="matchesFlow" hgap="24" vgap="24" alignment="CENTER" styleClass="matches-flow"/>
+        <!-- Enhanced Empty State Container -->
+        <VBox fx:id="emptyStateContainer" alignment="CENTER" spacing="20" styleClass="matches-empty-container"
+                      visible="false" managed="false">
+          <!-- Glowing Heart Icon -->
+          <StackPane>
+            <FontIcon iconLiteral="mdi2h-heart-broken" iconSize="80" iconColor="#64748b" styleClass="matches-empty-icon"/>
+          </StackPane>
+          <!-- Title -->
+          <Label text="No matches yet" styleClass="matches-empty-title">
+            <VBox.margin>
+              <Insets top="8"/>
+            </VBox.margin>
+          </Label>
+          <!-- Subtitle -->
+          <Label text="Your perfect match is waiting! Start browsing to connect with amazing people."
+                           styleClass="matches-empty-subtitle" wrapText="true" maxWidth="300" alignment="CENTER"/>
+          <!-- Premium Browse Button -->
+          <Button text="Start Browsing" onAction="#handleBrowse" styleClass="matches-browse-btn">
+            <graphic>
+              <FontIcon iconLiteral="mdi2c-compass" iconSize="18" iconColor="white"/>
+            </graphic>
+            <VBox.margin>
+              <Insets top="12"/>
+            </VBox.margin>
+          </Button>
+          <!-- Hint text -->
+          <Label text="Like someone and if they like you back, it's a match!"
+                           style="-fx-font-size: 11px; -fx-text-fill: #475569;">
+            <VBox.margin>
+              <Insets top="8"/>
+            </VBox.margin>
+          </Label>
+        </VBox>
+      </VBox>
+    </ScrollPane>
+  </center>
+</BorderPane>

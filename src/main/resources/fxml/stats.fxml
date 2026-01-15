@@ -1,48 +1,149 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane prefHeight="600.0" prefWidth="800.0" xmlns="http://javafx.com/javafx/21"
-    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.StatsController">
+<BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="900.0"
+    xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="datingapp.ui.controller.StatsController">
+  <!-- Header -->
+  <top>
+    <HBox alignment="CENTER_LEFT" spacing="16" styleClass="header-bar">
+      <Button onAction="#handleBack" styleClass="button-transparent">
+        <graphic>
+          <FontIcon iconLiteral="mdi2c-chevron-left" iconSize="28" iconColor="white"/>
+        </graphic>
+      </Button>
+      <FontIcon iconLiteral="mdi2t-trophy" iconSize="24" iconColor="#f59e0b"/>
+      <Label styleClass="subheading" text="Stats &amp; Achievements"/>
+    </HBox>
+  </top>
 
-    <top>
-        <HBox alignment="CENTER_LEFT" spacing="20.0"
-            style="-fx-background-color: -fx-surface-dark; -fx-padding: 15;">
-            <Button onAction="#handleBack" style="-fx-background-color: transparent;" text="← Back" />
-            <Label style="-fx-font-size: 18px; -fx-font-weight: bold;"
-                text="Stats &amp; Achievements" />
-        </HBox>
-    </top>
-
-    <center>
-        <VBox spacing="20.0">
-            <padding>
-                <Insets bottom="30" left="30" right="30" top="30" />
-            </padding>
-
-            <Label styleClass="heading" text="Your Progress" />
-
-            <HBox spacing="20.0">
-                <VBox styleClass="card" HBox.hgrow="ALWAYS" alignment="CENTER" spacing="5.0">
-                    <Label fx:id="totalLikesLabel" style="-fx-font-size: 24px; -fx-font-weight: bold;" text="0" />
-                    <Label style="-fx-text-fill: -fx-text-secondary;" text="Total Likes" />
-                </VBox>
-                <VBox styleClass="card" HBox.hgrow="ALWAYS" alignment="CENTER" spacing="5.0">
-                    <Label fx:id="totalMatchesLabel" style="-fx-font-size: 24px; -fx-font-weight: bold;" text="0" />
-                    <Label style="-fx-text-fill: -fx-text-secondary;" text="Matches" />
-                </VBox>
-                <VBox styleClass="card" HBox.hgrow="ALWAYS" alignment="CENTER" spacing="5.0">
-                    <Label fx:id="responseRateLabel" style="-fx-font-size: 24px; -fx-font-weight: bold;" text="--" />
-                    <Label style="-fx-text-fill: -fx-text-secondary;" text="Match Rate" />
-                </VBox>
-            </HBox>
-
-            <Label styleClass="heading" text="Achievements" style="-fx-padding: 20 0 0 0;" />
-
-            <ListView fx:id="achievementListView" VBox.vgrow="ALWAYS" />
+  <!-- Main Content -->
+  <center>
+    <ScrollPane fitToWidth="true" styleClass="transparent-scroll">
+      <VBox spacing="32">
+        <padding>
+          <Insets bottom="40" left="50" right="50" top="30"/>
+        </padding>
+        <!-- Your Progress Section -->
+        <VBox spacing="20">
+          <HBox alignment="CENTER_LEFT" spacing="12">
+            <FontIcon iconLiteral="mdi2c-chart-arc" iconSize="24" iconColor="#667eea"/>
+            <Label text="Your Progress" styleClass="stats-section-header"/>
+          </HBox>
+          <!-- Stats Cards Row -->
+          <HBox spacing="20">
+            <!-- Total Likes Card -->
+            <VBox styleClass="stats-card, stats-card-likes" HBox.hgrow="ALWAYS">
+              <StackPane styleClass="stats-icon-container, stats-icon-likes">
+                <FontIcon iconLiteral="mdi2h-heart" iconSize="32" iconColor="#f43f5e"/>
+              </StackPane>
+              <Label fx:id="totalLikesLabel" styleClass="stats-value" text="0"/>
+              <Label styleClass="stats-label" text="Total Likes"/>
+            </VBox>
+            <!-- Matches Card -->
+            <VBox styleClass="stats-card, stats-card-matches" HBox.hgrow="ALWAYS">
+              <StackPane styleClass="stats-icon-container, stats-icon-matches">
+                <FontIcon iconLiteral="mdi2a-account-group" iconSize="32" iconColor="#10b981"/>
+              </StackPane>
+              <Label fx:id="totalMatchesLabel" styleClass="stats-value" text="0"/>
+              <Label styleClass="stats-label" text="Matches"/>
+            </VBox>
+            <!-- Match Rate Card -->
+            <VBox styleClass="stats-card, stats-card-rate" HBox.hgrow="ALWAYS">
+              <StackPane styleClass="stats-icon-container, stats-icon-rate">
+                <FontIcon iconLiteral="mdi2c-chart-line" iconSize="32" iconColor="#f59e0b"/>
+              </StackPane>
+              <Label fx:id="responseRateLabel" styleClass="stats-value" text="--"/>
+              <Label styleClass="stats-label" text="Match Rate"/>
+            </VBox>
+          </HBox>
         </VBox>
-    </center>
-
+        <!-- Decorative Separator -->
+        <Region styleClass="profile-separator" prefHeight="1"/>
+        <!-- Achievements Section -->
+        <VBox spacing="20">
+          <HBox alignment="CENTER_LEFT" spacing="12">
+            <FontIcon iconLiteral="mdi2t-trophy-award" iconSize="24" iconColor="#fbbf24"/>
+            <Label text="Achievements" styleClass="stats-section-header"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label styleClass="text-secondary" style="-fx-font-size: 12px;" text="Coming Soon"/>
+          </HBox>
+          <!-- Achievement Cards Grid -->
+          <VBox spacing="12" styleClass="achievements-container">
+            <!-- First Match Achievement -->
+            <HBox styleClass="achievement-card" spacing="16" alignment="CENTER_LEFT">
+              <StackPane styleClass="achievement-icon">
+                <FontIcon iconLiteral="mdi2h-heart-flash" iconSize="24" iconColor="#f59e0b"/>
+              </StackPane>
+              <VBox spacing="4" HBox.hgrow="ALWAYS">
+                <Label text="First Match" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white;"/>
+                <Label text="Make your first match" styleClass="text-secondary" style="-fx-font-size: 12px;"/>
+              </VBox>
+              <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
+            </HBox>
+            <!-- Super Liker Achievement -->
+            <HBox styleClass="achievement-card" spacing="16" alignment="CENTER_LEFT">
+              <StackPane styleClass="achievement-icon-locked">
+                <FontIcon iconLiteral="mdi2s-star" iconSize="24" iconColor="#64748b"/>
+              </StackPane>
+              <VBox spacing="4" HBox.hgrow="ALWAYS">
+                <Label text="Super Liker" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white;"/>
+                <Label text="Send 10 super likes" styleClass="text-secondary" style="-fx-font-size: 12px;"/>
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                  <StackPane styleClass="achievement-progress" HBox.hgrow="ALWAYS">
+                    <StackPane styleClass="achievement-progress-fill" StackPane.alignment="CENTER_LEFT"
+                                                                style="-fx-max-width: 30%;"/>
+                  </StackPane>
+                  <Label text="0/10" styleClass="text-secondary" style="-fx-font-size: 11px;"/>
+                </HBox>
+              </VBox>
+              <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
+            </HBox>
+            <!-- Conversation Starter Achievement -->
+            <HBox styleClass="achievement-card" spacing="16" alignment="CENTER_LEFT">
+              <StackPane styleClass="achievement-icon-locked">
+                <FontIcon iconLiteral="mdi2m-message-text" iconSize="24" iconColor="#64748b"/>
+              </StackPane>
+              <VBox spacing="4" HBox.hgrow="ALWAYS">
+                <Label text="Conversation Starter" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white;"/>
+                <Label text="Start 5 conversations" styleClass="text-secondary" style="-fx-font-size: 12px;"/>
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                  <StackPane styleClass="achievement-progress" HBox.hgrow="ALWAYS">
+                    <StackPane styleClass="achievement-progress-fill" StackPane.alignment="CENTER_LEFT"
+                                                                style="-fx-max-width: 0%;"/>
+                  </StackPane>
+                  <Label text="0/5" styleClass="text-secondary" style="-fx-font-size: 11px;"/>
+                </HBox>
+              </VBox>
+              <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
+            </HBox>
+            <!-- Profile Pro Achievement -->
+            <HBox styleClass="achievement-card" spacing="16" alignment="CENTER_LEFT">
+              <StackPane styleClass="achievement-icon-locked">
+                <FontIcon iconLiteral="mdi2a-account-check" iconSize="24" iconColor="#64748b"/>
+              </StackPane>
+              <VBox spacing="4" HBox.hgrow="ALWAYS">
+                <Label text="Profile Pro" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white;"/>
+                <Label text="Complete your profile 100%" styleClass="text-secondary" style="-fx-font-size: 12px;"/>
+              </VBox>
+              <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
+            </HBox>
+          </VBox>
+        </VBox>
+        <!-- Hidden ListView for compatibility -->
+        <ListView fx:id="achievementListView" visible="false" managed="false"/>
+      </VBox>
+    </ScrollPane>
+  </center>
 </BorderPane>

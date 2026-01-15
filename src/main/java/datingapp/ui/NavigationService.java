@@ -81,6 +81,7 @@ public class NavigationService {
 
         } catch (IOException e) {
             logger.error("Failed to navigate to {}: {}", viewType, e.getMessage(), e);
+            e.printStackTrace(); // Print stack trace for debugging
         }
     }
 

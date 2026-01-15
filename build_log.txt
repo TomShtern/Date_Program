@@ -1,0 +1,90 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< com.datingapp:dating-app >----------------------
+[INFO] Building Dating App 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] 6 problems were encountered while building the effective model for org.openjfx:javafx-controls:jar:21.0.2 during dependency collection step for project (use -X to see details)
+[WARNING] 6 problems were encountered while building the effective model for org.openjfx:javafx-controls:jar:20 during dependency collection step for project (use -X to see details)
+[INFO] 
+[INFO] --- checkstyle:3.3.1:check (checkstyle-check) @ dating-app ---
+[INFO] Starting audit...
+[ERROR] C:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program\src\main\java\datingapp\ui\controller\StatsController.java:66: Line is longer than 140 characters (found 174). [LineLength]
+[ERROR] C:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program\src\main\java\datingapp\ui\controller\StatsController.java:93:25: 'if' construct must use '{}'s. [NeedBraces]
+[ERROR] C:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program\src\main\java\datingapp\ui\controller\StatsController.java:94:25: 'if' construct must use '{}'s. [NeedBraces]
+[ERROR] C:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program\src\main\java\datingapp\ui\controller\StatsController.java:95:25: 'if' construct must use '{}'s. [NeedBraces]
+[ERROR] C:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program\src\main\java\datingapp\ui\controller\StatsController.java:96:25: 'if' construct must use '{}'s. [NeedBraces]
+Audit done.
+[INFO] There are 5 errors reported by Checkstyle 10.14.2 with checkstyle.xml ruleset.
+[ERROR] src\main\java\datingapp\ui\controller\StatsController.java:[66] (sizes) LineLength: Line is longer than 140 characters (found 174).
+[ERROR] src\main\java\datingapp\ui\controller\StatsController.java:[93,25] (blocks) NeedBraces: 'if' construct must use '{}'s.
+[ERROR] src\main\java\datingapp\ui\controller\StatsController.java:[94,25] (blocks) NeedBraces: 'if' construct must use '{}'s.
+[ERROR] src\main\java\datingapp\ui\controller\StatsController.java:[95,25] (blocks) NeedBraces: 'if' construct must use '{}'s.
+[ERROR] src\main\java\datingapp\ui\controller\StatsController.java:[96,25] (blocks) NeedBraces: 'if' construct must use '{}'s.
+[WARNING] checkstyle:check violations detected but failOnViolation set to false
+[INFO] You have 5 Checkstyle violations.
+[INFO] 
+[INFO] --- jacoco:0.8.11:prepare-agent (prepare-agent) @ dating-app ---
+[INFO] argLine set to -javaagent:C:\\Users\\tom7s\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.11\\org.jacoco.agent-0.8.11-runtime.jar=destfile=C:\\Users\\tom7s\\Desktopp\\Claude_Folder_2\\Date_Program\\target\\jacoco.exec
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ dating-app ---
+[INFO] Copying 8 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.12.1:compile (default-compile) @ dating-app ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 119 source files with javac [debug release 21] to target\classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/ChatController.java:[100,27] cannot find symbol
+  symbol: class StackPane
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/ChatController.java:[100,55] cannot find symbol
+  symbol: class StackPane
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/StatsController.java:[57,27] cannot find symbol
+  symbol: class StackPane
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/StatsController.java:[57,53] cannot find symbol
+  symbol: class StackPane
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/LoginController.java:[63,27] cannot find symbol
+  symbol: class HBox
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/LoginController.java:[66,27] cannot find symbol
+  symbol: class VBox
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/LoginController.java:[63,48] cannot find symbol
+  symbol: class HBox
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/LoginController.java:[66,46] cannot find symbol
+  symbol: class VBox
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/LoginController.java:[77,40] cannot find symbol
+  symbol: variable Pos
+[INFO] 9 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  8.399 s
+[INFO] Finished at: 2026-01-15T00:26:16+02:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.12.1:compile (default-compile) on project dating-app: Compilation failure: Compilation failure: 
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/ChatController.java:[100,27] cannot find symbol
+[ERROR]   symbol: class StackPane
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/ChatController.java:[100,55] cannot find symbol
+[ERROR]   symbol: class StackPane
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/StatsController.java:[57,27] cannot find symbol
+[ERROR]   symbol: class StackPane
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/StatsController.java:[57,53] cannot find symbol
+[ERROR]   symbol: class StackPane
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/LoginController.java:[63,27] cannot find symbol
+[ERROR]   symbol: class HBox
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/LoginController.java:[66,27] cannot find symbol
+[ERROR]   symbol: class VBox
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/LoginController.java:[63,48] cannot find symbol
+[ERROR]   symbol: class HBox
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/LoginController.java:[66,46] cannot find symbol
+[ERROR]   symbol: class VBox
+[ERROR] /C:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/src/main/java/datingapp/ui/controller/LoginController.java:[77,40] cannot find symbol
+[ERROR]   symbol: variable Pos
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

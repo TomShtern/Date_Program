@@ -4,6 +4,7 @@ import datingapp.core.Message;
 import datingapp.core.MessagingService.ConversationPreview;
 import datingapp.ui.NavigationService;
 import datingapp.ui.ViewFactory;
+import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.ChatViewModel;
 import java.net.URL;
 import java.time.ZoneId;
@@ -20,6 +21,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 /**
@@ -29,6 +31,9 @@ import javafx.scene.layout.VBox;
 public class ChatController implements Initializable {
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+
+    @FXML
+    private javafx.scene.layout.BorderPane rootPane;
 
     @FXML
     private ListView<ConversationPreview> conversationListView;
@@ -85,107 +90,130 @@ public class ChatController implements Initializable {
         // Initial state
         chatContainer.setVisible(false);
         emptyStateContainer.setVisible(true);
+
+        // Apply fade-in animation
+        UiAnimations.fadeIn(rootPane, 800);
     }
 
     private ListCell<ConversationPreview> createConversationCell() {
-        return new ListCell<>() {
-            private final VBox container = new VBox(4);
-            private final HBox topRow = new HBox(8);
-            private final Label nameLabel = new Label();
-            private final Label unreadBadge = new Label();
-            private final Label snippetLabel = new Label();
+        return new ConversationListCell();
+    }
 
-            {
-                // Setup styling
-                container.setStyle("-fx-padding: 10;");
-                nameLabel.setStyle("-fx-font-weight: bold;");
-                snippetLabel.setStyle("-fx-text-fill: -fx-text-secondary; -fx-font-size: 12px;");
-                unreadBadge.setStyle("-fx-background-color: -fx-accent-super; -fx-background-radius: 10; "
-                        + "-fx-padding: 2 6; -fx-font-size: 11px; -fx-font-weight: bold;");
+    private static class ConversationListCell extends ListCell<ConversationPreview> {
+        private final HBox container = new HBox(15);
+        private final StackPane avatarStack = new StackPane();
+        private final org.kordamp.ikonli.javafx.FontIcon avatarIcon =
+                new org.kordamp.ikonli.javafx.FontIcon("mdi2a-account");
+        private final VBox textBox = new VBox(4);
+        private final HBox topRow = new HBox(10);
+        private final Label nameLabel = new Label();
+        private final Label unreadBadge = new Label();
+        private final Label snippetLabel = new Label();
 
-                HBox.setHgrow(nameLabel, Priority.ALWAYS);
-                topRow.getChildren().addAll(nameLabel, unreadBadge);
-                container.getChildren().addAll(topRow, snippetLabel);
-            }
+        public ConversationListCell() {
+            avatarStack.setPrefSize(40, 40);
+            avatarStack.getStyleClass().add("icon-primary");
+            avatarStack.setStyle("-fx-background-color: -fx-surface-dark; -fx-background-radius: 20;");
+            avatarIcon.setIconSize(24);
+            avatarStack.getChildren().add(avatarIcon);
 
-            @Override
-            protected void updateItem(ConversationPreview item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setGraphic(null);
+            nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+            snippetLabel.getStyleClass().add("text-secondary");
+            snippetLabel.setStyle("-fx-font-size: 12px;");
+
+            unreadBadge.getStyleClass().add("notification-badge");
+            unreadBadge.setStyle("-fx-min-width: 18; -fx-min-height: 18; -fx-background-radius: 9;");
+
+            HBox.setHgrow(nameLabel, Priority.ALWAYS);
+            topRow.getChildren().addAll(nameLabel, unreadBadge);
+            textBox.getChildren().addAll(topRow, snippetLabel);
+
+            container.setAlignment(Pos.CENTER_LEFT);
+            container.setPadding(new Insets(10, 15, 10, 15));
+            HBox.setHgrow(textBox, Priority.ALWAYS);
+            container.getChildren().addAll(avatarStack, textBox);
+        }
+
+        @Override
+        protected void updateItem(ConversationPreview item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null) {
+                setGraphic(null);
+            } else {
+                nameLabel.setText(item.otherUser().getName());
+
+                if (item.unreadCount() > 0) {
+                    unreadBadge.setText(String.valueOf(item.unreadCount()));
+                    unreadBadge.setVisible(true);
+                    unreadBadge.setManaged(true);
                 } else {
-                    nameLabel.setText(item.otherUser().getName());
-
-                    if (item.unreadCount() > 0) {
-                        unreadBadge.setText(String.valueOf(item.unreadCount()));
-                        unreadBadge.setVisible(true);
-                    } else {
-                        unreadBadge.setVisible(false);
-                    }
-
-                    String snippet = item.lastMessage()
-                            .map(Message::content)
-                            .map(s -> s.length() > 40 ? s.substring(0, 40) + "..." : s)
-                            .orElse("No messages yet");
-                    snippetLabel.setText(snippet);
-
-                    setGraphic(container);
+                    unreadBadge.setVisible(false);
+                    unreadBadge.setManaged(false);
                 }
+
+                String snippet = item.lastMessage()
+                        .map(Message::content)
+                        .map(s -> s.length() > 35 ? s.substring(0, 35) + "..." : s)
+                        .orElse("No messages yet");
+                snippetLabel.setText(snippet);
+
+                setGraphic(container);
             }
-        };
+        }
     }
 
     private ListCell<Message> createMessageCell() {
-        return new ListCell<>() {
-            private final HBox container = new HBox();
-            private final VBox bubble = new VBox(4);
-            private final Label contentLabel = new Label();
-            private final Label timeLabel = new Label();
+        return new MessageListCell(viewModel);
+    }
 
-            {
-                bubble.setMaxWidth(300);
-                bubble.setPadding(new Insets(10, 14, 10, 14));
-                contentLabel.setWrapText(true);
-                contentLabel.setMaxWidth(280);
-                timeLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.6);");
-                bubble.getChildren().addAll(contentLabel, timeLabel);
-            }
+    private static class MessageListCell extends ListCell<Message> {
+        private final HBox container = new HBox();
+        private final VBox bubble = new VBox(4);
+        private final Label contentLabel = new Label();
+        private final Label timeLabel = new Label();
+        private final ChatViewModel viewModel;
 
-            @Override
-            protected void updateItem(Message msg, boolean empty) {
-                super.updateItem(msg, empty);
-                if (empty || msg == null) {
-                    setGraphic(null);
-                    setStyle("-fx-background-color: transparent;");
+        public MessageListCell(ChatViewModel viewModel) {
+            this.viewModel = viewModel;
+            bubble.setMaxWidth(300);
+            bubble.setPadding(new Insets(10, 14, 10, 14));
+            contentLabel.setWrapText(true);
+            contentLabel.setMaxWidth(280);
+            timeLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.6);");
+            bubble.getChildren().addAll(contentLabel, timeLabel);
+        }
+
+        @Override
+        protected void updateItem(Message msg, boolean empty) {
+            super.updateItem(msg, empty);
+            if (empty || msg == null) {
+                setGraphic(null);
+                setStyle("-fx-background-color: transparent;");
+            } else {
+                contentLabel.setText(msg.content());
+
+                String time = msg.createdAt().atZone(ZoneId.systemDefault()).format(TIME_FORMAT);
+                timeLabel.setText(time);
+
+                boolean isMine = viewModel.isMessageFromCurrentUser(msg);
+
+                container.getChildren().clear();
+
+                if (isMine) {
+                    bubble.getStyleClass().add("message-bubble-gradient");
+                    container.setAlignment(Pos.CENTER_RIGHT);
+                    container.getChildren().add(bubble);
                 } else {
-                    contentLabel.setText(msg.content());
-
-                    String time = msg.createdAt().atZone(ZoneId.systemDefault()).format(TIME_FORMAT);
-                    timeLabel.setText(time);
-
-                    boolean isMine = viewModel.isMessageFromCurrentUser(msg);
-
-                    container.getChildren().clear();
-
-                    if (isMine) {
-                        // Sent message - right aligned, colored bubble
-                        bubble.setStyle(
-                                "-fx-background-color: -fx-accent-super; " + "-fx-background-radius: 18 18 4 18;");
-                        container.setAlignment(Pos.CENTER_RIGHT);
-                        container.getChildren().add(bubble);
-                    } else {
-                        // Received message - left aligned, dark bubble
-                        bubble.setStyle("-fx-background-color: #3a3a50; " + "-fx-background-radius: 18 18 18 4;");
-                        container.setAlignment(Pos.CENTER_LEFT);
-                        container.getChildren().add(bubble);
-                    }
-
-                    container.setPadding(new Insets(4, 10, 4, 10));
-                    setGraphic(container);
-                    setStyle("-fx-background-color: transparent;");
+                    bubble.setStyle("-fx-background-color: -fx-surface-dark; -fx-background-radius: 18 18 18 4;");
+                    container.setAlignment(Pos.CENTER_LEFT);
+                    container.getChildren().add(bubble);
                 }
+
+                container.setPadding(new Insets(4, 10, 4, 10));
+                setGraphic(container);
+                setStyle("-fx-background-color: transparent;");
             }
-        };
+        }
     }
 
     @SuppressWarnings("unused")
@@ -207,5 +235,11 @@ public class ChatController implements Initializable {
     @FXML
     private void handleBack() {
         NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleBrowseMatches() {
+        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.MATCHING);
     }
 }

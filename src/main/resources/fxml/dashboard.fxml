@@ -8,84 +8,152 @@
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane prefHeight="700.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21"
+<BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21"
     xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.DashboardController">
+  <!-- Top Header -->
+  <top>
+    <HBox alignment="CENTER_LEFT" spacing="16" styleClass="header-bar">
+      <!-- User Avatar + Name -->
+      <StackPane styleClass="user-avatar-container">
+        <FontIcon iconLiteral="mdi2a-account" iconSize="22" iconColor="white"/>
+      </StackPane>
+      <Label fx:id="userNameLabel" styleClass="subheading" text="User Name"/>
+      <Region HBox.hgrow="ALWAYS"/>
+      <!-- Likes Counter Badge -->
+      <HBox alignment="CENTER" styleClass="likes-counter" spacing="6">
+        <FontIcon iconLiteral="mdi2h-heart-pulse" iconSize="16" iconColor="#10b981"/>
+        <Label fx:id="statusLabel" styleClass="likes-counter-text" text="0/50"/>
+      </HBox>
+      <Button onAction="#handleLogout" styleClass="button-danger" text="Logout"/>
+    </HBox>
+  </top>
 
-    <!-- Top Header -->
-    <top>
-        <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="header-bar">
-            <Label fx:id="userNameLabel" styleClass="subheading" text="User Name" />
-            <HBox alignment="CENTER_RIGHT" HBox.hgrow="ALWAYS" spacing="15.0">
-                <Label fx:id="statusLabel" styleClass="text-secondary" text="Likes: 0/50" />
-                <Button onAction="#handleLogout" styleClass="button-danger" text="Logout" />
-            </HBox>
+  <!-- Center Content: Grid of Main Features -->
+  <center>
+    <VBox alignment="CENTER" spacing="30.0">
+      <padding>
+        <Insets bottom="40.0" left="40.0" right="40.0" top="30.0"/>
+      </padding>
+      <Label styleClass="heading" text="Dashboard"/>
+      <!-- Color-Coded Navigation Cards Grid -->
+      <GridPane hgap="24" vgap="24" alignment="CENTER">
+        <columnConstraints>
+          <ColumnConstraints hgrow="SOMETIMES" minWidth="180" prefWidth="200"/>
+          <ColumnConstraints hgrow="SOMETIMES" minWidth="180" prefWidth="200"/>
+        </columnConstraints>
+        <!-- Browse Card - Amber -->
+        <Button onAction="#handleBrowse" maxHeight="160" maxWidth="Infinity"
+                                            prefHeight="160" styleClass="dashboard-card, dashboard-card-browse"
+                                            GridPane.columnIndex="0" GridPane.rowIndex="0">
+          <graphic>
+            <VBox alignment="CENTER" spacing="12">
+              <StackPane styleClass="dashboard-icon-container">
+                <FontIcon iconLiteral="mdi2f-fire" iconSize="32" iconColor="#f59e0b"/>
+              </StackPane>
+              <Label text="Browse" style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+            </VBox>
+          </graphic>
+        </Button>
+        <!-- Matches Card - Rose -->
+        <Button onAction="#handleMatches" maxHeight="160" maxWidth="Infinity"
+                                            prefHeight="160" styleClass="dashboard-card, dashboard-card-matches"
+                                            GridPane.columnIndex="1" GridPane.rowIndex="0">
+          <graphic>
+            <VBox alignment="CENTER" spacing="12">
+              <StackPane styleClass="dashboard-icon-container">
+                <FontIcon iconLiteral="mdi2h-heart-multiple" iconSize="32" iconColor="#f43f5e"/>
+              </StackPane>
+              <Label text="Matches" style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+            </VBox>
+          </graphic>
+        </Button>
+        <!-- Chat Card - Blue -->
+        <Button onAction="#handleChat" maxHeight="160" maxWidth="Infinity"
+                                            prefHeight="160" styleClass="dashboard-card, dashboard-card-chat"
+                                            GridPane.columnIndex="0" GridPane.rowIndex="1">
+          <graphic>
+            <VBox alignment="CENTER" spacing="12">
+              <StackPane styleClass="dashboard-icon-container">
+                <FontIcon iconLiteral="mdi2c-chat" iconSize="32" iconColor="#3b82f6"/>
+              </StackPane>
+              <Label text="Chat" style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+            </VBox>
+          </graphic>
+        </Button>
+        <!-- Profile Card - Purple -->
+        <Button onAction="#handleProfile" maxHeight="160" maxWidth="Infinity"
+                                            prefHeight="160" styleClass="dashboard-card, dashboard-card-profile"
+                                            GridPane.columnIndex="1" GridPane.rowIndex="1">
+          <graphic>
+            <VBox alignment="CENTER" spacing="12">
+              <StackPane styleClass="dashboard-icon-container">
+                <FontIcon iconLiteral="mdi2a-account-circle" iconSize="32" iconColor="#a855f7"/>
+              </StackPane>
+              <Label text="Profile" style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+            </VBox>
+          </graphic>
+        </Button>
+      </GridPane>
+      <!-- Enhanced Daily Pick Card -->
+      <VBox styleClass="daily-pick-card" spacing="12" prefWidth="420" alignment="CENTER_LEFT">
+        <HBox spacing="12" alignment="CENTER_LEFT">
+          <FontIcon iconLiteral="mdi2s-star-circle" iconSize="28" iconColor="#fbbf24" styleClass="daily-pick-icon"/>
+          <Label text="DAILY PICK" styleClass="daily-pick-title"/>
         </HBox>
-    </top>
+        <Label fx:id="dailyPickLabel" styleClass="text-secondary"
+                                            text="Loading your daily pick..."/>
+        <Button onAction="#handleViewDailyPick" styleClass="matches-browse-btn" text="View Profile">
+          <graphic>
+            <FontIcon iconLiteral="mdi2e-eye" iconSize="16" iconColor="white"/>
+          </graphic>
+        </Button>
+      </VBox>
+    </VBox>
+  </center>
 
-    <!-- Center Content: Grid of Main Features -->
-    <center>
-        <VBox alignment="CENTER" spacing="30.0">
-            <padding>
-                <Insets bottom="40.0" left="40.0" right="40.0" top="30.0" />
-            </padding>
-
-            <Label styleClass="heading" text="Dashboard" />
-
-            <GridPane hgap="20.0" vgap="20.0" alignment="CENTER">
-                <columnConstraints>
-                    <ColumnConstraints hgrow="SOMETIMES" minWidth="160.0" prefWidth="180.0" />
-                    <ColumnConstraints hgrow="SOMETIMES" minWidth="160.0" prefWidth="180.0" />
-                </columnConstraints>
-
-                <Button onAction="#handleBrowse" maxHeight="140.0" maxWidth="Infinity"
-                    prefHeight="140.0" styleClass="dashboard-card" text="🔥 Browse"
-                    GridPane.columnIndex="0" GridPane.rowIndex="0" />
-
-                <Button onAction="#handleMatches" maxHeight="140.0" maxWidth="Infinity"
-                    prefHeight="140.0" styleClass="dashboard-card" text="❤️ Matches"
-                    GridPane.columnIndex="1" GridPane.rowIndex="0" />
-
-                <Button onAction="#handleChat" maxHeight="140.0" maxWidth="Infinity"
-                    prefHeight="140.0" styleClass="dashboard-card" text="💬 Chat"
-                    GridPane.columnIndex="0" GridPane.rowIndex="1" />
-
-                <Button onAction="#handleProfile" maxHeight="140.0" maxWidth="Infinity"
-                    prefHeight="140.0" styleClass="dashboard-card" text="👤 Profile"
-                    GridPane.columnIndex="1" GridPane.rowIndex="1" />
-            </GridPane>
-
-            <!-- Daily Pick Teaser -->
-            <VBox styleClass="card" spacing="10.0" prefWidth="400.0" alignment="CENTER_LEFT">
-                <Label style="-fx-font-weight: bold; -fx-font-size: 16px;" text="🌟 DAILY PICK" />
-                <Label fx:id="dailyPickLabel" styleClass="text-secondary"
-                    text="Loading your daily pick..." />
-                <Button onAction="#handleViewDailyPick" text="View Profile" />
-            </VBox>
+  <!-- Right Sidebar: Achievements & Quick Stats -->
+  <right>
+    <VBox spacing="20" prefWidth="260">
+      <padding>
+        <Insets top="20" right="20" bottom="20"/>
+      </padding>
+      <!-- Achievements Card -->
+      <VBox styleClass="sidebar-card" spacing="12">
+        <HBox spacing="10" alignment="CENTER_LEFT">
+          <FontIcon iconLiteral="mdi2t-trophy" iconSize="22" iconColor="#fbbf24"/>
+          <Label text="Achievements" styleClass="sidebar-section-title"/>
+        </HBox>
+        <ListView fx:id="achievementsListView" prefHeight="120" styleClass="transparent-scroll"/>
+      </VBox>
+      <!-- Quick Stats Card -->
+      <VBox styleClass="sidebar-card" spacing="16">
+        <HBox spacing="10" alignment="CENTER_LEFT">
+          <FontIcon iconLiteral="mdi2c-chart-bar" iconSize="22" iconColor="#10b981"/>
+          <Label text="Quick Stats" styleClass="sidebar-section-title"/>
+        </HBox>
+        <!-- Stats Grid -->
+        <VBox spacing="10">
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <FontIcon iconLiteral="mdi2h-heart" iconSize="16" iconColor="#f43f5e"/>
+            <Label text="Matches" style="-fx-text-fill: #94a3b8;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="totalMatchesLabel" styleClass="stats-value-highlight" text="0"/>
+          </HBox>
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <FontIcon iconLiteral="mdi2a-account-check" iconSize="16" iconColor="#a855f7"/>
+            <Label text="Profile" style="-fx-text-fill: #94a3b8;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="completionLabel" style="-fx-font-weight: 600; -fx-text-fill: #a855f7;" text="0%"/>
+          </HBox>
         </VBox>
-    </center>
-
-    <!-- Right Sidebar: Achievements & Quick Stats -->
-    <right>
-        <VBox spacing="20.0" styleClass="sidebar" prefWidth="240.0">
-            <Label styleClass="subheading" text="🏆 Achievements" />
-            <ListView fx:id="achievementsListView" prefHeight="150.0" />
-
-            <Label styleClass="subheading" text="📊 Quick Stats" />
-            <VBox spacing="8.0">
-                <HBox spacing="10.0">
-                    <Label text="Matches:" />
-                    <Label fx:id="totalMatchesLabel" styleClass="accent-success" text="0" />
-                </HBox>
-                <HBox spacing="10.0">
-                    <Label text="Profile:" />
-                    <Label fx:id="completionLabel" text="0%" />
-                </HBox>
-                <Button onAction="#handleStats" styleClass="button-transparent"
-                    text="→ View All Stats" />
-            </VBox>
-        </VBox>
-    </right>
-
+        <Region styleClass="matches-separator" prefHeight="1"/>
+        <Button onAction="#handleStats" styleClass="button-transparent" text="View All Stats →"/>
+      </VBox>
+    </VBox>
+  </right>
 </BorderPane>
