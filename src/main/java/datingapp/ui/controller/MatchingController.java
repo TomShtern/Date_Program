@@ -82,9 +82,7 @@ public class MatchingController implements Initializable {
         actionButtonsContainer.managedProperty().bind(viewModel.hasMoreCandidatesProperty());
 
         // Update UI when current candidate changes
-        viewModel.currentCandidateProperty().addListener((obs, oldVal, newVal) -> {
-            updateCandidateUI(newVal);
-        });
+        viewModel.currentCandidateProperty().addListener((obs, oldVal, newVal) -> updateCandidateUI(newVal));
 
         // Listen for matches to show popup
         viewModel.matchedUserProperty().addListener((obs, oldVal, newVal) -> {
@@ -200,9 +198,8 @@ public class MatchingController implements Initializable {
     @SuppressWarnings("unused")
     private void handleExpandPreferences() {
         logger.info("User clicked Expand Preferences - navigating to Profile settings");
-        // TODO: Navigate to filter/preferences screen when implemented
-        // For now, navigate to Profile where they can update preferences
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.PROFILE);
+        // Navigate to filter/preferences screen
+        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.PREFERENCES);
     }
 
     @FXML

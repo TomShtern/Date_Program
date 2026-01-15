@@ -6,6 +6,7 @@ import datingapp.ui.controller.DashboardController;
 import datingapp.ui.controller.LoginController;
 import datingapp.ui.controller.MatchesController;
 import datingapp.ui.controller.MatchingController;
+import datingapp.ui.controller.PreferencesController;
 import datingapp.ui.controller.ProfileController;
 import datingapp.ui.controller.StatsController;
 import datingapp.ui.viewmodel.ChatViewModel;
@@ -13,6 +14,7 @@ import datingapp.ui.viewmodel.DashboardViewModel;
 import datingapp.ui.viewmodel.LoginViewModel;
 import datingapp.ui.viewmodel.MatchesViewModel;
 import datingapp.ui.viewmodel.MatchingViewModel;
+import datingapp.ui.viewmodel.PreferencesViewModel;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import datingapp.ui.viewmodel.StatsViewModel;
 import java.lang.reflect.InvocationTargetException;
@@ -37,6 +39,7 @@ public class ViewModelFactory {
     private MatchesViewModel matchesViewModel;
     private ChatViewModel chatViewModel;
     private StatsViewModel statsViewModel;
+    private PreferencesViewModel preferencesViewModel;
 
     public ViewModelFactory(ServiceRegistry services) {
         this.services = services;
@@ -75,6 +78,10 @@ public class ViewModelFactory {
 
         if (controllerClass == StatsController.class) {
             return new StatsController(getStatsViewModel());
+        }
+
+        if (controllerClass == PreferencesController.class) {
+            return new PreferencesController(getPreferencesViewModel());
         }
 
         // Fallback for controllers that don't need DI or are not yet mapped
@@ -162,6 +169,13 @@ public class ViewModelFactory {
         return statsViewModel;
     }
 
+    public PreferencesViewModel getPreferencesViewModel() {
+        if (preferencesViewModel == null) {
+            preferencesViewModel = new PreferencesViewModel(services.getUserStorage());
+        }
+        return preferencesViewModel;
+    }
+
     /**
      * Resets all cached ViewModels. Useful when logging out.
      */
@@ -172,6 +186,8 @@ public class ViewModelFactory {
         matchingViewModel = null;
         chatViewModel = null;
         matchesViewModel = null;
+        matchesViewModel = null;
         statsViewModel = null;
+        preferencesViewModel = null;
     }
 }

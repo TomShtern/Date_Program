@@ -72,17 +72,31 @@ public class NavigationService {
             // For now, we replace the center of the root layout
             // Login screen typically replaces the entire content, other screens might keep
             // a sidebar/header
-            if (viewType == ViewFactory.ViewType.LOGIN) {
-                rootLayout.setCenter(view);
-            } else {
-                rootLayout.setCenter(view);
-                // Future: add sidebar/header navigation widgets here
-            }
+            rootLayout.setCenter(view);
+
+            // Future: add sidebar/header navigation widgets here if not LOGIN
 
         } catch (IOException e) {
             logger.error("Failed to navigate to {}: {}", viewType, e.getMessage(), e);
-            e.printStackTrace(); // Print stack trace for debugging
+            // Stack trace already logged above
         }
+    }
+
+    /**
+     * Navigates back to the previous screen.
+     * Currently simple implementation: always goes to Dashboard (or could track
+     * history).
+     * For now, effectively "Close" or "Dashboard".
+     */
+    public void goBack() {
+        // Simple fallback: Go to Matchng screen or Dashboard.
+        // Since Preferences is accessed from Matching, let's go there.
+        // A better implementation would use a Stack<ViewType>.
+        // Check if we want to go back to Matching or Dashboard.
+        // Let's safe default to DASHBOARD for generic "Back",
+        // or specifically MATCHING since we came from there.
+        // The user request context implies coming from Matching.
+        navigateTo(ViewFactory.ViewType.MATCHING);
     }
 
     public Stage getPrimaryStage() {

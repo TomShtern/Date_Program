@@ -12,7 +12,8 @@ public class ViewFactory {
         MATCHING("/fxml/matching.fxml"),
         MATCHES("/fxml/matches.fxml"),
         CHAT("/fxml/chat.fxml"),
-        STATS("/fxml/stats.fxml");
+        STATS("/fxml/stats.fxml"),
+        PREFERENCES("/fxml/preferences.fxml");
 
         private final String fxmlPath;
 

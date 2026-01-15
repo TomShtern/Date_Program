@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.Slider?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.Region?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="450.0" xmlns="http://javafx.com/javafx/21"
+    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.PreferencesController">
+  <top>
+    <HBox alignment="CENTER_LEFT" spacing="20.0" style="-fx-background-color: -fx-surface-dark; -fx-padding: 15;">
+      <Button onAction="#handleBack" styleClass="icon-button">
+        <graphic>
+          <FontIcon iconLiteral="mdi2a-arrow-left" iconSize="24" iconColor="white"/>
+        </graphic>
+      </Button>
+      <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Discovery Settings"/>
+      <Region HBox.hgrow="ALWAYS"/>
+      <Button text="Save" onAction="#handleSave" style="-fx-background-color: transparent; -fx-text-fill: -fx-accent-super; -fx-font-weight: bold; -fx-font-size: 14px;"/>
+    </HBox>
+  </top>
+
+  <center>
+    <VBox spacing="24.0" style="-fx-padding: 24;">
+      <!-- Distance Section -->
+      <VBox spacing="10.0">
+        <HBox alignment="CENTER_LEFT">
+          <Label text="Maximum Distance" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+          <Region HBox.hgrow="ALWAYS"/>
+          <Label fx:id="distanceValueLabel" text="50 km" style="-fx-text-fill: -fx-text-secondary;"/>
+        </HBox>
+        <Slider fx:id="distanceSlider" min="1" max="100" blockIncrement="1" showTickMarks="false"/>
+      </VBox>
+      <Separator/>
+      <!-- Age Range Section -->
+      <VBox spacing="10.0">
+        <HBox alignment="CENTER_LEFT">
+          <Label text="Age Preference" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+          <Region HBox.hgrow="ALWAYS"/>
+          <Label fx:id="ageStartLabel" text="18"/>
+          <Label text=""/>
+          <Label fx:id="ageEndLabel" text="35"/>
+        </HBox>
+        <Label text="Min Age" style="-fx-font-size: 11px; -fx-text-fill: -fx-text-secondary;"/>
+        <Slider fx:id="minAgeSlider" min="18" max="99" blockIncrement="1"/>
+        <Label text="Max Age" style="-fx-font-size: 11px; -fx-text-fill: -fx-text-secondary;"/>
+        <Slider fx:id="maxAgeSlider" min="18" max="99" blockIncrement="1"/>
+      </VBox>
+      <Separator/>
+      <!-- Interesting In Section -->
+      <VBox spacing="12.0">
+        <Label text="Show Me" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+        <VBox spacing="8" styleClass="toggle-group-container">
+          <fx:define>
+            <ToggleGroup fx:id="genderGroup"/>
+          </fx:define>
+          <ToggleButton fx:id="menToggle" text="Men" toggleGroup="$genderGroup"
+                                            maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
+          <ToggleButton fx:id="womenToggle" text="Women" toggleGroup="$genderGroup"
+                                            maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
+          <ToggleButton fx:id="everyoneToggle" text="Everyone" toggleGroup="$genderGroup"
+                                            maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
+        </VBox>
+      </VBox>
+    </VBox>
+  </center>
+</BorderPane>

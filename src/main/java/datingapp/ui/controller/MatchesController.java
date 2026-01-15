@@ -13,6 +13,7 @@ import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.ParallelTransition;
+import javafx.animation.PauseTransition;
 import javafx.animation.RotateTransition;
 import javafx.animation.ScaleTransition;
 import javafx.animation.Timeline;
@@ -75,9 +76,8 @@ public class MatchesController implements Initializable {
         populateMatchCards();
 
         // Listen for changes
-        viewModel.getMatches().addListener((javafx.collections.ListChangeListener<MatchCardData>) c -> {
-            populateMatchCards();
-        });
+        viewModel.getMatches().addListener((javafx.collections.ListChangeListener<MatchCardData>)
+                c -> populateMatchCards());
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
@@ -118,19 +118,14 @@ public class MatchesController implements Initializable {
 
         // Spawn floating hearts periodically
         Timeline spawnTimeline = new Timeline(new KeyFrame(Duration.millis(800), e -> spawnFloatingHeart()));
-        spawnTimeline.setCycleCount(Timeline.INDEFINITE);
+        spawnTimeline.setCycleCount(javafx.animation.Animation.INDEFINITE);
         spawnTimeline.play();
 
         // Spawn initial batch
         for (int i = 0; i < 5; i++) {
-            javafx.application.Platform.runLater(() -> {
-                try {
-                    Thread.sleep(RANDOM.nextInt(500));
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                }
-                spawnFloatingHeart();
-            });
+            PauseTransition delay = new PauseTransition(Duration.millis(RANDOM.nextInt(500)));
+            delay.setOnFinished(e -> spawnFloatingHeart());
+            delay.play();
         }
     }
 
@@ -154,15 +149,16 @@ public class MatchesController implements Initializable {
         particleLayer.getChildren().add(heart);
 
         // Float up animation
-        TranslateTransition floatUp = new TranslateTransition(Duration.millis(4000 + RANDOM.nextInt(3000)), heart);
+        TranslateTransition floatUp =
+                new TranslateTransition(Duration.millis(4000 + (double) RANDOM.nextInt(3000)), heart);
         floatUp.setFromY(0);
-        floatUp.setToY(-500 - RANDOM.nextInt(200));
+        floatUp.setToY(-500 - (double) RANDOM.nextInt(200));
         floatUp.setInterpolator(Interpolator.EASE_OUT);
 
         // Gentle horizontal sway
         TranslateTransition sway = new TranslateTransition(Duration.millis(1500), heart);
         sway.setFromX(0);
-        sway.setToX(-30 + RANDOM.nextInt(60));
+        sway.setToX(-30 + (double) RANDOM.nextInt(60));
         sway.setCycleCount(4);
         sway.setAutoReverse(true);
 
@@ -174,7 +170,7 @@ public class MatchesController implements Initializable {
         FadeTransition fadeOut = new FadeTransition(Duration.millis(1000), heart);
         fadeOut.setFromValue(0.6);
         fadeOut.setToValue(0);
-        fadeOut.setDelay(Duration.millis(3000 + RANDOM.nextInt(2000)));
+        fadeOut.setDelay(Duration.millis(3000 + (double) RANDOM.nextInt(2000)));
 
         // Gentle rotation
         RotateTransition rotate = new RotateTransition(Duration.millis(3000), heart);
@@ -212,7 +208,7 @@ public class MatchesController implements Initializable {
                                         Duration.millis(1200),
                                         new KeyValue(glow.radiusProperty(), 45, Interpolator.EASE_BOTH),
                                         new KeyValue(glow.spreadProperty(), 0.6, Interpolator.EASE_BOTH)));
-                        glowPulse.setCycleCount(Timeline.INDEFINITE);
+                        glowPulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
                         glowPulse.setAutoReverse(true);
                         glowPulse.play();
 
@@ -222,7 +218,7 @@ public class MatchesController implements Initializable {
                         breathe.setFromY(1.0);
                         breathe.setToX(1.15);
                         breathe.setToY(1.15);
-                        breathe.setCycleCount(Timeline.INDEFINITE);
+                        breathe.setCycleCount(javafx.animation.Animation.INDEFINITE);
                         breathe.setAutoReverse(true);
                         breathe.setInterpolator(Interpolator.EASE_BOTH);
                         breathe.play();
@@ -237,7 +233,7 @@ public class MatchesController implements Initializable {
         TranslateTransition floatAnim = new TranslateTransition(Duration.millis(2500), emptyStateContainer);
         floatAnim.setFromY(0);
         floatAnim.setToY(-12);
-        floatAnim.setCycleCount(Timeline.INDEFINITE);
+        floatAnim.setCycleCount(javafx.animation.Animation.INDEFINITE);
         floatAnim.setAutoReverse(true);
         floatAnim.setInterpolator(Interpolator.EASE_BOTH);
         floatAnim.play();
@@ -324,7 +320,7 @@ public class MatchesController implements Initializable {
             badgePulse.setFromY(1.0);
             badgePulse.setToX(1.2);
             badgePulse.setToY(1.2);
-            badgePulse.setCycleCount(Timeline.INDEFINITE);
+            badgePulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
             badgePulse.setAutoReverse(true);
             badgePulse.play();
         }
