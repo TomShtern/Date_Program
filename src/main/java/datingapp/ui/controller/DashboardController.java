@@ -3,6 +3,7 @@ package datingapp.ui.controller;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UISession;
 import datingapp.ui.ViewFactory;
+import datingapp.ui.util.ResponsiveController;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
@@ -18,7 +19,7 @@ import org.slf4j.LoggerFactory;
  * Controller for the Dashboard screen (dashboard.fxml).
  * Main hub for navigation to all app features.
  */
-public class DashboardController implements Initializable {
+public class DashboardController implements Initializable, ResponsiveController {
     private static final Logger logger = LoggerFactory.getLogger(DashboardController.class);
 
     @FXML
@@ -48,14 +49,35 @@ public class DashboardController implements Initializable {
         this.viewModel = viewModel;
     }
 
+    // Weak listeners to prevent memory leaks with cached ViewModels
+    private final javafx.beans.value.ChangeListener<String> nameListener =
+            (obs, old, val) -> userNameLabel.setText(val);
+    private final javafx.beans.value.ChangeListener<String> statusListener =
+            (obs, old, val) -> statusLabel.setText(val);
+    private final javafx.beans.value.ChangeListener<String> pickListener =
+            (obs, old, val) -> dailyPickLabel.setText(val);
+    private final javafx.beans.value.ChangeListener<String> matchListener =
+            (obs, old, val) -> totalMatchesLabel.setText(val);
+    private final javafx.beans.value.ChangeListener<String> completionListener =
+            (obs, old, val) -> completionLabel.setText(val);
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        // Bind UI labels to ViewModel properties
-        userNameLabel.textProperty().bind(viewModel.userNameProperty());
-        statusLabel.textProperty().bind(viewModel.dailyLikesStatusProperty());
-        dailyPickLabel.textProperty().bind(viewModel.dailyPickNameProperty());
-        totalMatchesLabel.textProperty().bind(viewModel.totalMatchesProperty());
-        completionLabel.textProperty().bind(viewModel.profileCompletionProperty());
+        // Use weak listeners for long-lived ViewModel properties
+        viewModel.userNameProperty().addListener(new javafx.beans.value.WeakChangeListener<>(nameListener));
+        viewModel.dailyLikesStatusProperty().addListener(new javafx.beans.value.WeakChangeListener<>(statusListener));
+        viewModel.dailyPickNameProperty().addListener(new javafx.beans.value.WeakChangeListener<>(pickListener));
+        viewModel.totalMatchesProperty().addListener(new javafx.beans.value.WeakChangeListener<>(matchListener));
+        viewModel
+                .profileCompletionProperty()
+                .addListener(new javafx.beans.value.WeakChangeListener<>(completionListener));
+
+        // Set initial values
+        userNameLabel.setText(viewModel.userNameProperty().get());
+        statusLabel.setText(viewModel.dailyLikesStatusProperty().get());
+        dailyPickLabel.setText(viewModel.dailyPickNameProperty().get());
+        totalMatchesLabel.setText(viewModel.totalMatchesProperty().get());
+        completionLabel.setText(viewModel.profileCompletionProperty().get());
 
         // Bind achievements list
         if (achievementsListView != null) {
@@ -65,8 +87,27 @@ public class DashboardController implements Initializable {
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
 
+        // Setup responsive window size listener
+        setupResponsiveListener();
+
         // Load initial data
         viewModel.refresh();
+    }
+
+    /** Adds a window width listener to trigger compact mode at 900px threshold. */
+    private void setupResponsiveListener() {
+        // Wait for scene to be available
+        rootPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null && newScene.getWindow() != null) {
+                javafx.stage.Stage stage = (javafx.stage.Stage) newScene.getWindow();
+                // Apply initial state
+                setCompactMode(stage.getWidth() < 900);
+                // Listen for resize
+                stage.widthProperty().addListener((o, oldW, newW) -> {
+                    setCompactMode(newW.doubleValue() < 900);
+                });
+            }
+        });
     }
 
     @SuppressWarnings("unused") // Called by FXML
@@ -118,5 +159,29 @@ public class DashboardController implements Initializable {
         UISession.getInstance().logout();
         NavigationService.getInstance().getViewModelFactory().reset();
         NavigationService.getInstance().navigateTo(ViewFactory.ViewType.LOGIN);
+    }
+
+    @Override
+    public void setCompactMode(boolean compact) {
+        if (rootPane == null) {
+            return;
+        }
+
+        if (compact) {
+            if (!rootPane.getStyleClass().contains("viewport-compact")) {
+                rootPane.getStyleClass().add("viewport-compact");
+            }
+            // Hide secondary stats on very small screens
+            if (totalMatchesLabel != null) {
+                totalMatchesLabel.getParent().setVisible(false);
+                totalMatchesLabel.getParent().setManaged(false);
+            }
+        } else {
+            rootPane.getStyleClass().remove("viewport-compact");
+            if (totalMatchesLabel != null) {
+                totalMatchesLabel.getParent().setVisible(true);
+                totalMatchesLabel.getParent().setManaged(true);
+            }
+        }
     }
 }

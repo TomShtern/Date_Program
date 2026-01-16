@@ -6,6 +6,10 @@
 
 # Log files
 *.log
+*log*.txt
+*_output.txt
+*_run.txt
+checkstyle_full_output.txt
 
 # Package files
 *.jar
@@ -57,6 +61,8 @@ generated-test-sources/
 .classpath.generated
 .factorypath
 out/
+.vscode/settings.json
+.vscode/eclipse-settings.prefs
 
 # JDT Language Server (critical for Java in VS Code)
 .jdtls/
@@ -128,3 +134,4 @@ cUserstom7sAppDataLocalTempclaude-*
 
 # Agent Skills
 .agent/
+.vscode/settings.json

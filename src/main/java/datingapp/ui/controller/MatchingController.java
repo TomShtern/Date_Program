@@ -8,16 +8,25 @@ import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
+import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.ParallelTransition;
+import javafx.animation.RotateTransition;
+import javafx.animation.TranslateTransition;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,10 +65,36 @@ public class MatchingController implements Initializable {
     @FXML
     private HBox actionButtonsContainer;
 
+    @FXML
+    private StackPane cardStackContainer;
+
+    @FXML
+    private Label likeOverlay;
+
+    @FXML
+    private Label passOverlay;
+
+    // Listeners stored as fields to allow removal/prevention of duplicates
+    private final javafx.beans.value.ChangeListener<User> candidateChangeListener;
+    private final javafx.beans.value.ChangeListener<User> matchListener;
+
+    // Swipe gesture state
+    private double dragStartX;
+
+    private static final double DRAG_THRESHOLD = 150;
+
     private final MatchingViewModel viewModel;
 
     public MatchingController(MatchingViewModel viewModel) {
         this.viewModel = viewModel;
+
+        // Initialize listeners here so they can refer to instance methods safely
+        this.candidateChangeListener = (obs, oldVal, newVal) -> updateCandidateUI(newVal);
+        this.matchListener = (obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                showMatchPopup(newVal, viewModel.lastMatchProperty().get());
+            }
+        };
     }
 
     @Override
@@ -82,14 +117,12 @@ public class MatchingController implements Initializable {
         actionButtonsContainer.managedProperty().bind(viewModel.hasMoreCandidatesProperty());
 
         // Update UI when current candidate changes
-        viewModel.currentCandidateProperty().addListener((obs, oldVal, newVal) -> updateCandidateUI(newVal));
+        viewModel.currentCandidateProperty().removeListener(candidateChangeListener);
+        viewModel.currentCandidateProperty().addListener(candidateChangeListener);
 
         // Listen for matches to show popup
-        viewModel.matchedUserProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                showMatchPopup(newVal, viewModel.lastMatchProperty().get());
-            }
-        });
+        viewModel.matchedUserProperty().removeListener(matchListener);
+        viewModel.matchedUserProperty().addListener(matchListener);
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
@@ -100,6 +133,172 @@ public class MatchingController implements Initializable {
         if (logger.isTraceEnabled()) {
             logger.trace("MatchingController initialized");
         }
+
+        // Setup keyboard shortcuts
+        setupKeyboardShortcuts();
+
+        // Setup swipe gestures
+        setupSwipeGestures();
+    }
+
+    /** Setup drag-to-swipe gestures on the candidate card. */
+    @SuppressWarnings("unused")
+    private void setupSwipeGestures() {
+        candidateCard.setOnMousePressed(e -> {
+            dragStartX = e.getSceneX();
+
+            candidateCard.setCursor(Cursor.CLOSED_HAND);
+        });
+
+        candidateCard.setOnMouseDragged(e -> {
+            double deltaX = e.getSceneX() - dragStartX;
+            double rotation = deltaX * 0.04;
+
+            candidateCard.setTranslateX(deltaX);
+            candidateCard.setRotate(rotation);
+
+            // Update overlay based on drag distance
+            double progress = Math.min(Math.abs(deltaX) / DRAG_THRESHOLD, 1.0);
+
+            if (deltaX > 30) {
+                showLikeOverlay(progress);
+                hidePassOverlay();
+            } else if (deltaX < -30) {
+                showPassOverlay(progress);
+                hideLikeOverlay();
+            } else {
+                hideAllOverlays();
+            }
+        });
+
+        candidateCard.setOnMouseReleased(e -> {
+            candidateCard.setCursor(Cursor.HAND);
+            double deltaX = e.getSceneX() - dragStartX;
+
+            if (Math.abs(deltaX) > DRAG_THRESHOLD) {
+                if (deltaX > 0) {
+                    animateCardExit(true, this::performLike);
+                } else {
+                    animateCardExit(false, this::performPass);
+                }
+            } else {
+                animateSnapBack();
+            }
+        });
+
+        candidateCard.setCursor(Cursor.HAND);
+    }
+
+    private void showLikeOverlay(double progress) {
+        likeOverlay.setVisible(true);
+        likeOverlay.setManaged(true);
+        likeOverlay.setOpacity(progress);
+    }
+
+    private void hideLikeOverlay() {
+        likeOverlay.setVisible(false);
+        likeOverlay.setManaged(false);
+    }
+
+    private void showPassOverlay(double progress) {
+        passOverlay.setVisible(true);
+        passOverlay.setManaged(true);
+        passOverlay.setOpacity(progress);
+    }
+
+    private void hidePassOverlay() {
+        passOverlay.setVisible(false);
+        passOverlay.setManaged(false);
+    }
+
+    private void hideAllOverlays() {
+        hideLikeOverlay();
+        hidePassOverlay();
+    }
+
+    private void animateCardExit(boolean toRight, Runnable onComplete) {
+        double targetX = toRight ? 800 : -800;
+        double targetRotation = toRight ? 30 : -30;
+
+        TranslateTransition translate = new TranslateTransition(Duration.millis(300), candidateCard);
+        translate.setToX(targetX);
+        translate.setInterpolator(Interpolator.EASE_IN);
+
+        RotateTransition rotate = new RotateTransition(Duration.millis(300), candidateCard);
+        rotate.setToAngle(targetRotation);
+
+        FadeTransition fade = new FadeTransition(Duration.millis(300), candidateCard);
+        fade.setToValue(0);
+
+        ParallelTransition exit = new ParallelTransition(translate, rotate, fade);
+        exit.setOnFinished(e -> {
+            resetCardPosition();
+            hideAllOverlays();
+            onComplete.run();
+        });
+        exit.play();
+    }
+
+    private void animateSnapBack() {
+        TranslateTransition translate = new TranslateTransition(Duration.millis(200), candidateCard);
+        translate.setToX(0);
+        translate.setInterpolator(Interpolator.EASE_OUT);
+
+        RotateTransition rotate = new RotateTransition(Duration.millis(200), candidateCard);
+        rotate.setToAngle(0);
+
+        ParallelTransition snapBack = new ParallelTransition(translate, rotate);
+        snapBack.setOnFinished(e -> hideAllOverlays());
+        snapBack.play();
+    }
+
+    private void resetCardPosition() {
+        candidateCard.setTranslateX(0);
+        candidateCard.setRotate(0);
+        candidateCard.setOpacity(1);
+    }
+
+    private void performLike() {
+        viewModel.like();
+    }
+
+    private void performPass() {
+        viewModel.pass();
+    }
+
+    /** Setup keyboard shortcuts for quick actions. */
+    private void setupKeyboardShortcuts() {
+        rootPane.setOnKeyPressed(e -> {
+            // Only handle if candidate is visible
+            if (!candidateCard.isVisible()) {
+                return;
+            }
+
+            switch (e.getCode()) {
+                case LEFT -> handlePass();
+                case RIGHT -> handleLike();
+                case UP -> handleSuperLike();
+                case Z -> {
+                    if (e.isControlDown()) {
+                        handleUndo();
+                    }
+                }
+                case ESCAPE -> handleBack();
+                default -> {
+                    /* no action */ }
+            }
+        });
+
+        // Ensure root pane can receive keyboard events
+        rootPane.setFocusTraversable(true);
+        Platform.runLater(() -> rootPane.requestFocus());
+    }
+
+    /** Placeholder for super like functionality. */
+    private void handleSuperLike() {
+        logger.info("Super Like triggered via keyboard");
+        // For now, acts like a regular like
+        viewModel.like();
     }
 
     private void updateCandidateUI(User user) {

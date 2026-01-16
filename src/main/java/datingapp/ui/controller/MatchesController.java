@@ -29,6 +29,7 @@ import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -60,6 +61,9 @@ public class MatchesController implements Initializable {
     private final MatchesViewModel viewModel;
     private Pane particleLayer;
 
+    // Field-level listener to prevent multiplication
+    private final javafx.collections.ListChangeListener<MatchCardData> matchesListener = c -> populateMatchCards();
+
     public MatchesController(MatchesViewModel viewModel) {
         this.viewModel = viewModel;
     }
@@ -76,8 +80,8 @@ public class MatchesController implements Initializable {
         populateMatchCards();
 
         // Listen for changes
-        viewModel.getMatches().addListener((javafx.collections.ListChangeListener<MatchCardData>)
-                c -> populateMatchCards());
+        viewModel.getMatches().removeListener(matchesListener);
+        viewModel.getMatches().addListener(matchesListener);
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
@@ -332,7 +336,17 @@ public class MatchesController implements Initializable {
         avatarIcon.setIconSize(36);
         avatarIcon.setIconColor(Color.web("#10b981"));
         avatarIcon.getStyleClass().add("match-avatar-icon");
-        avatarContainer.getChildren().add(avatarIcon);
+
+        // Status indicator dot (random for demo purposes)
+        Region statusDot = new Region();
+        statusDot.getStyleClass().add("status-dot");
+        String[] statuses = {"status-online", "status-away", "status-offline"};
+        statusDot.getStyleClass().add(statuses[RANDOM.nextInt(statuses.length)]);
+        StackPane.setAlignment(statusDot, Pos.BOTTOM_RIGHT);
+        statusDot.setTranslateX(4);
+        statusDot.setTranslateY(4);
+
+        avatarContainer.getChildren().addAll(avatarIcon, statusDot);
 
         // User name with premium styling
         Label nameLabel = new Label(match.userName());

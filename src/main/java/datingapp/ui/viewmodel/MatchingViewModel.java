@@ -86,7 +86,8 @@ public class MatchingViewModel {
     public void initialize() {
         User user = ensureCurrentUser();
         if (user != null) {
-            refreshCandidates();
+            // Load candidates in background to keep UI responsive
+            Thread.ofVirtual().start(this::refreshCandidates);
         }
     }
 
@@ -109,20 +110,30 @@ public class MatchingViewModel {
 
         List<User> candidates = candidateFinder.findCandidates(currentUser, activeUsers, excluded);
 
-        candidateQueue.clear();
-        candidateQueue.addAll(candidates);
+        javafx.application.Platform.runLater(() -> {
+            candidateQueue.clear();
+            candidateQueue.addAll(candidates);
 
-        logger.info("Found {} candidates", candidates.size());
-        nextCandidate();
+            logger.info("Found {} candidates", candidates.size());
+            nextCandidate();
+        });
     }
 
     /**
      * Loads the next candidate from the queue.
+     * MUST be called on FX Thread or use Platform.runLater.
      */
     public void nextCandidate() {
         User next = candidateQueue.poll();
-        currentCandidate.set(next);
-        hasMoreCandidates.set(next != null);
+        if (javafx.application.Platform.isFxApplicationThread()) {
+            currentCandidate.set(next);
+            hasMoreCandidates.set(next != null);
+        } else {
+            javafx.application.Platform.runLater(() -> {
+                currentCandidate.set(next);
+                hasMoreCandidates.set(next != null);
+            });
+        }
     }
 
     public void like() {

@@ -1,0 +1,152 @@
+/* ============================================
+   Light Theme Overrides
+   ============================================
+   Apply on top of theme.css for light mode.
+   Usage: Load after theme.css to override dark colors.
+   ============================================ */
+
+.root {
+    -fx-background-dark: #f8fafc;
+    -fx-surface-dark: #ffffff;
+    -fx-card-background: #f1f5f9;
+    -fx-text-primary: #0f172a;
+    -fx-text-secondary: #64748b;
+    -fx-text-muted: #94a3b8;
+
+    -fx-base: #ffffff;
+    -fx-background: #f8fafc;
+    -fx-control-inner-background: #ffffff;
+    -fx-control-inner-background-alt: #f1f5f9;
+    -fx-text-base-color: #0f172a;
+    -fx-text-inner-color: #0f172a;
+}
+
+/* Header */
+.header-bar,
+.header-surface {
+    -fx-background-color: rgba(255, 255, 255, 0.95);
+    -fx-border-color: #e2e8f0;
+}
+
+/* Sidebar */
+.sidebar,
+.nav-sidebar {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e2e8f0;
+}
+
+/* Cards */
+.card,
+.glass-card,
+.section-glass-card,
+.dashboard-card {
+    -fx-background-color: white;
+    -fx-border-color: #e2e8f0;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 10, 0, 0, 4);
+}
+
+/* Text inputs */
+.text-field,
+.text-area {
+    -fx-background-color: #f8fafc;
+    -fx-text-fill: #0f172a;
+    -fx-border-color: #e2e8f0;
+    -fx-prompt-text-fill: #94a3b8;
+}
+
+.text-field:focused,
+.text-area:focused {
+    -fx-background-color: white;
+    -fx-border-color: #667eea;
+}
+
+/* Labels */
+.label {
+    -fx-text-fill: #0f172a;
+}
+
+.text-secondary {
+    -fx-text-fill: #64748b;
+}
+
+.text-muted {
+    -fx-text-fill: #94a3b8;
+}
+
+/* List cells */
+.list-cell:filled {
+    -fx-background-color: transparent;
+    -fx-text-fill: #0f172a;
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: linear-gradient(to right, rgba(102, 126, 234, 0.15), transparent);
+}
+
+.list-cell:filled:hover {
+    -fx-background-color: #f1f5f9;
+}
+
+/* Keep buttons with gradient (accent colors remain same) */
+.button {
+    -fx-background-color: linear-gradient(to bottom right, #667eea, #764ba2);
+    -fx-text-fill: white;
+}
+
+.button-secondary {
+    -fx-background-color: white;
+    -fx-text-fill: #0f172a;
+    -fx-border-color: #e2e8f0;
+}
+
+.button-secondary:hover {
+    -fx-background-color: #f8fafc;
+    -fx-border-color: #667eea;
+}
+
+.button-transparent {
+    -fx-text-fill: #0f172a;
+}
+
+/* Scroll bars */
+.scroll-bar .thumb {
+    -fx-background-color: #cbd5e1;
+}
+
+.scroll-bar .track {
+    -fx-background-color: #f1f5f9;
+}
+
+/* Dialogs */
+.dialog-pane {
+    -fx-background-color: white;
+}
+
+/* Separators */
+.separator .line {
+    -fx-border-color: #e2e8f0;
+}
+
+/* Screen titles */
+.screen-title {
+    -fx-text-fill: #0f172a;
+}
+
+/* Chat bubbles (keep colors for distinction) */
+.chat-bubble-sent {
+    -fx-background-color: linear-gradient(to bottom right, #667eea, #764ba2);
+    -fx-text-fill: white;
+}
+
+.chat-bubble-received {
+    -fx-background-color: #e2e8f0;
+    -fx-text-fill: #0f172a;
+}
+
+/* Match popup - dark overlay looks good on light too */
+/* No changes needed */
+
+/* Empty states */
+.matches-empty-container {
+    -fx-background-color: rgba(0, 0, 0, 0.02);
+}

@@ -8,6 +8,7 @@ import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.control.ToggleButton;
@@ -57,6 +58,9 @@ public class PreferencesController implements Initializable {
 
     @FXML
     private ToggleButton everyoneToggle;
+
+    @FXML
+    private ToggleButton themeToggle;
 
     private final PreferencesViewModel viewModel;
 
@@ -166,5 +170,34 @@ public class PreferencesController implements Initializable {
         logger.info("Canceling preferences changes...");
         // Just go back without saving
         NavigationService.getInstance().goBack();
+    }
+
+    @FXML
+    @SuppressWarnings("unused")
+    private void handleThemeToggle() {
+        boolean isDarkMode = themeToggle.isSelected();
+        logger.info("Toggling theme to: {}", isDarkMode ? "Dark" : "Light");
+
+        Scene scene = rootPane.getScene();
+        if (scene == null) {
+            logger.warn("Scene not available for theme toggle");
+            return;
+        }
+
+        String darkTheme = getClass().getResource("/css/theme.css").toExternalForm();
+        String lightTheme = getClass().getResource("/css/light-theme.css").toExternalForm();
+
+        if (isDarkMode) {
+            // Remove light theme, ensure dark theme is present
+            scene.getStylesheets().remove(lightTheme);
+            if (!scene.getStylesheets().contains(darkTheme)) {
+                scene.getStylesheets().add(darkTheme);
+            }
+        } else {
+            // Add light theme on top (it overrides dark theme)
+            if (!scene.getStylesheets().contains(lightTheme)) {
+                scene.getStylesheets().add(lightTheme);
+            }
+        }
     }
 }

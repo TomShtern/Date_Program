@@ -134,23 +134,23 @@ public class AchievementService {
     /** Check if achievement criteria is met. */
     private boolean isEarned(UUID userId, User user, Achievement achievement) {
         return switch (achievement) {
-                // Matching milestones
+            // Matching milestones
             case FIRST_SPARK -> getMatchCount(userId) >= 1;
             case SOCIAL_BUTTERFLY -> getMatchCount(userId) >= 5;
             case POPULAR -> getMatchCount(userId) >= 10;
             case SUPERSTAR -> getMatchCount(userId) >= 25;
             case LEGEND -> getMatchCount(userId) >= 50;
 
-                // Behavior achievements
+            // Behavior achievements
             case SELECTIVE -> isSelective(userId);
             case OPEN_MINDED -> isOpenMinded(userId);
 
-                // Profile achievements
+            // Profile achievements
             case COMPLETE_PACKAGE -> isProfileComplete(user);
             case STORYTELLER -> hasBioOver100Chars(user);
             case LIFESTYLE_GURU -> hasAllLifestyleFields(user);
 
-                // Safety achievements
+            // Safety achievements
             case GUARDIAN -> hasReportedUser(userId);
         };
     }
@@ -162,22 +162,22 @@ public class AchievementService {
      */
     private int[] getProgressValues(UUID userId, User user, Achievement achievement) {
         return switch (achievement) {
-                // Matching milestones
+            // Matching milestones
             case FIRST_SPARK -> new int[] {Math.min(1, getMatchCount(userId)), 1};
             case SOCIAL_BUTTERFLY -> new int[] {Math.min(5, getMatchCount(userId)), 5};
             case POPULAR -> new int[] {Math.min(10, getMatchCount(userId)), 10};
             case SUPERSTAR -> new int[] {Math.min(25, getMatchCount(userId)), 25};
             case LEGEND -> new int[] {Math.min(50, getMatchCount(userId)), 50};
 
-                // Behavior - needs 50+ swipes
+            // Behavior - needs 50+ swipes
             case SELECTIVE, OPEN_MINDED -> new int[] {getTotalSwipes(userId), 50};
 
-                // Profile achievements
+            // Profile achievements
             case COMPLETE_PACKAGE -> new int[] {getProfileCompleteness(user), 100};
             case STORYTELLER -> new int[] {getBioLength(user), 100};
             case LIFESTYLE_GURU -> new int[] {getLifestyleFieldCount(user), 5};
 
-                // Safety
+            // Safety
             case GUARDIAN -> new int[] {getReportsGiven(userId), 1};
         };
     }

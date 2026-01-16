@@ -13,41 +13,59 @@
 <BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21"
     xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.MatchingController">
   <top>
-    <HBox alignment="CENTER_LEFT" spacing="20.0"
-                    style="-fx-background-color: -fx-surface-dark; -fx-padding: 15;">
-      <Button onAction="#handleBack" style="-fx-background-color: transparent;" text="← Back"/>
-      <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Discover"/>
+    <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="header-surface">
+      <Button onAction="#handleBack" styleClass="button-transparent" text="← Back"/>
+      <Label styleClass="screen-title" text="Discover"/>
     </HBox>
   </top>
 
   <center>
-    <StackPane>
-      <!-- Candidate Card -->
+    <StackPane fx:id="cardStackContainer">
+      <!-- Background card 3 (furthest back, for depth effect) -->
+      <VBox styleClass="card card-stack-3" visible="false" managed="false" maxWidth="400.0"/>
+      <!-- Background card 2 -->
+      <VBox styleClass="card card-stack-2" visible="false" managed="false" maxWidth="400.0"/>
+      <!-- Candidate Card (front) -->
       <VBox fx:id="candidateCard" alignment="TOP_CENTER" maxWidth="400.0" spacing="0.0"
-                            styleClass="card">
-        <StackPane prefHeight="350.0"
-                                    style="-fx-background-color: #2a2a40; -fx-background-radius: 20 20 0 0;">
-          <Label style="-fx-text-fill: -fx-text-secondary;" text="[Photo Placeholder]"/>
+                                              styleClass="card card-stack-1">
+        <!-- Swipe Overlays -->
+        <StackPane>
+          <!-- LIKE Overlay -->
+          <Label fx:id="likeOverlay" text="LIKE" visible="false" managed="false"
+                                     styleClass="swipe-overlay swipe-like-overlay swipe-overlay-text"
+                                     StackPane.alignment="TOP_LEFT">
+            <StackPane.margin>
+              <javafx.geometry.Insets top="20" left="20"/>
+            </StackPane.margin>
+          </Label>
+          <!-- PASS Overlay -->
+          <Label fx:id="passOverlay" text="NOPE" visible="false" managed="false"
+                                     styleClass="swipe-overlay swipe-pass-overlay swipe-overlay-text"
+                                     StackPane.alignment="TOP_RIGHT">
+            <StackPane.margin>
+              <javafx.geometry.Insets top="20" right="20"/>
+            </StackPane.margin>
+          </Label>
+          <!-- Photo placeholder -->
+          <StackPane prefHeight="350.0" styleClass="card-photo-placeholder">
+            <Label styleClass="text-secondary" text="[Photo Placeholder]"/>
+          </StackPane>
         </StackPane>
-        <VBox spacing="10.0" style="-fx-padding: 20;">
+        <VBox spacing="10.0" styleClass="card-info-container">
           <HBox alignment="CENTER_LEFT">
-            <Label fx:id="nameLabel" style="-fx-font-size: 24px; -fx-font-weight: bold;"
-                                                    text="Sarah, 28" />
+            <Label fx:id="nameLabel" styleClass="card-name" text="Sarah, 28"/>
             <HBox alignment="CENTER_RIGHT" HBox.hgrow="ALWAYS">
-              <Label fx:id="matchScoreLabel"
-                                                            style="-fx-text-fill: -fx-accent-super; -fx-font-weight: bold;"
-                                                            text="92% Match" />
+              <Label fx:id="matchScoreLabel" styleClass="card-match-score" text="92% Match"/>
             </HBox>
           </HBox>
-          <Label fx:id="distanceLabel" style="-fx-text-fill: -fx-text-secondary;"
-                                            text="📍 3km away" />
+          <Label fx:id="distanceLabel" styleClass="card-distance" text="📍 3km away"/>
           <Label fx:id="bioLabel" prefHeight="80.0" wrapText="true"
-                                            text="Lover of hiking, coding and good coffee. Always looking for the next adventure!" />
+                                                                          text="Lover of hiking, coding and good coffee. Always looking for the next adventure!" />
         </VBox>
       </VBox>
       <!-- Empty State: No More Candidates (Enhanced) -->
       <VBox fx:id="noCandidatesContainer" alignment="CENTER" spacing="24" visible="false"
-                  styleClass="matches-empty-container" maxWidth="450">
+                                    styleClass="matches-empty-container" maxWidth="450">
         <padding>
           <Insets top="40" right="48" bottom="40" left="48"/>
         </padding>
@@ -55,10 +73,9 @@
         <StackPane>
           <FontIcon iconLiteral="mdi2m-magnify-close" iconSize="72" iconColor="#64748b"/>
         </StackPane>
-        <Label style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: white;"
-                       text="No more people around you!"/>
-        <Label style="-fx-text-fill: #94a3b8; -fx-text-alignment: center;" wrapText="true" maxWidth="350"
-                       text="You've seen everyone nearby. Try expanding your search or check back later!"/>
+        <Label styleClass="empty-state-heading" text="No more people around you!"/>
+        <Label styleClass="empty-state-body" wrapText="true" maxWidth="350"
+                                       text="You've seen everyone nearby. Try expanding your search or check back later!"/>
         <!-- Separator -->
         <Region styleClass="matches-separator" prefHeight="1" prefWidth="200">
           <VBox.margin>
@@ -66,28 +83,28 @@
           </VBox.margin>
         </Region>
         <!-- Helpful Action Buttons -->
-        <Label text="WHAT YOU CAN DO" style="-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #64748b; -fx-letter-spacing: 1;"/>
+        <Label text="WHAT YOU CAN DO" styleClass="empty-state-label"/>
         <HBox spacing="16" alignment="CENTER">
           <!-- Expand Preferences -->
           <VBox alignment="CENTER" spacing="8" styleClass="suggestion-card" onMouseClicked="#handleExpandPreferences">
             <StackPane styleClass="suggestion-icon-container">
               <FontIcon iconLiteral="mdi2t-tune" iconSize="24" iconColor="#a855f7"/>
             </StackPane>
-            <Label text="Expand Search" style="-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+            <Label text="Expand Search" styleClass="action-label"/>
           </VBox>
           <!-- Check Likes -->
           <VBox alignment="CENTER" spacing="8" styleClass="suggestion-card" onMouseClicked="#handleCheckLikes">
             <StackPane styleClass="suggestion-icon-container">
               <FontIcon iconLiteral="mdi2h-heart-multiple" iconSize="24" iconColor="#f43f5e"/>
             </StackPane>
-            <Label text="Who Liked You" style="-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+            <Label text="Who Liked You" styleClass="action-label"/>
           </VBox>
           <!-- Improve Profile -->
           <VBox alignment="CENTER" spacing="8" styleClass="suggestion-card" onMouseClicked="#handleImproveProfile">
             <StackPane styleClass="suggestion-icon-container">
               <FontIcon iconLiteral="mdi2a-account-edit" iconSize="24" iconColor="#10b981"/>
             </StackPane>
-            <Label text="Edit Profile" style="-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+            <Label text="Edit Profile" styleClass="action-label"/>
           </VBox>
         </HBox>
         <!-- Return Button -->
@@ -105,23 +122,23 @@
 
   <!-- Action Buttons - Only visible when candidates exist -->
   <bottom>
-    <HBox fx:id="actionButtonsContainer" alignment="CENTER" spacing="30.0" style="-fx-padding: 30;">
-      <Button fx:id="undoButton" onAction="#handleUndo" styleClass="action-button-round" style="-fx-background-color: #334155;">
+    <HBox fx:id="actionButtonsContainer" alignment="CENTER" spacing="30.0" styleClass="card-info-container">
+      <Button fx:id="undoButton" onAction="#handleUndo" styleClass="action-button-round action-btn-neutral">
         <graphic>
           <FontIcon iconLiteral="mdi2u-undo" iconSize="24" iconColor="white"/>
         </graphic>
       </Button>
-      <Button onAction="#handlePass" styleClass="action-button-round" style="-fx-background-color: -fx-accent-pass;">
+      <Button onAction="#handlePass" styleClass="action-button-round action-btn-pass">
         <graphic>
           <FontIcon iconLiteral="mdi2c-close" iconSize="32" iconColor="white"/>
         </graphic>
       </Button>
-      <Button onAction="#handleLike" styleClass="action-button-round" style="-fx-background-color: -fx-accent-like;">
+      <Button onAction="#handleLike" styleClass="action-button-round action-btn-like">
         <graphic>
           <FontIcon iconLiteral="mdi2h-heart" iconSize="32" iconColor="white"/>
         </graphic>
       </Button>
-      <Button styleClass="action-button-round" style="-fx-background-color: #334155;">
+      <Button styleClass="action-button-round action-btn-neutral">
         <graphic>
           <FontIcon iconLiteral="mdi2s-star" iconSize="24" iconColor="#f59e0b"/>
         </graphic>

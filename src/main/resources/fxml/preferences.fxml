@@ -16,26 +16,26 @@
 <BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="450.0" xmlns="http://javafx.com/javafx/21"
     xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.PreferencesController">
   <top>
-    <HBox alignment="CENTER_LEFT" spacing="20.0" style="-fx-background-color: -fx-surface-dark; -fx-padding: 15;">
+    <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="header-surface">
       <Button onAction="#handleBack" styleClass="icon-button">
         <graphic>
           <FontIcon iconLiteral="mdi2a-arrow-left" iconSize="24" iconColor="white"/>
         </graphic>
       </Button>
-      <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Discovery Settings"/>
+      <Label styleClass="screen-title" text="Discovery Settings"/>
       <Region HBox.hgrow="ALWAYS"/>
-      <Button text="Save" onAction="#handleSave" style="-fx-background-color: transparent; -fx-text-fill: -fx-accent-super; -fx-font-weight: bold; -fx-font-size: 14px;"/>
+      <Button text="Save" onAction="#handleSave" styleClass="button-accent-text"/>
     </HBox>
   </top>
 
   <center>
-    <VBox spacing="24.0" style="-fx-padding: 24;">
+    <VBox spacing="24.0" styleClass="card-info-container">
       <!-- Distance Section -->
       <VBox spacing="10.0">
         <HBox alignment="CENTER_LEFT">
-          <Label text="Maximum Distance" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+          <Label text="Maximum Distance" styleClass="preference-label"/>
           <Region HBox.hgrow="ALWAYS"/>
-          <Label fx:id="distanceValueLabel" text="50 km" style="-fx-text-fill: -fx-text-secondary;"/>
+          <Label fx:id="distanceValueLabel" text="50 km" styleClass="preference-value"/>
         </HBox>
         <Slider fx:id="distanceSlider" min="1" max="100" blockIncrement="1" showTickMarks="false"/>
       </VBox>
@@ -43,32 +43,45 @@
       <!-- Age Range Section -->
       <VBox spacing="10.0">
         <HBox alignment="CENTER_LEFT">
-          <Label text="Age Preference" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+          <Label text="Age Preference" styleClass="preference-label"/>
           <Region HBox.hgrow="ALWAYS"/>
           <Label fx:id="ageStartLabel" text="18"/>
           <Label text=""/>
           <Label fx:id="ageEndLabel" text="35"/>
         </HBox>
-        <Label text="Min Age" style="-fx-font-size: 11px; -fx-text-fill: -fx-text-secondary;"/>
+        <Label text="Min Age" styleClass="preference-hint"/>
         <Slider fx:id="minAgeSlider" min="18" max="99" blockIncrement="1"/>
-        <Label text="Max Age" style="-fx-font-size: 11px; -fx-text-fill: -fx-text-secondary;"/>
+        <Label text="Max Age" styleClass="preference-hint"/>
         <Slider fx:id="maxAgeSlider" min="18" max="99" blockIncrement="1"/>
       </VBox>
       <Separator/>
       <!-- Interesting In Section -->
       <VBox spacing="12.0">
-        <Label text="Show Me" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+        <Label text="Show Me" styleClass="preference-label"/>
         <VBox spacing="8" styleClass="toggle-group-container">
           <fx:define>
             <ToggleGroup fx:id="genderGroup"/>
           </fx:define>
           <ToggleButton fx:id="menToggle" text="Men" toggleGroup="$genderGroup"
-                                            maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
+                                                                maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
           <ToggleButton fx:id="womenToggle" text="Women" toggleGroup="$genderGroup"
-                                            maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
+                                                                maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
           <ToggleButton fx:id="everyoneToggle" text="Everyone" toggleGroup="$genderGroup"
-                                            maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
+                                                                maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
         </VBox>
+      </VBox>
+      <Separator/>
+      <!-- Theme Section -->
+      <VBox spacing="12.0">
+        <Label text="Appearance" styleClass="preference-label"/>
+        <HBox alignment="CENTER_LEFT" spacing="16">
+          <VBox spacing="4" HBox.hgrow="ALWAYS">
+            <Label text="Dark Mode" styleClass="stat-label-primary"/>
+            <Label text="Use dark theme for the app" styleClass="preference-hint"/>
+          </VBox>
+          <ToggleButton fx:id="themeToggle" onAction="#handleThemeToggle"
+                                  styleClass="theme-toggle-button"/>
+        </HBox>
       </VBox>
     </VBox>
   </center>

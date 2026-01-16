@@ -5,10 +5,8 @@ import datingapp.core.DailyLimitService;
 import datingapp.core.DailyLimitService.DailyStatus;
 import datingapp.core.DailyPickService;
 import datingapp.core.DailyPickService.DailyPick;
-import datingapp.core.Match;
 import datingapp.core.MatchStorage;
 import datingapp.core.ProfileCompletionService;
-import datingapp.core.ProfileCompletionService.CompletionResult;
 import datingapp.core.User;
 import datingapp.core.UserAchievement;
 import datingapp.ui.UISession;
@@ -67,6 +65,9 @@ public class DashboardViewModel {
     /**
      * Refreshes all dashboard data from the services.
      */
+    /**
+     * Refreshes all dashboard data from the services asynchronously.
+     */
     public void refresh() {
         User user = getCurrentUser();
         if (user == null) {
@@ -74,71 +75,81 @@ public class DashboardViewModel {
             return;
         }
 
-        logger.info("Refreshing dashboard data for user: {}", user.getName());
+        // Run data fetching in background to prevent UI freeze
+        Thread.ofVirtual().start(() -> performRefresh(user));
+    }
 
-        // Update username
-        userName.set(user.getName());
+    private void performRefresh(User user) {
+        logger.info("Performing dashboard refresh for user: {}", user.getName());
 
-        // Profile completion (static method)
+        // 1. Data that doesn't need DB can be set immediately or just captured
+        String name = user.getName();
+
+        // 2. Fetch DB data
+        String completionText = "--";
         try {
-            CompletionResult completion = ProfileCompletionService.calculate(user);
-            profileCompletion.set(completion.getDisplayString());
+            completionText = ProfileCompletionService.calculate(user).getDisplayString();
         } catch (Exception e) {
-            logger.error("Failed to calculate profile completion", e);
-            profileCompletion.set("--");
+            logger.error("Completion count error", e);
         }
 
-        // Daily likes (use getStatus)
+        String likesText = "Likes: --/50";
         try {
             DailyStatus status = dailyLimitService.getStatus(user.getId());
-            if (status.hasUnlimitedLikes()) {
-                dailyLikesStatus.set("Likes: ∞");
-            } else {
-                dailyLikesStatus.set(
-                        "Likes: " + status.likesUsed() + "/" + (status.likesUsed() + status.likesRemaining()));
-            }
+            likesText = status.hasUnlimitedLikes()
+                    ? "Likes: ∞"
+                    : "Likes: " + status.likesUsed() + "/" + (status.likesUsed() + status.likesRemaining());
         } catch (Exception e) {
-            logger.error("Failed to get daily likes", e);
-            dailyLikesStatus.set("Likes: --/50");
+            logger.error("Likes reload error", e);
         }
 
-        // Total matches (use getActiveMatchesFor)
+        String matchCount = "--";
         try {
-            List<Match> matches = matchStorage.getActiveMatchesFor(user.getId());
-            totalMatches.set(String.valueOf(matches.size()));
+            matchCount = String.valueOf(
+                    matchStorage.getActiveMatchesFor(user.getId()).size());
         } catch (Exception e) {
-            logger.error("Failed to get matches", e);
-            totalMatches.set("--");
+            logger.error("Match count error", e);
         }
 
-        // Daily pick (returns DailyPick, not User)
+        String pickName = "No pick available";
         try {
             Optional<DailyPick> pick = dailyPickService.getDailyPick(user);
             if (pick.isPresent()) {
-                DailyPick dailyPick = pick.get();
-                User pickedUser = dailyPick.user();
-                dailyPickName.set(pickedUser.getName() + ", " + pickedUser.getAge());
-            } else {
-                dailyPickName.set("No pick available");
+                User pickedUser = pick.get().user();
+                pickName = pickedUser.getName() + ", " + pickedUser.getAge();
             }
         } catch (Exception e) {
-            logger.error("Failed to get daily pick", e);
-            dailyPickName.set("Error loading");
+            logger.error("Daily pick error", e);
         }
 
-        // Recent achievements (use getIcon() not getEmoji())
+        List<UserAchievement> achievements = List.of();
         try {
+            achievements = achievementService.getUnlocked(user.getId());
+        } catch (Exception e) {
+            logger.error("Achievements error", e);
+        }
+
+        // 3. Update UI on FX Thread
+        final String finalCompletion = completionText;
+        final String finalLikes = likesText;
+        final String finalMatches = matchCount;
+        final String finalPick = pickName;
+        final List<UserAchievement> finalAchievements = achievements;
+
+        javafx.application.Platform.runLater(() -> {
+            userName.set(name);
+            profileCompletion.set(finalCompletion);
+            dailyLikesStatus.set(finalLikes);
+            totalMatches.set(finalMatches);
+            dailyPickName.set(finalPick);
+
             recentAchievements.clear();
-            List<UserAchievement> achievements = achievementService.getUnlocked(user.getId());
-            // Show the 3 most recent
-            achievements.stream()
+            finalAchievements.stream()
                     .sorted((a, b) -> b.unlockedAt().compareTo(a.unlockedAt()))
                     .limit(3)
                     .forEach(ua -> recentAchievements.add(
                             ua.achievement().getIcon() + " " + ua.achievement().getDisplayName()));
-        } catch (Exception e) {
-            logger.error("Failed to get achievements", e);
-        }
+        });
     }
 
     // --- Properties for data binding ---

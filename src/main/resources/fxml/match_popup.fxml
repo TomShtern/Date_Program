@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<StackPane fx:id="rootPane" styleClass="match-popup-overlay"
+    xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="datingapp.ui.controller.MatchPopupController">
+  <!-- Confetti Canvas (background) -->
+  <Canvas fx:id="confettiCanvas"/>
+  <!-- Content -->
+  <VBox alignment="CENTER" spacing="30" maxWidth="450">
+    <padding>
+      <Insets top="60" right="40" bottom="60" left="40"/>
+    </padding>
+    <!-- Avatars + Heart -->
+    <HBox alignment="CENTER" spacing="30">
+      <StackPane styleClass="match-avatar-wrapper">
+        <FontIcon fx:id="leftAvatarIcon" iconLiteral="mdi2a-account" iconSize="48" iconColor="white"/>
+      </StackPane>
+      <FontIcon fx:id="heartIcon" iconLiteral="mdi2h-heart" iconSize="64"
+                            styleClass="match-heart"/>
+      <StackPane styleClass="match-avatar-wrapper">
+        <FontIcon fx:id="rightAvatarIcon" iconLiteral="mdi2a-account" iconSize="48" iconColor="white"/>
+      </StackPane>
+    </HBox>
+    <!-- Title -->
+    <Label text="It's a Match!" styleClass="match-title"/>
+    <!-- Subtitle -->
+    <Label fx:id="matchMessage" styleClass="match-subtitle"
+                   text="You and Sarah liked each other!"/>
+    <!-- Action Buttons -->
+    <VBox spacing="12" alignment="CENTER">
+      <Button text="Send Message" onAction="#handleMessage" styleClass="match-message-btn" maxWidth="280">
+        <graphic>
+          <FontIcon iconLiteral="mdi2c-chat" iconSize="20" iconColor="white"/>
+        </graphic>
+      </Button>
+      <Button text="Keep Browsing" onAction="#handleContinue" styleClass="match-continue-btn"/>
+    </VBox>
+  </VBox>
+</StackPane>

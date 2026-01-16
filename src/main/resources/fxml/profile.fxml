@@ -6,12 +6,14 @@
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.Circle?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="700.0"
@@ -29,9 +31,8 @@
       <Region HBox.hgrow="ALWAYS"/>
       <!-- Profile Completion Badge -->
       <VBox alignment="CENTER" spacing="2">
-        <Label fx:id="completionLabel" styleClass="notification-badge"
-                    style="-fx-font-size: 13px; -fx-padding: 6 12;" text="20%"/>
-        <Label style="-fx-font-size: 10px; -fx-text-fill: #94a3b8;" text="complete"/>
+        <Label fx:id="completionLabel" styleClass="notification-badge profile-completion-percent" text="20%"/>
+        <Label styleClass="profile-completion-text" text="complete"/>
       </VBox>
     </HBox>
   </top>
@@ -48,18 +49,27 @@
           <StackPane styleClass="profile-avatar-container">
             <!-- Outer glow ring -->
             <StackPane styleClass="profile-glow-ring"/>
-            <!-- Inner avatar circle -->
-            <StackPane styleClass="profile-avatar-inner">
-              <FontIcon iconLiteral="mdi2a-account" iconSize="56" iconColor="#94a3b8"/>
+            <!-- Inner avatar circle with photo or placeholder -->
+            <StackPane fx:id="avatarInner" styleClass="profile-avatar-inner">
+              <!-- Profile photo ImageView (hidden by default) -->
+              <ImageView fx:id="profileImageView" fitWidth="100" fitHeight="100" preserveRatio="true" visible="false">
+                <clip>
+                  <Circle radius="50" centerX="50" centerY="50"/>
+                </clip>
+              </ImageView>
+              <!-- Placeholder icon (shown when no photo) -->
+              <FontIcon fx:id="avatarPlaceholderIcon" iconLiteral="mdi2a-account" iconSize="56" iconColor="#94a3b8"/>
             </StackPane>
-            <!-- Camera button overlay -->
+            <!-- Camera button overlay - clickable -->
             <VBox alignment="BOTTOM_RIGHT">
               <padding>
                 <Insets right="5" bottom="5"/>
               </padding>
-              <StackPane styleClass="profile-camera-btn">
-                <FontIcon iconLiteral="mdi2c-camera" iconSize="18" iconColor="white"/>
-              </StackPane>
+              <Button fx:id="cameraButton" onAction="#handleUploadPhoto" styleClass="profile-camera-btn">
+                <graphic>
+                  <FontIcon iconLiteral="mdi2c-camera" iconSize="18" iconColor="white"/>
+                </graphic>
+              </Button>
             </VBox>
           </StackPane>
           <Label fx:id="nameLabel" styleClass="profile-name" text="User Name"/>
@@ -78,7 +88,7 @@
             <Label fx:id="charCountLabel" styleClass="char-counter" text="0/500"/>
           </HBox>
           <TextArea fx:id="bioArea" prefHeight="100" promptText="Tell others about yourself..."
-                        wrapText="true" styleClass="bio-textarea"/>
+                                                      wrapText="true" styleClass="bio-textarea"/>
         </VBox>
         <!-- Location Section -->
         <VBox styleClass="section-glass-card" spacing="12">
@@ -91,7 +101,7 @@
           <HBox spacing="12" alignment="CENTER_LEFT">
             <FontIcon iconLiteral="mdi2m-map-marker-outline" iconSize="20" iconColor="#64748b"/>
             <TextField fx:id="locationField" promptText="e.g. 40.7128, -74.0060"
-                            HBox.hgrow="ALWAYS"/>
+                                                                HBox.hgrow="ALWAYS"/>
           </HBox>
         </VBox>
         <!-- Interests Section -->
@@ -102,7 +112,7 @@
             </StackPane>
             <Label styleClass="section-title" text="Interests"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label styleClass="text-secondary" style="-fx-font-size: 11px;" text="Read-only"/>
+            <Label styleClass="text-secondary profile-readonly-hint" text="Read-only"/>
           </HBox>
           <!-- Interest chips display -->
           <FlowPane fx:id="interestsFlow" styleClass="interests-container" hgap="10" vgap="10">
@@ -112,7 +122,7 @@
           <TextField fx:id="interestsField" visible="false" managed="false"/>
           <HBox alignment="CENTER_LEFT" spacing="8">
             <FontIcon iconLiteral="mdi2i-information-outline" iconSize="14" iconColor="#64748b"/>
-            <Label styleClass="text-secondary" style="-fx-font-size: 12px;" text="Edit interests in Settings"/>
+            <Label styleClass="text-secondary profile-edit-hint" text="Edit interests in Settings"/>
           </HBox>
         </VBox>
         <!-- Spacer to ensure scroll content doesn't overlap with sticky footer -->

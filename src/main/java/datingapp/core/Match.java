@@ -160,10 +160,11 @@ public class Match {
 
     private boolean isValidTransition(State from, State to) {
         return switch (from) {
-            case ACTIVE -> Set.of(State.FRIENDS, State.UNMATCHED, State.GRACEFUL_EXIT, State.BLOCKED)
-                    .contains(to);
-            case FRIENDS -> Set.of(State.UNMATCHED, State.GRACEFUL_EXIT, State.BLOCKED)
-                    .contains(to);
+            case ACTIVE ->
+                Set.of(State.FRIENDS, State.UNMATCHED, State.GRACEFUL_EXIT, State.BLOCKED)
+                        .contains(to);
+            case FRIENDS ->
+                Set.of(State.UNMATCHED, State.GRACEFUL_EXIT, State.BLOCKED).contains(to);
             case UNMATCHED, GRACEFUL_EXIT, BLOCKED -> false;
         };
     }

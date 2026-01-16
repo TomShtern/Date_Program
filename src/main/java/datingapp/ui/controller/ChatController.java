@@ -21,6 +21,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
@@ -59,8 +60,22 @@ public class ChatController implements Initializable {
 
     private final ChatViewModel viewModel;
 
+    // Field-level listener to prevent multiplication
+    private final javafx.beans.value.ChangeListener<ConversationPreview> selectionListener;
+
     public ChatController(ChatViewModel viewModel) {
         this.viewModel = viewModel;
+        this.selectionListener = (obs, oldVal, newVal) -> {
+            viewModel.selectedConversationProperty().set(newVal);
+            if (newVal != null) {
+                chatHeaderLabel.setText(newVal.otherUser().getName());
+                chatContainer.setVisible(true);
+                emptyStateContainer.setVisible(false);
+            } else {
+                chatContainer.setVisible(false);
+                emptyStateContainer.setVisible(true);
+            }
+        };
     }
 
     @Override
@@ -75,17 +90,8 @@ public class ChatController implements Initializable {
         messageListView.setCellFactory(lv -> createMessageCell());
 
         // Bind selection
-        conversationListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            viewModel.selectedConversationProperty().set(newVal);
-            if (newVal != null) {
-                chatHeaderLabel.setText(newVal.otherUser().getName());
-                chatContainer.setVisible(true);
-                emptyStateContainer.setVisible(false);
-            } else {
-                chatContainer.setVisible(false);
-                emptyStateContainer.setVisible(true);
-            }
-        });
+        conversationListView.getSelectionModel().selectedItemProperty().removeListener(selectionListener);
+        conversationListView.getSelectionModel().selectedItemProperty().addListener(selectionListener);
 
         // Initial state
         chatContainer.setVisible(false);
@@ -104,6 +110,7 @@ public class ChatController implements Initializable {
         private final StackPane avatarStack = new StackPane();
         private final org.kordamp.ikonli.javafx.FontIcon avatarIcon =
                 new org.kordamp.ikonli.javafx.FontIcon("mdi2a-account");
+        private final Region statusDot = new Region();
         private final VBox textBox = new VBox(4);
         private final HBox topRow = new HBox(10);
         private final Label nameLabel = new Label();
@@ -115,7 +122,14 @@ public class ChatController implements Initializable {
             avatarStack.getStyleClass().add("icon-primary");
             avatarStack.setStyle("-fx-background-color: -fx-surface-dark; -fx-background-radius: 20;");
             avatarIcon.setIconSize(24);
-            avatarStack.getChildren().add(avatarIcon);
+
+            // Configure status dot
+            statusDot.getStyleClass().addAll("status-dot", "status-online");
+            StackPane.setAlignment(statusDot, Pos.BOTTOM_RIGHT);
+            statusDot.setTranslateX(2);
+            statusDot.setTranslateY(2);
+
+            avatarStack.getChildren().addAll(avatarIcon, statusDot);
 
             nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
             snippetLabel.getStyleClass().add("text-secondary");
@@ -200,10 +214,12 @@ public class ChatController implements Initializable {
                 container.getChildren().clear();
 
                 if (isMine) {
-                    bubble.getStyleClass().add("message-bubble-gradient");
+                    bubble.getStyleClass().setAll("message-bubble-gradient");
+                    bubble.setStyle(""); // Clear any explicit style
                     container.setAlignment(Pos.CENTER_RIGHT);
                     container.getChildren().add(bubble);
                 } else {
+                    bubble.getStyleClass().clear();
                     bubble.setStyle("-fx-background-color: -fx-surface-dark; -fx-background-radius: 18 18 18 4;");
                     container.setAlignment(Pos.CENTER_LEFT);
                     container.getChildren().add(bubble);

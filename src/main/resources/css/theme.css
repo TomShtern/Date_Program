@@ -60,44 +60,7 @@
    Animations & Keyframes
    ============================================ */
 
-@keyframes fade-in {
-    from {
-        -fx-opacity: 0;
-    }
-
-    to {
-        -fx-opacity: 1;
-    }
-}
-
-@keyframes slide-up {
-    from {
-        -fx-translate-y: 20;
-        -fx-opacity: 0;
-    }
-
-    to {
-        -fx-translate-y: 0;
-        -fx-opacity: 1;
-    }
-}
-
-@keyframes pulse {
-    0% {
-        -fx-scale-x: 1.0;
-        -fx-scale-y: 1.0;
-    }
-
-    50% {
-        -fx-scale-x: 1.05;
-        -fx-scale-y: 1.05;
-    }
-
-    100% {
-        -fx-scale-x: 1.0;
-        -fx-scale-y: 1.0;
-    }
-}
+/* Keyframes removed - Not supported in JavaFX CSS */
 
 /* ============================================
    Typography Polish
@@ -1105,7 +1068,7 @@
 }
 
 .matches-count-badge {
-    -fx-background-color: linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(168, 85, 247, 0.15));
+    -fx-background-color: linear-gradient(to bottom right, rgba(244, 63, 94, 0.2), rgba(168, 85, 247, 0.15));
     -fx-background-radius: 16;
     -fx-padding: 6 16;
     -fx-border-color: rgba(244, 63, 94, 0.3);
@@ -1114,9 +1077,9 @@
 
 /* Matches Empty State - Glassmorphic Container */
 .matches-empty-container {
-    -fx-background-color: linear-gradient(135deg, rgba(30, 30, 46, 0.95), rgba(20, 20, 35, 0.85));
+    -fx-background-color: linear-gradient(to bottom right, rgba(30, 30, 46, 0.95), rgba(20, 20, 35, 0.85));
     -fx-background-radius: 28;
-    -fx-border-color: linear-gradient(135deg, rgba(244, 63, 94, 0.3), rgba(168, 85, 247, 0.2));
+    -fx-border-color: linear-gradient(to bottom right, rgba(244, 63, 94, 0.3), rgba(168, 85, 247, 0.2));
     -fx-border-radius: 28;
     -fx-border-width: 1;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 40, 0, 0, 15);
@@ -1143,7 +1106,7 @@
 
 /* Matches Browse Button - Premium Animated */
 .matches-browse-btn {
-    -fx-background-color: linear-gradient(135deg, #f43f5e, #a855f7);
+    -fx-background-color: linear-gradient(to bottom right, #f43f5e, #a855f7);
     -fx-background-radius: 22;
     -fx-text-fill: white;
     -fx-font-size: 15px;
@@ -1154,7 +1117,7 @@
 }
 
 .matches-browse-btn:hover {
-    -fx-background-color: linear-gradient(135deg, #fb7185, #c084fc);
+    -fx-background-color: linear-gradient(to bottom right, #fb7185, #c084fc);
     -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.6), 28, 0.4, 0, 10);
     -fx-scale-x: 1.03;
     -fx-scale-y: 1.03;
@@ -1170,7 +1133,7 @@
    =============================================== */
 
 .match-card {
-    -fx-background-color: linear-gradient(145deg, rgba(30, 30, 46, 0.98), rgba(20, 20, 35, 0.95));
+    -fx-background-color: linear-gradient(to bottom right, rgba(30, 30, 46, 0.98), rgba(20, 20, 35, 0.95));
     -fx-background-radius: 22;
     -fx-border-color: rgba(16, 185, 129, 0.25);
     -fx-border-radius: 22;
@@ -1181,7 +1144,7 @@
 }
 
 .match-card:hover {
-    -fx-background-color: linear-gradient(145deg, rgba(35, 35, 55, 0.98), rgba(25, 25, 42, 0.95));
+    -fx-background-color: linear-gradient(to bottom right, rgba(35, 35, 55, 0.98), rgba(25, 25, 42, 0.95));
     -fx-border-color: rgba(16, 185, 129, 0.5);
     -fx-translate-y: -8;
     -fx-scale-x: 1.02;
@@ -1191,10 +1154,10 @@
 
 /* Match Avatar Container with Glow Ring */
 .match-avatar-container {
-    -fx-background-color: linear-gradient(180deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+    -fx-background-color: linear-gradient(to bottom, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
     -fx-background-radius: 40;
     -fx-padding: 8;
-    -fx-border-color: linear-gradient(180deg, rgba(16, 185, 129, 0.5), rgba(16, 185, 129, 0.2));
+    -fx-border-color: linear-gradient(to bottom, rgba(16, 185, 129, 0.5), rgba(16, 185, 129, 0.2));
     -fx-border-radius: 40;
     -fx-border-width: 2;
     -fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.5), 20, 0.3, 0, 0);
@@ -1219,7 +1182,7 @@
 
 /* New Match Badge - For matches < 24h */
 .new-match-badge {
-    -fx-background-color: linear-gradient(135deg, #f59e0b, #f43f5e);
+    -fx-background-color: linear-gradient(to bottom right, #f59e0b, #f43f5e);
     -fx-background-radius: 12;
     -fx-padding: 4 12;
     -fx-text-fill: white;
@@ -1230,7 +1193,7 @@
 
 /* Match Message Button */
 .match-message-btn {
-    -fx-background-color: linear-gradient(135deg, #10b981, #059669);
+    -fx-background-color: linear-gradient(to bottom right, #10b981, #059669);
     -fx-background-radius: 18;
     -fx-text-fill: white;
     -fx-font-size: 13px;
@@ -1241,7 +1204,7 @@
 }
 
 .match-message-btn:hover {
-    -fx-background-color: linear-gradient(135deg, #34d399, #10b981);
+    -fx-background-color: linear-gradient(to bottom right, #34d399, #10b981);
     -fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.6), 18, 0.3, 0, 6);
     -fx-scale-x: 1.05;
     -fx-scale-y: 1.05;
@@ -1290,19 +1253,7 @@
 }
 
 /* Pulse animation for empty state icon */
-@keyframes pulse-glow {
-    0% {
-        -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.4), 25, 0.3, 0, 0);
-    }
 
-    50% {
-        -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.7), 40, 0.5, 0, 0);
-    }
-
-    100% {
-        -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.4), 25, 0.3, 0, 0);
-    }
-}
 
 /* ===============================================
    SUGGESTION CARDS - Empty State Actions
@@ -1352,7 +1303,7 @@
 
 /* Browse Card - Amber/Orange Theme */
 .dashboard-card-browse {
-    -fx-background-color: linear-gradient(145deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.08)), #1e1e2e;
+    -fx-background-color: linear-gradient(to bottom right, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.08)), #1e1e2e;
     -fx-border-color: rgba(245, 158, 11, 0.4);
     -fx-border-radius: 20;
     -fx-border-width: 1;
@@ -1360,7 +1311,7 @@
 }
 
 .dashboard-card-browse:hover {
-    -fx-background-color: linear-gradient(145deg, rgba(245, 158, 11, 0.25), rgba(251, 191, 36, 0.15)), #252538;
+    -fx-background-color: linear-gradient(to bottom right, rgba(245, 158, 11, 0.25), rgba(251, 191, 36, 0.15)), #252538;
     -fx-border-color: rgba(245, 158, 11, 0.7);
     -fx-effect: dropshadow(gaussian, rgba(245, 158, 11, 0.5), 25, 0.2, 0, 8);
     -fx-scale-x: 1.03;
@@ -1373,7 +1324,7 @@
 
 /* Matches Card - Rose/Pink Theme */
 .dashboard-card-matches {
-    -fx-background-color: linear-gradient(145deg, rgba(244, 63, 94, 0.15), rgba(251, 113, 133, 0.08)), #1e1e2e;
+    -fx-background-color: linear-gradient(to bottom right, rgba(244, 63, 94, 0.15), rgba(251, 113, 133, 0.08)), #1e1e2e;
     -fx-border-color: rgba(244, 63, 94, 0.4);
     -fx-border-radius: 20;
     -fx-border-width: 1;
@@ -1381,7 +1332,7 @@
 }
 
 .dashboard-card-matches:hover {
-    -fx-background-color: linear-gradient(145deg, rgba(244, 63, 94, 0.25), rgba(251, 113, 133, 0.15)), #252538;
+    -fx-background-color: linear-gradient(to bottom right, rgba(244, 63, 94, 0.25), rgba(251, 113, 133, 0.15)), #252538;
     -fx-border-color: rgba(244, 63, 94, 0.7);
     -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.5), 25, 0.2, 0, 8);
     -fx-scale-x: 1.03;
@@ -1394,7 +1345,7 @@
 
 /* Chat Card - Blue/Cyan Theme */
 .dashboard-card-chat {
-    -fx-background-color: linear-gradient(145deg, rgba(59, 130, 246, 0.15), rgba(96, 165, 250, 0.08)), #1e1e2e;
+    -fx-background-color: linear-gradient(to bottom right, rgba(59, 130, 246, 0.15), rgba(96, 165, 250, 0.08)), #1e1e2e;
     -fx-border-color: rgba(59, 130, 246, 0.4);
     -fx-border-radius: 20;
     -fx-border-width: 1;
@@ -1402,7 +1353,7 @@
 }
 
 .dashboard-card-chat:hover {
-    -fx-background-color: linear-gradient(145deg, rgba(59, 130, 246, 0.25), rgba(96, 165, 250, 0.15)), #252538;
+    -fx-background-color: linear-gradient(to bottom right, rgba(59, 130, 246, 0.25), rgba(96, 165, 250, 0.15)), #252538;
     -fx-border-color: rgba(59, 130, 246, 0.7);
     -fx-effect: dropshadow(gaussian, rgba(59, 130, 246, 0.5), 25, 0.2, 0, 8);
     -fx-scale-x: 1.03;
@@ -1415,7 +1366,7 @@
 
 /* Profile Card - Purple/Violet Theme */
 .dashboard-card-profile {
-    -fx-background-color: linear-gradient(145deg, rgba(168, 85, 247, 0.15), rgba(192, 132, 252, 0.08)), #1e1e2e;
+    -fx-background-color: linear-gradient(to bottom right, rgba(168, 85, 247, 0.15), rgba(192, 132, 252, 0.08)), #1e1e2e;
     -fx-border-color: rgba(168, 85, 247, 0.4);
     -fx-border-radius: 20;
     -fx-border-width: 1;
@@ -1423,7 +1374,7 @@
 }
 
 .dashboard-card-profile:hover {
-    -fx-background-color: linear-gradient(145deg, rgba(168, 85, 247, 0.25), rgba(192, 132, 252, 0.15)), #252538;
+    -fx-background-color: linear-gradient(to bottom right, rgba(168, 85, 247, 0.25), rgba(192, 132, 252, 0.15)), #252538;
     -fx-border-color: rgba(168, 85, 247, 0.7);
     -fx-effect: dropshadow(gaussian, rgba(168, 85, 247, 0.5), 25, 0.2, 0, 8);
     -fx-scale-x: 1.03;
@@ -1447,7 +1398,7 @@
 
 /* Daily Pick Enhanced Card */
 .daily-pick-card {
-    -fx-background-color: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(245, 158, 11, 0.06)), rgba(30, 30, 46, 0.95);
+    -fx-background-color: linear-gradient(to bottom right, rgba(251, 191, 36, 0.12), rgba(245, 158, 11, 0.06)), rgba(30, 30, 46, 0.95);
     -fx-background-radius: 24;
     -fx-border-color: rgba(251, 191, 36, 0.3);
     -fx-border-radius: 24;
@@ -1470,7 +1421,7 @@
 
 /* Sidebar Card Container */
 .sidebar-card {
-    -fx-background-color: linear-gradient(135deg, rgba(30, 30, 46, 0.9), rgba(20, 20, 35, 0.85));
+    -fx-background-color: linear-gradient(to bottom right, rgba(30, 30, 46, 0.9), rgba(20, 20, 35, 0.85));
     -fx-background-radius: 20;
     -fx-border-color: rgba(100, 116, 139, 0.2);
     -fx-border-radius: 20;
@@ -1486,7 +1437,7 @@
 
 /* User Avatar in Header */
 .user-avatar-container {
-    -fx-background-color: linear-gradient(135deg, #a855f7, #f43f5e);
+    -fx-background-color: linear-gradient(to bottom right, #a855f7, #f43f5e);
     -fx-background-radius: 20;
     -fx-min-width: 40;
     -fx-min-height: 40;
@@ -1519,4 +1470,656 @@
     -fx-font-size: 18px;
     -fx-font-weight: 700;
     -fx-text-fill: #10b981;
+}
+
+/* ============================================
+   Toast Notification System
+   ============================================ */
+.toast {
+    -fx-background-color: rgba(30, 41, 59, 0.95);
+    -fx-background-radius: 12;
+    -fx-padding: 16 24;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 15, 0, 0, 5);
+}
+
+.toast-message {
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+}
+
+.toast-success {
+    -fx-border-color: #10b981;
+    -fx-border-width: 0 0 0 4;
+    -fx-border-radius: 12 0 0 12;
+}
+
+.toast-success .ikonli-font-icon {
+    -fx-icon-color: #10b981;
+}
+
+.toast-error {
+    -fx-border-color: #ef4444;
+    -fx-border-width: 0 0 0 4;
+    -fx-border-radius: 12 0 0 12;
+}
+
+.toast-error .ikonli-font-icon {
+    -fx-icon-color: #ef4444;
+}
+
+.toast-warning {
+    -fx-border-color: #f59e0b;
+    -fx-border-width: 0 0 0 4;
+    -fx-border-radius: 12 0 0 12;
+}
+
+.toast-warning .ikonli-font-icon {
+    -fx-icon-color: #f59e0b;
+}
+
+.toast-info {
+    -fx-border-color: #3b82f6;
+    -fx-border-width: 0 0 0 4;
+    -fx-border-radius: 12 0 0 12;
+}
+
+.toast-info .ikonli-font-icon {
+    -fx-icon-color: #3b82f6;
+}
+
+/* ============================================
+   Extracted Inline Styles
+   ============================================ */
+
+/* Screen Headers */
+.screen-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+}
+
+.screen-subtitle {
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* Stats / Achievement Labels */
+.stat-label-primary {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.stat-label-secondary {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.stat-label-small {
+    -fx-font-size: 11px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* Preference Screen Labels */
+.preference-label {
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
+
+.preference-hint {
+    -fx-font-size: 11px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.preference-value {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* Card Info Labels */
+.card-name {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+
+.card-match-score {
+    -fx-text-fill: -fx-accent-super;
+    -fx-font-weight: bold;
+}
+
+.card-distance {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* Empty State Messaging */
+.empty-state-heading {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.empty-state-body {
+    -fx-text-fill: #94a3b8;
+    -fx-text-alignment: center;
+}
+
+.empty-state-label {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #64748b;
+}
+
+/* Action Suggestion Labels */
+.action-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: white;
+}
+
+/* Dashboard Card Labels */
+.dashboard-card-label {
+    -fx-font-size: 16px;
+    -fx-font-weight: 600;
+    -fx-text-fill: white;
+}
+
+/* Sidebar Stats */
+.sidebar-stat-label {
+    -fx-text-fill: #94a3b8;
+}
+
+.sidebar-stat-value {
+    -fx-font-weight: 600;
+    -fx-text-fill: #a855f7;
+}
+
+/* Profile Completion Labels */
+.profile-completion-percent {
+    -fx-font-size: 13px;
+    -fx-padding: 6 12;
+}
+
+.profile-completion-text {
+    -fx-font-size: 10px;
+    -fx-text-fill: #94a3b8;
+}
+
+.profile-readonly-hint {
+    -fx-font-size: 11px;
+}
+
+.profile-edit-hint {
+    -fx-font-size: 12px;
+}
+
+/* Match Card Timestamp */
+.match-timestamp {
+    -fx-font-size: 11px;
+    -fx-text-fill: #475569;
+}
+
+/* Match Count Badge */
+.match-count-badge {
+    -fx-text-fill: #f43f5e;
+    -fx-font-weight: 600;
+    -fx-font-size: 13px;
+}
+
+/* Header Styles */
+.header-surface {
+    -fx-background-color: -fx-surface-dark;
+    -fx-padding: 15;
+}
+
+/* Action Button Background Variants */
+.action-btn-neutral {
+    -fx-background-color: #334155;
+}
+
+.action-btn-pass {
+    -fx-background-color: -fx-accent-pass;
+}
+
+.action-btn-like {
+    -fx-background-color: -fx-accent-like;
+}
+
+/* Card Photo Placeholder */
+.card-photo-placeholder {
+    -fx-background-color: #2a2a40;
+    -fx-background-radius: 20 20 0 0;
+}
+
+/* Card Info Container */
+.card-info-container {
+    -fx-padding: 20;
+}
+
+/* ============================================
+   Custom Styled Tooltips
+   ============================================ */
+.tooltip {
+    -fx-background-color: rgba(15, 23, 42, 0.95);
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-padding: 8 12;
+    -fx-background-radius: 8;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 10, 0, 0, 4);
+}
+
+.tooltip>.text {
+    -fx-text-fill: white;
+}
+
+/* Button Accent Text - for transparent buttons with accent-colored text */
+.button-accent-text {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-accent-super;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
+
+.button-accent-text:hover {
+    -fx-background-color: rgba(245, 158, 11, 0.1);
+}
+
+/* ============================================
+   Form Validation Styles
+   ============================================ */
+.text-field.error,
+.text-area.error {
+    -fx-border-color: #ef4444;
+    -fx-border-width: 1.5;
+    -fx-effect: dropshadow(gaussian, rgba(239, 68, 68, 0.3), 8, 0, 0, 0);
+}
+
+.text-field.success,
+.text-area.success {
+    -fx-border-color: #10b981;
+    -fx-border-width: 1.5;
+}
+
+.validation-error-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: #ef4444;
+    -fx-padding: 4 0 0 4;
+}
+
+.validation-success-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: #10b981;
+}
+
+/* ============================================
+   Status Indicators
+   ============================================ */
+.status-dot {
+    -fx-min-width: 12;
+    -fx-min-height: 12;
+    -fx-max-width: 12;
+    -fx-max-height: 12;
+    -fx-background-radius: 6;
+    -fx-border-color: #0f172a;
+    -fx-border-width: 2;
+    -fx-border-radius: 6;
+}
+
+.status-online {
+    -fx-background-color: #10b981;
+    -fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.6), 6, 0.4, 0, 0);
+}
+
+.status-offline {
+    -fx-background-color: #64748b;
+}
+
+.status-away {
+    -fx-background-color: #f59e0b;
+}
+
+/* Container for avatar + status dot */
+.avatar-status-container {
+    -fx-alignment: bottom-right;
+}
+
+/* ============================================
+   Match Popup Styles
+   ============================================ */
+.match-popup-overlay {
+    -fx-background-color: rgba(0, 0, 0, 0.9);
+}
+
+.match-avatar-wrapper {
+    -fx-min-width: 100;
+    -fx-min-height: 100;
+    -fx-background-color: linear-gradient(to bottom right, #667eea, #764ba2);
+    -fx-background-radius: 50;
+    -fx-alignment: center;
+}
+
+.match-title {
+    -fx-font-size: 48px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.8), 25, 0.6, 0, 0);
+}
+
+.match-subtitle {
+    -fx-font-size: 16px;
+    -fx-text-fill: #94a3b8;
+}
+
+.match-heart {
+    -fx-icon-color: #f43f5e;
+    -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.8), 30, 0.6, 0, 0);
+}
+
+.match-message-btn {
+    -fx-background-color: linear-gradient(to right, #f43f5e, #a855f7);
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-padding: 16 40;
+    -fx-background-radius: 28;
+}
+
+.match-message-btn:hover {
+    -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.5), 12, 0, 0, 0);
+}
+
+.match-continue-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 14px;
+}
+
+.match-continue-btn:hover {
+    -fx-text-fill: white;
+}
+
+/* ============================================
+   Card Stack Effect
+   ============================================ */
+.card-stack-3 {
+    -fx-scale-x: 0.88;
+    -fx-scale-y: 0.88;
+    -fx-translate-y: -24;
+    -fx-opacity: 0.4;
+}
+
+.card-stack-2 {
+    -fx-scale-x: 0.94;
+    -fx-scale-y: 0.94;
+    -fx-translate-y: -12;
+    -fx-opacity: 0.7;
+}
+
+.card-stack-1 {
+    -fx-scale-x: 1.0;
+    -fx-scale-y: 1.0;
+    -fx-translate-y: 0;
+    -fx-opacity: 1.0;
+}
+
+/* ============================================
+   Swipe Gesture Overlays
+   ============================================ */
+.swipe-overlay {
+    -fx-alignment: center;
+    -fx-padding: 20;
+    -fx-background-radius: 12;
+}
+
+.swipe-like-overlay {
+    -fx-background-color: rgba(16, 185, 129, 0.85);
+    -fx-border-color: #10b981;
+    -fx-border-width: 3;
+    -fx-border-radius: 12;
+}
+
+.swipe-pass-overlay {
+    -fx-background-color: rgba(239, 68, 68, 0.85);
+    -fx-border-color: #ef4444;
+    -fx-border-width: 3;
+    -fx-border-radius: 12;
+}
+
+.swipe-overlay-text {
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+    -fx-rotate: -15;
+}
+
+/* ============================================
+   Typing Indicator
+   ============================================ */
+.typing-indicator {
+    -fx-padding: 12 18;
+    -fx-background-color: #334155;
+    -fx-background-radius: 20 20 20 4;
+    -fx-max-width: 80;
+}
+
+.typing-dot {
+    -fx-fill: #94a3b8;
+}
+
+/* ============================================
+   Viewport Breakpoints
+   ============================================ */
+/* Compact mode: < 900px width */
+.viewport-compact .sidebar,
+.viewport-compact .nav-sidebar {
+    -fx-pref-width: 0;
+    -fx-min-width: 0;
+    -fx-max-width: 0;
+}
+
+.viewport-compact .dashboard-card {
+    -fx-min-width: 200;
+    -fx-pref-width: 100%;
+}
+
+.viewport-compact .card {
+    -fx-max-width: 360;
+}
+
+/* Normal mode: 900-1100px width (default styling) */
+.viewport-normal .dashboard-card {
+    -fx-min-width: 180;
+}
+
+/* Wide mode: > 1100px width */
+.viewport-wide .dashboard-card {
+    -fx-min-width: 220;
+}
+
+.viewport-wide .card {
+    -fx-max-width: 450;
+}
+
+.viewport-wide .content-container {
+    -fx-padding: 30 50;
+}
+
+/* ============================================
+   Extracted Inline Styles - Chat
+   ============================================ */
+.conversation-section-label {
+    -fx-font-weight: bold;
+    -fx-font-size: 11px;
+}
+
+.message-list-view {
+    -fx-background-color: transparent;
+    -fx-padding: 20;
+}
+
+/* ============================================
+   Theme Toggle Button
+   ============================================ */
+.theme-toggle-button {
+    -fx-min-width: 52;
+    -fx-min-height: 28;
+    -fx-max-width: 52;
+    -fx-max-height: 28;
+    -fx-background-color: #475569;
+    -fx-background-radius: 14;
+    -fx-padding: 2;
+}
+
+.theme-toggle-button:selected {
+    -fx-background-color: -fx-primary;
+}
+
+/* ============================================
+   Status Indicator Dots
+   ============================================ */
+.status-dot {
+    -fx-min-width: 12;
+    -fx-min-height: 12;
+    -fx-max-width: 12;
+    -fx-max-height: 12;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: -fx-surface-base;
+    -fx-border-width: 2;
+}
+
+.status-online {
+    -fx-background-color: #22c55e;
+}
+
+.status-offline {
+    -fx-background-color: #6b7280;
+}
+
+.status-away {
+    -fx-background-color: #eab308;
+}
+
+/* ============================================
+   Profile Photo Upload Button
+   ============================================ */
+.profile-camera-btn {
+    -fx-background-color: linear-gradient(to bottom right, #667eea, #764ba2);
+    -fx-background-radius: 50;
+    -fx-min-width: 36;
+    -fx-min-height: 36;
+    -fx-max-width: 36;
+    -fx-max-height: 36;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+    -fx-border-color: -fx-surface-base;
+    -fx-border-width: 2;
+    -fx-border-radius: 50;
+}
+
+.profile-camera-btn:hover {
+    -fx-background-color: linear-gradient(to bottom right, #7c8ff0, #8b5cb6);
+    -fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.5), 12, 0, 0, 3);
+}
+
+.profile-camera-btn:pressed {
+    -fx-background-color: linear-gradient(to bottom right, #5a72d9, #684095);
+}
+
+/* ============================================
+   Achievement Popup Styles
+   ============================================ */
+.achievement-popup-overlay {
+    -fx-background-color: rgba(0, 0, 0, 0.75);
+}
+
+.achievement-popup-card {
+    -fx-background-color: linear-gradient(to bottom, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+    -fx-background-radius: 24;
+    -fx-border-color: rgba(148, 163, 184, 0.2);
+    -fx-border-radius: 24;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 30, 0, 0, 10);
+}
+
+.achievement-icon-wrapper {
+    -fx-min-width: 120;
+    -fx-min-height: 120;
+    -fx-max-width: 120;
+    -fx-max-height: 120;
+}
+
+.achievement-icon-glow {
+    -fx-min-width: 120;
+    -fx-min-height: 120;
+    -fx-max-width: 120;
+    -fx-max-height: 120;
+    -fx-background-color: radial-gradient(center 50% 50%, radius 50%, #fbbf24 0%, transparent 70%);
+    -fx-opacity: 0.4;
+}
+
+.achievement-icon-container {
+    -fx-min-width: 100;
+    -fx-min-height: 100;
+    -fx-max-width: 100;
+    -fx-max-height: 100;
+    -fx-background-color: linear-gradient(to bottom right, #fbbf24, #f59e0b);
+    -fx-background-radius: 50;
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-border-radius: 50;
+    -fx-border-width: 3;
+}
+
+.achievement-icon {
+    -fx-fill: white;
+}
+
+.achievement-title {
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+    -fx-text-fill: #94a3b8;
+    -fx-letter-spacing: 2;
+}
+
+.achievement-name {
+    -fx-font-size: 28;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.achievement-description {
+    -fx-font-size: 15;
+    -fx-text-fill: #94a3b8;
+    -fx-max-width: 300;
+}
+
+.achievement-xp-badge {
+    -fx-background-color: rgba(251, 191, 36, 0.15);
+    -fx-background-radius: 20;
+    -fx-padding: 8 20 8 20;
+    -fx-border-color: rgba(251, 191, 36, 0.3);
+    -fx-border-radius: 20;
+    -fx-border-width: 1;
+}
+
+.achievement-xp-text {
+    -fx-font-size: 16;
+    -fx-font-weight: bold;
+    -fx-text-fill: #fbbf24;
+}
+
+.achievement-continue-btn {
+    -fx-background-color: linear-gradient(to right, #10b981, #059669);
+    -fx-text-fill: white;
+    -fx-font-size: 15;
+    -fx-font-weight: bold;
+    -fx-padding: 14 32 14 32;
+    -fx-background-radius: 25;
+    -fx-cursor: hand;
+}
+
+.achievement-continue-btn:hover {
+    -fx-background-color: linear-gradient(to right, #34d399, #10b981);
+    -fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.4), 12, 0, 0, 4);
+}
+
+.achievement-continue-btn:pressed {
+    -fx-background-color: linear-gradient(to right, #059669, #047857);
 }

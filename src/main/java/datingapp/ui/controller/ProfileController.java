@@ -2,21 +2,34 @@ package datingapp.ui.controller;
 
 import datingapp.ui.NavigationService;
 import datingapp.ui.ViewFactory;
+import datingapp.ui.util.AnimationHelper;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.ProfileViewModel;
+import java.io.File;
 import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.stage.FileChooser;
+import org.kordamp.ikonli.javafx.FontIcon;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Profile Editor screen (profile.fxml).
  */
 public class ProfileController implements Initializable {
+
+    private static final Logger logger = LoggerFactory.getLogger(ProfileController.class);
 
     @FXML
     private javafx.scene.layout.BorderPane rootPane;
@@ -41,6 +54,20 @@ public class ProfileController implements Initializable {
 
     @FXML
     private Label charCountLabel;
+
+    @FXML
+    private ImageView profileImageView;
+
+    @FXML
+    private FontIcon avatarPlaceholderIcon;
+
+    @SuppressWarnings("unused")
+    @FXML
+    private Button cameraButton;
+
+    @SuppressWarnings("unused")
+    @FXML
+    private StackPane avatarInner;
 
     private static final int BIO_MAX_LENGTH = 500;
     private static final int BIO_WARNING_THRESHOLD = 400;
@@ -86,6 +113,12 @@ public class ProfileController implements Initializable {
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
+
+        // Add pulsing glow to avatar container
+        StackPane avatarContainer = (StackPane) rootPane.lookup(".profile-avatar-container");
+        if (avatarContainer != null) {
+            AnimationHelper.addPulsingGlow(avatarContainer, Color.web("#667eea"));
+        }
     }
 
     /** Setup the character counter binding for the bio text area. */
@@ -165,5 +198,50 @@ public class ProfileController implements Initializable {
     @SuppressWarnings("unused")
     private void handleBack() {
         NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+    }
+
+    /**
+     * Handles profile photo upload via FileChooser.
+     */
+    @FXML
+    @SuppressWarnings("unused")
+    private void handleUploadPhoto() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select Profile Photo");
+        fileChooser
+                .getExtensionFilters()
+                .addAll(
+                        new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp"),
+                        new FileChooser.ExtensionFilter("All Files", "*.*"));
+
+        // Show file chooser dialog
+        File selectedFile = fileChooser.showOpenDialog(rootPane.getScene().getWindow());
+
+        if (selectedFile != null) {
+            try {
+                // Load image from file
+                Image image = new Image(selectedFile.toURI().toString(), 200, 200, true, true);
+
+                if (!image.isError()) {
+                    // Set image to ImageView
+                    profileImageView.setImage(image);
+                    profileImageView.setVisible(true);
+
+                    // Hide placeholder icon
+                    if (avatarPlaceholderIcon != null) {
+                        avatarPlaceholderIcon.setVisible(false);
+                    }
+
+                    logger.info("Profile photo loaded: {}", selectedFile.getName());
+
+                    // TODO: Save photo path to ViewModel/storage
+                    // viewModel.setProfilePhotoPath(selectedFile.getAbsolutePath());
+                } else {
+                    logger.warn("Failed to load image: {}", selectedFile.getAbsolutePath());
+                }
+            } catch (Exception e) {
+                logger.error("Error loading profile photo", e);
+            }
+        }
     }
 }

@@ -48,53 +48,53 @@
         </columnConstraints>
         <!-- Browse Card - Amber -->
         <Button onAction="#handleBrowse" maxHeight="160" maxWidth="Infinity"
-                                            prefHeight="160" styleClass="dashboard-card, dashboard-card-browse"
-                                            GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
+                                                            GridPane.columnIndex="0" GridPane.rowIndex="0">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
                 <FontIcon iconLiteral="mdi2f-fire" iconSize="32" iconColor="#f59e0b"/>
               </StackPane>
-              <Label text="Browse" style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+              <Label text="Browse" styleClass="dashboard-card-label"/>
             </VBox>
           </graphic>
         </Button>
         <!-- Matches Card - Rose -->
         <Button onAction="#handleMatches" maxHeight="160" maxWidth="Infinity"
-                                            prefHeight="160" styleClass="dashboard-card, dashboard-card-matches"
-                                            GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-matches"
+                                                            GridPane.columnIndex="1" GridPane.rowIndex="0">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
                 <FontIcon iconLiteral="mdi2h-heart-multiple" iconSize="32" iconColor="#f43f5e"/>
               </StackPane>
-              <Label text="Matches" style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+              <Label text="Matches" styleClass="dashboard-card-label"/>
             </VBox>
           </graphic>
         </Button>
         <!-- Chat Card - Blue -->
         <Button onAction="#handleChat" maxHeight="160" maxWidth="Infinity"
-                                            prefHeight="160" styleClass="dashboard-card, dashboard-card-chat"
-                                            GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-chat"
+                                                            GridPane.columnIndex="0" GridPane.rowIndex="1">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
                 <FontIcon iconLiteral="mdi2c-chat" iconSize="32" iconColor="#3b82f6"/>
               </StackPane>
-              <Label text="Chat" style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+              <Label text="Chat" styleClass="dashboard-card-label"/>
             </VBox>
           </graphic>
         </Button>
         <!-- Profile Card - Purple -->
         <Button onAction="#handleProfile" maxHeight="160" maxWidth="Infinity"
-                                            prefHeight="160" styleClass="dashboard-card, dashboard-card-profile"
-                                            GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
+                                                            GridPane.columnIndex="1" GridPane.rowIndex="1">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
                 <FontIcon iconLiteral="mdi2a-account-circle" iconSize="32" iconColor="#a855f7"/>
               </StackPane>
-              <Label text="Profile" style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: white;"/>
+              <Label text="Profile" styleClass="dashboard-card-label"/>
             </VBox>
           </graphic>
         </Button>
@@ -106,7 +106,7 @@
           <Label text="DAILY PICK" styleClass="daily-pick-title"/>
         </HBox>
         <Label fx:id="dailyPickLabel" styleClass="text-secondary"
-                                            text="Loading your daily pick..."/>
+                                                            text="Loading your daily pick..."/>
         <Button onAction="#handleViewDailyPick" styleClass="matches-browse-btn" text="View Profile">
           <graphic>
             <FontIcon iconLiteral="mdi2e-eye" iconSize="16" iconColor="white"/>
@@ -140,15 +140,15 @@
         <VBox spacing="10">
           <HBox spacing="12" alignment="CENTER_LEFT">
             <FontIcon iconLiteral="mdi2h-heart" iconSize="16" iconColor="#f43f5e"/>
-            <Label text="Matches" style="-fx-text-fill: #94a3b8;"/>
+            <Label text="Matches" styleClass="sidebar-stat-label"/>
             <Region HBox.hgrow="ALWAYS"/>
             <Label fx:id="totalMatchesLabel" styleClass="stats-value-highlight" text="0"/>
           </HBox>
           <HBox spacing="12" alignment="CENTER_LEFT">
             <FontIcon iconLiteral="mdi2a-account-check" iconSize="16" iconColor="#a855f7"/>
-            <Label text="Profile" style="-fx-text-fill: #94a3b8;"/>
+            <Label text="Profile" styleClass="sidebar-stat-label"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label fx:id="completionLabel" style="-fx-font-weight: 600; -fx-text-fill: #a855f7;" text="0%"/>
+            <Label fx:id="completionLabel" styleClass="sidebar-stat-value" text="0%"/>
           </HBox>
         </VBox>
         <Region styleClass="matches-separator" prefHeight="1"/>

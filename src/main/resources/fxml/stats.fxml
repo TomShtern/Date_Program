@@ -77,7 +77,7 @@
             <FontIcon iconLiteral="mdi2t-trophy-award" iconSize="24" iconColor="#fbbf24"/>
             <Label text="Achievements" styleClass="stats-section-header"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label styleClass="text-secondary" style="-fx-font-size: 12px;" text="Coming Soon"/>
+            <Label styleClass="text-secondary, stat-label-secondary" text="Coming Soon"/>
           </HBox>
           <!-- Achievement Cards Grid -->
           <VBox spacing="12" styleClass="achievements-container">
@@ -87,8 +87,8 @@
                 <FontIcon iconLiteral="mdi2h-heart-flash" iconSize="24" iconColor="#f59e0b"/>
               </StackPane>
               <VBox spacing="4" HBox.hgrow="ALWAYS">
-                <Label text="First Match" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white;"/>
-                <Label text="Make your first match" styleClass="text-secondary" style="-fx-font-size: 12px;"/>
+                <Label text="First Match" styleClass="stat-label-primary"/>
+                <Label text="Make your first match" styleClass="text-secondary, stat-label-secondary"/>
               </VBox>
               <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
             </HBox>
@@ -98,14 +98,13 @@
                 <FontIcon iconLiteral="mdi2s-star" iconSize="24" iconColor="#64748b"/>
               </StackPane>
               <VBox spacing="4" HBox.hgrow="ALWAYS">
-                <Label text="Super Liker" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white;"/>
-                <Label text="Send 10 super likes" styleClass="text-secondary" style="-fx-font-size: 12px;"/>
+                <Label text="Super Liker" styleClass="stat-label-primary"/>
+                <Label text="Send 10 super likes" styleClass="text-secondary, stat-label-secondary"/>
                 <HBox spacing="8" alignment="CENTER_LEFT">
                   <StackPane styleClass="achievement-progress" HBox.hgrow="ALWAYS">
-                    <StackPane styleClass="achievement-progress-fill" StackPane.alignment="CENTER_LEFT"
-                                                                style="-fx-max-width: 30%;"/>
+                    <StackPane styleClass="achievement-progress-fill" StackPane.alignment="CENTER_LEFT"/>
                   </StackPane>
-                  <Label text="0/10" styleClass="text-secondary" style="-fx-font-size: 11px;"/>
+                  <Label text="0/10" styleClass="text-secondary, stat-label-small"/>
                 </HBox>
               </VBox>
               <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
@@ -116,14 +115,13 @@
                 <FontIcon iconLiteral="mdi2m-message-text" iconSize="24" iconColor="#64748b"/>
               </StackPane>
               <VBox spacing="4" HBox.hgrow="ALWAYS">
-                <Label text="Conversation Starter" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white;"/>
-                <Label text="Start 5 conversations" styleClass="text-secondary" style="-fx-font-size: 12px;"/>
+                <Label text="Conversation Starter" styleClass="stat-label-primary"/>
+                <Label text="Start 5 conversations" styleClass="text-secondary, stat-label-secondary"/>
                 <HBox spacing="8" alignment="CENTER_LEFT">
                   <StackPane styleClass="achievement-progress" HBox.hgrow="ALWAYS">
-                    <StackPane styleClass="achievement-progress-fill" StackPane.alignment="CENTER_LEFT"
-                                                                style="-fx-max-width: 0%;"/>
+                    <StackPane styleClass="achievement-progress-fill" StackPane.alignment="CENTER_LEFT"/>
                   </StackPane>
-                  <Label text="0/5" styleClass="text-secondary" style="-fx-font-size: 11px;"/>
+                  <Label text="0/5" styleClass="text-secondary, stat-label-small"/>
                 </HBox>
               </VBox>
               <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
@@ -134,8 +132,8 @@
                 <FontIcon iconLiteral="mdi2a-account-check" iconSize="24" iconColor="#64748b"/>
               </StackPane>
               <VBox spacing="4" HBox.hgrow="ALWAYS">
-                <Label text="Profile Pro" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: white;"/>
-                <Label text="Complete your profile 100%" styleClass="text-secondary" style="-fx-font-size: 12px;"/>
+                <Label text="Profile Pro" styleClass="stat-label-primary"/>
+                <Label text="Complete your profile 100%" styleClass="text-secondary, stat-label-secondary"/>
               </VBox>
               <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
             </HBox>

@@ -59,10 +59,21 @@ public class DatingApp extends Application {
         // Setup the navigation service with our primary stage
         navigationService.initialize(primaryStage);
 
+        // Set window constraints
+        primaryStage.setMinWidth(800);
+        primaryStage.setMinHeight(600);
+        primaryStage.setMaxWidth(1600);
+        primaryStage.setMaxHeight(1000);
+
+        // Default size
+        primaryStage.setWidth(1000);
+        primaryStage.setHeight(700);
+
         // Show the initial screen (Login)
         navigationService.navigateTo(ViewFactory.ViewType.LOGIN);
 
         primaryStage.setTitle("🌹 Dating App");
+        primaryStage.centerOnScreen();
         primaryStage.show();
     }
 

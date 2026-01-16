@@ -29,7 +29,7 @@
       <!-- Match Count Badge -->
       <HBox alignment="CENTER" styleClass="matches-count-badge">
         <FontIcon iconLiteral="mdi2h-heart" iconSize="14" iconColor="#f43f5e"/>
-        <Label fx:id="matchCountLabel" style="-fx-text-fill: #f43f5e; -fx-font-weight: 600; -fx-font-size: 13px;" text="0">
+        <Label fx:id="matchCountLabel" styleClass="match-count-badge" text="0">
           <HBox.margin>
             <Insets left="6"/>
           </HBox.margin>
@@ -51,7 +51,7 @@
         <FlowPane fx:id="matchesFlow" hgap="24" vgap="24" alignment="CENTER" styleClass="matches-flow"/>
         <!-- Enhanced Empty State Container -->
         <VBox fx:id="emptyStateContainer" alignment="CENTER" spacing="20" styleClass="matches-empty-container"
-                      visible="false" managed="false">
+                              visible="false" managed="false">
           <!-- Glowing Heart Icon -->
           <StackPane>
             <FontIcon iconLiteral="mdi2h-heart-broken" iconSize="80" iconColor="#64748b" styleClass="matches-empty-icon"/>
@@ -64,7 +64,7 @@
           </Label>
           <!-- Subtitle -->
           <Label text="Your perfect match is waiting! Start browsing to connect with amazing people."
-                           styleClass="matches-empty-subtitle" wrapText="true" maxWidth="300" alignment="CENTER"/>
+                                     styleClass="matches-empty-subtitle" wrapText="true" maxWidth="300" alignment="CENTER"/>
           <!-- Premium Browse Button -->
           <Button text="Start Browsing" onAction="#handleBrowse" styleClass="matches-browse-btn">
             <graphic>
@@ -76,7 +76,7 @@
           </Button>
           <!-- Hint text -->
           <Label text="Like someone and if they like you back, it's a match!"
-                           style="-fx-font-size: 11px; -fx-text-fill: #475569;">
+                                     styleClass="match-timestamp">
             <VBox.margin>
               <Insets top="8"/>
             </VBox.margin>

@@ -2,11 +2,17 @@ package datingapp.ui;
 
 import java.io.IOException;
 import java.util.Objects;
+import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.ParallelTransition;
+import javafx.animation.TranslateTransition;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,6 +28,18 @@ public class NavigationService {
     private Stage primaryStage;
     private BorderPane rootLayout;
     private ViewModelFactory viewModelFactory;
+
+    /** Types of screen transition animations. */
+    public enum TransitionType {
+        /** Fade out old screen, fade in new screen */
+        FADE,
+        /** Slide new screen in from right, old screen slides left */
+        SLIDE_LEFT,
+        /** Slide new screen in from left, old screen slides right */
+        SLIDE_RIGHT,
+        /** No animation, instant switch */
+        NONE
+    }
 
     private NavigationService() {}
 
@@ -55,48 +73,100 @@ public class NavigationService {
 
     /**
      * Handles transitions to different views by loading FXML and injecting
-     * ViewModels.
+     * ViewModels. Uses no animation (instant switch).
      */
     public void navigateTo(ViewFactory.ViewType viewType) {
+        navigateWithTransition(viewType, TransitionType.NONE);
+    }
+
+    /**
+     * Navigates to a view with the specified transition animation.
+     *
+     * @param viewType The view to navigate to
+     * @param type     The type of transition animation
+     */
+    public void navigateWithTransition(ViewFactory.ViewType viewType, TransitionType type) {
         try {
-            logger.info("Navigating to: {}", viewType);
+            logger.info("Navigating to: {} with transition: {}", viewType, type);
 
             FXMLLoader loader = new FXMLLoader(getClass().getResource(viewType.getFxmlPath()));
-
-            // Controller factory allows us to inject ViewModels created by our
-            // ViewModelFactory
             loader.setControllerFactory(param -> viewModelFactory.createController(param));
+            Parent newView = loader.load();
 
-            Parent view = loader.load();
+            if (type == TransitionType.NONE) {
+                rootLayout.setCenter(newView);
+                return;
+            }
 
-            // For now, we replace the center of the root layout
-            // Login screen typically replaces the entire content, other screens might keep
-            // a sidebar/header
-            rootLayout.setCenter(view);
+            Parent oldView = (Parent) rootLayout.getCenter();
+            if (oldView == null) {
+                rootLayout.setCenter(newView);
+                return;
+            }
 
-            // Future: add sidebar/header navigation widgets here if not LOGIN
+            // Create transition container
+            StackPane transitionPane = new StackPane(oldView, newView);
+            rootLayout.setCenter(transitionPane);
+
+            switch (type) {
+                case FADE -> playFadeTransition(transitionPane, oldView, newView);
+                case SLIDE_LEFT -> playSlideTransition(transitionPane, oldView, newView, true);
+                case SLIDE_RIGHT -> playSlideTransition(transitionPane, oldView, newView, false);
+                default -> rootLayout.setCenter(newView);
+            }
 
         } catch (IOException e) {
             logger.error("Failed to navigate to {}: {}", viewType, e.getMessage(), e);
-            // Stack trace already logged above
         }
+    }
+
+    private void playFadeTransition(StackPane container, Parent oldView, Parent newView) {
+        newView.setOpacity(0);
+
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(150), oldView);
+        fadeOut.setToValue(0);
+
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(150), newView);
+        fadeIn.setFromValue(0);
+        fadeIn.setToValue(1);
+        fadeIn.setDelay(Duration.millis(100));
+
+        ParallelTransition parallel = new ParallelTransition(fadeOut, fadeIn);
+        parallel.setOnFinished(e -> rootLayout.setCenter(newView));
+        parallel.play();
+    }
+
+    private void playSlideTransition(StackPane container, Parent oldView, Parent newView, boolean slideLeft) {
+        double width = primaryStage.getScene().getWidth();
+
+        if (slideLeft) {
+            newView.setTranslateX(width);
+        } else {
+            newView.setTranslateX(-width);
+        }
+
+        TranslateTransition slideOut = new TranslateTransition(Duration.millis(300), oldView);
+        slideOut.setToX(slideLeft ? -width * 0.3 : width * 0.3);
+
+        TranslateTransition slideIn = new TranslateTransition(Duration.millis(300), newView);
+        slideIn.setToX(0);
+        slideIn.setInterpolator(Interpolator.EASE_OUT);
+
+        ParallelTransition parallel = new ParallelTransition(slideOut, slideIn);
+        parallel.setOnFinished(e -> {
+            newView.setTranslateX(0);
+            rootLayout.setCenter(newView);
+        });
+        parallel.play();
     }
 
     /**
      * Navigates back to the previous screen.
      * Currently simple implementation: always goes to Dashboard (or could track
      * history).
-     * For now, effectively "Close" or "Dashboard".
      */
     public void goBack() {
-        // Simple fallback: Go to Matchng screen or Dashboard.
-        // Since Preferences is accessed from Matching, let's go there.
-        // A better implementation would use a Stack<ViewType>.
-        // Check if we want to go back to Matching or Dashboard.
-        // Let's safe default to DASHBOARD for generic "Back",
-        // or specifically MATCHING since we came from there.
-        // The user request context implies coming from Matching.
-        navigateTo(ViewFactory.ViewType.MATCHING);
+        navigateWithTransition(ViewFactory.ViewType.MATCHING, TransitionType.SLIDE_RIGHT);
     }
 
     public Stage getPrimaryStage() {

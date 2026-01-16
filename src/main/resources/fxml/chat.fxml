@@ -23,8 +23,8 @@
       <padding>
         <Insets bottom="20" left="15" right="15" top="20"/>
       </padding>
-      <Label styleClass="text-secondary" style="-fx-font-weight: bold; -fx-font-size: 11px;"
-                                  text="CONVERSATIONS" />
+      <Label styleClass="text-secondary conversation-section-label"
+                                        text="CONVERSATIONS" />
       <ListView fx:id="conversationListView" VBox.vgrow="ALWAYS"/>
     </VBox>
   </left>
@@ -40,15 +40,15 @@
           <Label fx:id="chatHeaderLabel" styleClass="subheading" text="User Name"/>
         </HBox>
         <ListView fx:id="messageListView" VBox.vgrow="ALWAYS"
-                                            style="-fx-background-color: transparent; -fx-padding: 20;" />
+                                                    styleClass="message-list-view" />
         <HBox spacing="15.0" alignment="CENTER" styleClass="header-bar">
           <padding>
             <Insets bottom="20" left="20" right="20" top="20"/>
           </padding>
           <TextArea fx:id="messageArea" prefHeight="50.0" promptText="Type a message..."
-                                                      wrapText="true" HBox.hgrow="ALWAYS" />
+                                                                wrapText="true" HBox.hgrow="ALWAYS" />
           <Button fx:id="sendButton" onAction="#handleSendMessage" prefHeight="50.0"
-                                                      prefWidth="60.0" styleClass="button">
+                                                                prefWidth="60.0" styleClass="button">
             <graphic>
               <FontIcon iconLiteral="mdi2s-send" iconSize="20" iconColor="white"/>
             </graphic>
