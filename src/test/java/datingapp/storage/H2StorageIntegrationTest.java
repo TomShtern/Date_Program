@@ -6,16 +6,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Block;
-import datingapp.core.CommunicationStyle;
 import datingapp.core.Conversation;
-import datingapp.core.DepthPreference;
 import datingapp.core.Interest;
 import datingapp.core.Like;
 import datingapp.core.Match;
 import datingapp.core.Message;
-import datingapp.core.MessagingFrequency;
 import datingapp.core.PacePreferences;
-import datingapp.core.TimeToFirstDate;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.User;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -31,9 +31,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 /**
- * Integration tests for H2 storage implementations. These tests verify data survives round-trip to
+ * Integration tests for H2 storage implementations. These tests verify data
+ * survives round-trip to
  * database.
  */
+@SuppressWarnings("unused") // JUnit 5 discovers lifecycle methods and @Nested classes via reflection
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class H2StorageIntegrationTest {
 

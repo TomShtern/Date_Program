@@ -41,28 +41,20 @@ public class LikerBrowserService {
 
         Set<UUID> matched = new HashSet<>();
         for (Match match : matchStorage.getAllMatchesFor(currentUserId)) {
-            UUID other = match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
-            matched.add(other);
+            matched.add(otherUserId(match, currentUserId));
         }
+
+        Set<UUID> excluded = new HashSet<>(alreadyInteracted);
+        excluded.addAll(blocked);
+        excluded.addAll(matched);
 
         var likeTimes = likeStorage.getLikeTimesForUsersWhoLiked(currentUserId);
 
         List<PendingLiker> result = new ArrayList<>();
         for (var entry : likeTimes.entrySet()) {
             UUID likerId = entry.getKey();
-
-            if (alreadyInteracted.contains(likerId)) {
-                continue;
-            }
-            if (blocked.contains(likerId)) {
-                continue;
-            }
-            if (matched.contains(likerId)) {
-                continue;
-            }
-
             User liker = userStorage.get(likerId);
-            if (liker == null || liker.getState() != User.State.ACTIVE) {
+            if (excluded.contains(likerId) || liker == null || liker.getState() != User.State.ACTIVE) {
                 continue;
             }
 
@@ -72,6 +64,10 @@ public class LikerBrowserService {
 
         result.sort(java.util.Comparator.comparing(PendingLiker::likedAt).reversed());
         return result;
+    }
+
+    private static UUID otherUserId(Match match, UUID currentUserId) {
+        return match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
     }
 
     /** Represents a user who liked the current user but hasn't been responded to yet. */

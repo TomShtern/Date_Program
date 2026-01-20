@@ -4,6 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +15,7 @@ class PaceCompatibilityServiceTest {
 
     private PaceCompatibilityService service;
 
+    @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
         service = new PaceCompatibilityService();

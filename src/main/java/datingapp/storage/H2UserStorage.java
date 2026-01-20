@@ -1,13 +1,13 @@
 package datingapp.storage;
 
-import datingapp.core.CommunicationStyle;
 import datingapp.core.Dealbreakers;
-import datingapp.core.DepthPreference;
 import datingapp.core.Interest;
 import datingapp.core.Lifestyle;
-import datingapp.core.MessagingFrequency;
 import datingapp.core.PacePreferences;
-import datingapp.core.TimeToFirstDate;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
 import java.sql.Connection;

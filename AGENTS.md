@@ -440,4 +440,6 @@ Before committing changes, verify:
 # Format: SEQ|TS|agent|scope|summary|files
 # Append-only. Do not edit past entries. If SEQ conflict after 3 tries append ":CONFLICT".
 example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples regen|src/ui/*
+2|2026-01-20 00:00:00|agent:github_copilot|ui-utils|Consolidate UI animations; archive unused helpers|src/main/java/datingapp/ui/util/UiAnimations.java;src/main/java/datingapp/ui/util/ValidationHelper.java;src/main/java/datingapp/ui/controller/ProfileController.java;docs/archived-utils/*
+3|2026-01-20 00:00:00|agent:github_copilot|core-sweep|Simplify daily limits, picks, and pending liker filtering|src/main/java/datingapp/core/DailyLimitService.java;src/main/java/datingapp/core/DailyPickService.java;src/main/java/datingapp/core/LikerBrowserService.java
 ---AGENT-LOG-END---

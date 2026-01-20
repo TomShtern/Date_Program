@@ -64,12 +64,12 @@ public class PaceCompatibilityService {
         };
     }
 
-    private boolean isCommunicationStyleWildcard(CommunicationStyle style) {
-        return style == CommunicationStyle.MIX_OF_EVERYTHING;
+    private boolean isCommunicationStyleWildcard(PacePreferences.CommunicationStyle style) {
+        return style == PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING;
     }
 
-    private boolean isDepthPreferenceWildcard(DepthPreference preference) {
-        return preference == DepthPreference.DEPENDS_ON_VIBE;
+    private boolean isDepthPreferenceWildcard(PacePreferences.DepthPreference preference) {
+        return preference == PacePreferences.DepthPreference.DEPENDS_ON_VIBE;
     }
 
     /** Checks if a score is considered low compatibility. */

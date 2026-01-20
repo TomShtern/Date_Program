@@ -49,41 +49,24 @@ public class DailyLimitService {
         int likesUsed = likeStorage.countLikesToday(userId, startOfDay);
         int passesUsed = likeStorage.countPassesToday(userId, startOfDay);
 
-        int likesRemaining;
-        if (config.hasUnlimitedLikes()) {
-            likesRemaining = -1;
-        } else {
-            likesRemaining = Math.max(0, config.dailyLikeLimit() - likesUsed);
-        }
-
-        int passesRemaining;
-        if (config.hasUnlimitedPasses()) {
-            passesRemaining = -1;
-        } else {
-            passesRemaining = Math.max(0, config.dailyPassLimit() - passesUsed);
-        }
+        int likesRemaining = remainingFor(config.hasUnlimitedLikes(), config.dailyLikeLimit(), likesUsed);
+        int passesRemaining = remainingFor(config.hasUnlimitedPasses(), config.dailyPassLimit(), passesUsed);
 
         return new DailyStatus(likesUsed, likesRemaining, passesUsed, passesRemaining, today, resetTime);
     }
 
     /** Check if user can like (has remaining daily likes). */
     public boolean canLike(UUID userId) {
-        if (config.hasUnlimitedLikes()) {
-            return true;
-        }
         Instant startOfDay = getStartOfToday();
         int likesUsed = likeStorage.countLikesToday(userId, startOfDay);
-        return likesUsed < config.dailyLikeLimit();
+        return canPerform(config.hasUnlimitedLikes(), config.dailyLikeLimit(), likesUsed);
     }
 
     /** Check if user can pass (has remaining daily passes). Usually unlimited (returns true). */
     public boolean canPass(UUID userId) {
-        if (config.hasUnlimitedPasses()) {
-            return true;
-        }
         Instant startOfDay = getStartOfToday();
         int passesUsed = likeStorage.countPassesToday(userId, startOfDay);
-        return passesUsed < config.dailyPassLimit();
+        return canPerform(config.hasUnlimitedPasses(), config.dailyPassLimit(), passesUsed);
     }
 
     /** Get time remaining until daily limits reset. */
@@ -91,6 +74,14 @@ public class DailyLimitService {
         Instant now = Instant.now();
         Instant resetTime = getResetTime();
         return Duration.between(now, resetTime);
+    }
+
+    private int remainingFor(boolean unlimited, int limit, int used) {
+        return unlimited ? -1 : Math.max(0, limit - used);
+    }
+
+    private boolean canPerform(boolean unlimited, int limit, int used) {
+        return unlimited || used < limit;
     }
 
     /** Calculate start of today in user's timezone. */

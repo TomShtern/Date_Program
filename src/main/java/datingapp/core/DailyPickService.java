@@ -51,7 +51,7 @@ public class DailyPickService {
      * @return the daily pick, or empty if none available
      */
     public Optional<DailyPick> getDailyPick(User seeker) {
-        LocalDate today = LocalDate.now(config.userTimeZone());
+        LocalDate today = today();
 
         // 1. Get all active users except self, blocked, and already interacted
         List<User> candidates = userStorage.findActive().stream()
@@ -103,19 +103,19 @@ public class DailyPickService {
         }
 
         // Lifestyle matches
-        if (seeker.getLookingFor() != null && seeker.getLookingFor() == picked.getLookingFor()) {
+        if (sameNonNull(seeker.getLookingFor(), picked.getLookingFor())) {
             reasons.add("Looking for the same thing");
         }
 
-        if (seeker.getWantsKids() != null && seeker.getWantsKids() == picked.getWantsKids()) {
+        if (sameNonNull(seeker.getWantsKids(), picked.getWantsKids())) {
             reasons.add("Same stance on kids");
         }
 
-        if (seeker.getDrinking() != null && seeker.getDrinking() == picked.getDrinking()) {
+        if (sameNonNull(seeker.getDrinking(), picked.getDrinking())) {
             reasons.add("Compatible drinking habits");
         }
 
-        if (seeker.getSmoking() != null && seeker.getSmoking() == picked.getSmoking()) {
+        if (sameNonNull(seeker.getSmoking(), picked.getSmoking())) {
             reasons.add("Compatible smoking habits");
         }
 
@@ -147,8 +147,7 @@ public class DailyPickService {
      * @return true if they've viewed their pick today
      */
     public boolean hasViewedDailyPick(UUID userId) {
-        LocalDate today = LocalDate.now(config.userTimeZone());
-        return dailyPickStorage.hasViewed(userId, today);
+        return dailyPickStorage.hasViewed(userId, today());
     }
 
     /**
@@ -157,7 +156,14 @@ public class DailyPickService {
      * @param userId the user who viewed their pick
      */
     public void markDailyPickViewed(UUID userId) {
-        LocalDate today = LocalDate.now(config.userTimeZone());
-        dailyPickStorage.markViewed(userId, today);
+        dailyPickStorage.markViewed(userId, today());
+    }
+
+    private LocalDate today() {
+        return LocalDate.now(config.userTimeZone());
+    }
+
+    private static <T> boolean sameNonNull(T left, T right) {
+        return left != null && left.equals(right);
     }
 }

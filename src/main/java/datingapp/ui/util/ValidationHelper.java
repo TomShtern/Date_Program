@@ -1,5 +1,6 @@
 package datingapp.ui.util;
 
+import java.util.regex.Pattern;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
@@ -7,9 +8,13 @@ import javafx.scene.control.TextInputControl;
 
 /**
  * Utility class for form field validation with visual feedback.
- * Integrates with {@link AnimationHelper} for shake animations on errors.
+ * Integrates with {@link UiAnimations} for shake animations on errors.
  */
 public final class ValidationHelper {
+
+    private static final String ERROR_CLASS = "error";
+    private static final String SUCCESS_CLASS = "success";
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[\\w.-]++@(?:[\\w-]++\\.)++[\\w-]{2,4}$");
 
     private ValidationHelper() {
         // Utility class
@@ -40,7 +45,7 @@ public final class ValidationHelper {
      */
     public static boolean validateEmail(TextField field, Label errorLabel) {
         String email = field.getText();
-        if (email == null || !email.matches("^[\\w-.]+@([\\w-]+\\.)+[\\w-]{2,4}$")) {
+        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
             markError(field, errorLabel, "Please enter a valid email");
             return false;
         }
@@ -75,31 +80,21 @@ public final class ValidationHelper {
      */
     public static boolean validateTextAreaMinLength(TextArea area, Label errorLabel, int min) {
         if (area.getText() == null || area.getText().length() < min) {
-            markTextAreaError(area, errorLabel, "Minimum " + min + " characters required");
+            markError(area, errorLabel, "Minimum " + min + " characters required");
             return false;
         }
-        markTextAreaSuccess(area, errorLabel);
+        markSuccess(area, errorLabel);
         return true;
     }
 
     /**
      * Marks a text field as having an error with visual feedback.
      */
-    private static void markError(TextField field, Label errorLabel, String message) {
-        field.getStyleClass().removeAll("error", "success");
-        field.getStyleClass().add("error");
+    private static void markError(TextInputControl control, Label errorLabel, String message) {
+        control.getStyleClass().removeAll(ERROR_CLASS, SUCCESS_CLASS);
+        control.getStyleClass().add(ERROR_CLASS);
         showErrorLabel(errorLabel, message);
-        AnimationHelper.playShake(field);
-    }
-
-    /**
-     * Marks a text area as having an error with visual feedback.
-     */
-    private static void markTextAreaError(TextArea area, Label errorLabel, String message) {
-        area.getStyleClass().removeAll("error", "success");
-        area.getStyleClass().add("error");
-        showErrorLabel(errorLabel, message);
-        AnimationHelper.playShake(area);
+        UiAnimations.playShake(control);
     }
 
     private static void showErrorLabel(Label errorLabel, String message) {
@@ -113,18 +108,9 @@ public final class ValidationHelper {
     /**
      * Marks a text field as valid with visual feedback.
      */
-    private static void markSuccess(TextField field, Label errorLabel) {
-        field.getStyleClass().removeAll("error", "success");
-        field.getStyleClass().add("success");
-        hideErrorLabel(errorLabel);
-    }
-
-    /**
-     * Marks a text area as valid with visual feedback.
-     */
-    private static void markTextAreaSuccess(TextArea area, Label errorLabel) {
-        area.getStyleClass().removeAll("error", "success");
-        area.getStyleClass().add("success");
+    private static void markSuccess(TextInputControl control, Label errorLabel) {
+        control.getStyleClass().removeAll(ERROR_CLASS, SUCCESS_CLASS);
+        control.getStyleClass().add(SUCCESS_CLASS);
         hideErrorLabel(errorLabel);
     }
 
@@ -142,7 +128,7 @@ public final class ValidationHelper {
      * @param errorLabel Optional error label to hide
      */
     public static void clearValidation(TextInputControl control, Label errorLabel) {
-        control.getStyleClass().removeAll("error", "success");
+        control.getStyleClass().removeAll(ERROR_CLASS, SUCCESS_CLASS);
         hideErrorLabel(errorLabel);
     }
 }

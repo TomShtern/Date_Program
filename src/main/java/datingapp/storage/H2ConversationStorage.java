@@ -28,21 +28,21 @@ public class H2ConversationStorage implements ConversationStorage {
     /** Creates the conversations table if it doesn't exist. */
     private void ensureSchema() {
         String createTableSql = """
-        CREATE TABLE IF NOT EXISTS conversations (
-            id VARCHAR(100) PRIMARY KEY,
-            user_a UUID NOT NULL,
-            user_b UUID NOT NULL,
-            created_at TIMESTAMP NOT NULL,
-            last_message_at TIMESTAMP,
-            user_a_last_read_at TIMESTAMP,
-            user_b_last_read_at TIMESTAMP,
-            archived_at TIMESTAMP,
-            archive_reason VARCHAR(20),
-            visible_to_user_a BOOLEAN DEFAULT TRUE,
-            visible_to_user_b BOOLEAN DEFAULT TRUE,
-            CONSTRAINT unq_conversation_users UNIQUE (user_a, user_b)
-        )
-        """;
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id VARCHAR(100) PRIMARY KEY,
+                    user_a UUID NOT NULL,
+                    user_b UUID NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    last_message_at TIMESTAMP,
+                    user_a_last_read_at TIMESTAMP,
+                    user_b_last_read_at TIMESTAMP,
+                    archived_at TIMESTAMP,
+                    archive_reason VARCHAR(20),
+                    visible_to_user_a BOOLEAN DEFAULT TRUE,
+                    visible_to_user_b BOOLEAN DEFAULT TRUE,
+                    CONSTRAINT unq_conversation_users UNIQUE (user_a, user_b)
+                )
+                """;
         String indexA = "CREATE INDEX IF NOT EXISTS idx_conversations_user_a ON conversations(user_a)";
         String indexB = "CREATE INDEX IF NOT EXISTS idx_conversations_user_b ON conversations(user_b)";
 
@@ -59,11 +59,11 @@ public class H2ConversationStorage implements ConversationStorage {
     @Override
     public void save(Conversation conversation) {
         String sql = """
-        INSERT INTO conversations (id, user_a, user_b, created_at, last_message_at,
-                                   user_a_last_read_at, user_b_last_read_at,
-                                   archived_at, archive_reason, visible_to_user_a, visible_to_user_b)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """;
+                INSERT INTO conversations (id, user_a, user_b, created_at, last_message_at,
+                                           user_a_last_read_at, user_b_last_read_at,
+                                           archived_at, archive_reason, visible_to_user_a, visible_to_user_b)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -120,10 +120,10 @@ public class H2ConversationStorage implements ConversationStorage {
     @Override
     public List<Conversation> getConversationsFor(UUID userId) {
         String sql = """
-        SELECT * FROM conversations
-        WHERE user_a = ? OR user_b = ?
-        ORDER BY COALESCE(last_message_at, created_at) DESC
-        """;
+                SELECT * FROM conversations
+                WHERE user_a = ? OR user_b = ?
+                ORDER BY COALESCE(last_message_at, created_at) DESC
+                """;
 
         List<Conversation> conversations = new ArrayList<>();
 
@@ -164,11 +164,11 @@ public class H2ConversationStorage implements ConversationStorage {
     public void updateReadTimestamp(String conversationId, UUID userId, Instant timestamp) {
         // Single query with CASE/WHEN to update the correct column based on userId
         String sql = """
-        UPDATE conversations
-        SET user_a_last_read_at = CASE WHEN user_a = ? THEN ? ELSE user_a_last_read_at END,
-            user_b_last_read_at = CASE WHEN user_b = ? THEN ? ELSE user_b_last_read_at END
-        WHERE id = ? AND (user_a = ? OR user_b = ?)
-        """;
+                UPDATE conversations
+                SET user_a_last_read_at = CASE WHEN user_a = ? THEN ? ELSE user_a_last_read_at END,
+                    user_b_last_read_at = CASE WHEN user_b = ? THEN ? ELSE user_b_last_read_at END
+                WHERE id = ? AND (user_a = ? OR user_b = ?)
+                """;
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -212,11 +212,11 @@ public class H2ConversationStorage implements ConversationStorage {
     @Override
     public void setVisibility(String conversationId, UUID userId, boolean visible) {
         String sql = """
-        UPDATE conversations
-        SET visible_to_user_a = CASE WHEN user_a = ? THEN ? ELSE visible_to_user_a END,
-            visible_to_user_b = CASE WHEN user_b = ? THEN ? ELSE visible_to_user_b END
-        WHERE id = ?
-        """;
+                UPDATE conversations
+                SET visible_to_user_a = CASE WHEN user_a = ? THEN ? ELSE visible_to_user_a END,
+                    visible_to_user_b = CASE WHEN user_b = ? THEN ? ELSE visible_to_user_b END
+                WHERE id = ?
+                """;
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {

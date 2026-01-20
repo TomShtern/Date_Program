@@ -5,6 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.Set;

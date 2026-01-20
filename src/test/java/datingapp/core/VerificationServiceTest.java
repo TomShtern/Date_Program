@@ -1,8 +1,13 @@
 package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import java.time.Duration;
 import java.util.EnumSet;
 import java.util.Random;
@@ -73,7 +78,7 @@ class VerificationServiceTest {
             user.startVerification(User.VerificationMethod.PHONE, "123456");
 
             assertFalse(verificationService.verifyCode(user, "000000"));
-            assertFalse(Boolean.TRUE.equals(user.isVerified()));
+            assertNotEquals(Boolean.TRUE, user.isVerified());
         }
     }
 

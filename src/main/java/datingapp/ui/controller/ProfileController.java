@@ -2,7 +2,6 @@ package datingapp.ui.controller;
 
 import datingapp.ui.NavigationService;
 import datingapp.ui.ViewFactory;
-import datingapp.ui.util.AnimationHelper;
 import datingapp.ui.util.ToastService;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.ProfileViewModel;
@@ -119,7 +118,7 @@ public class ProfileController extends BaseController implements Initializable {
         // Add pulsing glow to avatar container
         StackPane avatarContainer = (StackPane) rootPane.lookup(".profile-avatar-container");
         if (avatarContainer != null) {
-            AnimationHelper.addPulsingGlow(avatarContainer, Color.web("#667eea"));
+            UiAnimations.addPulsingGlow(avatarContainer, Color.web("#667eea"));
         }
     }
 

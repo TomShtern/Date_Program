@@ -1,16 +1,16 @@
 package datingapp.cli;
 
 import datingapp.core.AchievementService;
-import datingapp.core.CommunicationStyle;
 import datingapp.core.Dealbreakers;
-import datingapp.core.DepthPreference;
 import datingapp.core.Interest;
 import datingapp.core.InterestMatcher;
 import datingapp.core.Lifestyle;
-import datingapp.core.MessagingFrequency;
 import datingapp.core.PacePreferences;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.ProfilePreviewService;
-import datingapp.core.TimeToFirstDate;
 import datingapp.core.User;
 import datingapp.core.UserAchievement;
 import datingapp.core.UserStorage;
