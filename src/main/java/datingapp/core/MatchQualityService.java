@@ -163,47 +163,49 @@ public class MatchQualityService {
     }
 
     private double calculateLifestyleScore(User me, User them) {
-        int matches = 0;
-        int total = 0;
-
-        // Smoking
-        if (me.getSmoking() != null && them.getSmoking() != null) {
-            total++;
-            if (me.getSmoking() == them.getSmoking()) {
-                matches++;
-            }
-        }
-
-        // Drinking
-        if (me.getDrinking() != null && them.getDrinking() != null) {
-            total++;
-            if (me.getDrinking() == them.getDrinking()) {
-                matches++;
-            }
-        }
-
-        // Wants Kids
-        if (me.getWantsKids() != null && them.getWantsKids() != null) {
-            total++;
-            if (areKidsStancesCompatible(me.getWantsKids(), them.getWantsKids())) {
-                matches++;
-            }
-        }
-
-        // Looking For
-        if (me.getLookingFor() != null && them.getLookingFor() != null) {
-            total++;
-            if (me.getLookingFor() == them.getLookingFor()) {
-                matches++;
-            }
-        }
-
-        // If no lifestyle data, return neutral
+        int total = countLifestyleFactors(me, them);
         if (total == 0) {
             return 0.5;
         }
 
+        int matches = countLifestyleMatches(me, them);
         return (double) matches / total;
+    }
+
+    private int countLifestyleFactors(User me, User them) {
+        int total = 0;
+        if (me.getSmoking() != null && them.getSmoking() != null) {
+            total++;
+        }
+        if (me.getDrinking() != null && them.getDrinking() != null) {
+            total++;
+        }
+        if (me.getWantsKids() != null && them.getWantsKids() != null) {
+            total++;
+        }
+        if (me.getLookingFor() != null && them.getLookingFor() != null) {
+            total++;
+        }
+        return total;
+    }
+
+    private int countLifestyleMatches(User me, User them) {
+        int matches = 0;
+        if (me.getSmoking() != null && them.getSmoking() != null && me.getSmoking() == them.getSmoking()) {
+            matches++;
+        }
+        if (me.getDrinking() != null && them.getDrinking() != null && me.getDrinking() == them.getDrinking()) {
+            matches++;
+        }
+        if (me.getWantsKids() != null
+                && them.getWantsKids() != null
+                && areKidsStancesCompatible(me.getWantsKids(), them.getWantsKids())) {
+            matches++;
+        }
+        if (me.getLookingFor() != null && them.getLookingFor() != null && me.getLookingFor() == them.getLookingFor()) {
+            matches++;
+        }
+        return matches;
     }
 
     private boolean areKidsStancesCompatible(Lifestyle.WantsKids a, Lifestyle.WantsKids b) {
@@ -238,41 +240,51 @@ public class MatchQualityService {
 
     private List<String> findLifestyleMatches(User me, User them) {
         List<String> matches = new ArrayList<>();
+        addSmokingHighlight(me, them, matches);
+        addDrinkingHighlight(me, them, matches);
+        addKidsHighlight(me, them, matches);
+        addRelationshipGoalsHighlight(me, them, matches);
+        return matches;
+    }
 
-        // Non-smokers highlight
-        if (me.getSmoking() != null && me.getSmoking() == them.getSmoking()) {
-            if (me.getSmoking() == Lifestyle.Smoking.NEVER) {
-                matches.add("Both non-smokers");
-            } else if (me.getSmoking() == Lifestyle.Smoking.SOMETIMES) {
-                matches.add("Both occasional smokers");
-            }
+    private void addSmokingHighlight(User me, User them, List<String> matches) {
+        if (me.getSmoking() == null || me.getSmoking() != them.getSmoking()) {
+            return;
         }
-
-        // Drinking habits
-        if (me.getDrinking() != null && me.getDrinking() == them.getDrinking()) {
-            if (me.getDrinking() == Lifestyle.Drinking.NEVER) {
-                matches.add("Neither drinks");
-            } else if (me.getDrinking() == Lifestyle.Drinking.SOCIALLY) {
-                matches.add("Both social drinkers");
-            }
+        if (me.getSmoking() == Lifestyle.Smoking.NEVER) {
+            matches.add("Both non-smokers");
+        } else if (me.getSmoking() == Lifestyle.Smoking.SOMETIMES) {
+            matches.add("Both occasional smokers");
         }
+    }
 
-        // Kids stance
-        if (me.getWantsKids() != null && them.getWantsKids() != null) {
-            if (me.getWantsKids() == them.getWantsKids()) {
-                matches.add("Same stance on kids");
-            } else if (areKidsStancesCompatible(me.getWantsKids(), them.getWantsKids())) {
-                matches.add("Compatible on kids");
-            }
+    private void addDrinkingHighlight(User me, User them, List<String> matches) {
+        if (me.getDrinking() == null || me.getDrinking() != them.getDrinking()) {
+            return;
         }
+        if (me.getDrinking() == Lifestyle.Drinking.NEVER) {
+            matches.add("Neither drinks");
+        } else if (me.getDrinking() == Lifestyle.Drinking.SOCIALLY) {
+            matches.add("Both social drinkers");
+        }
+    }
 
-        // Relationship goals
+    private void addKidsHighlight(User me, User them, List<String> matches) {
+        if (me.getWantsKids() == null || them.getWantsKids() == null) {
+            return;
+        }
+        if (me.getWantsKids() == them.getWantsKids()) {
+            matches.add("Same stance on kids");
+        } else if (areKidsStancesCompatible(me.getWantsKids(), them.getWantsKids())) {
+            matches.add("Compatible on kids");
+        }
+    }
+
+    private void addRelationshipGoalsHighlight(User me, User them, List<String> matches) {
         if (me.getLookingFor() != null && me.getLookingFor() == them.getLookingFor()) {
             matches.add(
                     "Both looking for " + me.getLookingFor().getDisplayName().toLowerCase());
         }
-
-        return matches;
     }
 
     private Duration calculateTimeBetweenLikes(UUID userId, UUID otherId) {

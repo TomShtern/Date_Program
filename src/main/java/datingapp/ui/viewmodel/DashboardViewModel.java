@@ -12,7 +12,9 @@ import datingapp.core.UserAchievement;
 import datingapp.ui.UISession;
 import java.util.List;
 import java.util.Optional;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
@@ -41,6 +43,7 @@ public class DashboardViewModel {
     private final StringProperty profileCompletion = new SimpleStringProperty("0%");
     private final IntegerProperty notificationCount = new SimpleIntegerProperty(0);
     private final IntegerProperty unreadMessages = new SimpleIntegerProperty(0);
+    private final BooleanProperty loading = new SimpleBooleanProperty(true);
 
     private final ObservableList<String> recentAchievements = FXCollections.observableArrayList();
 
@@ -74,6 +77,9 @@ public class DashboardViewModel {
             logger.warn("Cannot refresh dashboard - no user logged in");
             return;
         }
+
+        // Set loading state
+        javafx.application.Platform.runLater(() -> loading.set(true));
 
         // Run data fetching in background to prevent UI freeze
         Thread.ofVirtual().start(() -> performRefresh(user));
@@ -149,6 +155,9 @@ public class DashboardViewModel {
                     .limit(3)
                     .forEach(ua -> recentAchievements.add(
                             ua.achievement().getIcon() + " " + ua.achievement().getDisplayName()));
+
+            // Loading complete
+            loading.set(false);
         });
     }
 
@@ -180,6 +189,10 @@ public class DashboardViewModel {
 
     public IntegerProperty unreadMessagesProperty() {
         return unreadMessages;
+    }
+
+    public BooleanProperty loadingProperty() {
+        return loading;
     }
 
     public ObservableList<String> getRecentAchievements() {

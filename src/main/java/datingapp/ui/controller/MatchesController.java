@@ -41,8 +41,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Controller for the Matches screen (matches.fxml).
  * Displays all active matches for the current user with premium animations.
+ * Extends BaseController for automatic subscription cleanup.
  */
-public class MatchesController implements Initializable {
+public class MatchesController extends BaseController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(MatchesController.class);
     private static final Random RANDOM = new Random();
 
@@ -61,9 +62,6 @@ public class MatchesController implements Initializable {
     private final MatchesViewModel viewModel;
     private Pane particleLayer;
 
-    // Field-level listener to prevent multiplication
-    private final javafx.collections.ListChangeListener<MatchCardData> matchesListener = c -> populateMatchCards();
-
     public MatchesController(MatchesViewModel viewModel) {
         this.viewModel = viewModel;
     }
@@ -79,15 +77,19 @@ public class MatchesController implements Initializable {
         // Populate match cards
         populateMatchCards();
 
-        // Listen for changes
-        viewModel.getMatches().removeListener(matchesListener);
-        viewModel.getMatches().addListener(matchesListener);
+        // Listen for changes using Subscription API
+        addSubscription(viewModel.getMatches().subscribe(this::onMatchesChanged));
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
 
         // Start empty state animations if visible
         startEmptyStateAnimations();
+    }
+
+    /** Called when the matches list changes. */
+    private void onMatchesChanged() {
+        populateMatchCards();
     }
 
     /** Start animations for the empty state. */

@@ -3,6 +3,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -127,21 +128,25 @@
         <graphic>
           <FontIcon iconLiteral="mdi2u-undo" iconSize="24" iconColor="white"/>
         </graphic>
+        <tooltip><Tooltip text="Undo last action (Ctrl+Z)"/></tooltip>
       </Button>
       <Button onAction="#handlePass" styleClass="action-button-round action-btn-pass">
         <graphic>
           <FontIcon iconLiteral="mdi2c-close" iconSize="32" iconColor="white"/>
         </graphic>
+        <tooltip><Tooltip text="Pass on this person (←)"/></tooltip>
       </Button>
       <Button onAction="#handleLike" styleClass="action-button-round action-btn-like">
         <graphic>
           <FontIcon iconLiteral="mdi2h-heart" iconSize="32" iconColor="white"/>
         </graphic>
+        <tooltip><Tooltip text="Like this person (→)"/></tooltip>
       </Button>
       <Button styleClass="action-button-round action-btn-neutral">
         <graphic>
           <FontIcon iconLiteral="mdi2s-star" iconSize="24" iconColor="#f59e0b"/>
         </graphic>
+        <tooltip><Tooltip text="Super Like (↑)"/></tooltip>
       </Button>
     </HBox>
   </bottom>

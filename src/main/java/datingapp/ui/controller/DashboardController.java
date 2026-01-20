@@ -8,19 +8,23 @@ import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
+import javafx.animation.FadeTransition;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Dashboard screen (dashboard.fxml).
  * Main hub for navigation to all app features.
+ * Extends BaseController for automatic subscription cleanup.
  */
-public class DashboardController implements Initializable, ResponsiveController {
+public class DashboardController extends BaseController implements Initializable, ResponsiveController {
     private static final Logger logger = LoggerFactory.getLogger(DashboardController.class);
+    private static final String STYLE_VIEWPORT_COMPACT = "viewport-compact";
 
     @FXML
     private javafx.scene.layout.BorderPane rootPane;
@@ -49,28 +53,17 @@ public class DashboardController implements Initializable, ResponsiveController 
         this.viewModel = viewModel;
     }
 
-    // Weak listeners to prevent memory leaks with cached ViewModels
-    private final javafx.beans.value.ChangeListener<String> nameListener =
-            (obs, old, val) -> userNameLabel.setText(val);
-    private final javafx.beans.value.ChangeListener<String> statusListener =
-            (obs, old, val) -> statusLabel.setText(val);
-    private final javafx.beans.value.ChangeListener<String> pickListener =
-            (obs, old, val) -> dailyPickLabel.setText(val);
-    private final javafx.beans.value.ChangeListener<String> matchListener =
-            (obs, old, val) -> totalMatchesLabel.setText(val);
-    private final javafx.beans.value.ChangeListener<String> completionListener =
-            (obs, old, val) -> completionLabel.setText(val);
-
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        // Use weak listeners for long-lived ViewModel properties
-        viewModel.userNameProperty().addListener(new javafx.beans.value.WeakChangeListener<>(nameListener));
-        viewModel.dailyLikesStatusProperty().addListener(new javafx.beans.value.WeakChangeListener<>(statusListener));
-        viewModel.dailyPickNameProperty().addListener(new javafx.beans.value.WeakChangeListener<>(pickListener));
-        viewModel.totalMatchesProperty().addListener(new javafx.beans.value.WeakChangeListener<>(matchListener));
-        viewModel
-                .profileCompletionProperty()
-                .addListener(new javafx.beans.value.WeakChangeListener<>(completionListener));
+        // Use Subscription API for memory-safe listener management
+        addSubscription(viewModel.userNameProperty().subscribe(val -> userNameLabel.setText(val)));
+        addSubscription(viewModel.dailyLikesStatusProperty().subscribe(val -> statusLabel.setText(val)));
+        addSubscription(viewModel.dailyPickNameProperty().subscribe(val -> dailyPickLabel.setText(val)));
+        addSubscription(viewModel.totalMatchesProperty().subscribe(val -> totalMatchesLabel.setText(val)));
+        addSubscription(viewModel.profileCompletionProperty().subscribe(val -> completionLabel.setText(val)));
+
+        // Handle loading state changes for skeleton display
+        addSubscription(viewModel.loadingProperty().subscribe(this::handleLoadingChange));
 
         // Set initial values
         userNameLabel.setText(viewModel.userNameProperty().get());
@@ -90,8 +83,36 @@ public class DashboardController implements Initializable, ResponsiveController 
         // Setup responsive window size listener
         setupResponsiveListener();
 
-        // Load initial data
+        // Load initial data (will trigger loading skeleton)
         viewModel.refresh();
+    }
+
+    /**
+     * Handles loading state changes by showing/hiding skeleton loaders.
+     */
+    private void handleLoadingChange(boolean isLoading) {
+        if (isLoading) {
+            // Show skeleton for daily pick label while loading
+            if (dailyPickLabel != null) {
+                dailyPickLabel.setText("Loading...");
+                dailyPickLabel.setOpacity(0.5);
+            }
+            if (achievementsListView != null) {
+                achievementsListView.setOpacity(0.5);
+            }
+        } else {
+            // Data loaded - restore full opacity with fade
+            if (dailyPickLabel != null) {
+                FadeTransition fade = new FadeTransition(Duration.millis(300), dailyPickLabel);
+                fade.setToValue(1.0);
+                fade.play();
+            }
+            if (achievementsListView != null) {
+                FadeTransition fade = new FadeTransition(Duration.millis(300), achievementsListView);
+                fade.setToValue(1.0);
+                fade.play();
+            }
+        }
     }
 
     /** Adds a window width listener to trigger compact mode at 900px threshold. */
@@ -103,9 +124,7 @@ public class DashboardController implements Initializable, ResponsiveController 
                 // Apply initial state
                 setCompactMode(stage.getWidth() < 900);
                 // Listen for resize
-                stage.widthProperty().addListener((o, oldW, newW) -> {
-                    setCompactMode(newW.doubleValue() < 900);
-                });
+                stage.widthProperty().addListener((o, oldW, newW) -> setCompactMode(newW.doubleValue() < 900));
             }
         });
     }
@@ -168,8 +187,8 @@ public class DashboardController implements Initializable, ResponsiveController 
         }
 
         if (compact) {
-            if (!rootPane.getStyleClass().contains("viewport-compact")) {
-                rootPane.getStyleClass().add("viewport-compact");
+            if (!rootPane.getStyleClass().contains(STYLE_VIEWPORT_COMPACT)) {
+                rootPane.getStyleClass().add(STYLE_VIEWPORT_COMPACT);
             }
             // Hide secondary stats on very small screens
             if (totalMatchesLabel != null) {
@@ -177,7 +196,7 @@ public class DashboardController implements Initializable, ResponsiveController 
                 totalMatchesLabel.getParent().setManaged(false);
             }
         } else {
-            rootPane.getStyleClass().remove("viewport-compact");
+            rootPane.getStyleClass().remove(STYLE_VIEWPORT_COMPACT);
             if (totalMatchesLabel != null) {
                 totalMatchesLabel.getParent().setVisible(true);
                 totalMatchesLabel.getParent().setManaged(true);

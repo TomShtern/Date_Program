@@ -6,6 +6,7 @@
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.FlowPane?>
@@ -26,6 +27,7 @@
         <graphic>
           <FontIcon iconLiteral="mdi2c-chevron-left" iconSize="28" iconColor="white"/>
         </graphic>
+        <tooltip><Tooltip text="Go back to Dashboard"/></tooltip>
       </Button>
       <Label styleClass="subheading" text="Edit Profile"/>
       <Region HBox.hgrow="ALWAYS"/>
@@ -69,6 +71,7 @@
                 <graphic>
                   <FontIcon iconLiteral="mdi2c-camera" iconSize="18" iconColor="white"/>
                 </graphic>
+                <tooltip><Tooltip text="Upload a profile photo"/></tooltip>
               </Button>
             </VBox>
           </StackPane>

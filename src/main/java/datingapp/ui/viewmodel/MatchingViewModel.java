@@ -42,6 +42,7 @@ public class MatchingViewModel {
     private final Queue<User> candidateQueue = new LinkedList<>();
     private final ObjectProperty<User> currentCandidate = new SimpleObjectProperty<>();
     private final BooleanProperty hasMoreCandidates = new SimpleBooleanProperty(false);
+    private final BooleanProperty loading = new SimpleBooleanProperty(false);
 
     // New: Property to notify when a match occurs
     private final ObjectProperty<Match> lastMatch = new SimpleObjectProperty<>();
@@ -99,6 +100,7 @@ public class MatchingViewModel {
             return;
         }
 
+        javafx.application.Platform.runLater(() -> loading.set(true));
         logger.info("Refreshing candidates for user: {}", currentUser.getName());
 
         List<User> activeUsers = userStorage.findActive();
@@ -115,6 +117,7 @@ public class MatchingViewModel {
             candidateQueue.addAll(candidates);
 
             logger.info("Found {} candidates", candidates.size());
+            loading.set(false);
             nextCandidate();
         });
     }
@@ -281,6 +284,10 @@ public class MatchingViewModel {
 
     public BooleanProperty hasMoreCandidatesProperty() {
         return hasMoreCandidates;
+    }
+
+    public BooleanProperty loadingProperty() {
+        return loading;
     }
 
     public ObjectProperty<Match> lastMatchProperty() {

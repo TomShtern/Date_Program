@@ -33,8 +33,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Controller for the Matching screen (matching.fxml).
  * Handles candidate display, swipe actions, and match popup.
+ * Extends BaseController for automatic subscription cleanup.
  */
-public class MatchingController implements Initializable {
+public class MatchingController extends BaseController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(MatchingController.class);
 
     @FXML
@@ -66,6 +67,7 @@ public class MatchingController implements Initializable {
     private HBox actionButtonsContainer;
 
     @FXML
+    @SuppressWarnings("unused")
     private StackPane cardStackContainer;
 
     @FXML
@@ -73,10 +75,6 @@ public class MatchingController implements Initializable {
 
     @FXML
     private Label passOverlay;
-
-    // Listeners stored as fields to allow removal/prevention of duplicates
-    private final javafx.beans.value.ChangeListener<User> candidateChangeListener;
-    private final javafx.beans.value.ChangeListener<User> matchListener;
 
     // Swipe gesture state
     private double dragStartX;
@@ -87,14 +85,6 @@ public class MatchingController implements Initializable {
 
     public MatchingController(MatchingViewModel viewModel) {
         this.viewModel = viewModel;
-
-        // Initialize listeners here so they can refer to instance methods safely
-        this.candidateChangeListener = (obs, oldVal, newVal) -> updateCandidateUI(newVal);
-        this.matchListener = (obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                showMatchPopup(newVal, viewModel.lastMatchProperty().get());
-            }
-        };
     }
 
     @Override
@@ -116,13 +106,18 @@ public class MatchingController implements Initializable {
         actionButtonsContainer.visibleProperty().bind(viewModel.hasMoreCandidatesProperty());
         actionButtonsContainer.managedProperty().bind(viewModel.hasMoreCandidatesProperty());
 
-        // Update UI when current candidate changes
-        viewModel.currentCandidateProperty().removeListener(candidateChangeListener);
-        viewModel.currentCandidateProperty().addListener(candidateChangeListener);
+        // Update UI when current candidate changes - using Subscription API
+        addSubscription(viewModel.currentCandidateProperty().subscribe(this::updateCandidateUI));
 
-        // Listen for matches to show popup
-        viewModel.matchedUserProperty().removeListener(matchListener);
-        viewModel.matchedUserProperty().addListener(matchListener);
+        // Listen for matches to show popup - using Subscription API
+        addSubscription(viewModel.matchedUserProperty().subscribe(user -> {
+            if (user != null) {
+                showMatchPopup(user, viewModel.lastMatchProperty().get());
+            }
+        }));
+
+        // Handle loading state for skeleton display
+        addSubscription(viewModel.loadingProperty().subscribe(this::handleLoadingChange));
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
@@ -139,6 +134,25 @@ public class MatchingController implements Initializable {
 
         // Setup swipe gestures
         setupSwipeGestures();
+    }
+
+    /**
+     * Handles loading state changes by showing/hiding skeleton visual effect.
+     */
+    private void handleLoadingChange(boolean isLoading) {
+        if (isLoading) {
+            // Show loading state - fade the card
+            if (candidateCard != null) {
+                candidateCard.setOpacity(0.5);
+            }
+        } else {
+            // Data loaded - restore full opacity with fade
+            if (candidateCard != null) {
+                FadeTransition fade = new FadeTransition(Duration.millis(300), candidateCard);
+                fade.setToValue(1.0);
+                fade.play();
+            }
+        }
     }
 
     /** Setup drag-to-swipe gestures on the candidate card. */
@@ -285,7 +299,8 @@ public class MatchingController implements Initializable {
                 }
                 case ESCAPE -> handleBack();
                 default -> {
-                    /* no action */ }
+                    /* no action */
+                }
             }
         });
 
@@ -372,12 +387,16 @@ public class MatchingController implements Initializable {
     @FXML
     @SuppressWarnings("unused")
     private void handleLike() {
+        // Pulse the card for micro-interaction feedback
+        UiAnimations.pulseScale(candidateCard);
         viewModel.like();
     }
 
     @FXML
     @SuppressWarnings("unused")
     private void handlePass() {
+        // Pulse the card for micro-interaction feedback
+        UiAnimations.pulseScale(candidateCard);
         viewModel.pass();
     }
 

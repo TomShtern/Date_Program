@@ -28,8 +28,9 @@ import javafx.scene.layout.VBox;
 /**
  * Controller for the Chat screen (chat.fxml).
  * Handles conversation display, message styling, and sending messages.
+ * Extends BaseController for automatic subscription cleanup.
  */
-public class ChatController implements Initializable {
+public class ChatController extends BaseController implements Initializable {
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -60,22 +61,8 @@ public class ChatController implements Initializable {
 
     private final ChatViewModel viewModel;
 
-    // Field-level listener to prevent multiplication
-    private final javafx.beans.value.ChangeListener<ConversationPreview> selectionListener;
-
     public ChatController(ChatViewModel viewModel) {
         this.viewModel = viewModel;
-        this.selectionListener = (obs, oldVal, newVal) -> {
-            viewModel.selectedConversationProperty().set(newVal);
-            if (newVal != null) {
-                chatHeaderLabel.setText(newVal.otherUser().getName());
-                chatContainer.setVisible(true);
-                emptyStateContainer.setVisible(false);
-            } else {
-                chatContainer.setVisible(false);
-                emptyStateContainer.setVisible(true);
-            }
-        };
     }
 
     @Override
@@ -89,9 +76,11 @@ public class ChatController implements Initializable {
         conversationListView.setCellFactory(lv -> createConversationCell());
         messageListView.setCellFactory(lv -> createMessageCell());
 
-        // Bind selection
-        conversationListView.getSelectionModel().selectedItemProperty().removeListener(selectionListener);
-        conversationListView.getSelectionModel().selectedItemProperty().addListener(selectionListener);
+        // Bind selection using Subscription API
+        addSubscription(conversationListView
+                .getSelectionModel()
+                .selectedItemProperty()
+                .subscribe(this::handleConversationSelection));
 
         // Initial state
         chatContainer.setVisible(false);
@@ -99,6 +88,19 @@ public class ChatController implements Initializable {
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
+    }
+
+    /** Handle conversation selection change. */
+    private void handleConversationSelection(ConversationPreview selected) {
+        viewModel.selectedConversationProperty().set(selected);
+        if (selected != null) {
+            chatHeaderLabel.setText(selected.otherUser().getName());
+            chatContainer.setVisible(true);
+            emptyStateContainer.setVisible(false);
+        } else {
+            chatContainer.setVisible(false);
+            emptyStateContainer.setVisible(true);
+        }
     }
 
     private ListCell<ConversationPreview> createConversationCell() {

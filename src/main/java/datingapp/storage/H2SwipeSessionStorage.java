@@ -61,7 +61,9 @@ public class H2SwipeSessionStorage implements SwipeSessionStorage {
 
     @Override
     public Optional<SwipeSession> get(UUID sessionId) {
-        String sql = "SELECT * FROM swipe_sessions WHERE id = ?";
+        String sql = "SELECT id, user_id, started_at, last_activity_at, ended_at, "
+                + "state, swipe_count, like_count, pass_count, match_count "
+                + "FROM swipe_sessions WHERE id = ?";
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -81,7 +83,9 @@ public class H2SwipeSessionStorage implements SwipeSessionStorage {
 
     @Override
     public Optional<SwipeSession> getActiveSession(UUID userId) {
-        String sql = "SELECT * FROM swipe_sessions WHERE user_id = ? AND state = 'ACTIVE' LIMIT 1";
+        String sql = "SELECT id, user_id, started_at, last_activity_at, ended_at, "
+                + "state, swipe_count, like_count, pass_count, match_count "
+                + "FROM swipe_sessions WHERE user_id = ? AND state = 'ACTIVE' LIMIT 1";
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -101,7 +105,9 @@ public class H2SwipeSessionStorage implements SwipeSessionStorage {
 
     @Override
     public List<SwipeSession> getSessionsFor(UUID userId, int limit) {
-        String sql = "SELECT * FROM swipe_sessions WHERE user_id = ? ORDER BY started_at DESC LIMIT ?";
+        String sql = "SELECT id, user_id, started_at, last_activity_at, ended_at, "
+                + "state, swipe_count, like_count, pass_count, match_count "
+                + "FROM swipe_sessions WHERE user_id = ? ORDER BY started_at DESC LIMIT ?";
         List<SwipeSession> sessions = new ArrayList<>();
 
         try (Connection conn = dbManager.getConnection();

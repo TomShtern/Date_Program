@@ -118,7 +118,8 @@ public class H2ReportStorage implements ReportStorage {
 
     @Override
     public List<Report> getReportsAgainst(UUID userId) {
-        String sql = "SELECT * FROM reports WHERE reported_user_id = ? ORDER BY created_at DESC";
+        String sql = "SELECT id, reporter_id, reported_user_id, reason, description, created_at "
+                + "FROM reports WHERE reported_user_id = ? ORDER BY created_at DESC";
         List<Report> reports = new ArrayList<>();
 
         try (Connection conn = dbManager.getConnection();

@@ -19,8 +19,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Preferences/Filter screen.
+ * Extends BaseController for automatic subscription cleanup.
  */
-public class PreferencesController implements Initializable {
+public class PreferencesController extends BaseController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(PreferencesController.class);
 
     @FXML
@@ -87,8 +88,8 @@ public class PreferencesController implements Initializable {
         // Update labels
         updateAgeLabels();
 
-        // Listeners
-        minAgeSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+        // Listeners using Subscription API
+        addSubscription(minAgeSlider.valueProperty().subscribe(newVal -> {
             int val = newVal.intValue();
             // Enforce min < max
             if (val > maxAgeSlider.getValue()) {
@@ -96,9 +97,9 @@ public class PreferencesController implements Initializable {
             }
             viewModel.minAgeProperty().set(val);
             updateAgeLabels();
-        });
+        }));
 
-        maxAgeSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+        addSubscription(maxAgeSlider.valueProperty().subscribe(newVal -> {
             int val = newVal.intValue();
             // Enforce max > min
             if (val < minAgeSlider.getValue()) {
@@ -106,7 +107,7 @@ public class PreferencesController implements Initializable {
             }
             viewModel.maxAgeProperty().set(val);
             updateAgeLabels();
-        });
+        }));
     }
 
     private void updateAgeLabels() {
@@ -118,10 +119,10 @@ public class PreferencesController implements Initializable {
         distanceSlider.setValue(viewModel.maxDistanceProperty().get());
         updateDistanceLabel();
 
-        distanceSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+        addSubscription(distanceSlider.valueProperty().subscribe(newVal -> {
             viewModel.maxDistanceProperty().set(newVal.intValue());
             updateDistanceLabel();
-        });
+        }));
     }
 
     private void updateDistanceLabel() {
@@ -138,9 +139,9 @@ public class PreferencesController implements Initializable {
             default -> everyoneToggle.setSelected(true);
         }
 
-        // Add listener
-        genderGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal == null) {
+        // Add listener using Subscription API
+        addSubscription(genderGroup.selectedToggleProperty().subscribe((oldVal, newVal) -> {
+            if (newVal == null && oldVal != null) {
                 // Prevent deselecting all - reselect old
                 oldVal.setSelected(true);
                 return;
@@ -153,7 +154,7 @@ public class PreferencesController implements Initializable {
             } else {
                 viewModel.interestedInProperty().set(GenderPreference.EVERYONE);
             }
-        });
+        }));
     }
 
     @FXML

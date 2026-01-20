@@ -41,6 +41,7 @@ public class AchievementPopupController implements Initializable {
     private FontIcon achievementIcon;
 
     @FXML
+    @SuppressWarnings("unused")
     private Label titleLabel;
 
     @FXML

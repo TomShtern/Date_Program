@@ -21,8 +21,9 @@ import javafx.scene.layout.VBox;
 
 /**
  * Controller for the Stats screen (stats.fxml).
+ * Extends BaseController for automatic subscription cleanup.
  */
-public class StatsController implements Initializable {
+public class StatsController extends BaseController implements Initializable {
 
     @FXML
     private javafx.scene.layout.BorderPane rootPane;

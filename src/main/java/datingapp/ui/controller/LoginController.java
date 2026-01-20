@@ -33,9 +33,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Controller for the Login screen (login.fxml).
  * Handles user selection, login, and account creation dialog.
+ * Extends BaseController for automatic subscription cleanup.
  */
-public class LoginController implements Initializable {
+public class LoginController extends BaseController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
+    private static final String SECONDARY_TEXT_STYLE = "-fx-text-fill: -fx-text-secondary;";
 
     @FXML
     private javafx.scene.layout.StackPane rootPane;
@@ -63,11 +65,8 @@ public class LoginController implements Initializable {
         // Custom cell factory to show user name, status, and completion
         userListView.setCellFactory(lv -> new UserListCell());
 
-        // Listen for selection changes
-        userListView
-                .getSelectionModel()
-                .selectedItemProperty()
-                .addListener((obs, oldVal, newVal) -> viewModel.setSelectedUser(newVal));
+        // Listen for selection changes using Subscription API
+        addSubscription(userListView.getSelectionModel().selectedItemProperty().subscribe(viewModel::setSelectedUser));
 
         // Bind button disable state to ViewModel property
         loginButton.disableProperty().bind(viewModel.loginDisabledProperty());
@@ -171,7 +170,7 @@ public class LoginController implements Initializable {
         // Name field
         VBox nameBox = new VBox(8);
         Label nameLabel = new Label("Name:");
-        nameLabel.setStyle("-fx-text-fill: -fx-text-secondary;");
+        nameLabel.setStyle(SECONDARY_TEXT_STYLE);
         TextField nameField = new TextField();
         nameField.setPromptText("Enter your name");
         nameField.setPrefWidth(280);
@@ -182,7 +181,7 @@ public class LoginController implements Initializable {
         // Age spinner
         VBox ageBox = new VBox(8);
         Label ageLabel = new Label("Age:");
-        ageLabel.setStyle("-fx-text-fill: -fx-text-secondary;");
+        ageLabel.setStyle(SECONDARY_TEXT_STYLE);
         Spinner<Integer> ageSpinner = new Spinner<>();
         ageSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(18, 100, 25));
         ageSpinner.setEditable(true);
@@ -192,7 +191,7 @@ public class LoginController implements Initializable {
         // Gender combo
         VBox genderBox = new VBox(8);
         Label genderLabel = new Label("Gender:");
-        genderLabel.setStyle("-fx-text-fill: -fx-text-secondary;");
+        genderLabel.setStyle(SECONDARY_TEXT_STYLE);
         ComboBox<Gender> genderCombo = new ComboBox<>();
         genderCombo.getItems().addAll(Gender.values());
         genderCombo.setValue(Gender.OTHER);
@@ -205,7 +204,7 @@ public class LoginController implements Initializable {
         // Interested In combo
         VBox interestedBox = new VBox(8);
         Label interestedLabel = new Label("Interested In:");
-        interestedLabel.setStyle("-fx-text-fill: -fx-text-secondary;");
+        interestedLabel.setStyle(SECONDARY_TEXT_STYLE);
         ComboBox<Gender> interestedInCombo = new ComboBox<>();
         interestedInCombo.getItems().addAll(Gender.values());
         interestedInCombo.setValue(Gender.OTHER);

@@ -5,6 +5,15 @@ import datingapp.core.ProfileCompletionService.CompletionResult;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
 import datingapp.ui.UISession;
+import datingapp.ui.util.ToastService;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
+import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import org.slf4j.Logger;
@@ -12,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Profile Editor screen.
- * Handles editing of user bio and location.
+ * Handles editing of user bio, location, and profile photo.
  */
 public class ProfileViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
@@ -25,6 +34,7 @@ public class ProfileViewModel {
     private final StringProperty location = new SimpleStringProperty("");
     private final StringProperty interests = new SimpleStringProperty("");
     private final StringProperty completionStatus = new SimpleStringProperty("0%");
+    private final StringProperty primaryPhotoUrl = new SimpleStringProperty("");
 
     @SuppressWarnings("unused")
     public ProfileViewModel(UserStorage userStorage, ProfileCompletionService unused) {
@@ -103,7 +113,7 @@ public class ProfileViewModel {
                 if (parts.length == 2) {
                     user.setLocation(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()));
                 }
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException ignored) {
                 logger.warn("Could not parse location: {}", loc);
             }
         }
@@ -137,5 +147,69 @@ public class ProfileViewModel {
 
     public StringProperty completionStatusProperty() {
         return completionStatus;
+    }
+
+    /**
+     * Returns the primary photo URL property for binding.
+     *
+     * @return the primary photo URL property
+     */
+    public StringProperty primaryPhotoUrlProperty() {
+        return primaryPhotoUrl;
+    }
+
+    /**
+     * Saves a profile photo to app data directory and updates user record.
+     * Runs on a virtual thread to avoid blocking the UI.
+     *
+     * @param photoFile the selected photo file
+     */
+    public void savePhoto(File photoFile) {
+        User user = UISession.getInstance().getCurrentUser();
+        if (user == null) {
+            logger.warn("No current user for photo save");
+            return;
+        }
+
+        Thread.ofVirtual().name("photo-save").start(() -> {
+            try {
+                // 1. Create app data directory for photos
+                Path appData = Paths.get(System.getProperty("user.home"), ".datingapp", "photos");
+                Files.createDirectories(appData);
+
+                // 2. Generate unique filename based on user ID and timestamp
+                String filename = user.getId() + "_" + System.currentTimeMillis() + getExtension(photoFile);
+                Path destination = appData.resolve(filename);
+
+                // 3. Copy file to app data directory
+                Files.copy(photoFile.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
+
+                // 4. Update user record with photo URL (use file:// URI)
+                String photoUrl = destination.toUri().toString();
+                user.setPhotoUrls(List.of(photoUrl));
+                userStorage.save(user);
+
+                // 5. Update UI on FX thread
+                Platform.runLater(() -> {
+                    primaryPhotoUrl.set(photoUrl);
+                    ToastService.getInstance().showSuccess("Photo saved!");
+                    logger.info("Profile photo saved: {}", destination);
+                });
+
+            } catch (IOException e) {
+                logger.error("Failed to save profile photo", e);
+                Platform.runLater(
+                        () -> ToastService.getInstance().showError("Failed to save photo: " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Gets the file extension from a file.
+     */
+    private String getExtension(File file) {
+        String fileName = file.getName();
+        int lastDot = fileName.lastIndexOf('.');
+        return lastDot > 0 ? fileName.substring(lastDot) : ".jpg";
     }
 }

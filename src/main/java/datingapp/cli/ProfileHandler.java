@@ -130,13 +130,10 @@ public class ProfileHandler {
         logger.info("");
         logger.info("  📊 PROFILE COMPLETENESS: {}%", comp.percentage());
 
-        // Render progress bar (copied from profilePreviewService/Main logic)
-        // Main was accessing static method on ProfilePreviewService or just
-        // implementing it?
-        // Main used ProfilePreviewService.renderProgressBar. Assuming it's public
-        // static.
-        if (comp.percentage() > 0) {
-            logger.info("  {}", ProfilePreviewService.renderProgressBar(comp.percentage() / 100.0, 20));
+        // Render progress bar when profile has some completeness
+        if (comp.percentage() > 0 && logger.isInfoEnabled()) {
+            String progressBar = ProfilePreviewService.renderProgressBar(comp.percentage() / 100.0, 20);
+            logger.info("  {}", progressBar);
         }
 
         if (!comp.missingFields().isEmpty()) {

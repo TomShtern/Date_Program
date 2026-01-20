@@ -439,7 +439,9 @@ class AchievementServiceTest {
         }
 
         @Override
-        public void delete(UUID likeId) {}
+        public void delete(UUID likeId) {
+            // Not needed for achievement tests
+        }
     }
 
     private static class InMemoryUserStorage implements UserStorage {
@@ -476,7 +478,9 @@ class AchievementServiceTest {
         }
 
         @Override
-        public void save(Report report) {}
+        public void save(Report report) {
+            // Not needed for achievement tests
+        }
 
         @Override
         public int countReportsAgainst(UUID userId) {

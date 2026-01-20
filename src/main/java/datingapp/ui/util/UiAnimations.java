@@ -61,4 +61,17 @@ public final class UiAnimations {
             st.play();
         });
     }
+
+    /**
+     * Quick scale pulse for button press feedback.
+     * Per JavaFX Skill Cheatsheet Section 14.
+     */
+    public static void pulseScale(Node node) {
+        ScaleTransition scale = new ScaleTransition(Duration.millis(100), node);
+        scale.setToX(1.15);
+        scale.setToY(1.15);
+        scale.setAutoReverse(true);
+        scale.setCycleCount(2);
+        scale.play();
+    }
 }

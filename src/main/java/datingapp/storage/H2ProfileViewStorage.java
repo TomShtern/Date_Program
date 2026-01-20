@@ -100,17 +100,7 @@ public class H2ProfileViewStorage implements ProfileViewStorage {
 
     @Override
     public List<UUID> getRecentViewers(UUID userId, int limit) {
-        String sql =
-                """
-                SELECT DISTINCT viewer_id
-                FROM profile_views
-                WHERE viewed_id = ?
-                ORDER BY MAX(viewed_at) DESC
-                GROUP BY viewer_id
-                LIMIT ?
-                """;
-
-        // Simpler query that works better with H2
+        // Query that works with H2's GROUP BY semantics
         String simpleSql =
                 """
                 SELECT viewer_id, MAX(viewed_at) as last_view

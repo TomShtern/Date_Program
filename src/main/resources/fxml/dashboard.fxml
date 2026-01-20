@@ -4,6 +4,7 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
@@ -29,7 +30,9 @@
         <FontIcon iconLiteral="mdi2h-heart-pulse" iconSize="16" iconColor="#10b981"/>
         <Label fx:id="statusLabel" styleClass="likes-counter-text" text="0/50"/>
       </HBox>
-      <Button onAction="#handleLogout" styleClass="button-danger" text="Logout"/>
+      <Button onAction="#handleLogout" styleClass="button-danger" text="Logout">
+        <tooltip><Tooltip text="Sign out of your account"/></tooltip>
+      </Button>
     </HBox>
   </top>
 

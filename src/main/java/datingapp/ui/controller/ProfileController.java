@@ -3,6 +3,7 @@ package datingapp.ui.controller;
 import datingapp.ui.NavigationService;
 import datingapp.ui.ViewFactory;
 import datingapp.ui.util.AnimationHelper;
+import datingapp.ui.util.ToastService;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
@@ -26,8 +27,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Profile Editor screen (profile.fxml).
+ * Extends BaseController for automatic subscription cleanup.
  */
-public class ProfileController implements Initializable {
+public class ProfileController extends BaseController implements Initializable {
 
     private static final Logger logger = LoggerFactory.getLogger(ProfileController.class);
 
@@ -103,12 +105,12 @@ public class ProfileController implements Initializable {
         // Populate interest chips from the interests string
         populateInterestChips();
 
-        // Listen for interests changes to update chips
+        // Listen for interests changes to update chips using Subscription API (memory-safe)
         if (interestsField != null) {
-            interestsField.textProperty().addListener((obs, oldVal, newVal) -> populateInterestChips());
+            addSubscription(interestsField.textProperty().subscribe(text -> populateInterestChips()));
         }
 
-        // Setup character counter for bio
+        // Setup character counter for bio using Subscription API (memory-safe)
         setupCharacterCounter();
 
         // Apply fade-in animation
@@ -121,7 +123,7 @@ public class ProfileController implements Initializable {
         }
     }
 
-    /** Setup the character counter binding for the bio text area. */
+    /** Setup the character counter binding for the bio text area using Subscription API. */
     private void setupCharacterCounter() {
         if (charCountLabel == null || bioArea == null) {
             return;
@@ -130,8 +132,8 @@ public class ProfileController implements Initializable {
         // Initial update
         updateCharCounter(bioArea.getText());
 
-        // Listen for text changes
-        bioArea.textProperty().addListener((obs, oldVal, newVal) -> updateCharCounter(newVal));
+        // Use Subscription API for memory-safe listener
+        addSubscription(bioArea.textProperty().subscribe(this::updateCharCounter));
     }
 
     /** Updates the character counter label with appropriate styling. */
@@ -184,6 +186,7 @@ public class ProfileController implements Initializable {
     @FXML
     @SuppressWarnings("unused")
     private void handleSave() {
+        cleanup(); // Clean up subscriptions before navigating away
         viewModel.save();
         NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
     }
@@ -191,17 +194,19 @@ public class ProfileController implements Initializable {
     @FXML
     @SuppressWarnings("unused")
     private void handleCancel() {
+        cleanup(); // Clean up subscriptions before navigating away
         NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
     }
 
     @FXML
     @SuppressWarnings("unused")
     private void handleBack() {
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+        handleCancel(); // Delegate to avoid duplicate code
     }
 
     /**
      * Handles profile photo upload via FileChooser.
+     * Saves the photo via ViewModel for persistence.
      */
     @FXML
     @SuppressWarnings("unused")
@@ -211,7 +216,7 @@ public class ProfileController implements Initializable {
         fileChooser
                 .getExtensionFilters()
                 .addAll(
-                        new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp"),
+                        new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif"),
                         new FileChooser.ExtensionFilter("All Files", "*.*"));
 
         // Show file chooser dialog
@@ -219,11 +224,11 @@ public class ProfileController implements Initializable {
 
         if (selectedFile != null) {
             try {
-                // Load image from file
+                // Load image preview from file
                 Image image = new Image(selectedFile.toURI().toString(), 200, 200, true, true);
 
                 if (!image.isError()) {
-                    // Set image to ImageView
+                    // Set image to ImageView (immediate preview)
                     profileImageView.setImage(image);
                     profileImageView.setVisible(true);
 
@@ -234,13 +239,15 @@ public class ProfileController implements Initializable {
 
                     logger.info("Profile photo loaded: {}", selectedFile.getName());
 
-                    // TODO: Save photo path to ViewModel/storage
-                    // viewModel.setProfilePhotoPath(selectedFile.getAbsolutePath());
+                    // Save photo via ViewModel (persists to storage)
+                    viewModel.savePhoto(selectedFile);
                 } else {
                     logger.warn("Failed to load image: {}", selectedFile.getAbsolutePath());
+                    ToastService.getInstance().showError("Failed to load image");
                 }
             } catch (Exception e) {
                 logger.error("Error loading profile photo", e);
+                ToastService.getInstance().showError("Error loading photo: " + e.getMessage());
             }
         }
     }
