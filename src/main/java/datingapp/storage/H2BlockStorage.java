@@ -22,8 +22,7 @@ public class H2BlockStorage implements BlockStorage {
     }
 
     private void createTable() {
-        String sql =
-                """
+        String sql = """
                 CREATE TABLE IF NOT EXISTS blocks (
                     id UUID PRIMARY KEY,
                     blocker_id UUID NOT NULL,
@@ -58,8 +57,7 @@ public class H2BlockStorage implements BlockStorage {
 
     @Override
     public void save(Block block) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO blocks (id, blocker_id, blocked_id, created_at)
                 VALUES (?, ?, ?, ?)
                 """;
@@ -82,8 +80,7 @@ public class H2BlockStorage implements BlockStorage {
     @Override
     public boolean isBlocked(UUID userA, UUID userB) {
         // Check if either user has blocked the other
-        String sql =
-                """
+        String sql = """
                 SELECT 1 FROM blocks
                 WHERE (blocker_id = ? AND blocked_id = ?)
                    OR (blocker_id = ? AND blocked_id = ?)
@@ -108,8 +105,7 @@ public class H2BlockStorage implements BlockStorage {
     @Override
     public Set<UUID> getBlockedUserIds(UUID userId) {
         // Returns all users that this user blocked OR who blocked this user
-        String sql =
-                """
+        String sql = """
                 SELECT blocked_id FROM blocks WHERE blocker_id = ?
                 UNION
                 SELECT blocker_id FROM blocks WHERE blocked_id = ?

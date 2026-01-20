@@ -25,8 +25,7 @@ public class H2DailyPickViewStorage implements DailyPickStorage {
 
     @Override
     public void markViewed(UUID userId, LocalDate date) {
-        String sql =
-                """
+        String sql = """
                 MERGE INTO daily_pick_views (user_id, viewed_date, viewed_at)
                 VALUES (?, ?, ?)
                 """;
@@ -47,8 +46,7 @@ public class H2DailyPickViewStorage implements DailyPickStorage {
 
     @Override
     public boolean hasViewed(UUID userId, LocalDate date) {
-        String sql =
-                """
+        String sql = """
                 SELECT COUNT(*) FROM daily_pick_views
                 WHERE user_id = ? AND viewed_date = ?
                 """;

@@ -22,8 +22,7 @@ public class H2ReportStorage implements ReportStorage {
     }
 
     private void createTable() {
-        String sql =
-                """
+        String sql = """
                 CREATE TABLE IF NOT EXISTS reports (
                     id UUID PRIMARY KEY,
                     reporter_id UUID NOT NULL,
@@ -55,8 +54,7 @@ public class H2ReportStorage implements ReportStorage {
 
     @Override
     public void save(Report report) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO reports (id, reporter_id, reported_user_id, reason, description, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """;

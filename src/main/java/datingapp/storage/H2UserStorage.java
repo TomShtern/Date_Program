@@ -45,8 +45,7 @@ public class H2UserStorage implements UserStorage {
     }
 
     private void addColumnIfNotExists(String columnName, String columnDef) {
-        String checkSql =
-                """
+        String checkSql = """
         SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_NAME = 'USERS' AND COLUMN_NAME = ?
         """;
@@ -71,8 +70,7 @@ public class H2UserStorage implements UserStorage {
 
     @Override
     public void save(User user) {
-        String sql =
-                """
+        String sql = """
         MERGE INTO users (id, name, bio, birth_date, gender, interested_in, lat, lon,
                           max_distance_km, min_age, max_age, photo_urls, state, created_at,
                           updated_at, smoking, drinking, wants_kids, looking_for, education,

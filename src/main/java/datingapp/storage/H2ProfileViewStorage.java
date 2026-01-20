@@ -25,8 +25,7 @@ public class H2ProfileViewStorage implements ProfileViewStorage {
     }
 
     private void initializeTable() {
-        String sql =
-                """
+        String sql = """
                 CREATE TABLE IF NOT EXISTS profile_views (
                     viewer_id UUID NOT NULL,
                     viewed_id UUID NOT NULL,
@@ -101,8 +100,7 @@ public class H2ProfileViewStorage implements ProfileViewStorage {
     @Override
     public List<UUID> getRecentViewers(UUID userId, int limit) {
         // Query that works with H2's GROUP BY semantics
-        String simpleSql =
-                """
+        String simpleSql = """
                 SELECT viewer_id, MAX(viewed_at) as last_view
                 FROM profile_views
                 WHERE viewed_id = ?

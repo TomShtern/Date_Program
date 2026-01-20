@@ -24,8 +24,7 @@ public class H2LikeStorage implements LikeStorage {
 
     @Override
     public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-        String sql =
-                """
+        String sql = """
                 SELECT id, who_likes, who_got_liked, direction, created_at
                 FROM likes WHERE who_likes = ? AND who_got_liked = ?
                 """;
@@ -54,8 +53,7 @@ public class H2LikeStorage implements LikeStorage {
 
     @Override
     public void save(Like like) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO likes (id, who_likes, who_got_liked, direction, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """;
@@ -97,8 +95,7 @@ public class H2LikeStorage implements LikeStorage {
     @Override
     public boolean mutualLikeExists(UUID a, UUID b) {
         // Check if BOTH users have LIKED (not passed) each other
-        String sql =
-                """
+        String sql = """
                 SELECT COUNT(*) FROM likes l1
                 JOIN likes l2 ON l1.who_likes = l2.who_got_liked
                              AND l1.who_got_liked = l2.who_likes
@@ -167,8 +164,7 @@ public class H2LikeStorage implements LikeStorage {
 
     @Override
     public java.util.Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-        String sql =
-                """
+        String sql = """
                 SELECT who_likes, MAX(created_at) AS liked_at
                 FROM likes
                 WHERE who_got_liked = ? AND direction = 'LIKE'
@@ -244,8 +240,7 @@ public class H2LikeStorage implements LikeStorage {
     @Override
     public int countMutualLikes(UUID userId) {
         // Count users that userId LIKED who also LIKED userId back
-        String sql =
-                """
+        String sql = """
                 SELECT COUNT(*) FROM likes l1
                 JOIN likes l2 ON l1.who_likes = l2.who_got_liked
                              AND l1.who_got_liked = l2.who_likes
@@ -273,8 +268,7 @@ public class H2LikeStorage implements LikeStorage {
 
     @Override
     public int countLikesToday(UUID userId, Instant startOfDay) {
-        String sql =
-                """
+        String sql = """
                 SELECT COUNT(*) FROM likes
                 WHERE who_likes = ? AND direction = 'LIKE' AND created_at >= ?
                 """;
@@ -298,8 +292,7 @@ public class H2LikeStorage implements LikeStorage {
 
     @Override
     public int countPassesToday(UUID userId, Instant startOfDay) {
-        String sql =
-                """
+        String sql = """
                 SELECT COUNT(*) FROM likes
                 WHERE who_likes = ? AND direction = 'PASS' AND created_at >= ?
                 """;

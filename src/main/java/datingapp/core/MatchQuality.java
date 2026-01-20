@@ -35,9 +35,9 @@ public record MatchQuality(
         String paceSyncLevel, // e.g., "Perfect Sync", "Good Sync", etc.
         int compatibilityScore, // 0-100
         @SuppressWarnings("MismatchedQueryAndUpdateOfCollection") // False positive: populated via List.copyOf in
-                // compact
-                // constructor
-                List<String> highlights // Human-readable highlights
+        // compact
+        // constructor
+        List<String> highlights // Human-readable highlights
         ) {
     public MatchQuality {
         Objects.requireNonNull(matchId, "matchId cannot be null");

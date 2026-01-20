@@ -26,8 +26,7 @@ public class H2SwipeSessionStorage implements SwipeSessionStorage {
 
     @Override
     public void save(SwipeSession session) {
-        String sql =
-                """
+        String sql = """
                 MERGE INTO swipe_sessions (id, user_id, started_at, last_activity_at, ended_at,
                                            state, swipe_count, like_count, pass_count, match_count)
                 KEY (id)
@@ -153,8 +152,7 @@ public class H2SwipeSessionStorage implements SwipeSessionStorage {
 
     @Override
     public SessionAggregates getAggregates(UUID userId) {
-        String sql =
-                """
+        String sql = """
                 SELECT
                     COUNT(*) as total_sessions,
                     COALESCE(SUM(swipe_count), 0) as total_swipes,
@@ -211,8 +209,7 @@ public class H2SwipeSessionStorage implements SwipeSessionStorage {
     @Override
     public int endStaleSessions(Duration timeout) {
         Instant cutoff = Instant.now().minus(timeout);
-        String sql =
-                """
+        String sql = """
                 UPDATE swipe_sessions
                 SET state = 'COMPLETED', ended_at = ?
                 WHERE state = 'ACTIVE' AND last_activity_at < ?

@@ -25,8 +25,7 @@ public class H2MessageStorage implements MessageStorage {
 
     /** Creates the messages table if it doesn't exist. */
     private void ensureSchema() {
-        String createTableSql =
-                """
+        String createTableSql = """
                 CREATE TABLE IF NOT EXISTS messages (
                     id UUID PRIMARY KEY,
                     conversation_id VARCHAR(100) NOT NULL,
@@ -40,8 +39,7 @@ public class H2MessageStorage implements MessageStorage {
 
         // FK constraint added separately - will fail gracefully if conversations table doesn't exist
         // or if constraint already exists. This enables cascade delete when conversations are deleted.
-        String addFkConstraint =
-                """
+        String addFkConstraint = """
                 ALTER TABLE messages ADD CONSTRAINT IF NOT EXISTS fk_messages_conversation
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
                 """;
@@ -66,8 +64,7 @@ public class H2MessageStorage implements MessageStorage {
 
     @Override
     public void save(Message message) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO messages (id, conversation_id, sender_id, content, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """;
@@ -90,8 +87,7 @@ public class H2MessageStorage implements MessageStorage {
 
     @Override
     public List<Message> getMessages(String conversationId, int limit, int offset) {
-        String sql =
-                """
+        String sql = """
                 SELECT * FROM messages
                 WHERE conversation_id = ?
                 ORDER BY created_at ASC
@@ -120,8 +116,7 @@ public class H2MessageStorage implements MessageStorage {
 
     @Override
     public Optional<Message> getLatestMessage(String conversationId) {
-        String sql =
-                """
+        String sql = """
                 SELECT * FROM messages
                 WHERE conversation_id = ?
                 ORDER BY created_at DESC
@@ -166,8 +161,7 @@ public class H2MessageStorage implements MessageStorage {
 
     @Override
     public int countMessagesAfter(String conversationId, Instant after) {
-        String sql =
-                """
+        String sql = """
                 SELECT COUNT(*) FROM messages
                 WHERE conversation_id = ?
                 AND created_at > ?
@@ -192,8 +186,7 @@ public class H2MessageStorage implements MessageStorage {
 
     @Override
     public int countMessagesNotFromSender(String conversationId, UUID senderId) {
-        String sql =
-                """
+        String sql = """
                 SELECT COUNT(*) FROM messages
                 WHERE conversation_id = ?
                 AND sender_id != ?

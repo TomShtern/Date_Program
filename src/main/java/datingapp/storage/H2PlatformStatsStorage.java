@@ -23,8 +23,7 @@ public class H2PlatformStatsStorage implements PlatformStatsStorage {
 
     @Override
     public void save(PlatformStats stats) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO platform_stats (id, computed_at, total_active_users,
                     avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio)
                 VALUES (?, ?, ?, ?, ?, ?, ?)

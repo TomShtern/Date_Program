@@ -24,8 +24,7 @@ public class H2UserAchievementStorage implements UserAchievementStorage {
 
     @Override
     public void save(UserAchievement achievement) {
-        String sql =
-                """
+        String sql = """
                 MERGE INTO user_achievements (id, user_id, achievement, unlocked_at)
                 KEY (user_id, achievement)
                 VALUES (?, ?, ?, ?)
@@ -45,8 +44,7 @@ public class H2UserAchievementStorage implements UserAchievementStorage {
 
     @Override
     public List<UserAchievement> getUnlocked(UUID userId) {
-        String sql =
-                """
+        String sql = """
                 SELECT id, user_id, achievement, unlocked_at
                 FROM user_achievements
                 WHERE user_id = ?
@@ -73,8 +71,7 @@ public class H2UserAchievementStorage implements UserAchievementStorage {
 
     @Override
     public boolean hasAchievement(UUID userId, Achievement achievement) {
-        String sql =
-                """
+        String sql = """
                 SELECT COUNT(*) FROM user_achievements
                 WHERE user_id = ? AND achievement = ?
                 """;

@@ -27,8 +27,7 @@ public class H2ConversationStorage implements ConversationStorage {
 
     /** Creates the conversations table if it doesn't exist. */
     private void ensureSchema() {
-        String createTableSql =
-                """
+        String createTableSql = """
         CREATE TABLE IF NOT EXISTS conversations (
             id VARCHAR(100) PRIMARY KEY,
             user_a UUID NOT NULL,
@@ -59,8 +58,7 @@ public class H2ConversationStorage implements ConversationStorage {
 
     @Override
     public void save(Conversation conversation) {
-        String sql =
-                """
+        String sql = """
         INSERT INTO conversations (id, user_a, user_b, created_at, last_message_at,
                                    user_a_last_read_at, user_b_last_read_at,
                                    archived_at, archive_reason, visible_to_user_a, visible_to_user_b)
@@ -121,8 +119,7 @@ public class H2ConversationStorage implements ConversationStorage {
 
     @Override
     public List<Conversation> getConversationsFor(UUID userId) {
-        String sql =
-                """
+        String sql = """
         SELECT * FROM conversations
         WHERE user_a = ? OR user_b = ?
         ORDER BY COALESCE(last_message_at, created_at) DESC
@@ -166,8 +163,7 @@ public class H2ConversationStorage implements ConversationStorage {
     @Override
     public void updateReadTimestamp(String conversationId, UUID userId, Instant timestamp) {
         // Single query with CASE/WHEN to update the correct column based on userId
-        String sql =
-                """
+        String sql = """
         UPDATE conversations
         SET user_a_last_read_at = CASE WHEN user_a = ? THEN ? ELSE user_a_last_read_at END,
             user_b_last_read_at = CASE WHEN user_b = ? THEN ? ELSE user_b_last_read_at END
@@ -215,8 +211,7 @@ public class H2ConversationStorage implements ConversationStorage {
 
     @Override
     public void setVisibility(String conversationId, UUID userId, boolean visible) {
-        String sql =
-                """
+        String sql = """
         UPDATE conversations
         SET visible_to_user_a = CASE WHEN user_a = ? THEN ? ELSE visible_to_user_a END,
             visible_to_user_b = CASE WHEN user_b = ? THEN ? ELSE visible_to_user_b END

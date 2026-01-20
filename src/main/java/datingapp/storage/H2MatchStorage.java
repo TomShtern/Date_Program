@@ -34,8 +34,7 @@ public class H2MatchStorage implements MatchStorage {
     }
 
     private void addColumnIfNotExists(String columnName, String columnDef) {
-        String checkSql =
-                """
+        String checkSql = """
         SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_NAME = 'MATCHES' AND COLUMN_NAME = ?
         """;
@@ -60,8 +59,7 @@ public class H2MatchStorage implements MatchStorage {
 
     @Override
     public void save(Match match) {
-        String sql =
-                """
+        String sql = """
         INSERT INTO matches (id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """;
@@ -102,8 +100,7 @@ public class H2MatchStorage implements MatchStorage {
 
     @Override
     public void update(Match match) {
-        String sql =
-                """
+        String sql = """
         UPDATE matches SET state = ?, ended_at = ?, ended_by = ?, end_reason = ?
         WHERE id = ?
         """;
@@ -179,8 +176,7 @@ public class H2MatchStorage implements MatchStorage {
 
     @Override
     public List<Match> getActiveMatchesFor(UUID userId) {
-        String sql =
-                """
+        String sql = """
         SELECT * FROM matches
         WHERE (user_a = ? OR user_b = ?)
         AND state = 'ACTIVE'

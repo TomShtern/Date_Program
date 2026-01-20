@@ -31,8 +31,7 @@ public class H2NotificationStorage implements NotificationStorage {
     }
 
     private void ensureSchema() {
-        String sql =
-                """
+        String sql = """
                 CREATE TABLE IF NOT EXISTS notifications (
                     id UUID PRIMARY KEY,
                     user_id UUID NOT NULL,
@@ -59,8 +58,7 @@ public class H2NotificationStorage implements NotificationStorage {
 
     @Override
     public void save(Notification notification) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO notifications (id, user_id, type, title, message, created_at, is_read, data_json)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """;

@@ -29,8 +29,7 @@ public class H2ProfileNoteStorage implements ProfileNoteStorage {
     }
 
     private void initializeTable() {
-        String sql =
-                """
+        String sql = """
                 CREATE TABLE IF NOT EXISTS profile_notes (
                     author_id UUID NOT NULL,
                     subject_id UUID NOT NULL,
@@ -52,8 +51,7 @@ public class H2ProfileNoteStorage implements ProfileNoteStorage {
 
     @Override
     public void save(ProfileNote note) {
-        String sql =
-                """
+        String sql = """
                 MERGE INTO profile_notes (author_id, subject_id, content, created_at, updated_at)
                 KEY (author_id, subject_id)
                 VALUES (?, ?, ?, ?, ?)
@@ -74,8 +72,7 @@ public class H2ProfileNoteStorage implements ProfileNoteStorage {
 
     @Override
     public Optional<ProfileNote> get(UUID authorId, UUID subjectId) {
-        String sql =
-                """
+        String sql = """
                 SELECT content, created_at, updated_at
                 FROM profile_notes
                 WHERE author_id = ? AND subject_id = ?
@@ -103,8 +100,7 @@ public class H2ProfileNoteStorage implements ProfileNoteStorage {
 
     @Override
     public List<ProfileNote> getAllByAuthor(UUID authorId) {
-        String sql =
-                """
+        String sql = """
                 SELECT subject_id, content, created_at, updated_at
                 FROM profile_notes
                 WHERE author_id = ?

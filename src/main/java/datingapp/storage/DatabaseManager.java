@@ -88,8 +88,7 @@ public class DatabaseManager {
                 Statement stmt = conn.createStatement()) {
 
             // Users table
-            stmt.execute(
-                    """
+            stmt.execute("""
                             CREATE TABLE IF NOT EXISTS users (
                                 id UUID PRIMARY KEY,
                                 name VARCHAR(100) NOT NULL,
@@ -143,8 +142,7 @@ public class DatabaseManager {
             migrateSchemaColumns(stmt);
 
             // Likes table
-            stmt.execute(
-                    """
+            stmt.execute("""
                             CREATE TABLE IF NOT EXISTS likes (
                                 id UUID PRIMARY KEY,
                                 who_likes UUID NOT NULL,
@@ -158,8 +156,7 @@ public class DatabaseManager {
                             """);
 
             // Matches table
-            stmt.execute(
-                    """
+            stmt.execute("""
                             CREATE TABLE IF NOT EXISTS matches (
                                 id VARCHAR(100) PRIMARY KEY,
                                 user_a UUID NOT NULL,
@@ -176,8 +173,7 @@ public class DatabaseManager {
                             """);
 
             // Swipe sessions table (Phase 0.5b)
-            stmt.execute(
-                    """
+            stmt.execute("""
                             CREATE TABLE IF NOT EXISTS swipe_sessions (
                                 id UUID PRIMARY KEY,
                                 user_id UUID NOT NULL,
@@ -203,8 +199,7 @@ public class DatabaseManager {
                     "CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON " + "swipe_sessions(user_id, started_at)");
 
             // User stats snapshots table (Phase 0.5b)
-            stmt.execute(
-                    """
+            stmt.execute("""
                             CREATE TABLE IF NOT EXISTS user_stats (
                                 id UUID PRIMARY KEY,
                                 user_id UUID NOT NULL,
@@ -232,8 +227,7 @@ public class DatabaseManager {
                             """);
 
             // Platform stats table (Phase 0.5b)
-            stmt.execute(
-                    """
+            stmt.execute("""
                             CREATE TABLE IF NOT EXISTS platform_stats (
                                 id UUID PRIMARY KEY,
                                 computed_at TIMESTAMP NOT NULL,
@@ -253,8 +247,7 @@ public class DatabaseManager {
                     + "platform_stats(computed_at DESC)");
 
             // Daily pick views table (Phase 1)
-            stmt.execute(
-                    """
+            stmt.execute("""
                             CREATE TABLE IF NOT EXISTS daily_pick_views (
                                 user_id UUID NOT NULL,
                                 viewed_date DATE NOT NULL,
@@ -267,8 +260,7 @@ public class DatabaseManager {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_daily_pick_views_date ON daily_pick_views(viewed_date)");
 
             // User achievements table (Phase 1)
-            stmt.execute(
-                    """
+            stmt.execute("""
                             CREATE TABLE IF NOT EXISTS user_achievements (
                                 id UUID PRIMARY KEY,
                                 user_id UUID NOT NULL,

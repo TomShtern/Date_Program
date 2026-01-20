@@ -24,8 +24,7 @@ public class H2UserStatsStorage implements UserStatsStorage {
 
     @Override
     public void save(UserStats stats) {
-        String sql =
-                """
+        String sql = """
                 INSERT INTO user_stats (id, user_id, computed_at,
                     total_swipes_given, likes_given, passes_given, like_ratio,
                     total_swipes_received, likes_received, passes_received, incoming_like_ratio,
@@ -69,8 +68,7 @@ public class H2UserStatsStorage implements UserStatsStorage {
 
     @Override
     public Optional<UserStats> getLatest(UUID userId) {
-        String sql =
-                """
+        String sql = """
                 SELECT * FROM user_stats
                 WHERE user_id = ?
                 ORDER BY computed_at DESC
@@ -95,8 +93,7 @@ public class H2UserStatsStorage implements UserStatsStorage {
 
     @Override
     public List<UserStats> getHistory(UUID userId, int limit) {
-        String sql =
-                """
+        String sql = """
                 SELECT * FROM user_stats
                 WHERE user_id = ?
                 ORDER BY computed_at DESC
@@ -124,8 +121,7 @@ public class H2UserStatsStorage implements UserStatsStorage {
     @Override
     public List<UserStats> getAllLatestStats() {
         // Get the most recent stats snapshot for each user
-        String sql =
-                """
+        String sql = """
                 SELECT s.* FROM user_stats s
                 INNER JOIN (
                     SELECT user_id, MAX(computed_at) as max_date
