@@ -1,6 +1,5 @@
 package datingapp.storage;
 
-import datingapp.core.ArchiveReason;
 import datingapp.core.Match;
 import datingapp.core.MatchStorage;
 import java.sql.Connection;
@@ -225,7 +224,7 @@ public class H2MatchStorage implements MatchStorage {
                 state,
                 endedAtTs != null ? endedAtTs.toInstant() : null,
                 endedBy,
-                rs.getString("end_reason") != null ? ArchiveReason.valueOf(rs.getString("end_reason")) : null);
+                rs.getString("end_reason") != null ? Match.ArchiveReason.valueOf(rs.getString("end_reason")) : null);
     }
 
     // === Undo Methods (Phase 1) ===

@@ -2,7 +2,6 @@ package datingapp.ui.controller;
 
 import datingapp.ui.NavigationService;
 import datingapp.ui.UISession;
-import datingapp.ui.ViewFactory;
 import datingapp.ui.util.ResponsiveController;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.DashboardViewModel;
@@ -133,42 +132,42 @@ public class DashboardController extends BaseController implements Initializable
     @FXML
     private void handleBrowse() {
         logger.info("Navigating to Matching screen");
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.MATCHING);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
     }
 
     @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleMatches() {
         logger.info("Navigating to Matches screen");
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.MATCHES);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHES);
     }
 
     @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleStats() {
         logger.info("Navigating to Stats screen");
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.STATS);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.STATS);
     }
 
     @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleChat() {
         logger.info("Navigating to Chat screen");
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.CHAT);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.CHAT);
     }
 
     @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleProfile() {
         logger.info("Navigating to Profile screen");
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.PROFILE);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE);
     }
 
     @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleViewDailyPick() {
         logger.info("Viewing daily pick - navigating to Matching");
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.MATCHING);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
     }
 
     @SuppressWarnings("unused") // Called by FXML
@@ -177,7 +176,7 @@ public class DashboardController extends BaseController implements Initializable
         logger.info("Logging out");
         UISession.getInstance().logout();
         NavigationService.getInstance().getViewModelFactory().reset();
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.LOGIN);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
     }
 
     @Override

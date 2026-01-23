@@ -29,6 +29,28 @@ public class NavigationService {
     private BorderPane rootLayout;
     private ViewModelFactory viewModelFactory;
 
+    /** Enum defining available views and their FXML resource paths. */
+    public enum ViewType {
+        LOGIN("/fxml/login.fxml"),
+        DASHBOARD("/fxml/dashboard.fxml"),
+        PROFILE("/fxml/profile.fxml"),
+        MATCHING("/fxml/matching.fxml"),
+        MATCHES("/fxml/matches.fxml"),
+        CHAT("/fxml/chat.fxml"),
+        STATS("/fxml/stats.fxml"),
+        PREFERENCES("/fxml/preferences.fxml");
+
+        private final String fxmlPath;
+
+        ViewType(String fxmlPath) {
+            this.fxmlPath = fxmlPath;
+        }
+
+        public String getFxmlPath() {
+            return fxmlPath;
+        }
+    }
+
     /** Types of screen transition animations. */
     public enum TransitionType {
         /** Fade out old screen, fade in new screen */
@@ -75,7 +97,7 @@ public class NavigationService {
      * Handles transitions to different views by loading FXML and injecting
      * ViewModels. Uses no animation (instant switch).
      */
-    public void navigateTo(ViewFactory.ViewType viewType) {
+    public void navigateTo(ViewType viewType) {
         navigateWithTransition(viewType, TransitionType.NONE);
     }
 
@@ -85,7 +107,7 @@ public class NavigationService {
      * @param viewType The view to navigate to
      * @param type     The type of transition animation
      */
-    public void navigateWithTransition(ViewFactory.ViewType viewType, TransitionType type) {
+    public void navigateWithTransition(ViewType viewType, TransitionType type) {
         try {
             logger.info("Navigating to: {} with transition: {}", viewType, type);
 
@@ -166,7 +188,7 @@ public class NavigationService {
      * history).
      */
     public void goBack() {
-        navigateWithTransition(ViewFactory.ViewType.MATCHING, TransitionType.SLIDE_RIGHT);
+        navigateWithTransition(ViewType.MATCHING, TransitionType.SLIDE_RIGHT);
     }
 
     public Stage getPrimaryStage() {

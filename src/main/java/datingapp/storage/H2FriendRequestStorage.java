@@ -1,7 +1,6 @@
 package datingapp.storage;
 
 import datingapp.core.FriendRequest;
-import datingapp.core.FriendRequestStatus;
 import datingapp.core.FriendRequestStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -199,7 +198,7 @@ public class H2FriendRequestStorage implements FriendRequestStorage {
                 rs.getObject("from_user_id", UUID.class),
                 rs.getObject("to_user_id", UUID.class),
                 rs.getTimestamp("created_at").toInstant(),
-                FriendRequestStatus.valueOf(rs.getString("status")),
+                FriendRequest.Status.valueOf(rs.getString("status")),
                 respondedAtTs != null ? respondedAtTs.toInstant() : null);
     }
 }

@@ -27,7 +27,7 @@ public interface ConversationStorage {
     void updateReadTimestamp(String conversationId, UUID userId, Instant timestamp);
 
     /** Archives the conversation with a reason. */
-    void archive(String conversationId, ArchiveReason reason);
+    void archive(String conversationId, Match.ArchiveReason reason);
 
     /** Updates the visibility of the conversation for a specific user. */
     void setVisibility(String conversationId, UUID userId, boolean visible);

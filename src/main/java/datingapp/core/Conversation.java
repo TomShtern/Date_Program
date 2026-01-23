@@ -20,7 +20,7 @@ public class Conversation {
     private Instant userAReadAt;
     private Instant userBReadAt;
     private Instant archivedAt;
-    private ArchiveReason archiveReason;
+    private Match.ArchiveReason archiveReason;
     private boolean visibleToUserA = true;
     private boolean visibleToUserB = true;
 
@@ -33,7 +33,7 @@ public class Conversation {
             Instant userAReadAt,
             Instant userBReadAt,
             Instant archivedAt,
-            ArchiveReason archiveReason,
+            Match.ArchiveReason archiveReason,
             boolean visibleToUserA,
             boolean visibleToUserB) {
         Objects.requireNonNull(id, "id cannot be null");
@@ -196,7 +196,7 @@ public class Conversation {
         return archivedAt;
     }
 
-    public ArchiveReason getArchiveReason() {
+    public Match.ArchiveReason getArchiveReason() {
         return archiveReason;
     }
 
@@ -213,7 +213,7 @@ public class Conversation {
      *
      * @param reason The reason for archiving
      */
-    public void archive(ArchiveReason reason) {
+    public void archive(Match.ArchiveReason reason) {
         this.archivedAt = Instant.now();
         this.archiveReason = reason;
     }

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.Notification;
 import datingapp.core.NotificationStorage;
-import datingapp.core.NotificationType;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -179,7 +178,7 @@ public class H2NotificationStorage implements NotificationStorage {
         return new Notification(
                 rs.getObject("id", UUID.class),
                 rs.getObject("user_id", UUID.class),
-                NotificationType.valueOf(rs.getString("type")),
+                Notification.Type.valueOf(rs.getString("type")),
                 rs.getString("title"),
                 rs.getString("message"),
                 rs.getTimestamp("created_at").toInstant(),

@@ -18,7 +18,6 @@ import datingapp.core.DailyLimitService;
 import datingapp.core.LikerBrowserService;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.ServiceRegistryBuilder;
 import datingapp.core.SessionService;
 import datingapp.core.User;
 import datingapp.core.VerificationService;
@@ -103,7 +102,7 @@ public class Main {
         dbManager = DatabaseManager.getInstance();
 
         // Wire up all services through the registry
-        services = ServiceRegistryBuilder.buildH2(dbManager, config);
+        services = ServiceRegistry.Builder.buildH2(dbManager, config);
 
         // Initialize CLI Infrastructure
         inputReader = new InputReader(scanner);

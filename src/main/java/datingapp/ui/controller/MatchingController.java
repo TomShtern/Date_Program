@@ -3,7 +3,6 @@ package datingapp.ui.controller;
 import datingapp.core.Match;
 import datingapp.core.User;
 import datingapp.ui.NavigationService;
-import datingapp.ui.ViewFactory;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
@@ -377,7 +376,7 @@ public class MatchingController extends BaseController implements Initializable 
         dialog.showAndWait().ifPresent(response -> {
             if (response == sendMessageBtn) {
                 // Navigate to chat with this match
-                NavigationService.getInstance().navigateTo(ViewFactory.ViewType.CHAT);
+                NavigationService.getInstance().navigateTo(NavigationService.ViewType.CHAT);
             }
             // Clear the match notification
             viewModel.clearMatchNotification();
@@ -409,7 +408,7 @@ public class MatchingController extends BaseController implements Initializable 
     @FXML
     @SuppressWarnings("unused")
     private void handleBack() {
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
     @FXML
@@ -417,7 +416,7 @@ public class MatchingController extends BaseController implements Initializable 
     private void handleExpandPreferences() {
         logger.info("User clicked Expand Preferences - navigating to Profile settings");
         // Navigate to filter/preferences screen
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.PREFERENCES);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.PREFERENCES);
     }
 
     @FXML
@@ -425,13 +424,13 @@ public class MatchingController extends BaseController implements Initializable 
     private void handleCheckLikes() {
         logger.info("User clicked Check Likes - navigating to Matches");
         // Navigate to Matches screen where they can see who liked them
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.MATCHES);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHES);
     }
 
     @FXML
     @SuppressWarnings("unused")
     private void handleImproveProfile() {
         logger.info("User clicked Improve Profile - navigating to Profile");
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.PROFILE);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE);
     }
 }

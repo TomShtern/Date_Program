@@ -53,7 +53,7 @@ public class RelationshipTransitionService {
         // Send Notification
         notificationStorage.save(Notification.create(
                 targetUserId,
-                NotificationType.FRIEND_REQUEST,
+                Notification.Type.FRIEND_REQUEST,
                 "New Friend Request",
                 "Someone wants to move your match to the Friend Zone.",
                 Map.of("fromUserId", fromUserId.toString())));
@@ -96,14 +96,14 @@ public class RelationshipTransitionService {
                 request.fromUserId(),
                 request.toUserId(),
                 request.createdAt(),
-                FriendRequestStatus.ACCEPTED,
+                FriendRequest.Status.ACCEPTED,
                 Instant.now());
         friendRequestStorage.update(updated);
 
         // 3. Send Notification
         notificationStorage.save(Notification.create(
                 request.fromUserId(),
-                NotificationType.FRIEND_REQUEST_ACCEPTED,
+                Notification.Type.FRIEND_REQUEST_ACCEPTED,
                 "Friend Request Accepted",
                 "Your match with the other user has successfully transitioned to the Friend Zone.",
                 Map.of("responderId", responderId.toString())));
@@ -133,7 +133,7 @@ public class RelationshipTransitionService {
                 request.fromUserId(),
                 request.toUserId(),
                 request.createdAt(),
-                FriendRequestStatus.DECLINED,
+                FriendRequest.Status.DECLINED,
                 Instant.now());
         friendRequestStorage.update(updated);
     }
@@ -162,14 +162,14 @@ public class RelationshipTransitionService {
         // 2. Archive Conversation
         Optional<Conversation> convoOpt = conversationStorage.getByUsers(initiatorId, targetUserId);
         convoOpt.ifPresent(convo -> {
-            convo.archive(ArchiveReason.GRACEFUL_EXIT);
-            conversationStorage.archive(convo.getId(), ArchiveReason.GRACEFUL_EXIT);
+            convo.archive(Match.ArchiveReason.GRACEFUL_EXIT);
+            conversationStorage.archive(convo.getId(), Match.ArchiveReason.GRACEFUL_EXIT);
         });
 
         // 3. Send Notification to target user
         notificationStorage.save(Notification.create(
                 targetUserId,
-                NotificationType.GRACEFUL_EXIT,
+                Notification.Type.GRACEFUL_EXIT,
                 "Relationship Ended",
                 "The other user has gracefully moved on from this relationship.",
                 Map.of("initiatorId", initiatorId.toString())));

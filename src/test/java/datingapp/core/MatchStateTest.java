@@ -64,7 +64,7 @@ class MatchStateTest {
             assertFalse(match.isActive(), "isActive should return false after block");
             assertNotNull(match.getEndedAt(), "endedAt should be set");
             assertEquals(b, match.getEndedBy(), "endedBy should be the user who blocked");
-            assertEquals(ArchiveReason.BLOCK, match.getEndReason(), "endReason should be BLOCK");
+            assertEquals(Match.ArchiveReason.BLOCK, match.getEndReason(), "endReason should be BLOCK");
         }
 
         @Test
@@ -93,7 +93,7 @@ class MatchStateTest {
 
             assertEquals(Match.State.GRACEFUL_EXIT, match.getState());
             assertFalse(match.canMessage());
-            assertEquals(ArchiveReason.GRACEFUL_EXIT, match.getEndReason());
+            assertEquals(Match.ArchiveReason.GRACEFUL_EXIT, match.getEndReason());
             assertEquals(b, match.getEndedBy());
         }
 
@@ -171,7 +171,8 @@ class MatchStateTest {
             Instant createdAt = Instant.now().minusSeconds(3600);
             Instant endedAt = Instant.now();
 
-            Match match = new Match(id, a, b, createdAt, Match.State.UNMATCHED, endedAt, a, ArchiveReason.UNMATCH);
+            Match match =
+                    new Match(id, a, b, createdAt, Match.State.UNMATCHED, endedAt, a, Match.ArchiveReason.UNMATCH);
 
             assertEquals(id, match.getId());
             assertEquals(a, match.getUserA());

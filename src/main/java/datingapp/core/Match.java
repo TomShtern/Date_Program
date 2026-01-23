@@ -23,6 +23,14 @@ public class Match {
         BLOCKED // One user blocked the other
     }
 
+    /** Reasons why a relationship/match was archived or ended. */
+    public enum ArchiveReason {
+        FRIEND_ZONE,
+        GRACEFUL_EXIT,
+        UNMATCH,
+        BLOCK
+    }
+
     private final String id;
     private final UUID userA;
     private final UUID userB;
@@ -30,7 +38,7 @@ public class Match {
     private State state;
     private Instant endedAt; // When match was ended (nullable)
     private UUID endedBy; // Who ended it (nullable)
-    private ArchiveReason endReason; // Why it ended (nullable)
+    private ArchiveReason endReason; // Why it ended (nullable) - nested enum in Match
 
     /** Full constructor for reconstitution from storage. */
     public Match(

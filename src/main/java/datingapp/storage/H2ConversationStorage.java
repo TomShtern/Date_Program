@@ -1,8 +1,8 @@
 package datingapp.storage;
 
-import datingapp.core.ArchiveReason;
 import datingapp.core.Conversation;
 import datingapp.core.ConversationStorage;
+import datingapp.core.Match;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -193,7 +193,7 @@ public class H2ConversationStorage implements ConversationStorage {
     }
 
     @Override
-    public void archive(String conversationId, ArchiveReason reason) {
+    public void archive(String conversationId, Match.ArchiveReason reason) {
         String sql = "UPDATE conversations SET archived_at = ?, archive_reason = ? WHERE id = ?";
 
         try (Connection conn = dbManager.getConnection();
@@ -266,7 +266,9 @@ public class H2ConversationStorage implements ConversationStorage {
                 rs.getTimestamp("archived_at") != null
                         ? rs.getTimestamp("archived_at").toInstant()
                         : null,
-                rs.getString("archive_reason") != null ? ArchiveReason.valueOf(rs.getString("archive_reason")) : null,
+                rs.getString("archive_reason") != null
+                        ? Match.ArchiveReason.valueOf(rs.getString("archive_reason"))
+                        : null,
                 rs.getBoolean("visible_to_user_a"),
                 rs.getBoolean("visible_to_user_b"));
     }

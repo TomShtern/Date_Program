@@ -3,7 +3,6 @@ package datingapp.ui.controller;
 import datingapp.core.Message;
 import datingapp.core.MessagingService.ConversationPreview;
 import datingapp.ui.NavigationService;
-import datingapp.ui.ViewFactory;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.ChatViewModel;
 import java.net.URL;
@@ -252,12 +251,12 @@ public class ChatController extends BaseController implements Initializable {
     @SuppressWarnings("unused")
     @FXML
     private void handleBack() {
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
     @SuppressWarnings("unused")
     @FXML
     private void handleBrowseMatches() {
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.MATCHING);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
     }
 }

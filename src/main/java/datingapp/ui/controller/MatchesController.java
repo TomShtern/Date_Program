@@ -1,7 +1,6 @@
 package datingapp.ui.controller;
 
 import datingapp.ui.NavigationService;
-import datingapp.ui.ViewFactory;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.MatchesViewModel;
 import datingapp.ui.viewmodel.MatchesViewModel.MatchCardData;
@@ -388,19 +387,19 @@ public class MatchesController extends BaseController implements Initializable {
     /** Navigate to chat with selected match. */
     private void handleStartChat(MatchCardData match) {
         logger.info("Starting chat with match: {}", match.userName());
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.CHAT);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.CHAT);
     }
 
     @FXML
     @SuppressWarnings("unused")
     private void handleBack() {
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
     @FXML
     @SuppressWarnings("unused")
     private void handleBrowse() {
         logger.info("Navigating to browse/matching screen");
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.MATCHING);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
     }
 }

@@ -2,7 +2,6 @@ package datingapp.ui;
 
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.ServiceRegistryBuilder;
 import datingapp.storage.DatabaseManager;
 import javafx.application.Application;
 import javafx.stage.Stage;
@@ -36,7 +35,7 @@ public class DatingApp extends Application {
 
         // 2. Wire up all services
         logger.info("[DEBUG] Step 3: Building ServiceRegistry...");
-        this.serviceRegistry = ServiceRegistryBuilder.buildH2(dbManager, config);
+        this.serviceRegistry = ServiceRegistry.Builder.buildH2(dbManager, config);
         logger.info("[DEBUG] Step 3: ServiceRegistry built.");
 
         // 3. Initialize UI framework components
@@ -70,7 +69,7 @@ public class DatingApp extends Application {
         primaryStage.setHeight(700);
 
         // Show the initial screen (Login)
-        navigationService.navigateTo(ViewFactory.ViewType.LOGIN);
+        navigationService.navigateTo(NavigationService.ViewType.LOGIN);
 
         primaryStage.setTitle("🌹 Dating App");
         primaryStage.centerOnScreen();

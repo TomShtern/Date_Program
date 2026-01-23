@@ -1,7 +1,6 @@
 package datingapp.ui.controller;
 
 import datingapp.ui.NavigationService;
-import datingapp.ui.ViewFactory;
 import datingapp.ui.util.ToastService;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.ProfileViewModel;
@@ -187,14 +186,14 @@ public class ProfileController extends BaseController implements Initializable {
     private void handleSave() {
         cleanup(); // Clean up subscriptions before navigating away
         viewModel.save();
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
     @FXML
     @SuppressWarnings("unused")
     private void handleCancel() {
         cleanup(); // Clean up subscriptions before navigating away
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
     @FXML

@@ -2,7 +2,6 @@ package datingapp.ui.controller;
 
 import datingapp.core.Achievement;
 import datingapp.ui.NavigationService;
-import datingapp.ui.ViewFactory;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.StatsViewModel;
 import java.net.URL;
@@ -141,6 +140,6 @@ public class StatsController extends BaseController implements Initializable {
     @SuppressWarnings("unused")
     @FXML
     private void handleBack() {
-        NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 }

@@ -568,7 +568,7 @@ class MessagingServiceTest {
         }
 
         @Override
-        public void archive(String conversationId, ArchiveReason reason) {
+        public void archive(String conversationId, Match.ArchiveReason reason) {
             Conversation convo = conversations.get(conversationId);
             if (convo != null) {
                 convo.archive(reason);

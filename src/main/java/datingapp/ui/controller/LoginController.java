@@ -3,7 +3,6 @@ package datingapp.ui.controller;
 import datingapp.core.User;
 import datingapp.core.User.Gender;
 import datingapp.ui.NavigationService;
-import datingapp.ui.ViewFactory;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.LoginViewModel;
 import java.net.URL;
@@ -131,7 +130,7 @@ public class LoginController extends BaseController implements Initializable {
     private void handleLogin() {
         if (viewModel.login()) {
             logger.info("Login successful, navigating to Dashboard");
-            NavigationService.getInstance().navigateTo(ViewFactory.ViewType.DASHBOARD);
+            NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
         }
     }
 

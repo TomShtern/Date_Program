@@ -49,7 +49,7 @@ class RelationshipTransitionServiceTest {
         assertNotNull(request);
         assertEquals(aliceId, request.fromUserId());
         assertEquals(bobId, request.toUserId());
-        assertEquals(FriendRequestStatus.PENDING, request.status());
+        assertEquals(FriendRequest.Status.PENDING, request.status());
         assertTrue(friendRequestStorage.get(request.id()).isPresent());
     }
 
@@ -80,7 +80,7 @@ class RelationshipTransitionServiceTest {
         assertEquals(Match.State.FRIENDS, match.getState());
 
         FriendRequest updated = friendRequestStorage.get(request.id()).orElseThrow();
-        assertEquals(FriendRequestStatus.ACCEPTED, updated.status());
+        assertEquals(FriendRequest.Status.ACCEPTED, updated.status());
         assertNotNull(updated.respondedAt());
     }
 
@@ -99,7 +99,7 @@ class RelationshipTransitionServiceTest {
         service.declineFriendZone(request.id(), bobId);
 
         FriendRequest updated = friendRequestStorage.get(request.id()).orElseThrow();
-        assertEquals(FriendRequestStatus.DECLINED, updated.status());
+        assertEquals(FriendRequest.Status.DECLINED, updated.status());
 
         // Match should still be ACTIVE
         Match match = matchStorage.get(Match.generateId(aliceId, bobId)).orElseThrow();
@@ -117,7 +117,7 @@ class RelationshipTransitionServiceTest {
 
         Match match = matchStorage.get(Match.generateId(aliceId, bobId)).orElseThrow();
         assertEquals(Match.State.GRACEFUL_EXIT, match.getState());
-        assertEquals(ArchiveReason.GRACEFUL_EXIT, match.getEndReason());
+        assertEquals(Match.ArchiveReason.GRACEFUL_EXIT, match.getEndReason());
         assertEquals(aliceId, match.getEndedBy());
 
         // Check conversation archive
@@ -126,7 +126,7 @@ class RelationshipTransitionServiceTest {
         // Check notification
         List<Notification> notifications = notificationStorage.getForUser(bobId, true);
         assertEquals(1, notifications.size());
-        assertEquals(NotificationType.GRACEFUL_EXIT, notifications.get(0).type());
+        assertEquals(Notification.Type.GRACEFUL_EXIT, notifications.get(0).type());
     }
 
     @Test
@@ -258,7 +258,7 @@ class RelationshipTransitionServiceTest {
         }
 
         @Override
-        public void archive(String id, ArchiveReason r) {
+        public void archive(String id, Match.ArchiveReason r) {
             archived.add(id);
         }
 
