@@ -50,36 +50,40 @@ class MessagingServiceTest {
     }
 
     private User createActiveUser(UUID id, String name) {
-        // Use fromDatabase factory to create an ACTIVE user
-        return User.fromDatabase(
-                id,
-                name,
-                "Test bio",
-                null, // birthDate
-                null, // gender
-                null, // interestedIn
-                0.0, // lat
-                0.0, // lon
-                50, // maxDistanceKm
-                18, // minAge
-                99, // maxAge
-                List.of(), // photoUrls
-                User.State.ACTIVE, // state
-                Instant.now(), // createdAt
-                Instant.now(), // updatedAt
-                null, // interests
-                null, // smoking
-                null, // drinking
-                null, // wantsKids
-                null, // lookingFor
-                null, // email
-                null, // phone
-                null, // isVerified
-                null, // verificationMethod
-                null, // verificationCode
-                null, // verificationSentAt
-                null, // verifiedAt
-                null); // pacePreferences
+        User.DatabaseRecord data = User.DatabaseRecord.builder()
+                .id(id)
+                .name(name)
+                .bio("Test bio")
+                .birthDate(null)
+                .gender(null)
+                .interestedIn(null)
+                .lat(0.0)
+                .lon(0.0)
+                .maxDistanceKm(50)
+                .minAge(18)
+                .maxAge(99)
+                .photoUrls(List.of())
+                .state(User.State.ACTIVE)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .interests(null)
+                .smoking(null)
+                .drinking(null)
+                .wantsKids(null)
+                .lookingFor(null)
+                .education(null)
+                .heightCm(null)
+                .email(null)
+                .phone(null)
+                .isVerified(null)
+                .verificationMethod(null)
+                .verificationCode(null)
+                .verificationSentAt(null)
+                .verifiedAt(null)
+                .pacePreferences(null)
+                .build();
+
+        return User.fromDatabase(data);
     }
 
     @Nested

@@ -1,13 +1,9 @@
 package datingapp.storage;
 
 import datingapp.core.Dealbreakers;
-import datingapp.core.Interest;
-import datingapp.core.Lifestyle;
 import datingapp.core.PacePreferences;
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
+import datingapp.core.Preferences.Interest;
+import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
 import java.sql.Connection;
@@ -17,6 +13,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,6 +27,20 @@ import java.util.stream.Collectors;
 /** H2 implementation of UserStorage. */
 public class H2UserStorage implements UserStorage {
 
+    private static final String VARCHAR_20 = "VARCHAR(20)";
+    private static final String USER_COLUMNS = """
+            id, name, bio, birth_date, gender, interested_in, lat, lon,
+            max_distance_km, min_age, max_age, photo_urls, state, created_at,
+            updated_at, smoking, drinking, wants_kids, looking_for, education,
+            height_cm, db_smoking, db_drinking, db_wants_kids, db_looking_for,
+            db_education, db_min_height_cm, db_max_height_cm, db_max_age_diff,
+            interests, email, phone, is_verified, verification_method,
+            verification_code, verification_sent_at, verified_at,
+            pace_messaging_frequency, pace_time_to_first_date,
+            pace_communication_style, pace_depth_preference
+            """;
+    private static final String SELECT_USERS = "SELECT " + USER_COLUMNS + " FROM users";
+
     private final DatabaseManager dbManager;
 
     public H2UserStorage(DatabaseManager dbManager) {
@@ -38,10 +49,10 @@ public class H2UserStorage implements UserStorage {
     }
 
     private void ensureSchema() {
-        addColumnIfNotExists("pace_messaging_frequency", "VARCHAR(20)");
-        addColumnIfNotExists("pace_time_to_first_date", "VARCHAR(20)");
-        addColumnIfNotExists("pace_communication_style", "VARCHAR(20)");
-        addColumnIfNotExists("pace_depth_preference", "VARCHAR(20)");
+        addColumnIfNotExists("pace_messaging_frequency", VARCHAR_20);
+        addColumnIfNotExists("pace_time_to_first_date", VARCHAR_20);
+        addColumnIfNotExists("pace_communication_style", VARCHAR_20);
+        addColumnIfNotExists("pace_depth_preference", VARCHAR_20);
     }
 
     private void addColumnIfNotExists(String columnName, String columnDef) {
@@ -63,7 +74,7 @@ public class H2UserStorage implements UserStorage {
                 }
             }
 
-        } catch (SQLException e) {
+        } catch (SQLException _) {
             // ignore
         }
     }
@@ -87,111 +98,111 @@ public class H2UserStorage implements UserStorage {
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setObject(1, user.getId());
-            stmt.setString(2, user.getName());
-            stmt.setString(3, user.getBio());
-            stmt.setDate(4, user.getBirthDate() != null ? Date.valueOf(user.getBirthDate()) : null);
-            stmt.setString(5, user.getGender() != null ? user.getGender().name() : null);
-            stmt.setString(6, gendersToString(user.getInterestedIn()));
-            stmt.setDouble(7, user.getLat());
-            stmt.setDouble(8, user.getLon());
-            stmt.setInt(9, user.getMaxDistanceKm());
-            stmt.setInt(10, user.getMinAge());
-            stmt.setInt(11, user.getMaxAge());
-            stmt.setString(12, urlsToString(user.getPhotoUrls()));
-            stmt.setString(13, user.getState().name());
-            stmt.setTimestamp(14, Timestamp.from(user.getCreatedAt()));
-            stmt.setTimestamp(15, Timestamp.from(user.getUpdatedAt()));
-
-            // Lifestyle fields (Phase 0.5b)
-            stmt.setString(16, user.getSmoking() != null ? user.getSmoking().name() : null);
-            stmt.setString(17, user.getDrinking() != null ? user.getDrinking().name() : null);
-            stmt.setString(18, user.getWantsKids() != null ? user.getWantsKids().name() : null);
-            stmt.setString(
-                    19, user.getLookingFor() != null ? user.getLookingFor().name() : null);
-            stmt.setString(20, user.getEducation() != null ? user.getEducation().name() : null);
-            if (user.getHeightCm() != null) {
-                stmt.setInt(21, user.getHeightCm());
-            } else {
-                stmt.setNull(21, Types.INTEGER);
-            }
-
-            // Dealbreaker fields (Phase 0.5b)
-            Dealbreakers db = user.getDealbreakers();
-            stmt.setString(22, serializeEnumSet(db.acceptableSmoking()));
-            stmt.setString(23, serializeEnumSet(db.acceptableDrinking()));
-            stmt.setString(24, serializeEnumSet(db.acceptableKidsStance()));
-            stmt.setString(25, serializeEnumSet(db.acceptableLookingFor()));
-            stmt.setString(26, serializeEnumSet(db.acceptableEducation()));
-
-            if (db.minHeightCm() != null) {
-                stmt.setInt(27, db.minHeightCm());
-            } else {
-                stmt.setNull(27, Types.INTEGER);
-            }
-            if (db.maxHeightCm() != null) {
-                stmt.setInt(28, db.maxHeightCm());
-            } else {
-                stmt.setNull(28, Types.INTEGER);
-            }
-            if (db.maxAgeDifference() != null) {
-                stmt.setInt(29, db.maxAgeDifference());
-            } else {
-                stmt.setNull(29, Types.INTEGER);
-            }
-
+            bindCoreFields(stmt, user);
+            bindLifestyleFields(stmt, user);
+            bindDealbreakerFields(stmt, user.getDealbreakers());
             stmt.setString(30, serializeInterests(user.getInterests()));
-
-            // Verification fields (Phase 2)
-            stmt.setString(31, user.getEmail());
-            stmt.setString(32, user.getPhone());
-            stmt.setObject(33, user.isVerified());
-            stmt.setString(
-                    34,
-                    user.getVerificationMethod() != null
-                            ? user.getVerificationMethod().name()
-                            : null);
-            stmt.setString(35, user.getVerificationCode());
-            stmt.setTimestamp(
-                    36, user.getVerificationSentAt() != null ? Timestamp.from(user.getVerificationSentAt()) : null);
-            stmt.setTimestamp(37, user.getVerifiedAt() != null ? Timestamp.from(user.getVerifiedAt()) : null);
-
-            PacePreferences pace = user.getPacePreferences();
-            if (pace != null) {
-                stmt.setString(
-                        38,
-                        pace.messagingFrequency() != null
-                                ? pace.messagingFrequency().name()
-                                : null);
-                stmt.setString(
-                        39,
-                        pace.timeToFirstDate() != null ? pace.timeToFirstDate().name() : null);
-                stmt.setString(
-                        40,
-                        pace.communicationStyle() != null
-                                ? pace.communicationStyle().name()
-                                : null);
-                stmt.setString(
-                        41,
-                        pace.depthPreference() != null ? pace.depthPreference().name() : null);
-            } else {
-                stmt.setNull(38, Types.VARCHAR);
-                stmt.setNull(39, Types.VARCHAR);
-                stmt.setNull(40, Types.VARCHAR);
-                stmt.setNull(41, Types.VARCHAR);
-            }
+            bindVerificationFields(stmt, user);
+            bindPaceFields(stmt, user.getPacePreferences());
 
             stmt.executeUpdate();
 
-        } catch (SQLException e) {
-            throw new StorageException("Failed to save user: " + user.getId(), e);
+        } catch (SQLException ex) {
+            throw new StorageException("Failed to save user: " + user.getId(), ex);
         }
+    }
+
+    private void bindCoreFields(PreparedStatement stmt, User user) throws SQLException {
+        stmt.setObject(1, user.getId());
+        stmt.setString(2, user.getName());
+        stmt.setString(3, user.getBio());
+        stmt.setDate(4, user.getBirthDate() != null ? Date.valueOf(user.getBirthDate()) : null);
+        stmt.setString(5, user.getGender() != null ? user.getGender().name() : null);
+        stmt.setString(6, gendersToString(user.getInterestedIn()));
+        stmt.setDouble(7, user.getLat());
+        stmt.setDouble(8, user.getLon());
+        stmt.setInt(9, user.getMaxDistanceKm());
+        stmt.setInt(10, user.getMinAge());
+        stmt.setInt(11, user.getMaxAge());
+        stmt.setString(12, urlsToString(user.getPhotoUrls()));
+        stmt.setString(13, user.getState().name());
+        stmt.setTimestamp(14, Timestamp.from(user.getCreatedAt()));
+        stmt.setTimestamp(15, Timestamp.from(user.getUpdatedAt()));
+    }
+
+    private void bindLifestyleFields(PreparedStatement stmt, User user) throws SQLException {
+        stmt.setString(16, user.getSmoking() != null ? user.getSmoking().name() : null);
+        stmt.setString(17, user.getDrinking() != null ? user.getDrinking().name() : null);
+        stmt.setString(18, user.getWantsKids() != null ? user.getWantsKids().name() : null);
+        stmt.setString(19, user.getLookingFor() != null ? user.getLookingFor().name() : null);
+        stmt.setString(20, user.getEducation() != null ? user.getEducation().name() : null);
+        setNullableInt(stmt, 21, user.getHeightCm());
+    }
+
+    private void bindDealbreakerFields(PreparedStatement stmt, Dealbreakers dealbreakers) throws SQLException {
+        stmt.setString(22, serializeEnumSet(dealbreakers.acceptableSmoking()));
+        stmt.setString(23, serializeEnumSet(dealbreakers.acceptableDrinking()));
+        stmt.setString(24, serializeEnumSet(dealbreakers.acceptableKidsStance()));
+        stmt.setString(25, serializeEnumSet(dealbreakers.acceptableLookingFor()));
+        stmt.setString(26, serializeEnumSet(dealbreakers.acceptableEducation()));
+        setNullableInt(stmt, 27, dealbreakers.minHeightCm());
+        setNullableInt(stmt, 28, dealbreakers.maxHeightCm());
+        setNullableInt(stmt, 29, dealbreakers.maxAgeDifference());
+    }
+
+    private void bindVerificationFields(PreparedStatement stmt, User user) throws SQLException {
+        stmt.setString(31, user.getEmail());
+        stmt.setString(32, user.getPhone());
+        stmt.setObject(33, user.isVerified());
+        stmt.setString(
+                34,
+                user.getVerificationMethod() != null
+                        ? user.getVerificationMethod().name()
+                        : null);
+        stmt.setString(35, user.getVerificationCode());
+        setNullableTimestamp(stmt, 36, user.getVerificationSentAt());
+        setNullableTimestamp(stmt, 37, user.getVerifiedAt());
+    }
+
+    private void bindPaceFields(PreparedStatement stmt, PacePreferences pace) throws SQLException {
+        if (pace != null) {
+            stmt.setString(
+                    38,
+                    pace.messagingFrequency() != null
+                            ? pace.messagingFrequency().name()
+                            : null);
+            stmt.setString(
+                    39, pace.timeToFirstDate() != null ? pace.timeToFirstDate().name() : null);
+            stmt.setString(
+                    40,
+                    pace.communicationStyle() != null
+                            ? pace.communicationStyle().name()
+                            : null);
+            stmt.setString(
+                    41, pace.depthPreference() != null ? pace.depthPreference().name() : null);
+        } else {
+            stmt.setNull(38, Types.VARCHAR);
+            stmt.setNull(39, Types.VARCHAR);
+            stmt.setNull(40, Types.VARCHAR);
+            stmt.setNull(41, Types.VARCHAR);
+        }
+    }
+
+    private void setNullableInt(PreparedStatement stmt, int index, Integer value) throws SQLException {
+        if (value != null) {
+            stmt.setInt(index, value);
+        } else {
+            stmt.setNull(index, Types.INTEGER);
+        }
+    }
+
+    private void setNullableTimestamp(PreparedStatement stmt, int index, Instant value) throws SQLException {
+        stmt.setTimestamp(index, value != null ? Timestamp.from(value) : null);
     }
 
     @Override
     public User get(UUID id) {
-        String sql = "SELECT * FROM users WHERE id = ?";
+        String sql = SELECT_USERS + " WHERE id = ?";
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -211,13 +222,13 @@ public class H2UserStorage implements UserStorage {
 
     @Override
     public List<User> findActive() {
-        String sql = "SELECT * FROM users WHERE state = 'ACTIVE'";
+        String sql = SELECT_USERS + " WHERE state = 'ACTIVE'";
         return findByQuery(sql);
     }
 
     @Override
     public List<User> findAll() {
-        String sql = "SELECT * FROM users";
+        String sql = SELECT_USERS;
         return findByQuery(sql);
     }
 
@@ -239,116 +250,90 @@ public class H2UserStorage implements UserStorage {
     }
 
     private User mapUser(ResultSet rs) throws SQLException {
-        UUID id = rs.getObject("id", UUID.class);
-        String name = rs.getString("name");
-        String bio = rs.getString("bio");
-        Date birthDateSql = rs.getDate("birth_date");
-        LocalDate birthDate = birthDateSql != null ? birthDateSql.toLocalDate() : null;
-        String genderStr = rs.getString("gender");
-        User.Gender gender = genderStr != null ? User.Gender.valueOf(genderStr) : null;
-        Set<User.Gender> interestedIn = stringToGenders(rs.getString("interested_in"));
-        double lat = rs.getDouble("lat");
-        double lon = rs.getDouble("lon");
-        int maxDistanceKm = rs.getInt("max_distance_km");
-        int minAge = rs.getInt("min_age");
-        int maxAge = rs.getInt("max_age");
-        List<String> photoUrls = stringToUrls(rs.getString("photo_urls"));
-        User.State state = User.State.valueOf(rs.getString("state"));
-        var createdAt = rs.getTimestamp("created_at").toInstant();
-        var updatedAt = rs.getTimestamp("updated_at").toInstant();
+        User.DatabaseRecord data = User.DatabaseRecord.builder()
+                .id(rs.getObject("id", UUID.class))
+                .name(rs.getString("name"))
+                .bio(rs.getString("bio"))
+                .birthDate(readLocalDate(rs, "birth_date"))
+                .gender(readEnum(rs, "gender", User.Gender.class))
+                .interestedIn(stringToGenders(rs.getString("interested_in")))
+                .lat(rs.getDouble("lat"))
+                .lon(rs.getDouble("lon"))
+                .maxDistanceKm(rs.getInt("max_distance_km"))
+                .minAge(rs.getInt("min_age"))
+                .maxAge(rs.getInt("max_age"))
+                .photoUrls(stringToUrls(rs.getString("photo_urls")))
+                .state(User.State.valueOf(rs.getString("state")))
+                .createdAt(readInstant(rs, "created_at"))
+                .updatedAt(readInstant(rs, "updated_at"))
+                .interests(parseInterests(rs.getString("interests")))
+                .smoking(readEnum(rs, "smoking", Lifestyle.Smoking.class))
+                .drinking(readEnum(rs, "drinking", Lifestyle.Drinking.class))
+                .wantsKids(readEnum(rs, "wants_kids", Lifestyle.WantsKids.class))
+                .lookingFor(readEnum(rs, "looking_for", Lifestyle.LookingFor.class))
+                .education(readEnum(rs, "education", Lifestyle.Education.class))
+                .heightCm(readInteger(rs, "height_cm"))
+                .email(rs.getString("email"))
+                .phone(rs.getString("phone"))
+                .isVerified((Boolean) rs.getObject("is_verified"))
+                .verificationMethod(readEnum(rs, "verification_method", User.VerificationMethod.class))
+                .verificationCode(rs.getString("verification_code"))
+                .verificationSentAt(readInstant(rs, "verification_sent_at"))
+                .verifiedAt(readInstant(rs, "verified_at"))
+                .pacePreferences(readPacePreferences(rs))
+                .build();
 
-        String interestsStr = rs.getString("interests");
-        Set<Interest> interests = parseInterests(interestsStr);
+        User user = User.fromDatabase(data);
 
-        String email = rs.getString("email");
-        String phone = rs.getString("phone");
-        Boolean isVerified = (Boolean) rs.getObject("is_verified");
-
-        String verificationMethodStr = rs.getString("verification_method");
-        User.VerificationMethod verificationMethod =
-                verificationMethodStr != null ? User.VerificationMethod.valueOf(verificationMethodStr) : null;
-
-        String verificationCode = rs.getString("verification_code");
-
-        Timestamp verificationSentAtTs = rs.getTimestamp("verification_sent_at");
-        var verificationSentAt = verificationSentAtTs != null ? verificationSentAtTs.toInstant() : null;
-
-        Timestamp verifiedAtTs = rs.getTimestamp("verified_at");
-        var verifiedAt = verifiedAtTs != null ? verifiedAtTs.toInstant() : null;
-
-        String paceFreqStr = rs.getString("pace_messaging_frequency");
-        String paceTimeStr = rs.getString("pace_time_to_first_date");
-        String paceCommStr = rs.getString("pace_communication_style");
-        String paceDepthStr = rs.getString("pace_depth_preference");
-
-        PacePreferences pace = null;
-        if (paceFreqStr != null || paceTimeStr != null || paceCommStr != null || paceDepthStr != null) {
-            pace = new PacePreferences(
-                    paceFreqStr != null ? MessagingFrequency.valueOf(paceFreqStr) : null,
-                    paceTimeStr != null ? TimeToFirstDate.valueOf(paceTimeStr) : null,
-                    paceCommStr != null ? CommunicationStyle.valueOf(paceCommStr) : null,
-                    paceDepthStr != null ? DepthPreference.valueOf(paceDepthStr) : null);
-        }
-
-        String smokingStr = rs.getString("smoking");
-        Lifestyle.Smoking smoking = smokingStr != null ? Lifestyle.Smoking.valueOf(smokingStr) : null;
-
-        String drinkingStr = rs.getString("drinking");
-        Lifestyle.Drinking drinking = drinkingStr != null ? Lifestyle.Drinking.valueOf(drinkingStr) : null;
-
-        String wantsKidsStr = rs.getString("wants_kids");
-        Lifestyle.WantsKids wantsKids = wantsKidsStr != null ? Lifestyle.WantsKids.valueOf(wantsKidsStr) : null;
-
-        String lookingForStr = rs.getString("looking_for");
-        Lifestyle.LookingFor lookingFor = lookingForStr != null ? Lifestyle.LookingFor.valueOf(lookingForStr) : null;
-
-        User user = User.fromDatabase(
-                id,
-                name,
-                bio,
-                birthDate,
-                gender,
-                interestedIn,
-                lat,
-                lon,
-                maxDistanceKm,
-                minAge,
-                maxAge,
-                photoUrls,
-                state,
-                createdAt,
-                updatedAt,
-                interests,
-                smoking,
-                drinking,
-                wantsKids,
-                lookingFor,
-                email,
-                phone,
-                isVerified,
-                verificationMethod,
-                verificationCode,
-                verificationSentAt,
-                verifiedAt,
-                pace);
-
-        String educationStr = rs.getString("education");
-        if (educationStr != null) {
-            user.setEducation(Lifestyle.Education.valueOf(educationStr));
-        }
-
-        int heightCm = rs.getInt("height_cm");
-        if (!rs.wasNull()) {
-            user.setHeightCm(heightCm);
-        }
-
-        // Map dealbreakers (Phase 0.5b)
         Dealbreakers dealbreakers = mapDealbreakers(rs);
         if (dealbreakers.hasAnyDealbreaker()) {
             user.setDealbreakers(dealbreakers);
         }
 
         return user;
+    }
+
+    private LocalDate readLocalDate(ResultSet rs, String column) throws SQLException {
+        Date date = rs.getDate(column);
+        return date != null ? date.toLocalDate() : null;
+    }
+
+    private Instant readInstant(ResultSet rs, String column) throws SQLException {
+        Timestamp ts = rs.getTimestamp(column);
+        return ts != null ? ts.toInstant() : null;
+    }
+
+    private Integer readInteger(ResultSet rs, String column) throws SQLException {
+        int value = rs.getInt(column);
+        if (rs.wasNull()) {
+            return null;
+        }
+        return value;
+    }
+
+    private <E extends Enum<E>> E readEnum(ResultSet rs, String column, Class<E> enumType) throws SQLException {
+        String value = rs.getString(column);
+        return value != null ? Enum.valueOf(enumType, value) : null;
+    }
+
+    private PacePreferences readPacePreferences(ResultSet rs) throws SQLException {
+        PacePreferences.MessagingFrequency messagingFrequency =
+                readEnum(rs, "pace_messaging_frequency", PacePreferences.MessagingFrequency.class);
+        PacePreferences.TimeToFirstDate timeToFirstDate =
+                readEnum(rs, "pace_time_to_first_date", PacePreferences.TimeToFirstDate.class);
+        PacePreferences.CommunicationStyle communicationStyle =
+                readEnum(rs, "pace_communication_style", PacePreferences.CommunicationStyle.class);
+        PacePreferences.DepthPreference depthPreference =
+                readEnum(rs, "pace_depth_preference", PacePreferences.DepthPreference.class);
+
+        if (messagingFrequency == null
+                && timeToFirstDate == null
+                && communicationStyle == null
+                && depthPreference == null) {
+            return null;
+        }
+
+        return new PacePreferences(messagingFrequency, timeToFirstDate, communicationStyle, depthPreference);
     }
 
     private Dealbreakers mapDealbreakers(ResultSet rs) throws SQLException {
@@ -439,7 +424,7 @@ public class H2UserStorage implements UserStorage {
             if (!trimmed.isEmpty()) {
                 try {
                     result.add(Interest.valueOf(trimmed));
-                } catch (IllegalArgumentException e) {
+                } catch (IllegalArgumentException _) {
                     // Skip invalid interests
                 }
             }

@@ -31,39 +31,11 @@ class VerificationServiceTest {
             User user = createActiveUser();
             user.startVerification(User.VerificationMethod.EMAIL, "123456");
 
-            // Override the sent time using the DB factory to avoid adding test-only
-            // mutators.
-            User expired = User.fromDatabase(
-                    user.getId(),
-                    user.getName(),
-                    user.getBio(),
-                    user.getBirthDate(),
-                    user.getGender(),
-                    user.getInterestedIn(),
-                    user.getLat(),
-                    user.getLon(),
-                    user.getMaxDistanceKm(),
-                    user.getMinAge(),
-                    user.getMaxAge(),
-                    user.getPhotoUrls(),
-                    user.getState(),
-                    user.getCreatedAt(),
-                    user.getUpdatedAt(),
-                    user.getInterests(),
-                    user.getSmoking(),
-                    user.getDrinking(),
-                    user.getWantsKids(),
-                    user.getLookingFor(),
-                    user.getEmail(),
-                    user.getPhone(),
-                    user.isVerified(),
-                    user.getVerificationMethod(),
-                    user.getVerificationCode(),
+            User expired = copyWithVerificationSentAt(
+                    user,
                     user.getVerificationSentAt() != null
                             ? user.getVerificationSentAt().minus(Duration.ofMinutes(16))
-                            : java.time.Instant.now().minus(Duration.ofMinutes(16)),
-                    user.getVerifiedAt(),
-                    user.getPacePreferences());
+                            : java.time.Instant.now().minus(Duration.ofMinutes(16)));
 
             assertFalse(verificationService.verifyCode(expired, "123456"));
             assertTrue(verificationService.isExpired(expired.getVerificationSentAt()));
@@ -99,5 +71,42 @@ class VerificationServiceTest {
                 DepthPreference.DEEP_CHAT));
         user.activate();
         return user;
+    }
+
+    private static User copyWithVerificationSentAt(User user, java.time.Instant sentAt) {
+        User.DatabaseRecord data = User.DatabaseRecord.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .bio(user.getBio())
+                .birthDate(user.getBirthDate())
+                .gender(user.getGender())
+                .interestedIn(user.getInterestedIn())
+                .lat(user.getLat())
+                .lon(user.getLon())
+                .maxDistanceKm(user.getMaxDistanceKm())
+                .minAge(user.getMinAge())
+                .maxAge(user.getMaxAge())
+                .photoUrls(user.getPhotoUrls())
+                .state(user.getState())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .interests(user.getInterests())
+                .smoking(user.getSmoking())
+                .drinking(user.getDrinking())
+                .wantsKids(user.getWantsKids())
+                .lookingFor(user.getLookingFor())
+                .education(user.getEducation())
+                .heightCm(user.getHeightCm())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .isVerified(user.isVerified())
+                .verificationMethod(user.getVerificationMethod())
+                .verificationCode(user.getVerificationCode())
+                .verificationSentAt(sentAt)
+                .verifiedAt(user.getVerifiedAt())
+                .pacePreferences(user.getPacePreferences())
+                .build();
+
+        return User.fromDatabase(data);
     }
 }

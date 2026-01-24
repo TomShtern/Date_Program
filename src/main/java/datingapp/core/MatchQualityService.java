@@ -1,6 +1,8 @@
 package datingapp.core;
 
 import datingapp.core.CandidateFinder.GeoUtils;
+import datingapp.core.Preferences.Interest;
+import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.UserInteractions.Like;
 import java.time.Duration;
 import java.time.Instant;

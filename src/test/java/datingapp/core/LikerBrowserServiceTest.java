@@ -2,6 +2,7 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import datingapp.core.Preferences.Interest;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
 import java.time.Instant;
@@ -89,67 +90,48 @@ class LikerBrowserServiceTest {
     }
 
     private static User activeUser(UUID id, String name) {
-        return User.fromDatabase(
-                id,
-                name,
-                null,
-                LocalDate.of(1990, 1, 1),
-                User.Gender.OTHER,
-                EnumSet.of(User.Gender.OTHER),
-                0.0,
-                0.0,
-                50,
-                18,
-                99,
-                List.of(),
-                User.State.ACTIVE,
-                Instant.EPOCH,
-                Instant.EPOCH,
-                EnumSet.noneOf(Interest.class),
-                null, // smoking
-                null, // drinking
-                null, // wantsKids
-                null, // lookingFor
-                null, // email
-                null, // phone
-                false, // isVerified
-                null, // verificationMethod
-                null, // verificationCode
-                null, // verificationSentAt
-                null, // verifiedAt
-                null); // pacePreferences
+        return baseUser(id, name, User.State.ACTIVE);
     }
 
     private static User incompleteUser(UUID id, String name) {
-        return User.fromDatabase(
-                id,
-                name,
-                null,
-                null,
-                null,
-                null,
-                0.0,
-                0.0,
-                50,
-                18,
-                99,
-                List.of(),
-                User.State.INCOMPLETE,
-                Instant.EPOCH,
-                Instant.EPOCH,
-                EnumSet.noneOf(Interest.class),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                false,
-                null,
-                null,
-                null,
-                null,
-                null);
+        return baseUser(id, name, User.State.INCOMPLETE);
+    }
+
+    private static User baseUser(UUID id, String name, User.State state) {
+        User.DatabaseRecord data = User.DatabaseRecord.builder()
+                .id(id)
+                .name(name)
+                .bio(null)
+                .birthDate(LocalDate.of(1990, 1, 1))
+                .gender(User.Gender.OTHER)
+                .interestedIn(EnumSet.of(User.Gender.OTHER))
+                .lat(0.0)
+                .lon(0.0)
+                .maxDistanceKm(50)
+                .minAge(18)
+                .maxAge(99)
+                .photoUrls(List.of())
+                .state(state)
+                .createdAt(Instant.EPOCH)
+                .updatedAt(Instant.EPOCH)
+                .interests(EnumSet.noneOf(Interest.class))
+                .smoking(null)
+                .drinking(null)
+                .wantsKids(null)
+                .lookingFor(null)
+                .education(null)
+                .heightCm(null)
+                .email(null)
+                .phone(null)
+                .isVerified(false)
+                .verificationMethod(null)
+                .verificationCode(null)
+                .verificationSentAt(null)
+                .verifiedAt(null)
+                .pacePreferences(null)
+                .build();
+
+        return User.fromDatabase(data);
     }
 
     private static class InMemoryLikeStorage implements LikeStorage {

@@ -393,6 +393,7 @@ public final class UserStorages {
 - [x] Phase 6.6: Consolidated `Stats` (UserStats + PlatformStats); updated storage/tests; removed old files.
 - [x] Phase 6.7: Consolidated `UserInteractions` (Like + Block + Report); updated storage/services/CLI/UI/tests; removed old files.
 - [x] Phase 6.8: Consolidated `Messaging` (Message + Conversation); updated storage/CLI/UI/tests; removed old files.
+- [x] Phase 6.9: Consolidated `Preferences` (Interest + Lifestyle); updated storage/CLI/UI/tests; removed old files.
 - [ ] Phase 6+: Remaining consolidations (pending).
 
 1|2026-01-24 14:30:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phases 2-4 implemented; CandidateFinderService removed in favor of concrete CandidateFinder|docs/core-consolidation-plan.md
@@ -401,6 +402,8 @@ public final class UserStorages {
 4|2026-01-24 16:05:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.6 Stats consolidation complete|docs/core-consolidation-plan.md
 5|2026-01-24 16:20:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.7 UserInteractions consolidation complete|docs/core-consolidation-plan.md
 6|2026-01-24 16:35:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.8 Messaging consolidation complete|docs/core-consolidation-plan.md
+7|2026-01-24 17:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.9 Preferences consolidation complete|docs/core-consolidation-plan.md
+7|2026-01-24 17:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.9 Preferences consolidation complete|docs/core-consolidation-plan.md
 
 ### Phase 0: Preflight (MANDATORY - Do Not Skip)
 

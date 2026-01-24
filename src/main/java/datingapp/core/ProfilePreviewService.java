@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.Preferences.Interest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;

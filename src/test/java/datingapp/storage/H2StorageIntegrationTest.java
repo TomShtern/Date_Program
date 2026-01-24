@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.Interest;
 import datingapp.core.Match;
 import datingapp.core.Messaging.Conversation;
 import datingapp.core.Messaging.Message;
@@ -15,6 +14,7 @@ import datingapp.core.PacePreferences.CommunicationStyle;
 import datingapp.core.PacePreferences.DepthPreference;
 import datingapp.core.PacePreferences.MessagingFrequency;
 import datingapp.core.PacePreferences.TimeToFirstDate;
+import datingapp.core.Preferences.Interest;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;

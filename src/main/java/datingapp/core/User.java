@@ -1,5 +1,7 @@
 package datingapp.core;
 
+import datingapp.core.Preferences.Interest;
+import datingapp.core.Preferences.Lifestyle;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
@@ -108,71 +110,365 @@ public class User {
         this.interests = EnumSet.noneOf(Interest.class);
     }
 
+    /** Builder-backed record of database fields used to reconstruct a User. */
+    public static final class DatabaseRecord {
+        private UUID id;
+        private String name;
+        private String bio;
+        private LocalDate birthDate;
+        private Gender gender;
+        private Set<Gender> interestedIn;
+        private double lat;
+        private double lon;
+        private int maxDistanceKm;
+        private int minAge;
+        private int maxAge;
+        private List<String> photoUrls;
+        private State state;
+        private Instant createdAt;
+        private Instant updatedAt;
+        private Set<Interest> interests;
+        private Lifestyle.Smoking smoking;
+        private Lifestyle.Drinking drinking;
+        private Lifestyle.WantsKids wantsKids;
+        private Lifestyle.LookingFor lookingFor;
+        private Lifestyle.Education education;
+        private Integer heightCm;
+        private String email;
+        private String phone;
+        private Boolean isVerified;
+        private VerificationMethod verificationMethod;
+        private String verificationCode;
+        private Instant verificationSentAt;
+        private Instant verifiedAt;
+        private PacePreferences pacePreferences;
+
+        private DatabaseRecord() {}
+
+        public static Builder builder() {
+            return new Builder();
+        }
+
+        public UUID getId() {
+            return id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getBio() {
+            return bio;
+        }
+
+        public LocalDate getBirthDate() {
+            return birthDate;
+        }
+
+        public Gender getGender() {
+            return gender;
+        }
+
+        public Set<Gender> getInterestedIn() {
+            return interestedIn;
+        }
+
+        public double getLat() {
+            return lat;
+        }
+
+        public double getLon() {
+            return lon;
+        }
+
+        public int getMaxDistanceKm() {
+            return maxDistanceKm;
+        }
+
+        public int getMinAge() {
+            return minAge;
+        }
+
+        public int getMaxAge() {
+            return maxAge;
+        }
+
+        public List<String> getPhotoUrls() {
+            return photoUrls;
+        }
+
+        public State getState() {
+            return state;
+        }
+
+        public Instant getCreatedAt() {
+            return createdAt;
+        }
+
+        public Instant getUpdatedAt() {
+            return updatedAt;
+        }
+
+        public Set<Interest> getInterests() {
+            return interests;
+        }
+
+        public Lifestyle.Smoking getSmoking() {
+            return smoking;
+        }
+
+        public Lifestyle.Drinking getDrinking() {
+            return drinking;
+        }
+
+        public Lifestyle.WantsKids getWantsKids() {
+            return wantsKids;
+        }
+
+        public Lifestyle.LookingFor getLookingFor() {
+            return lookingFor;
+        }
+
+        public Lifestyle.Education getEducation() {
+            return education;
+        }
+
+        public Integer getHeightCm() {
+            return heightCm;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public String getPhone() {
+            return phone;
+        }
+
+        public Boolean getIsVerified() {
+            return isVerified;
+        }
+
+        public VerificationMethod getVerificationMethod() {
+            return verificationMethod;
+        }
+
+        public String getVerificationCode() {
+            return verificationCode;
+        }
+
+        public Instant getVerificationSentAt() {
+            return verificationSentAt;
+        }
+
+        public Instant getVerifiedAt() {
+            return verifiedAt;
+        }
+
+        public PacePreferences getPacePreferences() {
+            return pacePreferences;
+        }
+
+        public static final class Builder {
+            private final DatabaseRecord data = new DatabaseRecord();
+
+            public Builder id(UUID id) {
+                data.id = id;
+                return this;
+            }
+
+            public Builder name(String name) {
+                data.name = name;
+                return this;
+            }
+
+            public Builder bio(String bio) {
+                data.bio = bio;
+                return this;
+            }
+
+            public Builder birthDate(LocalDate birthDate) {
+                data.birthDate = birthDate;
+                return this;
+            }
+
+            public Builder gender(Gender gender) {
+                data.gender = gender;
+                return this;
+            }
+
+            public Builder interestedIn(Set<Gender> interestedIn) {
+                data.interestedIn = interestedIn;
+                return this;
+            }
+
+            public Builder lat(double lat) {
+                data.lat = lat;
+                return this;
+            }
+
+            public Builder lon(double lon) {
+                data.lon = lon;
+                return this;
+            }
+
+            public Builder maxDistanceKm(int maxDistanceKm) {
+                data.maxDistanceKm = maxDistanceKm;
+                return this;
+            }
+
+            public Builder minAge(int minAge) {
+                data.minAge = minAge;
+                return this;
+            }
+
+            public Builder maxAge(int maxAge) {
+                data.maxAge = maxAge;
+                return this;
+            }
+
+            public Builder photoUrls(List<String> photoUrls) {
+                data.photoUrls = photoUrls;
+                return this;
+            }
+
+            public Builder state(State state) {
+                data.state = state;
+                return this;
+            }
+
+            public Builder createdAt(Instant createdAt) {
+                data.createdAt = createdAt;
+                return this;
+            }
+
+            public Builder updatedAt(Instant updatedAt) {
+                data.updatedAt = updatedAt;
+                return this;
+            }
+
+            public Builder interests(Set<Interest> interests) {
+                data.interests = interests;
+                return this;
+            }
+
+            public Builder smoking(Lifestyle.Smoking smoking) {
+                data.smoking = smoking;
+                return this;
+            }
+
+            public Builder drinking(Lifestyle.Drinking drinking) {
+                data.drinking = drinking;
+                return this;
+            }
+
+            public Builder wantsKids(Lifestyle.WantsKids wantsKids) {
+                data.wantsKids = wantsKids;
+                return this;
+            }
+
+            public Builder lookingFor(Lifestyle.LookingFor lookingFor) {
+                data.lookingFor = lookingFor;
+                return this;
+            }
+
+            public Builder education(Lifestyle.Education education) {
+                data.education = education;
+                return this;
+            }
+
+            public Builder heightCm(Integer heightCm) {
+                data.heightCm = heightCm;
+                return this;
+            }
+
+            public Builder email(String email) {
+                data.email = email;
+                return this;
+            }
+
+            public Builder phone(String phone) {
+                data.phone = phone;
+                return this;
+            }
+
+            public Builder isVerified(Boolean isVerified) {
+                data.isVerified = isVerified;
+                return this;
+            }
+
+            public Builder verificationMethod(VerificationMethod verificationMethod) {
+                data.verificationMethod = verificationMethod;
+                return this;
+            }
+
+            public Builder verificationCode(String verificationCode) {
+                data.verificationCode = verificationCode;
+                return this;
+            }
+
+            public Builder verificationSentAt(Instant verificationSentAt) {
+                data.verificationSentAt = verificationSentAt;
+                return this;
+            }
+
+            public Builder verifiedAt(Instant verifiedAt) {
+                data.verifiedAt = verifiedAt;
+                return this;
+            }
+
+            public Builder pacePreferences(PacePreferences pacePreferences) {
+                data.pacePreferences = pacePreferences;
+                return this;
+            }
+
+            public DatabaseRecord build() {
+                return data;
+            }
+        }
+    }
+
     /**
      * Factory method for loading a user from the database. All 16 parameters are needed to fully
      * reconstruct a user record from storage. This method encapsulates the database-to-domain
      * conversion logic.
      */
-    @SuppressWarnings("too-many-parameters")
-    public static User fromDatabase(
-            UUID id,
-            String name,
-            String bio,
-            LocalDate birthDate,
-            Gender gender,
-            Set<Gender> interestedIn,
-            double lat,
-            double lon,
-            int maxDistanceKm,
-            int minAge,
-            int maxAge,
-            List<String> photoUrls,
-            State state,
-            Instant createdAt,
-            Instant updatedAt,
-            Set<Interest> interests,
-            Lifestyle.Smoking smoking,
-            Lifestyle.Drinking drinking,
-            Lifestyle.WantsKids wantsKids,
-            Lifestyle.LookingFor lookingFor,
-            String email,
-            String phone,
-            Boolean isVerified,
-            VerificationMethod verificationMethod,
-            String verificationCode,
-            Instant verificationSentAt,
-            Instant verifiedAt,
-            PacePreferences pacePreferences) {
+    public static User fromDatabase(DatabaseRecord data) {
+        Objects.requireNonNull(data, "record cannot be null");
 
-        User user = new User(id, name, createdAt);
+        User user = new User(data.getId(), data.getName(), data.getCreatedAt());
 
-        user.bio = bio;
-        user.birthDate = birthDate;
-        user.gender = gender;
-        user.interestedIn = interestedIn != null ? EnumSet.copyOf(interestedIn) : EnumSet.noneOf(Gender.class);
-        user.lat = lat;
-        user.lon = lon;
-        user.maxDistanceKm = maxDistanceKm;
-        user.minAge = minAge;
-        user.maxAge = maxAge;
-        user.photoUrls = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
-        user.state = state;
-        user.updatedAt = updatedAt;
-        user.interests = interests != null ? EnumSet.copyOf(interests) : EnumSet.noneOf(Interest.class);
+        user.bio = data.getBio();
+        user.birthDate = data.getBirthDate();
+        user.gender = data.getGender();
+        user.interestedIn =
+                data.getInterestedIn() != null ? EnumSet.copyOf(data.getInterestedIn()) : EnumSet.noneOf(Gender.class);
+        user.lat = data.getLat();
+        user.lon = data.getLon();
+        user.maxDistanceKm = data.getMaxDistanceKm();
+        user.minAge = data.getMinAge();
+        user.maxAge = data.getMaxAge();
+        user.photoUrls = data.getPhotoUrls() != null ? new ArrayList<>(data.getPhotoUrls()) : new ArrayList<>();
+        user.state = data.getState();
+        user.updatedAt = data.getUpdatedAt();
+        user.interests =
+                data.getInterests() != null ? EnumSet.copyOf(data.getInterests()) : EnumSet.noneOf(Interest.class);
 
-        user.smoking = smoking;
-        user.drinking = drinking;
-        user.wantsKids = wantsKids;
-        user.lookingFor = lookingFor;
+        user.smoking = data.getSmoking();
+        user.drinking = data.getDrinking();
+        user.wantsKids = data.getWantsKids();
+        user.lookingFor = data.getLookingFor();
+        user.education = data.getEducation();
+        user.heightCm = data.getHeightCm();
 
-        user.email = email;
-        user.phone = phone;
-        user.isVerified = isVerified != null && isVerified;
-        user.verificationMethod = verificationMethod;
-        user.verificationCode = verificationCode;
-        user.verificationSentAt = verificationSentAt;
-        user.verifiedAt = verifiedAt;
-        user.pacePreferences = pacePreferences;
+        user.email = data.getEmail();
+        user.phone = data.getPhone();
+        user.isVerified = data.getIsVerified() != null && data.getIsVerified();
+        user.verificationMethod = data.getVerificationMethod();
+        user.verificationCode = data.getVerificationCode();
+        user.verificationSentAt = data.getVerificationSentAt();
+        user.verifiedAt = data.getVerifiedAt();
+        user.pacePreferences = data.getPacePreferences();
 
         return user;
     }
