@@ -14,46 +14,21 @@ import java.util.Optional;
 import java.util.UUID;
 
 /** H2 implementation of MatchStorage. */
-public class H2MatchStorage implements MatchStorage {
-
-    private final DatabaseManager dbManager;
+public class H2MatchStorage extends AbstractH2Storage implements MatchStorage {
 
     public H2MatchStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
         ensureSchema();
     }
 
     /** Ensures the schema has the new columns for state support. */
-    private void ensureSchema() {
+    @Override
+    protected void ensureSchema() {
         // Add state column if not exists
-        addColumnIfNotExists("state", "VARCHAR(20) DEFAULT 'ACTIVE'");
-        addColumnIfNotExists("ended_at", "TIMESTAMP");
-        addColumnIfNotExists("ended_by", "UUID");
-        addColumnIfNotExists("end_reason", "VARCHAR(20)");
-    }
-
-    private void addColumnIfNotExists(String columnName, String columnDef) {
-        String checkSql = """
-        SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_NAME = 'MATCHES' AND COLUMN_NAME = ?
-        """;
-        String addSql = "ALTER TABLE matches ADD COLUMN " + columnName + " " + columnDef;
-
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
-
-            checkStmt.setString(1, columnName.toUpperCase());
-            ResultSet rs = checkStmt.executeQuery();
-
-            if (rs.next() && rs.getInt(1) == 0) {
-                try (PreparedStatement addStmt = conn.prepareStatement(addSql)) {
-                    addStmt.executeUpdate();
-                }
-            }
-
-        } catch (SQLException e) {
-            // Column might already exist, ignore
-        }
+        addColumnIfNotExists("matches", "state", "VARCHAR(20) DEFAULT 'ACTIVE'");
+        addColumnIfNotExists("matches", "ended_at", "TIMESTAMP");
+        addColumnIfNotExists("matches", "ended_by", "UUID");
+        addColumnIfNotExists("matches", "end_reason", "VARCHAR(20)");
     }
 
     @Override

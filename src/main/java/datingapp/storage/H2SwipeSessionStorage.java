@@ -16,12 +16,15 @@ import java.util.Optional;
 import java.util.UUID;
 
 /** H2 implementation of SwipeSessionStorage. */
-public class H2SwipeSessionStorage implements SwipeSessionStorage {
-
-    private final DatabaseManager dbManager;
+public class H2SwipeSessionStorage extends AbstractH2Storage implements SwipeSessionStorage {
 
     public H2SwipeSessionStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
+    }
+
+    @Override
+    protected void ensureSchema() {
+        // Table created by DatabaseManager
     }
 
     @Override

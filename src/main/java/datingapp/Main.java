@@ -16,7 +16,6 @@ import datingapp.cli.UserSession;
 import datingapp.core.AppConfig;
 import datingapp.core.DailyService;
 import datingapp.core.LikerBrowserService;
-import datingapp.core.ProfileCompletionService;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.SessionService;
 import datingapp.core.TrustSafetyService;
@@ -76,7 +75,7 @@ public class Main {
                     case "10" -> profileHandler.previewProfile();
                     case "11" -> statsHandler.viewAchievements();
                     case "12" -> profileNotesHandler.viewAllNotes();
-                    case "13" -> viewProfileScore();
+                    case "13" -> profileHandler.viewProfileScore();
                     case "14" -> profileVerificationHandler.verifyProfile();
                     case "15" -> likerBrowserHandler.browseWhoLikedMe();
                     case "16" -> messagingHandler.showConversations();
@@ -231,48 +230,6 @@ public class Main {
         logger.info("  18. 🤝 Friend Requests");
         logger.info("  0. Exit");
         logger.info(CliConstants.SEPARATOR_LINE + "\n");
-    }
-
-    private static void viewProfileScore() {
-        if (userSession.getCurrentUser() == null) {
-            logger.info(CliConstants.PLEASE_SELECT_USER);
-            return;
-        }
-
-        User currentUser = userSession.getCurrentUser();
-        ProfileCompletionService.CompletionResult result = ProfileCompletionService.calculate(currentUser);
-
-        logger.info("\n───────────────────────────────────────");
-        logger.info("      📊 PROFILE COMPLETION SCORE");
-        logger.info("───────────────────────────────────────\n");
-
-        logger.info("  {} {}% {}", result.getTierEmoji(), result.score(), result.tier());
-        if (logger.isInfoEnabled()) {
-            String overallBar = ProfileCompletionService.renderProgressBar(result.score(), 25);
-            logger.info("  {}", overallBar);
-        }
-        logger.info("");
-
-        // Category breakdown
-        for (ProfileCompletionService.CategoryBreakdown cat : result.breakdown()) {
-            logger.info("  {} - {}%", cat.category(), cat.score());
-            if (logger.isInfoEnabled()) {
-                String categoryBar = ProfileCompletionService.renderProgressBar(cat.score(), 15);
-                logger.info("    {}", categoryBar);
-            }
-            if (!cat.missingItems().isEmpty()) {
-                cat.missingItems().forEach(m -> logger.info("    ⚪ {}", m));
-            }
-        }
-
-        // Next steps
-        if (!result.nextSteps().isEmpty()) {
-            logger.info("\n  💡 NEXT STEPS:");
-            result.nextSteps().forEach(s -> logger.info("    {}", s));
-        }
-
-        logger.info("");
-        inputReader.readLine("  [Press Enter to return to menu]");
     }
 
     private static void shutdown() {

@@ -1,5 +1,7 @@
 package datingapp.ui.viewmodel;
 
+import static datingapp.core.CandidateFinder.GeoUtils.distanceKm;
+
 import datingapp.core.BlockStorage;
 import datingapp.core.CandidateFinder;
 import datingapp.core.LikeStorage;
@@ -251,7 +253,7 @@ public class MatchingViewModel {
         double lon2 = candidate.getLon();
 
         if (lat1 != 0 && lon1 != 0 && lat2 != 0 && lon2 != 0) {
-            double distKm = haversineDistance(lat1, lon1, lat2, lon2);
+            double distKm = distanceKm(lat1, lon1, lat2, lon2);
             if (distKm < 1) {
                 return "< 1 km away";
             } else if (distKm < 10) {
@@ -262,19 +264,6 @@ public class MatchingViewModel {
         }
 
         return "Nearby";
-    }
-
-    private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
-        double earthRadius = 6371; // km
-        double deltaLat = Math.toRadians(lat2 - lat1);
-        double deltaLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
-                + Math.cos(Math.toRadians(lat1))
-                        * Math.cos(Math.toRadians(lat2))
-                        * Math.sin(deltaLon / 2)
-                        * Math.sin(deltaLon / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return earthRadius * c;
     }
 
     // --- Properties ---

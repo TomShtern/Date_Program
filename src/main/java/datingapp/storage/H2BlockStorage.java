@@ -12,16 +12,15 @@ import java.util.Set;
 import java.util.UUID;
 
 /** H2 implementation of BlockStorage. */
-public class H2BlockStorage implements BlockStorage {
-
-    private final DatabaseManager dbManager;
+public class H2BlockStorage extends AbstractH2Storage implements BlockStorage {
 
     public H2BlockStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
-        createTable();
+        super(dbManager);
+        ensureSchema();
     }
 
-    private void createTable() {
+    @Override
+    protected void ensureSchema() {
         String sql = """
                 CREATE TABLE IF NOT EXISTS blocks (
                     id UUID PRIMARY KEY,

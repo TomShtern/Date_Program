@@ -1,0 +1,38 @@
+graph TD
+    %% Styling
+    classDef core fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef storage fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef ui fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef config fill:#e0f2f1,stroke:#00695c,stroke-width:2px;
+
+    subgraph "Presentation Layer (UI)"
+        direction TB
+        UI_App[DatingApp] --> NavService[NavigationService]
+        NavService --> ViewModelFactory
+        ViewModelFactory --> UI_VM[ViewModels]
+        UI_VM --> UI_Controller[Controllers]
+    end
+
+    subgraph "Domain Layer (Core)"
+        direction TB
+        ServiceRegistry --> |Injects| Services
+        Services[Domain Services]
+        Entities[Entities & Records]
+        Interfaces[Storage Interfaces]
+        Services --> Entities
+        Services --> Interfaces
+    end
+
+    subgraph "Infrastructure Layer (Storage)"
+        direction TB
+        DBManager[DatabaseManager] --> H2Impl[H2 Implementations]
+        H2Impl -.-> |Implements| Interfaces
+    end
+
+    class Services,Entities,Interfaces,ServiceRegistry core
+    class DBManager,H2Impl storage
+    class UI_App,NavService,ViewModelFactory,UI_VM,UI_Controller ui
+
+    %% Dependencies
+    UI_VM --> |Uses| Services
+    ServiceRegistry --> |Wires| H2Impl

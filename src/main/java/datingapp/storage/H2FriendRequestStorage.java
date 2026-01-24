@@ -14,16 +14,15 @@ import java.util.Optional;
 import java.util.UUID;
 
 /** H2 implementation of FriendRequestStorage. */
-public class H2FriendRequestStorage implements FriendRequestStorage {
-
-    private final DatabaseManager dbManager;
+public class H2FriendRequestStorage extends AbstractH2Storage implements FriendRequestStorage {
 
     public H2FriendRequestStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
         ensureSchema();
     }
 
-    private void ensureSchema() {
+    @Override
+    protected void ensureSchema() {
         String tableSql = """
                 CREATE TABLE IF NOT EXISTS friend_requests (
                     id UUID PRIMARY KEY,

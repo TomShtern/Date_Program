@@ -18,17 +18,17 @@ import org.slf4j.LoggerFactory;
  * H2 database implementation of ProfileNoteStorage. Stores private notes users make about other
  * profiles.
  */
-public class H2ProfileNoteStorage implements ProfileNoteStorage {
+public class H2ProfileNoteStorage extends AbstractH2Storage implements ProfileNoteStorage {
 
     private static final Logger logger = LoggerFactory.getLogger(H2ProfileNoteStorage.class);
-    private final DatabaseManager db;
 
-    public H2ProfileNoteStorage(DatabaseManager db) {
-        this.db = db;
-        initializeTable();
+    public H2ProfileNoteStorage(DatabaseManager dbManager) {
+        super(dbManager);
+        ensureSchema();
     }
 
-    private void initializeTable() {
+    @Override
+    protected void ensureSchema() {
         String sql = """
                 CREATE TABLE IF NOT EXISTS profile_notes (
                     author_id UUID NOT NULL,
@@ -41,7 +41,7 @@ public class H2ProfileNoteStorage implements ProfileNoteStorage {
                 CREATE INDEX IF NOT EXISTS idx_profile_notes_author ON profile_notes(author_id);
                 """;
 
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.execute();
         } catch (SQLException e) {
@@ -57,7 +57,7 @@ public class H2ProfileNoteStorage implements ProfileNoteStorage {
                 VALUES (?, ?, ?, ?, ?)
                 """;
 
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setObject(1, note.authorId());
             stmt.setObject(2, note.subjectId());
@@ -78,7 +78,7 @@ public class H2ProfileNoteStorage implements ProfileNoteStorage {
                 WHERE author_id = ? AND subject_id = ?
                 """;
 
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setObject(1, authorId);
             stmt.setObject(2, subjectId);
@@ -108,7 +108,7 @@ public class H2ProfileNoteStorage implements ProfileNoteStorage {
                 """;
 
         List<ProfileNote> notes = new ArrayList<>();
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setObject(1, authorId);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -130,7 +130,7 @@ public class H2ProfileNoteStorage implements ProfileNoteStorage {
     @Override
     public boolean delete(UUID authorId, UUID subjectId) {
         String sql = "DELETE FROM profile_notes WHERE author_id = ? AND subject_id = ?";
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setObject(1, authorId);
             stmt.setObject(2, subjectId);

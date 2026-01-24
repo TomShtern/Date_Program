@@ -15,12 +15,10 @@ import java.util.UUID;
  * H2 database implementation of DailyPickStorage. Tracks when users view their daily picks to
  * prevent duplicate displays.
  */
-public class H2DailyPickViewStorage implements DailyPickStorage {
-
-    private final DatabaseManager dbManager;
+public class H2DailyPickViewStorage extends AbstractH2Storage implements DailyPickStorage {
 
     public H2DailyPickViewStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
     }
 
     @Override

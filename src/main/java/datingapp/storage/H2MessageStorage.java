@@ -15,17 +15,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 /** H2 implementation of MessageStorage. */
-public class H2MessageStorage implements MessageStorage {
-
-    private final DatabaseManager dbManager;
+public class H2MessageStorage extends AbstractH2Storage implements MessageStorage {
 
     public H2MessageStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
         ensureSchema();
     }
 
     /** Creates the messages table if it doesn't exist. */
-    private void ensureSchema() {
+    @Override
+    protected void ensureSchema() {
         String createTableSql = """
                 CREATE TABLE IF NOT EXISTS messages (
                     id UUID PRIMARY KEY,

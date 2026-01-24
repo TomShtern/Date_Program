@@ -25,7 +25,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /** H2 implementation of UserStorage. */
-public class H2UserStorage implements UserStorage {
+public class H2UserStorage extends AbstractH2Storage implements UserStorage {
 
     private static final String VARCHAR_20 = "VARCHAR(20)";
     private static final String USER_COLUMNS = """
@@ -41,42 +41,17 @@ public class H2UserStorage implements UserStorage {
             """;
     private static final String SELECT_USERS = "SELECT " + USER_COLUMNS + " FROM users";
 
-    private final DatabaseManager dbManager;
-
     public H2UserStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
         ensureSchema();
     }
 
-    private void ensureSchema() {
-        addColumnIfNotExists("pace_messaging_frequency", VARCHAR_20);
-        addColumnIfNotExists("pace_time_to_first_date", VARCHAR_20);
-        addColumnIfNotExists("pace_communication_style", VARCHAR_20);
-        addColumnIfNotExists("pace_depth_preference", VARCHAR_20);
-    }
-
-    private void addColumnIfNotExists(String columnName, String columnDef) {
-        String checkSql = """
-        SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_NAME = 'USERS' AND COLUMN_NAME = ?
-        """;
-        String addSql = "ALTER TABLE users ADD COLUMN " + columnName + " " + columnDef;
-
-        try (Connection conn = dbManager.getConnection();
-                PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
-
-            checkStmt.setString(1, columnName.toUpperCase());
-            ResultSet rs = checkStmt.executeQuery();
-
-            if (rs.next() && rs.getInt(1) == 0) {
-                try (PreparedStatement addStmt = conn.prepareStatement(addSql)) {
-                    addStmt.executeUpdate();
-                }
-            }
-
-        } catch (SQLException _) {
-            // ignore
-        }
+    @Override
+    protected void ensureSchema() {
+        addColumnIfNotExists("users", "pace_messaging_frequency", VARCHAR_20);
+        addColumnIfNotExists("users", "pace_time_to_first_date", VARCHAR_20);
+        addColumnIfNotExists("users", "pace_communication_style", VARCHAR_20);
+        addColumnIfNotExists("users", "pace_depth_preference", VARCHAR_20);
     }
 
     @Override
@@ -186,18 +161,6 @@ public class H2UserStorage implements UserStorage {
             stmt.setNull(40, Types.VARCHAR);
             stmt.setNull(41, Types.VARCHAR);
         }
-    }
-
-    private void setNullableInt(PreparedStatement stmt, int index, Integer value) throws SQLException {
-        if (value != null) {
-            stmt.setInt(index, value);
-        } else {
-            stmt.setNull(index, Types.INTEGER);
-        }
-    }
-
-    private void setNullableTimestamp(PreparedStatement stmt, int index, Instant value) throws SQLException {
-        stmt.setTimestamp(index, value != null ? Timestamp.from(value) : null);
     }
 
     @Override

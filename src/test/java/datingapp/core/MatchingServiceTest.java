@@ -4,11 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.UserInteractions.Like;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import datingapp.core.testutil.InMemoryLikeStorage;
+import datingapp.core.testutil.InMemoryMatchStorage;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -150,128 +148,6 @@ class MatchingServiceTest {
             Optional<Match> result = matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
 
             assertTrue(result.isPresent(), "Order should not matter for matching");
-        }
-    }
-
-    // === In-Memory Mock Storage Implementations ===
-
-    private static class InMemoryLikeStorage implements LikeStorage {
-        private final Map<String, Like> likes = new HashMap<>();
-
-        @Override
-        public boolean exists(UUID from, UUID to) {
-            return likes.containsKey(key(from, to));
-        }
-
-        @Override
-        public void save(Like like) {
-            likes.put(key(like.whoLikes(), like.whoGotLiked()), like);
-        }
-
-        @Override
-        public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-            return Collections.emptySet();
-        }
-
-        @Override
-        public Set<UUID> getUserIdsWhoLiked(UUID userId) {
-            return Collections.emptySet();
-        }
-
-        @Override
-        public java.util.Map<UUID, java.time.Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-            java.util.Map<UUID, java.time.Instant> result = new java.util.HashMap<>();
-            for (Like like : likes.values()) {
-                if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
-                    result.put(like.whoLikes(), like.createdAt());
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public boolean mutualLikeExists(UUID user1, UUID user2) {
-            return exists(user1, user2) && exists(user2, user1);
-        }
-
-        @Override
-        public int countByDirection(UUID userId, Like.Direction direction) {
-            return 0;
-        }
-
-        @Override
-        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
-            return 0;
-        }
-
-        @Override
-        public int countMutualLikes(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-            return Optional.ofNullable(likes.get(key(fromUserId, toUserId)));
-        }
-
-        @Override
-        public int countLikesToday(UUID userId, java.time.Instant startOfDay) {
-            return 0;
-        }
-
-        @Override
-        public int countPassesToday(UUID userId, java.time.Instant startOfDay) {
-            return 0;
-        }
-
-        @Override
-        public void delete(UUID likeId) {
-            likes.values().removeIf(like -> like.id().equals(likeId));
-        }
-
-        private String key(UUID from, UUID to) {
-            return from.toString() + "->" + to.toString();
-        }
-    }
-
-    private static class InMemoryMatchStorage implements MatchStorage {
-        private final Map<String, Match> matches = new HashMap<>();
-
-        @Override
-        public void save(Match match) {
-            matches.put(match.getId(), match);
-        }
-
-        @Override
-        public void update(Match match) {
-            matches.put(match.getId(), match);
-        }
-
-        @Override
-        public Optional<Match> get(String matchId) {
-            return Optional.ofNullable(matches.get(matchId));
-        }
-
-        @Override
-        public boolean exists(String matchId) {
-            return matches.containsKey(matchId);
-        }
-
-        @Override
-        public java.util.List<Match> getActiveMatchesFor(UUID userId) {
-            return matches.values().stream()
-                    .filter(m -> m.involves(userId) && m.isActive())
-                    .toList();
-        }
-
-        @Override
-        public java.util.List<Match> getAllMatchesFor(UUID userId) {
-            return matches.values().stream().filter(m -> m.involves(userId)).toList();
-        }
-
-        @Override
-        public void delete(String matchId) {
-            matches.remove(matchId);
         }
     }
 }

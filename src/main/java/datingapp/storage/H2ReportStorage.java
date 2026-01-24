@@ -12,16 +12,15 @@ import java.util.List;
 import java.util.UUID;
 
 /** H2 implementation of ReportStorage. */
-public class H2ReportStorage implements ReportStorage {
-
-    private final DatabaseManager dbManager;
+public class H2ReportStorage extends AbstractH2Storage implements ReportStorage {
 
     public H2ReportStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
-        createTable();
+        super(dbManager);
+        ensureSchema();
     }
 
-    private void createTable() {
+    @Override
+    protected void ensureSchema() {
         String sql = """
                 CREATE TABLE IF NOT EXISTS reports (
                     id UUID PRIMARY KEY,

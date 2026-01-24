@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /** H2 implementation of LikeStorage. */
-public class H2LikeStorage implements LikeStorage {
+public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
 
     private static final String COL_ID = "id";
     private static final String COL_WHO_LIKES = "who_likes";
@@ -23,10 +23,13 @@ public class H2LikeStorage implements LikeStorage {
     private static final String COL_CREATED_AT = "created_at";
     private static final String COL_LIKED_AT = "liked_at";
 
-    private final DatabaseManager dbManager;
-
     public H2LikeStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
+    }
+
+    @Override
+    protected void ensureSchema() {
+        // Table created by DatabaseManager
     }
 
     @Override

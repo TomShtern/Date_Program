@@ -11,6 +11,7 @@ import datingapp.core.PacePreferences.MessagingFrequency;
 import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
+import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfilePreviewService;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
@@ -610,8 +611,7 @@ public class ProfileHandler {
         logger.info("  1=Never, 2=Sometimes, 3=Regularly, 0=Clear");
         String input = inputReader.readLine(PROMPT_CHOICES);
 
-        Dealbreakers.Builder builder = Dealbreakers.builder();
-        copyExceptSmoking(builder, current);
+        Dealbreakers.Builder builder = current.toBuilder().clearSmoking();
         if (!input.equals("0")) {
             for (String s : input.split(",")) {
                 switch (s.trim()) {
@@ -632,8 +632,7 @@ public class ProfileHandler {
         logger.info("\nAcceptable drinking (comma-separated):");
         logger.info("  1=Never, 2=Socially, 3=Regularly, 0=Clear");
         String input = inputReader.readLine(PROMPT_CHOICES);
-        Dealbreakers.Builder builder = Dealbreakers.builder();
-        copyExceptDrinking(builder, current);
+        Dealbreakers.Builder builder = current.toBuilder().clearDrinking();
         if (!input.equals("0")) {
             for (String s : input.split(",")) {
                 switch (s.trim()) {
@@ -654,8 +653,7 @@ public class ProfileHandler {
         logger.info("\nAcceptable kids stance (comma-separated):");
         logger.info("  1=Don't want, 2=Open, 3=Want someday, 4=Has kids, 0=Clear");
         String input = inputReader.readLine(PROMPT_CHOICES);
-        Dealbreakers.Builder builder = Dealbreakers.builder();
-        copyExceptKids(builder, current);
+        Dealbreakers.Builder builder = current.toBuilder().clearKids();
         if (!input.equals("0")) {
             for (String s : input.split(",")) {
                 switch (s.trim()) {
@@ -677,8 +675,7 @@ public class ProfileHandler {
         logger.info("\nAcceptable relationship goals (comma-separated):");
         logger.info("  1=Casual, 2=Short-term, 3=Long-term, 4=Marriage, 5=Unsure, 0=Clear");
         String input = inputReader.readLine(PROMPT_CHOICES);
-        Dealbreakers.Builder builder = Dealbreakers.builder();
-        copyExceptLookingFor(builder, current);
+        Dealbreakers.Builder builder = current.toBuilder().clearLookingFor();
         if (!input.equals("0")) {
             for (String s : input.split(",")) {
                 switch (s.trim()) {
@@ -701,8 +698,7 @@ public class ProfileHandler {
         logger.info("\nHeight range (in cm), or Enter to clear:");
         String minStr = inputReader.readLine("Minimum height (e.g., 160): ");
         String maxStr = inputReader.readLine("Maximum height (e.g., 190): ");
-        Dealbreakers.Builder builder = Dealbreakers.builder();
-        copyExceptHeight(builder, current);
+        Dealbreakers.Builder builder = current.toBuilder().clearHeight();
         try {
             Integer min = minStr.isBlank() ? null : Integer.valueOf(minStr);
             Integer max = maxStr.isBlank() ? null : Integer.valueOf(maxStr);
@@ -721,8 +717,7 @@ public class ProfileHandler {
     private void editAgeDealbreaker(User currentUser, Dealbreakers current) {
         logger.info("\nMax age difference (years), or Enter to clear:");
         String input = inputReader.readLine("Max years: ");
-        Dealbreakers.Builder builder = Dealbreakers.builder();
-        copyExceptAge(builder, current);
+        Dealbreakers.Builder builder = current.toBuilder().clearAge();
         if (!input.isBlank()) {
             try {
                 builder.maxAgeDifference(Integer.parseInt(input));
@@ -737,115 +732,48 @@ public class ProfileHandler {
         }
     }
 
-    // -- Copy Helpers --
-    // These ensure we don't overwrite other dealbreakers when editing one category.
-    // They are copied from Main.java but slightly cleaned up if possible.
+    /**
+     * Displays the profile completion score and breakdown for the current user.
+     */
+    public void viewProfileScore() {
+        if (!userSession.isLoggedIn()) {
+            logger.info(CliConstants.PLEASE_SELECT_USER);
+            return;
+        }
 
-    private void copyExceptSmoking(Dealbreakers.Builder b, Dealbreakers c) {
-        if (c.hasDrinkingDealbreaker()) {
-            b.acceptDrinking(c.acceptableDrinking().toArray(Lifestyle.Drinking[]::new));
-        }
-        if (c.hasKidsDealbreaker()) {
-            b.acceptKidsStance(c.acceptableKidsStance().toArray(Lifestyle.WantsKids[]::new));
-        }
-        if (c.hasLookingForDealbreaker()) {
-            b.acceptLookingFor(c.acceptableLookingFor().toArray(Lifestyle.LookingFor[]::new));
-        }
-        if (c.hasHeightDealbreaker()) {
-            b.heightRange(c.minHeightCm(), c.maxHeightCm());
-        }
-        if (c.hasAgeDealbreaker()) {
-            b.maxAgeDifference(c.maxAgeDifference());
-        }
-    }
+        User currentUser = userSession.getCurrentUser();
+        ProfileCompletionService.CompletionResult result = ProfileCompletionService.calculate(currentUser);
 
-    private void copyExceptDrinking(Dealbreakers.Builder b, Dealbreakers c) {
-        if (c.hasSmokingDealbreaker()) {
-            b.acceptSmoking(c.acceptableSmoking().toArray(Lifestyle.Smoking[]::new));
-        }
-        if (c.hasKidsDealbreaker()) {
-            b.acceptKidsStance(c.acceptableKidsStance().toArray(Lifestyle.WantsKids[]::new));
-        }
-        if (c.hasLookingForDealbreaker()) {
-            b.acceptLookingFor(c.acceptableLookingFor().toArray(Lifestyle.LookingFor[]::new));
-        }
-        if (c.hasHeightDealbreaker()) {
-            b.heightRange(c.minHeightCm(), c.maxHeightCm());
-        }
-        if (c.hasAgeDealbreaker()) {
-            b.maxAgeDifference(c.maxAgeDifference());
-        }
-    }
+        logger.info("\n───────────────────────────────────────");
+        logger.info("      📊 PROFILE COMPLETION SCORE");
+        logger.info("───────────────────────────────────────\n");
 
-    private void copyExceptKids(Dealbreakers.Builder b, Dealbreakers c) {
-        if (c.hasSmokingDealbreaker()) {
-            b.acceptSmoking(c.acceptableSmoking().toArray(Lifestyle.Smoking[]::new));
+        logger.info("  {} {}% {}", result.getTierEmoji(), result.score(), result.tier());
+        if (logger.isInfoEnabled()) {
+            String overallBar = ProfileCompletionService.renderProgressBar(result.score(), 25);
+            logger.info("  {}", overallBar);
         }
-        if (c.hasDrinkingDealbreaker()) {
-            b.acceptDrinking(c.acceptableDrinking().toArray(Lifestyle.Drinking[]::new));
-        }
-        if (c.hasLookingForDealbreaker()) {
-            b.acceptLookingFor(c.acceptableLookingFor().toArray(Lifestyle.LookingFor[]::new));
-        }
-        if (c.hasHeightDealbreaker()) {
-            b.heightRange(c.minHeightCm(), c.maxHeightCm());
-        }
-        if (c.hasAgeDealbreaker()) {
-            b.maxAgeDifference(c.maxAgeDifference());
-        }
-    }
+        logger.info("");
 
-    private void copyExceptLookingFor(Dealbreakers.Builder b, Dealbreakers c) {
-        if (c.hasSmokingDealbreaker()) {
-            b.acceptSmoking(c.acceptableSmoking().toArray(Lifestyle.Smoking[]::new));
+        // Category breakdown
+        for (ProfileCompletionService.CategoryBreakdown cat : result.breakdown()) {
+            logger.info("  {} - {}%", cat.category(), cat.score());
+            if (logger.isInfoEnabled()) {
+                String categoryBar = ProfileCompletionService.renderProgressBar(cat.score(), 15);
+                logger.info("    {}", categoryBar);
+            }
+            if (!cat.missingItems().isEmpty()) {
+                cat.missingItems().forEach(m -> logger.info("    ⚪ {}", m));
+            }
         }
-        if (c.hasDrinkingDealbreaker()) {
-            b.acceptDrinking(c.acceptableDrinking().toArray(Lifestyle.Drinking[]::new));
-        }
-        if (c.hasKidsDealbreaker()) {
-            b.acceptKidsStance(c.acceptableKidsStance().toArray(Lifestyle.WantsKids[]::new));
-        }
-        if (c.hasHeightDealbreaker()) {
-            b.heightRange(c.minHeightCm(), c.maxHeightCm());
-        }
-        if (c.hasAgeDealbreaker()) {
-            b.maxAgeDifference(c.maxAgeDifference());
-        }
-    }
 
-    private void copyExceptHeight(Dealbreakers.Builder b, Dealbreakers c) {
-        if (c.hasSmokingDealbreaker()) {
-            b.acceptSmoking(c.acceptableSmoking().toArray(Lifestyle.Smoking[]::new));
+        // Next steps
+        if (!result.nextSteps().isEmpty()) {
+            logger.info("\n  💡 NEXT STEPS:");
+            result.nextSteps().forEach(s -> logger.info("    {}", s));
         }
-        if (c.hasDrinkingDealbreaker()) {
-            b.acceptDrinking(c.acceptableDrinking().toArray(Lifestyle.Drinking[]::new));
-        }
-        if (c.hasKidsDealbreaker()) {
-            b.acceptKidsStance(c.acceptableKidsStance().toArray(Lifestyle.WantsKids[]::new));
-        }
-        if (c.hasLookingForDealbreaker()) {
-            b.acceptLookingFor(c.acceptableLookingFor().toArray(Lifestyle.LookingFor[]::new));
-        }
-        if (c.hasAgeDealbreaker()) {
-            b.maxAgeDifference(c.maxAgeDifference());
-        }
-    }
 
-    private void copyExceptAge(Dealbreakers.Builder b, Dealbreakers c) {
-        if (c.hasSmokingDealbreaker()) {
-            b.acceptSmoking(c.acceptableSmoking().toArray(Lifestyle.Smoking[]::new));
-        }
-        if (c.hasDrinkingDealbreaker()) {
-            b.acceptDrinking(c.acceptableDrinking().toArray(Lifestyle.Drinking[]::new));
-        }
-        if (c.hasKidsDealbreaker()) {
-            b.acceptKidsStance(c.acceptableKidsStance().toArray(Lifestyle.WantsKids[]::new));
-        }
-        if (c.hasLookingForDealbreaker()) {
-            b.acceptLookingFor(c.acceptableLookingFor().toArray(Lifestyle.LookingFor[]::new));
-        }
-        if (c.hasHeightDealbreaker()) {
-            b.heightRange(c.minHeightCm(), c.maxHeightCm());
-        }
+        logger.info("");
+        inputReader.readLine("  [Press Enter to return to menu]");
     }
 }

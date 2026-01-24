@@ -106,6 +106,25 @@ public record Dealbreakers(
                 || hasAgeDealbreaker();
     }
 
+    /**
+     * Creates a Builder pre-populated with this record's values. Enables partial updates without
+     * copying every field manually.
+     *
+     * @return a new Builder with all current values
+     */
+    public Builder toBuilder() {
+        Builder builder = new Builder();
+        builder.smoking.addAll(this.acceptableSmoking);
+        builder.drinking.addAll(this.acceptableDrinking);
+        builder.kids.addAll(this.acceptableKidsStance);
+        builder.lookingFor.addAll(this.acceptableLookingFor);
+        builder.education.addAll(this.acceptableEducation);
+        builder.minHeight = this.minHeightCm;
+        builder.maxHeight = this.maxHeightCm;
+        builder.maxAgeDiff = this.maxAgeDifference;
+        return builder;
+    }
+
     /** Builder for fluent construction of Dealbreakers. */
     public static class Builder {
         private final Set<Lifestyle.Smoking> smoking = new HashSet<>();
@@ -160,6 +179,43 @@ public record Dealbreakers(
 
         public Builder maxAgeDifference(int years) {
             this.maxAgeDiff = years;
+            return this;
+        }
+
+        // Clear methods for replacement semantics
+        public Builder clearSmoking() {
+            smoking.clear();
+            return this;
+        }
+
+        public Builder clearDrinking() {
+            drinking.clear();
+            return this;
+        }
+
+        public Builder clearKids() {
+            kids.clear();
+            return this;
+        }
+
+        public Builder clearLookingFor() {
+            lookingFor.clear();
+            return this;
+        }
+
+        public Builder clearEducation() {
+            education.clear();
+            return this;
+        }
+
+        public Builder clearHeight() {
+            minHeight = null;
+            maxHeight = null;
+            return this;
+        }
+
+        public Builder clearAge() {
+            maxAgeDiff = null;
             return this;
         }
 

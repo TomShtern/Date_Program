@@ -10,16 +10,18 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 /** H2 implementation of UserAchievementStorage. */
-public class H2UserAchievementStorage implements UserAchievementStorage {
-
-    private final DatabaseManager dbManager;
+public class H2UserAchievementStorage extends AbstractH2Storage implements UserAchievementStorage {
 
     public H2UserAchievementStorage(DatabaseManager dbManager) {
-        this.dbManager = Objects.requireNonNull(dbManager);
+        super(dbManager);
+    }
+
+    @Override
+    protected void ensureSchema() {
+        // Table created by DatabaseManager
     }
 
     @Override

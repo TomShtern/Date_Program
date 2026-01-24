@@ -14,12 +14,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /** H2 implementation of UserStatsStorage. */
-public class H2UserStatsStorage implements UserStatsStorage {
-
-    private final DatabaseManager dbManager;
+public class H2UserStatsStorage extends AbstractH2Storage implements UserStatsStorage {
 
     public H2UserStatsStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
     }
 
     @Override

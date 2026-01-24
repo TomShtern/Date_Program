@@ -18,18 +18,18 @@ import java.util.Optional;
 import java.util.UUID;
 
 /** H2 implementation of NotificationStorage. */
-public class H2NotificationStorage implements NotificationStorage {
+public class H2NotificationStorage extends AbstractH2Storage implements NotificationStorage {
 
-    private final DatabaseManager dbManager;
     private final ObjectMapper objectMapper;
 
     public H2NotificationStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
         this.objectMapper = new ObjectMapper();
         ensureSchema();
     }
 
-    private void ensureSchema() {
+    @Override
+    protected void ensureSchema() {
         String sql = """
                 CREATE TABLE IF NOT EXISTS notifications (
                     id UUID PRIMARY KEY,

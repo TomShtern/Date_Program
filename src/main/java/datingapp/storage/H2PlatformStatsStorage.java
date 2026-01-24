@@ -13,12 +13,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /** H2 implementation of PlatformStatsStorage. */
-public class H2PlatformStatsStorage implements PlatformStatsStorage {
-
-    private final DatabaseManager dbManager;
+public class H2PlatformStatsStorage extends AbstractH2Storage implements PlatformStatsStorage {
 
     public H2PlatformStatsStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
     }
 
     @Override

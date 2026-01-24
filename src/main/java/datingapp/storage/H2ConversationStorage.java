@@ -16,17 +16,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 /** H2 implementation of ConversationStorage. */
-public class H2ConversationStorage implements ConversationStorage {
-
-    private final DatabaseManager dbManager;
+public class H2ConversationStorage extends AbstractH2Storage implements ConversationStorage {
 
     public H2ConversationStorage(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
+        super(dbManager);
         ensureSchema();
     }
 
     /** Creates the conversations table if it doesn't exist. */
-    private void ensureSchema() {
+    @Override
+    protected void ensureSchema() {
         String createTableSql = """
                 CREATE TABLE IF NOT EXISTS conversations (
                     id VARCHAR(100) PRIMARY KEY,
@@ -280,13 +279,5 @@ public class H2ConversationStorage implements ConversationStorage {
                         : null,
                 rs.getBoolean("visible_to_user_a"),
                 rs.getBoolean("visible_to_user_b"));
-    }
-
-    private void setNullableTimestamp(PreparedStatement stmt, int index, Instant instant) throws SQLException {
-        if (instant != null) {
-            stmt.setTimestamp(index, Timestamp.from(instant));
-        } else {
-            stmt.setNull(index, Types.TIMESTAMP);
-        }
     }
 }

@@ -14,17 +14,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** H2 database implementation of ProfileViewStorage. Tracks who viewed which profile and when. */
-public class H2ProfileViewStorage implements ProfileViewStorage {
+public class H2ProfileViewStorage extends AbstractH2Storage implements ProfileViewStorage {
 
     private static final Logger logger = LoggerFactory.getLogger(H2ProfileViewStorage.class);
-    private final DatabaseManager db;
 
-    public H2ProfileViewStorage(DatabaseManager db) {
-        this.db = db;
-        initializeTable();
+    public H2ProfileViewStorage(DatabaseManager dbManager) {
+        super(dbManager);
+        ensureSchema();
     }
 
-    private void initializeTable() {
+    @Override
+    protected void ensureSchema() {
         String sql = """
                 CREATE TABLE IF NOT EXISTS profile_views (
                     viewer_id UUID NOT NULL,
@@ -37,7 +37,7 @@ public class H2ProfileViewStorage implements ProfileViewStorage {
                     profile_views(viewed_at DESC);
                 """;
 
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.execute();
         } catch (SQLException e) {
@@ -52,7 +52,7 @@ public class H2ProfileViewStorage implements ProfileViewStorage {
         }
 
         String sql = "INSERT INTO profile_views (viewer_id, viewed_id, viewed_at) VALUES (?, ?, ?)";
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setObject(1, viewerId);
             stmt.setObject(2, viewedId);
@@ -66,7 +66,7 @@ public class H2ProfileViewStorage implements ProfileViewStorage {
     @Override
     public int getViewCount(UUID userId) {
         String sql = "SELECT COUNT(*) FROM profile_views WHERE viewed_id = ?";
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setObject(1, userId);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -83,7 +83,7 @@ public class H2ProfileViewStorage implements ProfileViewStorage {
     @Override
     public int getUniqueViewerCount(UUID userId) {
         String sql = "SELECT COUNT(DISTINCT viewer_id) FROM profile_views WHERE viewed_id = ?";
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setObject(1, userId);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -110,7 +110,7 @@ public class H2ProfileViewStorage implements ProfileViewStorage {
                 """;
 
         List<UUID> viewers = new ArrayList<>();
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(simpleSql)) {
             stmt.setObject(1, userId);
             stmt.setInt(2, limit);
@@ -128,7 +128,7 @@ public class H2ProfileViewStorage implements ProfileViewStorage {
     @Override
     public boolean hasViewed(UUID viewerId, UUID viewedId) {
         String sql = "SELECT 1 FROM profile_views WHERE viewer_id = ? AND viewed_id = ? LIMIT 1";
-        try (Connection conn = db.getConnection();
+        try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setObject(1, viewerId);
             stmt.setObject(2, viewedId);
