@@ -1,7 +1,7 @@
 package datingapp.storage;
 
-import datingapp.core.FriendRequest;
 import datingapp.core.FriendRequestStorage;
+import datingapp.core.Social.FriendRequest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -110,7 +110,8 @@ public class H2FriendRequestStorage implements FriendRequestStorage {
 
     @Override
     public Optional<FriendRequest> get(UUID id) {
-        String sql = "SELECT * FROM friend_requests WHERE id = ?";
+        String sql =
+                "SELECT id, from_user_id, to_user_id, created_at, status, responded_at FROM friend_requests WHERE id = ?";
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -131,10 +132,10 @@ public class H2FriendRequestStorage implements FriendRequestStorage {
     @Override
     public Optional<FriendRequest> getPendingBetween(UUID user1, UUID user2) {
         String sql = """
-                SELECT * FROM friend_requests
-                WHERE ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?))
-                AND status = 'PENDING'
-                """;
+            SELECT id, from_user_id, to_user_id, created_at, status, responded_at FROM friend_requests
+            WHERE ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?))
+            AND status = 'PENDING'
+            """;
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -157,7 +158,11 @@ public class H2FriendRequestStorage implements FriendRequestStorage {
 
     @Override
     public List<FriendRequest> getPendingForUser(UUID userId) {
-        String sql = "SELECT * FROM friend_requests WHERE to_user_id = ? AND status = 'PENDING'";
+        String sql = """
+            SELECT id, from_user_id, to_user_id, created_at, status, responded_at
+            FROM friend_requests
+            WHERE to_user_id = ? AND status = 'PENDING'
+            """;
         List<FriendRequest> requests = new ArrayList<>();
 
         try (Connection conn = dbManager.getConnection();

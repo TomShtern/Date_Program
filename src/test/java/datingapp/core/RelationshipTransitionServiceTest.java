@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.RelationshipTransitionService.TransitionValidationException;
+import datingapp.core.Social.FriendRequest;
+import datingapp.core.Social.Notification;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -58,16 +60,20 @@ class RelationshipTransitionServiceTest {
     @DisplayName("Cannot request friend zone if no active match")
     void requestFriendZoneNoMatch() {
         UUID charlieId = UUID.randomUUID();
+        UUID fromUserId = aliceId;
+        UUID targetUserId = charlieId;
         // noinspection ThrowableNotThrown - intentionally ignoring return value
-        assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(aliceId, charlieId));
+        assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(fromUserId, targetUserId));
     }
 
     @Test
     @DisplayName("Cannot request twice if one is pending")
     void requestFriendZoneDuplicate() {
         service.requestFriendZone(aliceId, bobId);
+        UUID fromUserId = aliceId;
+        UUID targetUserId = bobId;
         // noinspection ThrowableNotThrown - intentionally ignoring return value
-        assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(aliceId, bobId));
+        assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(fromUserId, targetUserId));
     }
 
     @Test
@@ -89,8 +95,10 @@ class RelationshipTransitionServiceTest {
     @DisplayName("Only target user can accept")
     void acceptFriendZoneWrongUser() {
         FriendRequest request = service.requestFriendZone(aliceId, bobId);
+        UUID requestId = request.id();
+        UUID responderId = aliceId;
         // noinspection ThrowableNotThrown - intentionally ignoring return value
-        assertThrows(TransitionValidationException.class, () -> service.acceptFriendZone(request.id(), aliceId));
+        assertThrows(TransitionValidationException.class, () -> service.acceptFriendZone(requestId, responderId));
     }
 
     @Test

@@ -1,5 +1,7 @@
 package datingapp.core;
 
+import datingapp.core.Social.FriendRequest;
+import datingapp.core.Social.Notification;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

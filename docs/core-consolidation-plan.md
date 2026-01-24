@@ -389,10 +389,12 @@ public final class UserStorages {
 - [ ] Phase 5+: Remaining consolidations (pending).
 <!--/ARCHIVE-->
 - [x] Phase 5: Consolidated `Achievement` + `UserAchievement`; updated usages/tests; removed old file.
+- [x] Phase 6.5: Consolidated `Social` (FriendRequest + Notification); updated storage/CLI/tests; removed old files.
 - [ ] Phase 6+: Remaining consolidations (pending).
 
 1|2026-01-24 14:30:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phases 2-4 implemented; CandidateFinderService removed in favor of concrete CandidateFinder|docs/core-consolidation-plan.md
 2|2026-01-24 15:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 5 Achievement consolidation complete|docs/core-consolidation-plan.md
+3|2026-01-24 15:45:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.5 Social consolidation complete|docs/core-consolidation-plan.md
 
 ### Phase 0: Preflight (MANDATORY - Do Not Skip)
 
@@ -1217,3 +1219,4 @@ However, if ever relaxed, related interfaces could be grouped (e.g., `UserStorag
 
 1|2026-01-24 14:30:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phases 2-4 implemented; CandidateFinderService removed in favor of concrete CandidateFinder|docs/core-consolidation-plan.md
 2|2026-01-24 15:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 5 Achievement consolidation complete|docs/core-consolidation-plan.md
+3|2026-01-24 15:45:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.5 Social consolidation complete|docs/core-consolidation-plan.md

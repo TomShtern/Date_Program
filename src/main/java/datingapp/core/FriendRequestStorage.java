@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.Social.FriendRequest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
