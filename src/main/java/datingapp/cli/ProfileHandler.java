@@ -211,7 +211,7 @@ public class ProfileHandler {
         try {
             LocalDate birthDate = LocalDate.parse(birthStr, DATE_FORMAT);
             currentUser.setBirthDate(birthDate);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             logger.info("⚠️  Invalid date format, skipping.");
         }
     }
@@ -346,7 +346,7 @@ public class ProfileHandler {
                     logger.info("❌ Limit reached.\n");
                 }
             }
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logger.info(CliConstants.INVALID_INPUT);
         }
     }
@@ -363,7 +363,7 @@ public class ProfileHandler {
             double lat = Double.parseDouble(latStr);
             double lon = Double.parseDouble(lonStr);
             currentUser.setLocation(lat, lon);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logger.info("⚠️  Invalid coordinates, skipping.");
         }
     }
@@ -378,7 +378,7 @@ public class ProfileHandler {
         try {
             int dist = Integer.parseInt(distStr);
             currentUser.setMaxDistanceKm(dist);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             // Keep default
         }
 
@@ -388,7 +388,7 @@ public class ProfileHandler {
             int minAge = minAgeStr.isBlank() ? 18 : Integer.parseInt(minAgeStr);
             int maxAge = maxAgeStr.isBlank() ? 99 : Integer.parseInt(maxAgeStr);
             currentUser.setAgeRange(minAge, maxAge);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             logger.info("⚠️  Invalid age range, using defaults.");
         }
     }
@@ -412,7 +412,7 @@ public class ProfileHandler {
         if (!heightStr.isBlank()) {
             try {
                 currentUser.setHeightCm(Integer.valueOf(heightStr));
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 logger.info("⚠️  Invalid height, skipping.");
             }
         }
@@ -711,7 +711,7 @@ public class ProfileHandler {
             }
             currentUser.setDealbreakers(builder.build());
             logger.info("✅ Height dealbreaker updated.\n");
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logger.info(CliConstants.INVALID_INPUT);
         } catch (IllegalArgumentException e) {
             logger.info("❌ {}\n", e.getMessage());
@@ -728,7 +728,7 @@ public class ProfileHandler {
                 builder.maxAgeDifference(Integer.parseInt(input));
                 currentUser.setDealbreakers(builder.build());
                 logger.info("✅ Age dealbreaker updated.\n");
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 logger.info(CliConstants.INVALID_INPUT);
             }
         } else {

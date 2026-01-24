@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.Messaging.Message;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -97,25 +98,26 @@ class MessageTest {
         @Test
         @DisplayName("should reject null conversationId")
         void rejectNullConversationId() {
-            assertThrows(
-                    NullPointerException.class,
-                    () -> new Message(UUID.randomUUID(), null, SENDER_ID, "Hello", Instant.now()));
+            UUID id = UUID.randomUUID();
+            Instant createdAt = Instant.now();
+            assertThrows(NullPointerException.class, () -> new Message(id, null, SENDER_ID, "Hello", createdAt));
         }
 
         @Test
         @DisplayName("should reject null senderId")
         void rejectNullSenderId() {
-            assertThrows(
-                    NullPointerException.class,
-                    () -> new Message(UUID.randomUUID(), CONVERSATION_ID, null, "Hello", Instant.now()));
+            UUID id = UUID.randomUUID();
+            Instant createdAt = Instant.now();
+            assertThrows(NullPointerException.class, () -> new Message(id, CONVERSATION_ID, null, "Hello", createdAt));
         }
 
         @Test
         @DisplayName("should reject null id")
         void rejectNullId() {
+            Instant createdAt = Instant.now();
             assertThrows(
                     NullPointerException.class,
-                    () -> new Message(null, CONVERSATION_ID, SENDER_ID, "Hello", Instant.now()));
+                    () -> new Message(null, CONVERSATION_ID, SENDER_ID, "Hello", createdAt));
         }
     }
 }

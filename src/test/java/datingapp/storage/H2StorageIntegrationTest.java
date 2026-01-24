@@ -2,21 +2,22 @@ package datingapp.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.Block;
-import datingapp.core.Conversation;
 import datingapp.core.Interest;
-import datingapp.core.Like;
 import datingapp.core.Match;
-import datingapp.core.Message;
+import datingapp.core.Messaging.Conversation;
+import datingapp.core.Messaging.Message;
 import datingapp.core.PacePreferences;
 import datingapp.core.PacePreferences.CommunicationStyle;
 import datingapp.core.PacePreferences.DepthPreference;
 import datingapp.core.PacePreferences.MessagingFrequency;
 import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.User;
+import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.Like;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -58,7 +59,7 @@ class H2StorageIntegrationTest {
         try (var conn = dbManager.getConnection();
                 var stmt = conn.createStatement()) {
             stmt.execute("DROP ALL OBJECTS");
-        } catch (Exception e) {
+        } catch (Exception _) {
             // Ignore errors if tables don't exist yet
         }
 
@@ -498,7 +499,7 @@ class H2StorageIntegrationTest {
             assertEquals(2, firstPage.size());
             assertEquals(2, secondPage.size());
             // Ensure no overlap
-            assertFalse(firstPage.get(0).id().equals(secondPage.get(0).id()));
+            assertNotEquals(firstPage.get(0).id(), secondPage.get(0).id());
         }
 
         @Test

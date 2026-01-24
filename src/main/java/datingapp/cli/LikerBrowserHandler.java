@@ -1,9 +1,9 @@
 package datingapp.cli;
 
-import datingapp.core.Like;
 import datingapp.core.LikerBrowserService;
 import datingapp.core.MatchingService;
 import datingapp.core.User;
+import datingapp.core.UserInteractions.Like;
 import java.util.List;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -61,10 +61,7 @@ public class LikerBrowserHandler {
                 case "0" -> {
                     return;
                 }
-                default -> {
-                    logger.info(CliConstants.INVALID_SELECTION);
-                    continue;
-                }
+                default -> logger.info(CliConstants.INVALID_SELECTION);
             }
         }
 

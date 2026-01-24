@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.UserInteractions.Like;
 import java.util.Optional;
 
 /**
@@ -68,7 +69,7 @@ public class MatchingService {
                     }
 
                     return Optional.of(match);
-                } catch (Exception e) {
+                } catch (Exception _) {
                     // Race condition: match was created by another thread just now
                     // Return the existing match if possible, or simple empty (idempotent)
                     return matchStorage.get(match.getId());

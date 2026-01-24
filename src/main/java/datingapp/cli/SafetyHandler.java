@@ -1,12 +1,12 @@
 package datingapp.cli;
 
-import datingapp.core.Block;
 import datingapp.core.BlockStorage;
 import datingapp.core.Match;
 import datingapp.core.MatchStorage;
-import datingapp.core.Report;
 import datingapp.core.ReportService;
 import datingapp.core.User;
+import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.Report;
 import datingapp.core.UserStorage;
 import java.util.List;
 import java.util.Set;
@@ -98,7 +98,7 @@ public class SafetyHandler {
             } else {
                 logger.info(CliConstants.CANCELLED);
             }
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logger.info(CliConstants.INVALID_INPUT);
         }
     }
@@ -174,7 +174,7 @@ public class SafetyHandler {
                 return null;
             }
             return reportableUsers.get(idx);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logger.info("❌ Invalid input.\n");
             return null;
         }
@@ -200,7 +200,7 @@ public class SafetyHandler {
                 return null;
             }
             return reasons[reasonIdx];
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logger.info("❌ Invalid input.\n");
             return null;
         }

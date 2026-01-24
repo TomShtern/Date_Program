@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.UserInteractions.Block;
 import java.util.Set;
 import java.util.UUID;
 

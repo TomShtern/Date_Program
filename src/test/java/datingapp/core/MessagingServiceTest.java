@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.Messaging.Conversation;
+import datingapp.core.Messaging.Message;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -206,12 +208,11 @@ class MessagingServiceTest {
 
         @Test
         @DisplayName("should return messages in order")
-        void returnMessagesInOrder() throws InterruptedException {
+        void returnMessagesInOrder() {
             Match match = Match.create(userA, userB);
             matchStorage.save(match);
 
             messagingService.sendMessage(userA, userB, "First");
-            Thread.sleep(10); // Ensure different timestamps
             messagingService.sendMessage(userB, userA, "Second");
 
             List<Message> messages = messagingService.getMessages(userA, userB, 10, 0);
@@ -304,15 +305,13 @@ class MessagingServiceTest {
 
         @Test
         @DisplayName("should return correct count for unread messages")
-        void returnCorrectCount() throws InterruptedException {
+        void returnCorrectCount() {
             Match match = Match.create(userA, userB);
             matchStorage.save(match);
 
             // Send 3 messages from A to B
             messagingService.sendMessage(userA, userB, "Message 1");
-            Thread.sleep(10);
             messagingService.sendMessage(userA, userB, "Message 2");
-            Thread.sleep(10);
             messagingService.sendMessage(userA, userB, "Message 3");
 
             String conversationId = Conversation.generateId(userA, userB);
@@ -323,19 +322,15 @@ class MessagingServiceTest {
 
         @Test
         @DisplayName("should return 0 after marking as read")
-        void returnZeroAfterRead() throws InterruptedException {
+        void returnZeroAfterRead() {
             Match match = Match.create(userA, userB);
             matchStorage.save(match);
 
             messagingService.sendMessage(userA, userB, "Hello!");
-            Thread.sleep(10);
             String conversationId = Conversation.generateId(userA, userB);
 
             // Mark as read
             messagingService.markAsRead(userB, conversationId);
-
-            // Wait a bit to ensure timestamp is in the past
-            Thread.sleep(10);
 
             // Count should be 0 now (no messages after the read timestamp)
             int unreadForB = messagingService.getUnreadCount(userB, conversationId);
@@ -357,15 +352,13 @@ class MessagingServiceTest {
 
         @Test
         @DisplayName("should not count own messages as unread")
-        void notCountOwnMessages() throws InterruptedException {
+        void notCountOwnMessages() {
             Match match = Match.create(userA, userB);
             matchStorage.save(match);
 
             // A sends 2 messages, B sends 1 message
             messagingService.sendMessage(userA, userB, "From A - 1");
-            Thread.sleep(10);
             messagingService.sendMessage(userB, userA, "From B");
-            Thread.sleep(10);
             messagingService.sendMessage(userA, userB, "From A - 2");
 
             String conversationId = Conversation.generateId(userA, userB);
@@ -382,7 +375,7 @@ class MessagingServiceTest {
 
         @Test
         @DisplayName("should aggregate across conversations")
-        void aggregateAcrossConversations() throws InterruptedException {
+        void aggregateAcrossConversations() {
             // Create matches: A-B and A-C
             Match matchAB = Match.create(userA, userB);
             Match matchAC = Match.create(userA, userC);
@@ -391,15 +384,11 @@ class MessagingServiceTest {
 
             // B sends 2 messages to A
             messagingService.sendMessage(userB, userA, "From B - 1");
-            Thread.sleep(10);
             messagingService.sendMessage(userB, userA, "From B - 2");
 
             // C sends 3 messages to A
-            Thread.sleep(10);
             messagingService.sendMessage(userC, userA, "From C - 1");
-            Thread.sleep(10);
             messagingService.sendMessage(userC, userA, "From C - 2");
-            Thread.sleep(10);
             messagingService.sendMessage(userC, userA, "From C - 3");
 
             int totalUnread = messagingService.getTotalUnreadCount(userA);
@@ -420,7 +409,7 @@ class MessagingServiceTest {
 
         @Test
         @DisplayName("should return sorted by most recent")
-        void returnSortedByMostRecent() throws InterruptedException {
+        void returnSortedByMostRecent() {
             Match matchAB = Match.create(userA, userB);
             Match matchAC = Match.create(userA, userC);
             matchStorage.save(matchAB);
@@ -428,8 +417,13 @@ class MessagingServiceTest {
 
             // Send older message to B, newer to C
             messagingService.sendMessage(userA, userB, "Older");
-            Thread.sleep(20);
             messagingService.sendMessage(userA, userC, "Newer");
+
+            String convoIdAB = Conversation.generateId(userA, userB);
+            String convoIdAC = Conversation.generateId(userA, userC);
+            Instant now = Instant.now();
+            conversationStorage.updateLastMessageAt(convoIdAB, now);
+            conversationStorage.updateLastMessageAt(convoIdAC, now.plusSeconds(1));
 
             List<MessagingService.ConversationPreview> previews = messagingService.getConversations(userA);
 
@@ -441,15 +435,13 @@ class MessagingServiceTest {
 
         @Test
         @DisplayName("should include unread counts")
-        void includeUnreadCounts() throws InterruptedException {
+        void includeUnreadCounts() {
             Match match = Match.create(userA, userB);
             matchStorage.save(match);
 
             // B sends 3 messages to A
             messagingService.sendMessage(userB, userA, "1");
-            Thread.sleep(10);
             messagingService.sendMessage(userB, userA, "2");
-            Thread.sleep(10);
             messagingService.sendMessage(userB, userA, "3");
 
             List<MessagingService.ConversationPreview> previews = messagingService.getConversations(userA);
@@ -460,13 +452,16 @@ class MessagingServiceTest {
 
         @Test
         @DisplayName("should include last message")
-        void includeLastMessage() throws InterruptedException {
+        void includeLastMessage() {
             Match match = Match.create(userA, userB);
             matchStorage.save(match);
 
             messagingService.sendMessage(userA, userB, "First");
-            Thread.sleep(10);
-            messagingService.sendMessage(userB, userA, "Last message");
+            String conversationId = Conversation.generateId(userA, userB);
+            Instant later = Instant.now().plusSeconds(1);
+            Message lastMessage = new Message(UUID.randomUUID(), conversationId, userB, "Last message", later);
+            messageStorage.save(lastMessage);
+            conversationStorage.updateLastMessageAt(conversationId, later);
 
             List<MessagingService.ConversationPreview> previews = messagingService.getConversations(userA);
 

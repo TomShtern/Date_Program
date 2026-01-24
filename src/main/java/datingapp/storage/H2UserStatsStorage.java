@@ -1,6 +1,6 @@
 package datingapp.storage;
 
-import datingapp.core.UserStats;
+import datingapp.core.Stats.UserStats;
 import datingapp.core.UserStatsStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -69,11 +69,17 @@ public class H2UserStatsStorage implements UserStatsStorage {
     @Override
     public Optional<UserStats> getLatest(UUID userId) {
         String sql = """
-                SELECT * FROM user_stats
-                WHERE user_id = ?
-                ORDER BY computed_at DESC
-                LIMIT 1
-                """;
+            SELECT id, user_id, computed_at,
+                total_swipes_given, likes_given, passes_given, like_ratio,
+                total_swipes_received, likes_received, passes_received, incoming_like_ratio,
+                total_matches, active_matches, match_rate,
+                blocks_given, blocks_received, reports_given, reports_received,
+                reciprocity_score, selectiveness_score, attractiveness_score
+            FROM user_stats
+            WHERE user_id = ?
+            ORDER BY computed_at DESC
+            LIMIT 1
+            """;
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -94,11 +100,17 @@ public class H2UserStatsStorage implements UserStatsStorage {
     @Override
     public List<UserStats> getHistory(UUID userId, int limit) {
         String sql = """
-                SELECT * FROM user_stats
-                WHERE user_id = ?
-                ORDER BY computed_at DESC
-                LIMIT ?
-                """;
+            SELECT id, user_id, computed_at,
+                total_swipes_given, likes_given, passes_given, like_ratio,
+                total_swipes_received, likes_received, passes_received, incoming_like_ratio,
+                total_matches, active_matches, match_rate,
+                blocks_given, blocks_received, reports_given, reports_received,
+                reciprocity_score, selectiveness_score, attractiveness_score
+            FROM user_stats
+            WHERE user_id = ?
+            ORDER BY computed_at DESC
+            LIMIT ?
+            """;
         List<UserStats> history = new ArrayList<>();
 
         try (Connection conn = dbManager.getConnection();
@@ -122,7 +134,13 @@ public class H2UserStatsStorage implements UserStatsStorage {
     public List<UserStats> getAllLatestStats() {
         // Get the most recent stats snapshot for each user
         String sql = """
-                SELECT s.* FROM user_stats s
+                SELECT s.id, s.user_id, s.computed_at,
+                    s.total_swipes_given, s.likes_given, s.passes_given, s.like_ratio,
+                    s.total_swipes_received, s.likes_received, s.passes_received, s.incoming_like_ratio,
+                    s.total_matches, s.active_matches, s.match_rate,
+                    s.blocks_given, s.blocks_received, s.reports_given, s.reports_received,
+                    s.reciprocity_score, s.selectiveness_score, s.attractiveness_score
+                FROM user_stats s
                 INNER JOIN (
                     SELECT user_id, MAX(computed_at) as max_date
                     FROM user_stats

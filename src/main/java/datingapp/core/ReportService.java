@@ -1,5 +1,7 @@
 package datingapp.core;
 
+import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.Report;
 import java.util.Objects;
 
 /** Service for handling user reports with auto-ban logic. */

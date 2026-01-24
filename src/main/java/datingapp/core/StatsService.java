@@ -1,5 +1,8 @@
 package datingapp.core;
 
+import datingapp.core.Stats.PlatformStats;
+import datingapp.core.Stats.UserStats;
+import datingapp.core.UserInteractions.Like;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;

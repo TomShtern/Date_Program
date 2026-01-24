@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.Messaging.Conversation;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -180,8 +181,9 @@ class ConversationTest {
             UUID b = UUID.randomUUID();
             UUID c = UUID.randomUUID();
             Conversation convo = Conversation.create(a, b);
+            Instant now = Instant.now();
 
-            assertThrows(IllegalArgumentException.class, () -> convo.updateReadTimestamp(c, Instant.now()));
+            assertThrows(IllegalArgumentException.class, () -> convo.updateReadTimestamp(c, now));
         }
     }
 
@@ -199,13 +201,15 @@ class ConversationTest {
         @Test
         @DisplayName("should reject null userA")
         void rejectNullUserA() {
-            assertThrows(NullPointerException.class, () -> Conversation.create(null, UUID.randomUUID()));
+            UUID userB = UUID.randomUUID();
+            assertThrows(NullPointerException.class, () -> Conversation.create(null, userB));
         }
 
         @Test
         @DisplayName("should reject null userB")
         void rejectNullUserB() {
-            assertThrows(NullPointerException.class, () -> Conversation.create(UUID.randomUUID(), null));
+            UUID userA = UUID.randomUUID();
+            assertThrows(NullPointerException.class, () -> Conversation.create(userA, null));
         }
     }
 }

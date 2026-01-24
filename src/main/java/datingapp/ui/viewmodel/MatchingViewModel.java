@@ -2,12 +2,12 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.BlockStorage;
 import datingapp.core.CandidateFinder;
-import datingapp.core.Like;
 import datingapp.core.LikeStorage;
 import datingapp.core.Match;
 import datingapp.core.MatchingService;
 import datingapp.core.UndoService;
 import datingapp.core.User;
+import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserStorage;
 import datingapp.ui.UISession;
 import java.util.HashSet;

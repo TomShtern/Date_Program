@@ -1,11 +1,12 @@
 package datingapp.storage;
 
-import datingapp.core.Message;
 import datingapp.core.MessageStorage;
+import datingapp.core.Messaging.Message;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -48,17 +49,20 @@ public class H2MessageStorage implements MessageStorage {
                 var stmt = conn.createStatement()) {
             stmt.execute(createTableSql);
             stmt.execute(index);
-
-            // Try to add FK constraint - ignore errors if conversations table doesn't exist yet
-            // or if constraint already exists. The application handles cleanup via deleteByConversation.
-            try {
-                stmt.execute(addFkConstraint);
-            } catch (SQLException fkError) {
-                // FK constraint failed (conversations table may not exist yet) - this is OK
-                // as the application handles cascade delete manually via deleteByConversation()
-            }
+            tryAddConversationForeignKey(stmt, addFkConstraint);
         } catch (SQLException e) {
             throw new StorageException("Failed to create messages schema", e);
+        }
+    }
+
+    private void tryAddConversationForeignKey(Statement stmt, String addFkConstraint) throws SQLException {
+        // Try to add FK constraint - ignore errors if conversations table doesn't exist yet
+        // or if constraint already exists. The application handles cleanup via deleteByConversation.
+        try {
+            stmt.execute(addFkConstraint);
+        } catch (SQLException _) {
+            // FK constraint failed (conversations table may not exist yet) - this is OK
+            // as the application handles cascade delete manually via deleteByConversation()
         }
     }
 
@@ -88,11 +92,12 @@ public class H2MessageStorage implements MessageStorage {
     @Override
     public List<Message> getMessages(String conversationId, int limit, int offset) {
         String sql = """
-                SELECT * FROM messages
-                WHERE conversation_id = ?
-                ORDER BY created_at ASC
-                LIMIT ? OFFSET ?
-                """;
+            SELECT id, conversation_id, sender_id, content, created_at
+            FROM messages
+            WHERE conversation_id = ?
+            ORDER BY created_at ASC
+            LIMIT ? OFFSET ?
+            """;
 
         List<Message> messages = new ArrayList<>();
 
@@ -117,11 +122,12 @@ public class H2MessageStorage implements MessageStorage {
     @Override
     public Optional<Message> getLatestMessage(String conversationId) {
         String sql = """
-                SELECT * FROM messages
-                WHERE conversation_id = ?
-                ORDER BY created_at DESC
-                LIMIT 1
-                """;
+            SELECT id, conversation_id, sender_id, content, created_at
+            FROM messages
+            WHERE conversation_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """;
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {

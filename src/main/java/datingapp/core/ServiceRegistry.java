@@ -26,6 +26,7 @@ import java.util.Objects;
  * <p>This pattern enables: - Easy testing with mock implementations - Swapping storage backends (H2
  * -> PostgreSQL) - Adding new services without modifying Main
  */
+@SuppressWarnings("java:S6539")
 public class ServiceRegistry {
 
     // Configuration
@@ -66,6 +67,7 @@ public class ServiceRegistry {
     private final PaceCompatibilityService paceCompatibilityService; // Phase 1
 
     /** Package-private constructor - use ServiceRegistry.Builder to create. */
+    @SuppressWarnings("java:S107")
     ServiceRegistry(
             AppConfig config,
             UserStorage userStorage,

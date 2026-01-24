@@ -9,6 +9,8 @@ import datingapp.core.PacePreferences.CommunicationStyle;
 import datingapp.core.PacePreferences.DepthPreference;
 import datingapp.core.PacePreferences.MessagingFrequency;
 import datingapp.core.PacePreferences.TimeToFirstDate;
+import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.Report;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumSet;

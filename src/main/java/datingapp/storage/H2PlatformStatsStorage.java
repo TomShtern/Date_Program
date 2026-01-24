@@ -1,7 +1,7 @@
 package datingapp.storage;
 
-import datingapp.core.PlatformStats;
 import datingapp.core.PlatformStatsStorage;
+import datingapp.core.Stats.PlatformStats;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -49,7 +49,13 @@ public class H2PlatformStatsStorage implements PlatformStatsStorage {
 
     @Override
     public Optional<PlatformStats> getLatest() {
-        String sql = "SELECT * FROM platform_stats ORDER BY computed_at DESC LIMIT 1";
+        String sql = """
+            SELECT id, computed_at, total_active_users,
+                avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio
+            FROM platform_stats
+            ORDER BY computed_at DESC
+            LIMIT 1
+            """;
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -68,7 +74,13 @@ public class H2PlatformStatsStorage implements PlatformStatsStorage {
 
     @Override
     public List<PlatformStats> getHistory(int limit) {
-        String sql = "SELECT * FROM platform_stats ORDER BY computed_at DESC LIMIT ?";
+        String sql = """
+            SELECT id, computed_at, total_active_users,
+                avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio
+            FROM platform_stats
+            ORDER BY computed_at DESC
+            LIMIT ?
+            """;
         List<PlatformStats> history = new ArrayList<>();
 
         try (Connection conn = dbManager.getConnection();

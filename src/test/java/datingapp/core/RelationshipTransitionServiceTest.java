@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.Messaging.Conversation;
 import datingapp.core.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.Social.FriendRequest;
 import datingapp.core.Social.Notification;

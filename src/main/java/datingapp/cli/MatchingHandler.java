@@ -2,13 +2,11 @@ package datingapp.cli;
 
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
-import datingapp.core.Block;
 import datingapp.core.BlockStorage;
 import datingapp.core.CandidateFinder;
 import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.DailyLimitService;
 import datingapp.core.DailyPickService;
-import datingapp.core.Like;
 import datingapp.core.LikeStorage;
 import datingapp.core.Match;
 import datingapp.core.MatchQuality;
@@ -21,6 +19,8 @@ import datingapp.core.RelationshipTransitionService;
 import datingapp.core.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.UndoService;
 import datingapp.core.User;
+import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserStorage;
 import java.util.HashSet;
 import java.util.List;
@@ -53,6 +53,7 @@ public class MatchingHandler {
     private final UserSession userSession;
     private final InputReader inputReader;
 
+    @SuppressWarnings("java:S107")
     public MatchingHandler(
             CandidateFinder candidateFinderService,
             MatchingService matchingService,
@@ -141,29 +142,19 @@ public class MatchingHandler {
                 candidate.getLat(), candidate.getLon());
 
         logger.info(CliConstants.BOX_TOP);
+        boolean verified = Boolean.TRUE.equals(candidate.isVerified());
         logger.info(
                 "│ 💝 {}{}{}, {} years old",
                 candidate.getName(),
-                candidate.isVerified() ? " " : "",
-                candidate.isVerified() ? "✅ Verified" : "",
+                verified ? " " : "",
+                verified ? "✅ Verified" : "",
                 candidate.getAge());
         if (logger.isInfoEnabled()) {
             logger.info("│ 📍 {} km away", String.format("%.1f", distance));
         }
         logger.info(CliConstants.PROFILE_BIO_FORMAT, candidate.getBio() != null ? candidate.getBio() : "(no bio)");
 
-        // Enhanced Mutual Interests Badge
-        InterestMatcher.MatchResult matchResult =
-                InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
-        if (matchResult.hasSharedInterests()) {
-            String badge = getMutualInterestsBadge(matchResult.sharedCount());
-            logger.info(
-                    "│ {} {} shared interest{}: {}",
-                    badge,
-                    matchResult.sharedCount(),
-                    matchResult.sharedCount() > 1 ? "s" : "",
-                    InterestMatcher.formatSharedInterests(matchResult.shared()));
-        }
+        logSharedInterests(currentUser, candidate);
 
         logger.info(CliConstants.BOX_BOTTOM);
 
@@ -286,7 +277,7 @@ public class MatchingHandler {
 
             handleMatchDetailAction(action, match, otherUser, otherUserId, currentUser);
 
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logger.info(CliConstants.INVALID_INPUT);
         }
     }
@@ -325,30 +316,42 @@ public class MatchingHandler {
     }
 
     private void displayScoreBreakdown(MatchQuality quality) {
+        if (!logger.isInfoEnabled()) {
+            return;
+        }
+
+        String distanceBar = MatchQualityService.renderProgressBar(quality.distanceScore(), 12);
+        String ageBar = MatchQualityService.renderProgressBar(quality.ageScore(), 12);
+        String interestBar = MatchQualityService.renderProgressBar(quality.interestScore(), 12);
+        String lifestyleBar = MatchQualityService.renderProgressBar(quality.lifestyleScore(), 12);
+        String paceBar = MatchQualityService.renderProgressBar(quality.paceScore(), 12);
+        String responseBar = MatchQualityService.renderProgressBar(quality.responseScore(), 12);
+
         logger.info("\n  📊 SCORE BREAKDOWN");
         logger.info(CliConstants.SECTION_LINE);
+        logger.info("  Distance:      {} {}%", distanceBar, (int) (quality.distanceScore() * 100));
+        logger.info("  Age match:     {} {}%", ageBar, (int) (quality.ageScore() * 100));
+        logger.info("  Interests:     {} {}%", interestBar, (int) (quality.interestScore() * 100));
+        logger.info("  Lifestyle:     {} {}%", lifestyleBar, (int) (quality.lifestyleScore() * 100));
+        logger.info("  Pace/Sync:      {} {}%", paceBar, (int) (quality.paceScore() * 100));
+        logger.info("  Response:      {} {}%", responseBar, (int) (quality.responseScore() * 100));
+    }
+
+    private void logSharedInterests(User currentUser, User candidate) {
+        InterestMatcher.MatchResult matchResult =
+                InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
+        if (!matchResult.hasSharedInterests() || !logger.isInfoEnabled()) {
+            return;
+        }
+
+        String badge = getMutualInterestsBadge(matchResult.sharedCount());
+        String sharedInterests = InterestMatcher.formatSharedInterests(matchResult.shared());
         logger.info(
-                "  Distance:      {} {}%",
-                MatchQualityService.renderProgressBar(quality.distanceScore(), 12),
-                (int) (quality.distanceScore() * 100));
-        logger.info(
-                "  Age match:     {} {}%",
-                MatchQualityService.renderProgressBar(quality.ageScore(), 12), (int) (quality.ageScore() * 100));
-        logger.info(
-                "  Interests:     {} {}%",
-                MatchQualityService.renderProgressBar(quality.interestScore(), 12),
-                (int) (quality.interestScore() * 100));
-        logger.info(
-                "  Lifestyle:     {} {}%",
-                MatchQualityService.renderProgressBar(quality.lifestyleScore(), 12),
-                (int) (quality.lifestyleScore() * 100));
-        logger.info(
-                "  Pace/Sync:      {} {}%",
-                MatchQualityService.renderProgressBar(quality.paceScore(), 12), (int) (quality.paceScore() * 100));
-        logger.info(
-                "  Response:      {} {}%",
-                MatchQualityService.renderProgressBar(quality.responseScore(), 12),
-                (int) (quality.responseScore() * 100));
+                "│ {} {} shared interest{}: {}",
+                badge,
+                matchResult.sharedCount(),
+                matchResult.sharedCount() > 1 ? "s" : "",
+                sharedInterests);
     }
 
     private void handleMatchDetailAction(
@@ -419,7 +422,7 @@ public class MatchingHandler {
             } else {
                 logger.info(CliConstants.CANCELLED);
             }
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logger.info(CliConstants.INVALID_INPUT);
         }
     }
@@ -448,7 +451,7 @@ public class MatchingHandler {
             } else {
                 logger.info(CliConstants.CANCELLED);
             }
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logger.info(CliConstants.INVALID_INPUT);
         }
     }
@@ -502,8 +505,9 @@ public class MatchingHandler {
 
         InterestMatcher.MatchResult matchResult =
                 InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
-        if (!matchResult.shared().isEmpty()) {
-            logger.info("│ ✨ You both like: {}", InterestMatcher.formatSharedInterests(matchResult.shared()));
+        if (!matchResult.shared().isEmpty() && logger.isInfoEnabled()) {
+            String sharedInterests = InterestMatcher.formatSharedInterests(matchResult.shared());
+            logger.info("│ ✨ You both like: {}", sharedInterests);
         }
 
         logger.info(CliConstants.BOX_BOTTOM);

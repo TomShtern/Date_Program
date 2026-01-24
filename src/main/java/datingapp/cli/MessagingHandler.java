@@ -1,14 +1,15 @@
 package datingapp.cli;
 
-import datingapp.core.Conversation;
 import datingapp.core.Match;
 import datingapp.core.MatchStorage;
-import datingapp.core.Message;
+import datingapp.core.Messaging.Conversation;
+import datingapp.core.Messaging.Message;
 import datingapp.core.MessagingService;
 import datingapp.core.MessagingService.ConversationPreview;
 import datingapp.core.MessagingService.SendResult;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.User;
+import datingapp.core.UserInteractions.Block;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -123,7 +124,7 @@ public class MessagingHandler {
             } else {
                 logger.info(CliConstants.INVALID_SELECTION);
             }
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logger.info(CliConstants.INVALID_INPUT);
         }
         return previews;
@@ -363,7 +364,7 @@ public class MessagingHandler {
 
     /** Blocks another user. */
     private void blockUser(User currentUser, User otherUser) {
-        datingapp.core.Block block = datingapp.core.Block.create(currentUser.getId(), otherUser.getId());
+        Block block = Block.create(currentUser.getId(), otherUser.getId());
         registry.getBlockStorage().save(block);
 
         String matchId = Match.generateId(currentUser.getId(), otherUser.getId());

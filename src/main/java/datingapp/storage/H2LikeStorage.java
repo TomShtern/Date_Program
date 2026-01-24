@@ -1,7 +1,7 @@
 package datingapp.storage;
 
-import datingapp.core.Like;
 import datingapp.core.LikeStorage;
+import datingapp.core.UserInteractions.Like;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -15,6 +15,13 @@ import java.util.UUID;
 
 /** H2 implementation of LikeStorage. */
 public class H2LikeStorage implements LikeStorage {
+
+    private static final String COL_ID = "id";
+    private static final String COL_WHO_LIKES = "who_likes";
+    private static final String COL_WHO_GOT_LIKED = "who_got_liked";
+    private static final String COL_DIRECTION = "direction";
+    private static final String COL_CREATED_AT = "created_at";
+    private static final String COL_LIKED_AT = "liked_at";
 
     private final DatabaseManager dbManager;
 
@@ -38,11 +45,11 @@ public class H2LikeStorage implements LikeStorage {
 
             if (rs.next()) {
                 return Optional.of(new Like(
-                        rs.getObject("id", UUID.class),
-                        rs.getObject("who_likes", UUID.class),
-                        rs.getObject("who_got_liked", UUID.class),
-                        Like.Direction.valueOf(rs.getString("direction")),
-                        rs.getTimestamp("created_at").toInstant()));
+                        rs.getObject(COL_ID, UUID.class),
+                        rs.getObject(COL_WHO_LIKES, UUID.class),
+                        rs.getObject(COL_WHO_GOT_LIKED, UUID.class),
+                        Like.Direction.valueOf(rs.getString(COL_DIRECTION)),
+                        rs.getTimestamp(COL_CREATED_AT).toInstant()));
             }
             return Optional.empty();
 
@@ -132,7 +139,7 @@ public class H2LikeStorage implements LikeStorage {
             ResultSet rs = stmt.executeQuery();
 
             while (rs.next()) {
-                result.add(rs.getObject("who_got_liked", UUID.class));
+                result.add(rs.getObject(COL_WHO_GOT_LIKED, UUID.class));
             }
             return result;
 
@@ -153,7 +160,7 @@ public class H2LikeStorage implements LikeStorage {
             ResultSet rs = stmt.executeQuery();
 
             while (rs.next()) {
-                result.add(rs.getObject("who_likes", UUID.class));
+                result.add(rs.getObject(COL_WHO_LIKES, UUID.class));
             }
             return result;
 
@@ -180,8 +187,8 @@ public class H2LikeStorage implements LikeStorage {
             ResultSet rs = stmt.executeQuery();
 
             while (rs.next()) {
-                UUID whoLikes = rs.getObject("who_likes", UUID.class);
-                Timestamp likedAt = rs.getTimestamp("liked_at");
+                UUID whoLikes = rs.getObject(COL_WHO_LIKES, UUID.class);
+                Timestamp likedAt = rs.getTimestamp(COL_LIKED_AT);
                 if (whoLikes != null && likedAt != null) {
                     result.put(whoLikes, likedAt.toInstant());
                 }

@@ -7,6 +7,7 @@ import datingapp.core.PacePreferences.CommunicationStyle;
 import datingapp.core.PacePreferences.DepthPreference;
 import datingapp.core.PacePreferences.MessagingFrequency;
 import datingapp.core.PacePreferences.TimeToFirstDate;
+import datingapp.core.UserInteractions.Like;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.Optional;

@@ -1,6 +1,6 @@
 package datingapp.ui.viewmodel;
 
-import datingapp.core.Message;
+import datingapp.core.Messaging.Message;
 import datingapp.core.MessagingService;
 import datingapp.core.MessagingService.ConversationPreview;
 import datingapp.core.User;

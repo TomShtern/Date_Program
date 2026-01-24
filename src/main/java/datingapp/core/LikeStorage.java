@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.UserInteractions.Like;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import datingapp.core.Stats.UserStats;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -20,14 +21,14 @@ class UserStatsTest {
         @Test
         @DisplayName("Ratios must be between 0.0 and 1.0")
         void validatesRatios() {
-            var ex = assertThrows(IllegalArgumentException.class, () -> createInvalidRatioStats());
+            var ex = assertThrows(IllegalArgumentException.class, this::createInvalidRatioStats);
             assertNotNull(ex);
         }
 
         @Test
         @DisplayName("Negative ratios are rejected")
         void rejectsNegativeRatios() {
-            var ex = assertThrows(IllegalArgumentException.class, () -> createNegativeRatioStats());
+            var ex = assertThrows(IllegalArgumentException.class, this::createNegativeRatioStats);
             assertNotNull(ex);
         }
 

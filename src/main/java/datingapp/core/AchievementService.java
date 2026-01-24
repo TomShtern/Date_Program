@@ -1,6 +1,7 @@
 package datingapp.core;
 
 import datingapp.core.Achievement.UserAchievement;
+import datingapp.core.UserInteractions.Like;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;

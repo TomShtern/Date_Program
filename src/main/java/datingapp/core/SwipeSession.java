@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.UserInteractions.Like;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
@@ -47,6 +48,7 @@ public class SwipeSession {
     }
 
     /** Full constructor for loading from database. */
+    @SuppressWarnings("java:S107")
     public SwipeSession(
             UUID id,
             UUID userId,
@@ -157,7 +159,7 @@ public class SwipeSession {
         if (seconds < 60) {
             return swipeCount; // Less than a minute, return raw count
         }
-        return (double) swipeCount / (seconds / 60.0);
+        return swipeCount / (seconds / 60.0);
     }
 
     /** Get like ratio for this session. */

@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.Messaging.Message;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

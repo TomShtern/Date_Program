@@ -2,6 +2,8 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.Like;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -31,13 +33,13 @@ class LikerBrowserServiceTest {
         UUID inactiveId = UUID.randomUUID();
 
         InMemoryLikeStorage likeStorage = new InMemoryLikeStorage();
-        likeStorage.addIncomingLike(currentUserId, pendingLikerId);
-        likeStorage.addIncomingLike(currentUserId, alreadyInteractedId);
-        likeStorage.addIncomingLike(currentUserId, blockedId);
-        likeStorage.addIncomingLike(currentUserId, matchedId);
-        likeStorage.addIncomingLike(currentUserId, inactiveId);
+        likeStorage.addIncomingLike(pendingLikerId);
+        likeStorage.addIncomingLike(alreadyInteractedId);
+        likeStorage.addIncomingLike(blockedId);
+        likeStorage.addIncomingLike(matchedId);
+        likeStorage.addIncomingLike(inactiveId);
 
-        likeStorage.addAlreadyInteracted(currentUserId, alreadyInteractedId);
+        likeStorage.addAlreadyInteracted(alreadyInteractedId);
 
         InMemoryBlockStorage blockStorage = new InMemoryBlockStorage();
         blockStorage.blocked.add(blockedId);
@@ -69,8 +71,8 @@ class LikerBrowserServiceTest {
         UUID newerLikerId = UUID.randomUUID();
 
         InMemoryLikeStorage likeStorage = new InMemoryLikeStorage();
-        likeStorage.addIncomingLike(currentUserId, olderLikerId, Instant.parse("2026-01-01T00:00:00Z"));
-        likeStorage.addIncomingLike(currentUserId, newerLikerId, Instant.parse("2026-01-02T00:00:00Z"));
+        likeStorage.addIncomingLike(olderLikerId, Instant.parse("2026-01-01T00:00:00Z"));
+        likeStorage.addIncomingLike(newerLikerId, Instant.parse("2026-01-02T00:00:00Z"));
 
         InMemoryUserStorage userStorage = new InMemoryUserStorage();
         userStorage.put(activeUser(olderLikerId, "Older"));
@@ -155,16 +157,16 @@ class LikerBrowserServiceTest {
         private final Set<UUID> alreadyInteracted = new HashSet<>();
         private final Map<UUID, Instant> likeTimes = new HashMap<>();
 
-        void addIncomingLike(UUID toUserId, UUID fromUserId) {
-            addIncomingLike(toUserId, fromUserId, Instant.EPOCH);
+        void addIncomingLike(UUID fromUserId) {
+            addIncomingLike(fromUserId, Instant.EPOCH);
         }
 
-        void addIncomingLike(UUID toUserId, UUID fromUserId, Instant likedAt) {
+        void addIncomingLike(UUID fromUserId, Instant likedAt) {
             whoLikedCurrent.add(fromUserId);
             likeTimes.put(fromUserId, likedAt);
         }
 
-        void addAlreadyInteracted(UUID fromUserId, UUID toUserId) {
+        void addAlreadyInteracted(UUID toUserId) {
             alreadyInteracted.add(toUserId);
         }
 

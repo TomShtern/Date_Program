@@ -1,6 +1,6 @@
 package datingapp.ui.controller;
 
-import datingapp.core.Message;
+import datingapp.core.Messaging.Message;
 import datingapp.core.MessagingService.ConversationPreview;
 import datingapp.ui.NavigationService;
 import datingapp.ui.util.UiAnimations;

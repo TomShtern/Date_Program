@@ -1,8 +1,8 @@
 package datingapp.storage;
 
-import datingapp.core.Conversation;
 import datingapp.core.ConversationStorage;
 import datingapp.core.Match;
+import datingapp.core.Messaging.Conversation;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -93,7 +93,13 @@ public class H2ConversationStorage implements ConversationStorage {
 
     @Override
     public Optional<Conversation> get(String conversationId) {
-        String sql = "SELECT * FROM conversations WHERE id = ?";
+        String sql = """
+            SELECT id, user_a, user_b, created_at, last_message_at,
+                user_a_last_read_at, user_b_last_read_at,
+                archived_at, archive_reason, visible_to_user_a, visible_to_user_b
+            FROM conversations
+            WHERE id = ?
+            """;
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -120,10 +126,13 @@ public class H2ConversationStorage implements ConversationStorage {
     @Override
     public List<Conversation> getConversationsFor(UUID userId) {
         String sql = """
-                SELECT * FROM conversations
-                WHERE user_a = ? OR user_b = ?
-                ORDER BY COALESCE(last_message_at, created_at) DESC
-                """;
+            SELECT id, user_a, user_b, created_at, last_message_at,
+                user_a_last_read_at, user_b_last_read_at,
+                archived_at, archive_reason, visible_to_user_a, visible_to_user_b
+            FROM conversations
+            WHERE user_a = ? OR user_b = ?
+            ORDER BY COALESCE(last_message_at, created_at) DESC
+            """;
 
         List<Conversation> conversations = new ArrayList<>();
 
