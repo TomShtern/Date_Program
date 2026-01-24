@@ -129,7 +129,7 @@ public class SwipeSession {
             return false; // Already ended
         }
         Duration inactivity = Duration.between(lastActivityAt, Instant.now());
-        return inactivity.compareTo(timeout) > 0;
+        return inactivity.compareTo(timeout) >= 0;
     }
 
     // === Computed Properties ===

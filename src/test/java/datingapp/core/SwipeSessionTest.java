@@ -2,6 +2,7 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -17,6 +18,22 @@ import org.junit.jupiter.api.Test;
 
 /** Unit tests for SwipeSession state machine and computed properties. */
 class SwipeSessionTest {
+
+    @Test
+    @DisplayName("SwipeSession can be instantiated with all parameters")
+    void canInstantiateWithAllParameters() {
+        UUID id = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant createdAt = Instant.now();
+        Instant lastActivityAt = Instant.now();
+
+        SwipeSession session =
+                new SwipeSession(id, userId, createdAt, lastActivityAt, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
+
+        assertNotNull(session);
+        assertEquals(id, session.getId());
+        assertEquals(userId, session.getUserId());
+    }
 
     @Nested
     @DisplayName("Creation tests")
@@ -270,6 +287,377 @@ class SwipeSessionTest {
 
             assertEquals(session1, session2);
             assertEquals(session1.hashCode(), session2.hashCode());
+        }
+
+        @Test
+        @DisplayName("Sessions with different IDs are not equal")
+        void notEqualByDifferentId() {
+            UUID userId = UUID.randomUUID();
+            Instant now = Instant.now();
+
+            SwipeSession session1 =
+                    new SwipeSession(UUID.randomUUID(), userId, now, now, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
+            SwipeSession session2 =
+                    new SwipeSession(UUID.randomUUID(), userId, now, now, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
+
+            assertNotEquals(session1, session2);
+        }
+
+        @Test
+        @DisplayName("Session equals itself")
+        void equalsItself() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            assertEquals(session, session);
+        }
+
+        @Test
+        @DisplayName("Session not equal to null")
+        void notEqualToNull() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            assertNotEquals(null, session);
+        }
+    }
+
+    @Nested
+    @DisplayName("Edge case swipe tests")
+    class EdgeCaseSwipeTests {
+
+        @Test
+        @DisplayName("Recording only LIKE swipes results in 100% like ratio")
+        void allLikesGives100PercentRatio() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            session.recordSwipe(Like.Direction.LIKE, false);
+            session.recordSwipe(Like.Direction.LIKE, false);
+            session.recordSwipe(Like.Direction.LIKE, false);
+
+            assertEquals(1.0, session.getLikeRatio(), 0.001);
+            assertEquals(3, session.getSwipeCount());
+            assertEquals(3, session.getLikeCount());
+            assertEquals(0, session.getPassCount());
+        }
+
+        @Test
+        @DisplayName("Recording only PASS swipes results in 0% like ratio")
+        void allPassesGivesZeroPercentRatio() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            session.recordSwipe(Like.Direction.PASS, false);
+            session.recordSwipe(Like.Direction.PASS, false);
+            session.recordSwipe(Like.Direction.PASS, false);
+
+            assertEquals(0.0, session.getLikeRatio(), 0.001);
+            assertEquals(3, session.getSwipeCount());
+            assertEquals(0, session.getLikeCount());
+            assertEquals(3, session.getPassCount());
+        }
+
+        @Test
+        @DisplayName("All likes matching gives 100% match rate")
+        void allLikesMatchingGives100PercentMatchRate() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            session.recordSwipe(Like.Direction.LIKE, true);
+            session.recordSwipe(Like.Direction.LIKE, true);
+            session.recordSwipe(Like.Direction.LIKE, true);
+
+            assertEquals(1.0, session.getMatchRate(), 0.001);
+            assertEquals(3, session.getLikeCount());
+            assertEquals(3, session.getMatchCount());
+        }
+
+        @Test
+        @DisplayName("PASS with match flag true does not increment match count")
+        void passWithMatchFlagDoesNotIncrementMatches() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            session.recordSwipe(Like.Direction.PASS, true);
+
+            assertEquals(0, session.getMatchCount());
+            assertEquals(1, session.getPassCount());
+            assertEquals(0, session.getLikeCount());
+        }
+
+        @Test
+        @DisplayName("Multiple sequential swipes are correctly counted")
+        void multipleSequentialSwipes() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            for (int i = 0; i < 10; i++) {
+                session.recordSwipe(Like.Direction.LIKE, i % 2 == 0);
+            }
+            for (int i = 0; i < 5; i++) {
+                session.recordSwipe(Like.Direction.PASS, false);
+            }
+
+            assertEquals(15, session.getSwipeCount());
+            assertEquals(10, session.getLikeCount());
+            assertEquals(5, session.getPassCount());
+            assertEquals(5, session.getMatchCount());
+        }
+    }
+
+    @Nested
+    @DisplayName("State validation tests")
+    class StateValidationTests {
+
+        @Test
+        @DisplayName("isActive returns true for ACTIVE state")
+        void isActiveTrueForActiveState() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            assertTrue(session.isActive());
+            assertEquals(SwipeSession.State.ACTIVE, session.getState());
+        }
+
+        @Test
+        @DisplayName("isActive returns false for COMPLETED state")
+        void isActiveFalseForCompletedState() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            session.end();
+
+            assertFalse(session.isActive());
+            assertEquals(SwipeSession.State.COMPLETED, session.getState());
+        }
+
+        @Test
+        @DisplayName("Cannot increment match count on completed session")
+        void cannotIncrementMatchCountOnCompleted() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            session.recordSwipe(Like.Direction.LIKE, true);
+            session.end();
+            int matchCountBefore = session.getMatchCount();
+
+            session.incrementMatchCount(); // Should be silently ignored
+
+            assertEquals(matchCountBefore, session.getMatchCount());
+        }
+
+        @Test
+        @DisplayName("Session preserves counts when ending")
+        void preservesCountsWhenEnding() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            session.recordSwipe(Like.Direction.LIKE, true);
+            session.recordSwipe(Like.Direction.LIKE, false);
+            session.recordSwipe(Like.Direction.PASS, false);
+
+            session.end();
+
+            assertEquals(3, session.getSwipeCount());
+            assertEquals(2, session.getLikeCount());
+            assertEquals(1, session.getPassCount());
+            assertEquals(1, session.getMatchCount());
+        }
+    }
+
+    @Nested
+    @DisplayName("Computed properties edge cases")
+    class ComputedPropertiesEdgeCases {
+
+        @Test
+        @DisplayName("Match rate with no likes but passes recorded is zero")
+        void matchRateZeroWithOnlyPasses() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            session.recordSwipe(Like.Direction.PASS, false);
+            session.recordSwipe(Like.Direction.PASS, false);
+
+            assertEquals(0.0, session.getMatchRate());
+        }
+
+        @Test
+        @DisplayName("Like ratio with single like is 100%")
+        void likeRatioWithSingleLike() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            session.recordSwipe(Like.Direction.LIKE, false);
+
+            assertEquals(1.0, session.getLikeRatio(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Like ratio with single pass is 0%")
+        void likeRatioWithSinglePass() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            session.recordSwipe(Like.Direction.PASS, false);
+
+            assertEquals(0.0, session.getLikeRatio(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Match rate with single matching like is 100%")
+        void matchRateWithSingleMatch() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            session.recordSwipe(Like.Direction.LIKE, true);
+
+            assertEquals(1.0, session.getMatchRate(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Match rate with single non-matching like is 0%")
+        void matchRateWithSingleNonMatch() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            session.recordSwipe(Like.Direction.LIKE, false);
+
+            assertEquals(0.0, session.getMatchRate(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Formatted duration for completed session shows total duration")
+        void formattedDurationForCompletedSession() {
+            UUID userId = UUID.randomUUID();
+            Instant start = Instant.now().minus(Duration.ofMinutes(10));
+            Instant end = start.plus(Duration.ofMinutes(5));
+
+            SwipeSession session = new SwipeSession(
+                    UUID.randomUUID(), userId, start, end, end, SwipeSession.State.COMPLETED, 10, 5, 5, 2);
+
+            String formatted = session.getFormattedDuration();
+            assertTrue(formatted.matches("\\d+:\\d{2}"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Timeout boundary tests")
+    class TimeoutBoundaryTests {
+
+        @Test
+        @DisplayName("Session at exact timeout boundary is timed out")
+        void atExactTimeoutBoundary() {
+            UUID userId = UUID.randomUUID();
+            Duration timeout = Duration.ofMinutes(5);
+
+            SwipeSession session = new SwipeSession(
+                    UUID.randomUUID(),
+                    userId,
+                    Instant.now().minus(timeout),
+                    Instant.now().minus(timeout),
+                    null,
+                    SwipeSession.State.ACTIVE,
+                    0,
+                    0,
+                    0,
+                    0);
+
+            assertTrue(session.isTimedOut(timeout));
+        }
+
+        @Test
+        @DisplayName("Session just before timeout is not timed out")
+        void justBeforeTimeout() {
+            UUID userId = UUID.randomUUID();
+            Duration timeout = Duration.ofMinutes(5);
+
+            SwipeSession session = new SwipeSession(
+                    UUID.randomUUID(),
+                    userId,
+                    Instant.now().minus(timeout.minusSeconds(1)),
+                    Instant.now().minus(timeout.minusSeconds(1)),
+                    null,
+                    SwipeSession.State.ACTIVE,
+                    0,
+                    0,
+                    0,
+                    0);
+
+            assertFalse(session.isTimedOut(timeout));
+        }
+
+        @Test
+        @DisplayName("Session timeout with zero duration always times out")
+        void zeroTimeoutAlwaysTimesOut() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            assertTrue(session.isTimedOut(Duration.ZERO));
+        }
+    }
+
+    @Nested
+    @DisplayName("Getter validation tests")
+    class GetterValidationTests {
+
+        @Test
+        @DisplayName("All getters return expected values after construction")
+        void gettersReturnConstructedValues() {
+            UUID id = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            Instant createdAt = Instant.now().minus(Duration.ofMinutes(10));
+            Instant lastActivityAt = Instant.now().minus(Duration.ofMinutes(5));
+            Instant endedAt = Instant.now();
+
+            SwipeSession session = new SwipeSession(
+                    id, userId, createdAt, lastActivityAt, endedAt, SwipeSession.State.COMPLETED, 20, 12, 8, 5);
+
+            assertEquals(id, session.getId());
+            assertEquals(userId, session.getUserId());
+            assertEquals(createdAt, session.getStartedAt());
+            assertEquals(lastActivityAt, session.getLastActivityAt());
+            assertEquals(endedAt, session.getEndedAt());
+            assertEquals(SwipeSession.State.COMPLETED, session.getState());
+            assertEquals(20, session.getSwipeCount());
+            assertEquals(12, session.getLikeCount());
+            assertEquals(8, session.getPassCount());
+            assertEquals(5, session.getMatchCount());
+        }
+
+        @Test
+        @DisplayName("Created session has null endedAt")
+        void createdSessionHasNullEndedAt() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            assertNull(session.getEndedAt());
+        }
+
+        @Test
+        @DisplayName("Created session has timestamps set")
+        void createdSessionHasTimestamps() {
+            Instant before = Instant.now();
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Instant after = Instant.now();
+
+            assertNotNull(session.getStartedAt());
+            assertNotNull(session.getLastActivityAt());
+            assertFalse(session.getStartedAt().isBefore(before));
+            assertFalse(session.getStartedAt().isAfter(after));
+            assertFalse(session.getLastActivityAt().isBefore(before));
+            assertFalse(session.getLastActivityAt().isAfter(after));
+        }
+    }
+
+    @Nested
+    @DisplayName("Large dataset tests")
+    class LargeDatasetTests {
+
+        @Test
+        @DisplayName("Session handles large number of swipes correctly")
+        void handlesManySwipes() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            for (int i = 0; i < 1000; i++) {
+                session.recordSwipe(i % 3 == 0 ? Like.Direction.LIKE : Like.Direction.PASS, i % 10 == 0);
+            }
+
+            assertEquals(1000, session.getSwipeCount());
+            assertTrue(session.getLikeCount() > 0);
+            assertTrue(session.getPassCount() > 0);
+            assertTrue(session.getMatchCount() > 0);
+        }
+
+        @Test
+        @DisplayName("Computed ratios are accurate with large datasets")
+        void ratiosAccurateWithLargeDataset() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+
+            // 600 likes, 400 passes
+            for (int i = 0; i < 600; i++) {
+                session.recordSwipe(Like.Direction.LIKE, i < 300);
+            }
+            for (int i = 0; i < 400; i++) {
+                session.recordSwipe(Like.Direction.PASS, false);
+            }
+
+            assertEquals(0.6, session.getLikeRatio(), 0.001);
+            assertEquals(0.5, session.getMatchRate(), 0.001);
         }
     }
 }

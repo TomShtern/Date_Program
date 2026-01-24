@@ -11,7 +11,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@SuppressWarnings("unused") // IDE false positives for @Nested classes
+@SuppressWarnings({"unused", "java:S2187"}) // IDE false positives for @Nested classes, tests are in nested classes
 class InterestMatcherTest {
 
     @Nested

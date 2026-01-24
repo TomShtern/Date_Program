@@ -86,5 +86,44 @@ class MatchQualityConfigTest {
             assertEquals(0.2, config.paceWeight());
             assertEquals(0.2, config.responseWeight());
         }
+
+        @Test
+        @DisplayName("Allows zero weights if sum is 1.0")
+        void allowsZeroWeights() {
+            MatchQualityConfig config = new MatchQualityConfig(0.0, 0.0, 0.5, 0.5, 0.0, 0.0);
+
+            assertEquals(0.0, config.distanceWeight());
+            assertEquals(0.0, config.ageWeight());
+            assertEquals(0.5, config.interestWeight());
+            assertEquals(0.5, config.lifestyleWeight());
+        }
+
+        @Test
+        @DisplayName("Allows all weight in one category")
+        void allowsAllWeightInOneCategory() {
+            MatchQualityConfig config = new MatchQualityConfig(1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+
+            assertEquals(1.0, config.distanceWeight());
+            assertEquals(0.0, config.ageWeight());
+        }
+
+        @Test
+        @DisplayName("Throws if weights sum slightly below 1.0")
+        void throwsIfWeightsSumBelowOne() {
+            assertThrows(
+                    IllegalArgumentException.class, () -> new MatchQualityConfig(0.15, 0.15, 0.15, 0.15, 0.15, 0.15));
+        }
+
+        @Test
+        @DisplayName("Throws if weights sum slightly above 1.0")
+        void throwsIfWeightsSumAboveOne() {
+            assertThrows(IllegalArgumentException.class, () -> new MatchQualityConfig(0.2, 0.2, 0.2, 0.2, 0.2, 0.2));
+        }
+
+        @Test
+        @DisplayName("Throws if any weight exceeds 1.0")
+        void throwsIfWeightExceedsOne() {
+            assertThrows(IllegalArgumentException.class, () -> new MatchQualityConfig(1.5, 0.0, 0.0, 0.0, 0.0, -0.5));
+        }
     }
 }
