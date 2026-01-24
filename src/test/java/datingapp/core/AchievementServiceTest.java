@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.Achievement.UserAchievement;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;

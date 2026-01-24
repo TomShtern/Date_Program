@@ -1,5 +1,6 @@
 package datingapp.cli;
 
+import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
 import datingapp.core.Block;
 import datingapp.core.BlockStorage;
@@ -20,7 +21,6 @@ import datingapp.core.RelationshipTransitionService;
 import datingapp.core.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.UndoService;
 import datingapp.core.User;
-import datingapp.core.UserAchievement;
 import datingapp.core.UserStorage;
 import java.util.HashSet;
 import java.util.List;

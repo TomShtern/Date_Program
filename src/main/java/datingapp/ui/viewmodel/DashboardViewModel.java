@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
 import datingapp.core.DailyLimitService;
 import datingapp.core.DailyLimitService.DailyStatus;
@@ -8,7 +9,6 @@ import datingapp.core.DailyPickService.DailyPick;
 import datingapp.core.MatchStorage;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
-import datingapp.core.UserAchievement;
 import datingapp.ui.UISession;
 import java.util.List;
 import java.util.Optional;

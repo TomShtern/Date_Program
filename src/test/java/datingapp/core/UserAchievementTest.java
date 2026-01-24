@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import datingapp.core.Achievement.UserAchievement;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -57,9 +58,11 @@ class UserAchievementTest {
     @Test
     @DisplayName("Null ID throws NullPointerException")
     void nullIdThrows() {
+        UUID userId = UUID.randomUUID();
+        Instant unlockedAt = Instant.now();
         assertThrows(
                 NullPointerException.class,
-                () -> UserAchievement.of(null, UUID.randomUUID(), Achievement.FIRST_SPARK, Instant.now()));
+                () -> UserAchievement.of(null, userId, Achievement.FIRST_SPARK, unlockedAt));
     }
 
     @Test
@@ -71,15 +74,16 @@ class UserAchievementTest {
     @Test
     @DisplayName("Null achievement throws NullPointerException")
     void nullAchievementThrows() {
-        assertThrows(NullPointerException.class, () -> UserAchievement.create(UUID.randomUUID(), null));
+        UUID userId = UUID.randomUUID();
+        assertThrows(NullPointerException.class, () -> UserAchievement.create(userId, null));
     }
 
     @Test
     @DisplayName("Null unlockedAt throws NullPointerException")
     void nullUnlockedAtThrows() {
-        assertThrows(
-                NullPointerException.class,
-                () -> UserAchievement.of(UUID.randomUUID(), UUID.randomUUID(), Achievement.FIRST_SPARK, null));
+        UUID id = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        assertThrows(NullPointerException.class, () -> UserAchievement.of(id, userId, Achievement.FIRST_SPARK, null));
     }
 
     @Test

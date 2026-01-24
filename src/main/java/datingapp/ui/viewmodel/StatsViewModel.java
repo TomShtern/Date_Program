@@ -1,13 +1,13 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.Achievement;
+import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
 import datingapp.core.Like;
 import datingapp.core.LikeStorage;
 import datingapp.core.Match;
 import datingapp.core.MatchStorage;
 import datingapp.core.User;
-import datingapp.core.UserAchievement;
 import datingapp.ui.UISession;
 import java.util.List;
 import javafx.beans.property.IntegerProperty;

@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.Achievement.UserAchievement;
 import java.util.List;
 import java.util.UUID;
 

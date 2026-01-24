@@ -1,7 +1,7 @@
 package datingapp.storage;
 
 import datingapp.core.Achievement;
-import datingapp.core.UserAchievement;
+import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.UserAchievementStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;

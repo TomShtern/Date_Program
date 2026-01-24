@@ -1,5 +1,6 @@
 package datingapp.cli;
 
+import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
 import datingapp.core.Dealbreakers;
 import datingapp.core.Interest;
@@ -12,7 +13,6 @@ import datingapp.core.PacePreferences.MessagingFrequency;
 import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.ProfilePreviewService;
 import datingapp.core.User;
-import datingapp.core.UserAchievement;
 import datingapp.core.UserStorage;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;

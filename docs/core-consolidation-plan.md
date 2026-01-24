@@ -385,9 +385,14 @@ public final class UserStorages {
 - [x] Phase 4: Nested `GeoUtils` in `CandidateFinder`; updated usages/tests; removed `GeoUtils.java`.
 - [x] Phase 4 note: Removed `CandidateFinderService` interface; consumers now use `CandidateFinder` directly to avoid cyclic nesting.
 - [ ] Phase 1: Package reorganization (pending).
+<!--ARCHIVE:2:agent:github_copilot:core-consolidation-plan-->
 - [ ] Phase 5+: Remaining consolidations (pending).
+<!--/ARCHIVE-->
+- [x] Phase 5: Consolidated `Achievement` + `UserAchievement`; updated usages/tests; removed old file.
+- [ ] Phase 6+: Remaining consolidations (pending).
 
 1|2026-01-24 14:30:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phases 2-4 implemented; CandidateFinderService removed in favor of concrete CandidateFinder|docs/core-consolidation-plan.md
+2|2026-01-24 15:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 5 Achievement consolidation complete|docs/core-consolidation-plan.md
 
 ### Phase 0: Preflight (MANDATORY - Do Not Skip)
 
@@ -1211,3 +1216,4 @@ However, if ever relaxed, related interfaces could be grouped (e.g., `UserStorag
 ## Agent Changelog
 
 1|2026-01-24 14:30:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phases 2-4 implemented; CandidateFinderService removed in favor of concrete CandidateFinder|docs/core-consolidation-plan.md
+2|2026-01-24 15:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 5 Achievement consolidation complete|docs/core-consolidation-plan.md
