@@ -20,13 +20,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for DailyLimitService. Uses in-memory mock storage for isolated testing. */
-@SuppressWarnings("unused") // IDE false positives for @Nested classes and @BeforeEach
+/** Unit tests for DailyService daily limits. Uses in-memory mock storage for isolated testing. */
 class DailyLimitServiceTest {
 
     private InMemoryLikeStorage likeStorage;
     private AppConfig config;
-    private DailyLimitService service;
+    private DailyService service;
     private UUID userId;
 
     @BeforeEach
@@ -37,7 +36,7 @@ class DailyLimitServiceTest {
                 .dailyPassLimit(-1) // unlimited
                 .userTimeZone(ZoneId.of("UTC"))
                 .build();
-        service = new DailyLimitService(likeStorage, config);
+        service = new DailyService(likeStorage, config);
         userId = UUID.randomUUID();
     }
 
@@ -84,7 +83,7 @@ class DailyLimitServiceTest {
                     .dailyLikeLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyLimitService unlimitedService = new DailyLimitService(likeStorage, unlimitedConfig);
+            DailyService unlimitedService = new DailyService(likeStorage, unlimitedConfig);
 
             // Add many likes
             Instant now = Instant.now();
@@ -125,7 +124,7 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(2)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyLimitService limitedPassService = new DailyLimitService(likeStorage, limitedPassConfig);
+            DailyService limitedPassService = new DailyService(likeStorage, limitedPassConfig);
 
             // Add 2 passes today (at limit)
             Instant now = Instant.now();
@@ -151,7 +150,7 @@ class DailyLimitServiceTest {
             likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
             likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now));
 
-            DailyLimitService.DailyStatus status = service.getStatus(userId);
+            DailyService.DailyStatus status = service.getStatus(userId);
 
             assertEquals(2, status.likesUsed());
             assertEquals(1, status.likesRemaining()); // 3 - 2 = 1
@@ -166,9 +165,9 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyLimitService unlimitedService = new DailyLimitService(likeStorage, unlimitedConfig);
+            DailyService unlimitedService = new DailyService(likeStorage, unlimitedConfig);
 
-            DailyLimitService.DailyStatus status = unlimitedService.getStatus(userId);
+            DailyService.DailyStatus status = unlimitedService.getStatus(userId);
 
             assertTrue(status.hasUnlimitedLikes());
             assertTrue(status.hasUnlimitedPasses());
@@ -177,7 +176,7 @@ class DailyLimitServiceTest {
         @Test
         @DisplayName("Status returns correct date")
         void getStatus_returnsCorrectDate() {
-            DailyLimitService.DailyStatus status = service.getStatus(userId);
+            DailyService.DailyStatus status = service.getStatus(userId);
             assertEquals(LocalDate.now(ZoneOffset.UTC), status.date());
         }
     }
@@ -204,10 +203,9 @@ class DailyLimitServiceTest {
         @DisplayName("formatDuration works correctly")
         void formatDuration_formatsCorrectly() {
             assertEquals(
-                    "4h 30m",
-                    DailyLimitService.formatDuration(Duration.ofHours(4).plusMinutes(30)));
-            assertEquals("5m", DailyLimitService.formatDuration(Duration.ofMinutes(5)));
-            assertEquals("12h 00m", DailyLimitService.formatDuration(Duration.ofHours(12)));
+                    "4h 30m", DailyService.formatDuration(Duration.ofHours(4).plusMinutes(30)));
+            assertEquals("5m", DailyService.formatDuration(Duration.ofMinutes(5)));
+            assertEquals("12h 00m", DailyService.formatDuration(Duration.ofHours(12)));
         }
     }
 
@@ -222,7 +220,7 @@ class DailyLimitServiceTest {
                     .dailyLikeLimit(0)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyLimitService zeroService = new DailyLimitService(likeStorage, zeroConfig);
+            DailyService zeroService = new DailyService(likeStorage, zeroConfig);
 
             assertFalse(zeroService.canLike(userId));
         }
@@ -248,7 +246,7 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(2)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyLimitService limitedPassService = new DailyLimitService(likeStorage, limitedPassConfig);
+            DailyService limitedPassService = new DailyService(likeStorage, limitedPassConfig);
 
             Instant now = Instant.now();
             // 5 likes

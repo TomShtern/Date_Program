@@ -30,7 +30,7 @@ import java.util.UUID;
  * <h3>Naming Rationale</h3>
  *
  * <p>This class does NOT follow the {@code *Service} naming convention (e.g., {@code
- * MatchingService}, {@code DailyLimitService}) because it is not a service in the architectural
+ * MatchingService}, {@code DailyService}) because it is not a service in the architectural
  * sense. Services in this codebase:
  *
  * <ul>

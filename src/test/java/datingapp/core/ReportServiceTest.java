@@ -31,12 +31,11 @@ class ReportServiceTest {
     private InMemoryReportStorage reportStorage;
     private InMemoryUserStorage userStorage;
     private InMemoryBlockStorage blockStorage;
-    private ReportService reportService;
+    private TrustSafetyService trustSafetyService;
 
     private User activeReporter;
     private User reportedUser;
 
-    @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
 
@@ -45,7 +44,7 @@ class ReportServiceTest {
         blockStorage = new InMemoryBlockStorage();
 
         AppConfig config = AppConfig.builder().autoBanThreshold(3).build();
-        reportService = new ReportService(reportStorage, userStorage, blockStorage, config);
+        trustSafetyService = new TrustSafetyService(reportStorage, userStorage, blockStorage, config);
 
         // Create test users
         activeReporter = createActiveUser("Reporter");
@@ -54,7 +53,6 @@ class ReportServiceTest {
         userStorage.save(reportedUser);
     }
 
-    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("Successful Reports")
     class SuccessfulReports {
@@ -62,7 +60,7 @@ class ReportServiceTest {
         @Test
         @DisplayName("Valid report succeeds")
         void validReportSucceeds() {
-            var result = reportService.report(
+            var result = trustSafetyService.report(
                     activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, "Sent spam messages");
 
             assertTrue(result.success(), "Report should succeed");
@@ -73,7 +71,7 @@ class ReportServiceTest {
         @Test
         @DisplayName("Report auto-blocks the reported user")
         void reportAutoBlocks() {
-            reportService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.HARASSMENT, null);
+            trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.HARASSMENT, null);
 
             assertTrue(
                     blockStorage.isBlocked(activeReporter.getId(), reportedUser.getId()),
@@ -83,7 +81,7 @@ class ReportServiceTest {
         @Test
         @DisplayName("Report is persisted")
         void reportIsPersisted() {
-            reportService.report(
+            trustSafetyService.report(
                     activeReporter.getId(), reportedUser.getId(), Report.Reason.FAKE_PROFILE, "Fake photos");
 
             assertTrue(
@@ -93,7 +91,6 @@ class ReportServiceTest {
         }
     }
 
-    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("Auto-Ban Logic")
     class AutoBanLogic {
@@ -107,8 +104,8 @@ class ReportServiceTest {
             userStorage.save(reporter3);
 
             // First two reports - no ban
-            reportService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
-            reportService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
+            trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
+            trustSafetyService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
 
             assertEquals(
                     User.State.ACTIVE,
@@ -116,7 +113,7 @@ class ReportServiceTest {
                     "User should still be ACTIVE after 2 reports");
 
             // Third report - triggers ban
-            var result = reportService.report(reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
+            var result = trustSafetyService.report(reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
 
             assertTrue(result.userWasBanned(), "Third report should trigger ban");
             assertEquals(
@@ -129,7 +126,8 @@ class ReportServiceTest {
         @DisplayName("Custom threshold works")
         void customThresholdWorks() {
             AppConfig customConfig = AppConfig.builder().autoBanThreshold(2).build();
-            ReportService customService = new ReportService(reportStorage, userStorage, blockStorage, customConfig);
+            TrustSafetyService customService =
+                    new TrustSafetyService(reportStorage, userStorage, blockStorage, customConfig);
 
             User reporter2 = createActiveUser("Reporter2");
             userStorage.save(reporter2);
@@ -141,7 +139,6 @@ class ReportServiceTest {
         }
     }
 
-    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("Validation Errors")
     class ValidationErrors {
@@ -152,7 +149,8 @@ class ReportServiceTest {
             User incompleteUser = new User(UUID.randomUUID(), "Incomplete");
             userStorage.save(incompleteUser);
 
-            var result = reportService.report(incompleteUser.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
+            var result =
+                    trustSafetyService.report(incompleteUser.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
 
             assertFalse(result.success(), "Report should fail for inactive reporter");
             assertEquals("Reporter must be active user", result.errorMessage());
@@ -161,7 +159,7 @@ class ReportServiceTest {
         @Test
         @DisplayName("Cannot report non-existent user")
         void cannotReportNonexistentUser() {
-            var result = reportService.report(
+            var result = trustSafetyService.report(
                     activeReporter.getId(),
                     UUID.randomUUID(), // Non-existent
                     Report.Reason.SPAM,
@@ -174,11 +172,10 @@ class ReportServiceTest {
         @Test
         @DisplayName("Cannot report same user twice")
         void cannotReportSameUserTwice() {
-            reportService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
+            trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
 
-            var result = reportService.report(
+            var result = trustSafetyService.report(
                     activeReporter.getId(), reportedUser.getId(), Report.Reason.HARASSMENT, "Different reason");
-
             assertFalse(result.success(), "Duplicate report should fail");
             assertEquals("Already reported this user", result.errorMessage());
         }

@@ -5,8 +5,7 @@ import datingapp.core.AchievementService;
 import datingapp.core.BlockStorage;
 import datingapp.core.CandidateFinder;
 import datingapp.core.CandidateFinder.GeoUtils;
-import datingapp.core.DailyLimitService;
-import datingapp.core.DailyPickService;
+import datingapp.core.DailyService;
 import datingapp.core.LikeStorage;
 import datingapp.core.Match;
 import datingapp.core.MatchQuality;
@@ -24,6 +23,7 @@ import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserStorage;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -42,8 +42,7 @@ public class MatchingHandler {
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
     private final BlockStorage blockStorage;
-    private final DailyLimitService dailyLimitService;
-    private final DailyPickService dailyPickService;
+    private final DailyService dailyService;
     private final UndoService undoService;
     private final MatchQualityService matchQualityService;
     private final UserStorage userStorage;
@@ -53,15 +52,30 @@ public class MatchingHandler {
     private final UserSession userSession;
     private final InputReader inputReader;
 
-    @SuppressWarnings("java:S107")
-    public MatchingHandler(
+    public MatchingHandler(Dependencies dependencies) {
+        this.candidateFinderService = dependencies.candidateFinderService();
+        this.matchingService = dependencies.matchingService();
+        this.likeStorage = dependencies.likeStorage();
+        this.matchStorage = dependencies.matchStorage();
+        this.blockStorage = dependencies.blockStorage();
+        this.dailyService = dependencies.dailyService();
+        this.undoService = dependencies.undoService();
+        this.matchQualityService = dependencies.matchQualityService();
+        this.userStorage = dependencies.userStorage();
+        this.achievementService = dependencies.achievementService();
+        this.profileViewStorage = dependencies.profileViewStorage();
+        this.transitionService = dependencies.transitionService();
+        this.userSession = dependencies.userSession();
+        this.inputReader = dependencies.inputReader();
+    }
+
+    public record Dependencies(
             CandidateFinder candidateFinderService,
             MatchingService matchingService,
             LikeStorage likeStorage,
             MatchStorage matchStorage,
             BlockStorage blockStorage,
-            DailyLimitService dailyLimitService,
-            DailyPickService dailyPickService,
+            DailyService dailyService,
             UndoService undoService,
             MatchQualityService matchQualityService,
             UserStorage userStorage,
@@ -70,21 +84,23 @@ public class MatchingHandler {
             RelationshipTransitionService transitionService,
             UserSession userSession,
             InputReader inputReader) {
-        this.candidateFinderService = candidateFinderService;
-        this.matchingService = matchingService;
-        this.likeStorage = likeStorage;
-        this.matchStorage = matchStorage;
-        this.blockStorage = blockStorage;
-        this.dailyLimitService = dailyLimitService;
-        this.dailyPickService = dailyPickService;
-        this.undoService = undoService;
-        this.matchQualityService = matchQualityService;
-        this.userStorage = userStorage;
-        this.achievementService = achievementService;
-        this.profileViewStorage = profileViewStorage;
-        this.transitionService = transitionService;
-        this.userSession = userSession;
-        this.inputReader = inputReader;
+
+        public Dependencies {
+            Objects.requireNonNull(candidateFinderService);
+            Objects.requireNonNull(matchingService);
+            Objects.requireNonNull(likeStorage);
+            Objects.requireNonNull(matchStorage);
+            Objects.requireNonNull(blockStorage);
+            Objects.requireNonNull(dailyService);
+            Objects.requireNonNull(undoService);
+            Objects.requireNonNull(matchQualityService);
+            Objects.requireNonNull(userStorage);
+            Objects.requireNonNull(achievementService);
+            Objects.requireNonNull(profileViewStorage);
+            Objects.requireNonNull(transitionService);
+            Objects.requireNonNull(userSession);
+            Objects.requireNonNull(inputReader);
+        }
     }
 
     /**
@@ -104,8 +120,8 @@ public class MatchingHandler {
         }
 
         // Check for daily pick first
-        Optional<DailyPickService.DailyPick> dailyPick = dailyPickService.getDailyPick(currentUser);
-        if (dailyPick.isPresent() && !dailyPickService.hasViewedDailyPick(currentUser.getId())) {
+        Optional<DailyService.DailyPick> dailyPick = dailyService.getDailyPick(currentUser);
+        if (dailyPick.isPresent() && !dailyService.hasViewedDailyPick(currentUser.getId())) {
             showDailyPick(dailyPick.get(), currentUser);
         }
 
@@ -169,7 +185,7 @@ public class MatchingHandler {
         Like.Direction direction = action.equals("l") ? Like.Direction.LIKE : Like.Direction.PASS;
 
         // Check daily limit before recording a like
-        if (direction == Like.Direction.LIKE && !dailyLimitService.canLike(currentUser.getId())) {
+        if (direction == Like.Direction.LIKE && !dailyService.canLike(currentUser.getId())) {
             showDailyLimitReached(currentUser);
             return false;
         }
@@ -463,8 +479,8 @@ public class MatchingHandler {
      * @param currentUser The user who reached the limit
      */
     private void showDailyLimitReached(User currentUser) {
-        DailyLimitService.DailyStatus status = dailyLimitService.getStatus(currentUser.getId());
-        String timeUntilReset = DailyLimitService.formatDuration(dailyLimitService.getTimeUntilReset());
+        DailyService.DailyStatus status = dailyService.getStatus(currentUser.getId());
+        String timeUntilReset = DailyService.formatDuration(dailyService.getTimeUntilReset());
 
         logger.info("\n" + CliConstants.SEPARATOR_LINE);
         logger.info("         💔 DAILY LIMIT REACHED");
@@ -483,7 +499,7 @@ public class MatchingHandler {
         logger.info(CliConstants.SEPARATOR_LINE + "\n");
     }
 
-    private void showDailyPick(DailyPickService.DailyPick pick, User currentUser) {
+    private void showDailyPick(DailyService.DailyPick pick, User currentUser) {
         logger.info("\n" + CliConstants.SEPARATOR_LINE);
         logger.info("       🎲 YOUR DAILY PICK 🎲");
         logger.info(CliConstants.SEPARATOR_LINE);
@@ -523,11 +539,11 @@ public class MatchingHandler {
             return;
         }
 
-        dailyPickService.markDailyPickViewed(currentUser.getId());
+        dailyService.markDailyPickViewed(currentUser.getId());
 
         Like.Direction direction = action.equals("l") ? Like.Direction.LIKE : Like.Direction.PASS;
 
-        if (direction == Like.Direction.LIKE && !dailyLimitService.canLike(currentUser.getId())) {
+        if (direction == Like.Direction.LIKE && !dailyService.canLike(currentUser.getId())) {
             showDailyLimitReached(currentUser);
             return;
         }

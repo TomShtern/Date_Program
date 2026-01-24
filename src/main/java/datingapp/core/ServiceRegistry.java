@@ -53,14 +53,13 @@ public class ServiceRegistry {
     // Services
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
-    private final ReportService reportService;
+    private final TrustSafetyService trustSafetyService;
     private final SessionService sessionService; // Phase 0.5b
     private final StatsService statsService; // Phase 0.5b
     private final MatchQualityService matchQualityService; // Phase 0.5b
     private final ProfilePreviewService profilePreviewService; // Phase 1
-    private final DailyLimitService dailyLimitService; // Phase 1
+    private final DailyService dailyService; // Phase 1
     private final UndoService undoService; // Phase 1
-    private final DailyPickService dailyPickService; // Phase 1
     private final AchievementService achievementService; // Phase 1
     private final MessagingService messagingService; // Messaging
     private final RelationshipTransitionService relationshipTransitionService; // Phase 2/3
@@ -88,14 +87,13 @@ public class ServiceRegistry {
             NotificationStorage notificationStorage,
             CandidateFinder candidateFinder,
             MatchingService matchingService,
-            ReportService reportService,
+            TrustSafetyService trustSafetyService,
             SessionService sessionService,
             StatsService statsService,
             MatchQualityService matchQualityService,
             ProfilePreviewService profilePreviewService,
-            DailyLimitService dailyLimitService,
+            DailyService dailyService,
             UndoService undoService,
-            DailyPickService dailyPickService,
             AchievementService achievementService,
             MessagingService messagingService,
             RelationshipTransitionService relationshipTransitionService,
@@ -119,14 +117,13 @@ public class ServiceRegistry {
         this.notificationStorage = Objects.requireNonNull(notificationStorage);
         this.candidateFinder = Objects.requireNonNull(candidateFinder);
         this.matchingService = Objects.requireNonNull(matchingService);
-        this.reportService = Objects.requireNonNull(reportService);
+        this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
         this.sessionService = Objects.requireNonNull(sessionService);
         this.statsService = Objects.requireNonNull(statsService);
         this.matchQualityService = Objects.requireNonNull(matchQualityService);
         this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
-        this.dailyLimitService = Objects.requireNonNull(dailyLimitService);
+        this.dailyService = Objects.requireNonNull(dailyService);
         this.undoService = Objects.requireNonNull(undoService);
-        this.dailyPickService = Objects.requireNonNull(dailyPickService);
         this.achievementService = Objects.requireNonNull(achievementService);
         this.messagingService = Objects.requireNonNull(messagingService);
         this.relationshipTransitionService = Objects.requireNonNull(relationshipTransitionService);
@@ -179,8 +176,8 @@ public class ServiceRegistry {
         return matchingService;
     }
 
-    public ReportService getReportService() {
-        return reportService;
+    public TrustSafetyService getTrustSafetyService() {
+        return trustSafetyService;
     }
 
     public SessionService getSessionService() {
@@ -199,8 +196,8 @@ public class ServiceRegistry {
         return profilePreviewService;
     }
 
-    public DailyLimitService getDailyLimitService() {
-        return dailyLimitService;
+    public DailyService getDailyService() {
+        return dailyService;
     }
 
     public UndoService getUndoService() {
@@ -209,10 +206,6 @@ public class ServiceRegistry {
 
     public DailyPickStorage getDailyPickStorage() {
         return dailyPickStorage;
-    }
-
-    public DailyPickService getDailyPickService() {
-        return dailyPickService;
     }
 
     public UserAchievementStorage getUserAchievementStorage() {
@@ -294,17 +287,17 @@ public class ServiceRegistry {
             CandidateFinder candidateFinder = new CandidateFinder();
             SessionService sessionService = new SessionService(sessionStorage, config);
             MatchingService matchingService = new MatchingService(likeStorage, matchStorage, sessionService);
-            ReportService reportService = new ReportService(reportStorage, userStorage, blockStorage, config);
+            TrustSafetyService trustSafetyService =
+                    new TrustSafetyService(reportStorage, userStorage, blockStorage, config);
             StatsService statsService = new StatsService(
                     likeStorage, matchStorage, blockStorage, reportStorage, userStatsStorage, platformStatsStorage);
             PaceCompatibilityService paceCompatibilityService = new PaceCompatibilityService();
             MatchQualityService matchQualityService =
                     new MatchQualityService(userStorage, likeStorage, paceCompatibilityService);
             ProfilePreviewService profilePreviewService = new ProfilePreviewService();
-            DailyLimitService dailyLimitService = new DailyLimitService(likeStorage, config);
+            DailyService dailyService =
+                    new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, config);
             UndoService undoService = new UndoService(likeStorage, matchStorage, config);
-            DailyPickService dailyPickService =
-                    new DailyPickService(userStorage, likeStorage, blockStorage, dailyPickStorage, config);
 
             // Achievement System (Phase 1)
             UserAchievementStorage userAchievementStorage = new H2UserAchievementStorage(dbManager);
@@ -352,14 +345,13 @@ public class ServiceRegistry {
                     notificationStorage,
                     candidateFinder,
                     matchingService,
-                    reportService,
+                    trustSafetyService,
                     sessionService,
                     statsService,
                     matchQualityService,
                     profilePreviewService,
-                    dailyLimitService,
+                    dailyService,
                     undoService,
-                    dailyPickService,
                     achievementService,
                     messagingService,
                     relationshipTransitionService,

@@ -2,10 +2,9 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
-import datingapp.core.DailyLimitService;
-import datingapp.core.DailyLimitService.DailyStatus;
-import datingapp.core.DailyPickService;
-import datingapp.core.DailyPickService.DailyPick;
+import datingapp.core.DailyService;
+import datingapp.core.DailyService.DailyPick;
+import datingapp.core.DailyService.DailyStatus;
 import datingapp.core.MatchStorage;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
@@ -30,9 +29,8 @@ import org.slf4j.LoggerFactory;
 public class DashboardViewModel {
     private static final Logger logger = LoggerFactory.getLogger(DashboardViewModel.class);
 
-    private final DailyPickService dailyPickService;
+    private final DailyService dailyService;
     private final MatchStorage matchStorage;
-    private final DailyLimitService dailyLimitService;
     private final AchievementService achievementService;
 
     // Observable properties for data binding
@@ -48,13 +46,9 @@ public class DashboardViewModel {
     private final ObservableList<String> recentAchievements = FXCollections.observableArrayList();
 
     public DashboardViewModel(
-            DailyPickService dailyPickService,
-            MatchStorage matchStorage,
-            DailyLimitService dailyLimitService,
-            AchievementService achievementService) {
-        this.dailyPickService = dailyPickService;
+            DailyService dailyService, MatchStorage matchStorage, AchievementService achievementService) {
+        this.dailyService = dailyService;
         this.matchStorage = matchStorage;
-        this.dailyLimitService = dailyLimitService;
         this.achievementService = achievementService;
     }
 
@@ -101,7 +95,7 @@ public class DashboardViewModel {
 
         String likesText = "Likes: --/50";
         try {
-            DailyStatus status = dailyLimitService.getStatus(user.getId());
+            DailyStatus status = dailyService.getStatus(user.getId());
             likesText = status.hasUnlimitedLikes()
                     ? "Likes: ∞"
                     : "Likes: " + status.likesUsed() + "/" + (status.likesUsed() + status.likesRemaining());
@@ -119,7 +113,7 @@ public class DashboardViewModel {
 
         String pickName = "No pick available";
         try {
-            Optional<DailyPick> pick = dailyPickService.getDailyPick(user);
+            Optional<DailyPick> pick = dailyService.getDailyPick(user);
             if (pick.isPresent()) {
                 User pickedUser = pick.get().user();
                 pickName = pickedUser.getName() + ", " + pickedUser.getAge();

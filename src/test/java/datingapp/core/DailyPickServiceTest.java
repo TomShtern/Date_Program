@@ -23,14 +23,13 @@ import org.junit.jupiter.api.Test;
 
 class DailyPickServiceTest {
 
-    private DailyPickService service;
+    private DailyService service;
     private InMemoryUserStorage userStorage;
     private InMemoryLikeStorage likeStorage;
     private InMemoryBlockStorage blockStorage;
     private InMemoryDailyPickStorage dailyPickStorage;
     private AppConfig config;
 
-    @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
         userStorage = new InMemoryUserStorage();
@@ -39,7 +38,7 @@ class DailyPickServiceTest {
         dailyPickStorage = new InMemoryDailyPickStorage();
         config = AppConfig.defaults();
 
-        service = new DailyPickService(userStorage, likeStorage, blockStorage, dailyPickStorage, config);
+        service = new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, config);
     }
 
     @Test
@@ -56,8 +55,8 @@ class DailyPickServiceTest {
         userStorage.save(candidate3);
 
         // Get daily pick twice in the same call
-        Optional<DailyPickService.DailyPick> pick1 = service.getDailyPick(seeker);
-        Optional<DailyPickService.DailyPick> pick2 = service.getDailyPick(seeker);
+        Optional<DailyService.DailyPick> pick1 = service.getDailyPick(seeker);
+        Optional<DailyService.DailyPick> pick2 = service.getDailyPick(seeker);
 
         assertTrue(pick1.isPresent());
         assertTrue(pick2.isPresent());
@@ -82,8 +81,8 @@ class DailyPickServiceTest {
         userStorage.save(candidate3);
 
         // Get daily picks for different users
-        Optional<DailyPickService.DailyPick> alicePick = service.getDailyPick(alice);
-        Optional<DailyPickService.DailyPick> bobPick = service.getDailyPick(bob);
+        Optional<DailyService.DailyPick> alicePick = service.getDailyPick(alice);
+        Optional<DailyService.DailyPick> bobPick = service.getDailyPick(bob);
 
         assertTrue(alicePick.isPresent());
         assertTrue(bobPick.isPresent());
@@ -105,7 +104,7 @@ class DailyPickServiceTest {
         blockStorage.save(Block.create(seeker.getId(), candidate1.getId()));
 
         // Get daily pick - should not include blocked user
-        Optional<DailyPickService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
         assertTrue(pick.isPresent());
         assertNotEquals(candidate1.getId(), pick.get().user().getId(), "Blocked user should not appear as daily pick");
     }
@@ -126,7 +125,7 @@ class DailyPickServiceTest {
         likeStorage.save(Like.create(seeker.getId(), candidate1.getId(), Like.Direction.LIKE));
 
         // Get daily pick - should not include already-liked user
-        Optional<DailyPickService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
         assertTrue(pick.isPresent());
         assertNotEquals(
                 candidate1.getId(), pick.get().user().getId(), "Already swiped user should not appear as daily pick");
@@ -137,7 +136,7 @@ class DailyPickServiceTest {
         User seeker = createActiveUser("Alice", 25);
         userStorage.save(seeker);
 
-        Optional<DailyPickService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
 
         assertFalse(pick.isPresent(), "Should return empty when no candidates");
     }
@@ -153,7 +152,7 @@ class DailyPickServiceTest {
         // Swipe on the only candidate
         likeStorage.save(Like.create(seeker.getId(), candidate.getId(), Like.Direction.PASS));
 
-        Optional<DailyPickService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
 
         assertFalse(pick.isPresent(), "Should return empty when all candidates excluded");
     }
@@ -166,7 +165,7 @@ class DailyPickServiceTest {
         userStorage.save(seeker);
         userStorage.save(candidate);
 
-        Optional<DailyPickService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
 
         assertTrue(pick.isPresent());
         assertNotNull(pick.get().reason());
@@ -181,7 +180,7 @@ class DailyPickServiceTest {
         userStorage.save(seeker);
         userStorage.save(candidate);
 
-        Optional<DailyPickService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
 
         assertTrue(pick.isPresent());
         assertEquals(LocalDate.now(config.userTimeZone()), pick.get().date());

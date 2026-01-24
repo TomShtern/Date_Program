@@ -3,7 +3,7 @@ package datingapp.cli;
 import datingapp.core.BlockStorage;
 import datingapp.core.Match;
 import datingapp.core.MatchStorage;
-import datingapp.core.ReportService;
+import datingapp.core.TrustSafetyService;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Report;
@@ -21,7 +21,7 @@ public class SafetyHandler {
     private final UserStorage userStorage;
     private final BlockStorage blockStorage;
     private final MatchStorage matchStorage;
-    private final ReportService reportService;
+    private final TrustSafetyService trustSafetyService;
     private final UserSession userSession;
     private final InputReader inputReader;
 
@@ -29,13 +29,13 @@ public class SafetyHandler {
             UserStorage userStorage,
             BlockStorage blockStorage,
             MatchStorage matchStorage,
-            ReportService reportService,
+            TrustSafetyService trustSafetyService,
             UserSession userSession,
             InputReader inputReader) {
         this.userStorage = userStorage;
         this.blockStorage = blockStorage;
         this.matchStorage = matchStorage;
-        this.reportService = reportService;
+        this.trustSafetyService = trustSafetyService;
         this.userSession = userSession;
         this.inputReader = inputReader;
     }
@@ -143,8 +143,8 @@ public class SafetyHandler {
             description = null;
         }
 
-        ReportService.ReportResult result =
-                reportService.report(currentUser.getId(), toReport.getId(), reason, description);
+        TrustSafetyService.ReportResult result =
+                trustSafetyService.report(currentUser.getId(), toReport.getId(), reason, description);
 
         if (result.success()) {
             logger.info("\n✅ Report submitted. {} has been blocked.", toReport.getName());

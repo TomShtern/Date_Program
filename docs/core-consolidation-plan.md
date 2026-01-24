@@ -403,6 +403,10 @@ public final class UserStorages {
 5|2026-01-24 16:20:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.7 UserInteractions consolidation complete|docs/core-consolidation-plan.md
 6|2026-01-24 16:35:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.8 Messaging consolidation complete|docs/core-consolidation-plan.md
 7|2026-01-24 17:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.9 Preferences consolidation complete|docs/core-consolidation-plan.md
+8|2026-01-24 18:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 7.1 TrustSafetyService consolidation complete|docs/core-consolidation-plan.md
+9|2026-01-24 18:40:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 7.2 DailyService consolidation complete|docs/core-consolidation-plan.md
+7|2026-01-24 18:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 7.1 TrustSafetyService consolidation complete|docs/core-consolidation-plan.md
+7|2026-01-24 17:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.9 Preferences consolidation complete|docs/core-consolidation-plan.md
 7|2026-01-24 17:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 6.9 Preferences consolidation complete|docs/core-consolidation-plan.md
 
 ### Phase 0: Preflight (MANDATORY - Do Not Skip)
@@ -816,6 +820,10 @@ mvn spotless:apply && mvn test
 
 **Step 7.1:** Create `TrustSafetyService.java` (VerificationService + ReportService)
 
+Status: ✅ Completed — consolidated verification + reporting into `TrustSafetyService` and updated usages/tests; removed old services.
+<!-- ChangeStamp: 8|2026-01-24 18:10:00|agent:github_copilot|scope:core-consolidation-plan|Complete TrustSafetyService consolidation|docs/core-consolidation-plan.md -->
+2|2026-01-24 18:10:00|agent:github_copilot|scope:core-consolidation-plan|Progress update: Phase 7.1 TrustSafetyService consolidation complete|docs/core-consolidation-plan.md
+
 ```java
 // service/TrustSafetyService.java
 public class TrustSafetyService {
@@ -833,6 +841,9 @@ public class TrustSafetyService {
 ```
 
 **Step 7.2:** Create `DailyService.java` (DailyLimitService + DailyPickService)
+
+Status: ✅ Completed — consolidated daily limit + daily pick into `DailyService`; updated CLI/UI/tests; removed old services.
+<!-- ChangeStamp: 9|2026-01-24 18:40:00|agent:github_copilot|scope:core-consolidation-plan|Complete DailyService consolidation|docs/core-consolidation-plan.md -->
 
 ```java
 // service/DailyService.java

@@ -1,8 +1,8 @@
 package datingapp.cli;
 
+import datingapp.core.TrustSafetyService;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
-import datingapp.core.VerificationService;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,17 +12,17 @@ public class ProfileVerificationHandler {
     private static final Logger logger = LoggerFactory.getLogger(ProfileVerificationHandler.class);
 
     private final UserStorage userStorage;
-    private final VerificationService verificationService;
+    private final TrustSafetyService trustSafetyService;
     private final UserSession userSession;
     private final InputReader inputReader;
 
     public ProfileVerificationHandler(
             UserStorage userStorage,
-            VerificationService verificationService,
+            TrustSafetyService trustSafetyService,
             UserSession userSession,
             InputReader inputReader) {
         this.userStorage = Objects.requireNonNull(userStorage);
-        this.verificationService = Objects.requireNonNull(verificationService);
+        this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
         this.userSession = Objects.requireNonNull(userSession);
         this.inputReader = Objects.requireNonNull(inputReader);
     }
@@ -47,13 +47,15 @@ public class ProfileVerificationHandler {
         logger.info("0. Back\n");
 
         String choice = inputReader.readLine("Choice: ");
-        switch (choice) {
-            case "1" -> startVerification(currentUser, User.VerificationMethod.EMAIL);
-            case "2" -> startVerification(currentUser, User.VerificationMethod.PHONE);
-            case "0" -> {
-                return;
-            }
-            default -> logger.info(CliConstants.INVALID_SELECTION);
+        if ("0".equals(choice)) {
+            return;
+        }
+        if ("1".equals(choice)) {
+            startVerification(currentUser, User.VerificationMethod.EMAIL);
+        } else if ("2".equals(choice)) {
+            startVerification(currentUser, User.VerificationMethod.PHONE);
+        } else {
+            logger.info(CliConstants.INVALID_SELECTION);
         }
     }
 
@@ -80,15 +82,15 @@ public class ProfileVerificationHandler {
             user.setPhone(phone.trim());
         }
 
-        String generatedCode = verificationService.generateVerificationCode();
+        String generatedCode = trustSafetyService.generateVerificationCode();
         user.startVerification(method, generatedCode);
         userStorage.save(user);
 
         logger.info("\n[SIMULATED DELIVERY] Your verification code is: {}\n", generatedCode);
 
         String inputCode = inputReader.readLine("Enter the code: ");
-        if (!verificationService.verifyCode(user, inputCode)) {
-            if (verificationService.isExpired(user.getVerificationSentAt())) {
+        if (!trustSafetyService.verifyCode(user, inputCode)) {
+            if (trustSafetyService.isExpired(user.getVerificationSentAt())) {
                 logger.info("❌ Code expired. Please try again.\n");
             } else {
                 logger.info("❌ Incorrect code.\n");

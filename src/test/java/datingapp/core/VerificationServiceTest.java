@@ -16,7 +16,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@SuppressWarnings("unused")
 class VerificationServiceTest {
 
     @Nested
@@ -26,7 +25,7 @@ class VerificationServiceTest {
         @Test
         @DisplayName("Returns false when code expired")
         void returnsFalseWhenCodeExpired() {
-            VerificationService verificationService = new VerificationService(Duration.ofMinutes(15), new Random(123));
+            TrustSafetyService trustSafetyService = new TrustSafetyService(Duration.ofMinutes(15), new Random(123));
 
             User user = createActiveUser();
             user.startVerification(User.VerificationMethod.EMAIL, "123456");
@@ -37,19 +36,19 @@ class VerificationServiceTest {
                             ? user.getVerificationSentAt().minus(Duration.ofMinutes(16))
                             : java.time.Instant.now().minus(Duration.ofMinutes(16)));
 
-            assertFalse(verificationService.verifyCode(expired, "123456"));
-            assertTrue(verificationService.isExpired(expired.getVerificationSentAt()));
+            assertFalse(trustSafetyService.verifyCode(expired, "123456"));
+            assertTrue(trustSafetyService.isExpired(expired.getVerificationSentAt()));
         }
 
         @Test
         @DisplayName("Returns false when code mismatches")
         void returnsFalseWhenCodeMismatches() {
-            VerificationService verificationService = new VerificationService();
+            TrustSafetyService trustSafetyService = new TrustSafetyService();
 
             User user = createActiveUser();
             user.startVerification(User.VerificationMethod.PHONE, "123456");
 
-            assertFalse(verificationService.verifyCode(user, "000000"));
+            assertFalse(trustSafetyService.verifyCode(user, "000000"));
             assertNotEquals(Boolean.TRUE, user.isVerified());
         }
     }

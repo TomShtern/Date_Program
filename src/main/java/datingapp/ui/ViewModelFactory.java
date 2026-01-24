@@ -88,7 +88,6 @@ public class ViewModelFactory {
         return createFallbackController(controllerClass);
     }
 
-    @SuppressWarnings("java:S1166") // We log and rethrow with context
     private Object createFallbackController(Class<?> controllerClass) {
         try {
             return controllerClass.getDeclaredConstructor().newInstance();
@@ -96,8 +95,9 @@ public class ViewModelFactory {
                 | IllegalAccessException
                 | InvocationTargetException
                 | NoSuchMethodException e) {
-            logger.error("Failed to create controller {}", controllerClass, e);
-            throw new IllegalStateException("Failed to create controller: " + controllerClass, e);
+            String controllerName = controllerClass.getName();
+            logger.error("Failed to create fallback controller: {}", controllerName, e);
+            throw new IllegalStateException("Failed to create fallback controller: " + controllerName, e);
         }
     }
 
@@ -113,10 +113,7 @@ public class ViewModelFactory {
     public DashboardViewModel getDashboardViewModel() {
         if (dashboardViewModel == null) {
             dashboardViewModel = new DashboardViewModel(
-                    services.getDailyPickService(),
-                    services.getMatchStorage(),
-                    services.getDailyLimitService(),
-                    services.getAchievementService());
+                    services.getDailyService(), services.getMatchStorage(), services.getAchievementService());
         }
         return dashboardViewModel;
     }
@@ -185,7 +182,6 @@ public class ViewModelFactory {
         profileViewModel = null;
         matchingViewModel = null;
         chatViewModel = null;
-        matchesViewModel = null;
         matchesViewModel = null;
         statsViewModel = null;
         preferencesViewModel = null;

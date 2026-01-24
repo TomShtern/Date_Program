@@ -14,13 +14,13 @@ import datingapp.cli.StatsHandler;
 import datingapp.cli.UserManagementHandler;
 import datingapp.cli.UserSession;
 import datingapp.core.AppConfig;
-import datingapp.core.DailyLimitService;
+import datingapp.core.DailyService;
 import datingapp.core.LikerBrowserService;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.SessionService;
+import datingapp.core.TrustSafetyService;
 import datingapp.core.User;
-import datingapp.core.VerificationService;
 import datingapp.storage.DatabaseManager;
 import java.util.Scanner;
 import org.slf4j.Logger;
@@ -118,14 +118,13 @@ public class Main {
                 userSession,
                 inputReader);
 
-        matchingHandler = new MatchingHandler(
+        MatchingHandler.Dependencies matchingDependencies = new MatchingHandler.Dependencies(
                 services.getCandidateFinder(),
                 services.getMatchingService(),
                 services.getLikeStorage(),
                 services.getMatchStorage(),
                 services.getBlockStorage(),
-                services.getDailyLimitService(),
-                services.getDailyPickService(),
+                services.getDailyService(),
                 services.getUndoService(),
                 services.getMatchQualityService(),
                 services.getUserStorage(),
@@ -134,12 +133,13 @@ public class Main {
                 services.getRelationshipTransitionService(),
                 userSession,
                 inputReader);
+        matchingHandler = new MatchingHandler(matchingDependencies);
 
         safetyHandler = new SafetyHandler(
                 services.getUserStorage(),
                 services.getBlockStorage(),
                 services.getMatchStorage(),
-                services.getReportService(),
+                services.getTrustSafetyService(),
                 userSession,
                 inputReader);
 
@@ -150,7 +150,7 @@ public class Main {
                 services.getProfileNoteStorage(), services.getUserStorage(), userSession, inputReader);
 
         profileVerificationHandler = new ProfileVerificationHandler(
-                services.getUserStorage(), new VerificationService(), userSession, inputReader);
+                services.getUserStorage(), new TrustSafetyService(), userSession, inputReader);
 
         likerBrowserHandler = new LikerBrowserHandler(
                 new LikerBrowserService(
@@ -194,8 +194,8 @@ public class Main {
                             session.getFormattedDuration()));
 
             // Show daily likes
-            DailyLimitService dailyLimitService = services.getDailyLimitService();
-            DailyLimitService.DailyStatus dailyStatus = dailyLimitService.getStatus(currentUser.getId());
+            DailyService dailyService = services.getDailyService();
+            DailyService.DailyStatus dailyStatus = dailyService.getStatus(currentUser.getId());
             if (dailyStatus.hasUnlimitedLikes()) {
                 logger.info("  💝 Daily Likes: unlimited");
             } else {
@@ -247,13 +247,19 @@ public class Main {
         logger.info("───────────────────────────────────────\n");
 
         logger.info("  {} {}% {}", result.getTierEmoji(), result.score(), result.tier());
-        logger.info("  {}", ProfileCompletionService.renderProgressBar(result.score(), 25));
+        if (logger.isInfoEnabled()) {
+            String overallBar = ProfileCompletionService.renderProgressBar(result.score(), 25);
+            logger.info("  {}", overallBar);
+        }
         logger.info("");
 
         // Category breakdown
         for (ProfileCompletionService.CategoryBreakdown cat : result.breakdown()) {
             logger.info("  {} - {}%", cat.category(), cat.score());
-            logger.info("    {}", ProfileCompletionService.renderProgressBar(cat.score(), 15));
+            if (logger.isInfoEnabled()) {
+                String categoryBar = ProfileCompletionService.renderProgressBar(cat.score(), 15);
+                logger.info("    {}", categoryBar);
+            }
             if (!cat.missingItems().isEmpty()) {
                 cat.missingItems().forEach(m -> logger.info("    ⚪ {}", m));
             }
