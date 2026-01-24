@@ -50,7 +50,7 @@ public class ServiceRegistry {
     private final NotificationStorage notificationStorage; // Phase 3
 
     // Services
-    private final CandidateFinderService candidateFinder;
+    private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
     private final ReportService reportService;
     private final SessionService sessionService; // Phase 0.5b
@@ -84,7 +84,7 @@ public class ServiceRegistry {
             MessageStorage messageStorage,
             FriendRequestStorage friendRequestStorage,
             NotificationStorage notificationStorage,
-            CandidateFinderService candidateFinder,
+            CandidateFinder candidateFinder,
             MatchingService matchingService,
             ReportService reportService,
             SessionService sessionService,
@@ -169,7 +169,7 @@ public class ServiceRegistry {
         return platformStatsStorage;
     }
 
-    public CandidateFinderService getCandidateFinder() {
+    public CandidateFinder getCandidateFinder() {
         return candidateFinder;
     }
 
@@ -289,7 +289,7 @@ public class ServiceRegistry {
             DailyPickStorage dailyPickStorage = new H2DailyPickViewStorage(dbManager);
 
             // Services
-            CandidateFinderService candidateFinder = new CandidateFinder();
+            CandidateFinder candidateFinder = new CandidateFinder();
             SessionService sessionService = new SessionService(sessionStorage, config);
             MatchingService matchingService = new MatchingService(likeStorage, matchStorage, sessionService);
             ReportService reportService = new ReportService(reportStorage, userStorage, blockStorage, config);

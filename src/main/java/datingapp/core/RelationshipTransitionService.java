@@ -9,6 +9,13 @@ import java.util.UUID;
 /** Handles transitions in the relationship lifecycle (Friend Zone, Graceful Exit). */
 public class RelationshipTransitionService {
 
+    /** Exception thrown when a relationship transition is invalid. */
+    public static class TransitionValidationException extends RuntimeException {
+        public TransitionValidationException(String message) {
+            super(message);
+        }
+    }
+
     private final MatchStorage matchStorage;
     private final FriendRequestStorage friendRequestStorage;
     private final ConversationStorage conversationStorage;

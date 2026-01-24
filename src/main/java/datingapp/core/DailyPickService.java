@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.CandidateFinder.GeoUtils;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;

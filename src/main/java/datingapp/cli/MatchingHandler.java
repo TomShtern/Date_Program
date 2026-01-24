@@ -3,21 +3,21 @@ package datingapp.cli;
 import datingapp.core.AchievementService;
 import datingapp.core.Block;
 import datingapp.core.BlockStorage;
-import datingapp.core.CandidateFinderService;
+import datingapp.core.CandidateFinder;
+import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.DailyLimitService;
 import datingapp.core.DailyPickService;
-import datingapp.core.GeoUtils;
-import datingapp.core.InterestMatcher;
 import datingapp.core.Like;
 import datingapp.core.LikeStorage;
 import datingapp.core.Match;
 import datingapp.core.MatchQuality;
 import datingapp.core.MatchQualityService;
+import datingapp.core.MatchQualityService.InterestMatcher;
 import datingapp.core.MatchStorage;
 import datingapp.core.MatchingService;
 import datingapp.core.ProfileViewStorage;
 import datingapp.core.RelationshipTransitionService;
-import datingapp.core.TransitionValidationException;
+import datingapp.core.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.UndoService;
 import datingapp.core.User;
 import datingapp.core.UserAchievement;
@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public class MatchingHandler {
     private static final Logger logger = LoggerFactory.getLogger(MatchingHandler.class);
 
-    private final CandidateFinderService candidateFinderService;
+    private final CandidateFinder candidateFinderService;
     private final MatchingService matchingService;
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
@@ -54,7 +54,7 @@ public class MatchingHandler {
     private final InputReader inputReader;
 
     public MatchingHandler(
-            CandidateFinderService candidateFinderService,
+            CandidateFinder candidateFinderService,
             MatchingService matchingService,
             LikeStorage likeStorage,
             MatchStorage matchStorage,

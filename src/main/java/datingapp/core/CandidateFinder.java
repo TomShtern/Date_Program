@@ -4,7 +4,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Finds candidate users for matching based on preferences and filters.
@@ -20,9 +19,8 @@ import java.util.stream.Collectors;
  *   <li><strong>Zero Framework Dependencies:</strong> Operates only on in-memory collections passed
  *       by callers. Never queries storage directly, maintaining the "core stays pure" architectural
  *       rule.
- *   <li><strong>Strategy Pattern:</strong> Implements {@link CandidateFinderService} interface to
- *       allow future algorithm swapping (e.g., ML-based ranking, A/B testing different filters).
- *       The interface enables easy mocking in tests.
+ *   <li><strong>Strategy Pattern:</strong> Designed for easy algorithm swapping (e.g., ML-based
+ *       ranking, A/B testing different filters) via dependency injection or adapter interfaces.
  *   <li><strong>Stateless Transform:</strong> No mutable state, no persistence concerns. Each call
  *       is independent and deterministic given the same inputs.
  *   <li><strong>Performance:</strong> Operates on in-memory lists for speed. Callers are
@@ -62,12 +60,46 @@ import java.util.stream.Collectors;
  *       scores for intelligent ranking.
  * </ul>
  *
- * @see CandidateFinderService
  * @see DealbreakersEvaluator
- * @see InterestMatcher
+ * @see MatchQualityService.InterestMatcher
  * @see GeoUtils
  */
-public class CandidateFinder implements CandidateFinderService {
+public class CandidateFinder {
+
+    /** Geographic utility functions. Pure Java - no external dependencies. */
+    public static final class GeoUtils {
+
+        private static final double EARTH_RADIUS_KM = 6371.0;
+
+        private GeoUtils() {
+            // Utility class
+        }
+
+        /**
+         * Calculates the distance in kilometers between two geographic points using the Haversine
+         * formula.
+         *
+         * @param lat1 Latitude of point 1 in degrees
+         * @param lon1 Longitude of point 1 in degrees
+         * @param lat2 Latitude of point 2 in degrees
+         * @param lon2 Longitude of point 2 in degrees
+         * @return Distance in kilometers
+         */
+        public static double distanceKm(double lat1, double lon1, double lat2, double lon2) {
+            double deltaLatitude = Math.toRadians(lat2 - lat1);
+            double deltaLongitude = Math.toRadians(lon2 - lon1);
+
+            double a = Math.sin(deltaLatitude / 2) * Math.sin(deltaLatitude / 2)
+                    + Math.cos(Math.toRadians(lat1))
+                            * Math.cos(Math.toRadians(lat2))
+                            * Math.sin(deltaLongitude / 2)
+                            * Math.sin(deltaLongitude / 2);
+
+            double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return EARTH_RADIUS_KM * c;
+        }
+    }
 
     private final DealbreakersEvaluator dealbreakersEvaluator;
 
@@ -84,7 +116,6 @@ public class CandidateFinder implements CandidateFinderService {
      *
      * <p>Results are sorted by distance (closest first).
      */
-    @Override
     public List<User> findCandidates(User seeker, List<User> allActive, Set<UUID> alreadyInteracted) {
         return allActive.stream()
                 .filter(candidate -> !candidate.getId().equals(seeker.getId())) // Not self
@@ -95,7 +126,7 @@ public class CandidateFinder implements CandidateFinderService {
                 .filter(candidate -> isWithinDistance(seeker, candidate)) // Within distance
                 .filter(candidate -> dealbreakersEvaluator.passes(seeker, candidate)) // Dealbreakers (Phase 0.5b)
                 .sorted(Comparator.comparingDouble(c -> distanceTo(seeker, c))) // Sort by distance
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /**

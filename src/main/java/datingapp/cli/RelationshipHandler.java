@@ -4,7 +4,7 @@ import datingapp.core.FriendRequest;
 import datingapp.core.Notification;
 import datingapp.core.NotificationStorage;
 import datingapp.core.RelationshipTransitionService;
-import datingapp.core.TransitionValidationException;
+import datingapp.core.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
 import java.util.List;

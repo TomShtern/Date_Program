@@ -1,7 +1,7 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.BlockStorage;
-import datingapp.core.CandidateFinderService;
+import datingapp.core.CandidateFinder;
 import datingapp.core.Like;
 import datingapp.core.LikeStorage;
 import datingapp.core.Match;
@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 public class MatchingViewModel {
     private static final Logger logger = LoggerFactory.getLogger(MatchingViewModel.class);
 
-    private final CandidateFinderService candidateFinder;
+    private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
     private final UserStorage userStorage;
     private final LikeStorage likeStorage;
@@ -52,7 +52,7 @@ public class MatchingViewModel {
     private User currentUser;
 
     public MatchingViewModel(
-            CandidateFinderService candidateFinder,
+            CandidateFinder candidateFinder,
             MatchingService matchingService,
             UserStorage userStorage,
             LikeStorage likeStorage,
