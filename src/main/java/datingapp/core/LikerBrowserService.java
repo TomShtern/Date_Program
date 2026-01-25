@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.Match.MatchStorage;
 import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.LikeStorage;
 import java.util.ArrayList;

@@ -239,4 +239,67 @@ public class SwipeSession {
     public String toString() {
         return String.format("SwipeSession{id=%s, user=%s, swipes=%d, state=%s}", id, userId, swipeCount, state);
     }
+
+    // ========== STORAGE INTERFACE ==========
+
+    /**
+     * Storage interface for SwipeSession entities. Provides CRUD operations and aggregate queries for
+     * session analytics.
+     */
+    public interface SwipeSessionStorage {
+
+        /** Save a new session or update existing. */
+        void save(SwipeSession session);
+
+        /** Get a session by ID. */
+        java.util.Optional<SwipeSession> get(java.util.UUID sessionId);
+
+        /** Get the currently active session for a user, if any. */
+        java.util.Optional<SwipeSession> getActiveSession(java.util.UUID userId);
+
+        /**
+         * Get recent sessions for a user (most recent first).
+         *
+         * @param userId the user ID
+         * @param limit maximum number of sessions to return
+         */
+        java.util.List<SwipeSession> getSessionsFor(java.util.UUID userId, int limit);
+
+        /**
+         * Get sessions for a user within a time range.
+         *
+         * @param userId the user ID
+         * @param start start of time range (inclusive)
+         * @param end end of time range (inclusive)
+         */
+        java.util.List<SwipeSession> getSessionsInRange(
+                java.util.UUID userId, java.time.Instant start, java.time.Instant end);
+
+        /** Get aggregate session stats for a user. */
+        SessionAggregates getAggregates(java.util.UUID userId);
+
+        /**
+         * End all active sessions older than timeout (cleanup job).
+         *
+         * @param timeout the inactivity duration after which sessions should be ended
+         * @return number of sessions ended
+         */
+        int endStaleSessions(java.time.Duration timeout);
+
+        /** Aggregate statistics across all sessions for a user. */
+        record SessionAggregates(
+                int totalSessions,
+                int totalSwipes,
+                int totalLikes,
+                int totalPasses,
+                int totalMatches,
+                double avgSessionDurationSeconds,
+                double avgSwipesPerSession,
+                double avgSwipeVelocity) {
+            /** Empty aggregates for users with no sessions. */
+            public static SessionAggregates empty() {
+                return new SessionAggregates(0, 0, 0, 0, 0, 0.0, 0.0, 0.0);
+            }
+        }
+    }
 }

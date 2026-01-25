@@ -7,17 +7,14 @@ import datingapp.cli.MatchingHandler;
 import datingapp.cli.MessagingHandler;
 import datingapp.cli.ProfileHandler;
 import datingapp.cli.ProfileNotesHandler;
-import datingapp.cli.ProfileVerificationHandler;
 import datingapp.cli.RelationshipHandler;
 import datingapp.cli.SafetyHandler;
 import datingapp.cli.StatsHandler;
-import datingapp.cli.UserManagementHandler;
 import datingapp.core.AppConfig;
 import datingapp.core.DailyService;
 import datingapp.core.LikerBrowserService;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.SessionService;
-import datingapp.core.TrustSafetyService;
 import datingapp.core.User;
 import datingapp.storage.DatabaseManager;
 import java.util.Scanner;
@@ -39,13 +36,11 @@ public class Main {
     // CLI Components
     private static CliUtilities.InputReader inputReader;
     private static CliUtilities.UserSession userSession;
-    private static UserManagementHandler userHandler;
     private static ProfileHandler profileHandler;
     private static MatchingHandler matchingHandler;
     private static SafetyHandler safetyHandler;
     private static StatsHandler statsHandler;
     private static ProfileNotesHandler profileNotesHandler;
-    private static ProfileVerificationHandler profileVerificationHandler;
     private static LikerBrowserHandler likerBrowserHandler;
     private static MessagingHandler messagingHandler;
     private static RelationshipHandler relationshipHandler;
@@ -62,8 +57,8 @@ public class Main {
                 String choice = inputReader.readLine("Choose an option: ");
 
                 switch (choice) {
-                    case "1" -> userHandler.createUser();
-                    case "2" -> userHandler.selectUser();
+                    case "1" -> profileHandler.createUser();
+                    case "2" -> profileHandler.selectUser();
                     case "3" -> profileHandler.completeProfile();
                     case "4" -> matchingHandler.browseCandidates();
                     case "5" -> matchingHandler.viewMatches();
@@ -75,7 +70,7 @@ public class Main {
                     case "11" -> statsHandler.viewAchievements();
                     case "12" -> profileNotesHandler.viewAllNotes();
                     case "13" -> profileHandler.viewProfileScore();
-                    case "14" -> profileVerificationHandler.verifyProfile();
+                    case "14" -> safetyHandler.verifyProfile();
                     case "15" -> likerBrowserHandler.browseWhoLikedMe();
                     case "16" -> messagingHandler.showConversations();
                     case "17" -> relationshipHandler.viewNotifications();
@@ -107,8 +102,6 @@ public class Main {
         userSession = new CliUtilities.UserSession();
 
         // Initialize Handlers
-        userHandler = new UserManagementHandler(services.getUserStorage(), userSession, inputReader);
-
         profileHandler = new ProfileHandler(
                 services.getUserStorage(),
                 services.getProfilePreviewService(),
@@ -146,9 +139,6 @@ public class Main {
 
         profileNotesHandler = new ProfileNotesHandler(
                 services.getProfileNoteStorage(), services.getUserStorage(), userSession, inputReader);
-
-        profileVerificationHandler = new ProfileVerificationHandler(
-                services.getUserStorage(), new TrustSafetyService(), userSession, inputReader);
 
         likerBrowserHandler = new LikerBrowserHandler(
                 new LikerBrowserService(

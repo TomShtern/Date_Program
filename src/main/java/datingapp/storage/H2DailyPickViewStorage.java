@@ -1,6 +1,6 @@
 package datingapp.storage;
 
-import datingapp.core.DailyPickStorage;
+import datingapp.core.DailyService.DailyPickStorage;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;

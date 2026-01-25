@@ -1,7 +1,7 @@
 package datingapp.storage;
 
-import datingapp.core.FriendRequestStorage;
 import datingapp.core.Social.FriendRequest;
+import datingapp.core.Social.FriendRequestStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

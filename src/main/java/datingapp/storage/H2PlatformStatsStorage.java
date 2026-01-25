@@ -1,7 +1,7 @@
 package datingapp.storage;
 
-import datingapp.core.PlatformStatsStorage;
 import datingapp.core.Stats.PlatformStats;
+import datingapp.core.Stats.PlatformStatsStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

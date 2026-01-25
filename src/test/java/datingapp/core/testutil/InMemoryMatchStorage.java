@@ -1,7 +1,7 @@
 package datingapp.core.testutil;
 
 import datingapp.core.Match;
-import datingapp.core.MatchStorage;
+import datingapp.core.Match.MatchStorage;
 import java.util.*;
 
 /**

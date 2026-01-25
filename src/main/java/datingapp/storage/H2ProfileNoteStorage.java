@@ -1,7 +1,7 @@
 package datingapp.storage;
 
-import datingapp.core.ProfileNoteStorage;
 import datingapp.core.User;
+import datingapp.core.User.ProfileNoteStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

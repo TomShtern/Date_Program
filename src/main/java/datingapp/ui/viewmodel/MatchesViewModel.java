@@ -1,7 +1,7 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.Match;
-import datingapp.core.MatchStorage;
+import datingapp.core.Match.MatchStorage;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
 import datingapp.ui.ViewModelFactory.UISession;

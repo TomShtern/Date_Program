@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Achievement.UserAchievement;
+import datingapp.core.Achievement.UserAchievementStorage;
+import datingapp.core.Match.MatchStorage;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.UserInteractions.Like;

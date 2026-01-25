@@ -5,7 +5,7 @@ import datingapp.core.AchievementService;
 import datingapp.core.DailyService;
 import datingapp.core.DailyService.DailyPick;
 import datingapp.core.DailyService.DailyStatus;
-import datingapp.core.MatchStorage;
+import datingapp.core.Match.MatchStorage;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
 import datingapp.ui.ViewModelFactory.UISession;

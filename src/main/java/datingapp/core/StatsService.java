@@ -1,7 +1,10 @@
 package datingapp.core;
 
+import datingapp.core.Match.MatchStorage;
 import datingapp.core.Stats.PlatformStats;
+import datingapp.core.Stats.PlatformStatsStorage;
 import datingapp.core.Stats.UserStats;
+import datingapp.core.Stats.UserStatsStorage;
 import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.LikeStorage;

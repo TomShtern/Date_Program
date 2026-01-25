@@ -1,7 +1,7 @@
 package datingapp.cli;
 
-import datingapp.core.ProfileNoteStorage;
 import datingapp.core.User;
+import datingapp.core.User.ProfileNoteStorage;
 import datingapp.core.UserStorage;
 import java.util.List;
 import java.util.Optional;

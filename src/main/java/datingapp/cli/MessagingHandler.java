@@ -1,7 +1,7 @@
 package datingapp.cli;
 
 import datingapp.core.Match;
-import datingapp.core.MatchStorage;
+import datingapp.core.Match.MatchStorage;
 import datingapp.core.Messaging.Conversation;
 import datingapp.core.Messaging.Message;
 import datingapp.core.MessagingService;

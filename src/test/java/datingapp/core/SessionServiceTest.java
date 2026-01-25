@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.SwipeSession.SwipeSessionStorage;
 import datingapp.core.UserInteractions.Like;
 import java.time.Duration;
 import java.time.Instant;

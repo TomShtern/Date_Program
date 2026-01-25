@@ -1,5 +1,17 @@
 package datingapp.core;
 
+import datingapp.core.Achievement.UserAchievementStorage;
+import datingapp.core.DailyService.DailyPickStorage;
+import datingapp.core.Match.MatchStorage;
+import datingapp.core.Messaging.ConversationStorage;
+import datingapp.core.Messaging.MessageStorage;
+import datingapp.core.Social.FriendRequestStorage;
+import datingapp.core.Social.NotificationStorage;
+import datingapp.core.Stats.PlatformStatsStorage;
+import datingapp.core.Stats.UserStatsStorage;
+import datingapp.core.SwipeSession.SwipeSessionStorage;
+import datingapp.core.User.ProfileNoteStorage;
+import datingapp.core.User.ProfileViewStorage;
 import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.LikeStorage;
 import datingapp.core.UserInteractions.ReportStorage;

@@ -1,7 +1,7 @@
 package datingapp.storage;
 
 import datingapp.core.Match;
-import datingapp.core.MatchStorage;
+import datingapp.core.Match.MatchStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

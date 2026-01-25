@@ -970,4 +970,93 @@ public class User {
             return content.substring(0, 47) + "...";
         }
     }
+
+    // ========== STORAGE INTERFACES ==========
+
+    /**
+     * Storage interface for private profile notes.
+     */
+    public interface ProfileNoteStorage {
+
+        /**
+         * Saves or updates a note about another user.
+         *
+         * @param note the profile note to save
+         */
+        void save(ProfileNote note);
+
+        /**
+         * Gets a user's note about another user.
+         *
+         * @param authorId ID of the note author
+         * @param subjectId ID of the user the note is about
+         * @return the note if it exists
+         */
+        java.util.Optional<ProfileNote> get(java.util.UUID authorId, java.util.UUID subjectId);
+
+        /**
+         * Gets all notes created by a user.
+         *
+         * @param authorId ID of the note author
+         * @return list of all notes by this user
+         */
+        java.util.List<ProfileNote> getAllByAuthor(java.util.UUID authorId);
+
+        /**
+         * Deletes a note.
+         *
+         * @param authorId ID of the note author
+         * @param subjectId ID of the user the note is about
+         * @return true if a note was deleted
+         */
+        boolean delete(java.util.UUID authorId, java.util.UUID subjectId);
+    }
+
+    /**
+     * Storage interface for tracking profile views.
+     */
+    public interface ProfileViewStorage {
+
+        /**
+         * Records a profile view.
+         *
+         * @param viewerId ID of the user who viewed the profile
+         * @param viewedId ID of the profile that was viewed
+         */
+        void recordView(java.util.UUID viewerId, java.util.UUID viewedId);
+
+        /**
+         * Gets the total number of views for a user's profile.
+         *
+         * @param userId ID of the user whose profile was viewed
+         * @return total view count
+         */
+        int getViewCount(java.util.UUID userId);
+
+        /**
+         * Gets the number of unique viewers for a user's profile.
+         *
+         * @param userId ID of the user whose profile was viewed
+         * @return unique viewer count
+         */
+        int getUniqueViewerCount(java.util.UUID userId);
+
+        /**
+         * Gets recent viewers of a user's profile.
+         *
+         * @param userId ID of the user whose profile was viewed
+         * @param limit maximum number of viewers to return
+         * @return list of viewer IDs (most recent first)
+         */
+        java.util.List<java.util.UUID> getRecentViewers(java.util.UUID userId, int limit);
+
+        /**
+         * Checks if a user has viewed another user's profile.
+         *
+         * @param viewerId ID of the potential viewer
+         * @param viewedId ID of the profile owner
+         * @return true if the viewer has viewed the profile
+         */
+        boolean hasViewed(java.util.UUID viewerId, java.util.UUID viewedId);
+    }
 }

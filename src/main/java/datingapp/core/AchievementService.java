@@ -1,6 +1,8 @@
 package datingapp.core;
 
 import datingapp.core.Achievement.UserAchievement;
+import datingapp.core.Achievement.UserAchievementStorage;
+import datingapp.core.Match.MatchStorage;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.LikeStorage;
 import datingapp.core.UserInteractions.ReportStorage;

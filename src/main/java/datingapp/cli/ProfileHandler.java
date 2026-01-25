@@ -20,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -729,6 +730,57 @@ public class ProfileHandler {
         } else {
             currentUser.setDealbreakers(builder.build());
             logger.info("✅ Age dealbreaker cleared.\n");
+        }
+    }
+
+    // --- User Creation and Selection Methods ---
+
+    /** Creates a new user and sets them as the current user. */
+    public void createUser() {
+        logger.info("\n--- Create New User ---\n");
+
+        String name = inputReader.readLine("Enter your name: ");
+        if (name.isBlank()) {
+            logger.info("❌ Name cannot be empty.\n");
+            return;
+        }
+
+        User user = new User(UUID.randomUUID(), name);
+        userStorage.save(user);
+        userSession.setCurrentUser(user);
+
+        logger.info("\n✅ User created! ID: {}", user.getId());
+        logger.info("   Status: {} (Complete your profile to become ACTIVE)\n", user.getState());
+    }
+
+    /** Displays all users and allows selection of one as the current user. */
+    public void selectUser() {
+        logger.info("\n--- Select User ---\n");
+
+        List<User> users = userStorage.findAll();
+        if (users.isEmpty()) {
+            logger.info("No users found. Create one first!\n");
+            return;
+        }
+
+        for (int i = 0; i < users.size(); i++) {
+            User u = users.get(i);
+            logger.info("  {}. {} ({})", i + 1, u.getName(), u.getState());
+        }
+
+        String input = inputReader.readLine("\nSelect user number (or 0 to cancel): ");
+        try {
+            int idx = Integer.parseInt(input) - 1;
+            if (idx < 0 || idx >= users.size()) {
+                if (idx != -1) {
+                    logger.info("\n❌ Invalid selection.\n");
+                }
+                return;
+            }
+            userSession.setCurrentUser(users.get(idx));
+            logger.info("\n✅ Selected: {}\n", userSession.getCurrentUser().getName());
+        } catch (NumberFormatException _) {
+            logger.info("❌ Invalid input.\n");
         }
     }
 

@@ -2,6 +2,7 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import datingapp.core.Match.MatchStorage;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.BlockStorage;
