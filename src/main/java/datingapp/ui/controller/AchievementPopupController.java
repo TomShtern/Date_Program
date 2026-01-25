@@ -26,10 +26,14 @@ import org.slf4j.LoggerFactory;
 /**
  * Controller for the Achievement Popup overlay.
  * Displays achievement unlocked notifications with animations and confetti.
+ *
+ * <p>FXML controller reference:
+ * {@code fx:controller="datingapp.ui.controller.AchievementPopupController"}
  */
 public class AchievementPopupController implements Initializable {
 
     private static final Logger logger = LoggerFactory.getLogger(AchievementPopupController.class);
+    private static final int AUTO_DISMISS_SECONDS = 5;
 
     @FXML
     private StackPane rootPane;
@@ -56,7 +60,6 @@ public class AchievementPopupController implements Initializable {
     private UiHelpers.ConfettiAnimation confetti;
     private Runnable onCloseCallback;
     private boolean autoDismiss = true;
-    private static final int AUTO_DISMISS_SECONDS = 5;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -69,9 +72,9 @@ public class AchievementPopupController implements Initializable {
      * Shows the achievement with specified details and plays entrance animation.
      *
      * @param iconLiteral The Material Design icon literal (e.g., "mdi2t-trophy")
-     * @param name        The achievement name
+     * @param name The achievement name
      * @param description The achievement description
-     * @param xpAmount    The XP/points earned
+     * @param xpAmount The XP/points earned
      */
     public void showAchievement(String iconLiteral, String name, String description, int xpAmount) {
         // Set content
@@ -93,9 +96,7 @@ public class AchievementPopupController implements Initializable {
         }
     }
 
-    /**
-     * Convenience method for common achievement types.
-     */
+    /** Convenience method for common achievement types. */
     public void showAchievement(AchievementType type) {
         showAchievement(type.iconLiteral, type.name, type.description, type.xp);
     }
@@ -192,9 +193,7 @@ public class AchievementPopupController implements Initializable {
         this.autoDismiss = autoDismiss;
     }
 
-    /**
-     * Predefined achievement types for common scenarios.
-     */
+    /** Predefined achievement types for common scenarios. */
     public enum AchievementType {
         FIRST_MATCH("mdi2h-heart-multiple", "First Match!", "You've made your first connection!", 50),
         PROFILE_COMPLETE("mdi2a-account-check", "Profile Complete", "Your profile is 100% complete!", 100),

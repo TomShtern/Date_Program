@@ -4,8 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.testutil.InMemoryLikeStorage;
-import datingapp.core.testutil.InMemoryMatchStorage;
+import datingapp.core.testutil.TestStorages;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,15 +15,15 @@ import org.junit.jupiter.api.Test;
 /** Unit tests for MatchingService using in-memory mock storage. */
 class MatchingServiceTest {
 
-    private InMemoryLikeStorage likeStorage;
-    private InMemoryMatchStorage matchStorage;
+    private TestStorages.Likes likeStorage;
+    private TestStorages.Matches matchStorage;
     private MatchingService matchingService;
 
     @BeforeEach
     void setUp() {
 
-        likeStorage = new InMemoryLikeStorage();
-        matchStorage = new InMemoryMatchStorage();
+        likeStorage = new TestStorages.Likes();
+        matchStorage = new TestStorages.Matches();
         matchingService = new MatchingService(likeStorage, matchStorage);
     }
 

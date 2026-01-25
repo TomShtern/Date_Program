@@ -1,0 +1,269 @@
+package datingapp.core;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+
+import datingapp.storage.DatabaseManager;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Tests for ServiceRegistry - central dependency registry and service wiring.
+ *
+ * <p>Verifies that the Builder correctly creates all services and storages,
+ * and that getters return non-null instances.
+ */
+@SuppressWarnings("unused")
+@DisplayName("ServiceRegistry")
+class ServiceRegistryTest {
+
+    private static DatabaseManager dbManager;
+    private static ServiceRegistry registry;
+
+    @BeforeAll
+    static void setUpOnce() {
+        // Use in-memory H2 database for testing
+        DatabaseManager.setJdbcUrl("jdbc:h2:mem:test_service_registry_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+        DatabaseManager.resetInstance();
+        dbManager = DatabaseManager.getInstance();
+        registry = ServiceRegistry.Builder.buildH2(dbManager, AppConfig.defaults());
+    }
+
+    @AfterAll
+    static void tearDownOnce() {
+        DatabaseManager.resetInstance();
+    }
+
+    @Nested
+    @DisplayName("Builder.buildH2")
+    class BuilderTests {
+
+        @Test
+        @DisplayName("Creates non-null registry")
+        void createsNonNullRegistry() {
+            assertNotNull(registry);
+        }
+
+        @Test
+        @DisplayName("Uses provided config")
+        void usesProvidedConfig() {
+            AppConfig customConfig = AppConfig.builder().dailyLikeLimit(50).build();
+            // Note: Using same dbManager since we can't easily create isolated instances
+            // Config customization is the key thing being tested
+            ServiceRegistry customRegistry = ServiceRegistry.Builder.buildH2(dbManager, customConfig);
+
+            assertSame(customConfig, customRegistry.getConfig());
+        }
+
+        @Test
+        @DisplayName("Uses default config when not specified")
+        void usesDefaultConfig() {
+            ServiceRegistry defaultRegistry = ServiceRegistry.Builder.buildH2(dbManager);
+
+            assertNotNull(defaultRegistry.getConfig());
+        }
+    }
+
+    @Nested
+    @DisplayName("Storage Getters")
+    class StorageGetters {
+
+        @Test
+        @DisplayName("getUserStorage returns non-null")
+        void getUserStorage() {
+            assertNotNull(registry.getUserStorage());
+        }
+
+        @Test
+        @DisplayName("getLikeStorage returns non-null")
+        void getLikeStorage() {
+            assertNotNull(registry.getLikeStorage());
+        }
+
+        @Test
+        @DisplayName("getMatchStorage returns non-null")
+        void getMatchStorage() {
+            assertNotNull(registry.getMatchStorage());
+        }
+
+        @Test
+        @DisplayName("getBlockStorage returns non-null")
+        void getBlockStorage() {
+            assertNotNull(registry.getBlockStorage());
+        }
+
+        @Test
+        @DisplayName("getReportStorage returns non-null")
+        void getReportStorage() {
+            assertNotNull(registry.getReportStorage());
+        }
+
+        @Test
+        @DisplayName("getSessionStorage returns non-null")
+        void getSessionStorage() {
+            assertNotNull(registry.getSessionStorage());
+        }
+
+        @Test
+        @DisplayName("getUserStatsStorage returns non-null")
+        void getUserStatsStorage() {
+            assertNotNull(registry.getUserStatsStorage());
+        }
+
+        @Test
+        @DisplayName("getPlatformStatsStorage returns non-null")
+        void getPlatformStatsStorage() {
+            assertNotNull(registry.getPlatformStatsStorage());
+        }
+
+        @Test
+        @DisplayName("getDailyPickStorage returns non-null")
+        void getDailyPickStorage() {
+            assertNotNull(registry.getDailyPickStorage());
+        }
+
+        @Test
+        @DisplayName("getUserAchievementStorage returns non-null")
+        void getUserAchievementStorage() {
+            assertNotNull(registry.getUserAchievementStorage());
+        }
+
+        @Test
+        @DisplayName("getProfileViewStorage returns non-null")
+        void getProfileViewStorage() {
+            assertNotNull(registry.getProfileViewStorage());
+        }
+
+        @Test
+        @DisplayName("getProfileNoteStorage returns non-null")
+        void getProfileNoteStorage() {
+            assertNotNull(registry.getProfileNoteStorage());
+        }
+
+        @Test
+        @DisplayName("getConversationStorage returns non-null")
+        void getConversationStorage() {
+            assertNotNull(registry.getConversationStorage());
+        }
+
+        @Test
+        @DisplayName("getMessageStorage returns non-null")
+        void getMessageStorage() {
+            assertNotNull(registry.getMessageStorage());
+        }
+
+        @Test
+        @DisplayName("getFriendRequestStorage returns non-null")
+        void getFriendRequestStorage() {
+            assertNotNull(registry.getFriendRequestStorage());
+        }
+
+        @Test
+        @DisplayName("getNotificationStorage returns non-null")
+        void getNotificationStorage() {
+            assertNotNull(registry.getNotificationStorage());
+        }
+    }
+
+    @Nested
+    @DisplayName("Service Getters")
+    class ServiceGetters {
+
+        @Test
+        @DisplayName("getCandidateFinder returns non-null")
+        void getCandidateFinder() {
+            assertNotNull(registry.getCandidateFinder());
+        }
+
+        @Test
+        @DisplayName("getMatchingService returns non-null")
+        void getMatchingService() {
+            assertNotNull(registry.getMatchingService());
+        }
+
+        @Test
+        @DisplayName("getTrustSafetyService returns non-null")
+        void getTrustSafetyService() {
+            assertNotNull(registry.getTrustSafetyService());
+        }
+
+        @Test
+        @DisplayName("getSessionService returns non-null")
+        void getSessionService() {
+            assertNotNull(registry.getSessionService());
+        }
+
+        @Test
+        @DisplayName("getStatsService returns non-null")
+        void getStatsService() {
+            assertNotNull(registry.getStatsService());
+        }
+
+        @Test
+        @DisplayName("getMatchQualityService returns non-null")
+        void getMatchQualityService() {
+            assertNotNull(registry.getMatchQualityService());
+        }
+
+        @Test
+        @DisplayName("getProfilePreviewService returns non-null")
+        void getProfilePreviewService() {
+            assertNotNull(registry.getProfilePreviewService());
+        }
+
+        @Test
+        @DisplayName("getDailyService returns non-null")
+        void getDailyService() {
+            assertNotNull(registry.getDailyService());
+        }
+
+        @Test
+        @DisplayName("getUndoService returns non-null")
+        void getUndoService() {
+            assertNotNull(registry.getUndoService());
+        }
+
+        @Test
+        @DisplayName("getAchievementService returns non-null")
+        void getAchievementService() {
+            assertNotNull(registry.getAchievementService());
+        }
+
+        @Test
+        @DisplayName("getMessagingService returns non-null")
+        void getMessagingService() {
+            assertNotNull(registry.getMessagingService());
+        }
+
+        @Test
+        @DisplayName("getRelationshipTransitionService returns non-null")
+        void getRelationshipTransitionService() {
+            assertNotNull(registry.getRelationshipTransitionService());
+        }
+    }
+
+    @Nested
+    @DisplayName("Config Getter")
+    class ConfigGetter {
+
+        @Test
+        @DisplayName("getConfig returns non-null")
+        void getConfigReturnsNonNull() {
+            assertNotNull(registry.getConfig());
+        }
+
+        @Test
+        @DisplayName("getConfig returns expected defaults")
+        void getConfigReturnsExpectedDefaults() {
+            AppConfig config = registry.getConfig();
+
+            // Verify some default values
+            assertNotNull(config.userTimeZone());
+            assertNotNull(config);
+        }
+    }
+}

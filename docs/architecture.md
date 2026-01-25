@@ -276,17 +276,23 @@ graph TB
 - `ReportService` - Reporting and auto-moderation
 - `StatsService` - Statistics aggregation
 
-**Storage Interfaces (10):**
-- `UserStorage` - CRUD for User entities
-- `LikeStorage` - CRUD for Like records + daily counting
-- `MatchStorage` - CRUD for Match entities + cascade delete
-- `BlockStorage` - CRUD for Block records
-- `ReportStorage` - CRUD for Report records
-- `SwipeSessionStorage` - CRUD + timeout queries + aggregates
-- `UserStatsStorage` - User metrics persistence
-- `PlatformStatsStorage` - Platform-wide metrics
-- `DailyPickStorage` - Daily pick view tracking
-- `UserAchievementStorage` - Achievement unlock tracking
+**Storage Interfaces (Nested in Domain Models):**
+- `UserInteractions.LikeStorage` - CRUD for Like records + daily counting
+- `UserInteractions.BlockStorage` - CRUD for Block records
+- `UserInteractions.ReportStorage` - CRUD for Report records
+- `Messaging.MessageStorage` - CRUD for Message records
+- `Messaging.ConversationStorage` - CRUD for Conversation records
+- `Social.FriendRequestStorage` - CRUD for FriendRequest records
+- `Social.NotificationStorage` - CRUD for Notification records
+- `Stats.UserStatsStorage` - User metrics persistence
+- `Stats.PlatformStatsStorage` - Platform-wide metrics
+- `Match.MatchStorage` - CRUD for Match entities + cascade delete
+- `Achievement.UserAchievementStorage` - Achievement unlock tracking
+- `SwipeSession.SwipeSessionStorage` - CRUD + timeout queries + aggregates
+- `ProfilePreviewService.ProfileViewStorage` - Profile view tracking
+- `User.ProfileNoteStorage` - Profile note persistence
+- `DailyService.DailyPickStorage` - Daily pick view tracking
+- `UserStorage` (standalone) - CRUD for User entities (primary entity storage)
 
 **Utilities (5):**
 - `GeoUtils` - Haversine distance calculation

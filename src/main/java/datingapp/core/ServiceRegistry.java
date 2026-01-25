@@ -16,20 +16,15 @@ import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.LikeStorage;
 import datingapp.core.UserInteractions.ReportStorage;
 import datingapp.storage.DatabaseManager;
-import datingapp.storage.H2BlockStorage;
 import datingapp.storage.H2ConversationStorage;
-import datingapp.storage.H2DailyPickViewStorage;
-import datingapp.storage.H2FriendRequestStorage;
 import datingapp.storage.H2LikeStorage;
 import datingapp.storage.H2MatchStorage;
 import datingapp.storage.H2MessageStorage;
-import datingapp.storage.H2NotificationStorage;
-import datingapp.storage.H2PlatformStatsStorage;
-import datingapp.storage.H2ProfileNoteStorage;
-import datingapp.storage.H2ProfileViewStorage;
-import datingapp.storage.H2ReportStorage;
+import datingapp.storage.H2MetricsStorage;
+import datingapp.storage.H2ModerationStorage;
+import datingapp.storage.H2ProfileDataStorage;
+import datingapp.storage.H2SocialStorage;
 import datingapp.storage.H2SwipeSessionStorage;
-import datingapp.storage.H2UserAchievementStorage;
 import datingapp.storage.H2UserStatsStorage;
 import datingapp.storage.H2UserStorage;
 import java.util.Objects;
@@ -280,16 +275,37 @@ public class ServiceRegistry {
          * @return Fully wired ServiceRegistry
          */
         public static ServiceRegistry buildH2(DatabaseManager dbManager, AppConfig config) {
-            // Storage layer
+            // Core storage layer
             User.Storage userStorage = new H2UserStorage(dbManager);
             LikeStorage likeStorage = new H2LikeStorage(dbManager);
             MatchStorage matchStorage = new H2MatchStorage(dbManager);
-            BlockStorage blockStorage = new H2BlockStorage(dbManager);
-            ReportStorage reportStorage = new H2ReportStorage(dbManager);
             SwipeSessionStorage sessionStorage = new H2SwipeSessionStorage(dbManager);
             UserStatsStorage userStatsStorage = new H2UserStatsStorage(dbManager);
-            PlatformStatsStorage platformStatsStorage = new H2PlatformStatsStorage(dbManager);
-            DailyPickStorage dailyPickStorage = new H2DailyPickViewStorage(dbManager);
+
+            // Consolidated moderation storage (blocks + reports)
+            H2ModerationStorage moderationStorage = new H2ModerationStorage(dbManager);
+            BlockStorage blockStorage = moderationStorage.blocks();
+            ReportStorage reportStorage = moderationStorage.reports();
+
+            // Consolidated metrics storage (platform stats, daily picks, achievements)
+            H2MetricsStorage metricsStorage = new H2MetricsStorage(dbManager);
+            PlatformStatsStorage platformStatsStorage = metricsStorage.platformStats();
+            DailyPickStorage dailyPickStorage = metricsStorage.dailyPicks();
+            UserAchievementStorage userAchievementStorage = metricsStorage.achievements();
+
+            // Consolidated profile data storage (views + notes)
+            H2ProfileDataStorage profileDataStorage = new H2ProfileDataStorage(dbManager);
+            ProfileViewStorage profileViewStorage = profileDataStorage.views();
+            ProfileNoteStorage profileNoteStorage = profileDataStorage.notes();
+
+            // Messaging storage (Phase 2)
+            ConversationStorage conversationStorage = new H2ConversationStorage(dbManager);
+            MessageStorage messageStorage = new H2MessageStorage(dbManager);
+
+            // Consolidated social storage (friend requests + notifications)
+            H2SocialStorage socialStorage = new H2SocialStorage(dbManager);
+            FriendRequestStorage friendRequestStorage = socialStorage.friendRequests();
+            NotificationStorage notificationStorage = socialStorage.notifications();
 
             // Services
             CandidateFinder candidateFinder = new CandidateFinder();
@@ -306,8 +322,7 @@ public class ServiceRegistry {
                     new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, config);
             UndoService undoService = new UndoService(likeStorage, matchStorage, config);
 
-            // Achievement System (Phase 1)
-            UserAchievementStorage userAchievementStorage = new H2UserAchievementStorage(dbManager);
+            // Achievement Service (Phase 1)
             AchievementService achievementService = new AchievementService(
                     userAchievementStorage,
                     matchStorage,
@@ -316,19 +331,11 @@ public class ServiceRegistry {
                     reportStorage,
                     profilePreviewService);
 
-            // Profile Views & Notes (Phase 1.5)
-            ProfileViewStorage profileViewStorage = new H2ProfileViewStorage(dbManager);
-            ProfileNoteStorage profileNoteStorage = new H2ProfileNoteStorage(dbManager);
-
-            // Messaging (Phase 2)
-            ConversationStorage conversationStorage = new H2ConversationStorage(dbManager);
-            MessageStorage messageStorage = new H2MessageStorage(dbManager);
+            // Messaging Service (Phase 2)
             MessagingService messagingService =
                     new MessagingService(conversationStorage, messageStorage, matchStorage, userStorage);
 
-            // Relationship Lifecycle (Phase 2 & 3)
-            FriendRequestStorage friendRequestStorage = new H2FriendRequestStorage(dbManager);
-            NotificationStorage notificationStorage = new H2NotificationStorage(dbManager);
+            // Relationship Lifecycle Service (Phase 2 & 3)
             RelationshipTransitionService relationshipTransitionService = new RelationshipTransitionService(
                     matchStorage, friendRequestStorage, conversationStorage, notificationStorage);
 

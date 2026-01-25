@@ -4,7 +4,7 @@ import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfileCompletionService.CompletionResult;
 import datingapp.core.User;
 import datingapp.ui.ViewModelFactory.UISession;
-import datingapp.ui.util.ToastService;
+import datingapp.ui.util.UiServices;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -112,7 +112,7 @@ public class ProfileViewModel {
                 if (parts.length == 2) {
                     user.setLocation(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()));
                 }
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException _) {
                 logger.warn("Could not parse location: {}", loc);
             }
         }
@@ -191,14 +191,14 @@ public class ProfileViewModel {
                 // 5. Update UI on FX thread
                 Platform.runLater(() -> {
                     primaryPhotoUrl.set(photoUrl);
-                    ToastService.getInstance().showSuccess("Photo saved!");
+                    UiServices.Toast.getInstance().showSuccess("Photo saved!");
                     logger.info("Profile photo saved: {}", destination);
                 });
 
             } catch (IOException e) {
                 logger.error("Failed to save profile photo", e);
                 Platform.runLater(
-                        () -> ToastService.getInstance().showError("Failed to save photo: " + e.getMessage()));
+                        () -> UiServices.Toast.getInstance().showError("Failed to save photo: " + e.getMessage()));
             }
         });
     }

@@ -14,14 +14,61 @@
 
 # AGENTS.md - AI Agent Development Guide
 
+## Development Environment
+
+**Platform:** Windows 11 (10.0, amd64)
+**Shell:** PowerShell 7.5.4
+**IDE:** VS Code Insiders
+**Java:** OpenJDK 25.0.1 (Eclipse Adoptium Temurin) with `--enable-preview`
+**Maven:** Apache Maven 3.9.12
+**JavaFX:** 25.0.1
+**UI Theme:** AtlantaFX 2.1.0 (GitHub Primer-based modern theme)
+**Icons:** Ikonli 12.4.0 with Material Design 2 icon pack
+**Database:** H2 2.4.240 (embedded, file-based)
+
+You are operating in an environment where ast-grep is installed. For any code search that requires understanding of syntax or code structure, you should default to using ast-grep --lang [language] -p '<pattern>'. Adjust the --lang flag as needed for the specific programming language. Avoid using text-only search tools unless a plain-text search is explicitly requested.
+
+### Windows Setup Requirements
+
+**UTF-8 Console Encoding** (REQUIRED for emoji display in CLI):
+```powershell
+chcp 65001  # Run before starting the app
+```
+
+Or set permanently:
+1. Run `intl.cpl`
+2. Administrative → Change system locale
+3. Check "Beta: Use Unicode UTF-8 for worldwide language support"
+4. Restart
+
+**Note:** Platform encoding is already UTF-8 by default on this system.
+
+### Available System Tools
+
+These tools are installed on the development machine and can be leveraged:
+
+- **ripgrep** (`rg`) v14.1.0 - Ultra-fast regex search, respects `.gitignore` by default
+- **ast-grep** (`sg`) v0.40.0 - AST-based structural code search and refactoring
+- **tokei** v12.1.2 - Fast lines-of-code/comments/blanks counter across all languages
+- **fd** v10.3.0 - User-friendly alternative to `find` for file system traversal
+- **fzf** v0.67.0 - Interactive fuzzy finder for command-line filtering
+- **bat** v0.26.0 - `cat` clone with syntax highlighting and Git integration
+- **sd** v1.0.0 - Intuitive find & replace (simpler than `sed`)
+- **jq** v1.8.1 - Command-line JSON processor
+- **yq** v4.48.2 - YAML/TOML/XML processor
+- **Semgrep** v1.140.0 - Polyglot SAST and logic checker
+
+**Usage Tip:** Prefer `rg` over `grep` and `fd` over `find` for faster searches.
+
 ## Essential Commands
 
 ```bash
 # Build & Run
 mvn compile                          # Compile source
-mvn exec:java                        # Run CLI app
-mvn javafx:run                       # Run JavaFX GUI app
-mvn package                          # Build fat JAR
+mvn exec:java                        # Run CLI app (may have input buffering)
+mvn javafx:run                       # Run JavaFX GUI app (experimental UI)
+mvn package                          # Build fat JAR (creates target/dating-app-1.0.0-shaded.jar)
+java -jar target/dating-app-1.0.0-shaded.jar  # Run from JAR (RECOMMENDED - better terminal support)
 
 # Testing
 mvn test                             # All tests
@@ -176,6 +223,14 @@ public void setName(String name) {
 - Map old defaults in `fromDatabase()` for legacy rows
 
 ## Database Patterns
+
+**H2 Database Configuration:**
+- **Location:** `./data/dating.mv.db` (file-based, auto-created on first run)
+- **JDBC URL:** `jdbc:h2:./data/dating`
+- **Username:** `sa`
+- **Password:** `changeit` (hardcoded for development; use env var `DATING_APP_DB_PASSWORD` in production)
+- **Mode:** Embedded (no separate server process)
+- **Auto-Server:** Disabled during tests to prevent locking issues
 
 **H2 Storage Implementation:**
 ```java
@@ -428,9 +483,11 @@ Before committing changes, verify:
 - Use feature flags for incomplete features
 - Add TODO comments for future improvements
 
-**Last Updated:** 2026-01-14
-**Phase:** 1.5
+**Last Updated:** 2026-01-25
+**Phase:** 2.2 (file-consolidation complete: 128 Java files, 464 tests passing)
 **Repository:** https://github.com/TomShtern/Date_Program.git
+**Total Java Files:** 128 in `src/` (81 main + 47 test files)
+**Test Coverage:** 60% minimum (JaCoCo enforced, excludes ui/ and cli/)
 
 
 
@@ -453,4 +510,5 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 12|2026-01-24 18:10:00|agent:github_copilot|core-trust-safety|Consolidate VerificationService + ReportService into TrustSafetyService; update CLI/service registry/tests; remove old files|src/main/java/datingapp/core/TrustSafetyService.java;src/main/java/datingapp/core/ServiceRegistry.java;src/main/java/datingapp/cli/SafetyHandler.java;src/main/java/datingapp/cli/ProfileVerificationHandler.java;src/main/java/datingapp/Main.java;src/test/java/datingapp/core/ReportServiceTest.java;src/test/java/datingapp/core/VerificationServiceTest.java;docs/core-consolidation-plan.md
 13|2026-01-24 18:40:00|agent:github_copilot|core-daily|Consolidate DailyLimitService + DailyPickService into DailyService; update CLI/UI/tests; remove old files|src/main/java/datingapp/core/DailyService.java;src/main/java/datingapp/core/ServiceRegistry.java;src/main/java/datingapp/cli/MatchingHandler.java;src/main/java/datingapp/Main.java;src/main/java/datingapp/ui/viewmodel/DashboardViewModel.java;src/main/java/datingapp/ui/ViewModelFactory.java;src/test/java/datingapp/core/DailyLimitServiceTest.java;src/test/java/datingapp/core/DailyPickServiceTest.java;docs/core-consolidation-plan.md
 14|2026-01-25 05:05:00|agent:github_copilot|file-consolidation|Complete Batches 4-6: Nested 10 storage interfaces into domain files; merged ProfileVerificationHandler→SafetyHandler, UserManagementHandler→ProfileHandler. Reduced from 159 to 132 Java files (-27, -17%). All 464 tests pass.|src/main/java/datingapp/core/Messaging.java;src/main/java/datingapp/core/Social.java;src/main/java/datingapp/core/Stats.java;src/main/java/datingapp/core/Match.java;src/main/java/datingapp/core/Achievement.java;src/main/java/datingapp/core/ProfilePreviewService.java;src/main/java/datingapp/core/User.java;src/main/java/datingapp/core/SwipeSession.java;src/main/java/datingapp/cli/SafetyHandler.java;src/main/java/datingapp/cli/ProfileHandler.java;src/main/java/datingapp/Main.java;src/test/java/datingapp/cli/ProfileCreateSelectTest.java;FILE_CONSOLIDATION_IMPLEMENTATION_PLAN.md
+15|2026-01-25 08:30:00|agent:github_copilot|doc-finalize|Verify file consolidation complete (159→128 files, -31, -19.5%); update docs with actual results; mark plan complete|FILE_COUNT_REDUCTION_REPORT.md;docs/architecture.md;FILE_CONSOLIDATION_IMPLEMENTATION_PLAN.md;AGENTS.md
 ---AGENT-LOG-END---

@@ -1,8 +1,8 @@
 package datingapp.ui.controller;
 
 import datingapp.ui.NavigationService;
-import datingapp.ui.util.ToastService;
 import datingapp.ui.util.UiAnimations;
+import datingapp.ui.util.UiServices;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
 import java.net.URL;
@@ -241,11 +241,11 @@ public class ProfileController extends BaseController implements Initializable {
                     viewModel.savePhoto(selectedFile);
                 } else {
                     logger.warn("Failed to load image: {}", selectedFile.getAbsolutePath());
-                    ToastService.getInstance().showError("Failed to load image");
+                    UiServices.Toast.getInstance().showError("Failed to load image");
                 }
             } catch (Exception e) {
                 logger.error("Error loading profile photo", e);
-                ToastService.getInstance().showError("Error loading photo: " + e.getMessage());
+                UiServices.Toast.getInstance().showError("Error loading photo: " + e.getMessage());
             }
         }
     }

@@ -20,6 +20,7 @@ mvn compile                              # Compile
 mvn exec:java                            # Run CLI app
 mvn javafx:run                           # Run JavaFX GUI
 mvn package                              # Build fat JAR
+java -jar target/dating-app-1.0.0-shaded.jar  # Run from JAR (best terminal support)
 
 # Testing
 mvn test                                 # All tests
@@ -36,6 +37,8 @@ mvn jacoco:report                        # Generate coverage report
 
 **Phase 2.1** console dating app: **Java 25** + Maven + H2 embedded DB. Features: matching, messaging, relationship transitions (Friend Zone/Graceful Exit), pace compatibility, achievements, interests matching.
 
+**Post-Consolidation Stats (2026-01-25):** 128 Java files (81 main + 47 test), 464 tests passing, 60% coverage minimum.
+
 ### Package Structure
 
 | Package    | Purpose                  | Rule                                |
@@ -47,36 +50,48 @@ mvn jacoco:report                        # Generate coverage report
 
 ### Domain Models (`core/`)
 
-| Model             | Type      | State Machine / Key Fields                                                      |
-|-------------------|-----------|---------------------------------------------------------------------------------|
-| `User`            | Mutable   | `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`, interests (max 10), verification    |
-| `Match`           | Mutable   | `ACTIVE → FRIENDS \| UNMATCHED \| GRACEFUL_EXIT \| BLOCKED`, deterministic ID|
-| `Like`            | Immutable | direction (`LIKE`/`PASS`), timestamp                                            |
-| `Block`, `Report` | Immutable | Safety records                                                                  |
-| `Conversation`    | Mutable   | deterministic ID (`userA_userB`), per-user read timestamps                      |
-| `Message`         | Immutable | max 1000 chars, sender, timestamp                                               |
-| `FriendRequest`   | Immutable | status: `PENDING → ACCEPTED \| DECLINED \| EXPIRED`                          |
-| `Notification`    | Immutable | type, title, message, metadata, read status                                     |
-| `PacePreferences` | Immutable | messagingFrequency, timeToFirstDate, communicationStyle, depthPreference        |
-| `SwipeSession`    | Mutable   | `ACTIVE → COMPLETED`, velocity tracking                                      |
-| `MatchQuality`    | Immutable | score (0-100), star rating (1-5), highlights                                    |
-| `Dealbreakers`    | Immutable | lifestyle, physical, age filters                                                |
-| `Interest`        | Enum      | 37 interests in 6 categories                                                    |
-| `Achievement`     | Enum      | 11 achievements in 4 categories                                                 |
+| Model                 | Type      | Location / Key Fields                                                           |
+|-----------------------|-----------|---------------------------------------------------------------------------------|
+| `User`                | Mutable   | Own file; `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`; nested `Storage` interface |
+| `User.Storage`        | Interface | Nested in `User.java` - storage contract for users                              |
+| `Match`               | Mutable   | Own file; `ACTIVE → FRIENDS \| UNMATCHED \| GRACEFUL_EXIT \| BLOCKED`        |
+| `Match.Storage`       | Interface | Nested in `Match.java` - storage contract for matches                           |
+| `Messaging.Message`   | Immutable | `Messaging.java`; max 1000 chars, sender, timestamp                             |
+| `Messaging.Conversation` | Mutable | `Messaging.java`; deterministic ID (`userA_userB`), per-user read timestamps   |
+| `Social.FriendRequest`| Immutable | `Social.java`; status: `PENDING → ACCEPTED \| DECLINED \| EXPIRED`           |
+| `Social.Notification` | Immutable | `Social.java`; type, title, message, metadata, read status                      |
+| `Stats.UserStats`     | Immutable | `Stats.java`; user activity metrics                                             |
+| `Stats.MatchQuality`  | Immutable | `Stats.java`; score (0-100), star rating (1-5), highlights                      |
+| `Preferences.Interest`| Enum      | `Preferences.java`; 37 interests in 6 categories                                |
+| `Preferences.Lifestyle`| Records  | `Preferences.java`; Smoking, Drinking, WantsKids, etc.                          |
+| `Preferences.PacePreferences` | Immutable | `Preferences.java`; messaging frequency, communication style            |
+| `Achievement`         | Enum      | `Achievement.java`; 11 achievements in 4 categories; nested `Storage` interface |
+| `SwipeSession`        | Mutable   | Own file; `ACTIVE → COMPLETED`, velocity tracking; nested `Storage` interface |
+| `Dealbreakers`        | Immutable | Own file; lifestyle, physical, age filters + `Evaluator` inner class            |
+| `UserInteractions`    | Container | `UserInteractions.java`; `Like`, `Block`, `Report` records + storage interfaces |
 
 ### Services (`core/`)
 
-**Core**: `CandidateFinder` (7-stage filter), `MatchingService`, `ReportService`
+**Core**: `CandidateFinder` (7-stage filter), `MatchingService` (includes LikerBrowser, PaceCompatibility), `TrustSafetyService` (includes Verification, Reports)
 
-**Phase 1**: `UndoService`, `DailyLimitService`, `MatchQualityService`, `DealbreakersEvaluator`, `SessionService`, `ProfilePreviewService`, `StatsService`
+**Phase 1**: `UndoService`, `DailyService` (merged Limits + Picks), `MatchQualityService`, `SessionService`, `ProfilePreviewService`, `StatsService`
 
-**Phase 1.5+**: `InterestMatcher`, `AchievementService`, `DailyPickService`, `LikerBrowserService`, `ProfileCompletionService`, `VerificationService`
+**Phase 1.5+**: `AchievementService`, `ProfileCompletionService`
 
-**Phase 2.0+**: `MessagingService`, `PaceCompatibilityService`, `RelationshipTransitionService`
+**Phase 2.0+**: `MessagingService`, `RelationshipTransitionService`
 
-### Storage Interfaces (`core/` → `storage/`)
+### Storage Interfaces (Consolidated Pattern)
 
-All interfaces defined in `core/`, implemented as `H2*Storage` in `storage/`. Data: `./data/dating.mv.db`
+Storage interfaces are now **nested inside their domain classes** following the pattern:
+```java
+public class User {
+    public interface Storage { void save(User user); User get(UUID id); ... }
+}
+```
+
+This applies to: `User.Storage`, `Match.Storage`, `Achievement.Storage`, `SwipeSession.Storage`, plus interfaces in `UserInteractions`, `Messaging`, `Social`, `Stats`.
+
+All implementations remain as `H2*Storage` classes in `storage/` extending `AbstractH2Storage`. Data: `./data/dating.mv.db`
 
 ## Coding Standards Quick Reference
 
@@ -98,6 +113,17 @@ All interfaces defined in `core/`, implemented as `H2*Storage` in `storage/`. Da
 | `Optional<T>` | Nullable return values                           |
 
 ### Key Patterns
+
+**Nested Storage Interface (NEW - Post-Consolidation):**
+```java
+public class DomainEntity {
+    public interface Storage {
+        void save(DomainEntity entity);
+        DomainEntity get(UUID id);
+    }
+    // ... entity fields and methods
+}
+```
 
 **Factory Methods:**
 ```java
@@ -151,6 +177,12 @@ public static String generateId(UUID a, UUID b) {
 
 ## Storage Layer Patterns
 
+**AbstractH2Storage Base Class (NEW):**
+All H2 storage classes extend `AbstractH2Storage` which provides:
+- `addColumnIfNotExists()` - Schema migration helper
+- Common error handling wrapping `SQLException` → `StorageException`
+- DatabaseManager injection via constructor
+
 **JDBC Pattern:**
 ```java
 try (Connection conn = dbManager.getConnection();
@@ -189,7 +221,7 @@ int val = rs.getInt("col"); if (rs.wasNull()) { val = null; }
 
 ### Mock Pattern:
 ```java
-static class InMemoryUserStorage implements UserStorage {
+static class InMemoryUserStorage implements User.Storage {
     private final Map<UUID, User> users = new HashMap<>();
     @Override public void save(User u) { users.put(u.getId(), u); }
     @Override public User get(UUID id) { return users.get(id); }
@@ -224,6 +256,36 @@ static class InMemoryUserStorage implements UserStorage {
 | PMD        | 3.28.0  | Bug detection (advisory)              |
 | JaCoCo     | 0.8.14  | Coverage (60% min, excludes ui/cli)   |
 
+## Recent Updates (2026-01-25)
+
+### Major Consolidation Complete
+The codebase underwent significant consolidation reducing file count by ~17%:
+
+**Service Consolidations:**
+- `DailyLimitService` + `DailyPickService` → `DailyService`
+- `VerificationService` + `ReportService` → `TrustSafetyService`
+- `LikerBrowserService` + `PaceCompatibilityService` → merged into `MatchingService`
+- `DealbreakersEvaluator` → nested `Evaluator` class in `Dealbreakers`
+
+**Storage Interface Nesting:**
+- 10 standalone `*Storage.java` interfaces moved into their domain classes as nested interfaces
+- Examples: `UserStorage` → `User.Storage`, `MatchStorage` → `Match.Storage`
+
+**CLI Handler Merges:**
+- `ProfileVerificationHandler` → merged into `SafetyHandler`
+- `UserManagementHandler` → merged into `ProfileHandler`
+- `InputReader`, `UserSession` → merged into `CliUtilities`
+
+**Domain Model Grouping:**
+- `Message` + `Conversation` → `Messaging.java`
+- `FriendRequest` + `Notification` → `Social.java`
+- `UserStats` + `PlatformStats` + `MatchQuality` → `Stats.java`
+- `Interest` + `Lifestyle` + `PacePreferences` → `Preferences.java`
+- `Like` + `Block` + `Report` → `UserInteractions.java`
+
+**New Infrastructure:**
+- `AbstractH2Storage` base class reducing boilerplate across 16 storage implementations
+
 ## Known Limitations
 
 **Phase 0**: No transactions (undo not atomic), in-memory undo state, single-user console, no auth
@@ -246,4 +308,5 @@ static class InMemoryUserStorage implements UserStorage {
 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples regen|src/ui/*
 2|2026-01-16 00:00:00|agent:claude_code|docs|CLAUDE.md slimmed 49k→20k chars|CLAUDE.md
 3|2026-01-16 01:00:00|agent:claude_code|docs|Enhanced with coding standards, patterns, anti-patterns|CLAUDE.md
+4|2026-01-25 12:00:00|agent:claude_code|docs|Updated CLAUDE.md for post-consolidation: nested Storage interfaces, new domain groupings (Messaging/Social/Stats/Preferences/UserInteractions), service merges, AbstractH2Storage|CLAUDE.md
 ---AGENT-LOG-END---

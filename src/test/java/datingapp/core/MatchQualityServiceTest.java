@@ -1,9 +1,13 @@
 package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.MatchQualityService.InterestMatcher;
 import datingapp.core.MatchQualityService.MatchQuality;
+import datingapp.core.MatchQualityService.MatchQualityConfig;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
@@ -292,6 +296,253 @@ class MatchQualityServiceTest {
         void halfScoreRendersHalfFilled() {
             String bar = MatchQualityService.renderProgressBar(0.5, 10);
             assertEquals("█████░░░░░", bar);
+        }
+    }
+
+    // ==================== MATCH QUALITY CONFIG TESTS ====================
+
+    @Nested
+    @DisplayName("MatchQualityConfig Validation")
+    class ConfigValidationTests {
+
+        @Test
+        @DisplayName("Default config weights sum to 1.0")
+        void defaultConfigSumsToOne() {
+            MatchQualityConfig config = MatchQualityConfig.defaults();
+
+            double total = config.distanceWeight()
+                    + config.ageWeight()
+                    + config.interestWeight()
+                    + config.lifestyleWeight()
+                    + config.paceWeight()
+                    + config.responseWeight();
+
+            assertEquals(1.0, total, 0.001);
+        }
+
+        @Test
+        @DisplayName("Proximity focused config weights sum to 1.0")
+        void proximityFocusedSumsToOne() {
+            MatchQualityConfig config = MatchQualityConfig.proximityFocused();
+
+            double total = config.distanceWeight()
+                    + config.ageWeight()
+                    + config.interestWeight()
+                    + config.lifestyleWeight()
+                    + config.paceWeight()
+                    + config.responseWeight();
+
+            assertEquals(1.0, total, 0.001);
+        }
+
+        @Test
+        @DisplayName("Lifestyle focused config weights sum to 1.0")
+        void lifestyleFocusedSumsToOne() {
+            MatchQualityConfig config = MatchQualityConfig.lifestyleFocused();
+
+            double total = config.distanceWeight()
+                    + config.ageWeight()
+                    + config.interestWeight()
+                    + config.lifestyleWeight()
+                    + config.paceWeight()
+                    + config.responseWeight();
+
+            assertEquals(1.0, total, 0.001);
+        }
+
+        @Test
+        @DisplayName("Throws if weights don't sum to 1.0")
+        void throwsIfWeightsDontSumToOne() {
+            assertThrows(IllegalArgumentException.class, () -> new MatchQualityConfig(0.5, 0.5, 0.5, 0.5, 0.5, 0.5));
+        }
+
+        @Test
+        @DisplayName("Throws if any weight is negative")
+        void throwsIfNegativeWeight() {
+            assertThrows(IllegalArgumentException.class, () -> new MatchQualityConfig(-0.1, 0.3, 0.2, 0.2, 0.2, 0.2));
+        }
+
+        @Test
+        @DisplayName("Allows custom valid weights")
+        void allowsCustomValidWeights() {
+            MatchQualityConfig config = new MatchQualityConfig(0.1, 0.1, 0.2, 0.2, 0.2, 0.2);
+
+            assertEquals(0.1, config.distanceWeight());
+            assertEquals(0.1, config.ageWeight());
+            assertEquals(0.2, config.interestWeight());
+            assertEquals(0.2, config.lifestyleWeight());
+            assertEquals(0.2, config.paceWeight());
+            assertEquals(0.2, config.responseWeight());
+        }
+
+        @Test
+        @DisplayName("Allows zero weights if sum is 1.0")
+        void allowsZeroWeights() {
+            MatchQualityConfig config = new MatchQualityConfig(0.0, 0.0, 0.5, 0.5, 0.0, 0.0);
+
+            assertEquals(0.0, config.distanceWeight());
+            assertEquals(0.0, config.ageWeight());
+            assertEquals(0.5, config.interestWeight());
+            assertEquals(0.5, config.lifestyleWeight());
+        }
+
+        @Test
+        @DisplayName("Allows all weight in one category")
+        void allowsAllWeightInOneCategory() {
+            MatchQualityConfig config = new MatchQualityConfig(1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+
+            assertEquals(1.0, config.distanceWeight());
+            assertEquals(0.0, config.ageWeight());
+        }
+
+        @Test
+        @DisplayName("Throws if weights sum slightly below 1.0")
+        void throwsIfWeightsSumBelowOne() {
+            assertThrows(
+                    IllegalArgumentException.class, () -> new MatchQualityConfig(0.15, 0.15, 0.15, 0.15, 0.15, 0.15));
+        }
+
+        @Test
+        @DisplayName("Throws if weights sum slightly above 1.0")
+        void throwsIfWeightsSumAboveOne() {
+            assertThrows(IllegalArgumentException.class, () -> new MatchQualityConfig(0.2, 0.2, 0.2, 0.2, 0.2, 0.2));
+        }
+
+        @Test
+        @DisplayName("Throws if any weight exceeds 1.0")
+        void throwsIfWeightExceedsOne() {
+            assertThrows(IllegalArgumentException.class, () -> new MatchQualityConfig(1.5, 0.0, 0.0, 0.0, 0.0, -0.5));
+        }
+    }
+
+    // ==================== INTEREST MATCHER TESTS ====================
+
+    @Nested
+    @DisplayName("InterestMatcher - Compare")
+    class InterestMatcherCompareTests {
+
+        @Test
+        @DisplayName("Identical sets returns overlap ratio 1.0")
+        void identicalSets_returnsOverlapRatio1() {
+            Set<Interest> setA = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL);
+            Set<Interest> setB = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL);
+
+            InterestMatcher.MatchResult result = InterestMatcher.compare(setA, setB);
+
+            assertEquals(3, result.sharedCount());
+            assertEquals(1.0, result.overlapRatio(), 0.001);
+            assertEquals(1.0, result.jaccardIndex(), 0.001);
+        }
+
+        @Test
+        @DisplayName("No overlap returns overlap ratio 0.0")
+        void noOverlap_returnsOverlapRatio0() {
+            Set<Interest> setA = EnumSet.of(Interest.HIKING, Interest.COFFEE);
+            Set<Interest> setB = EnumSet.of(Interest.MOVIES, Interest.MUSIC);
+
+            InterestMatcher.MatchResult result = InterestMatcher.compare(setA, setB);
+
+            assertEquals(0, result.sharedCount());
+            assertEquals(0.0, result.overlapRatio(), 0.001);
+            assertEquals(0.0, result.jaccardIndex(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Partial overlap calculates correctly")
+        void partialOverlap_calculatesCorrectly() {
+            Set<Interest> setA = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL);
+            Set<Interest> setB = EnumSet.of(Interest.HIKING, Interest.MOVIES, Interest.TRAVEL);
+
+            InterestMatcher.MatchResult result = InterestMatcher.compare(setA, setB);
+
+            assertEquals(2, result.sharedCount());
+            // shared(2) / minSize(3) = 0.666
+            assertEquals(0.666, result.overlapRatio(), 0.001);
+            // shared(2) / union(4) = 0.5
+            assertEquals(0.5, result.jaccardIndex(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Asymmetric sizes uses smallest denominator")
+        void asymmetricSizes_usesSmallestDenominator() {
+            Set<Interest> setA = EnumSet.of(Interest.HIKING, Interest.COFFEE);
+            Set<Interest> setB =
+                    EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL, Interest.MOVIES, Interest.COFFEE);
+
+            InterestMatcher.MatchResult result = InterestMatcher.compare(setA, setB);
+
+            assertEquals(2, result.sharedCount());
+            // shared(2) / minSize(2) = 1.0
+            assertEquals(1.0, result.overlapRatio(), 0.001);
+            // shared(2) / union(4) = 0.5
+            assertEquals(0.5, result.jaccardIndex(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Empty sets handles gracefully")
+        void emptySets_handlesGracefully() {
+            InterestMatcher.MatchResult result =
+                    InterestMatcher.compare(EnumSet.noneOf(Interest.class), EnumSet.noneOf(Interest.class));
+            assertEquals(0, result.sharedCount());
+            assertEquals(0.0, result.overlapRatio());
+        }
+
+        @Test
+        @DisplayName("Null inputs handles gracefully")
+        void nullInputs_handlesGracefully() {
+            InterestMatcher.MatchResult result = InterestMatcher.compare(null, null);
+            assertNotNull(result);
+            assertEquals(0, result.sharedCount());
+        }
+    }
+
+    @Nested
+    @DisplayName("InterestMatcher - Format Shared Interests")
+    class InterestMatcherFormatTests {
+
+        @Test
+        @DisplayName("Single interest returns name")
+        void singleInterest_returnsName() {
+            Set<Interest> shared = EnumSet.of(Interest.HIKING);
+            assertEquals("Hiking", InterestMatcher.formatSharedInterests(shared));
+        }
+
+        @Test
+        @DisplayName("Two interests joins with 'and'")
+        void twoInterests_joinsWithAnd() {
+            Set<Interest> shared = EnumSet.of(Interest.HIKING, Interest.COFFEE);
+            // Order depends on EnumSet, hiking is first
+            String formatted = InterestMatcher.formatSharedInterests(shared);
+            assertTrue(formatted.contains("Hiking") && formatted.contains("Coffee") && formatted.contains("and"));
+        }
+
+        @Test
+        @DisplayName("Three interests joins with comma and 'and'")
+        void threeInterests_joinsWithCommaAnd() {
+            Set<Interest> shared = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL);
+            String formatted = InterestMatcher.formatSharedInterests(shared);
+            assertEquals("Hiking, Coffee, and Travel", formatted);
+        }
+
+        @Test
+        @DisplayName("Four+ interests shows 'and X more'")
+        void fourPlusInterests_showsAndXMore() {
+            Set<Interest> shared = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL, Interest.MOVIES);
+            String formatted = InterestMatcher.formatSharedInterests(shared);
+            // EnumSet iterates by ordinal: HIKING(0), MOVIES(6), COFFEE(18), TRAVEL(31)
+            assertEquals("Hiking, Movies, Coffee, and 1 more", formatted);
+        }
+
+        @Test
+        @DisplayName("Empty set returns empty string")
+        void emptySet_returnsEmptyString() {
+            assertEquals("", InterestMatcher.formatSharedInterests(EnumSet.noneOf(Interest.class)));
+        }
+
+        @Test
+        @DisplayName("Null set returns empty string")
+        void nullSet_returnsEmptyString() {
+            assertEquals("", InterestMatcher.formatSharedInterests(null));
         }
     }
 

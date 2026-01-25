@@ -20,6 +20,9 @@ import org.kordamp.ikonli.javafx.FontIcon;
 /**
  * Controller for the "It's a Match!" celebration popup.
  * Displays confetti, animated avatars, and action buttons.
+ *
+ * <p>FXML controller reference:
+ * {@code fx:controller="datingapp.ui.controller.MatchPopupController"}
  */
 public class MatchPopupController implements Initializable {
 

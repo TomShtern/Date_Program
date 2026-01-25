@@ -26,7 +26,7 @@ class H2DailyPickViewStorageTest {
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:test_daily_pick_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
         DatabaseManager.resetInstance();
         dbManager = DatabaseManager.getInstance();
-        storage = new H2DailyPickViewStorage(dbManager);
+        storage = new H2MetricsStorage(dbManager).dailyPicks();
     }
 
     @AfterEach
@@ -53,15 +53,7 @@ class H2DailyPickViewStorageTest {
         assertFalse(storage.hasViewed(userId, date), "Should return false before marking as viewed");
     }
 
-    @Test
-    void hasViewed_returnsTrue_afterMarking() {
-        UUID userId = UUID.randomUUID();
-        LocalDate date = LocalDate.now();
-
-        storage.markViewed(userId, date);
-
-        assertTrue(storage.hasViewed(userId, date), "Should return true after marking as viewed");
-    }
+    // Note: hasViewed_returnsTrue_afterMarking was removed as it was identical to markViewed_createsRecord
 
     @Test
     void hasViewed_differentDates_independent() {

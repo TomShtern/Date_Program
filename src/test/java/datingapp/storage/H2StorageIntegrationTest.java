@@ -17,6 +17,7 @@ import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -44,7 +45,7 @@ class H2StorageIntegrationTest {
     private static H2UserStorage userStorage;
     private static H2LikeStorage likeStorage;
     private static H2MatchStorage matchStorage;
-    private static H2BlockStorage blockStorage;
+    private static BlockStorage blockStorage;
     private static H2ConversationStorage conversationStorage;
     private static H2MessageStorage messageStorage;
 
@@ -70,7 +71,7 @@ class H2StorageIntegrationTest {
         userStorage = new H2UserStorage(dbManager);
         likeStorage = new H2LikeStorage(dbManager);
         matchStorage = new H2MatchStorage(dbManager);
-        blockStorage = new H2BlockStorage(dbManager);
+        blockStorage = new H2ModerationStorage(dbManager).blocks();
         conversationStorage = new H2ConversationStorage(dbManager);
         messageStorage = new H2MessageStorage(dbManager);
     }
