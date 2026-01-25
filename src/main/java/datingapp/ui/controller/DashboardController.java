@@ -1,9 +1,9 @@
 package datingapp.ui.controller;
 
 import datingapp.ui.NavigationService;
-import datingapp.ui.UISession;
-import datingapp.ui.util.ResponsiveController;
+import datingapp.ui.ViewModelFactory.UISession;
 import datingapp.ui.util.UiAnimations;
+import datingapp.ui.util.UiHelpers;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
  * Main hub for navigation to all app features.
  * Extends BaseController for automatic subscription cleanup.
  */
-public class DashboardController extends BaseController implements Initializable, ResponsiveController {
+public class DashboardController extends BaseController implements Initializable, UiHelpers.ResponsiveController {
     private static final Logger logger = LoggerFactory.getLogger(DashboardController.class);
     private static final String STYLE_VIEWPORT_COMPACT = "viewport-compact";
 

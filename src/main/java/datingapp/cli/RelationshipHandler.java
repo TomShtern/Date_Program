@@ -22,15 +22,15 @@ public class RelationshipHandler {
     private final RelationshipTransitionService transitionService;
     private final NotificationStorage notificationStorage;
     private final UserStorage userStorage;
-    private final UserSession userSession;
-    private final InputReader inputReader;
+    private final CliUtilities.UserSession userSession;
+    private final CliUtilities.InputReader inputReader;
 
     public RelationshipHandler(
             RelationshipTransitionService transitionService,
             NotificationStorage notificationStorage,
             UserStorage userStorage,
-            UserSession userSession,
-            InputReader inputReader) {
+            CliUtilities.UserSession userSession,
+            CliUtilities.InputReader inputReader) {
         this.transitionService = transitionService;
         this.notificationStorage = notificationStorage;
         this.userStorage = userStorage;

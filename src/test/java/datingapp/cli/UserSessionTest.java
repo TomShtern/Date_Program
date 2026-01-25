@@ -5,11 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.PacePreferences;
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
+import datingapp.core.Preferences.PacePreferences;
+import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.User;
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -22,12 +22,12 @@ import org.junit.jupiter.api.Test;
 /** Unit tests for UserSession. */
 class UserSessionTest {
 
-    private UserSession userSession;
+    private CliUtilities.UserSession userSession;
 
     @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
-        userSession = new UserSession();
+        userSession = new CliUtilities.UserSession();
     }
 
     @SuppressWarnings("unused") // JUnit 5 discovers via reflection

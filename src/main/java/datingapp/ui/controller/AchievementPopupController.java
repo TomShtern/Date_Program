@@ -1,6 +1,6 @@
 package datingapp.ui.controller;
 
-import datingapp.ui.util.ConfettiAnimation;
+import datingapp.ui.util.UiHelpers;
 import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.animation.FadeTransition;
@@ -53,7 +53,7 @@ public class AchievementPopupController implements Initializable {
     @FXML
     private Label xpLabel;
 
-    private ConfettiAnimation confetti;
+    private UiHelpers.ConfettiAnimation confetti;
     private Runnable onCloseCallback;
     private boolean autoDismiss = true;
     private static final int AUTO_DISMISS_SECONDS = 5;
@@ -130,7 +130,7 @@ public class AchievementPopupController implements Initializable {
         addIconGlow();
 
         // Start confetti
-        confetti = new ConfettiAnimation();
+        confetti = new UiHelpers.ConfettiAnimation();
         confetti.play(confettiCanvas);
 
         new ParallelTransition(fadeIn, iconPop).play();

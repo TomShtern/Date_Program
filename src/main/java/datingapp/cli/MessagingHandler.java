@@ -30,10 +30,11 @@ public class MessagingHandler {
             DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
 
     private final ServiceRegistry registry;
-    private final InputReader input;
-    private final UserSession session;
+    private final CliUtilities.InputReader input;
+    private final CliUtilities.UserSession session;
 
-    public MessagingHandler(ServiceRegistry registry, InputReader input, UserSession session) {
+    public MessagingHandler(
+            ServiceRegistry registry, CliUtilities.InputReader input, CliUtilities.UserSession session) {
         this.registry = Objects.requireNonNull(registry, "registry cannot be null");
         this.input = Objects.requireNonNull(input, "input cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");

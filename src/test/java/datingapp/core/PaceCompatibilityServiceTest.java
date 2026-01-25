@@ -4,10 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
+import datingapp.core.Preferences.PacePreferences;
+import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -23,12 +24,12 @@ class PaceCompatibilityServiceTest {
 
     @Test
     void perfectMatch_returns100() {
-        PacePreferences p1 = new PacePreferences(
+        PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
                 DepthPreference.DEEP_CHAT);
-        PacePreferences p2 = new PacePreferences(
+        PacePreferences p2 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
@@ -39,12 +40,12 @@ class PaceCompatibilityServiceTest {
 
     @Test
     void extremeOpposites_returnsLowScore() {
-        PacePreferences p1 = new PacePreferences(
+        PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.RARELY,
                 TimeToFirstDate.QUICKLY,
                 CommunicationStyle.TEXT_ONLY,
                 DepthPreference.SMALL_TALK);
-        PacePreferences p2 = new PacePreferences(
+        PacePreferences p2 = new Preferences.PacePreferences(
                 MessagingFrequency.CONSTANTLY,
                 TimeToFirstDate.MONTHS,
                 CommunicationStyle.IN_PERSON_ONLY,
@@ -60,12 +61,12 @@ class PaceCompatibilityServiceTest {
 
     @Test
     void communicationStyleWildcard_appliesWildcardScore() {
-        PacePreferences p1 = new PacePreferences(
+        PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.MIX_OF_EVERYTHING,
                 DepthPreference.DEEP_CHAT);
-        PacePreferences p2 = new PacePreferences(
+        PacePreferences p2 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,
@@ -81,12 +82,12 @@ class PaceCompatibilityServiceTest {
 
     @Test
     void depthPreferenceWildcard_appliesWildcardScore() {
-        PacePreferences p1 = new PacePreferences(
+        PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
                 DepthPreference.DEPENDS_ON_VIBE);
-        PacePreferences p2 = new PacePreferences(
+        PacePreferences p2 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
@@ -102,9 +103,9 @@ class PaceCompatibilityServiceTest {
 
     @Test
     void incompletePreferences_returnsNegativeOne() {
-        PacePreferences p1 = new PacePreferences(
+        PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN, null, CommunicationStyle.VOICE_NOTES, DepthPreference.SMALL_TALK);
-        PacePreferences p2 = new PacePreferences(
+        PacePreferences p2 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
@@ -125,12 +126,12 @@ class PaceCompatibilityServiceTest {
 
     @Test
     void adjacencyLogic_worksCorrectly() {
-        PacePreferences p1 = new PacePreferences(
+        PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
                 DepthPreference.DEEP_CHAT);
-        PacePreferences p2 = new PacePreferences(
+        PacePreferences p2 = new Preferences.PacePreferences(
                 MessagingFrequency.RARELY, // dist 1 -> 15
                 TimeToFirstDate.QUICKLY, // dist 1 -> 15
                 CommunicationStyle.TEXT_ONLY, // dist 1 -> 15

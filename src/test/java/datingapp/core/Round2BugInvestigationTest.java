@@ -4,11 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
+import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserInteractions.LikeStorage;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -138,7 +139,7 @@ class Round2BugInvestigationTest {
         user.setMaxDistanceKm(100);
         user.setAgeRange(18, 99);
         user.addPhotoUrl("http://url");
-        user.setPacePreferences(new PacePreferences(
+        user.setPacePreferences(new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,

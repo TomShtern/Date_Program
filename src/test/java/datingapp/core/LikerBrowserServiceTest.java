@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import datingapp.core.Preferences.Interest;
 import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserInteractions.LikeStorage;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;

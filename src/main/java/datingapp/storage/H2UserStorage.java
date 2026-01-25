@@ -1,9 +1,9 @@
 package datingapp.storage;
 
 import datingapp.core.Dealbreakers;
-import datingapp.core.PacePreferences;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
+import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
 import java.sql.Connection;

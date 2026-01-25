@@ -1,6 +1,8 @@
 package datingapp.core;
 
 import datingapp.core.CandidateFinder.GeoUtils;
+import datingapp.core.UserInteractions.BlockStorage;
+import datingapp.core.UserInteractions.LikeStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;

@@ -15,15 +15,15 @@ public class LikerBrowserHandler {
 
     private final LikerBrowserService likerBrowserService;
     private final MatchingService matchingService;
-    private final UserSession userSession;
-    private final InputReader inputReader;
+    private final CliUtilities.UserSession userSession;
+    private final CliUtilities.InputReader inputReader;
 
     /** Creates a new LikerBrowserHandler with the required dependencies. */
     public LikerBrowserHandler(
             LikerBrowserService likerBrowserService,
             MatchingService matchingService,
-            UserSession userSession,
-            InputReader inputReader) {
+            CliUtilities.UserSession userSession,
+            CliUtilities.InputReader inputReader) {
         this.likerBrowserService = Objects.requireNonNull(likerBrowserService);
         this.matchingService = Objects.requireNonNull(matchingService);
         this.userSession = Objects.requireNonNull(userSession);

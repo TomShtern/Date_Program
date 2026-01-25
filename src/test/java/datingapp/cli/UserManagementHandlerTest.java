@@ -15,13 +15,13 @@ import org.junit.jupiter.api.Test;
 class UserManagementHandlerTest {
 
     private InMemoryUserStorage userStorage;
-    private UserSession userSession;
+    private CliUtilities.UserSession userSession;
     private UserManagementHandler handler;
 
     @BeforeEach
     void setUp() {
         userStorage = new InMemoryUserStorage();
-        userSession = new UserSession();
+        userSession = new CliUtilities.UserSession();
     }
 
     @Nested
@@ -31,7 +31,7 @@ class UserManagementHandlerTest {
         @Test
         @DisplayName("Creates user with valid name")
         void createsUserWithValidName() {
-            InputReader inputReader = createInputReader("Alice\n");
+            CliUtilities.InputReader inputReader = createInputReader("Alice\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader);
 
             handler.createUser();
@@ -46,7 +46,7 @@ class UserManagementHandlerTest {
         @Test
         @DisplayName("Rejects empty name")
         void rejectsEmptyName() {
-            InputReader inputReader = createInputReader("\n");
+            CliUtilities.InputReader inputReader = createInputReader("\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader);
 
             handler.createUser();
@@ -58,7 +58,7 @@ class UserManagementHandlerTest {
         @Test
         @DisplayName("Rejects blank name")
         void rejectsBlankName() {
-            InputReader inputReader = createInputReader("   \n");
+            CliUtilities.InputReader inputReader = createInputReader("   \n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader);
 
             handler.createUser();
@@ -70,12 +70,12 @@ class UserManagementHandlerTest {
         @Test
         @DisplayName("Generates unique UUID for each user")
         void generatesUniqueIds() {
-            InputReader inputReader1 = createInputReader("Alice\n");
+            CliUtilities.InputReader inputReader1 = createInputReader("Alice\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader1);
             handler.createUser();
             UUID id1 = userSession.getCurrentUser().getId();
 
-            InputReader inputReader2 = createInputReader("Bob\n");
+            CliUtilities.InputReader inputReader2 = createInputReader("Bob\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader2);
             handler.createUser();
             UUID id2 = userSession.getCurrentUser().getId();
@@ -91,7 +91,7 @@ class UserManagementHandlerTest {
         @Test
         @DisplayName("Handles empty user list")
         void handlesEmptyUserList() {
-            InputReader inputReader = createInputReader("1\n");
+            CliUtilities.InputReader inputReader = createInputReader("1\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader);
 
             handler.selectUser();
@@ -107,7 +107,7 @@ class UserManagementHandlerTest {
             userStorage.save(alice);
             userStorage.save(bob);
 
-            InputReader inputReader = createInputReader("1\n");
+            CliUtilities.InputReader inputReader = createInputReader("1\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader);
 
             handler.selectUser();
@@ -123,7 +123,7 @@ class UserManagementHandlerTest {
             userStorage.save(alice);
             userStorage.save(bob);
 
-            InputReader inputReader = createInputReader("2\n");
+            CliUtilities.InputReader inputReader = createInputReader("2\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader);
 
             handler.selectUser();
@@ -137,7 +137,7 @@ class UserManagementHandlerTest {
             User alice = createUser("Alice");
             userStorage.save(alice);
 
-            InputReader inputReader = createInputReader("0\n");
+            CliUtilities.InputReader inputReader = createInputReader("0\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader);
 
             handler.selectUser();
@@ -151,7 +151,7 @@ class UserManagementHandlerTest {
             User alice = createUser("Alice");
             userStorage.save(alice);
 
-            InputReader inputReader = createInputReader("5\n");
+            CliUtilities.InputReader inputReader = createInputReader("5\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader);
 
             handler.selectUser();
@@ -165,7 +165,7 @@ class UserManagementHandlerTest {
             User alice = createUser("Alice");
             userStorage.save(alice);
 
-            InputReader inputReader = createInputReader("-1\n");
+            CliUtilities.InputReader inputReader = createInputReader("-1\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader);
 
             handler.selectUser();
@@ -179,7 +179,7 @@ class UserManagementHandlerTest {
             User alice = createUser("Alice");
             userStorage.save(alice);
 
-            InputReader inputReader = createInputReader("abc\n");
+            CliUtilities.InputReader inputReader = createInputReader("abc\n");
             handler = new UserManagementHandler(userStorage, userSession, inputReader);
 
             handler.selectUser();
@@ -194,8 +194,8 @@ class UserManagementHandlerTest {
         return new User(UUID.randomUUID(), name);
     }
 
-    private InputReader createInputReader(String input) {
-        return new InputReader(new Scanner(new StringReader(input)));
+    private CliUtilities.InputReader createInputReader(String input) {
+        return new CliUtilities.InputReader(new Scanner(new StringReader(input)));
     }
 
     // === In-Memory Mock Storage ===

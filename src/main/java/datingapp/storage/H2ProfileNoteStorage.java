@@ -1,7 +1,7 @@
 package datingapp.storage;
 
-import datingapp.core.ProfileNote;
 import datingapp.core.ProfileNoteStorage;
+import datingapp.core.User;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -50,7 +50,7 @@ public class H2ProfileNoteStorage extends AbstractH2Storage implements ProfileNo
     }
 
     @Override
-    public void save(ProfileNote note) {
+    public void save(User.ProfileNote note) {
         String sql = """
                 MERGE INTO profile_notes (author_id, subject_id, content, created_at, updated_at)
                 KEY (author_id, subject_id)
@@ -71,7 +71,7 @@ public class H2ProfileNoteStorage extends AbstractH2Storage implements ProfileNo
     }
 
     @Override
-    public Optional<ProfileNote> get(UUID authorId, UUID subjectId) {
+    public Optional<User.ProfileNote> get(UUID authorId, UUID subjectId) {
         String sql = """
                 SELECT content, created_at, updated_at
                 FROM profile_notes
@@ -84,7 +84,7 @@ public class H2ProfileNoteStorage extends AbstractH2Storage implements ProfileNo
             stmt.setObject(2, subjectId);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(new ProfileNote(
+                    return Optional.of(new User.ProfileNote(
                             authorId,
                             subjectId,
                             rs.getString("content"),
@@ -99,7 +99,7 @@ public class H2ProfileNoteStorage extends AbstractH2Storage implements ProfileNo
     }
 
     @Override
-    public List<ProfileNote> getAllByAuthor(UUID authorId) {
+    public List<User.ProfileNote> getAllByAuthor(UUID authorId) {
         String sql = """
                 SELECT subject_id, content, created_at, updated_at
                 FROM profile_notes
@@ -107,13 +107,13 @@ public class H2ProfileNoteStorage extends AbstractH2Storage implements ProfileNo
                 ORDER BY updated_at DESC
                 """;
 
-        List<ProfileNote> notes = new ArrayList<>();
+        List<User.ProfileNote> notes = new ArrayList<>();
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setObject(1, authorId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    notes.add(new ProfileNote(
+                    notes.add(new User.ProfileNote(
                             authorId,
                             rs.getObject("subject_id", UUID.class),
                             rs.getString("content"),

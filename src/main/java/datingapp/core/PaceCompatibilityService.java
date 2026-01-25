@@ -1,5 +1,7 @@
 package datingapp.core;
 
+import datingapp.core.Preferences.PacePreferences;
+
 /**
  * Service for calculating compatibility between users' pace preferences. Uses a weighted ordinal
  * distance with wildcard logic for flexibility.

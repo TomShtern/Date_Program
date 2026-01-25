@@ -3,13 +3,15 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
+import datingapp.core.MatchQualityService.MatchQuality;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
+import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserInteractions.LikeStorage;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.Optional;
@@ -305,7 +307,7 @@ class MatchQualityServiceTest {
         user.setAgeRange(18, 60);
         user.addPhotoUrl("http://example.com/photo.jpg");
         user.setBio("Test bio");
-        user.setPacePreferences(new PacePreferences(
+        user.setPacePreferences(new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,

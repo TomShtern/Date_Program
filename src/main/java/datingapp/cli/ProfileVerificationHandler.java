@@ -13,14 +13,14 @@ public class ProfileVerificationHandler {
 
     private final UserStorage userStorage;
     private final TrustSafetyService trustSafetyService;
-    private final UserSession userSession;
-    private final InputReader inputReader;
+    private final CliUtilities.UserSession userSession;
+    private final CliUtilities.InputReader inputReader;
 
     public ProfileVerificationHandler(
             UserStorage userStorage,
             TrustSafetyService trustSafetyService,
-            UserSession userSession,
-            InputReader inputReader) {
+            CliUtilities.UserSession userSession,
+            CliUtilities.InputReader inputReader) {
         this.userStorage = Objects.requireNonNull(userStorage);
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
         this.userSession = Objects.requireNonNull(userSession);

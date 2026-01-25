@@ -4,7 +4,7 @@ import datingapp.core.Messaging.Message;
 import datingapp.core.MessagingService;
 import datingapp.core.MessagingService.ConversationPreview;
 import datingapp.core.User;
-import datingapp.ui.UISession;
+import datingapp.ui.ViewModelFactory.UISession;
 import java.util.List;
 import java.util.UUID;
 import javafx.beans.property.BooleanProperty;

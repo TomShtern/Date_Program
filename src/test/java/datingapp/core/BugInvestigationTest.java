@@ -5,10 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
+import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.Set;
@@ -83,7 +83,7 @@ class BugInvestigationTest {
             user.setMaxDistanceKm(50);
             user.setAgeRange(18, 40);
             user.addPhotoUrl("photo.jpg");
-            user.setPacePreferences(new PacePreferences(
+            user.setPacePreferences(new Preferences.PacePreferences(
                     MessagingFrequency.OFTEN,
                     TimeToFirstDate.FEW_DAYS,
                     CommunicationStyle.TEXT_ONLY,
@@ -132,7 +132,7 @@ class BugInvestigationTest {
             user.setMaxDistanceKm(50);
             user.setAgeRange(18, 40);
             user.addPhotoUrl("photo.jpg");
-            user.setPacePreferences(new PacePreferences(
+            user.setPacePreferences(new Preferences.PacePreferences(
                     MessagingFrequency.OFTEN,
                     TimeToFirstDate.FEW_DAYS,
                     CommunicationStyle.TEXT_ONLY,
@@ -210,7 +210,7 @@ class BugInvestigationTest {
         user.setMaxDistanceKm(50);
         user.setAgeRange(18, 60);
         user.addPhotoUrl("photo.jpg");
-        user.setPacePreferences(new PacePreferences(
+        user.setPacePreferences(new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,

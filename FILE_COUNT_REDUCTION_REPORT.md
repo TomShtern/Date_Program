@@ -587,6 +587,7 @@ class UserInteractionsTest {
 
 ### ❌ Approach 1: Aggressive Consolidation
 **Idea:** Merge all H2 storage into 2-3 massive files (500-1000 LOC each)
+comment from the user: 500 loc is not that massive. i will accept files being up to 1K LOC if it helps reduce file count significantly.
 
 **Rejected Because:**
 - Files become too large to navigate
@@ -628,7 +629,7 @@ class UserInteractionsTest {
 5. File count reduced by ≥20 files
 
 ### Should Have ✨
-1. Average file size increases to 200-250 LOC
+1. Average file size increases to 200-250 LOC. im ok with files going up to 1000 LOC if necessary as long as it makes it so we have less files.
 2. Files <100 LOC reduced by >50%
 3. Storage interfaces nested in domain models
 4. Related UI components grouped
@@ -717,8 +718,6 @@ This consolidation plan targets a **20-25% reduction** in file count (~28-35 fil
 
 ### Pre-Implementation
 - [ ] Full test suite passing (mvn test)
-- [ ] Clean git state (no uncommitted changes)
-- [ ] Create feature branch: `refactor/file-consolidation-phase-N`
 - [ ] Backup ServiceRegistry.java
 - [ ] Document current file count: `find src -name "*.java" | wc -l`
 
@@ -726,7 +725,6 @@ This consolidation plan targets a **20-25% reduction** in file count (~28-35 fil
 - [ ] Make changes incrementally (one consolidation at a time)
 - [ ] Run `mvn test` after each consolidation
 - [ ] Run `mvn spotless:apply` to maintain formatting
-- [ ] Commit after each successful consolidation
 - [ ] Update imports using IDE refactoring tools
 
 ### Post-Implementation
@@ -736,7 +734,7 @@ This consolidation plan targets a **20-25% reduction** in file count (~28-35 fil
 - [ ] Update AGENTS.md with structural changes
 - [ ] Update architecture.md if needed
 - [ ] Document new file count
-- [ ] Create PR with before/after comparison
+- [ ] mvn spotless:apply
 
 ---
 

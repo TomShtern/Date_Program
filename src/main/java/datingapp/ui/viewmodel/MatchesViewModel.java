@@ -4,7 +4,7 @@ import datingapp.core.Match;
 import datingapp.core.MatchStorage;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
-import datingapp.ui.UISession;
+import datingapp.ui.ViewModelFactory.UISession;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;

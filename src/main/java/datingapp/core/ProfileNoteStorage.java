@@ -15,7 +15,7 @@ public interface ProfileNoteStorage {
      *
      * @param note the profile note to save
      */
-    void save(ProfileNote note);
+    void save(User.ProfileNote note);
 
     /**
      * Gets a user's note about another user.
@@ -24,7 +24,7 @@ public interface ProfileNoteStorage {
      * @param subjectId ID of the user the note is about
      * @return the note if it exists
      */
-    Optional<ProfileNote> get(UUID authorId, UUID subjectId);
+    Optional<User.ProfileNote> get(UUID authorId, UUID subjectId);
 
     /**
      * Gets all notes created by a user.
@@ -32,7 +32,7 @@ public interface ProfileNoteStorage {
      * @param authorId ID of the note author
      * @return list of all notes by this user
      */
-    List<ProfileNote> getAllByAuthor(UUID authorId);
+    List<User.ProfileNote> getAllByAuthor(UUID authorId);
 
     /**
      * Deletes a note.

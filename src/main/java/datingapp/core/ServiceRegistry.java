@@ -1,5 +1,8 @@
 package datingapp.core;
 
+import datingapp.core.UserInteractions.BlockStorage;
+import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.UserInteractions.ReportStorage;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.H2BlockStorage;
 import datingapp.storage.H2ConversationStorage;

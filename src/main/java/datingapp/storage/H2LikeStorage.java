@@ -1,7 +1,7 @@
 package datingapp.storage;
 
-import datingapp.core.LikeStorage;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserInteractions.LikeStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

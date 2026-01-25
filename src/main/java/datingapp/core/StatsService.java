@@ -2,7 +2,10 @@ package datingapp.core;
 
 import datingapp.core.Stats.PlatformStats;
 import datingapp.core.Stats.UserStats;
+import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.UserInteractions.ReportStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;

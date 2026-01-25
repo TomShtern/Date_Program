@@ -2,15 +2,13 @@ package datingapp.cli;
 
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
-import datingapp.core.BlockStorage;
 import datingapp.core.CandidateFinder;
 import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.DailyService;
-import datingapp.core.LikeStorage;
 import datingapp.core.Match;
-import datingapp.core.MatchQuality;
 import datingapp.core.MatchQualityService;
 import datingapp.core.MatchQualityService.InterestMatcher;
+import datingapp.core.MatchQualityService.MatchQuality;
 import datingapp.core.MatchStorage;
 import datingapp.core.MatchingService;
 import datingapp.core.ProfileViewStorage;
@@ -19,7 +17,9 @@ import datingapp.core.RelationshipTransitionService.TransitionValidationExceptio
 import datingapp.core.UndoService;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserInteractions.LikeStorage;
 import datingapp.core.UserStorage;
 import java.util.HashSet;
 import java.util.List;
@@ -49,8 +49,8 @@ public class MatchingHandler {
     private final AchievementService achievementService;
     private final ProfileViewStorage profileViewStorage;
     private final RelationshipTransitionService transitionService;
-    private final UserSession userSession;
-    private final InputReader inputReader;
+    private final CliUtilities.UserSession userSession;
+    private final CliUtilities.InputReader inputReader;
 
     public MatchingHandler(Dependencies dependencies) {
         this.candidateFinderService = dependencies.candidateFinderService();
@@ -82,8 +82,8 @@ public class MatchingHandler {
             AchievementService achievementService,
             ProfileViewStorage profileViewStorage,
             RelationshipTransitionService transitionService,
-            UserSession userSession,
-            InputReader inputReader) {
+            CliUtilities.UserSession userSession,
+            CliUtilities.InputReader inputReader) {
 
         public Dependencies {
             Objects.requireNonNull(candidateFinderService);

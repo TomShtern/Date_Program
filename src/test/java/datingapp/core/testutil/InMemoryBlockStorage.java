@@ -1,7 +1,7 @@
 package datingapp.core.testutil;
 
-import datingapp.core.BlockStorage;
 import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.BlockStorage;
 import java.util.*;
 
 /**

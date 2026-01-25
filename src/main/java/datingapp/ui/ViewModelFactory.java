@@ -1,6 +1,7 @@
 package datingapp.ui;
 
 import datingapp.core.ServiceRegistry;
+import datingapp.core.User;
 import datingapp.ui.controller.ChatController;
 import datingapp.ui.controller.DashboardController;
 import datingapp.ui.controller.LoginController;
@@ -18,6 +19,8 @@ import datingapp.ui.viewmodel.PreferencesViewModel;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import datingapp.ui.viewmodel.StatsViewModel;
 import java.lang.reflect.InvocationTargetException;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +30,49 @@ import org.slf4j.LoggerFactory;
  * This is the bridge between the core ServiceRegistry and the UI layer.
  */
 public class ViewModelFactory {
+
+    /**
+     * Singleton session manager for the JavaFX UI.
+     * Tracks the currently logged-in user and provides observable access for data
+     * binding.
+     */
+    public static final class UISession {
+        private static final UISession INSTANCE = new UISession();
+
+        private final ObjectProperty<User> currentUser = new SimpleObjectProperty<>();
+
+        private UISession() {}
+
+        public static UISession getInstance() {
+            return INSTANCE;
+        }
+
+        public User getCurrentUser() {
+            return currentUser.get();
+        }
+
+        public void setCurrentUser(User user) {
+            this.currentUser.set(user);
+        }
+
+        public ObjectProperty<User> currentUserProperty() {
+            return currentUser;
+        }
+
+        public boolean isLoggedIn() {
+            return currentUser.get() != null;
+        }
+
+        public boolean isActive() {
+            User user = currentUser.get();
+            return user != null && user.getState() == User.State.ACTIVE;
+        }
+
+        public void logout() {
+            currentUser.set(null);
+        }
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(ViewModelFactory.class);
 
     private final ServiceRegistry services;

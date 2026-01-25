@@ -15,14 +15,14 @@ public class StatsHandler {
 
     private final StatsService statsService;
     private final AchievementService achievementService;
-    private final UserSession userSession;
-    private final InputReader inputReader;
+    private final CliUtilities.UserSession userSession;
+    private final CliUtilities.InputReader inputReader;
 
     public StatsHandler(
             StatsService statsService,
             AchievementService achievementService,
-            UserSession userSession,
-            InputReader inputReader) {
+            CliUtilities.UserSession userSession,
+            CliUtilities.InputReader inputReader) {
         this.statsService = statsService;
         this.achievementService = achievementService;
         this.userSession = userSession;

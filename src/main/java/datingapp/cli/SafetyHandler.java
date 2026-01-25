@@ -1,11 +1,11 @@
 package datingapp.cli;
 
-import datingapp.core.BlockStorage;
 import datingapp.core.Match;
 import datingapp.core.MatchStorage;
 import datingapp.core.TrustSafetyService;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Report;
 import datingapp.core.UserStorage;
 import java.util.List;
@@ -22,16 +22,16 @@ public class SafetyHandler {
     private final BlockStorage blockStorage;
     private final MatchStorage matchStorage;
     private final TrustSafetyService trustSafetyService;
-    private final UserSession userSession;
-    private final InputReader inputReader;
+    private final CliUtilities.UserSession userSession;
+    private final CliUtilities.InputReader inputReader;
 
     public SafetyHandler(
             UserStorage userStorage,
             BlockStorage blockStorage,
             MatchStorage matchStorage,
             TrustSafetyService trustSafetyService,
-            UserSession userSession,
-            InputReader inputReader) {
+            CliUtilities.UserSession userSession,
+            CliUtilities.InputReader inputReader) {
         this.userStorage = userStorage;
         this.blockStorage = blockStorage;
         this.matchStorage = matchStorage;

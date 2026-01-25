@@ -10,7 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("ProfileNote")
+@DisplayName("User.ProfileNote")
 class ProfileNoteTest {
 
     private static final UUID AUTHOR = UUID.randomUUID();
@@ -23,7 +23,7 @@ class ProfileNoteTest {
         @Test
         @DisplayName("creates note with valid content")
         void createsNoteWithValidContent() {
-            ProfileNote note = ProfileNote.create(AUTHOR, SUBJECT, "Met at coffee shop");
+            User.ProfileNote note = User.ProfileNote.create(AUTHOR, SUBJECT, "Met at coffee shop");
 
             assertEquals(AUTHOR, note.authorId());
             assertEquals(SUBJECT, note.subjectId());
@@ -35,40 +35,41 @@ class ProfileNoteTest {
         @Test
         @DisplayName("throws on null author")
         void throwsOnNullAuthor() {
-            assertThrows(NullPointerException.class, () -> ProfileNote.create(null, SUBJECT, "content"));
+            assertThrows(NullPointerException.class, () -> User.ProfileNote.create(null, SUBJECT, "content"));
         }
 
         @Test
         @DisplayName("throws on null subject")
         void throwsOnNullSubject() {
-            assertThrows(NullPointerException.class, () -> ProfileNote.create(AUTHOR, null, "content"));
+            assertThrows(NullPointerException.class, () -> User.ProfileNote.create(AUTHOR, null, "content"));
         }
 
         @Test
         @DisplayName("throws on null content")
         void throwsOnNullContent() {
-            assertThrows(NullPointerException.class, () -> ProfileNote.create(AUTHOR, SUBJECT, null));
+            assertThrows(NullPointerException.class, () -> User.ProfileNote.create(AUTHOR, SUBJECT, null));
         }
 
         @Test
         @DisplayName("throws on blank content")
         void throwsOnBlankContent() {
-            assertThrows(IllegalArgumentException.class, () -> ProfileNote.create(AUTHOR, SUBJECT, "   "));
+            assertThrows(IllegalArgumentException.class, () -> User.ProfileNote.create(AUTHOR, SUBJECT, "   "));
         }
 
         @Test
         @DisplayName("throws if content exceeds max length")
         void throwsIfContentExceedsMaxLength() {
-            String tooLong = "x".repeat(ProfileNote.MAX_LENGTH + 1);
-            IllegalArgumentException ex =
-                    assertThrows(IllegalArgumentException.class, () -> ProfileNote.create(AUTHOR, SUBJECT, tooLong));
+            String tooLong = "x".repeat(User.ProfileNote.MAX_LENGTH + 1);
+            IllegalArgumentException ex = assertThrows(
+                    IllegalArgumentException.class, () -> User.ProfileNote.create(AUTHOR, SUBJECT, tooLong));
             assertTrue(ex.getMessage().contains("500"));
         }
 
         @Test
         @DisplayName("throws if author equals subject")
         void throwsIfAuthorEqualsSubject() {
-            assertThrows(IllegalArgumentException.class, () -> ProfileNote.create(AUTHOR, AUTHOR, "note about myself"));
+            assertThrows(
+                    IllegalArgumentException.class, () -> User.ProfileNote.create(AUTHOR, AUTHOR, "note about myself"));
         }
     }
 
@@ -79,9 +80,9 @@ class ProfileNoteTest {
         @Test
         @DisplayName("updates content and timestamp")
         void updatesContentAndTimestamp() throws InterruptedException {
-            ProfileNote original = ProfileNote.create(AUTHOR, SUBJECT, "Original");
+            User.ProfileNote original = User.ProfileNote.create(AUTHOR, SUBJECT, "Original");
             Thread.sleep(10); // Ensure different timestamp
-            ProfileNote updated = original.withContent("Updated");
+            User.ProfileNote updated = original.withContent("Updated");
 
             assertEquals("Updated", updated.content());
             assertEquals(original.createdAt(), updated.createdAt());
@@ -91,7 +92,7 @@ class ProfileNoteTest {
         @Test
         @DisplayName("throws on blank content")
         void throwsOnBlankContent() {
-            ProfileNote note = ProfileNote.create(AUTHOR, SUBJECT, "Original");
+            User.ProfileNote note = User.ProfileNote.create(AUTHOR, SUBJECT, "Original");
             assertThrows(IllegalArgumentException.class, () -> note.withContent("  "));
         }
     }
@@ -103,7 +104,7 @@ class ProfileNoteTest {
         @Test
         @DisplayName("returns full content if short")
         void returnsFullContentIfShort() {
-            ProfileNote note = ProfileNote.create(AUTHOR, SUBJECT, "Short note");
+            User.ProfileNote note = User.ProfileNote.create(AUTHOR, SUBJECT, "Short note");
             assertEquals("Short note", note.getPreview());
         }
 
@@ -111,7 +112,7 @@ class ProfileNoteTest {
         @DisplayName("truncates long content with ellipsis")
         void truncatesLongContentWithEllipsis() {
             String longContent = "x".repeat(100);
-            ProfileNote note = ProfileNote.create(AUTHOR, SUBJECT, longContent);
+            User.ProfileNote note = User.ProfileNote.create(AUTHOR, SUBJECT, longContent);
 
             String preview = note.getPreview();
             assertEquals(50, preview.length());

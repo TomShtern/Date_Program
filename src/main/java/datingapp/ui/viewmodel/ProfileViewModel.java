@@ -4,7 +4,7 @@ import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfileCompletionService.CompletionResult;
 import datingapp.core.User;
 import datingapp.core.UserStorage;
-import datingapp.ui.UISession;
+import datingapp.ui.ViewModelFactory.UISession;
 import datingapp.ui.util.ToastService;
 import java.io.File;
 import java.io.IOException;

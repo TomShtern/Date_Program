@@ -1,6 +1,7 @@
 package datingapp.core;
 
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserInteractions.LikeStorage;
 import java.util.Optional;
 
 /**

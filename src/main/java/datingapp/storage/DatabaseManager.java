@@ -276,7 +276,7 @@ public class DatabaseManager {
             initialized = true;
 
         } catch (SQLException e) {
-            throw new StorageException("Failed to initialize database schema", e);
+            throw new AbstractH2Storage.StorageException("Failed to initialize database schema", e);
         }
     }
 

@@ -1,7 +1,9 @@
 package datingapp.core;
 
 import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Report;
+import datingapp.core.UserInteractions.ReportStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;

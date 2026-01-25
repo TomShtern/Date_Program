@@ -11,10 +11,11 @@ import org.slf4j.LoggerFactory;
 public class UserManagementHandler {
     private static final Logger logger = LoggerFactory.getLogger(UserManagementHandler.class);
     private final UserStorage userStorage;
-    private final UserSession userSession;
-    private final InputReader inputReader;
+    private final CliUtilities.UserSession userSession;
+    private final CliUtilities.InputReader inputReader;
 
-    public UserManagementHandler(UserStorage userStorage, UserSession userSession, InputReader inputReader) {
+    public UserManagementHandler(
+            UserStorage userStorage, CliUtilities.UserSession userSession, CliUtilities.InputReader inputReader) {
         this.userStorage = userStorage;
         this.userSession = userSession;
         this.inputReader = inputReader;

@@ -2,7 +2,7 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.User;
 import datingapp.core.UserStorage;
-import datingapp.ui.UISession;
+import datingapp.ui.ViewModelFactory.UISession;
 import java.util.EnumSet;
 import java.util.Set;
 import javafx.beans.property.IntegerProperty;

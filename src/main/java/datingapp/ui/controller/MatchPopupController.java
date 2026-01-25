@@ -1,7 +1,7 @@
 package datingapp.ui.controller;
 
 import datingapp.core.User;
-import datingapp.ui.util.ConfettiAnimation;
+import datingapp.ui.util.UiHelpers;
 import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.animation.FadeTransition;
@@ -41,7 +41,7 @@ public class MatchPopupController implements Initializable {
     @FXML
     private Label matchMessage;
 
-    private ConfettiAnimation confetti;
+    private UiHelpers.ConfettiAnimation confetti;
     private Runnable onMessageCallback;
     private Runnable onContinueCallback;
 
@@ -101,7 +101,7 @@ public class MatchPopupController implements Initializable {
         });
 
         // Start confetti
-        confetti = new ConfettiAnimation();
+        confetti = new UiHelpers.ConfettiAnimation();
         confetti.play(confettiCanvas);
 
         new ParallelTransition(fadeIn, leftFly, rightFly, heartPop).play();

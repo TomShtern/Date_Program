@@ -1,7 +1,7 @@
 package datingapp.core.testutil;
 
-import datingapp.core.LikeStorage;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserInteractions.LikeStorage;
 import java.time.Instant;
 import java.util.*;
 

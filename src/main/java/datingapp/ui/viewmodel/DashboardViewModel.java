@@ -8,7 +8,7 @@ import datingapp.core.DailyService.DailyStatus;
 import datingapp.core.MatchStorage;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
-import datingapp.ui.UISession;
+import datingapp.ui.ViewModelFactory.UISession;
 import java.util.List;
 import java.util.Optional;
 import javafx.beans.property.BooleanProperty;

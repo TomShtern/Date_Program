@@ -4,13 +4,13 @@ import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
 import datingapp.core.Dealbreakers;
 import datingapp.core.MatchQualityService.InterestMatcher;
-import datingapp.core.PacePreferences;
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
+import datingapp.core.Preferences.PacePreferences;
+import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfilePreviewService;
 import datingapp.core.User;
@@ -34,8 +34,8 @@ public class ProfileHandler {
     private final UserStorage userStorage;
     private final ProfilePreviewService profilePreviewService;
     private final AchievementService achievementService;
-    private final UserSession userSession;
-    private final InputReader inputReader;
+    private final CliUtilities.UserSession userSession;
+    private final CliUtilities.InputReader inputReader;
 
     private static final String PROMPT_CHOICE = "Your choice: ";
     private static final String PROMPT_CHOICES = "Choices: ";
@@ -44,8 +44,8 @@ public class ProfileHandler {
             UserStorage userStorage,
             ProfilePreviewService profilePreviewService,
             AchievementService achievementService,
-            UserSession userSession,
-            InputReader inputReader) {
+            CliUtilities.UserSession userSession,
+            CliUtilities.InputReader inputReader) {
         this.userStorage = userStorage;
         this.profilePreviewService = profilePreviewService;
         this.achievementService = achievementService;

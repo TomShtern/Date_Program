@@ -3,7 +3,7 @@ package datingapp.ui.viewmodel;
 import datingapp.core.User;
 import datingapp.core.User.Gender;
 import datingapp.core.UserStorage;
-import datingapp.ui.UISession;
+import datingapp.ui.ViewModelFactory.UISession;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;

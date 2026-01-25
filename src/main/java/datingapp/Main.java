@@ -1,7 +1,7 @@
 package datingapp;
 
 import datingapp.cli.CliConstants;
-import datingapp.cli.InputReader;
+import datingapp.cli.CliUtilities;
 import datingapp.cli.LikerBrowserHandler;
 import datingapp.cli.MatchingHandler;
 import datingapp.cli.MessagingHandler;
@@ -12,7 +12,6 @@ import datingapp.cli.RelationshipHandler;
 import datingapp.cli.SafetyHandler;
 import datingapp.cli.StatsHandler;
 import datingapp.cli.UserManagementHandler;
-import datingapp.cli.UserSession;
 import datingapp.core.AppConfig;
 import datingapp.core.DailyService;
 import datingapp.core.LikerBrowserService;
@@ -38,8 +37,8 @@ public class Main {
     private static ServiceRegistry services;
 
     // CLI Components
-    private static InputReader inputReader;
-    private static UserSession userSession;
+    private static CliUtilities.InputReader inputReader;
+    private static CliUtilities.UserSession userSession;
     private static UserManagementHandler userHandler;
     private static ProfileHandler profileHandler;
     private static MatchingHandler matchingHandler;
@@ -104,8 +103,8 @@ public class Main {
         services = ServiceRegistry.Builder.buildH2(dbManager, config);
 
         // Initialize CLI Infrastructure
-        inputReader = new InputReader(scanner);
-        userSession = new UserSession();
+        inputReader = new CliUtilities.InputReader(scanner);
+        userSession = new CliUtilities.UserSession();
 
         // Initialize Handlers
         userHandler = new UserManagementHandler(services.getUserStorage(), userSession, inputReader);
