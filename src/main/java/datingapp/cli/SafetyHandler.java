@@ -7,7 +7,6 @@ import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Report;
-import datingapp.core.UserStorage;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -19,7 +18,7 @@ import org.slf4j.LoggerFactory;
 public class SafetyHandler {
     private static final Logger logger = LoggerFactory.getLogger(SafetyHandler.class);
 
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final BlockStorage blockStorage;
     private final MatchStorage matchStorage;
     private final TrustSafetyService trustSafetyService;
@@ -27,7 +26,7 @@ public class SafetyHandler {
     private final CliUtilities.InputReader inputReader;
 
     public SafetyHandler(
-            UserStorage userStorage,
+            User.Storage userStorage,
             BlockStorage blockStorage,
             MatchStorage matchStorage,
             TrustSafetyService trustSafetyService,

@@ -48,7 +48,7 @@ public class ServiceRegistry {
     private final AppConfig config;
 
     // Storage layer
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
     private final BlockStorage blockStorage;
@@ -78,13 +78,12 @@ public class ServiceRegistry {
     private final AchievementService achievementService; // Phase 1
     private final MessagingService messagingService; // Messaging
     private final RelationshipTransitionService relationshipTransitionService; // Phase 2/3
-    private final PaceCompatibilityService paceCompatibilityService; // Phase 1
 
     /** Package-private constructor - use ServiceRegistry.Builder to create. */
     @SuppressWarnings("java:S107")
     ServiceRegistry(
             AppConfig config,
-            UserStorage userStorage,
+            User.Storage userStorage,
             LikeStorage likeStorage,
             MatchStorage matchStorage,
             BlockStorage blockStorage,
@@ -111,8 +110,7 @@ public class ServiceRegistry {
             UndoService undoService,
             AchievementService achievementService,
             MessagingService messagingService,
-            RelationshipTransitionService relationshipTransitionService,
-            PaceCompatibilityService paceCompatibilityService) {
+            RelationshipTransitionService relationshipTransitionService) {
         this.config = Objects.requireNonNull(config);
         this.userStorage = Objects.requireNonNull(userStorage);
         this.likeStorage = Objects.requireNonNull(likeStorage);
@@ -142,7 +140,6 @@ public class ServiceRegistry {
         this.achievementService = Objects.requireNonNull(achievementService);
         this.messagingService = Objects.requireNonNull(messagingService);
         this.relationshipTransitionService = Objects.requireNonNull(relationshipTransitionService);
-        this.paceCompatibilityService = Objects.requireNonNull(paceCompatibilityService);
     }
 
     // === Getters ===
@@ -151,7 +148,7 @@ public class ServiceRegistry {
         return config;
     }
 
-    public UserStorage getUserStorage() {
+    public User.Storage getUserStorage() {
         return userStorage;
     }
 
@@ -263,10 +260,6 @@ public class ServiceRegistry {
         return relationshipTransitionService;
     }
 
-    public PaceCompatibilityService getPaceCompatibilityService() {
-        return paceCompatibilityService;
-    }
-
     /**
      * Builder for creating ServiceRegistry instances with different storage backends.
      *
@@ -288,7 +281,7 @@ public class ServiceRegistry {
          */
         public static ServiceRegistry buildH2(DatabaseManager dbManager, AppConfig config) {
             // Storage layer
-            UserStorage userStorage = new H2UserStorage(dbManager);
+            User.Storage userStorage = new H2UserStorage(dbManager);
             LikeStorage likeStorage = new H2LikeStorage(dbManager);
             MatchStorage matchStorage = new H2MatchStorage(dbManager);
             BlockStorage blockStorage = new H2BlockStorage(dbManager);
@@ -301,14 +294,13 @@ public class ServiceRegistry {
             // Services
             CandidateFinder candidateFinder = new CandidateFinder();
             SessionService sessionService = new SessionService(sessionStorage, config);
-            MatchingService matchingService = new MatchingService(likeStorage, matchStorage, sessionService);
+            MatchingService matchingService =
+                    new MatchingService(likeStorage, matchStorage, userStorage, blockStorage, sessionService);
             TrustSafetyService trustSafetyService =
                     new TrustSafetyService(reportStorage, userStorage, blockStorage, config);
             StatsService statsService = new StatsService(
                     likeStorage, matchStorage, blockStorage, reportStorage, userStatsStorage, platformStatsStorage);
-            PaceCompatibilityService paceCompatibilityService = new PaceCompatibilityService();
-            MatchQualityService matchQualityService =
-                    new MatchQualityService(userStorage, likeStorage, paceCompatibilityService);
+            MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage);
             ProfilePreviewService profilePreviewService = new ProfilePreviewService();
             DailyService dailyService =
                     new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, config);
@@ -369,8 +361,7 @@ public class ServiceRegistry {
                     undoService,
                     achievementService,
                     messagingService,
-                    relationshipTransitionService,
-                    paceCompatibilityService);
+                    relationshipTransitionService);
         }
 
         /** Builds a ServiceRegistry with H2 database and default configuration. */

@@ -5,7 +5,6 @@ import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.User;
-import datingapp.core.UserStorage;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -24,8 +23,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** H2 implementation of UserStorage. */
-public class H2UserStorage extends AbstractH2Storage implements UserStorage {
+/** H2 implementation of User.Storage. */
+public class H2UserStorage extends AbstractH2Storage implements User.Storage {
 
     private static final String VARCHAR_20 = "VARCHAR(20)";
     private static final String USER_COLUMNS = """

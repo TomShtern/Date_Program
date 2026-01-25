@@ -6,7 +6,6 @@ import datingapp.core.Social.FriendRequest;
 import datingapp.core.Social.Notification;
 import datingapp.core.Social.NotificationStorage;
 import datingapp.core.User;
-import datingapp.core.UserStorage;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -21,14 +20,14 @@ public class RelationshipHandler {
 
     private final RelationshipTransitionService transitionService;
     private final NotificationStorage notificationStorage;
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final CliUtilities.UserSession userSession;
     private final CliUtilities.InputReader inputReader;
 
     public RelationshipHandler(
             RelationshipTransitionService transitionService,
             NotificationStorage notificationStorage,
-            UserStorage userStorage,
+            User.Storage userStorage,
             CliUtilities.UserSession userSession,
             CliUtilities.InputReader inputReader) {
         this.transitionService = transitionService;

@@ -3,7 +3,6 @@ package datingapp.ui.viewmodel;
 import datingapp.core.Match;
 import datingapp.core.Match.MatchStorage;
 import datingapp.core.User;
-import datingapp.core.UserStorage;
 import datingapp.ui.ViewModelFactory.UISession;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -26,14 +25,14 @@ public class MatchesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(MatchesViewModel.class);
 
     private final MatchStorage matchStorage;
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final IntegerProperty matchCount = new SimpleIntegerProperty(0);
 
     private User currentUser;
 
-    public MatchesViewModel(MatchStorage matchStorage, UserStorage userStorage) {
+    public MatchesViewModel(MatchStorage matchStorage, User.Storage userStorage) {
         this.matchStorage = matchStorage;
         this.userStorage = userStorage;
     }

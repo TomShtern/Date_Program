@@ -3,6 +3,7 @@ package datingapp.core;
 import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
+import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.LikeStorage;
 import java.time.Duration;
@@ -21,9 +22,11 @@ import java.util.UUID;
  */
 public class MatchQualityService {
 
-    private final UserStorage userStorage;
+    private static final int LOW_PACE_COMPATIBILITY_THRESHOLD = 50;
+    private static final int WILDCARD_SCORE = 20;
+
+    private final User.Storage userStorage;
     private final LikeStorage likeStorage;
-    private final PaceCompatibilityService paceService;
     private final MatchQualityConfig config;
 
     /** Configuration for match quality score weights. Weights must sum to 1.0 (normalized). */
@@ -318,18 +321,13 @@ public class MatchQualityService {
         }
     }
 
-    public MatchQualityService(UserStorage userStorage, LikeStorage likeStorage, PaceCompatibilityService paceService) {
-        this(userStorage, likeStorage, paceService, MatchQualityConfig.defaults());
+    public MatchQualityService(User.Storage userStorage, LikeStorage likeStorage) {
+        this(userStorage, likeStorage, MatchQualityConfig.defaults());
     }
 
-    public MatchQualityService(
-            UserStorage userStorage,
-            LikeStorage likeStorage,
-            PaceCompatibilityService paceService,
-            MatchQualityConfig config) {
+    public MatchQualityService(User.Storage userStorage, LikeStorage likeStorage, MatchQualityConfig config) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
-        this.paceService = Objects.requireNonNull(paceService, "paceService cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
     }
 
@@ -376,7 +374,7 @@ public class MatchQualityService {
         double responseScore = calculateResponseScore(timeBetweenLikes);
 
         // Pace Score (Phase 2)
-        double paceScore = paceService.calculatePaceScore(me.getPacePreferences(), them.getPacePreferences());
+        double paceScore = calculatePaceScore(me.getPacePreferences(), them.getPacePreferences());
         String paceSyncLevel = getPaceSyncLevel(paceScore);
 
         // === Calculate Overall Score ===
@@ -702,5 +700,86 @@ public class MatchQualityService {
         int filled = (int) Math.round(score * width);
         int empty = width - filled;
         return "█".repeat(Math.max(0, filled)) + "░".repeat(Math.max(0, empty));
+    }
+
+    // === Pace Compatibility Methods (formerly PaceCompatibilityService) ===
+
+    /**
+     * Calculates a compatibility score (0-100) between two users' pace preferences.
+     *
+     * @param a first user's preferences
+     * @param b second user's preferences
+     * @return score from 0 to 100, or -1 if either is null/incomplete
+     */
+    public int calculatePaceCompatibility(PacePreferences a, PacePreferences b) {
+        if (a == null || b == null || !a.isComplete() || !b.isComplete()) {
+            return -1; // Compatibility unknown
+        }
+
+        int score = 0;
+
+        // Dimension 1: Messaging Frequency
+        score += dimensionScore(a.messagingFrequency(), b.messagingFrequency(), false);
+
+        // Dimension 2: Time to First Date
+        score += dimensionScore(a.timeToFirstDate(), b.timeToFirstDate(), false);
+
+        // Dimension 3: Communication Style (Wildcard: MIX_OF_EVERYTHING)
+        boolean commStyleWildcard = isCommunicationStyleWildcard(a.communicationStyle())
+                || isCommunicationStyleWildcard(b.communicationStyle());
+        score += dimensionScore(a.communicationStyle(), b.communicationStyle(), commStyleWildcard);
+
+        // Dimension 4: Depth Preference (Wildcard: DEPENDS_ON_VIBE)
+        boolean depthWildcard =
+                isDepthPreferenceWildcard(a.depthPreference()) || isDepthPreferenceWildcard(b.depthPreference());
+        score += dimensionScore(a.depthPreference(), b.depthPreference(), depthWildcard);
+
+        return score;
+    }
+
+    /**
+     * Calculates a pace compatibility score as a normalized double (0.0-1.0).
+     *
+     * @param a first user's preferences
+     * @param b second user's preferences
+     * @return score from 0.0 to 1.0, or 0.5 (neutral) if unknown
+     */
+    public double calculatePaceScore(PacePreferences a, PacePreferences b) {
+        int comp = calculatePaceCompatibility(a, b);
+        if (comp == -1) {
+            return 0.5; // Neutral
+        }
+        return (double) comp / 100.0;
+    }
+
+    private int dimensionScore(Enum<?> a, Enum<?> b, boolean hasWildcard) {
+        if (hasWildcard) {
+            return WILDCARD_SCORE;
+        }
+
+        int distance = Math.abs(a.ordinal() - b.ordinal());
+        return switch (distance) {
+            case 0 -> 25; // Perfect match
+            case 1 -> 15; // Close enough
+            default -> 5; // Quite different
+        };
+    }
+
+    private boolean isCommunicationStyleWildcard(PacePreferences.CommunicationStyle style) {
+        return style == PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING;
+    }
+
+    private boolean isDepthPreferenceWildcard(PacePreferences.DepthPreference preference) {
+        return preference == PacePreferences.DepthPreference.DEPENDS_ON_VIBE;
+    }
+
+    /** Checks if a pace score is considered low compatibility. */
+    public boolean isLowPaceCompatibility(int score) {
+        return score >= 0 && score < LOW_PACE_COMPATIBILITY_THRESHOLD;
+    }
+
+    /** Gets the warning message for low pace compatibility. */
+    public String getLowPaceCompatibilityWarning() {
+        return "Your pacing styles differ significantly. Worth discussing early!";
     }
 }

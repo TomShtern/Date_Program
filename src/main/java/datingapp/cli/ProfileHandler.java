@@ -14,7 +14,6 @@ import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfilePreviewService;
 import datingapp.core.User;
-import datingapp.core.UserStorage;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -32,7 +31,7 @@ public class ProfileHandler {
     private static final Logger logger = LoggerFactory.getLogger(ProfileHandler.class);
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final ProfilePreviewService profilePreviewService;
     private final AchievementService achievementService;
     private final CliUtilities.UserSession userSession;
@@ -42,7 +41,7 @@ public class ProfileHandler {
     private static final String PROMPT_CHOICES = "Choices: ";
 
     public ProfileHandler(
-            UserStorage userStorage,
+            User.Storage userStorage,
             ProfilePreviewService profilePreviewService,
             AchievementService achievementService,
             CliUtilities.UserSession userSession,

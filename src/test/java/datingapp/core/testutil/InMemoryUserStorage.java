@@ -1,13 +1,12 @@
 package datingapp.core.testutil;
 
 import datingapp.core.User;
-import datingapp.core.UserStorage;
 import java.util.*;
 
 /**
- * In-memory UserStorage for testing. Thread-safe and provides test helper methods.
+ * In-memory User.Storage for testing. Provides test helper methods.
  */
-public class InMemoryUserStorage implements UserStorage {
+public class InMemoryUserStorage implements User.Storage {
     private final Map<UUID, User> users = new HashMap<>();
 
     @Override

@@ -1,7 +1,7 @@
 package datingapp.cli;
 
-import datingapp.core.LikerBrowserService;
 import datingapp.core.MatchingService;
+import datingapp.core.MatchingService.PendingLiker;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Like;
 import java.util.List;
@@ -13,18 +13,15 @@ import org.slf4j.LoggerFactory;
 public class LikerBrowserHandler {
     private static final Logger logger = LoggerFactory.getLogger(LikerBrowserHandler.class);
 
-    private final LikerBrowserService likerBrowserService;
     private final MatchingService matchingService;
     private final CliUtilities.UserSession userSession;
     private final CliUtilities.InputReader inputReader;
 
     /** Creates a new LikerBrowserHandler with the required dependencies. */
     public LikerBrowserHandler(
-            LikerBrowserService likerBrowserService,
             MatchingService matchingService,
             CliUtilities.UserSession userSession,
             CliUtilities.InputReader inputReader) {
-        this.likerBrowserService = Objects.requireNonNull(likerBrowserService);
         this.matchingService = Objects.requireNonNull(matchingService);
         this.userSession = Objects.requireNonNull(userSession);
         this.inputReader = Objects.requireNonNull(inputReader);
@@ -38,8 +35,7 @@ public class LikerBrowserHandler {
         }
 
         User currentUser = userSession.getCurrentUser();
-        List<LikerBrowserService.PendingLiker> likers =
-                likerBrowserService.findPendingLikersWithTimes(currentUser.getId());
+        List<PendingLiker> likers = matchingService.findPendingLikersWithTimes(currentUser.getId());
 
         if (likers.isEmpty()) {
             logger.info("\nNo new likes yet.\n");
@@ -48,7 +44,7 @@ public class LikerBrowserHandler {
 
         logger.info("\n--- Who Liked Me ({} pending) ---\n", likers.size());
 
-        for (LikerBrowserService.PendingLiker liker : likers) {
+        for (PendingLiker liker : likers) {
             showCard(liker);
             logger.info("1. Like back");
             logger.info("2. Pass");
@@ -68,7 +64,7 @@ public class LikerBrowserHandler {
         logger.info("\nEnd of list.\n");
     }
 
-    private void showCard(LikerBrowserService.PendingLiker pending) {
+    private void showCard(PendingLiker pending) {
         User user = pending.user();
         String verifiedBadge = Boolean.TRUE.equals(user.isVerified()) ? " ✅ Verified" : "";
         String likedAgo = formatTimeAgo(pending.likedAt());

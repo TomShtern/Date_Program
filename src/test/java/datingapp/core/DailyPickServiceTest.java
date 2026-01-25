@@ -239,7 +239,7 @@ class DailyPickServiceTest {
 
     // In-memory test storage implementations
 
-    private static class InMemoryUserStorage implements UserStorage {
+    private static class InMemoryUserStorage implements User.Storage {
         private final List<User> users = new ArrayList<>();
 
         @Override

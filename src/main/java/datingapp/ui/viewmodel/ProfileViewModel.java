@@ -3,7 +3,6 @@ package datingapp.ui.viewmodel;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfileCompletionService.CompletionResult;
 import datingapp.core.User;
-import datingapp.core.UserStorage;
 import datingapp.ui.ViewModelFactory.UISession;
 import datingapp.ui.util.ToastService;
 import java.io.File;
@@ -26,7 +25,7 @@ import org.slf4j.LoggerFactory;
 public class ProfileViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
 
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
 
     // Observable properties for form binding
     private final StringProperty name = new SimpleStringProperty("");
@@ -37,7 +36,7 @@ public class ProfileViewModel {
     private final StringProperty primaryPhotoUrl = new SimpleStringProperty("");
 
     @SuppressWarnings("unused")
-    public ProfileViewModel(UserStorage userStorage, ProfileCompletionService unused) {
+    public ProfileViewModel(User.Storage userStorage, ProfileCompletionService unused) {
         // ProfileCompletionService has static methods, so we ignore the parameter
         this.userStorage = userStorage;
     }

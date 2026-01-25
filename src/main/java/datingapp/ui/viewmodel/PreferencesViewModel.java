@@ -1,7 +1,6 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.User;
-import datingapp.core.UserStorage;
 import datingapp.ui.ViewModelFactory.UISession;
 import java.util.EnumSet;
 import java.util.Set;
@@ -19,7 +18,7 @@ import org.slf4j.LoggerFactory;
 public class PreferencesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(PreferencesViewModel.class);
 
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private User currentUser;
 
     // UI-specific enum for single-selection preference
@@ -35,7 +34,7 @@ public class PreferencesViewModel {
     private final IntegerProperty maxDistance = new SimpleIntegerProperty(50);
     private final ObjectProperty<GenderPreference> interestedIn = new SimpleObjectProperty<>(GenderPreference.EVERYONE);
 
-    public PreferencesViewModel(UserStorage userStorage) {
+    public PreferencesViewModel(User.Storage userStorage) {
         this.userStorage = userStorage;
     }
 

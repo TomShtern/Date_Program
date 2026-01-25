@@ -35,7 +35,7 @@ class MatchQualityServiceTest {
     void setUp() {
         userStorage = new TestUserStorage();
         likeStorage = new TestLikeStorage();
-        service = new MatchQualityService(userStorage, likeStorage, new PaceCompatibilityService());
+        service = new MatchQualityService(userStorage, likeStorage);
     }
 
     @Nested
@@ -324,7 +324,7 @@ class MatchQualityServiceTest {
 
     // === Test Doubles ===
 
-    private static class TestUserStorage implements UserStorage {
+    private static class TestUserStorage implements User.Storage {
         private final java.util.Map<UUID, User> users = new java.util.HashMap<>();
 
         @Override

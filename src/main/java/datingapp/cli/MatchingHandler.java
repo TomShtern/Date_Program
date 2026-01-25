@@ -20,7 +20,6 @@ import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.LikeStorage;
-import datingapp.core.UserStorage;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -45,7 +44,7 @@ public class MatchingHandler {
     private final DailyService dailyService;
     private final UndoService undoService;
     private final MatchQualityService matchQualityService;
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final AchievementService achievementService;
     private final ProfileViewStorage profileViewStorage;
     private final RelationshipTransitionService transitionService;
@@ -78,7 +77,7 @@ public class MatchingHandler {
             DailyService dailyService,
             UndoService undoService,
             MatchQualityService matchQualityService,
-            UserStorage userStorage,
+            User.Storage userStorage,
             AchievementService achievementService,
             ProfileViewStorage profileViewStorage,
             RelationshipTransitionService transitionService,

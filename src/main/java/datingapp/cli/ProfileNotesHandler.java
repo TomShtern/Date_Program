@@ -2,7 +2,6 @@ package datingapp.cli;
 
 import datingapp.core.User;
 import datingapp.core.User.ProfileNoteStorage;
-import datingapp.core.UserStorage;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,13 +17,13 @@ public class ProfileNotesHandler {
     private static final Logger logger = LoggerFactory.getLogger(ProfileNotesHandler.class);
 
     private final ProfileNoteStorage profileNoteStorage;
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final CliUtilities.UserSession userSession;
     private final CliUtilities.InputReader inputReader;
 
     public ProfileNotesHandler(
             ProfileNoteStorage profileNoteStorage,
-            UserStorage userStorage,
+            User.Storage userStorage,
             CliUtilities.UserSession userSession,
             CliUtilities.InputReader inputReader) {
         this.profileNoteStorage = profileNoteStorage;

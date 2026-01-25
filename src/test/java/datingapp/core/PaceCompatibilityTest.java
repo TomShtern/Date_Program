@@ -9,20 +9,33 @@ import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserInteractions.LikeStorage;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class PaceCompatibilityServiceTest {
+/**
+ * Tests for pace compatibility calculation in MatchQualityService. Formerly PaceCompatibilityServiceTest.
+ */
+@SuppressWarnings("unused")
+class PaceCompatibilityTest {
 
-    private PaceCompatibilityService service;
+    private MatchQualityService service;
 
-    @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
-        service = new PaceCompatibilityService();
+        service = new MatchQualityService(new MinimalUserStorage(), new MinimalLikeStorage());
     }
 
     @Test
+    @DisplayName("Perfect match returns 100")
     void perfectMatch_returns100() {
         PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
@@ -35,10 +48,11 @@ class PaceCompatibilityServiceTest {
                 CommunicationStyle.VOICE_NOTES,
                 DepthPreference.DEEP_CHAT);
 
-        assertEquals(100, service.calculateCompatibility(p1, p2));
+        assertEquals(100, service.calculatePaceCompatibility(p1, p2));
     }
 
     @Test
+    @DisplayName("Extreme opposites return low score")
     void extremeOpposites_returnsLowScore() {
         PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.RARELY,
@@ -56,10 +70,11 @@ class PaceCompatibilityServiceTest {
         // Comm: dist 3 -> 5
         // Depth: dist 2 -> 5
         // Total: 20
-        assertEquals(20, service.calculateCompatibility(p1, p2));
+        assertEquals(20, service.calculatePaceCompatibility(p1, p2));
     }
 
     @Test
+    @DisplayName("Communication style wildcard applies wildcard score")
     void communicationStyleWildcard_appliesWildcardScore() {
         PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
@@ -77,10 +92,11 @@ class PaceCompatibilityServiceTest {
         // Comm: wildcard -> 20
         // Depth: 25
         // Total: 95
-        assertEquals(95, service.calculateCompatibility(p1, p2));
+        assertEquals(95, service.calculatePaceCompatibility(p1, p2));
     }
 
     @Test
+    @DisplayName("Depth preference wildcard applies wildcard score")
     void depthPreferenceWildcard_appliesWildcardScore() {
         PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
@@ -98,10 +114,11 @@ class PaceCompatibilityServiceTest {
         // Comm: 25
         // Depth: wildcard -> 20
         // Total: 95
-        assertEquals(95, service.calculateCompatibility(p1, p2));
+        assertEquals(95, service.calculatePaceCompatibility(p1, p2));
     }
 
     @Test
+    @DisplayName("Incomplete preferences return -1")
     void incompletePreferences_returnsNegativeOne() {
         PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN, null, CommunicationStyle.VOICE_NOTES, DepthPreference.SMALL_TALK);
@@ -111,20 +128,22 @@ class PaceCompatibilityServiceTest {
                 CommunicationStyle.VOICE_NOTES,
                 DepthPreference.SMALL_TALK);
 
-        assertEquals(-1, service.calculateCompatibility(p1, p2));
-        assertEquals(-1, service.calculateCompatibility(null, p2));
+        assertEquals(-1, service.calculatePaceCompatibility(p1, p2));
+        assertEquals(-1, service.calculatePaceCompatibility(null, p2));
     }
 
     @Test
+    @DisplayName("Low compatibility threshold detects correctly")
     void lowCompatibilityThreshold_detectsCorrectly() {
-        assertTrue(service.isLowCompatibility(45));
-        assertTrue(service.isLowCompatibility(0));
-        assertFalse(service.isLowCompatibility(50));
-        assertFalse(service.isLowCompatibility(100));
-        assertFalse(service.isLowCompatibility(-1));
+        assertTrue(service.isLowPaceCompatibility(45));
+        assertTrue(service.isLowPaceCompatibility(0));
+        assertFalse(service.isLowPaceCompatibility(50));
+        assertFalse(service.isLowPaceCompatibility(100));
+        assertFalse(service.isLowPaceCompatibility(-1));
     }
 
     @Test
+    @DisplayName("Adjacency logic works correctly")
     void adjacencyLogic_worksCorrectly() {
         PacePreferences p1 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
@@ -138,6 +157,91 @@ class PaceCompatibilityServiceTest {
                 DepthPreference.SMALL_TALK // dist 1 -> 15
                 );
 
-        assertEquals(60, service.calculateCompatibility(p1, p2));
+        assertEquals(60, service.calculatePaceCompatibility(p1, p2));
+    }
+
+    // Minimal mock storage implementations for constructor requirements
+
+    private static class MinimalUserStorage implements User.Storage {
+        @Override
+        public void save(User user) {}
+
+        @Override
+        public User get(UUID id) {
+            return null;
+        }
+
+        @Override
+        public List<User> findAll() {
+            return List.of();
+        }
+
+        @Override
+        public List<User> findActive() {
+            return List.of();
+        }
+    }
+
+    private static class MinimalLikeStorage implements LikeStorage {
+        @Override
+        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void save(Like like) {}
+
+        @Override
+        public boolean exists(UUID from, UUID to) {
+            return false;
+        }
+
+        @Override
+        public boolean mutualLikeExists(UUID a, UUID b) {
+            return false;
+        }
+
+        @Override
+        public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
+            return Set.of();
+        }
+
+        @Override
+        public Set<UUID> getUserIdsWhoLiked(UUID userId) {
+            return Set.of();
+        }
+
+        @Override
+        public Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
+            return Map.of();
+        }
+
+        @Override
+        public int countByDirection(UUID userId, Like.Direction direction) {
+            return 0;
+        }
+
+        @Override
+        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
+            return 0;
+        }
+
+        @Override
+        public int countMutualLikes(UUID userId) {
+            return 0;
+        }
+
+        @Override
+        public int countLikesToday(UUID userId, Instant startOfDay) {
+            return 0;
+        }
+
+        @Override
+        public int countPassesToday(UUID userId, Instant startOfDay) {
+            return 0;
+        }
+
+        @Override
+        public void delete(UUID likeId) {}
     }
 }

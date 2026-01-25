@@ -10,7 +10,6 @@ import datingapp.core.User;
 import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.LikeStorage;
-import datingapp.core.UserStorage;
 import datingapp.ui.ViewModelFactory.UISession;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -36,7 +35,7 @@ public class MatchingViewModel {
 
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final LikeStorage likeStorage;
     private final BlockStorage blockStorage;
     private final UndoService undoService;
@@ -56,7 +55,7 @@ public class MatchingViewModel {
     public MatchingViewModel(
             CandidateFinder candidateFinder,
             MatchingService matchingService,
-            UserStorage userStorage,
+            User.Storage userStorage,
             LikeStorage likeStorage,
             BlockStorage blockStorage,
             UndoService undoService) {

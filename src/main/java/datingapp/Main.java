@@ -12,7 +12,6 @@ import datingapp.cli.SafetyHandler;
 import datingapp.cli.StatsHandler;
 import datingapp.core.AppConfig;
 import datingapp.core.DailyService;
-import datingapp.core.LikerBrowserService;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.SessionService;
 import datingapp.core.User;
@@ -140,15 +139,7 @@ public class Main {
         profileNotesHandler = new ProfileNotesHandler(
                 services.getProfileNoteStorage(), services.getUserStorage(), userSession, inputReader);
 
-        likerBrowserHandler = new LikerBrowserHandler(
-                new LikerBrowserService(
-                        services.getLikeStorage(),
-                        services.getUserStorage(),
-                        services.getMatchStorage(),
-                        services.getBlockStorage()),
-                services.getMatchingService(),
-                userSession,
-                inputReader);
+        likerBrowserHandler = new LikerBrowserHandler(services.getMatchingService(), userSession, inputReader);
 
         messagingHandler = new MessagingHandler(services, inputReader, userSession);
 

@@ -166,7 +166,7 @@ public class ViewModelFactory {
 
     public ProfileViewModel getProfileViewModel() {
         if (profileViewModel == null) {
-            // ProfileViewModel takes (UserStorage, ProfileCompletionService)
+            // ProfileViewModel takes (User.Storage, ProfileCompletionService)
             // ProfileCompletionService methods are static, so we pass null
             profileViewModel = new ProfileViewModel(services.getUserStorage(), null);
         }

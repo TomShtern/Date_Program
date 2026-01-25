@@ -1,28 +1,59 @@
 package datingapp.core;
 
 import datingapp.core.Match.MatchStorage;
+import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.LikeStorage;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 /**
- * Business logic for processing likes and creating matches. Pure Java - no framework dependencies.
+ * Business logic for processing likes, creating matches, and browsing pending likers. Pure Java - no
+ * framework dependencies.
  */
 public class MatchingService {
 
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
+    private final User.Storage userStorage;
+    private final BlockStorage blockStorage;
     private SessionService sessionService; // Optional (Phase 0.5b)
 
+    /** Basic constructor for minimal usage. */
     public MatchingService(LikeStorage likeStorage, MatchStorage matchStorage) {
-        this.likeStorage = likeStorage;
-        this.matchStorage = matchStorage;
+        this.likeStorage = Objects.requireNonNull(likeStorage);
+        this.matchStorage = Objects.requireNonNull(matchStorage);
+        this.userStorage = null;
+        this.blockStorage = null;
+    }
+
+    /** Full constructor with all dependencies for liker browsing functionality. */
+    public MatchingService(
+            LikeStorage likeStorage, MatchStorage matchStorage, User.Storage userStorage, BlockStorage blockStorage) {
+        this.likeStorage = Objects.requireNonNull(likeStorage);
+        this.matchStorage = Objects.requireNonNull(matchStorage);
+        this.userStorage = userStorage;
+        this.blockStorage = blockStorage;
     }
 
     /** Enhanced constructor with session tracking (Phase 0.5b). */
-    public MatchingService(LikeStorage likeStorage, MatchStorage matchStorage, SessionService sessionService) {
-        this.likeStorage = likeStorage;
-        this.matchStorage = matchStorage;
+    public MatchingService(
+            LikeStorage likeStorage,
+            MatchStorage matchStorage,
+            User.Storage userStorage,
+            BlockStorage blockStorage,
+            SessionService sessionService) {
+        this.likeStorage = Objects.requireNonNull(likeStorage);
+        this.matchStorage = Objects.requireNonNull(matchStorage);
+        this.userStorage = userStorage;
+        this.blockStorage = blockStorage;
         this.sessionService = sessionService;
     }
 
@@ -86,4 +117,65 @@ public class MatchingService {
     public Optional<SessionService> getSessionService() {
         return Optional.ofNullable(sessionService);
     }
+
+    // ================== Liker Browser Methods ==================
+
+    /**
+     * Returns all users that liked {@code currentUserId} and the current user has not responded to.
+     * Requires userStorage and blockStorage to be initialized.
+     */
+    public List<User> findPendingLikers(UUID currentUserId) {
+        return findPendingLikersWithTimes(currentUserId).stream()
+                .map(PendingLiker::user)
+                .toList();
+    }
+
+    /**
+     * Same as {@link #findPendingLikers(UUID)}, but also includes when the like happened. Requires
+     * userStorage and blockStorage to be initialized.
+     */
+    public List<PendingLiker> findPendingLikersWithTimes(UUID currentUserId) {
+        Objects.requireNonNull(currentUserId, "currentUserId cannot be null");
+
+        if (userStorage == null || blockStorage == null) {
+            throw new IllegalStateException(
+                    "userStorage and blockStorage required for liker browsing. Use full constructor.");
+        }
+
+        Set<UUID> alreadyInteracted = likeStorage.getLikedOrPassedUserIds(currentUserId);
+        Set<UUID> blocked = blockStorage.getBlockedUserIds(currentUserId);
+
+        Set<UUID> matched = new HashSet<>();
+        for (Match match : matchStorage.getAllMatchesFor(currentUserId)) {
+            matched.add(otherUserId(match, currentUserId));
+        }
+
+        Set<UUID> excluded = new HashSet<>(alreadyInteracted);
+        excluded.addAll(blocked);
+        excluded.addAll(matched);
+
+        var likeTimes = likeStorage.getLikeTimesForUsersWhoLiked(currentUserId);
+
+        List<PendingLiker> result = new ArrayList<>();
+        for (var entry : likeTimes.entrySet()) {
+            UUID likerId = entry.getKey();
+            User liker = userStorage.get(likerId);
+            if (excluded.contains(likerId) || liker == null || liker.getState() != User.State.ACTIVE) {
+                continue;
+            }
+
+            Instant likedAt = entry.getValue();
+            result.add(new PendingLiker(liker, likedAt));
+        }
+
+        result.sort(Comparator.comparing(PendingLiker::likedAt).reversed());
+        return result;
+    }
+
+    private static UUID otherUserId(Match match, UUID currentUserId) {
+        return match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
+    }
+
+    /** Represents a user who liked the current user but hasn't been responded to yet. */
+    public record PendingLiker(User user, Instant likedAt) {}
 }

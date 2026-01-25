@@ -19,7 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for UserSession. */
+/** Unit tests for CliUtilities.UserSession. */
 class UserSessionTest {
 
     private CliUtilities.UserSession userSession;

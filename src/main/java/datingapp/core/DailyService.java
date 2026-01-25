@@ -17,7 +17,7 @@ import java.util.UUID;
 /** Consolidated daily limit and daily pick workflows. */
 public class DailyService {
 
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final LikeStorage likeStorage;
     private final BlockStorage blockStorage;
     private final DailyPickStorage dailyPickStorage;
@@ -28,7 +28,7 @@ public class DailyService {
     }
 
     public DailyService(
-            UserStorage userStorage,
+            User.Storage userStorage,
             LikeStorage likeStorage,
             BlockStorage blockStorage,
             DailyPickStorage dailyPickStorage,

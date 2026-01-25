@@ -2,7 +2,6 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.User;
 import datingapp.core.User.Gender;
-import datingapp.core.UserStorage;
 import datingapp.ui.ViewModelFactory.UISession;
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -24,7 +23,7 @@ import org.slf4j.LoggerFactory;
 public class LoginViewModel {
     private static final Logger logger = LoggerFactory.getLogger(LoginViewModel.class);
 
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loginDisabled = new SimpleBooleanProperty(true);
@@ -36,7 +35,7 @@ public class LoginViewModel {
 
     private User selectedUser;
 
-    public LoginViewModel(UserStorage userStorage) {
+    public LoginViewModel(User.Storage userStorage) {
         this.userStorage = userStorage;
         loadUsers();
     }

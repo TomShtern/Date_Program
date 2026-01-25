@@ -14,17 +14,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for DealbreakersEvaluator. */
+/** Unit tests for Dealbreakers.Evaluator. */
 class DealbreakersEvaluatorTest {
 
-    private DealbreakersEvaluator evaluator;
     private User seeker;
     private User candidate;
 
     @BeforeEach
     void setUp() {
-
-        evaluator = new DealbreakersEvaluator();
 
         // Create seeker (30 years old)
         seeker = new User(UUID.randomUUID(), "Seeker");
@@ -47,14 +44,14 @@ class DealbreakersEvaluatorTest {
         @DisplayName("No dealbreakers means everyone passes")
         void noDealbreakersPassesAll() {
             // seeker has no dealbreakers set
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
         @DisplayName("Dealbreakers.none() accepts all")
         void explicitNonePasses() {
             seeker.setDealbreakers(Dealbreakers.none());
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }
 
@@ -71,7 +68,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setSmoking(Lifestyle.Smoking.NEVER);
 
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -83,7 +80,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setSmoking(Lifestyle.Smoking.REGULARLY);
 
-            assertFalse(evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -95,7 +92,7 @@ class DealbreakersEvaluatorTest {
 
             // candidate.setSmoking is not called - remains null
 
-            assertFalse(evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -107,7 +104,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setSmoking(Lifestyle.Smoking.SOMETIMES);
 
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }
 
@@ -124,7 +121,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setDrinking(Lifestyle.Drinking.SOCIALLY);
 
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -136,7 +133,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setDrinking(Lifestyle.Drinking.REGULARLY);
 
-            assertFalse(evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }
 
@@ -153,7 +150,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setWantsKids(Lifestyle.WantsKids.SOMEDAY);
 
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -165,7 +162,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setWantsKids(Lifestyle.WantsKids.NO);
 
-            assertFalse(evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }
 
@@ -182,7 +179,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setLookingFor(Lifestyle.LookingFor.MARRIAGE);
 
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -194,7 +191,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setLookingFor(Lifestyle.LookingFor.CASUAL);
 
-            assertFalse(evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }
 
@@ -209,7 +206,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setHeightCm(180);
 
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -219,7 +216,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setHeightCm(170);
 
-            assertFalse(evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -229,7 +226,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setHeightCm(185);
 
-            assertFalse(evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -239,7 +236,7 @@ class DealbreakersEvaluatorTest {
 
             // candidate height not set
 
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }
 
@@ -254,7 +251,7 @@ class DealbreakersEvaluatorTest {
 
             // seeker is 30, candidate is 28 - difference is 2
 
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -264,7 +261,7 @@ class DealbreakersEvaluatorTest {
 
             // seeker is 30, candidate is 28 - difference is 2
 
-            assertFalse(evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -274,7 +271,7 @@ class DealbreakersEvaluatorTest {
 
             // seeker is 30, candidate is 28 - difference is 2
 
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }
 
@@ -293,7 +290,7 @@ class DealbreakersEvaluatorTest {
             candidate.setSmoking(Lifestyle.Smoking.NEVER);
             candidate.setDrinking(Lifestyle.Drinking.REGULARLY); // fails this one
 
-            assertFalse(evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
 
         @Test
@@ -309,7 +306,7 @@ class DealbreakersEvaluatorTest {
             candidate.setDrinking(Lifestyle.Drinking.SOCIALLY);
             // age difference is 2, within limit
 
-            assertTrue(evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }
 
@@ -326,7 +323,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setSmoking(Lifestyle.Smoking.NEVER);
 
-            List<String> failures = evaluator.getFailedDealbreakers(seeker, candidate);
+            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate);
             assertTrue(failures.isEmpty());
         }
 
@@ -341,7 +338,7 @@ class DealbreakersEvaluatorTest {
             candidate.setSmoking(Lifestyle.Smoking.REGULARLY);
             candidate.setDrinking(Lifestyle.Drinking.REGULARLY);
 
-            List<String> failures = evaluator.getFailedDealbreakers(seeker, candidate);
+            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate);
             assertEquals(2, failures.size());
         }
 
@@ -354,7 +351,7 @@ class DealbreakersEvaluatorTest {
 
             // candidate smoking not set
 
-            List<String> failures = evaluator.getFailedDealbreakers(seeker, candidate);
+            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate);
             assertEquals(1, failures.size());
             assertTrue(failures.get(0).contains("not specified"));
         }

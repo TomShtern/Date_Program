@@ -21,13 +21,13 @@ public class MessagingService {
     private final ConversationStorage conversationStorage;
     private final MessageStorage messageStorage;
     private final MatchStorage matchStorage;
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
 
     public MessagingService(
             ConversationStorage conversationStorage,
             MessageStorage messageStorage,
             MatchStorage matchStorage,
-            UserStorage userStorage) {
+            User.Storage userStorage) {
         this.conversationStorage = Objects.requireNonNull(conversationStorage, "conversationStorage cannot be null");
         this.messageStorage = Objects.requireNonNull(messageStorage, "messageStorage cannot be null");
         this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");

@@ -683,7 +683,7 @@ class MessagingServiceTest {
         }
     }
 
-    static class InMemoryUserStorage implements UserStorage {
+    static class InMemoryUserStorage implements User.Storage {
         private final Map<UUID, User> users = new HashMap<>();
 
         @Override

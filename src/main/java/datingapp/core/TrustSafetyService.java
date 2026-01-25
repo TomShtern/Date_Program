@@ -16,7 +16,7 @@ public class TrustSafetyService {
     public static final Duration DEFAULT_VERIFICATION_TTL = Duration.ofMinutes(15);
 
     private final ReportStorage reportStorage;
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final BlockStorage blockStorage;
     private final AppConfig config;
     private final Duration verificationTtl;
@@ -31,13 +31,13 @@ public class TrustSafetyService {
     }
 
     public TrustSafetyService(
-            ReportStorage reportStorage, UserStorage userStorage, BlockStorage blockStorage, AppConfig config) {
+            ReportStorage reportStorage, User.Storage userStorage, BlockStorage blockStorage, AppConfig config) {
         this(reportStorage, userStorage, blockStorage, config, DEFAULT_VERIFICATION_TTL, new Random());
     }
 
     public TrustSafetyService(
             ReportStorage reportStorage,
-            UserStorage userStorage,
+            User.Storage userStorage,
             BlockStorage blockStorage,
             AppConfig config,
             Duration verificationTtl,

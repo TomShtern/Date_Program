@@ -242,7 +242,7 @@ class ReportServiceTest {
         }
     }
 
-    private static class InMemoryUserStorage implements UserStorage {
+    private static class InMemoryUserStorage implements User.Storage {
         private final Map<UUID, User> users = new HashMap<>();
 
         @Override

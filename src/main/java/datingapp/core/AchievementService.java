@@ -22,7 +22,7 @@ public class AchievementService {
     private final UserAchievementStorage achievementStorage;
     private final MatchStorage matchStorage;
     private final LikeStorage likeStorage;
-    private final UserStorage userStorage;
+    private final User.Storage userStorage;
     private final ReportStorage reportStorage;
     private final ProfilePreviewService profilePreviewService;
 
@@ -30,7 +30,7 @@ public class AchievementService {
             UserAchievementStorage achievementStorage,
             MatchStorage matchStorage,
             LikeStorage likeStorage,
-            UserStorage userStorage,
+            User.Storage userStorage,
             ReportStorage reportStorage,
             ProfilePreviewService profilePreviewService) {
         this.achievementStorage = Objects.requireNonNull(achievementStorage);

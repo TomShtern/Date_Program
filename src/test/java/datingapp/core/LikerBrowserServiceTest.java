@@ -3,6 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import datingapp.core.Match.MatchStorage;
+import datingapp.core.MatchingService.PendingLiker;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.BlockStorage;
@@ -22,6 +23,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Tests for the liker browser functionality in MatchingService. These methods allow users to see
+ * who has liked them.
+ */
 @SuppressWarnings("unused")
 class LikerBrowserServiceTest {
 
@@ -58,7 +63,7 @@ class LikerBrowserServiceTest {
         userStorage.put(activeUser(matchedId, "Matched"));
         userStorage.put(incompleteUser(inactiveId, "Inactive"));
 
-        LikerBrowserService service = new LikerBrowserService(likeStorage, userStorage, matchStorage, blockStorage);
+        MatchingService service = new MatchingService(likeStorage, matchStorage, userStorage, blockStorage);
 
         List<User> pending = service.findPendingLikers(currentUserId);
 
@@ -82,10 +87,10 @@ class LikerBrowserServiceTest {
         userStorage.put(activeUser(olderLikerId, "Older"));
         userStorage.put(activeUser(newerLikerId, "Newer"));
 
-        LikerBrowserService service = new LikerBrowserService(
-                likeStorage, userStorage, new InMemoryMatchStorage(), new InMemoryBlockStorage());
+        MatchingService service =
+                new MatchingService(likeStorage, new InMemoryMatchStorage(), userStorage, new InMemoryBlockStorage());
 
-        List<LikerBrowserService.PendingLiker> pending = service.findPendingLikersWithTimes(currentUserId);
+        List<PendingLiker> pending = service.findPendingLikersWithTimes(currentUserId);
 
         assertEquals(2, pending.size());
         assertEquals(newerLikerId, pending.getFirst().user().getId());
@@ -221,7 +226,7 @@ class LikerBrowserServiceTest {
         }
     }
 
-    private static class InMemoryUserStorage implements UserStorage {
+    private static class InMemoryUserStorage implements User.Storage {
         private final Map<UUID, User> users = new HashMap<>();
 
         void put(User user) {

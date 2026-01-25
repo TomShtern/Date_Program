@@ -34,7 +34,7 @@ import java.util.UUID;
  * sense. Services in this codebase:
  *
  * <ul>
- *   <li>Depend on storage interfaces (e.g., {@code UserStorage}, {@code LikeStorage})
+ *   <li>Depend on storage interfaces (e.g., {@code User.Storage}, {@code LikeStorage})
  *   <li>Manage state or coordinate persistence operations
  *   <li>Handle business workflows with side effects
  * </ul>
@@ -45,7 +45,7 @@ import java.util.UUID;
  *
  * <h3>Related Naming Inconsistencies</h3>
  *
- * <p>For historical consistency, {@code DealbreakersEvaluator} and {@code InterestMatcher} should
+ * <p>For historical consistency, {@code Dealbreakers.Evaluator} and {@code InterestMatcher} should
  * also be renamed to follow either the {@code *Service} pattern or remain as utilities. This is
  * tracked in <a href="file:///DEVELOPMENT_PLAN.md">DEVELOPMENT_PLAN.md</a> items #6 and #15.
  *
@@ -60,7 +60,7 @@ import java.util.UUID;
  *       scores for intelligent ranking.
  * </ul>
  *
- * @see DealbreakersEvaluator
+ * @see Dealbreakers.Evaluator
  * @see MatchQualityService.InterestMatcher
  * @see GeoUtils
  */
@@ -101,10 +101,8 @@ public class CandidateFinder {
         }
     }
 
-    private final DealbreakersEvaluator dealbreakersEvaluator;
-
     public CandidateFinder() {
-        this.dealbreakersEvaluator = new DealbreakersEvaluator();
+        // No-arg constructor for utility class
     }
 
     /**
@@ -124,7 +122,7 @@ public class CandidateFinder {
                 .filter(candidate -> hasMatchingGenderPreferences(seeker, candidate)) // Mutual gender
                 .filter(candidate -> hasMatchingAgePreferences(seeker, candidate)) // Mutual age
                 .filter(candidate -> isWithinDistance(seeker, candidate)) // Within distance
-                .filter(candidate -> dealbreakersEvaluator.passes(seeker, candidate)) // Dealbreakers (Phase 0.5b)
+                .filter(candidate -> Dealbreakers.Evaluator.passes(seeker, candidate)) // Dealbreakers (Phase 0.5b)
                 .sorted(Comparator.comparingDouble(c -> distanceTo(seeker, c))) // Sort by distance
                 .toList();
     }
