@@ -128,8 +128,9 @@ public final class H2ModerationStorage {
                 stmt.setObject(3, userB);
                 stmt.setObject(4, userA);
 
-                ResultSet rs = stmt.executeQuery();
-                return rs.next();
+                try (ResultSet rs = stmt.executeQuery()) {
+                    return rs.next();
+                }
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to check block status", e);
@@ -153,9 +154,10 @@ public final class H2ModerationStorage {
                 stmt.setObject(1, userId);
                 stmt.setObject(2, userId);
 
-                ResultSet rs = stmt.executeQuery();
-                while (rs.next()) {
-                    blockedIds.add(rs.getObject(1, UUID.class));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        blockedIds.add(rs.getObject(1, UUID.class));
+                    }
                 }
 
                 return blockedIds;
@@ -175,12 +177,12 @@ public final class H2ModerationStorage {
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
                 stmt.setObject(1, userId);
-                ResultSet rs = stmt.executeQuery();
-
-                if (rs.next()) {
-                    return rs.getInt(1);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
+                    return 0;
                 }
-                return 0;
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to count blocks given", e);
@@ -195,12 +197,12 @@ public final class H2ModerationStorage {
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
                 stmt.setObject(1, userId);
-                ResultSet rs = stmt.executeQuery();
-
-                if (rs.next()) {
-                    return rs.getInt(1);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
+                    return 0;
                 }
-                return 0;
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to count blocks received", e);
@@ -284,12 +286,12 @@ public final class H2ModerationStorage {
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
                 stmt.setObject(1, userId);
-                ResultSet rs = stmt.executeQuery();
-
-                if (rs.next()) {
-                    return rs.getInt(1);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
+                    return 0;
                 }
-                return 0;
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to count reports", e);
@@ -306,8 +308,9 @@ public final class H2ModerationStorage {
                 stmt.setObject(1, reporterId);
                 stmt.setObject(2, reportedUserId);
 
-                ResultSet rs = stmt.executeQuery();
-                return rs.next();
+                try (ResultSet rs = stmt.executeQuery()) {
+                    return rs.next();
+                }
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to check report status", e);
@@ -324,16 +327,16 @@ public final class H2ModerationStorage {
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
                 stmt.setObject(1, userId);
-                ResultSet rs = stmt.executeQuery();
-
-                while (rs.next()) {
-                    reports.add(new Report(
-                            rs.getObject("id", UUID.class),
-                            rs.getObject("reporter_id", UUID.class),
-                            rs.getObject("reported_user_id", UUID.class),
-                            Report.Reason.valueOf(rs.getString("reason")),
-                            rs.getString("description"),
-                            rs.getTimestamp("created_at").toInstant()));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        reports.add(new Report(
+                                rs.getObject("id", UUID.class),
+                                rs.getObject("reporter_id", UUID.class),
+                                rs.getObject("reported_user_id", UUID.class),
+                                Report.Reason.valueOf(rs.getString("reason")),
+                                rs.getString("description"),
+                                rs.getTimestamp("created_at").toInstant()));
+                    }
                 }
 
                 return reports;
@@ -353,12 +356,12 @@ public final class H2ModerationStorage {
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
                 stmt.setObject(1, userId);
-                ResultSet rs = stmt.executeQuery();
-
-                if (rs.next()) {
-                    return rs.getInt(1);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
+                    return 0;
                 }
-                return 0;
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to count reports by user", e);

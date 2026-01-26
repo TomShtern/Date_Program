@@ -71,12 +71,12 @@ public class H2SwipeSessionStorage extends AbstractH2Storage implements SwipeSes
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setObject(1, sessionId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return Optional.of(mapSession(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapSession(rs));
+                }
+                return Optional.empty();
             }
-            return Optional.empty();
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get session: " + sessionId, e);
@@ -93,12 +93,12 @@ public class H2SwipeSessionStorage extends AbstractH2Storage implements SwipeSes
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setObject(1, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return Optional.of(mapSession(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapSession(rs));
+                }
+                return Optional.empty();
             }
-            return Optional.empty();
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get active session for user: " + userId, e);
@@ -117,12 +117,12 @@ public class H2SwipeSessionStorage extends AbstractH2Storage implements SwipeSes
 
             stmt.setObject(1, userId);
             stmt.setInt(2, limit);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                sessions.add(mapSession(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    sessions.add(mapSession(rs));
+                }
+                return sessions;
             }
-            return sessions;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get sessions for user: " + userId, e);
@@ -141,12 +141,12 @@ public class H2SwipeSessionStorage extends AbstractH2Storage implements SwipeSes
             stmt.setObject(1, userId);
             stmt.setTimestamp(2, Timestamp.from(start));
             stmt.setTimestamp(3, Timestamp.from(end));
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                sessions.add(mapSession(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    sessions.add(mapSession(rs));
+                }
+                return sessions;
             }
-            return sessions;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get sessions in range for user: " + userId, e);
@@ -175,34 +175,34 @@ public class H2SwipeSessionStorage extends AbstractH2Storage implements SwipeSes
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setObject(1, userId);
-            ResultSet rs = stmt.executeQuery();
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    int totalSessions = rs.getInt("total_sessions");
+                    int totalSwipes = rs.getInt("total_swipes");
+                    int totalLikes = rs.getInt("total_likes");
+                    int totalPasses = rs.getInt("total_passes");
+                    int totalMatches = rs.getInt("total_matches");
+                    double avgDurationSeconds = rs.getDouble("avg_duration_seconds");
 
-            if (rs.next()) {
-                int totalSessions = rs.getInt("total_sessions");
-                int totalSwipes = rs.getInt("total_swipes");
-                int totalLikes = rs.getInt("total_likes");
-                int totalPasses = rs.getInt("total_passes");
-                int totalMatches = rs.getInt("total_matches");
-                double avgDurationSeconds = rs.getDouble("avg_duration_seconds");
+                    double avgSwipesPerSession = totalSessions > 0 ? (double) totalSwipes / totalSessions : 0.0;
+                    // Calculate avg velocity: if avg duration is at least 60s, use it; otherwise
+                    // assume 60s
+                    double avgSwipeVelocity = avgDurationSeconds >= 60
+                            ? avgSwipesPerSession / (avgDurationSeconds / 60.0)
+                            : avgSwipesPerSession;
 
-                double avgSwipesPerSession = totalSessions > 0 ? (double) totalSwipes / totalSessions : 0.0;
-                // Calculate avg velocity: if avg duration is at least 60s, use it; otherwise
-                // assume 60s
-                double avgSwipeVelocity = avgDurationSeconds >= 60
-                        ? avgSwipesPerSession / (avgDurationSeconds / 60.0)
-                        : avgSwipesPerSession;
-
-                return new SessionAggregates(
-                        totalSessions,
-                        totalSwipes,
-                        totalLikes,
-                        totalPasses,
-                        totalMatches,
-                        avgDurationSeconds,
-                        avgSwipesPerSession,
-                        avgSwipeVelocity);
+                    return new SessionAggregates(
+                            totalSessions,
+                            totalSwipes,
+                            totalLikes,
+                            totalPasses,
+                            totalMatches,
+                            avgDurationSeconds,
+                            avgSwipesPerSession,
+                            avgSwipeVelocity);
+                }
+                return SessionAggregates.empty();
             }
-            return SessionAggregates.empty();
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get aggregates for user: " + userId, e);

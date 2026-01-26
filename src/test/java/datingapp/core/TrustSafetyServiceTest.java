@@ -26,10 +26,12 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Unit tests for TrustSafetyService - consolidated from ReportServiceTest and
@@ -41,6 +43,7 @@ import org.junit.jupiter.api.Test;
  */
 @SuppressWarnings("unused")
 @DisplayName("TrustSafetyService")
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class TrustSafetyServiceTest {
 
     // ============================================================
@@ -369,6 +372,11 @@ class TrustSafetyServiceTest {
             return users.values().stream()
                     .filter(u -> u.getState() == User.State.ACTIVE)
                     .toList();
+        }
+
+        @Override
+        public void delete(UUID id) {
+            users.remove(id);
         }
     }
 

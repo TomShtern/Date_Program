@@ -109,6 +109,13 @@ public class Match {
 
     /** Generates the deterministic match ID for two user UUIDs. */
     public static String generateId(UUID a, UUID b) {
+        Objects.requireNonNull(a, "a cannot be null");
+        Objects.requireNonNull(b, "b cannot be null");
+
+        if (a.equals(b)) {
+            throw new IllegalArgumentException("Cannot generate match ID for the same user");
+        }
+
         String firstUserId = a.toString();
         String secondUserId = b.toString();
 
@@ -119,10 +126,10 @@ public class Match {
         }
     }
 
-    /** Unmatch - ends the match. Can only be done from ACTIVE state. */
+    /** Unmatch - ends the match. Can be done from ACTIVE or FRIENDS state. */
     public void unmatch(UUID userId) {
-        if (this.state != State.ACTIVE) {
-            throw new IllegalStateException("Match is not active");
+        if (!isValidTransition(this.state, State.UNMATCHED)) {
+            throw new IllegalStateException("Cannot unmatch from " + this.state + " state");
         }
         if (!involves(userId)) {
             throw new IllegalArgumentException("User is not part of this match");

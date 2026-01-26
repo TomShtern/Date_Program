@@ -5,6 +5,7 @@ import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.PreferencesViewModel;
 import datingapp.ui.viewmodel.PreferencesViewModel.GenderPreference;
 import java.net.URL;
+import java.util.Objects;
 import java.util.ResourceBundle;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -147,9 +148,9 @@ public class PreferencesController extends BaseController implements Initializab
                 return;
             }
 
-            if (newVal == menToggle) {
+            if (Objects.equals(newVal, menToggle)) {
                 viewModel.interestedInProperty().set(GenderPreference.MEN);
-            } else if (newVal == womenToggle) {
+            } else if (Objects.equals(newVal, womenToggle)) {
                 viewModel.interestedInProperty().set(GenderPreference.WOMEN);
             } else {
                 viewModel.interestedInProperty().set(GenderPreference.EVERYONE);

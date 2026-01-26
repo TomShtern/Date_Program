@@ -173,10 +173,18 @@ public class DashboardController extends BaseController implements Initializable
     @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleLogout() {
-        logger.info("Logging out");
-        UISession.getInstance().logout();
-        NavigationService.getInstance().getViewModelFactory().reset();
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
+        javafx.scene.control.Alert alert =
+                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Logout");
+        alert.setHeaderText("Are you sure you want to logout?");
+        alert.setContentText("You will need to login again to access your account.");
+
+        if (alert.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL) == javafx.scene.control.ButtonType.OK) {
+            logger.info("Logging out");
+            UISession.getInstance().logout();
+            NavigationService.getInstance().getViewModelFactory().reset();
+            NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
+        }
     }
 
     @Override

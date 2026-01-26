@@ -8,11 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Preferences.Lifestyle;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Unit tests for Dealbreakers validation and builder. */
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class DealbreakersTest {
 
     @Nested

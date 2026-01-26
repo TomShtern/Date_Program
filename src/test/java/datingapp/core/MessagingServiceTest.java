@@ -16,12 +16,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 @DisplayName("MessagingService Tests")
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MessagingServiceTest {
 
     private InMemoryConversationStorage conversationStorage;
@@ -706,6 +709,11 @@ class MessagingServiceTest {
         @Override
         public List<User> findAll() {
             return List.copyOf(users.values());
+        }
+
+        @Override
+        public void delete(UUID id) {
+            users.remove(id);
         }
     }
 }

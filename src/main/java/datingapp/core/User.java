@@ -64,6 +64,14 @@ public class User {
 
         /** Finds all users regardless of state. */
         List<User> findAll();
+
+        /**
+         * Deletes a user and all their associated data. When combined with CASCADE DELETE on
+         * foreign keys, this will automatically remove likes, matches, sessions, and stats.
+         *
+         * @param id The user ID to delete
+         */
+        void delete(UUID id);
     }
 
     private final UUID id;
@@ -712,6 +720,9 @@ public class User {
         if (maxDistanceKm < 1) {
             throw new IllegalArgumentException("maxDistanceKm must be at least 1");
         }
+        if (maxDistanceKm > 500) {
+            throw new IllegalArgumentException("maxDistanceKm cannot exceed 500");
+        }
         this.maxDistanceKm = maxDistanceKm;
         touch();
     }
@@ -719,6 +730,9 @@ public class User {
     public void setAgeRange(int minAge, int maxAge) {
         if (minAge < 18) {
             throw new IllegalArgumentException("minAge must be at least 18");
+        }
+        if (maxAge > 120) {
+            throw new IllegalArgumentException("maxAge cannot exceed 120");
         }
         if (maxAge < minAge) {
             throw new IllegalArgumentException("maxAge cannot be less than minAge");

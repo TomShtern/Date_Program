@@ -12,11 +12,14 @@ import datingapp.core.UserInteractions.Like;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Unit tests for SwipeSession state machine and computed properties. */
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class SwipeSessionTest {
 
     @Test
@@ -118,6 +121,17 @@ class SwipeSessionTest {
             session.incrementMatchCount();
 
             assertEquals(1, session.getMatchCount());
+        }
+
+        @Test
+        @DisplayName("incrementMatchCount does nothing on completed session")
+        void incrementMatchCountCompletedSession() {
+            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            session.end();
+
+            session.incrementMatchCount();
+
+            assertEquals(0, session.getMatchCount());
         }
     }
 
@@ -268,6 +282,18 @@ class SwipeSessionTest {
             String formatted = session.getFormattedDuration();
             // Should be something like "5:30" or "5:31" depending on timing
             assertTrue(formatted.matches("\\d+:\\d{2}"));
+        }
+
+        @Test
+        @DisplayName("Duration is never negative when start time is in the future")
+        void durationNotNegativeForFutureStart() {
+            UUID userId = UUID.randomUUID();
+            Instant future = Instant.now().plus(Duration.ofMinutes(5));
+
+            SwipeSession session = new SwipeSession(
+                    UUID.randomUUID(), userId, future, future, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
+
+            assertEquals(0, session.getDurationSeconds());
         }
     }
 

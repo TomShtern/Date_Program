@@ -7,7 +7,6 @@ import datingapp.core.Social.Notification;
 import datingapp.core.Social.NotificationStorage;
 import datingapp.core.User;
 import java.util.List;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,53 +36,13 @@ public class RelationshipHandler {
         this.inputReader = inputReader;
     }
 
-    /** Initiates a Friend Zone request for the target user. */
-    public void handleFriendZone(UUID targetUserId) {
-        User currentUser = userSession.getCurrentUser();
-        User targetUser = userStorage.get(targetUserId);
-        if (targetUser == null) {
-            return;
-        }
-
-        logger.info("\nAsking to move your match with {} to the Friend Zone...", targetUser.getName());
-        logger.info("This will end the romantic match and transition to a Platonic Friendship if they accept.");
-
-        String confirm = inputReader.readLine("Send friend request? (y/n): ");
-        if (confirm.equalsIgnoreCase("y")) {
-            try {
-                transitionService.requestFriendZone(currentUser.getId(), targetUserId);
-                logger.info("✅ Friend request sent to {}.\n", targetUser.getName());
-            } catch (TransitionValidationException e) {
-                logger.info("❌ Failed: {}\n", e.getMessage());
-            }
-        }
-    }
-
-    /** Initiates a Graceful Exit for the target user. */
-    public void handleGracefulExit(UUID targetUserId) {
-        User currentUser = userSession.getCurrentUser();
-        User targetUser = userStorage.get(targetUserId);
-        if (targetUser == null) {
-            return;
-        }
-
-        logger.info("\nEnding your relationship with {} gracefully...", targetUser.getName());
-        logger.info("This is a kind way to move on. They will be notified and the match/friendship will end.");
-
-        String confirm = inputReader.readLine("Proceed with graceful exit? (y/n): ");
-        if (confirm.equalsIgnoreCase("y")) {
-            try {
-                transitionService.gracefulExit(currentUser.getId(), targetUserId);
-                logger.info("🕊️ You have gracefully moved on. Match ended.\n");
-            } catch (TransitionValidationException e) {
-                logger.info("❌ Failed: {}\n", e.getMessage());
-            }
-        }
-    }
-
     /** Displays and manages pending friend requests. */
     public void viewPendingRequests() {
         User currentUser = userSession.getCurrentUser();
+        if (currentUser == null) {
+            logger.info("\n⚠️ Please log in first.\n");
+            return;
+        }
         List<FriendRequest> requests = transitionService.getPendingRequestsFor(currentUser.getId());
 
         if (requests.isEmpty()) {
@@ -135,6 +94,10 @@ public class RelationshipHandler {
     /** Displays notifications for the current user. */
     public void viewNotifications() {
         User currentUser = userSession.getCurrentUser();
+        if (currentUser == null) {
+            logger.info("\n⚠️ Please log in first.\n");
+            return;
+        }
         List<Notification> notifications = notificationStorage.getForUser(currentUser.getId(), false);
 
         if (notifications.isEmpty()) {

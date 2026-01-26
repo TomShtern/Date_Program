@@ -2,6 +2,7 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextArea?>
@@ -107,7 +108,37 @@
                                                                 HBox.hgrow="ALWAYS"/>
           </HBox>
         </VBox>
-        <!-- Interests Section -->
+
+        <!-- Gender &amp; Preferences Section - CRITICAL for matching -->
+        <VBox styleClass="section-glass-card" spacing="16">
+          <HBox styleClass="section-header" alignment="CENTER_LEFT">
+            <StackPane styleClass="section-icon-container">
+              <FontIcon iconLiteral="mdi2g-gender-male-female" iconSize="20" iconColor="#c084fc"/>
+            </StackPane>
+            <Label styleClass="section-title" text="Gender &amp; Preferences"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label styleClass="text-secondary" text="Required for matching"/>
+          </HBox>
+
+          <!-- Gender -->
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <Label styleClass="field-label" text="I am:" prefWidth="120"/>
+            <ComboBox fx:id="genderCombo" promptText="Select your gender..." prefWidth="180"/>
+          </HBox>
+
+          <!-- Interested In (multi-select) -->
+          <VBox spacing="8">
+            <HBox spacing="12" alignment="CENTER_LEFT">
+              <Label styleClass="field-label" text="Interested in:"/>
+              <Label fx:id="interestedInLabel" styleClass="text-secondary" text="Select at least one"/>
+            </HBox>
+            <FlowPane fx:id="interestedInFlow" hgap="12" vgap="8">
+              <!-- Populated programmatically with toggle buttons -->
+            </FlowPane>
+          </VBox>
+        </VBox>
+
+        <!-- Interests Section - Editable -->
         <VBox styleClass="section-glass-card" spacing="12">
           <HBox styleClass="section-header" alignment="CENTER_LEFT">
             <StackPane styleClass="section-icon-container">
@@ -115,19 +146,107 @@
             </StackPane>
             <Label styleClass="section-title" text="Interests"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label styleClass="text-secondary profile-readonly-hint" text="Read-only"/>
+            <Label fx:id="interestCountLabel" styleClass="text-secondary" text="0/10 selected"/>
           </HBox>
-          <!-- Interest chips display -->
+          <!-- Interest chips display - clickable -->
           <FlowPane fx:id="interestsFlow" styleClass="interests-container" hgap="10" vgap="10">
-            <Label styleClass="interest-chip" text="No interests set"/>
+            <Label styleClass="interest-chip" text="Click to add interests..."/>
           </FlowPane>
           <!-- Hidden field for binding -->
           <TextField fx:id="interestsField" visible="false" managed="false"/>
-          <HBox alignment="CENTER_LEFT" spacing="8">
-            <FontIcon iconLiteral="mdi2i-information-outline" iconSize="14" iconColor="#64748b"/>
-            <Label styleClass="text-secondary profile-edit-hint" text="Edit interests in Settings"/>
+          <Button onAction="#handleEditInterests" text="Select Interests" styleClass="button-secondary-small">
+            <graphic>
+              <FontIcon iconLiteral="mdi2p-plus" iconSize="16" iconColor="white"/>
+            </graphic>
+          </Button>
+        </VBox>
+
+        <!-- Lifestyle Section -->
+        <VBox styleClass="section-glass-card" spacing="16">
+          <HBox styleClass="section-header" alignment="CENTER_LEFT">
+            <StackPane styleClass="section-icon-container">
+              <FontIcon iconLiteral="mdi2a-account-heart" iconSize="20" iconColor="#34d399"/>
+            </StackPane>
+            <Label styleClass="section-title" text="Lifestyle"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label styleClass="text-secondary" text="Helps find compatible matches"/>
+          </HBox>
+
+          <!-- Height -->
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <Label styleClass="field-label" text="Height (cm):" prefWidth="120"/>
+            <TextField fx:id="heightField" promptText="e.g. 175" prefWidth="100"/>
+          </HBox>
+
+          <!-- Smoking -->
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <Label styleClass="field-label" text="Smoking:" prefWidth="120"/>
+            <ComboBox fx:id="smokingCombo" promptText="Select..." prefWidth="180"/>
+          </HBox>
+
+          <!-- Drinking -->
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <Label styleClass="field-label" text="Drinking:" prefWidth="120"/>
+            <ComboBox fx:id="drinkingCombo" promptText="Select..." prefWidth="180"/>
+          </HBox>
+
+          <!-- Wants Kids -->
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <Label styleClass="field-label" text="Kids:" prefWidth="120"/>
+            <ComboBox fx:id="wantsKidsCombo" promptText="Select..." prefWidth="180"/>
+          </HBox>
+
+          <!-- Looking For -->
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <Label styleClass="field-label" text="Looking for:" prefWidth="120"/>
+            <ComboBox fx:id="lookingForCombo" promptText="Select..." prefWidth="180"/>
           </HBox>
         </VBox>
+
+        <!-- Search Preferences Section -->
+        <VBox styleClass="section-glass-card" spacing="16">
+          <HBox styleClass="section-header" alignment="CENTER_LEFT">
+            <StackPane styleClass="section-icon-container">
+              <FontIcon iconLiteral="mdi2t-tune" iconSize="20" iconColor="#60a5fa"/>
+            </StackPane>
+            <Label styleClass="section-title" text="Search Preferences"/>
+          </HBox>
+
+          <!-- Age Range -->
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <Label styleClass="field-label" text="Age range:" prefWidth="120"/>
+            <TextField fx:id="minAgeField" promptText="18" prefWidth="60"/>
+            <Label text="to"/>
+            <TextField fx:id="maxAgeField" promptText="99" prefWidth="60"/>
+            <Label styleClass="text-secondary" text="years"/>
+          </HBox>
+
+          <!-- Max Distance -->
+          <HBox spacing="12" alignment="CENTER_LEFT">
+            <Label styleClass="field-label" text="Max distance:" prefWidth="120"/>
+            <TextField fx:id="maxDistanceField" promptText="50" prefWidth="80"/>
+            <Label styleClass="text-secondary" text="km"/>
+          </HBox>
+        </VBox>
+
+        <!-- Dealbreakers Section (Optional) -->
+        <VBox styleClass="section-glass-card" spacing="16">
+          <HBox styleClass="section-header" alignment="CENTER_LEFT">
+            <StackPane styleClass="section-icon-container">
+              <FontIcon iconLiteral="mdi2s-shield-check" iconSize="20" iconColor="#f87171"/>
+            </StackPane>
+            <Label styleClass="section-title" text="Dealbreakers"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="dealbreakersStatusLabel" styleClass="text-secondary" text="None set"/>
+          </HBox>
+          <Label styleClass="text-secondary" text="Set hard filters to exclude certain profiles. Optional."/>
+          <Button fx:id="editDealbreakersBtn" onAction="#handleEditDealbreakers" text="Configure Dealbreakers" styleClass="button-secondary-small">
+            <graphic>
+              <FontIcon iconLiteral="mdi2p-pencil" iconSize="16" iconColor="white"/>
+            </graphic>
+          </Button>
+        </VBox>
+
         <!-- Spacer to ensure scroll content doesn't overlap with sticky footer -->
         <Region prefHeight="80"/>
       </VBox>

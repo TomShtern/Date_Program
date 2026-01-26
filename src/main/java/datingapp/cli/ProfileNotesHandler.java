@@ -61,7 +61,7 @@ public class ProfileNotesHandler {
 
             String choice = inputReader.readLine("\nChoice: ");
             switch (choice) {
-                case "1" -> editNote(currentUser.getId(), subjectId, existingNote.get());
+                case "1" -> editNote(existingNote.get());
                 case "2" -> deleteNote(currentUser.getId(), subjectId, subjectName);
                 default -> {
                     /* back */ }
@@ -113,11 +113,9 @@ public class ProfileNotesHandler {
     /**
      * Edits an existing note.
      *
-     * @param authorId The ID of the user editing the note
-     * @param subjectId The ID of the user the note is about
      * @param existing The existing note to edit
      */
-    private void editNote(UUID authorId, UUID subjectId, User.ProfileNote existing) {
+    private void editNote(User.ProfileNote existing) {
         logger.info("\nCurrent note: \"{}\"\n", existing.content());
         logger.info("Enter new note (or press Enter to keep current):");
         String content = inputReader.readLine("Note: ");
@@ -205,7 +203,8 @@ public class ProfileNotesHandler {
                 manageNoteFor(note.subjectId(), subjectName);
             }
         } catch (NumberFormatException e) {
-            // Back to menu
+            logger.trace("Non-numeric input for note selection: {}", e.getMessage());
+            // Back to menu - user entered non-numeric input
         }
     }
 

@@ -23,13 +23,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Unit tests for AchievementService. Uses in-memory mock storage for isolated testing. */
 @SuppressWarnings("unused") // IDE false positives for @Nested classes and @BeforeEach
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class AchievementServiceTest {
 
     private InMemoryUserAchievementStorage achievementStorage;
@@ -476,6 +479,11 @@ class AchievementServiceTest {
             return users.values().stream()
                     .filter(u -> u.getState() == User.State.ACTIVE)
                     .toList();
+        }
+
+        @Override
+        public void delete(UUID id) {
+            users.remove(id);
         }
     }
 

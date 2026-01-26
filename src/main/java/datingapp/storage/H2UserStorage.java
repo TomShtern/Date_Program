@@ -170,12 +170,12 @@ public class H2UserStorage extends AbstractH2Storage implements User.Storage {
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setObject(1, id);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return mapUser(rs);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapUser(rs);
+                }
+                return null;
             }
-            return null;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get user: " + id, e);
@@ -192,6 +192,21 @@ public class H2UserStorage extends AbstractH2Storage implements User.Storage {
     public List<User> findAll() {
         String sql = SELECT_USERS;
         return findByQuery(sql);
+    }
+
+    @Override
+    public void delete(UUID id) {
+        String sql = "DELETE FROM users WHERE id = ?";
+
+        try (Connection conn = dbManager.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setObject(1, id);
+            stmt.executeUpdate();
+
+        } catch (SQLException e) {
+            throw new StorageException("Failed to delete user: " + id, e);
+        }
     }
 
     private List<User> findByQuery(String sql) {
@@ -386,8 +401,10 @@ public class H2UserStorage extends AbstractH2Storage implements User.Storage {
             if (!trimmed.isEmpty()) {
                 try {
                     result.add(Interest.valueOf(trimmed));
-                } catch (IllegalArgumentException _) {
-                    // Skip invalid interests
+                } catch (IllegalArgumentException e) {
+                    // Skip invalid interests - may occur from data migration
+                    java.util.logging.Logger.getLogger(H2UserStorage.class.getName())
+                            .fine("Skipping unknown interest: " + trimmed);
                 }
             }
         }

@@ -5,12 +5,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 @DisplayName("User.ProfileNote")
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class ProfileNoteTest {
 
     private static final UUID AUTHOR = UUID.randomUUID();
@@ -79,9 +83,9 @@ class ProfileNoteTest {
 
         @Test
         @DisplayName("updates content and timestamp")
-        void updatesContentAndTimestamp() throws InterruptedException {
-            User.ProfileNote original = User.ProfileNote.create(AUTHOR, SUBJECT, "Original");
-            Thread.sleep(10); // Ensure different timestamp
+        void updatesContentAndTimestamp() {
+            Instant fixed = Instant.parse("2026-01-26T00:00:00Z");
+            User.ProfileNote original = new User.ProfileNote(AUTHOR, SUBJECT, "Original", fixed, fixed);
             User.ProfileNote updated = original.withContent("Updated");
 
             assertEquals("Updated", updated.content());

@@ -149,8 +149,8 @@ public class DatabaseManager {
                                 who_got_liked UUID NOT NULL,
                                 direction VARCHAR(10) NOT NULL,
                                 created_at TIMESTAMP NOT NULL,
-                                CONSTRAINT fk_likes_who_likes FOREIGN KEY (who_likes) REFERENCES users(id),
-                                CONSTRAINT fk_likes_who_got_liked FOREIGN KEY (who_got_liked) REFERENCES users(id),
+                                CONSTRAINT fk_likes_who_likes FOREIGN KEY (who_likes) REFERENCES users(id) ON DELETE CASCADE,
+                                CONSTRAINT fk_likes_who_got_liked FOREIGN KEY (who_got_liked) REFERENCES users(id) ON DELETE CASCADE,
                                 CONSTRAINT uk_likes UNIQUE (who_likes, who_got_liked)
                             )
                             """);
@@ -166,8 +166,8 @@ public class DatabaseManager {
                                 ended_at TIMESTAMP,
                                 ended_by UUID,
                                 end_reason VARCHAR(30),
-                                CONSTRAINT fk_matches_user_a FOREIGN KEY (user_a) REFERENCES users(id),
-                                CONSTRAINT fk_matches_user_b FOREIGN KEY (user_b) REFERENCES users(id),
+                                CONSTRAINT fk_matches_user_a FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
+                                CONSTRAINT fk_matches_user_b FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE,
                                 CONSTRAINT uk_matches UNIQUE (user_a, user_b)
                             )
                             """);
@@ -185,18 +185,23 @@ public class DatabaseManager {
                                 like_count INT NOT NULL DEFAULT 0,
                                 pass_count INT NOT NULL DEFAULT 0,
                                 match_count INT NOT NULL DEFAULT 0,
-                                CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id)
+                                CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                             )
                             """);
 
             // Indexes
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_likes_who_likes ON likes(who_likes)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_likes_who_got_liked ON likes(who_got_liked)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_matches_user_a ON matches(user_a)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_matches_user_b ON matches(user_b)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_matches_state ON matches(state)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON swipe_sessions(user_id)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_active ON " + "swipe_sessions(user_id, state)");
             stmt.execute(
                     "CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON " + "swipe_sessions(user_id, started_at)");
+            // Users indexes for faster lookups
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_users_state ON users(state)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_users_gender_state ON users(gender, state)");
 
             // User stats snapshots table (Phase 0.5b)
             stmt.execute("""
@@ -222,7 +227,7 @@ public class DatabaseManager {
                                 reciprocity_score DOUBLE NOT NULL DEFAULT 0.0,
                                 selectiveness_score DOUBLE NOT NULL DEFAULT 0.5,
                                 attractiveness_score DOUBLE NOT NULL DEFAULT 0.5,
-                                CONSTRAINT fk_user_stats_user FOREIGN KEY (user_id) REFERENCES users(id)
+                                CONSTRAINT fk_user_stats_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                             )
                             """);
 
@@ -322,7 +327,10 @@ public class DatabaseManager {
                 Statement stmt = conn.createStatement()) {
             stmt.execute("SHUTDOWN");
         } catch (SQLException e) {
-            // Ignore shutdown errors
+            // Shutdown errors are expected when database is already closed
+            // Log at finest level only for debugging purposes
+            java.util.logging.Logger.getLogger(DatabaseManager.class.getName())
+                    .finest("Database shutdown: " + e.getMessage());
         }
     }
 }

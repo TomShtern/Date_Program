@@ -37,7 +37,7 @@
                    text="You and Sarah liked each other!"/>
     <!-- Action Buttons -->
     <VBox spacing="12" alignment="CENTER">
-      <Button text="Send Message" onAction="#handleMessage" styleClass="match-message-btn" maxWidth="280">
+      <Button text="Send Message" onAction="#handleMessage" styleClass="match-popup-message-btn" maxWidth="280">
         <graphic>
           <FontIcon iconLiteral="mdi2c-chat" iconSize="20" iconColor="white"/>
         </graphic>

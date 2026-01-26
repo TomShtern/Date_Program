@@ -11,12 +11,15 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 @DisplayName("ProfileCompletionService")
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class ProfileCompletionServiceTest {
 
     private User user;

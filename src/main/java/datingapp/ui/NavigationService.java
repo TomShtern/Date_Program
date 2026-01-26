@@ -1,6 +1,9 @@
 package datingapp.ui;
 
+import datingapp.ui.controller.BaseController;
 import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Objects;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
@@ -28,6 +31,15 @@ public class NavigationService {
     private Stage primaryStage;
     private BorderPane rootLayout;
     private ViewModelFactory viewModelFactory;
+
+    /** Navigation history stack for back navigation. */
+    private final Deque<ViewType> navigationHistory = new ArrayDeque<>();
+
+    /** Current controller for cleanup when navigating away. */
+    private Object currentController;
+
+    /** Maximum history size to prevent memory leaks. */
+    private static final int MAX_HISTORY_SIZE = 20;
 
     /** Enum defining available views and their FXML resource paths. */
     public enum ViewType {
@@ -108,12 +120,45 @@ public class NavigationService {
      * @param type     The type of transition animation
      */
     public void navigateWithTransition(ViewType viewType, TransitionType type) {
+        navigateWithTransition(viewType, type, true);
+    }
+
+    /**
+     * Navigates to a view with the specified transition animation, optionally tracking history.
+     *
+     * @param viewType     The view to navigate to
+     * @param type         The type of transition animation
+     * @param addToHistory Whether to add this navigation to the history stack
+     */
+    private void navigateWithTransition(ViewType viewType, TransitionType type, boolean addToHistory) {
         try {
             logger.info("Navigating to: {} with transition: {}", viewType, type);
 
+            // Track navigation history (skip for back navigation)
+            if (addToHistory) {
+                // Avoid duplicate consecutive entries
+                if (navigationHistory.isEmpty() || navigationHistory.peek() != viewType) {
+                    navigationHistory.push(viewType);
+
+                    // Limit history size to prevent memory leaks
+                    while (navigationHistory.size() > MAX_HISTORY_SIZE) {
+                        navigationHistory.removeLast();
+                    }
+                }
+            }
+
             FXMLLoader loader = new FXMLLoader(getClass().getResource(viewType.getFxmlPath()));
             loader.setControllerFactory(param -> viewModelFactory.createController(param));
+
+            // Cleanup old controller before loading new one
+            if (currentController instanceof BaseController bc) {
+                bc.cleanup();
+            }
+
             Parent newView = loader.load();
+
+            // Store new controller for future cleanup
+            currentController = loader.getController();
 
             if (type == TransitionType.NONE) {
                 rootLayout.setCenter(newView);
@@ -131,9 +176,9 @@ public class NavigationService {
             rootLayout.setCenter(transitionPane);
 
             switch (type) {
-                case FADE -> playFadeTransition(transitionPane, oldView, newView);
-                case SLIDE_LEFT -> playSlideTransition(transitionPane, oldView, newView, true);
-                case SLIDE_RIGHT -> playSlideTransition(transitionPane, oldView, newView, false);
+                case FADE -> playFadeTransition(oldView, newView);
+                case SLIDE_LEFT -> playSlideTransition(oldView, newView, true);
+                case SLIDE_RIGHT -> playSlideTransition(oldView, newView, false);
                 default -> rootLayout.setCenter(newView);
             }
 
@@ -142,7 +187,7 @@ public class NavigationService {
         }
     }
 
-    private void playFadeTransition(StackPane container, Parent oldView, Parent newView) {
+    private void playFadeTransition(Parent oldView, Parent newView) {
         newView.setOpacity(0);
 
         FadeTransition fadeOut = new FadeTransition(Duration.millis(150), oldView);
@@ -158,7 +203,7 @@ public class NavigationService {
         parallel.play();
     }
 
-    private void playSlideTransition(StackPane container, Parent oldView, Parent newView, boolean slideLeft) {
+    private void playSlideTransition(Parent oldView, Parent newView, boolean slideLeft) {
         double width = primaryStage.getScene().getWidth();
 
         if (slideLeft) {
@@ -183,12 +228,36 @@ public class NavigationService {
     }
 
     /**
-     * Navigates back to the previous screen.
-     * Currently simple implementation: always goes to Dashboard (or could track
-     * history).
+     * Navigates back to the previous screen using history stack.
+     * If no history exists, defaults to DASHBOARD.
      */
     public void goBack() {
-        navigateWithTransition(ViewType.MATCHING, TransitionType.SLIDE_RIGHT);
+        // Pop current view from history
+        if (!navigationHistory.isEmpty()) {
+            navigationHistory.pop();
+        }
+
+        // Navigate to previous view or default to DASHBOARD
+        ViewType previousView = navigationHistory.isEmpty() ? ViewType.DASHBOARD : navigationHistory.peek();
+
+        // Navigate without adding to history (we're going back, not forward)
+        navigateWithTransition(previousView, TransitionType.SLIDE_RIGHT, false);
+    }
+
+    /**
+     * Clears navigation history. Useful when logging out or resetting state.
+     */
+    public void clearHistory() {
+        navigationHistory.clear();
+    }
+
+    /**
+     * Checks if there is navigation history to go back to.
+     *
+     * @return true if back navigation is possible
+     */
+    public boolean canGoBack() {
+        return navigationHistory.size() > 1;
     }
 
     public Stage getPrimaryStage() {

@@ -4,6 +4,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Finds candidate users for matching based on preferences and filters.
@@ -66,6 +68,8 @@ import java.util.UUID;
  */
 public class CandidateFinder {
 
+    private static final Logger logger = LoggerFactory.getLogger(CandidateFinder.class);
+
     /** Geographic utility functions. Pure Java - no external dependencies. */
     public static final class GeoUtils {
 
@@ -115,16 +119,104 @@ public class CandidateFinder {
      * <p>Results are sorted by distance (closest first).
      */
     public List<User> findCandidates(User seeker, List<User> allActive, Set<UUID> alreadyInteracted) {
-        return allActive.stream()
-                .filter(candidate -> !candidate.getId().equals(seeker.getId())) // Not self
-                .filter(candidate -> candidate.getState() == User.State.ACTIVE) // Must be active
-                .filter(candidate -> !alreadyInteracted.contains(candidate.getId())) // Not already interacted
-                .filter(candidate -> hasMatchingGenderPreferences(seeker, candidate)) // Mutual gender
-                .filter(candidate -> hasMatchingAgePreferences(seeker, candidate)) // Mutual age
-                .filter(candidate -> isWithinDistance(seeker, candidate)) // Within distance
-                .filter(candidate -> Dealbreakers.Evaluator.passes(seeker, candidate)) // Dealbreakers (Phase 0.5b)
+        logger.debug(
+                "Finding candidates for {} (state={}, gender={}, interestedIn={}, age={}, minAge={}, maxAge={})",
+                seeker.getName(),
+                seeker.getState(),
+                seeker.getGender(),
+                seeker.getInterestedIn(),
+                seeker.getAge(),
+                seeker.getMinAge(),
+                seeker.getMaxAge());
+        logger.debug("Total active users to filter: {}", allActive.size());
+        logger.debug("Already interacted with: {} users", alreadyInteracted.size());
+
+        List<User> candidates = allActive.stream()
+                .filter(candidate -> {
+                    boolean notSelf = !candidate.getId().equals(seeker.getId());
+                    if (!notSelf) {
+                        logger.trace("Rejecting {}: IS SELF", candidate.getName());
+                    }
+                    return notSelf;
+                })
+                .filter(candidate -> {
+                    boolean isActive = candidate.getState() == User.State.ACTIVE;
+                    if (!isActive) {
+                        logger.debug(
+                                "Rejecting {} ({}): NOT ACTIVE (state={})",
+                                candidate.getName(),
+                                candidate.getId(),
+                                candidate.getState());
+                    }
+                    return isActive;
+                })
+                .filter(candidate -> {
+                    boolean notInteracted = !alreadyInteracted.contains(candidate.getId());
+                    if (!notInteracted) {
+                        logger.trace("Rejecting {}: ALREADY INTERACTED", candidate.getName());
+                    }
+                    return notInteracted;
+                })
+                .filter(candidate -> {
+                    boolean genderMatch = hasMatchingGenderPreferences(seeker, candidate);
+                    if (!genderMatch) {
+                        logger.debug(
+                                "Rejecting {} ({}): GENDER MISMATCH - seeker({})→interestedIn({}), candidate({})→interestedIn({})",
+                                candidate.getName(),
+                                candidate.getId(),
+                                seeker.getGender(),
+                                seeker.getInterestedIn(),
+                                candidate.getGender(),
+                                candidate.getInterestedIn());
+                    }
+                    return genderMatch;
+                })
+                .filter(candidate -> {
+                    boolean ageMatch = hasMatchingAgePreferences(seeker, candidate);
+                    if (!ageMatch) {
+                        logger.debug(
+                                "Rejecting {} ({}): AGE MISMATCH - seeker(age={}, range={}-{}), candidate(age={}, range={}-{})",
+                                candidate.getName(),
+                                candidate.getId(),
+                                seeker.getAge(),
+                                seeker.getMinAge(),
+                                seeker.getMaxAge(),
+                                candidate.getAge(),
+                                candidate.getMinAge(),
+                                candidate.getMaxAge());
+                    }
+                    return ageMatch;
+                })
+                .filter(candidate -> {
+                    boolean inDistance = isWithinDistance(seeker, candidate);
+                    if (!inDistance) {
+                        double dist = distanceTo(seeker, candidate);
+                        logger.debug(
+                                "Rejecting {} ({}): TOO FAR - distance={}km, max={}km",
+                                candidate.getName(),
+                                candidate.getId(),
+                                String.format("%.1f", dist),
+                                seeker.getMaxDistanceKm());
+                    }
+                    return inDistance;
+                })
+                .filter(candidate -> {
+                    boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate);
+                    if (!passesDb) {
+                        logger.debug("Rejecting {} ({}): DEALBREAKER HIT", candidate.getName(), candidate.getId());
+                    }
+                    return passesDb;
+                })
                 .sorted(Comparator.comparingDouble(c -> distanceTo(seeker, c))) // Sort by distance
                 .toList();
+
+        logger.info(
+                "CandidateFinder: Found {} candidates for {} (from {} active users)",
+                candidates.size(),
+                seeker.getName(),
+                allActive.size());
+
+        return candidates;
     }
 
     /**

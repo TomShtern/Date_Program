@@ -61,8 +61,8 @@ public final class UiServices {
             // Private constructor for singleton
         }
 
-        /** Gets the singleton instance. */
-        public static Toast getInstance() {
+        /** Gets the singleton instance. Thread-safe lazy initialization. */
+        public static synchronized Toast getInstance() {
             if (instance == null) {
                 instance = new Toast();
             }

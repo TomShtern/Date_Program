@@ -2,6 +2,7 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -10,14 +11,21 @@ import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.User.ProfileNote;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Unit tests for User domain model. */
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class UserTest {
 
     @Test
@@ -46,6 +54,15 @@ class UserTest {
 
         assertFalse(user.isComplete());
         assertThrows(IllegalStateException.class, user::activate);
+    }
+
+    @Test
+    @DisplayName("Incomplete user cannot pause")
+    void incompleteUserCannotPause() {
+        User user = new User(UUID.randomUUID(), "Paula");
+
+        assertFalse(user.isComplete());
+        assertThrows(IllegalStateException.class, user::pause);
     }
 
     @Test
@@ -157,6 +174,27 @@ class UserTest {
         assertFalse(user.getInterests().contains(Interest.TRAVEL));
     }
 
+    @Test
+    @DisplayName("setAgeRange allows min and max equal")
+    void setAgeRange_allowsEqualBounds() {
+        User user = new User(UUID.randomUUID(), "Eve");
+        user.setAgeRange(18, 18);
+
+        assertEquals(18, user.getMinAge());
+        assertEquals(18, user.getMaxAge());
+    }
+
+    @Test
+    @DisplayName("addInterest is idempotent for duplicates")
+    void addInterest_isIdempotent() {
+        User user = new User(UUID.randomUUID(), "Eve");
+        user.addInterest(Interest.TRAVEL);
+        user.addInterest(Interest.TRAVEL);
+
+        assertEquals(1, user.getInterests().size());
+        assertTrue(user.getInterests().contains(Interest.TRAVEL));
+    }
+
     private User createCompleteUser(String name) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("A great person");
@@ -173,5 +211,213 @@ class UserTest {
                 CommunicationStyle.TEXT_ONLY,
                 DepthPreference.DEEP_CHAT));
         return user;
+    }
+
+    /** Tests for the ProfileNote nested record. */
+    @Nested
+    @DisplayName("ProfileNote")
+    @SuppressWarnings("unused")
+    class ProfileNoteTests {
+
+        private final UUID authorId = UUID.randomUUID();
+        private final UUID subjectId = UUID.randomUUID();
+
+        @Test
+        @DisplayName("Create valid profile note")
+        void createValidNote() {
+            ProfileNote note = ProfileNote.create(authorId, subjectId, "Met at coffee shop");
+
+            assertEquals(authorId, note.authorId());
+            assertEquals(subjectId, note.subjectId());
+            assertEquals("Met at coffee shop", note.content());
+            assertNotNull(note.createdAt());
+            assertNotNull(note.updatedAt());
+        }
+
+        @Test
+        @DisplayName("Cannot create note with null authorId")
+        void cannotCreateWithNullAuthor() {
+            assertThrows(NullPointerException.class, () -> ProfileNote.create(null, subjectId, "content"));
+        }
+
+        @Test
+        @DisplayName("Cannot create note with null subjectId")
+        void cannotCreateWithNullSubject() {
+            assertThrows(NullPointerException.class, () -> ProfileNote.create(authorId, null, "content"));
+        }
+
+        @Test
+        @DisplayName("Cannot create note with null content")
+        void cannotCreateWithNullContent() {
+            assertThrows(NullPointerException.class, () -> ProfileNote.create(authorId, subjectId, null));
+        }
+
+        @Test
+        @DisplayName("Cannot create note with blank content")
+        void cannotCreateWithBlankContent() {
+            assertThrows(IllegalArgumentException.class, () -> ProfileNote.create(authorId, subjectId, "   "));
+        }
+
+        @Test
+        @DisplayName("Cannot create note about yourself")
+        void cannotCreateNoteAboutSelf() {
+            UUID sameId = UUID.randomUUID();
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> ProfileNote.create(sameId, sameId, "Note"));
+            assertTrue(ex.getMessage().contains("yourself"));
+        }
+
+        @Test
+        @DisplayName("Cannot exceed maximum length")
+        void cannotExceedMaxLength() {
+            String tooLong = "x".repeat(ProfileNote.MAX_LENGTH + 1);
+            IllegalArgumentException ex = assertThrows(
+                    IllegalArgumentException.class, () -> ProfileNote.create(authorId, subjectId, tooLong));
+            assertTrue(ex.getMessage().contains("maximum length"));
+        }
+
+        @Test
+        @DisplayName("Content at maximum length is allowed")
+        void contentAtMaxLengthAllowed() {
+            String maxContent = "x".repeat(ProfileNote.MAX_LENGTH);
+            ProfileNote note = ProfileNote.create(authorId, subjectId, maxContent);
+            assertEquals(ProfileNote.MAX_LENGTH, note.content().length());
+        }
+
+        @Test
+        @DisplayName("withContent updates content and timestamp")
+        void withContentUpdatesContent() {
+            Instant fixed = Instant.parse("2026-01-26T00:00:00Z");
+            ProfileNote original = new ProfileNote(authorId, subjectId, "Original", fixed, fixed);
+
+            ProfileNote updated = original.withContent("Updated note");
+
+            assertEquals("Updated note", updated.content());
+            assertEquals(original.createdAt(), updated.createdAt());
+            assertTrue(updated.updatedAt().isAfter(original.createdAt()));
+        }
+
+        @Test
+        @DisplayName("withContent rejects blank content")
+        void withContentRejectsBlank() {
+            ProfileNote note = ProfileNote.create(authorId, subjectId, "Original");
+            assertThrows(IllegalArgumentException.class, () -> note.withContent(""));
+        }
+
+        @Test
+        @DisplayName("withContent rejects content exceeding max length")
+        void withContentRejectsExceedingLength() {
+            ProfileNote note = ProfileNote.create(authorId, subjectId, "Original");
+            String tooLong = "x".repeat(ProfileNote.MAX_LENGTH + 1);
+            assertThrows(IllegalArgumentException.class, () -> note.withContent(tooLong));
+        }
+
+        @Test
+        @DisplayName("getPreview returns full content for short notes")
+        void getPreviewReturnsFullForShort() {
+            ProfileNote note = ProfileNote.create(authorId, subjectId, "Short note");
+            assertEquals("Short note", note.getPreview());
+        }
+
+        @Test
+        @DisplayName("getPreview truncates long content with ellipsis")
+        void getPreviewTruncatesLong() {
+            String longContent =
+                    "This is a very long note that exceeds fifty characters in length and should be truncated";
+            ProfileNote note = ProfileNote.create(authorId, subjectId, longContent);
+
+            String preview = note.getPreview();
+            assertEquals(50, preview.length());
+            assertTrue(preview.endsWith("..."));
+        }
+
+        @Test
+        @DisplayName("getPreview returns exact 50 chars without ellipsis")
+        void getPreviewExact50Chars() {
+            String exact50 = "x".repeat(50);
+            ProfileNote note = ProfileNote.create(authorId, subjectId, exact50);
+            assertEquals(exact50, note.getPreview());
+        }
+    }
+
+    @Nested
+    @DisplayName("DatabaseRecord.Builder")
+    @SuppressWarnings("unused")
+    class DatabaseRecordBuilderTests {
+
+        private User.DatabaseRecord buildRecord() {
+            Preferences.PacePreferences pace = new Preferences.PacePreferences(
+                    MessagingFrequency.OFTEN,
+                    TimeToFirstDate.FEW_DAYS,
+                    CommunicationStyle.TEXT_ONLY,
+                    DepthPreference.DEEP_CHAT);
+
+            return User.DatabaseRecord.builder()
+                    .id(UUID.randomUUID())
+                    .name("Alice")
+                    .bio("Bio")
+                    .birthDate(LocalDate.of(1990, 1, 1))
+                    .gender(User.Gender.FEMALE)
+                    .interestedIn(EnumSet.of(User.Gender.MALE))
+                    .lat(32.1)
+                    .lon(34.8)
+                    .maxDistanceKm(50)
+                    .minAge(20)
+                    .maxAge(30)
+                    .photoUrls(List.of("a.jpg", "b.jpg"))
+                    .state(User.State.ACTIVE)
+                    .createdAt(Instant.parse("2026-01-01T10:00:00Z"))
+                    .updatedAt(Instant.parse("2026-01-02T10:00:00Z"))
+                    .interests(EnumSet.of(Interest.COFFEE))
+                    .smoking(Preferences.Lifestyle.Smoking.NEVER)
+                    .drinking(Preferences.Lifestyle.Drinking.SOCIALLY)
+                    .wantsKids(Preferences.Lifestyle.WantsKids.SOMEDAY)
+                    .lookingFor(Preferences.Lifestyle.LookingFor.LONG_TERM)
+                    .education(Preferences.Lifestyle.Education.BACHELORS)
+                    .heightCm(170)
+                    .email("alice@example.com")
+                    .phone("+123456789")
+                    .isVerified(true)
+                    .verificationMethod(User.VerificationMethod.EMAIL)
+                    .verificationCode("123456")
+                    .verificationSentAt(Instant.parse("2026-01-01T10:00:00Z"))
+                    .verifiedAt(Instant.parse("2026-01-02T10:00:00Z"))
+                    .pacePreferences(pace)
+                    .build();
+        }
+
+        @Test
+        @DisplayName("Builds record with core fields")
+        void buildsRecordWithCoreFields() {
+            User.DatabaseRecord dbRecord = buildRecord();
+
+            assertEquals("Alice", dbRecord.getName());
+            assertEquals(LocalDate.of(1990, 1, 1), dbRecord.getBirthDate());
+            assertEquals(User.Gender.FEMALE, dbRecord.getGender());
+            assertEquals(EnumSet.of(User.Gender.MALE), dbRecord.getInterestedIn());
+            assertEquals(32.1, dbRecord.getLat());
+            assertEquals(34.8, dbRecord.getLon());
+            assertEquals(50, dbRecord.getMaxDistanceKm());
+            assertEquals(20, dbRecord.getMinAge());
+            assertEquals(30, dbRecord.getMaxAge());
+            assertEquals(List.of("a.jpg", "b.jpg"), dbRecord.getPhotoUrls());
+            assertEquals(User.State.ACTIVE, dbRecord.getState());
+        }
+
+        @Test
+        @DisplayName("fromDatabase maps optional fields")
+        void fromDatabaseMapsOptionalFields() {
+            User.DatabaseRecord dbRecord = buildRecord();
+            User user = User.fromDatabase(dbRecord);
+
+            assertEquals(EnumSet.of(Interest.COFFEE), user.getInterests());
+            assertEquals(Preferences.Lifestyle.Smoking.NEVER, user.getSmoking());
+            assertEquals(Preferences.Lifestyle.Drinking.SOCIALLY, user.getDrinking());
+            assertEquals(Preferences.Lifestyle.WantsKids.SOMEDAY, user.getWantsKids());
+            assertEquals(Preferences.Lifestyle.LookingFor.LONG_TERM, user.getLookingFor());
+            assertEquals(Preferences.Lifestyle.Education.BACHELORS, user.getEducation());
+            assertTrue(user.isVerified());
+            assertEquals(User.VerificationMethod.EMAIL, user.getVerificationMethod());
+        }
     }
 }

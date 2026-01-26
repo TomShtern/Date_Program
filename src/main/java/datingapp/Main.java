@@ -214,7 +214,7 @@ public class Main {
 
     private static void shutdown() {
         if (dbManager != null) {
-            // dbManager.close(); // If dbManager has close logic
+            dbManager.shutdown();
         }
     }
 }

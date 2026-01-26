@@ -142,7 +142,7 @@
         </graphic>
         <tooltip><Tooltip text="Like this person (→)"/></tooltip>
       </Button>
-      <Button styleClass="action-button-round action-btn-neutral">
+      <Button styleClass="action-button-round action-btn-neutral" onAction="#handleSuperLike">
         <graphic>
           <FontIcon iconLiteral="mdi2s-star" iconSize="24" iconColor="#f59e0b"/>
         </graphic>

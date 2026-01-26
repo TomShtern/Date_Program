@@ -240,22 +240,26 @@ public final class ProfileCompletionService {
             prefsMissing.add("Location");
         }
 
-        // Age range (5 pts)
+        // Age range (5 pts) - give points if valid range is set (even if using full 18-99 range)
         totalPoints += 5;
-        if (user.getMinAge() != 18 || user.getMaxAge() != 99) {
+        if (user.getMinAge() >= 18 && user.getMaxAge() <= 120 && user.getMinAge() <= user.getMaxAge()) {
             earnedPoints += 5;
             prefsFilled.add("Age preferences");
         } else {
-            prefsMissing.add("Age preferences (using defaults)");
+            prefsMissing.add("Age preferences (invalid range)");
         }
 
-        // Dealbreakers (5 pts)
+        // Dealbreakers (5 pts) - give points if dealbreakers are configured (even if set to "none")
         totalPoints += 5;
-        if (user.getDealbreakers() != null && user.getDealbreakers().hasAnyDealbreaker()) {
+        if (user.getDealbreakers() != null) {
             earnedPoints += 5;
-            prefsFilled.add("Dealbreakers set");
+            if (user.getDealbreakers().hasAnyDealbreaker()) {
+                prefsFilled.add("Dealbreakers configured");
+            } else {
+                prefsFilled.add("Dealbreakers reviewed (none set)");
+            }
         } else {
-            prefsMissing.add("No dealbreakers configured");
+            prefsMissing.add("Review dealbreakers");
         }
 
         int prefsScore =

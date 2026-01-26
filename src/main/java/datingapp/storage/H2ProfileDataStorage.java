@@ -196,10 +196,10 @@ public final class H2ProfileDataStorage {
         protected void ensureSchema() {
             String sql = """
                     CREATE TABLE IF NOT EXISTS profile_views (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
                         viewer_id UUID NOT NULL,
                         viewed_id UUID NOT NULL,
-                        viewed_at TIMESTAMP NOT NULL,
-                        PRIMARY KEY (viewer_id, viewed_id, viewed_at)
+                        viewed_at TIMESTAMP NOT NULL
                     );
                     CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_id ON profile_views(viewed_id);
                     CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_at ON

@@ -6,6 +6,7 @@ import datingapp.ui.NavigationService;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.LoginViewModel;
 import java.net.URL;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import javafx.application.Platform;
@@ -77,11 +78,6 @@ public class LoginController extends BaseController implements Initializable {
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
-
-        // Suppress unused warnings for FXML-injected fields
-        if (rootPane != null && createAccountButton != null) {
-            // Fields are used by FXML
-        }
     }
 
     /** Custom list cell for displaying user accounts with avatar icons. */
@@ -238,7 +234,7 @@ public class LoginController extends BaseController implements Initializable {
 
         // Convert result to User
         dialog.setResultConverter(dialogButton -> {
-            if (dialogButton == createButtonType) {
+            if (Objects.equals(dialogButton, createButtonType)) {
                 String name = nameField.getText().trim();
                 int age = ageSpinner.getValue();
                 Gender gender = genderCombo.getValue();

@@ -44,17 +44,17 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
 
             stmt.setObject(1, fromUserId);
             stmt.setObject(2, toUserId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return Optional.of(new Like(
-                        rs.getObject(COL_ID, UUID.class),
-                        rs.getObject(COL_WHO_LIKES, UUID.class),
-                        rs.getObject(COL_WHO_GOT_LIKED, UUID.class),
-                        Like.Direction.valueOf(rs.getString(COL_DIRECTION)),
-                        rs.getTimestamp(COL_CREATED_AT).toInstant()));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(new Like(
+                            rs.getObject(COL_ID, UUID.class),
+                            rs.getObject(COL_WHO_LIKES, UUID.class),
+                            rs.getObject(COL_WHO_GOT_LIKED, UUID.class),
+                            Like.Direction.valueOf(rs.getString(COL_DIRECTION)),
+                            rs.getTimestamp(COL_CREATED_AT).toInstant()));
+                }
+                return Optional.empty();
             }
-            return Optional.empty();
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get like", e);
@@ -93,9 +93,9 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
 
             stmt.setObject(1, from);
             stmt.setObject(2, to);
-            ResultSet rs = stmt.executeQuery();
-
-            return rs.next();
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
 
         } catch (SQLException e) {
             throw new StorageException("Failed to check like exists", e);
@@ -118,12 +118,12 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
 
             stmt.setObject(1, a);
             stmt.setObject(2, b);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1) > 0;
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+                return false;
             }
-            return false;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to check mutual like", e);
@@ -139,12 +139,12 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setObject(1, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                result.add(rs.getObject(COL_WHO_GOT_LIKED, UUID.class));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    result.add(rs.getObject(COL_WHO_GOT_LIKED, UUID.class));
+                }
+                return result;
             }
-            return result;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get liked user IDs", e);
@@ -160,12 +160,12 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setObject(1, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                result.add(rs.getObject(COL_WHO_LIKES, UUID.class));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    result.add(rs.getObject(COL_WHO_LIKES, UUID.class));
+                }
+                return result;
             }
-            return result;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get users who liked", e);
@@ -187,16 +187,16 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setObject(1, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                UUID whoLikes = rs.getObject(COL_WHO_LIKES, UUID.class);
-                Timestamp likedAt = rs.getTimestamp(COL_LIKED_AT);
-                if (whoLikes != null && likedAt != null) {
-                    result.put(whoLikes, likedAt.toInstant());
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    UUID whoLikes = rs.getObject(COL_WHO_LIKES, UUID.class);
+                    Timestamp likedAt = rs.getTimestamp(COL_LIKED_AT);
+                    if (whoLikes != null && likedAt != null) {
+                        result.put(whoLikes, likedAt.toInstant());
+                    }
                 }
+                return result;
             }
-            return result;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get liker timestamps", e);
@@ -214,12 +214,12 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
 
             stmt.setObject(1, userId);
             stmt.setString(2, direction.name());
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
             }
-            return 0;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to count likes by direction", e);
@@ -235,12 +235,12 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
 
             stmt.setObject(1, userId);
             stmt.setString(2, direction.name());
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
             }
-            return 0;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to count received likes by direction", e);
@@ -262,12 +262,12 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setObject(1, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
             }
-            return 0;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to count mutual likes", e);
@@ -288,12 +288,12 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
 
             stmt.setObject(1, userId);
             stmt.setTimestamp(2, Timestamp.from(startOfDay));
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
             }
-            return 0;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to count likes today", e);
@@ -312,12 +312,12 @@ public class H2LikeStorage extends AbstractH2Storage implements LikeStorage {
 
             stmt.setObject(1, userId);
             stmt.setTimestamp(2, Timestamp.from(startOfDay));
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
             }
-            return 0;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to count passes today", e);

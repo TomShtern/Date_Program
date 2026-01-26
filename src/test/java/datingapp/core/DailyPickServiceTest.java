@@ -21,9 +21,12 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class DailyPickServiceTest {
 
     private DailyService service;
@@ -261,6 +264,11 @@ class DailyPickServiceTest {
         @Override
         public List<User> findActive() {
             return users.stream().filter(u -> u.getState() == User.State.ACTIVE).toList();
+        }
+
+        @Override
+        public void delete(UUID id) {
+            users.removeIf(u -> u.getId().equals(id));
         }
     }
 

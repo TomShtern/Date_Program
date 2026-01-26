@@ -21,14 +21,17 @@ import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Tests for MatchQualityService. */
 @DisplayName("MatchQualityService Tests")
 @SuppressWarnings("unused") // IDE false positives for @Nested classes and @BeforeEach
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MatchQualityServiceTest {
 
     private MatchQualityService service;
@@ -598,6 +601,11 @@ class MatchQualityServiceTest {
             return users.values().stream()
                     .filter(u -> u.getState() == User.State.ACTIVE)
                     .toList();
+        }
+
+        @Override
+        public void delete(UUID id) {
+            users.remove(id);
         }
     }
 

@@ -3,9 +3,11 @@ package datingapp.core;
 import datingapp.core.Match.MatchStorage;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.LikeStorage;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +36,7 @@ public class UndoService {
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
     private final AppConfig config;
+    private final Clock clock;
 
     // In-memory state per user: userId -> UndoState
     private final Map<UUID, UndoState> undoStates = new ConcurrentHashMap<>();
@@ -46,9 +49,14 @@ public class UndoService {
      * @param config Application configuration with undo window setting
      */
     public UndoService(LikeStorage likeStorage, MatchStorage matchStorage, AppConfig config) {
+        this(likeStorage, matchStorage, config, Clock.systemUTC());
+    }
+
+    UndoService(LikeStorage likeStorage, MatchStorage matchStorage, AppConfig config, Clock clock) {
         this.likeStorage = likeStorage;
         this.matchStorage = matchStorage;
         this.config = config;
+        this.clock = Objects.requireNonNull(clock, "clock cannot be null");
     }
 
     /**
@@ -59,7 +67,7 @@ public class UndoService {
      * @param matchCreated Optional match if the swipe created a match
      */
     public void recordSwipe(UUID userId, Like like, Optional<Match> matchCreated) {
-        Instant expiresAt = Instant.now().plusSeconds(config.undoWindowSeconds());
+        Instant expiresAt = Instant.now(clock).plusSeconds(config.undoWindowSeconds());
 
         UndoState state =
                 new UndoState(userId, like, matchCreated.map(Match::getId).orElse(null), expiresAt);
@@ -82,7 +90,7 @@ public class UndoService {
         }
 
         // Check if window has expired
-        if (Instant.now().isAfter(state.expiresAt)) {
+        if (Instant.now(clock).isAfter(state.expiresAt)) {
             undoStates.remove(userId);
             return false;
         }
@@ -104,7 +112,7 @@ public class UndoService {
             return 0;
         }
 
-        long seconds = Duration.between(Instant.now(), state.expiresAt).getSeconds();
+        long seconds = Duration.between(Instant.now(clock), state.expiresAt).getSeconds();
         return Math.max(0, (int) seconds);
     }
 
@@ -124,7 +132,7 @@ public class UndoService {
         }
 
         // Validation: Window expired
-        if (Instant.now().isAfter(state.expiresAt)) {
+        if (Instant.now(clock).isAfter(state.expiresAt)) {
             undoStates.remove(userId);
             return UndoResult.failure("Undo window expired");
         }

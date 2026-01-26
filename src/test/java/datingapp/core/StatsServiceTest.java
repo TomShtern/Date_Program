@@ -24,16 +24,19 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for StatsService - user and platform statistics computation.
  */
 @SuppressWarnings("unused")
 @DisplayName("StatsService")
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class StatsServiceTest {
 
     private InMemoryLikeStorage likeStorage;

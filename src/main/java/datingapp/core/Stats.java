@@ -79,6 +79,20 @@ public final class Stats {
             Objects.requireNonNull(userId);
             Objects.requireNonNull(computedAt);
 
+            // Validate counts are non-negative
+            validateNonNegative(totalSwipesGiven, "totalSwipesGiven");
+            validateNonNegative(likesGiven, "likesGiven");
+            validateNonNegative(passesGiven, "passesGiven");
+            validateNonNegative(totalSwipesReceived, "totalSwipesReceived");
+            validateNonNegative(likesReceived, "likesReceived");
+            validateNonNegative(passesReceived, "passesReceived");
+            validateNonNegative(totalMatches, "totalMatches");
+            validateNonNegative(activeMatches, "activeMatches");
+            validateNonNegative(blocksGiven, "blocksGiven");
+            validateNonNegative(blocksReceived, "blocksReceived");
+            validateNonNegative(reportsGiven, "reportsGiven");
+            validateNonNegative(reportsReceived, "reportsReceived");
+
             // Validate ratios are 0.0-1.0
             validateRatio(likeRatio, "likeRatio");
             validateRatio(incomingLikeRatio, "incomingLikeRatio");
@@ -86,6 +100,12 @@ public final class Stats {
             validateRatio(reciprocityScore, "reciprocityScore");
             validateRatio(selectivenessScore, "selectivenessScore");
             validateRatio(attractivenessScore, "attractivenessScore");
+        }
+
+        private static void validateNonNegative(int value, String name) {
+            if (value < 0) {
+                throw new IllegalArgumentException(name + " cannot be negative, got: " + value);
+            }
         }
 
         private static void validateRatio(double value, String name) {

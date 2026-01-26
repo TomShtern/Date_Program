@@ -34,7 +34,8 @@ public class H2MatchStorage extends AbstractH2Storage implements MatchStorage {
     @Override
     public void save(Match match) {
         String sql = """
-        INSERT INTO matches (id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason)
+        MERGE INTO matches (id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason)
+        KEY (id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """;
 
@@ -119,12 +120,12 @@ public class H2MatchStorage extends AbstractH2Storage implements MatchStorage {
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, matchId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return Optional.of(mapRow(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
+                return Optional.empty();
             }
-            return Optional.empty();
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get match: " + matchId, e);
@@ -139,9 +140,9 @@ public class H2MatchStorage extends AbstractH2Storage implements MatchStorage {
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, matchId);
-            ResultSet rs = stmt.executeQuery();
-
-            return rs.next();
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
 
         } catch (SQLException e) {
             throw new StorageException("Failed to check match exists", e);
@@ -172,10 +173,10 @@ public class H2MatchStorage extends AbstractH2Storage implements MatchStorage {
 
             stmt.setObject(1, userId);
             stmt.setObject(2, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                matches.add(mapRow(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    matches.add(mapRow(rs));
+                }
             }
             return matches;
 

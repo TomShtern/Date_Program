@@ -10,11 +10,14 @@ import datingapp.core.Preferences.Lifestyle;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class ProfilePreviewServiceTest {
 
     private ProfilePreviewService service;

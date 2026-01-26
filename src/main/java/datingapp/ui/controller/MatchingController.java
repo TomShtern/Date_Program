@@ -6,6 +6,7 @@ import datingapp.ui.NavigationService;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
+import java.util.Objects;
 import java.util.ResourceBundle;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
@@ -308,10 +309,14 @@ public class MatchingController extends BaseController implements Initializable 
         Platform.runLater(() -> rootPane.requestFocus());
     }
 
-    /** Placeholder for super like functionality. */
+    /** Super like action - triggered by button or UP key. */
+    @FXML
+    @SuppressWarnings("unused")
     private void handleSuperLike() {
-        logger.info("Super Like triggered via keyboard");
-        // For now, acts like a regular like
+        logger.info("Super Like triggered");
+        // Pulse the card for micro-interaction feedback
+        UiAnimations.pulseScale(candidateCard);
+        // For now, acts like a regular like (super like logic to be added later)
         viewModel.like();
     }
 
@@ -374,7 +379,7 @@ public class MatchingController extends BaseController implements Initializable 
         sendBtn.setStyle("-fx-background-color: -fx-accent-super;");
 
         dialog.showAndWait().ifPresent(response -> {
-            if (response == sendMessageBtn) {
+            if (Objects.equals(response, sendMessageBtn)) {
                 // Navigate to chat with this match
                 NavigationService.getInstance().navigateTo(NavigationService.ViewType.CHAT);
             }

@@ -26,11 +26,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Integration tests for H2 storage implementations. These tests verify data
@@ -39,6 +41,7 @@ import org.junit.jupiter.api.TestInstance;
  */
 @SuppressWarnings("unused") // JUnit 5 discovers lifecycle methods and @Nested classes via reflection
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Timeout(value = 10, unit = TimeUnit.SECONDS)
 class H2StorageIntegrationTest {
 
     private static DatabaseManager dbManager;

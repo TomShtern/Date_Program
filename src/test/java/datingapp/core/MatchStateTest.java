@@ -9,13 +9,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Extended unit tests for Match domain model, focusing on state transitions.
  */
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MatchStateTest {
 
     @Nested
@@ -95,6 +98,57 @@ class MatchStateTest {
             assertFalse(match.canMessage());
             assertEquals(Match.ArchiveReason.GRACEFUL_EXIT, match.getEndReason());
             assertEquals(b, match.getEndedBy());
+        }
+
+        @Test
+        @DisplayName("Friends match can be unmatched")
+        void friendsCanBeUnmatched() {
+            UUID a = UUID.randomUUID();
+            UUID b = UUID.randomUUID();
+            Match match = Match.create(a, b);
+            match.transitionToFriends(a);
+
+            match.unmatch(a);
+
+            assertEquals(Match.State.UNMATCHED, match.getState());
+            assertEquals(Match.ArchiveReason.UNMATCH, match.getEndReason());
+        }
+
+        @Test
+        @DisplayName("Friends match can be blocked")
+        void friendsCanBeBlocked() {
+            UUID a = UUID.randomUUID();
+            UUID b = UUID.randomUUID();
+            Match match = Match.create(a, b);
+            match.transitionToFriends(a);
+
+            match.block(b);
+
+            assertEquals(Match.State.BLOCKED, match.getState());
+            assertEquals(Match.ArchiveReason.BLOCK, match.getEndReason());
+        }
+
+        @Test
+        @DisplayName("Cannot transition from UNMATCHED to FRIENDS")
+        void cannotTransitionFromUnmatchedToFriends() {
+            UUID a = UUID.randomUUID();
+            UUID b = UUID.randomUUID();
+            Match match = Match.create(a, b);
+            match.unmatch(a);
+
+            assertThrows(IllegalStateException.class, () -> match.transitionToFriends(b));
+        }
+
+        @Nested
+        @DisplayName("Match.generateId")
+        class GenerateIdTests {
+
+            @Test
+            @DisplayName("Throws when UUIDs are the same")
+            void throwsOnSameUuid() {
+                UUID id = UUID.randomUUID();
+                assertThrows(IllegalArgumentException.class, () -> Match.generateId(id, id));
+            }
         }
 
         @Test

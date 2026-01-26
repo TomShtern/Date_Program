@@ -9,12 +9,15 @@ import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Unit tests for Dealbreakers.Evaluator. */
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class DealbreakersEvaluatorTest {
 
     private User seeker;
@@ -306,6 +309,64 @@ class DealbreakersEvaluatorTest {
             candidate.setDrinking(Lifestyle.Drinking.SOCIALLY);
             // age difference is 2, within limit
 
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+        }
+    }
+
+    @Nested
+    @DisplayName("Null candidate fields")
+    class NullCandidateFields {
+
+        @Test
+        @DisplayName("Fails when candidate has null drinking with dealbreaker")
+        void failsNullDrinking() {
+            seeker.setDealbreakers(Dealbreakers.builder()
+                    .acceptDrinking(Lifestyle.Drinking.NEVER)
+                    .build());
+
+            // candidate drinking is null
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+        }
+
+        @Test
+        @DisplayName("Fails when candidate has null wantsKids with dealbreaker")
+        void failsNullWantsKids() {
+            seeker.setDealbreakers(Dealbreakers.builder()
+                    .acceptKidsStance(Lifestyle.WantsKids.OPEN)
+                    .build());
+
+            // candidate wantsKids is null
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+        }
+
+        @Test
+        @DisplayName("Fails when candidate has null lookingFor with dealbreaker")
+        void failsNullLookingFor() {
+            seeker.setDealbreakers(Dealbreakers.builder()
+                    .acceptLookingFor(Lifestyle.LookingFor.LONG_TERM)
+                    .build());
+
+            // candidate lookingFor is null
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+        }
+
+        @Test
+        @DisplayName("Fails when candidate has null education with dealbreaker")
+        void failsNullEducation() {
+            seeker.setDealbreakers(Dealbreakers.builder()
+                    .requireEducation(Lifestyle.Education.BACHELORS)
+                    .build());
+
+            // candidate education is null
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+        }
+
+        @Test
+        @DisplayName("Passes when candidate has null height with height dealbreaker")
+        void passesNullHeight() {
+            seeker.setDealbreakers(Dealbreakers.builder().minHeight(160).build());
+
+            // height is null by default and should not be a blocker
             assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }

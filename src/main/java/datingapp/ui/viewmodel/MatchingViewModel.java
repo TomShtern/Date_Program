@@ -49,6 +49,11 @@ public class MatchingViewModel {
     private final ObjectProperty<Match> lastMatch = new SimpleObjectProperty<>();
     private final ObjectProperty<User> matchedUser = new SimpleObjectProperty<>();
 
+    /** Track background thread for cleanup on dispose. */
+    private volatile Thread backgroundThread;
+
+    private volatile boolean disposed = false;
+
     private User lastSwipedCandidate;
     private User currentUser;
 
@@ -89,7 +94,19 @@ public class MatchingViewModel {
         User user = ensureCurrentUser();
         if (user != null) {
             // Load candidates in background to keep UI responsive
-            Thread.ofVirtual().start(this::refreshCandidates);
+            backgroundThread = Thread.ofVirtual().start(this::refreshCandidates);
+        }
+    }
+
+    /**
+     * Disposes resources held by this ViewModel.
+     * Should be called when the ViewModel is no longer needed.
+     */
+    public void dispose() {
+        disposed = true;
+        Thread thread = backgroundThread;
+        if (thread != null && thread.isAlive()) {
+            thread.interrupt();
         }
     }
 
@@ -97,14 +114,45 @@ public class MatchingViewModel {
      * Fetches a new list of candidates for the current user.
      */
     public void refreshCandidates() {
+        if (disposed) {
+            return;
+        }
         if (ensureCurrentUser() == null) {
+            logger.warn("Cannot refresh candidates: no current user set");
             return;
         }
 
         javafx.application.Platform.runLater(() -> loading.set(true));
-        logger.info("Refreshing candidates for user: {}", currentUser.getName());
+        logger.info(
+                "Refreshing candidates for user: {} (state={}, isComplete={}, gender={}, interestedIn={})",
+                currentUser.getName(),
+                currentUser.getState(),
+                currentUser.isComplete(),
+                currentUser.getGender(),
+                currentUser.getInterestedIn());
+
+        // Check if current user is ACTIVE - otherwise they cannot browse
+        if (currentUser.getState() != User.State.ACTIVE) {
+            logger.warn(
+                    "Current user {} is NOT ACTIVE (state={}). Cannot browse candidates. Profile complete: {}",
+                    currentUser.getName(),
+                    currentUser.getState(),
+                    currentUser.isComplete());
+        }
 
         List<User> activeUsers = userStorage.findActive();
+        logger.info("Found {} ACTIVE users in database", activeUsers.size());
+
+        // Log each active user for debugging
+        if (activeUsers.isEmpty()) {
+            logger.warn("NO ACTIVE users in database! All users may be INCOMPLETE.");
+            List<User> allUsers = userStorage.findAll();
+            logger.info("Total users in database: {}", allUsers.size());
+            for (User u : allUsers) {
+                logger.debug("  User: {} (state={}, isComplete={})", u.getName(), u.getState(), u.isComplete());
+            }
+        }
+
         Set<UUID> alreadyInteracted = likeStorage.getLikedOrPassedUserIds(currentUser.getId());
         Set<UUID> blockedUsers = blockStorage.getBlockedUserIds(currentUser.getId());
 
@@ -117,7 +165,13 @@ public class MatchingViewModel {
             candidateQueue.clear();
             candidateQueue.addAll(candidates);
 
-            logger.info("Found {} candidates", candidates.size());
+            logger.info("Found {} candidates after filtering", candidates.size());
+            if (candidates.isEmpty() && !activeUsers.isEmpty()) {
+                logger.warn(
+                        "No candidates found despite {} active users. Check CandidateFinder logs for filter details.",
+                        activeUsers.size());
+            }
+
             loading.set(false);
             nextCandidate();
         });

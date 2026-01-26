@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Service for managing swipe sessions. Handles session lifecycle (create, update, end) and anti-bot
@@ -18,6 +20,9 @@ public class SessionService {
 
     private final SwipeSessionStorage sessionStorage;
     private final AppConfig config;
+
+    /** Per-user locks to prevent race conditions in swipe recording. */
+    private final ConcurrentMap<UUID, Object> userLocks = new ConcurrentHashMap<>();
 
     public SessionService(SwipeSessionStorage sessionStorage, AppConfig config) {
         this.sessionStorage = Objects.requireNonNull(sessionStorage, "sessionStorage cannot be null");
@@ -66,24 +71,28 @@ public class SessionService {
      * @return the result of the swipe operation (may be blocked or have warnings)
      */
     public SwipeResult recordSwipe(UUID userId, Like.Direction direction, boolean matched) {
-        SwipeSession session = getOrCreateSession(userId);
+        // Per-user lock to prevent race condition in read-modify-write
+        Object lock = userLocks.computeIfAbsent(userId, _ -> new Object());
+        synchronized (lock) {
+            SwipeSession session = getOrCreateSession(userId);
 
-        // Check for anti-bot limits
-        if (session.getSwipeCount() >= config.maxSwipesPerSession()) {
-            return SwipeResult.blocked(session, "Session swipe limit reached. Take a break!");
+            // Check for anti-bot limits
+            if (session.getSwipeCount() >= config.maxSwipesPerSession()) {
+                return SwipeResult.blocked(session, "Session swipe limit reached. Take a break!");
+            }
+
+            // Record the swipe
+            session.recordSwipe(direction, matched);
+            sessionStorage.save(session);
+
+            // Check for suspicious velocity
+            String warning = null;
+            if (session.getSwipeCount() >= 10 && session.getSwipesPerMinute() > config.suspiciousSwipeVelocity()) {
+                warning = "Unusually fast swiping detected. Take a moment to review profiles!";
+            }
+
+            return SwipeResult.success(session, warning);
         }
-
-        // Record the swipe
-        session.recordSwipe(direction, matched);
-        sessionStorage.save(session);
-
-        // Check for suspicious velocity
-        String warning = null;
-        if (session.getSwipeCount() >= 10 && session.getSwipesPerMinute() > config.suspiciousSwipeVelocity()) {
-            warning = "Unusually fast swiping detected. Take a moment to review profiles!";
-        }
-
-        return SwipeResult.success(session, warning);
     }
 
     /**

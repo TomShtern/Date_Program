@@ -64,6 +64,11 @@ public final class TestStorages {
         public int size() {
             return users.size();
         }
+
+        @Override
+        public void delete(UUID id) {
+            users.remove(id);
+        }
     }
 
     /**

@@ -14,12 +14,15 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Unit tests for SessionService logic. Uses a simple in-memory session storage for testing. */
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class SessionServiceTest {
 
     private InMemorySwipeSessionStorage storage;

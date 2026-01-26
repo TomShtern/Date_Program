@@ -1,8 +1,12 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.Dealbreakers;
+import datingapp.core.Preferences.Interest;
+import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfileCompletionService.CompletionResult;
 import datingapp.core.User;
+import datingapp.core.User.Gender;
 import datingapp.ui.ViewModelFactory.UISession;
 import datingapp.ui.util.UiServices;
 import java.io.File;
@@ -11,29 +15,58 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.EnumSet;
 import java.util.List;
 import javafx.application.Platform;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Profile Editor screen.
- * Handles editing of user bio, location, and profile photo.
+ * Handles editing of user bio, location, interests, lifestyle, and profile photo.
  */
 public class ProfileViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
 
     private final User.Storage userStorage;
 
-    // Observable properties for form binding
+    // Observable properties for form binding - Basic Info
     private final StringProperty name = new SimpleStringProperty("");
     private final StringProperty bio = new SimpleStringProperty("");
     private final StringProperty location = new SimpleStringProperty("");
     private final StringProperty interests = new SimpleStringProperty("");
     private final StringProperty completionStatus = new SimpleStringProperty("0%");
     private final StringProperty primaryPhotoUrl = new SimpleStringProperty("");
+
+    // Gender and preferences
+    private final ObjectProperty<Gender> gender = new SimpleObjectProperty<>(null);
+    private final ObservableSet<Gender> interestedInGenders = FXCollections.observableSet(EnumSet.noneOf(Gender.class));
+
+    // Lifestyle properties
+    private final ObjectProperty<Integer> height = new SimpleObjectProperty<>(null);
+    private final ObjectProperty<Lifestyle.Smoking> smoking = new SimpleObjectProperty<>(null);
+    private final ObjectProperty<Lifestyle.Drinking> drinking = new SimpleObjectProperty<>(null);
+    private final ObjectProperty<Lifestyle.WantsKids> wantsKids = new SimpleObjectProperty<>(null);
+    private final ObjectProperty<Lifestyle.LookingFor> lookingFor = new SimpleObjectProperty<>(null);
+
+    // Search preferences properties
+    private final StringProperty minAge = new SimpleStringProperty("18");
+    private final StringProperty maxAge = new SimpleStringProperty("99");
+    private final StringProperty maxDistance = new SimpleStringProperty("50");
+
+    // Dealbreakers property
+    private final ObjectProperty<Dealbreakers> dealbreakers = new SimpleObjectProperty<>(Dealbreakers.none());
+    private final StringProperty dealbreakersStatus = new SimpleStringProperty("None set");
+
+    // Selected interests (observable set for multi-selection)
+    private final ObservableSet<Interest> selectedInterests =
+            FXCollections.observableSet(EnumSet.noneOf(Interest.class));
 
     @SuppressWarnings("unused")
     public ProfileViewModel(User.Storage userStorage, ProfileCompletionService unused) {
@@ -53,23 +86,87 @@ public class ProfileViewModel {
 
         logger.info("Loading profile for user: {}", user.getName());
 
+        // Basic info
         name.set(user.getName());
         bio.set(user.getBio() != null ? user.getBio() : "");
         location.set(formatLocation(user.getLat(), user.getLon()));
 
+        // Gender and interested in
+        gender.set(user.getGender());
+        interestedInGenders.clear();
+        if (user.getInterestedIn() != null && !user.getInterestedIn().isEmpty()) {
+            interestedInGenders.addAll(user.getInterestedIn());
+        }
+
         // Format interests as comma-separated list
         if (user.getInterests() != null && !user.getInterests().isEmpty()) {
             String interestStr = user.getInterests().stream()
-                    .map(Enum::name)
+                    .map(Interest::getDisplayName)
                     .reduce((a, b) -> a + ", " + b)
                     .orElse("");
             interests.set(interestStr);
+            // Populate selected interests set
+            selectedInterests.clear();
+            selectedInterests.addAll(user.getInterests());
         } else {
             interests.set("");
+            selectedInterests.clear();
+        }
+
+        // Lifestyle fields
+        height.set(user.getHeightCm());
+        smoking.set(user.getSmoking());
+        drinking.set(user.getDrinking());
+        wantsKids.set(user.getWantsKids());
+        lookingFor.set(user.getLookingFor());
+
+        // Search preferences
+        minAge.set(String.valueOf(user.getMinAge()));
+        maxAge.set(String.valueOf(user.getMaxAge()));
+        maxDistance.set(String.valueOf(user.getMaxDistanceKm()));
+
+        // Dealbreakers
+        Dealbreakers db = user.getDealbreakers();
+        if (db != null) {
+            dealbreakers.set(db);
+            updateDealbreakersStatus(db);
+        } else {
+            dealbreakers.set(Dealbreakers.none());
+            dealbreakersStatus.set("None set");
         }
 
         // Calculate completion using static method
         updateCompletion(user);
+    }
+
+    private void updateDealbreakersStatus(Dealbreakers db) {
+        if (!db.hasAnyDealbreaker()) {
+            dealbreakersStatus.set("None set");
+        } else {
+            int count = 0;
+            if (db.hasSmokingDealbreaker()) {
+                count++;
+            }
+            if (db.hasDrinkingDealbreaker()) {
+                count++;
+            }
+            if (db.hasKidsDealbreaker()) {
+                count++;
+            }
+            if (db.hasLookingForDealbreaker()) {
+                count++;
+            }
+            if (db.hasEducationDealbreaker()) {
+                count++;
+            }
+            if (db.hasHeightDealbreaker()) {
+                count++;
+            }
+            if (db.hasAgeDealbreaker()) {
+                count++;
+            }
+            dealbreakersStatus.set(count + " filter" + (count != 1 ? "s" : "") + " set");
+        }
     }
 
     private void updateCompletion(User user) {
@@ -101,8 +198,16 @@ public class ProfileViewModel {
 
         logger.info("Saving profile for user: {}", user.getName());
 
-        // Update user fields
+        // Update basic fields
         user.setBio(bio.get());
+
+        // Save gender and interested in
+        if (gender.get() != null) {
+            user.setGender(gender.get());
+        }
+        if (!interestedInGenders.isEmpty()) {
+            user.setInterestedIn(EnumSet.copyOf(interestedInGenders));
+        }
 
         // Parse location if provided
         String loc = location.get();
@@ -117,11 +222,73 @@ public class ProfileViewModel {
             }
         }
 
+        // Save interests
+        if (!selectedInterests.isEmpty()) {
+            user.setInterests(EnumSet.copyOf(selectedInterests));
+        }
+
+        // Save lifestyle fields
+        if (height.get() != null) {
+            user.setHeightCm(height.get());
+        }
+        if (smoking.get() != null) {
+            user.setSmoking(smoking.get());
+        }
+        if (drinking.get() != null) {
+            user.setDrinking(drinking.get());
+        }
+        if (wantsKids.get() != null) {
+            user.setWantsKids(wantsKids.get());
+        }
+        if (lookingFor.get() != null) {
+            user.setLookingFor(lookingFor.get());
+        }
+
+        // Save search preferences
+        try {
+            int min = Integer.parseInt(minAge.get());
+            int max = Integer.parseInt(maxAge.get());
+            if (min >= 18 && max <= 120 && min <= max) {
+                user.setAgeRange(min, max);
+            }
+        } catch (NumberFormatException _) {
+            logger.warn("Invalid age range values");
+        }
+
+        try {
+            int dist = Integer.parseInt(maxDistance.get());
+            if (dist > 0 && dist <= 500) {
+                user.setMaxDistanceKm(dist);
+            }
+        } catch (NumberFormatException _) {
+            logger.warn("Invalid max distance value");
+        }
+
+        // Save dealbreakers
+        if (dealbreakers.get() != null) {
+            user.setDealbreakers(dealbreakers.get());
+        }
+
         // Save to storage
         userStorage.save(user);
 
+        // Try to activate user if profile is now complete
+        if (user.isComplete() && user.getState() == User.State.INCOMPLETE) {
+            try {
+                user.activate();
+                userStorage.save(user);
+                logger.info("User {} activated after profile completion", user.getName());
+                UiServices.Toast.getInstance().showSuccess("Profile complete! You're now active!");
+            } catch (IllegalStateException e) {
+                logger.warn("Could not activate user: {}", e.getMessage());
+            }
+        }
+
         // Update the user in session
         UISession.getInstance().setCurrentUser(user);
+
+        // Update completion display
+        updateCompletion(user);
 
         logger.info("Profile saved successfully");
     }
@@ -155,6 +322,142 @@ public class ProfileViewModel {
      */
     public StringProperty primaryPhotoUrlProperty() {
         return primaryPhotoUrl;
+    }
+
+    // --- Gender and preferences properties ---
+
+    public ObjectProperty<Gender> genderProperty() {
+        return gender;
+    }
+
+    public ObservableSet<Gender> getInterestedInGenders() {
+        return interestedInGenders;
+    }
+
+    /**
+     * Toggles a gender preference.
+     *
+     * @param g the gender to toggle
+     * @return true if the gender is now selected, false if removed
+     */
+    public boolean toggleInterestedIn(Gender g) {
+        if (interestedInGenders.contains(g)) {
+            interestedInGenders.remove(g);
+            return false;
+        } else {
+            interestedInGenders.add(g);
+            return true;
+        }
+    }
+
+    // --- Lifestyle properties for data binding ---
+
+    public ObjectProperty<Integer> heightProperty() {
+        return height;
+    }
+
+    public ObjectProperty<Lifestyle.Smoking> smokingProperty() {
+        return smoking;
+    }
+
+    public ObjectProperty<Lifestyle.Drinking> drinkingProperty() {
+        return drinking;
+    }
+
+    public ObjectProperty<Lifestyle.WantsKids> wantsKidsProperty() {
+        return wantsKids;
+    }
+
+    public ObjectProperty<Lifestyle.LookingFor> lookingForProperty() {
+        return lookingFor;
+    }
+
+    // --- Search preferences properties ---
+
+    public StringProperty minAgeProperty() {
+        return minAge;
+    }
+
+    public StringProperty maxAgeProperty() {
+        return maxAge;
+    }
+
+    public StringProperty maxDistanceProperty() {
+        return maxDistance;
+    }
+
+    // --- Dealbreakers properties ---
+
+    public ObjectProperty<Dealbreakers> dealbreakersProperty() {
+        return dealbreakers;
+    }
+
+    public StringProperty dealbreakersStatusProperty() {
+        return dealbreakersStatus;
+    }
+
+    /**
+     * Returns the current dealbreakers.
+     *
+     * @return current Dealbreakers instance
+     */
+    public Dealbreakers getDealbreakers() {
+        return dealbreakers.get();
+    }
+
+    /**
+     * Updates the dealbreakers and refreshes the status display.
+     *
+     * @param newDealbreakers the new Dealbreakers to set
+     */
+    public void setDealbreakers(Dealbreakers newDealbreakers) {
+        dealbreakers.set(newDealbreakers != null ? newDealbreakers : Dealbreakers.none());
+        updateDealbreakersStatus(dealbreakers.get());
+    }
+
+    // --- Interests management ---
+
+    public ObservableSet<Interest> getSelectedInterests() {
+        return selectedInterests;
+    }
+
+    /**
+     * Toggles an interest selection.
+     *
+     * @param interest the interest to toggle
+     * @return true if the interest is now selected, false if removed
+     */
+    public boolean toggleInterest(Interest interest) {
+        if (selectedInterests.contains(interest)) {
+            selectedInterests.remove(interest);
+            updateInterestsDisplay();
+            return false;
+        } else {
+            if (selectedInterests.size() < Interest.MAX_PER_USER) {
+                selectedInterests.add(interest);
+                updateInterestsDisplay();
+                return true;
+            } else {
+                UiServices.Toast.getInstance().showWarning("Maximum " + Interest.MAX_PER_USER + " interests allowed");
+                return false;
+            }
+        }
+    }
+
+    /**
+     * Updates the interests display string from selected interests.
+     */
+    private void updateInterestsDisplay() {
+        if (selectedInterests.isEmpty()) {
+            interests.set("");
+        } else {
+            String interestStr = selectedInterests.stream()
+                    .map(Interest::getDisplayName)
+                    .sorted()
+                    .reduce((a, b) -> a + ", " + b)
+                    .orElse("");
+            interests.set(interestStr);
+        }
     }
 
     /**

@@ -66,6 +66,17 @@ public class SwipeSession {
         this.lastActivityAt = Objects.requireNonNull(lastActivityAt);
         this.endedAt = endedAt;
         this.state = Objects.requireNonNull(state);
+        // Validate counts are non-negative
+        if (swipeCount < 0 || likeCount < 0 || passCount < 0 || matchCount < 0) {
+            throw new IllegalArgumentException("Counts cannot be negative");
+        }
+        // Validate logical constraints
+        if (matchCount > likeCount) {
+            throw new IllegalArgumentException("matchCount cannot exceed likeCount");
+        }
+        if (likeCount + passCount != swipeCount) {
+            throw new IllegalArgumentException("likeCount + passCount must equal swipeCount");
+        }
         this.swipeCount = swipeCount;
         this.likeCount = likeCount;
         this.passCount = passCount;
@@ -105,6 +116,9 @@ public class SwipeSession {
     /** Increment match count (when we discover a match after recording the swipe). */
     public void incrementMatchCount() {
         if (state == State.ACTIVE) {
+            if (matchCount >= likeCount) {
+                throw new IllegalStateException("matchCount cannot exceed likeCount");
+            }
             this.matchCount++;
         }
     }
@@ -137,7 +151,8 @@ public class SwipeSession {
     /** Get session duration in seconds. */
     public long getDurationSeconds() {
         Instant end = endedAt != null ? endedAt : Instant.now();
-        return Duration.between(startedAt, end).toSeconds();
+        long seconds = Duration.between(startedAt, end).toSeconds();
+        return Math.max(0, seconds);
     }
 
     /** Get formatted duration (MM:SS or HH:MM:SS for long sessions). */

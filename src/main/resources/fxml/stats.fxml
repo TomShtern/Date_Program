@@ -83,7 +83,7 @@
           <VBox spacing="12" styleClass="achievements-container">
             <!-- First Match Achievement -->
             <HBox styleClass="achievement-card" spacing="16" alignment="CENTER_LEFT">
-              <StackPane styleClass="achievement-icon">
+              <StackPane styleClass="achievement-badge-icon">
                 <FontIcon iconLiteral="mdi2h-heart-flash" iconSize="24" iconColor="#f59e0b"/>
               </StackPane>
               <VBox spacing="4" HBox.hgrow="ALWAYS">
@@ -139,8 +139,6 @@
             </HBox>
           </VBox>
         </VBox>
-        <!-- Hidden ListView for compatibility -->
-        <ListView fx:id="achievementListView" visible="false" managed="false"/>
       </VBox>
     </ScrollPane>
   </center>

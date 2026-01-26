@@ -83,12 +83,12 @@ public class H2UserStatsStorage extends AbstractH2Storage implements UserStatsSt
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setObject(1, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return Optional.of(mapStats(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapStats(rs));
+                }
+                return Optional.empty();
             }
-            return Optional.empty();
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get latest stats for user: " + userId, e);
@@ -116,12 +116,12 @@ public class H2UserStatsStorage extends AbstractH2Storage implements UserStatsSt
 
             stmt.setObject(1, userId);
             stmt.setInt(2, limit);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                history.add(mapStats(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    history.add(mapStats(rs));
+                }
+                return history;
             }
-            return history;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get stats history for user: " + userId, e);
@@ -148,9 +148,8 @@ public class H2UserStatsStorage extends AbstractH2Storage implements UserStatsSt
         List<UserStats> allStats = new ArrayList<>();
 
         try (Connection conn = dbManager.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            ResultSet rs = stmt.executeQuery();
+                PreparedStatement stmt = conn.prepareStatement(sql);
+                ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
                 allStats.add(mapStats(rs));

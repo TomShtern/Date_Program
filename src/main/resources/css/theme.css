@@ -97,7 +97,7 @@
     -fx-padding: 12 24;
     -fx-cursor: hand;
     -fx-border-color: transparent;
-    -fx-transition: 0.3s;
+    /* Note: transitions must be done in Java code - JavaFX CSS has no transition property */
 }
 
 .button:hover {
@@ -109,6 +109,13 @@
 .button:pressed {
     -fx-background-color: linear-gradient(to bottom right, derive(-fx-primary, -10%), derive(-fx-primary-dark, -10%));
     -fx-translate-y: 1;
+}
+
+.button:focused {
+    -fx-background-color: linear-gradient(to bottom right, derive(-fx-primary, 5%), derive(-fx-primary-dark, 5%));
+    -fx-border-color: white;
+    -fx-border-width: 2;
+    -fx-border-radius: 12;
 }
 
 .button-secondary {
@@ -284,29 +291,6 @@
 }
 
 /* ============================================
-   Dashboard Grid Cards
-   ============================================ */
-.dashboard-card {
-    -fx-background-color: -fx-surface-dark;
-    -fx-border-color: #334155;
-    -fx-border-width: 1.5;
-    -fx-border-radius: 20;
-    -fx-background-radius: 20;
-    -fx-font-size: 18px;
-    -fx-font-weight: bold;
-    -fx-text-fill: white;
-    -fx-cursor: hand;
-    -fx-alignment: center;
-}
-
-.dashboard-card:hover {
-    -fx-background-color: #334155;
-    -fx-border-color: -fx-primary;
-    -fx-translate-y: -5;
-    -fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.3), 15, 0, 0, 5);
-}
-
-/* ============================================
    Lists - Clean & Readable
    ============================================ */
 .list-view {
@@ -456,8 +440,8 @@
     -fx-padding: 12 18;
 }
 
-/* Empty State Icon with Glow */
-.empty-state-icon {
+/* Empty State Icon with Glow (for browse empty state) */
+.browse-empty-icon {
     -fx-effect: dropshadow(gaussian, rgba(167, 139, 250, 0.7), 25, 0.4, 0, 0);
 }
 
@@ -552,24 +536,6 @@
     -fx-min-height: 120;
     -fx-max-width: 120;
     -fx-max-height: 120;
-}
-
-/* Camera Overlay Button */
-.profile-camera-btn {
-    -fx-background-color: linear-gradient(to bottom right, #667eea, #764ba2);
-    -fx-background-radius: 20;
-    -fx-min-width: 40;
-    -fx-min-height: 40;
-    -fx-max-width: 40;
-    -fx-max-height: 40;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 8, 0, 0, 3);
-    -fx-cursor: hand;
-}
-
-.profile-camera-btn:hover {
-    -fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.5), 12, 0, 0, 4);
-    -fx-scale-x: 1.05;
-    -fx-scale-y: 1.05;
 }
 
 /* Profile Name - Gradient text effect via shadow */
@@ -1007,7 +973,7 @@
 }
 
 /* Achievement Icon Badge */
-.achievement-icon {
+.achievement-badge-icon {
     -fx-min-width: 48;
     -fx-min-height: 48;
     -fx-max-width: 48;
@@ -1748,33 +1714,6 @@
     -fx-text-fill: #10b981;
 }
 
-/* ============================================
-   Status Indicators
-   ============================================ */
-.status-dot {
-    -fx-min-width: 12;
-    -fx-min-height: 12;
-    -fx-max-width: 12;
-    -fx-max-height: 12;
-    -fx-background-radius: 6;
-    -fx-border-color: #0f172a;
-    -fx-border-width: 2;
-    -fx-border-radius: 6;
-}
-
-.status-online {
-    -fx-background-color: #10b981;
-    -fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.6), 6, 0.4, 0, 0);
-}
-
-.status-offline {
-    -fx-background-color: #64748b;
-}
-
-.status-away {
-    -fx-background-color: #f59e0b;
-}
-
 /* Container for avatar + status dot */
 .avatar-status-container {
     -fx-alignment: bottom-right;
@@ -1812,7 +1751,7 @@
     -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.8), 30, 0.6, 0, 0);
 }
 
-.match-message-btn {
+.match-popup-message-btn {
     -fx-background-color: linear-gradient(to right, #f43f5e, #a855f7);
     -fx-text-fill: white;
     -fx-font-size: 16px;
@@ -1821,7 +1760,7 @@
     -fx-background-radius: 28;
 }
 
-.match-message-btn:hover {
+.match-popup-message-btn:hover {
     -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.5), 12, 0, 0, 0);
 }
 
@@ -1981,7 +1920,7 @@
     -fx-max-height: 12;
     -fx-background-radius: 6;
     -fx-border-radius: 6;
-    -fx-border-color: -fx-surface-base;
+    -fx-border-color: #0f172a;
     -fx-border-width: 2;
 }
 
@@ -2009,7 +1948,7 @@
     -fx-max-height: 36;
     -fx-padding: 0;
     -fx-cursor: hand;
-    -fx-border-color: -fx-surface-base;
+    -fx-border-color: #0f172a;
     -fx-border-width: 2;
     -fx-border-radius: 50;
 }
@@ -2174,4 +2113,91 @@
 .loading-label {
     -fx-font-size: 13px;
     -fx-text-fill: #94a3b8;
+}
+
+/* ============================================
+   Missing UI Component Classes (CRIT-05 Fix)
+   ============================================ */
+
+/* Form field label styling - used in profile and settings forms */
+.field-label {
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* Small secondary button variant - compact version of button-secondary */
+.button-secondary-small {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-border-color: #475569;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 6 12;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+}
+
+.button-secondary-small:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-border-color: -fx-primary;
+    -fx-text-fill: -fx-text-primary;
+}
+
+.button-secondary-small:pressed {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Base content container - centered padded wrapper */
+.content-container {
+    -fx-padding: 30 40;
+    -fx-alignment: center;
+    -fx-background-color: -fx-surface-dark;
+    -fx-background-radius: 20;
+}
+
+/* Icon button - minimal button with icon only */
+.icon-button {
+    -fx-background-color: transparent;
+    -fx-padding: 8;
+    -fx-cursor: hand;
+    -fx-background-radius: 8;
+}
+
+.icon-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+}
+
+.icon-button:pressed {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Settings toggle button - for preferences/settings screens */
+.settings-toggle {
+    -fx-background-color: transparent;
+    -fx-border-color: #475569;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12 16;
+    -fx-text-fill: -fx-text-primary;
+    -fx-cursor: hand;
+}
+
+.settings-toggle:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-border-color: -fx-primary;
+}
+
+.settings-toggle:selected {
+    -fx-background-color: -fx-primary;
+    -fx-border-color: -fx-primary;
+    -fx-text-fill: white;
+}
+
+/* Toggle group container - wrapper for toggle button groups */
+.toggle-group-container {
+    -fx-spacing: 8;
+    -fx-alignment: center-left;
 }

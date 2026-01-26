@@ -209,8 +209,9 @@ public final class H2MetricsStorage {
                 stmt.setObject(1, userId);
                 stmt.setDate(2, Date.valueOf(date));
 
-                ResultSet rs = stmt.executeQuery();
-                return rs.next() && rs.getInt(1) > 0;
+                try (ResultSet rs = stmt.executeQuery()) {
+                    return rs.next() && rs.getInt(1) > 0;
+                }
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to check daily pick view: " + userId, e);
@@ -283,12 +284,12 @@ public final class H2MetricsStorage {
             try (Connection conn = dbManager.getConnection();
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-                ResultSet rs = stmt.executeQuery();
-
-                if (rs.next()) {
-                    return Optional.of(mapStats(rs));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return Optional.of(mapStats(rs));
+                    }
+                    return Optional.empty();
                 }
-                return Optional.empty();
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to get latest platform stats", e);
@@ -310,10 +311,10 @@ public final class H2MetricsStorage {
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
                 stmt.setInt(1, limit);
-                ResultSet rs = stmt.executeQuery();
-
-                while (rs.next()) {
-                    history.add(mapStats(rs));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        history.add(mapStats(rs));
+                    }
                 }
                 return history;
 

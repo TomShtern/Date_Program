@@ -13,9 +13,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 /** H2 implementation of MessageStorage. */
 public class H2MessageStorage extends AbstractH2Storage implements MessageStorage {
+
+    private static final Logger LOGGER = Logger.getLogger(H2MessageStorage.class.getName());
 
     public H2MessageStorage(DatabaseManager dbManager) {
         super(dbManager);
@@ -54,14 +57,15 @@ public class H2MessageStorage extends AbstractH2Storage implements MessageStorag
         }
     }
 
-    private void tryAddConversationForeignKey(Statement stmt, String addFkConstraint) throws SQLException {
+    private void tryAddConversationForeignKey(Statement stmt, String addFkConstraint) {
         // Try to add FK constraint - ignore errors if conversations table doesn't exist yet
         // or if constraint already exists. The application handles cleanup via deleteByConversation.
         try {
             stmt.execute(addFkConstraint);
-        } catch (SQLException _) {
+        } catch (SQLException e) {
             // FK constraint failed (conversations table may not exist yet) - this is OK
             // as the application handles cascade delete manually via deleteByConversation()
+            LOGGER.fine("FK constraint not added (expected if conversations table not yet created): " + e.getMessage());
         }
     }
 
@@ -106,10 +110,10 @@ public class H2MessageStorage extends AbstractH2Storage implements MessageStorag
             stmt.setString(1, conversationId);
             stmt.setInt(2, limit);
             stmt.setInt(3, Math.max(0, offset));
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                messages.add(mapRow(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    messages.add(mapRow(rs));
+                }
             }
             return messages;
 
@@ -132,12 +136,12 @@ public class H2MessageStorage extends AbstractH2Storage implements MessageStorag
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, conversationId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return Optional.of(mapRow(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
+                return Optional.empty();
             }
-            return Optional.empty();
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get latest message for conversation: " + conversationId, e);
@@ -152,12 +156,12 @@ public class H2MessageStorage extends AbstractH2Storage implements MessageStorag
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, conversationId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
             }
-            return 0;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to count messages for conversation: " + conversationId, e);
@@ -177,12 +181,12 @@ public class H2MessageStorage extends AbstractH2Storage implements MessageStorag
 
             stmt.setString(1, conversationId);
             stmt.setTimestamp(2, Timestamp.from(after));
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
             }
-            return 0;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to count unread messages: " + conversationId, e);
@@ -202,12 +206,12 @@ public class H2MessageStorage extends AbstractH2Storage implements MessageStorag
 
             stmt.setString(1, conversationId);
             stmt.setObject(2, senderId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
             }
-            return 0;
 
         } catch (SQLException e) {
             throw new StorageException("Failed to count messages not from sender: " + conversationId, e);

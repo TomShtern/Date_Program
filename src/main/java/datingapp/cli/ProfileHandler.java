@@ -298,7 +298,9 @@ public class ProfileHandler {
                     selected.clear();
                     logger.info("✅ Interests cleared.\n");
                 }
-                case "0" -> editing = false;
+                case "0" -> {
+                    editing = false;
+                }
                 default -> logger.info(CliConstants.INVALID_SELECTION);
             }
         }
@@ -364,7 +366,8 @@ public class ProfileHandler {
             double lat = Double.parseDouble(latStr);
             double lon = Double.parseDouble(lonStr);
             currentUser.setLocation(lat, lon);
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException e) {
+            logger.debug("Invalid coordinates: {}", e.getMessage());
             logger.info("⚠️  Invalid coordinates, skipping.");
         }
     }
@@ -379,8 +382,9 @@ public class ProfileHandler {
         try {
             int dist = Integer.parseInt(distStr);
             currentUser.setMaxDistanceKm(dist);
-        } catch (NumberFormatException _) {
-            // Keep default
+        } catch (NumberFormatException e) {
+            logger.trace("Using default distance, input was: {}", e.getMessage());
+            // Keep default - user entered non-numeric or empty input
         }
 
         String minAgeStr = inputReader.readLine("Min age preference (default 18): ");

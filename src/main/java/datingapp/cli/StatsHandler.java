@@ -38,7 +38,7 @@ public class StatsHandler {
 
         User currentUser = userSession.getCurrentUser();
         logger.info("\n" + CliConstants.SEPARATOR_LINE);
-        logger.info("CliConstants.HEADER_YOUR_STATISTICS");
+        logger.info(CliConstants.HEADER_YOUR_STATISTICS);
         logger.info(CliConstants.SEPARATOR_LINE + "\n");
 
         UserStats stats = statsService.getOrComputeStats(currentUser.getId());
@@ -46,7 +46,7 @@ public class StatsHandler {
         logger.info("  Last updated: {}\n", computedAt);
 
         // Activity section
-        logger.info("CliConstants.STATS_ACTIVITY");
+        logger.info(CliConstants.STATS_ACTIVITY);
         logger.info(CliConstants.SECTION_LINE);
         logger.info(
                 "  Swipes given:     {} ({} likes, {} passes)",
@@ -69,7 +69,7 @@ public class StatsHandler {
                 stats.passesReceived());
 
         // Matches section
-        logger.info("CliConstants.STATS_MATCHES");
+        logger.info(CliConstants.STATS_MATCHES);
         logger.info(CliConstants.SECTION_LINE);
         logger.info("  Total matches:    {}", stats.totalMatches());
         logger.info("  Active matches:   {}", stats.activeMatches());
@@ -84,7 +84,7 @@ public class StatsHandler {
         logger.info("  Match rate:       {} {}\n", stats.getMatchRateDisplay(), matchRateDesc);
 
         // Scores section
-        logger.info("CliConstants.STATS_SCORES");
+        logger.info(CliConstants.STATS_SCORES);
         logger.info(CliConstants.SECTION_LINE);
         logger.info("  Reciprocity:      {} (of your likes, liked you back)", stats.getReciprocityDisplay());
 
@@ -111,7 +111,7 @@ public class StatsHandler {
                 || stats.blocksReceived() > 0
                 || stats.reportsGiven() > 0
                 || stats.reportsReceived() > 0) {
-            logger.info("CliConstants.STATS_SAFETY");
+            logger.info(CliConstants.STATS_SAFETY);
             logger.info(CliConstants.SECTION_LINE);
             logger.info("  Blocks: {} given | {} received", stats.blocksGiven(), stats.blocksReceived());
             logger.info("  Reports: {} given | {} received\n", stats.reportsGiven(), stats.reportsReceived());
@@ -134,7 +134,7 @@ public class StatsHandler {
         final List<UserAchievement> unlocked = achievementService.getUnlocked(currentUser.getId());
 
         logger.info("\n" + CliConstants.SEPARATOR_LINE);
-        logger.info("CliConstants.HEADER_YOUR_ACHIEVEMENTS");
+        logger.info(CliConstants.HEADER_YOUR_ACHIEVEMENTS);
         logger.info(CliConstants.SEPARATOR_LINE + "\n");
 
         if (unlocked.isEmpty()) {

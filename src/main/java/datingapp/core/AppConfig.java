@@ -25,7 +25,25 @@ public record AppConfig(
         int maxSwipesPerSession, // Anti-bot: max swipes in single session
         double suspiciousSwipeVelocity, // Anti-bot: swipes/min threshold for warning
         // Undo feature (Phase 1)
-        int undoWindowSeconds // Time window for undo in seconds (30)
+        int undoWindowSeconds, // Time window for undo in seconds (30)
+        // Algorithm thresholds (MED-01: centralized from hardcoded values)
+        int nearbyDistanceKm, // Distance considered "nearby" (5km default)
+        int closeDistanceKm, // Distance considered "close" (10km default)
+        int similarAgeDiff, // Age difference considered "similar" (2 years)
+        int compatibleAgeDiff, // Age difference considered "compatible" (5 years)
+        int minSharedInterests, // Min shared interests for "many" (3)
+        int paceCompatibilityThreshold, // Min pace score for compatibility (50)
+        int responseTimeExcellentHours, // Response time for "excellent" (1)
+        int responseTimeGreatHours, // Response time for "great" (24)
+        int responseTimeGoodHours, // Response time for "good" (72)
+        int achievementMatchTier1, // First match milestone (1)
+        int achievementMatchTier2, // Second match milestone (5)
+        int achievementMatchTier3, // Third match milestone (10)
+        int achievementMatchTier4, // Fourth match milestone (25)
+        int achievementMatchTier5, // Fifth match milestone (50)
+        int minSwipesForBehaviorAchievement, // Min swipes to evaluate behavior (50)
+        int maxDistanceKm, // Max allowed search distance (500km)
+        int maxAge // Max valid age (120)
         ) {
     /** Default configuration values. */
     public static AppConfig defaults() {
@@ -42,7 +60,25 @@ public record AppConfig(
                 5, // sessionTimeoutMinutes
                 500, // maxSwipesPerSession
                 30.0, // suspiciousSwipeVelocity
-                30 // undoWindowSeconds
+                30, // undoWindowSeconds
+                // Algorithm thresholds
+                5, // nearbyDistanceKm
+                10, // closeDistanceKm
+                2, // similarAgeDiff
+                5, // compatibleAgeDiff
+                3, // minSharedInterests
+                50, // paceCompatibilityThreshold
+                1, // responseTimeExcellentHours
+                24, // responseTimeGreatHours
+                72, // responseTimeGoodHours
+                1, // achievementMatchTier1
+                5, // achievementMatchTier2
+                10, // achievementMatchTier3
+                25, // achievementMatchTier4
+                50, // achievementMatchTier5
+                50, // minSwipesForBehaviorAchievement
+                500, // maxDistanceKm
+                120 // maxAge
                 );
     }
 
@@ -81,6 +117,24 @@ public record AppConfig(
         private int maxSwipesPerSession = 500;
         private double suspiciousSwipeVelocity = 30.0;
         private int undoWindowSeconds = 30;
+        // Algorithm thresholds
+        private int nearbyDistanceKm = 5;
+        private int closeDistanceKm = 10;
+        private int similarAgeDiff = 2;
+        private int compatibleAgeDiff = 5;
+        private int minSharedInterests = 3;
+        private int paceCompatibilityThreshold = 50;
+        private int responseTimeExcellentHours = 1;
+        private int responseTimeGreatHours = 24;
+        private int responseTimeGoodHours = 72;
+        private int achievementMatchTier1 = 1;
+        private int achievementMatchTier2 = 5;
+        private int achievementMatchTier3 = 10;
+        private int achievementMatchTier4 = 25;
+        private int achievementMatchTier5 = 50;
+        private int minSwipesForBehaviorAchievement = 50;
+        private int maxDistanceKm = 500;
+        private int maxAge = 120;
 
         public Builder autoBanThreshold(int v) {
             this.autoBanThreshold = v;
@@ -147,6 +201,91 @@ public record AppConfig(
             return this;
         }
 
+        public Builder nearbyDistanceKm(int v) {
+            this.nearbyDistanceKm = v;
+            return this;
+        }
+
+        public Builder closeDistanceKm(int v) {
+            this.closeDistanceKm = v;
+            return this;
+        }
+
+        public Builder similarAgeDiff(int v) {
+            this.similarAgeDiff = v;
+            return this;
+        }
+
+        public Builder compatibleAgeDiff(int v) {
+            this.compatibleAgeDiff = v;
+            return this;
+        }
+
+        public Builder minSharedInterests(int v) {
+            this.minSharedInterests = v;
+            return this;
+        }
+
+        public Builder paceCompatibilityThreshold(int v) {
+            this.paceCompatibilityThreshold = v;
+            return this;
+        }
+
+        public Builder responseTimeExcellentHours(int v) {
+            this.responseTimeExcellentHours = v;
+            return this;
+        }
+
+        public Builder responseTimeGreatHours(int v) {
+            this.responseTimeGreatHours = v;
+            return this;
+        }
+
+        public Builder responseTimeGoodHours(int v) {
+            this.responseTimeGoodHours = v;
+            return this;
+        }
+
+        public Builder achievementMatchTier1(int v) {
+            this.achievementMatchTier1 = v;
+            return this;
+        }
+
+        public Builder achievementMatchTier2(int v) {
+            this.achievementMatchTier2 = v;
+            return this;
+        }
+
+        public Builder achievementMatchTier3(int v) {
+            this.achievementMatchTier3 = v;
+            return this;
+        }
+
+        public Builder achievementMatchTier4(int v) {
+            this.achievementMatchTier4 = v;
+            return this;
+        }
+
+        public Builder achievementMatchTier5(int v) {
+            this.achievementMatchTier5 = v;
+            return this;
+        }
+
+        public Builder minSwipesForBehaviorAchievement(int v) {
+            this.minSwipesForBehaviorAchievement = v;
+            return this;
+        }
+
+        public Builder maxDistanceKm(int v) {
+            this.maxDistanceKm = v;
+            return this;
+        }
+
+        public Builder maxAge(int v) {
+            this.maxAge = v;
+            return this;
+        }
+
         public AppConfig build() {
             return new AppConfig(
                     autoBanThreshold,
@@ -161,7 +300,24 @@ public record AppConfig(
                     sessionTimeoutMinutes,
                     maxSwipesPerSession,
                     suspiciousSwipeVelocity,
-                    undoWindowSeconds);
+                    undoWindowSeconds,
+                    nearbyDistanceKm,
+                    closeDistanceKm,
+                    similarAgeDiff,
+                    compatibleAgeDiff,
+                    minSharedInterests,
+                    paceCompatibilityThreshold,
+                    responseTimeExcellentHours,
+                    responseTimeGreatHours,
+                    responseTimeGoodHours,
+                    achievementMatchTier1,
+                    achievementMatchTier2,
+                    achievementMatchTier3,
+                    achievementMatchTier4,
+                    achievementMatchTier5,
+                    minSwipesForBehaviorAchievement,
+                    maxDistanceKm,
+                    maxAge);
         }
     }
 }

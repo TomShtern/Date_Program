@@ -14,12 +14,15 @@ import datingapp.core.User;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Unit tests for CliUtilities.UserSession. */
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class UserSessionTest {
 
     private CliUtilities.UserSession userSession;

@@ -10,9 +10,11 @@ import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.Preferences.Interest;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Consolidated unit tests for core utility classes and value objects.
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.Test;
  * </ul>
  */
 @SuppressWarnings("unused") // Test class with @Nested
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class CoreUtilitiesTest {
 
     // ==================== GeoUtils TESTS ====================

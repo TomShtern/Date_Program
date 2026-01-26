@@ -104,12 +104,12 @@ public class H2ConversationStorage extends AbstractH2Storage implements Conversa
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, conversationId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return Optional.of(mapRow(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
+                return Optional.empty();
             }
-            return Optional.empty();
 
         } catch (SQLException e) {
             throw new StorageException("Failed to get conversation: " + conversationId, e);
@@ -140,10 +140,10 @@ public class H2ConversationStorage extends AbstractH2Storage implements Conversa
 
             stmt.setObject(1, userId);
             stmt.setObject(2, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                conversations.add(mapRow(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    conversations.add(mapRow(rs));
+                }
             }
             return conversations;
 

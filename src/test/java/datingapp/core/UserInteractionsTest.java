@@ -10,9 +10,11 @@ import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.Report;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Consolidated unit tests for UserInteractions domain models (Like, Block, Report).
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.Test;
  * <p>Grouped using JUnit 5 {@code @Nested} classes for logical organization.
  */
 @SuppressWarnings("unused") // Test class with @Nested
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class UserInteractionsTest {
 
     // ==================== LIKE TESTS ====================

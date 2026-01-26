@@ -10,7 +10,9 @@ import datingapp.core.Match.MatchStorage;
 import datingapp.core.UndoService.UndoResult;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.LikeStorage;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -18,22 +20,26 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for UndoService - time-windowed undo functionality for swipe actions.
  */
 @SuppressWarnings("unused")
 @DisplayName("UndoService")
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class UndoServiceTest {
 
     private InMemoryLikeStorage likeStorage;
     private InMemoryMatchStorage matchStorage;
     private AppConfig config;
     private UndoService undoService;
+    private TestClock clock;
 
     private UUID userId;
     private UUID targetUserId;
@@ -43,7 +49,8 @@ class UndoServiceTest {
         likeStorage = new InMemoryLikeStorage();
         matchStorage = new InMemoryMatchStorage();
         config = AppConfig.builder().undoWindowSeconds(30).build(); // 30 second undo window
-        undoService = new UndoService(likeStorage, matchStorage, config);
+        clock = new TestClock(Instant.parse("2026-01-26T00:00:00Z"));
+        undoService = new UndoService(likeStorage, matchStorage, config, clock);
 
         userId = UUID.randomUUID();
         targetUserId = UUID.randomUUID();
@@ -123,16 +130,17 @@ class UndoServiceTest {
 
         @Test
         @DisplayName("Returns false after expiry (with short window)")
-        void returnsFalseAfterExpiry() throws InterruptedException {
+        void returnsFalseAfterExpiry() {
             // Use 1 second undo window for fast test
             AppConfig shortConfig = AppConfig.builder().undoWindowSeconds(1).build();
-            UndoService shortUndoService = new UndoService(likeStorage, matchStorage, shortConfig);
+            TestClock shortClock = new TestClock(clock.instant());
+            UndoService shortUndoService = new UndoService(likeStorage, matchStorage, shortConfig, shortClock);
 
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             shortUndoService.recordSwipe(userId, like, Optional.empty());
 
-            // Wait for expiry
-            Thread.sleep(1100);
+            // Advance time beyond expiry
+            shortClock.advanceSeconds(2);
 
             assertFalse(shortUndoService.canUndo(userId));
         }
@@ -270,17 +278,18 @@ class UndoServiceTest {
 
         @Test
         @DisplayName("Fails after expiry (with short window)")
-        void failsAfterExpiry() throws InterruptedException {
+        void failsAfterExpiry() {
             // Use 1 second undo window for fast test
             AppConfig shortConfig = AppConfig.builder().undoWindowSeconds(1).build();
-            UndoService shortUndoService = new UndoService(likeStorage, matchStorage, shortConfig);
+            TestClock shortClock = new TestClock(clock.instant());
+            UndoService shortUndoService = new UndoService(likeStorage, matchStorage, shortConfig, shortClock);
 
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             likeStorage.save(like);
             shortUndoService.recordSwipe(userId, like, Optional.empty());
 
-            // Wait for expiry
-            Thread.sleep(1100);
+            // Advance time beyond expiry
+            shortClock.advanceSeconds(2);
 
             UndoResult result = shortUndoService.undo(userId);
 
@@ -473,6 +482,36 @@ class UndoServiceTest {
         @Override
         public void delete(String matchId) {
             matches.remove(matchId);
+        }
+    }
+
+    /**
+     * Mutable clock for deterministic time control in tests.
+     */
+    private static final class TestClock extends Clock {
+        private Instant current;
+
+        private TestClock(Instant start) {
+            this.current = start;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneId.of("UTC");
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return current;
+        }
+
+        public void advanceSeconds(long seconds) {
+            current = current.plusSeconds(seconds);
         }
     }
 }

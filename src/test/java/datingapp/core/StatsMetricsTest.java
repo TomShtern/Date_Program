@@ -11,9 +11,11 @@ import datingapp.core.Stats.PlatformStats;
 import datingapp.core.Stats.UserStats;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Consolidated unit tests for statistics and metrics domain models.
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.Test;
  * </ul>
  */
 @SuppressWarnings("unused") // Test class with @Nested
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class StatsMetricsTest {
 
     // ==================== PLATFORM STATS TESTS ====================

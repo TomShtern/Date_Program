@@ -7,14 +7,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.DailyService.DailyPickStorage;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Integration test for H2DailyPickViewStorage. Tests database operations for tracking daily pick
  * views.
  */
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class H2DailyPickViewStorageTest {
 
     private DatabaseManager dbManager;

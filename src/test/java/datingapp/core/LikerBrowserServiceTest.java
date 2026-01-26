@@ -20,14 +20,17 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for the liker browser functionality in MatchingService. These methods allow users to see
  * who has liked them.
  */
 @SuppressWarnings("unused")
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class LikerBrowserServiceTest {
 
     @Test
@@ -251,6 +254,11 @@ class LikerBrowserServiceTest {
         @Override
         public List<User> findActive() {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void delete(UUID id) {
+            users.remove(id);
         }
     }
 

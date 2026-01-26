@@ -57,7 +57,7 @@
       </VBox>
       <!-- Empty State - Redesigned -->
       <VBox fx:id="emptyStateContainer" alignment="CENTER" spacing="12.0">
-        <FontIcon iconLiteral="mdi2g-ghost" iconSize="100" iconColor="#a78bfa" styleClass="empty-state-icon"/>
+        <FontIcon iconLiteral="mdi2g-ghost" iconSize="100" iconColor="#a78bfa" styleClass="browse-empty-icon"/>
         <Label text="Start a conversation" styleClass="empty-state-title">
           <VBox.margin>
             <Insets top="10"/>

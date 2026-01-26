@@ -88,25 +88,22 @@ public class MatchingService {
 
         // Check for mutual LIKE
         if (likeStorage.mutualLikeExists(like.whoLikes(), like.whoGotLiked())) {
-            // Create match
+            // Create match with deterministic ID (allows idempotent saves)
             Match match = Match.create(like.whoLikes(), like.whoGotLiked());
 
-            // Check if match already exists (shouldn't happen, but defensive)
-            if (!matchStorage.exists(match.getId())) {
-                try {
-                    matchStorage.save(match);
+            try {
+                // Save using upsert semantics (MERGE) - idempotent operation
+                matchStorage.save(match);
 
-                    // Update session with match count (Phase 0.5b)
-                    if (sessionService != null) {
-                        sessionService.recordMatch(like.whoLikes());
-                    }
-
-                    return Optional.of(match);
-                } catch (Exception _) {
-                    // Race condition: match was created by another thread just now
-                    // Return the existing match if possible, or simple empty (idempotent)
-                    return matchStorage.get(match.getId());
+                // Update session with match count (Phase 0.5b)
+                if (sessionService != null) {
+                    sessionService.recordMatch(like.whoLikes());
                 }
+
+                return Optional.of(match);
+            } catch (Exception _) {
+                // Race condition or duplicate: return existing match
+                return matchStorage.get(match.getId());
             }
         }
 

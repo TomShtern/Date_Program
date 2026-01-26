@@ -173,11 +173,10 @@ public class MatchingHandler {
 
         logger.info(CliConstants.BOX_BOTTOM);
 
-        String action =
-                inputReader.readLine("CliConstants.PROMPT_LIKE_PASS_QUIT").toLowerCase();
+        String action = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_QUIT).toLowerCase();
 
         if (action.equals("q")) {
-            logger.info("CliConstants.MSG_STOPPING_BROWSE");
+            logger.info(CliConstants.MSG_STOPPING_BROWSE);
             return false;
         }
 
@@ -256,8 +255,8 @@ public class MatchingHandler {
             }
         }
 
-        logger.info("CliConstants.MENU_DIVIDER_WITH_NEWLINES");
-        logger.info("  CliConstants.PROMPT_VIEW_UNMATCH_BLOCK");
+        logger.info(CliConstants.MENU_DIVIDER_WITH_NEWLINES);
+        logger.info("  " + CliConstants.PROMPT_VIEW_UNMATCH_BLOCK);
         String action = inputReader.readLine("\nYour choice: ").toLowerCase();
 
         switch (action) {
@@ -286,7 +285,7 @@ public class MatchingHandler {
 
             displayMatchQuality(otherUser, quality);
 
-            logger.info("CliConstants.MENU_DIVIDER_WITH_NEWLINES");
+            logger.info(CliConstants.MENU_DIVIDER_WITH_NEWLINES);
             logger.info("  (U)nmatch | (B)lock | (F)riend Zone | (G)raceful Exit | back");
             String action = inputReader.readLine("  Your choice: ").toLowerCase();
 
@@ -530,8 +529,7 @@ public class MatchingHandler {
         logger.info("  This pick resets tomorrow at midnight!");
         logger.info("");
 
-        String action =
-                inputReader.readLine("CliConstants.PROMPT_LIKE_PASS_SKIP").toLowerCase();
+        String action = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_SKIP).toLowerCase();
 
         if (action.equals("s")) {
             logger.info("  👋 You can see this pick again later today.\n");

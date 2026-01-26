@@ -24,9 +24,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Edge case regression tests - consolidated from BugInvestigationTest and
@@ -37,6 +39,7 @@ import org.junit.jupiter.api.Test;
  */
 @SuppressWarnings("unused")
 @DisplayName("Edge Case Regression Tests")
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class EdgeCaseRegressionTest {
 
     // ============================================================

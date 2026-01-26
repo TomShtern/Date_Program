@@ -154,12 +154,12 @@ public final class H2SocialStorage {
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
                 stmt.setObject(1, id);
-                ResultSet rs = stmt.executeQuery();
-
-                if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return Optional.of(mapRow(rs));
+                    }
+                    return Optional.empty();
                 }
-                return Optional.empty();
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to get friend request: " + id, e);
@@ -181,12 +181,12 @@ public final class H2SocialStorage {
                 stmt.setObject(2, user2);
                 stmt.setObject(3, user2);
                 stmt.setObject(4, user1);
-                ResultSet rs = stmt.executeQuery();
-
-                if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return Optional.of(mapRow(rs));
+                    }
+                    return Optional.empty();
                 }
-                return Optional.empty();
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to get pending friend request", e);
@@ -206,12 +206,12 @@ public final class H2SocialStorage {
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
                 stmt.setObject(1, userId);
-                ResultSet rs = stmt.executeQuery();
-
-                while (rs.next()) {
-                    requests.add(mapRow(rs));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        requests.add(mapRow(rs));
+                    }
+                    return requests;
                 }
-                return requests;
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to get pending requests for user: " + userId, e);
@@ -343,12 +343,12 @@ public final class H2SocialStorage {
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
                 stmt.setObject(1, userId);
-                ResultSet rs = stmt.executeQuery();
-
-                while (rs.next()) {
-                    notificationList.add(mapRow(rs));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        notificationList.add(mapRow(rs));
+                    }
+                    return notificationList;
                 }
-                return notificationList;
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to get notifications for user: " + userId, e);
@@ -364,12 +364,12 @@ public final class H2SocialStorage {
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
 
                 stmt.setObject(1, id);
-                ResultSet rs = stmt.executeQuery();
-
-                if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return Optional.of(mapRow(rs));
+                    }
+                    return Optional.empty();
                 }
-                return Optional.empty();
 
             } catch (SQLException e) {
                 throw new StorageException("Failed to get notification: " + id, e);

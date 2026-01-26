@@ -5,11 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import datingapp.storage.DatabaseManager;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for ServiceRegistry - central dependency registry and service wiring.
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.Test;
  */
 @SuppressWarnings("unused")
 @DisplayName("ServiceRegistry")
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class ServiceRegistryTest {
 
     private static DatabaseManager dbManager;

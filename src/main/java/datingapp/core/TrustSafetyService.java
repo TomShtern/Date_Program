@@ -32,7 +32,13 @@ public class TrustSafetyService {
 
     public TrustSafetyService(
             ReportStorage reportStorage, User.Storage userStorage, BlockStorage blockStorage, AppConfig config) {
-        this(reportStorage, userStorage, blockStorage, config, DEFAULT_VERIFICATION_TTL, new Random());
+        this(
+                Objects.requireNonNull(reportStorage, "reportStorage cannot be null"),
+                Objects.requireNonNull(userStorage, "userStorage cannot be null"),
+                Objects.requireNonNull(blockStorage, "blockStorage cannot be null"),
+                Objects.requireNonNull(config, "config cannot be null"),
+                DEFAULT_VERIFICATION_TTL,
+                new Random());
     }
 
     public TrustSafetyService(

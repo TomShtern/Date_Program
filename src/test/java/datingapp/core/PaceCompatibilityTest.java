@@ -17,14 +17,17 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for pace compatibility calculation in MatchQualityService. Formerly PaceCompatibilityServiceTest.
  */
 @SuppressWarnings("unused")
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class PaceCompatibilityTest {
 
     private MatchQualityService service;
@@ -179,6 +182,11 @@ class PaceCompatibilityTest {
         @Override
         public List<User> findActive() {
             return List.of();
+        }
+
+        @Override
+        public void delete(UUID id) {
+            // No-op for minimal storage
         }
     }
 

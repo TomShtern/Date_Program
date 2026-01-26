@@ -10,13 +10,16 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Tests for MatchQuality record. */
 @DisplayName("MatchQuality Tests")
 @SuppressWarnings("unused") // IDE false positives for @Nested classes
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MatchQualityTest {
 
     private static final String MATCH_ID = "test-match-id";
