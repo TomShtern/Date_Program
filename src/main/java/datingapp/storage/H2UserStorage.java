@@ -190,8 +190,7 @@ public class H2UserStorage extends AbstractH2Storage implements User.Storage {
 
     @Override
     public List<User> findAll() {
-        String sql = SELECT_USERS;
-        return findByQuery(sql);
+        return findByQuery(SELECT_USERS);
     }
 
     @Override

@@ -4,37 +4,53 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.layout.StackPane?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane fx:id="rootPane" prefHeight="700.0" prefWidth="900.0"
+<StackPane fx:id="rootPane" prefHeight="760.0" prefWidth="900.0"
            styleClass="content-container"
            xmlns="http://javafx.com/javafx/21"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="datingapp.ui.controller.LoginController">
 
-    <VBox alignment="CENTER" maxWidth="500.0" maxHeight="600.0" spacing="30.0" styleClass="glass-card">
+    <Region styleClass="login-glow login-glow-left" mouseTransparent="true" StackPane.alignment="TOP_LEFT"/>
+    <Region styleClass="login-glow login-glow-right" mouseTransparent="true" StackPane.alignment="BOTTOM_RIGHT"/>
+
+    <VBox alignment="TOP_CENTER" maxWidth="520.0" minHeight="700.0" prefHeight="740.0"
+          spacing="16.0" styleClass="glass-card login-card">
         <padding>
-            <Insets bottom="50.0" left="50.0" right="50.0" top="50.0" />
+            <Insets bottom="32.0" left="48.0" right="48.0" top="20.0" />
         </padding>
 
         <!-- Header Section -->
-        <VBox alignment="CENTER" spacing="15.0">
-            <FontIcon iconLiteral="mdi2h-heart" iconSize="64" styleClass="icon-primary"/>
+        <VBox alignment="CENTER" spacing="6.0">
+            <FontIcon iconLiteral="mdi2h-heart" iconSize="48" styleClass="icon-primary"/>
+            <Label styleClass="login-kicker" text="Welcome back" />
             <Label styleClass="heading" text="Dating App" />
             <Label styleClass="text-secondary" text="Find your perfect match" />
         </VBox>
 
         <!-- User Selection Section -->
-        <VBox spacing="10.0" VBox.vgrow="ALWAYS">
+        <VBox spacing="6.0" alignment="TOP_LEFT" VBox.vgrow="ALWAYS">
             <Label styleClass="subheading" text="Select Account" />
-            <ListView fx:id="userListView" minHeight="200.0" VBox.vgrow="ALWAYS" />
+            <HBox alignment="CENTER_LEFT" spacing="10" styleClass="login-search-container" maxWidth="Infinity">
+                <FontIcon iconLiteral="mdi2m-magnify" iconSize="16" styleClass="login-search-icon"/>
+                <TextField fx:id="filterField" promptText="Search by name, age, or status"
+                           HBox.hgrow="ALWAYS" styleClass="login-search-field"/>
+            </HBox>
+            <ListView fx:id="userListView" minHeight="320.0" prefHeight="440.0" maxHeight="480.0"
+                      maxWidth="Infinity"
+                      VBox.vgrow="ALWAYS" styleClass="login-user-list" />
+            <Label styleClass="login-hint" wrapText="true" maxWidth="420.0"
+                   text="Tip: Double-click or press Enter to log in. Use Up/Down to navigate." />
         </VBox>
 
         <!-- Actions Section -->
-        <VBox spacing="15.0">
+        <VBox spacing="12.0">
             <Button fx:id="loginButton" maxWidth="Infinity" onAction="#handleLogin" text="Log In">
                 <graphic>
                     <FontIcon iconLiteral="mdi2l-login" iconColor="white" iconSize="18"/>

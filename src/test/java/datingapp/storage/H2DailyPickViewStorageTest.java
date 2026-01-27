@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.DailyService.DailyPickStorage;
+import datingapp.core.User;
 import java.time.LocalDate;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -22,6 +23,7 @@ class H2DailyPickViewStorageTest {
 
     private DatabaseManager dbManager;
     private DailyPickStorage storage;
+    private H2UserStorage userStorage;
 
     @BeforeEach
     void setUp() {
@@ -30,6 +32,7 @@ class H2DailyPickViewStorageTest {
         DatabaseManager.resetInstance();
         dbManager = DatabaseManager.getInstance();
         storage = new H2MetricsStorage(dbManager).dailyPicks();
+        userStorage = new H2UserStorage(dbManager);
     }
 
     @AfterEach
@@ -43,6 +46,7 @@ class H2DailyPickViewStorageTest {
         UUID userId = UUID.randomUUID();
         LocalDate date = LocalDate.now();
 
+        saveUser(userId);
         storage.markViewed(userId, date);
 
         assertTrue(storage.hasViewed(userId, date), "Should return true after marking as viewed");
@@ -53,6 +57,7 @@ class H2DailyPickViewStorageTest {
         UUID userId = UUID.randomUUID();
         LocalDate date = LocalDate.now();
 
+        saveUser(userId);
         assertFalse(storage.hasViewed(userId, date), "Should return false before marking as viewed");
     }
 
@@ -64,6 +69,7 @@ class H2DailyPickViewStorageTest {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
 
+        saveUser(userId);
         storage.markViewed(userId, today);
 
         assertTrue(storage.hasViewed(userId, today), "Should return true for marked date");
@@ -76,6 +82,8 @@ class H2DailyPickViewStorageTest {
         UUID user2 = UUID.randomUUID();
         LocalDate date = LocalDate.now();
 
+        saveUser(user1);
+        saveUser(user2);
         storage.markViewed(user1, date);
 
         assertTrue(storage.hasViewed(user1, date), "User1 should have viewed");
@@ -88,6 +96,7 @@ class H2DailyPickViewStorageTest {
         LocalDate date = LocalDate.now();
 
         // Mark multiple times (should upsert, not create duplicates)
+        saveUser(userId);
         storage.markViewed(userId, date);
         storage.markViewed(userId, date);
         storage.markViewed(userId, date);
@@ -104,6 +113,7 @@ class H2DailyPickViewStorageTest {
         LocalDate fiveDaysAgo = today.minusDays(5);
 
         // Mark views for different dates
+        saveUser(userId);
         storage.markViewed(userId, fiveDaysAgo);
         storage.markViewed(userId, threeDaysAgo);
         storage.markViewed(userId, today);
@@ -118,12 +128,17 @@ class H2DailyPickViewStorageTest {
         assertTrue(storage.hasViewed(userId, today), "Today's record should remain");
     }
 
+    private void saveUser(UUID userId) {
+        userStorage.save(new User(userId, "User_" + userId));
+    }
+
     @Test
     void cleanup_keepsRecentRecords() {
         UUID userId = UUID.randomUUID();
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
 
+        saveUser(userId);
         storage.markViewed(userId, today);
         storage.markViewed(userId, yesterday);
 
@@ -151,6 +166,8 @@ class H2DailyPickViewStorageTest {
         UUID user2 = UUID.randomUUID();
         LocalDate tenDaysAgo = LocalDate.now().minusDays(10);
 
+        saveUser(user1);
+        saveUser(user2);
         storage.markViewed(user1, tenDaysAgo);
         storage.markViewed(user2, tenDaysAgo);
 

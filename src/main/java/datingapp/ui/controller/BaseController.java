@@ -31,13 +31,11 @@ public abstract class BaseController {
      * Call this for every property subscription created in the controller.
      *
      * @param subscription the subscription to manage
-     * @return the same subscription (for chaining)
      */
-    protected Subscription addSubscription(Subscription subscription) {
+    protected void addSubscription(Subscription subscription) {
         if (subscription != null) {
             subscriptions.add(subscription);
         }
-        return subscription;
     }
 
     /**

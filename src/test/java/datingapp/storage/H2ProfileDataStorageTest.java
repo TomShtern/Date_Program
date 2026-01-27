@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.User;
 import datingapp.core.User.ProfileNote;
 import java.time.Instant;
 import java.util.List;
@@ -21,6 +22,7 @@ class H2ProfileDataStorageTest {
 
     private H2ProfileDataStorage.Notes notes;
     private H2ProfileDataStorage.Views views;
+    private H2UserStorage userStorage;
 
     @BeforeEach
     void setUp() {
@@ -28,6 +30,7 @@ class H2ProfileDataStorageTest {
         DatabaseManager.resetInstance();
         DatabaseManager dbManager = DatabaseManager.getInstance();
 
+        userStorage = new H2UserStorage(dbManager);
         notes = new H2ProfileDataStorage.Notes(dbManager);
         views = new H2ProfileDataStorage.Views(dbManager);
     }
@@ -39,6 +42,8 @@ class H2ProfileDataStorageTest {
         UUID subject = UUID.randomUUID();
         ProfileNote note = ProfileNote.create(author, subject, "Met at coffee shop");
 
+        saveUser(author);
+        saveUser(subject);
         notes.save(note);
 
         Optional<ProfileNote> loaded = notes.get(author, subject);
@@ -53,6 +58,8 @@ class H2ProfileDataStorageTest {
         UUID subject = UUID.randomUUID();
         ProfileNote note = ProfileNote.create(author, subject, "Original");
 
+        saveUser(author);
+        saveUser(subject);
         notes.save(note);
 
         ProfileNote updated = note.withContent("Updated");
@@ -70,6 +77,8 @@ class H2ProfileDataStorageTest {
         UUID subject = UUID.randomUUID();
         ProfileNote note = ProfileNote.create(author, subject, "Delete me");
 
+        saveUser(author);
+        saveUser(subject);
         notes.save(note);
         assertTrue(notes.delete(author, subject));
         assertFalse(notes.get(author, subject).isPresent());
@@ -86,6 +95,9 @@ class H2ProfileDataStorageTest {
         ProfileNote first = new ProfileNote(author, subjectA, "First", base, base);
         ProfileNote second = new ProfileNote(author, subjectB, "Second", base, base.plusSeconds(10));
 
+        saveUser(author);
+        saveUser(subjectA);
+        saveUser(subjectB);
         notes.save(first);
         notes.save(second);
 
@@ -101,6 +113,8 @@ class H2ProfileDataStorageTest {
         UUID viewer = UUID.randomUUID();
         UUID viewed = UUID.randomUUID();
 
+        saveUser(viewer);
+        saveUser(viewed);
         views.recordView(viewer, viewed);
         views.recordView(viewer, viewed);
 
@@ -114,6 +128,7 @@ class H2ProfileDataStorageTest {
     void ignoresSelfViews() {
         UUID userId = UUID.randomUUID();
 
+        saveUser(userId);
         views.recordView(userId, userId);
 
         assertEquals(0, views.getViewCount(userId));
@@ -122,16 +137,25 @@ class H2ProfileDataStorageTest {
 
     @Test
     @DisplayName("Returns recent viewers ordered by latest view")
-    void returnsRecentViewers() {
+    void returnsRecentViewers() throws InterruptedException {
         UUID viewed = UUID.randomUUID();
         UUID viewerA = UUID.randomUUID();
         UUID viewerB = UUID.randomUUID();
 
+        saveUser(viewed);
+        saveUser(viewerA);
+        saveUser(viewerB);
         views.recordView(viewerA, viewed);
+        TimeUnit.MILLISECONDS.sleep(5);
         views.recordView(viewerB, viewed);
+        TimeUnit.MILLISECONDS.sleep(5);
         views.recordView(viewerA, viewed);
 
         List<UUID> recent = views.getRecentViewers(viewed, 10);
         assertEquals(List.of(viewerA, viewerB), recent);
+    }
+
+    private void saveUser(UUID userId) {
+        userStorage.save(new User(userId, "User_" + userId));
     }
 }

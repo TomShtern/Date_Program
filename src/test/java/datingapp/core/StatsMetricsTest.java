@@ -242,8 +242,8 @@ class StatsMetricsTest {
                 assertNotNull(ex);
             }
 
-            private UserStats createInvalidRatioStats() {
-                return new UserStats(
+            private void createInvalidRatioStats() {
+                new UserStats(
                         UUID.randomUUID(),
                         UUID.randomUUID(),
                         Instant.now(),
@@ -267,8 +267,8 @@ class StatsMetricsTest {
                         0.5);
             }
 
-            private UserStats createNegativeRatioStats() {
-                return new UserStats(
+            private void createNegativeRatioStats() {
+                new UserStats(
                         UUID.randomUUID(),
                         UUID.randomUUID(),
                         Instant.now(),

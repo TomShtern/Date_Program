@@ -15,6 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDate;
+import java.time.Period;
 import java.util.EnumSet;
 import java.util.List;
 import javafx.application.Platform;
@@ -43,11 +45,13 @@ public class ProfileViewModel {
     private final StringProperty location = new SimpleStringProperty("");
     private final StringProperty interests = new SimpleStringProperty("");
     private final StringProperty completionStatus = new SimpleStringProperty("0%");
+    private final StringProperty completionDetails = new SimpleStringProperty("");
     private final StringProperty primaryPhotoUrl = new SimpleStringProperty("");
 
     // Gender and preferences
     private final ObjectProperty<Gender> gender = new SimpleObjectProperty<>(null);
     private final ObservableSet<Gender> interestedInGenders = FXCollections.observableSet(EnumSet.noneOf(Gender.class));
+    private final ObjectProperty<LocalDate> birthDate = new SimpleObjectProperty<>(null);
 
     // Lifestyle properties
     private final ObjectProperty<Integer> height = new SimpleObjectProperty<>(null);
@@ -98,6 +102,7 @@ public class ProfileViewModel {
         if (user.getInterestedIn() != null && !user.getInterestedIn().isEmpty()) {
             interestedInGenders.addAll(user.getInterestedIn());
         }
+        birthDate.set(user.getBirthDate());
 
         // Format interests as comma-separated list
         if (user.getInterests() != null && !user.getInterests().isEmpty()) {
@@ -177,9 +182,11 @@ public class ProfileViewModel {
         try {
             CompletionResult result = ProfileCompletionService.calculate(user);
             completionStatus.set(result.getDisplayString());
+            completionDetails.set(buildCompletionDetails(result));
         } catch (Exception e) {
             logger.error("Failed to calculate profile completion", e);
             completionStatus.set("--");
+            completionDetails.set("Unable to calculate completion");
         }
     }
 
@@ -230,6 +237,7 @@ public class ProfileViewModel {
         if (!interestedInGenders.isEmpty()) {
             user.setInterestedIn(EnumSet.copyOf(interestedInGenders));
         }
+        applyBirthDate(user);
 
         // Parse location if provided
         String loc = location.get();
@@ -337,6 +345,10 @@ public class ProfileViewModel {
         return completionStatus;
     }
 
+    public StringProperty completionDetailsProperty() {
+        return completionDetails;
+    }
+
     /**
      * Returns the primary photo URL property for binding.
      *
@@ -354,6 +366,10 @@ public class ProfileViewModel {
 
     public ObservableSet<Gender> getInterestedInGenders() {
         return interestedInGenders;
+    }
+
+    public ObjectProperty<LocalDate> birthDateProperty() {
+        return birthDate;
     }
 
     /**
@@ -541,5 +557,47 @@ public class ProfileViewModel {
         String fileName = file.getName();
         int lastDot = fileName.lastIndexOf('.');
         return lastDot > 0 ? fileName.substring(lastDot) : ".jpg";
+    }
+
+    private String buildCompletionDetails(CompletionResult result) {
+        if (result == null) {
+            return "";
+        }
+        List<String> missing = result.breakdown().stream()
+                .flatMap(breakdown -> breakdown.missingItems().stream())
+                .map(String::trim)
+                .filter(item -> !item.isEmpty())
+                .distinct()
+                .toList();
+        if (missing.isEmpty()) {
+            return "All sections complete";
+        }
+        int limit = 3;
+        String summary =
+                missing.stream().limit(limit).reduce((a, b) -> a + ", " + b).orElse("");
+        if (missing.size() > limit) {
+            summary += " +" + (missing.size() - limit) + " more";
+        }
+        return "Missing: " + summary;
+    }
+
+    private void applyBirthDate(User user) {
+        LocalDate selected = birthDate.get();
+        if (selected == null) {
+            return;
+        }
+        LocalDate today = LocalDate.now();
+        if (selected.isAfter(today)) {
+            logger.warn("Birth date cannot be in the future: {}", selected);
+            UiServices.Toast.getInstance().showWarning("Birth date cannot be in the future");
+            return;
+        }
+        int age = Period.between(selected, today).getYears();
+        if (age < 18 || age > 120) {
+            logger.warn("Birth date outside allowed age range: {}", selected);
+            UiServices.Toast.getInstance().showWarning("Birth date must be for ages 18-120");
+            return;
+        }
+        user.setBirthDate(selected);
     }
 }

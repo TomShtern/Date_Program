@@ -257,12 +257,35 @@ public class CandidateFinder {
 
     /** Checks if the candidate is within the seeker's max distance preference. */
     private boolean isWithinDistance(User seeker, User candidate) {
+        if (!hasLocation(seeker) || !hasLocation(candidate)) {
+            logger.debug(
+                    "Skipping distance filter for {} ({}): missing location (seekerLatLon={}, candidateLatLon={}).",
+                    candidate.getName(),
+                    candidate.getId(),
+                    formatLatLon(seeker),
+                    formatLatLon(candidate));
+            return true;
+        }
         double distance = distanceTo(seeker, candidate);
         return distance <= seeker.getMaxDistanceKm();
     }
 
     /** Calculates distance between two users. */
     private double distanceTo(User a, User b) {
+        if (!hasLocation(a) || !hasLocation(b)) {
+            return Double.MAX_VALUE;
+        }
         return GeoUtils.distanceKm(a.getLat(), a.getLon(), b.getLat(), b.getLon());
+    }
+
+    private boolean hasLocation(User user) {
+        return user.getLat() != 0.0 || user.getLon() != 0.0;
+    }
+
+    private String formatLatLon(User user) {
+        if (!hasLocation(user)) {
+            return "missing";
+        }
+        return String.format("%.4f, %.4f", user.getLat(), user.getLon());
     }
 }

@@ -85,9 +85,8 @@ public final class UiAnimations {
      *
      * @param node The node to apply the glow effect to
      * @param glowColor The color of the glow
-     * @return The Timeline so it can be stopped when navigating away
      */
-    public static Timeline addPulsingGlow(Node node, Color glowColor) {
+    public static void addPulsingGlow(Node node, Color glowColor) {
         DropShadow glow = new DropShadow();
         glow.setColor(glowColor);
         glow.setRadius(15);
@@ -110,8 +109,6 @@ public final class UiAnimations {
 
         node.setEffect(glow);
         timeline.play();
-
-        return timeline;
     }
 
     /**

@@ -107,6 +107,7 @@ public final class ProfileCompletionService {
             basicFilled.add("Birth date");
         } else {
             basicMissing.add("Birth date");
+            nextSteps.add("Add your birth date to complete your profile");
         }
 
         // Gender (5 pts)

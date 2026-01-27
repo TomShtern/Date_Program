@@ -189,7 +189,12 @@ public class ViewModelFactory {
 
     public MatchesViewModel getMatchesViewModel() {
         if (matchesViewModel == null) {
-            matchesViewModel = new MatchesViewModel(services.getMatchStorage(), services.getUserStorage());
+            matchesViewModel = new MatchesViewModel(
+                    services.getMatchStorage(),
+                    services.getUserStorage(),
+                    services.getLikeStorage(),
+                    services.getBlockStorage(),
+                    services.getMatchingService());
         }
         return matchesViewModel;
     }

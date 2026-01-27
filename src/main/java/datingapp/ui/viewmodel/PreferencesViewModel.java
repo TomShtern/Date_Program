@@ -88,7 +88,13 @@ public class PreferencesViewModel {
 
         // Map UI GenderPreference to Set<Gender>
         Set<User.Gender> newInterests = EnumSet.noneOf(User.Gender.class);
-        switch (interestedIn.get()) {
+        GenderPreference preference = interestedIn.get();
+        if (preference == null) {
+            logger.warn("Interested-in preference missing; defaulting to EVERYONE");
+            preference = GenderPreference.EVERYONE;
+        }
+
+        switch (preference) {
             case MEN -> newInterests.add(User.Gender.MALE);
             case WOMEN -> newInterests.add(User.Gender.FEMALE);
             case EVERYONE -> {
@@ -97,6 +103,7 @@ public class PreferencesViewModel {
                 newInterests.add(User.Gender.OTHER);
             }
             default -> {
+                logger.warn("Unknown interested-in preference: {}", preference);
                 newInterests.add(User.Gender.MALE);
                 newInterests.add(User.Gender.FEMALE);
                 newInterests.add(User.Gender.OTHER);

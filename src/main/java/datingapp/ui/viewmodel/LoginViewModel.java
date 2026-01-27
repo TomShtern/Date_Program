@@ -15,6 +15,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,8 +28,10 @@ public class LoginViewModel {
 
     private final User.Storage userStorage;
     private final ObservableList<User> users = FXCollections.observableArrayList();
+    private final FilteredList<User> filteredUsers;
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loginDisabled = new SimpleBooleanProperty(true);
+    private final StringProperty filterText = new SimpleStringProperty("");
 
     // For account creation dialog
     private final StringProperty newUserName = new SimpleStringProperty("");
@@ -39,6 +42,8 @@ public class LoginViewModel {
 
     public LoginViewModel(User.Storage userStorage) {
         this.userStorage = userStorage;
+        this.filteredUsers = new FilteredList<>(users, user -> true);
+        this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
         loadUsers();
     }
 
@@ -65,6 +70,10 @@ public class LoginViewModel {
         return users;
     }
 
+    public FilteredList<User> getFilteredUsers() {
+        return filteredUsers;
+    }
+
     public BooleanProperty loadingProperty() {
         return loading;
     }
@@ -83,6 +92,10 @@ public class LoginViewModel {
 
     public StringProperty errorMessageProperty() {
         return errorMessage;
+    }
+
+    public StringProperty filterTextProperty() {
+        return filterText;
     }
 
     public void setSelectedUser(User user) {
@@ -281,5 +294,32 @@ public class LoginViewModel {
         newUserName.set("");
         newUserAge.set("");
         errorMessage.set("");
+    }
+
+    private void applyFilter(String text) {
+        String normalized = text == null ? "" : text.trim().toLowerCase();
+        if (normalized.isBlank()) {
+            filteredUsers.setPredicate(user -> true);
+            return;
+        }
+
+        filteredUsers.setPredicate(user -> {
+            if (user == null) {
+                return false;
+            }
+
+            String name = user.getName() == null ? "" : user.getName().toLowerCase();
+            String state = user.getState() == null ? "" : user.getState().name().toLowerCase();
+            String ageText = user.getAge() > 0 ? String.valueOf(user.getAge()) : "";
+            String verifiedTag = Boolean.TRUE.equals(user.isVerified()) ? "verified" : "";
+
+            String searchable = String.join(" ", name, state, ageText, verifiedTag);
+            for (String term : normalized.split("\\s+")) {
+                if (!searchable.contains(term)) {
+                    return false;
+                }
+            }
+            return true;
+        });
     }
 }

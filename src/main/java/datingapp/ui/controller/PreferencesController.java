@@ -133,11 +133,18 @@ public class PreferencesController extends BaseController implements Initializab
     private void setupGenderControls() {
         // Set initial toggle
         GenderPreference pref = viewModel.interestedInProperty().get();
-        switch (pref) {
-            case MEN -> menToggle.setSelected(true);
-            case WOMEN -> womenToggle.setSelected(true);
-            case EVERYONE -> everyoneToggle.setSelected(true);
-            default -> everyoneToggle.setSelected(true);
+        if (pref == null) {
+            everyoneToggle.setSelected(true);
+        } else {
+            switch (pref) {
+                case MEN -> menToggle.setSelected(true);
+                case WOMEN -> womenToggle.setSelected(true);
+                case EVERYONE -> everyoneToggle.setSelected(true);
+                default -> {
+                    logger.warn("Unknown gender preference: {}", pref);
+                    everyoneToggle.setSelected(true);
+                }
+            }
         }
 
         // Add listener using Subscription API
@@ -186,20 +193,31 @@ public class PreferencesController extends BaseController implements Initializab
             return;
         }
 
-        String darkTheme = getClass().getResource("/css/theme.css").toExternalForm();
-        String lightTheme = getClass().getResource("/css/light-theme.css").toExternalForm();
+        String darkTheme = resolveStylesheet("/css/theme.css");
+        String lightTheme = resolveStylesheet("/css/light-theme.css");
 
         if (isDarkMode) {
             // Remove light theme, ensure dark theme is present
-            scene.getStylesheets().remove(lightTheme);
-            if (!scene.getStylesheets().contains(darkTheme)) {
+            if (lightTheme != null) {
+                scene.getStylesheets().remove(lightTheme);
+            }
+            if (darkTheme != null && !scene.getStylesheets().contains(darkTheme)) {
                 scene.getStylesheets().add(darkTheme);
             }
         } else {
             // Add light theme on top (it overrides dark theme)
-            if (!scene.getStylesheets().contains(lightTheme)) {
+            if (lightTheme != null && !scene.getStylesheets().contains(lightTheme)) {
                 scene.getStylesheets().add(lightTheme);
             }
         }
+    }
+
+    private String resolveStylesheet(String path) {
+        URL resource = getClass().getResource(path);
+        if (resource == null) {
+            logger.warn("Stylesheet not found: {}", path);
+            return null;
+        }
+        return resource.toExternalForm();
     }
 }

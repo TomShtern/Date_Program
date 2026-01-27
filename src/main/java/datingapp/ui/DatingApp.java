@@ -66,7 +66,7 @@ public class DatingApp extends Application {
 
         // Default size
         primaryStage.setWidth(1000);
-        primaryStage.setHeight(700);
+        primaryStage.setHeight(760);
 
         // Show the initial screen (Login)
         navigationService.navigateTo(NavigationService.ViewType.LOGIN);

@@ -3,8 +3,11 @@ package datingapp.ui.controller;
 import datingapp.ui.NavigationService;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.MatchesViewModel;
+import datingapp.ui.viewmodel.MatchesViewModel.LikeCardData;
 import datingapp.ui.viewmodel.MatchesViewModel.MatchCardData;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.ResourceBundle;
 import javafx.animation.FadeTransition;
@@ -24,9 +27,12 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -46,11 +52,44 @@ public class MatchesController extends BaseController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(MatchesController.class);
     private static final Random RANDOM = new Random();
 
+    private enum Section {
+        MATCHES,
+        LIKES_YOU,
+        YOU_LIKED
+    }
+
     @FXML
     private BorderPane rootPane;
 
     @FXML
+    private FontIcon headerIcon;
+
+    @FXML
+    private Label headerTitleLabel;
+
+    @FXML
     private Label matchCountLabel;
+
+    @FXML
+    private ToggleGroup sectionGroup;
+
+    @FXML
+    private ToggleButton matchesTabButton;
+
+    @FXML
+    private ToggleButton likesYouTabButton;
+
+    @FXML
+    private ToggleButton youLikedTabButton;
+
+    @FXML
+    private Label matchesTabCountLabel;
+
+    @FXML
+    private Label likesYouTabCountLabel;
+
+    @FXML
+    private Label youLikedTabCountLabel;
 
     @FXML
     private FlowPane matchesFlow;
@@ -58,8 +97,25 @@ public class MatchesController extends BaseController implements Initializable {
     @FXML
     private VBox emptyStateContainer;
 
+    @FXML
+    private FontIcon emptyStateIcon;
+
+    @FXML
+    private Label emptyTitleLabel;
+
+    @FXML
+    private Label emptySubtitleLabel;
+
+    @FXML
+    private Label emptyHintLabel;
+
+    @FXML
+    private Button emptyActionButton;
+
     private final MatchesViewModel viewModel;
     private Pane particleLayer;
+    private boolean emptyStateAnimated;
+    private Section currentSection = Section.MATCHES;
 
     public MatchesController(MatchesViewModel viewModel) {
         this.viewModel = viewModel;
@@ -70,14 +126,16 @@ public class MatchesController extends BaseController implements Initializable {
         // Initialize viewmodel
         viewModel.initialize();
 
-        // Bind match count - just the number since badge has heart icon
-        matchCountLabel.textProperty().bind(viewModel.matchCountProperty().asString());
+        setupSectionTabs();
+        bindTabCounts();
 
-        // Populate match cards
-        populateMatchCards();
+        // Populate initial cards
+        populateCards();
 
         // Listen for changes using Subscription API
-        addSubscription(viewModel.getMatches().subscribe(this::onMatchesChanged));
+        addSubscription(viewModel.getMatches().subscribe(this::onSectionDataChanged));
+        addSubscription(viewModel.getLikesReceived().subscribe(this::onSectionDataChanged));
+        addSubscription(viewModel.getLikesSent().subscribe(this::onSectionDataChanged));
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
@@ -86,9 +144,53 @@ public class MatchesController extends BaseController implements Initializable {
         startEmptyStateAnimations();
     }
 
-    /** Called when the matches list changes. */
-    private void onMatchesChanged() {
-        populateMatchCards();
+    private void onSectionDataChanged() {
+        populateCards();
+    }
+
+    private void setupSectionTabs() {
+        matchesTabButton.setUserData(Section.MATCHES);
+        likesYouTabButton.setUserData(Section.LIKES_YOU);
+        youLikedTabButton.setUserData(Section.YOU_LIKED);
+
+        ToggleButton defaultTab = resolveDefaultTab();
+        defaultTab.setSelected(true);
+        currentSection = (Section) defaultTab.getUserData();
+        updateHeader();
+
+        sectionGroup.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+            if (newToggle == null) {
+                matchesTabButton.setSelected(true);
+                return;
+            }
+
+            currentSection = (Section) newToggle.getUserData();
+            updateHeader();
+            populateCards();
+        });
+    }
+
+    private ToggleButton resolveDefaultTab() {
+        if (!viewModel.getLikesReceived().isEmpty()) {
+            return likesYouTabButton;
+        }
+        if (!viewModel.getMatches().isEmpty()) {
+            return matchesTabButton;
+        }
+        if (!viewModel.getLikesSent().isEmpty()) {
+            return youLikedTabButton;
+        }
+        return matchesTabButton;
+    }
+
+    private void bindTabCounts() {
+        matchesTabCountLabel.textProperty().bind(viewModel.matchCountProperty().asString());
+        likesYouTabCountLabel
+                .textProperty()
+                .bind(viewModel.likesReceivedCountProperty().asString());
+        youLikedTabCountLabel
+                .textProperty()
+                .bind(viewModel.likesSentCountProperty().asString());
     }
 
     /** Start animations for the empty state. */
@@ -101,14 +203,22 @@ public class MatchesController extends BaseController implements Initializable {
         createFloatingHeartsBackground();
 
         // Animate the main icon with pronounced effects
-        animateMainIcon();
+        if (!emptyStateAnimated) {
+            animateMainIcon();
+            animateEmptyStateContainer();
+            emptyStateAnimated = true;
+        }
 
-        // Animate the container
-        animateEmptyStateContainer();
+        // Ensure icon stays updated for the active section
+        updateEmptyStateContent();
     }
 
     /** Create floating heart particles in the background. */
     private void createFloatingHeartsBackground() {
+        if (particleLayer != null) {
+            return;
+        }
+
         // Create a particle layer as overlay
         particleLayer = new Pane();
         particleLayer.setMouseTransparent(true);
@@ -191,46 +301,37 @@ public class MatchesController extends BaseController implements Initializable {
 
     /** Animate the main broken heart icon. */
     private void animateMainIcon() {
-        // Find the icon - it's a StackPane child in emptyStateContainer
-        for (Node child : emptyStateContainer.getChildren()) {
-            if (child instanceof StackPane iconWrapper) {
-                for (Node icon : iconWrapper.getChildren()) {
-                    if (icon instanceof FontIcon fontIcon) {
-                        // Apply pulsing glow
-                        DropShadow glow = new DropShadow();
-                        glow.setColor(Color.web("#f43f5e"));
-                        glow.setRadius(30);
-                        glow.setSpread(0.4);
-                        fontIcon.setEffect(glow);
+        // Apply pulsing glow
+        DropShadow glow = new DropShadow();
+        glow.setColor(Color.web("#f43f5e"));
+        glow.setRadius(30);
+        glow.setSpread(0.4);
+        emptyStateIcon.setEffect(glow);
 
-                        // Pulse the glow
-                        Timeline glowPulse = new Timeline(
-                                new KeyFrame(
-                                        Duration.ZERO,
-                                        new KeyValue(glow.radiusProperty(), 20),
-                                        new KeyValue(glow.spreadProperty(), 0.2)),
-                                new KeyFrame(
-                                        Duration.millis(1200),
-                                        new KeyValue(glow.radiusProperty(), 45, Interpolator.EASE_BOTH),
-                                        new KeyValue(glow.spreadProperty(), 0.6, Interpolator.EASE_BOTH)));
-                        glowPulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
-                        glowPulse.setAutoReverse(true);
-                        glowPulse.play();
+        // Pulse the glow
+        Timeline glowPulse = new Timeline(
+                new KeyFrame(
+                        Duration.ZERO,
+                        new KeyValue(glow.radiusProperty(), 20),
+                        new KeyValue(glow.spreadProperty(), 0.2)),
+                new KeyFrame(
+                        Duration.millis(1200),
+                        new KeyValue(glow.radiusProperty(), 45, Interpolator.EASE_BOTH),
+                        new KeyValue(glow.spreadProperty(), 0.6, Interpolator.EASE_BOTH)));
+        glowPulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        glowPulse.setAutoReverse(true);
+        glowPulse.play();
 
-                        // Scale breathing
-                        ScaleTransition breathe = new ScaleTransition(Duration.millis(1800), fontIcon);
-                        breathe.setFromX(1.0);
-                        breathe.setFromY(1.0);
-                        breathe.setToX(1.15);
-                        breathe.setToY(1.15);
-                        breathe.setCycleCount(javafx.animation.Animation.INDEFINITE);
-                        breathe.setAutoReverse(true);
-                        breathe.setInterpolator(Interpolator.EASE_BOTH);
-                        breathe.play();
-                    }
-                }
-            }
-        }
+        // Scale breathing
+        ScaleTransition breathe = new ScaleTransition(Duration.millis(1800), emptyStateIcon);
+        breathe.setFromX(1.0);
+        breathe.setFromY(1.0);
+        breathe.setToX(1.15);
+        breathe.setToY(1.15);
+        breathe.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        breathe.setAutoReverse(true);
+        breathe.setInterpolator(Interpolator.EASE_BOTH);
+        breathe.play();
     }
 
     /** Animate the empty state container with gentle float. */
@@ -244,11 +345,11 @@ public class MatchesController extends BaseController implements Initializable {
         floatAnim.play();
     }
 
-    /** Populate the FlowPane with match cards. */
-    private void populateMatchCards() {
+    /** Populate the FlowPane with the current section's cards. */
+    private void populateCards() {
         matchesFlow.getChildren().clear();
 
-        if (viewModel.getMatches().isEmpty()) {
+        if (getActiveCardsCount() == 0) {
             matchesFlow.setVisible(false);
             matchesFlow.setManaged(false);
             emptyStateContainer.setVisible(true);
@@ -261,13 +362,51 @@ public class MatchesController extends BaseController implements Initializable {
             emptyStateContainer.setManaged(false);
 
             int index = 0;
-            for (MatchCardData match : viewModel.getMatches()) {
-                VBox card = createMatchCard(match);
+            for (VBox card : buildCardsForSection()) {
                 matchesFlow.getChildren().add(card);
                 animateCardEntrance(card, index * 120);
                 index++;
             }
         }
+
+        updateHeader();
+    }
+
+    private int getActiveCardsCount() {
+        return switch (currentSection) {
+            case MATCHES -> viewModel.getMatches().size();
+            case LIKES_YOU -> viewModel.getLikesReceived().size();
+            case YOU_LIKED -> viewModel.getLikesSent().size();
+            default -> viewModel.getMatches().size();
+        };
+    }
+
+    private List<VBox> buildCardsForSection() {
+        List<VBox> cards = new ArrayList<>();
+        switch (currentSection) {
+            case MATCHES -> {
+                for (MatchCardData match : viewModel.getMatches()) {
+                    cards.add(createMatchCard(match));
+                }
+            }
+            case LIKES_YOU -> {
+                for (LikeCardData like : viewModel.getLikesReceived()) {
+                    cards.add(createIncomingLikeCard(like));
+                }
+            }
+            case YOU_LIKED -> {
+                for (LikeCardData like : viewModel.getLikesSent()) {
+                    cards.add(createOutgoingLikeCard(like));
+                }
+            }
+            default -> {
+                logger.warn("Unknown section {}, defaulting to matches list", currentSection);
+                for (MatchCardData match : viewModel.getMatches()) {
+                    cards.add(createMatchCard(match));
+                }
+            }
+        }
+        return cards;
     }
 
     /** Animate a card entering with fade + slide up. */
@@ -384,6 +523,86 @@ public class MatchesController extends BaseController implements Initializable {
         return card;
     }
 
+    private VBox createIncomingLikeCard(LikeCardData like) {
+        VBox card = buildLikeCardBase(like);
+        card.getStyleClass().add("like-card-received");
+
+        Button likeBackBtn = new Button("Like back");
+        likeBackBtn.getStyleClass().add("like-action-primary");
+        FontIcon likeIcon = new FontIcon("mdi2h-heart");
+        likeIcon.setIconSize(14);
+        likeIcon.setIconColor(Color.WHITE);
+        likeBackBtn.setGraphic(likeIcon);
+        likeBackBtn.setOnAction(e -> viewModel.likeBack(like));
+
+        Button passBtn = new Button("Pass");
+        passBtn.getStyleClass().add("like-action-secondary");
+        FontIcon passIcon = new FontIcon("mdi2c-close");
+        passIcon.setIconSize(14);
+        passIcon.setIconColor(Color.web("#e2e8f0"));
+        passBtn.setGraphic(passIcon);
+        passBtn.setOnAction(e -> viewModel.passOn(like));
+
+        HBox actions = new HBox(10, likeBackBtn, passBtn);
+        actions.getStyleClass().add("like-action-row");
+
+        card.getChildren().add(actions);
+        return card;
+    }
+
+    private VBox createOutgoingLikeCard(LikeCardData like) {
+        VBox card = buildLikeCardBase(like);
+        card.getStyleClass().add("like-card-sent");
+
+        Label status = new Label("Pending reply");
+        status.getStyleClass().add("like-status-label");
+
+        Button withdrawBtn = new Button("Withdraw");
+        withdrawBtn.getStyleClass().add("like-action-secondary");
+        FontIcon withdrawIcon = new FontIcon("mdi2a-arrow-left");
+        withdrawIcon.setIconSize(14);
+        withdrawIcon.setIconColor(Color.web("#e2e8f0"));
+        withdrawBtn.setGraphic(withdrawIcon);
+        withdrawBtn.setOnAction(e -> viewModel.withdrawLike(like));
+
+        HBox actions = new HBox(10, status, withdrawBtn);
+        actions.getStyleClass().add("like-action-row");
+
+        card.getChildren().add(actions);
+        return card;
+    }
+
+    private VBox buildLikeCardBase(LikeCardData like) {
+        VBox card = new VBox(12);
+        card.getStyleClass().add("like-card");
+        card.setAlignment(Pos.CENTER);
+        card.setPrefWidth(240);
+        card.setPadding(new Insets(24, 20, 24, 20));
+
+        StackPane avatarContainer = new StackPane();
+        avatarContainer.getStyleClass().add("like-avatar-container");
+        FontIcon avatarIcon = new FontIcon("mdi2a-account");
+        avatarIcon.setIconSize(34);
+        avatarIcon.setIconColor(Color.web("#e2e8f0"));
+        avatarIcon.getStyleClass().add("like-avatar-icon");
+        avatarContainer.getChildren().add(avatarIcon);
+
+        Label nameLabel = new Label(like.userName() + ", " + like.age());
+        nameLabel.getStyleClass().add("like-user-name");
+
+        Label bioLabel = new Label(like.bioSnippet());
+        bioLabel.getStyleClass().add("like-bio-label");
+        bioLabel.setWrapText(true);
+        bioLabel.setMaxWidth(200);
+
+        String prefix = currentSection == Section.LIKES_YOU ? "Liked you " : "You liked ";
+        Label timeLabel = new Label(prefix + like.likedTimeAgo());
+        timeLabel.getStyleClass().add("like-time-label");
+
+        card.getChildren().addAll(avatarContainer, nameLabel, bioLabel, timeLabel);
+        return card;
+    }
+
     /** Navigate to chat with selected match. */
     private void handleStartChat(MatchCardData match) {
         logger.info("Starting chat with match: {}", match.userName());
@@ -401,5 +620,81 @@ public class MatchesController extends BaseController implements Initializable {
     private void handleBrowse() {
         logger.info("Navigating to browse/matching screen");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
+    }
+
+    private void updateHeader() {
+        switch (currentSection) {
+            case MATCHES -> {
+                headerTitleLabel.setText("Your Matches");
+                headerIcon.setIconLiteral("mdi2h-heart-multiple");
+                headerIcon.setIconColor(Color.web("#f43f5e"));
+                matchCountLabel.setText(
+                        String.valueOf(viewModel.matchCountProperty().get()));
+            }
+            case LIKES_YOU -> {
+                headerTitleLabel.setText("Likes You");
+                headerIcon.setIconLiteral("mdi2h-heart-flash");
+                headerIcon.setIconColor(Color.web("#f59e0b"));
+                matchCountLabel.setText(
+                        String.valueOf(viewModel.likesReceivedCountProperty().get()));
+            }
+            case YOU_LIKED -> {
+                headerTitleLabel.setText("You Liked");
+                headerIcon.setIconLiteral("mdi2h-heart");
+                headerIcon.setIconColor(Color.web("#a855f7"));
+                matchCountLabel.setText(
+                        String.valueOf(viewModel.likesSentCountProperty().get()));
+            }
+            default -> {
+                logger.warn("Unknown section {}, defaulting to matches header", currentSection);
+                headerTitleLabel.setText("Your Matches");
+                headerIcon.setIconLiteral("mdi2h-heart-multiple");
+                headerIcon.setIconColor(Color.web("#f43f5e"));
+                matchCountLabel.setText(
+                        String.valueOf(viewModel.matchCountProperty().get()));
+            }
+        }
+
+        updateEmptyStateContent();
+    }
+
+    private void updateEmptyStateContent() {
+        switch (currentSection) {
+            case MATCHES -> {
+                emptyStateIcon.setIconLiteral("mdi2h-heart-broken");
+                emptyStateIcon.setIconColor(Color.web("#64748b"));
+                emptyTitleLabel.setText("No matches yet");
+                emptySubtitleLabel.setText(
+                        "Your perfect match is waiting! Start browsing to connect with amazing people.");
+                emptyHintLabel.setText("Like someone and if they like you back, it's a match!");
+                emptyActionButton.setText("Start Browsing");
+            }
+            case LIKES_YOU -> {
+                emptyStateIcon.setIconLiteral("mdi2h-heart-flash");
+                emptyStateIcon.setIconColor(Color.web("#f59e0b"));
+                emptyTitleLabel.setText("No new likes yet");
+                emptySubtitleLabel.setText("When someone likes you, they will appear here.");
+                emptyHintLabel.setText("Keep browsing to boost your profile visibility.");
+                emptyActionButton.setText("Browse More");
+            }
+            case YOU_LIKED -> {
+                emptyStateIcon.setIconLiteral("mdi2h-heart");
+                emptyStateIcon.setIconColor(Color.web("#a855f7"));
+                emptyTitleLabel.setText("No likes sent yet");
+                emptySubtitleLabel.setText("Swipe right on people you like to start conversations.");
+                emptyHintLabel.setText("Sent likes stay here until they respond.");
+                emptyActionButton.setText("Start Browsing");
+            }
+            default -> {
+                logger.warn("Unknown section {}, defaulting to matches empty state", currentSection);
+                emptyStateIcon.setIconLiteral("mdi2h-heart-broken");
+                emptyStateIcon.setIconColor(Color.web("#64748b"));
+                emptyTitleLabel.setText("No matches yet");
+                emptySubtitleLabel.setText(
+                        "Your perfect match is waiting! Start browsing to connect with amazing people.");
+                emptyHintLabel.setText("Like someone and if they like you back, it's a match!");
+                emptyActionButton.setText("Start Browsing");
+            }
+        }
     }
 }

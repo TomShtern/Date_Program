@@ -217,7 +217,7 @@ public class MatchingHandler {
             checkAndDisplayNewAchievements(currentUser);
         }
 
-        undoService.recordSwipe(currentUser.getId(), like, match);
+        undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
         promptUndo(candidate.getName(), currentUser);
 
         return true;
@@ -583,7 +583,7 @@ public class MatchingHandler {
             logger.info("👋 Passed on daily pick.\n");
         }
 
-        undoService.recordSwipe(currentUser.getId(), like, match);
+        undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
         promptUndo(candidate.getName(), currentUser);
     }
 

@@ -75,8 +75,8 @@ public final class Messaging {
         private Instant userBReadAt;
         private Instant archivedAt;
         private Match.ArchiveReason archiveReason;
-        private boolean visibleToUserA = true;
-        private boolean visibleToUserB = true;
+        private boolean visibleToUserA;
+        private boolean visibleToUserB;
 
         @SuppressWarnings("java:S107")
         public Conversation(
@@ -146,7 +146,7 @@ public final class Messaging {
                 userB = a;
             }
 
-            String id = userA.toString() + "_" + userB.toString();
+            String id = userA + "_" + userB;
             Instant now = Instant.now();
             return new Conversation(id, userA, userB, now, null, null, null, null, null, true, true);
         }

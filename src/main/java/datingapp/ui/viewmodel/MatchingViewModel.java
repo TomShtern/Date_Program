@@ -214,7 +214,7 @@ public class MatchingViewModel {
         Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
 
         Optional<Match> match = matchingService.recordLike(like);
-        undoService.recordSwipe(currentUser.getId(), like, match);
+        undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
 
         lastSwipedCandidate = candidate;
 

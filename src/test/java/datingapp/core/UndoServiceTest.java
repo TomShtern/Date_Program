@@ -65,7 +65,7 @@ class UndoServiceTest {
         void recordsSwipeEnablesUndo() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
 
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             assertTrue(undoService.canUndo(userId));
         }
@@ -76,7 +76,7 @@ class UndoServiceTest {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             Match match = Match.create(userId, targetUserId);
 
-            undoService.recordSwipe(userId, like, Optional.of(match));
+            undoService.recordSwipe(userId, like, match);
 
             assertTrue(undoService.canUndo(userId));
         }
@@ -89,8 +89,8 @@ class UndoServiceTest {
             likeStorage.save(firstLike);
             likeStorage.save(secondLike);
 
-            undoService.recordSwipe(userId, firstLike, Optional.empty());
-            undoService.recordSwipe(userId, secondLike, Optional.empty());
+            undoService.recordSwipe(userId, firstLike, null);
+            undoService.recordSwipe(userId, secondLike, null);
 
             // Undo should affect the second like, not the first
             UndoResult result = undoService.undo(userId);
@@ -114,7 +114,7 @@ class UndoServiceTest {
         @DisplayName("Returns true within window")
         void returnsTrueWithinWindow() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             assertTrue(undoService.canUndo(userId));
         }
@@ -123,7 +123,7 @@ class UndoServiceTest {
         @DisplayName("Returns false for different user")
         void returnsFalseForDifferentUser() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             assertFalse(undoService.canUndo(UUID.randomUUID()));
         }
@@ -137,7 +137,7 @@ class UndoServiceTest {
             UndoService shortUndoService = new UndoService(likeStorage, matchStorage, shortConfig, shortClock);
 
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            shortUndoService.recordSwipe(userId, like, Optional.empty());
+            shortUndoService.recordSwipe(userId, like, null);
 
             // Advance time beyond expiry
             shortClock.advanceSeconds(2);
@@ -160,7 +160,7 @@ class UndoServiceTest {
         @DisplayName("Returns positive value within window")
         void returnsPositiveWithinWindow() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             int remaining = undoService.getSecondsRemaining(userId);
 
@@ -172,7 +172,7 @@ class UndoServiceTest {
         @DisplayName("Returns approximate configured window")
         void returnsApproximateWindow() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             int remaining = undoService.getSecondsRemaining(userId);
 
@@ -200,7 +200,7 @@ class UndoServiceTest {
         void succeedsWithinWindow() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             likeStorage.save(like);
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             UndoResult result = undoService.undo(userId);
 
@@ -214,7 +214,7 @@ class UndoServiceTest {
         void deletesLikeFromStorage() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             likeStorage.save(like);
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             undoService.undo(userId);
 
@@ -228,7 +228,7 @@ class UndoServiceTest {
             Match match = Match.create(userId, targetUserId);
             likeStorage.save(like);
             matchStorage.save(match);
-            undoService.recordSwipe(userId, like, Optional.of(match));
+            undoService.recordSwipe(userId, like, match);
 
             UndoResult result = undoService.undo(userId);
 
@@ -242,7 +242,7 @@ class UndoServiceTest {
         void reportsNoMatchDeleted() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             likeStorage.save(like);
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             UndoResult result = undoService.undo(userId);
 
@@ -255,7 +255,7 @@ class UndoServiceTest {
         void clearsStateAfterSuccess() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             likeStorage.save(like);
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             undoService.undo(userId);
 
@@ -267,7 +267,7 @@ class UndoServiceTest {
         void cannotUndoTwice() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             likeStorage.save(like);
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             UndoResult first = undoService.undo(userId);
             UndoResult second = undoService.undo(userId);
@@ -286,7 +286,7 @@ class UndoServiceTest {
 
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             likeStorage.save(like);
-            shortUndoService.recordSwipe(userId, like, Optional.empty());
+            shortUndoService.recordSwipe(userId, like, null);
 
             // Advance time beyond expiry
             shortClock.advanceSeconds(2);
@@ -306,7 +306,7 @@ class UndoServiceTest {
         @DisplayName("Clears existing undo state")
         void clearsExistingState() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            undoService.recordSwipe(userId, like, Optional.empty());
+            undoService.recordSwipe(userId, like, null);
 
             undoService.clearUndo(userId);
 

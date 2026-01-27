@@ -68,20 +68,14 @@ class RelationshipTransitionServiceTest {
     @DisplayName("Cannot request friend zone if no active match")
     void requestFriendZoneNoMatch() {
         UUID charlieId = UUID.randomUUID();
-        UUID fromUserId = aliceId;
-        UUID targetUserId = charlieId;
-        // noinspection ThrowableNotThrown - intentionally ignoring return value
-        assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(fromUserId, targetUserId));
+        assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(aliceId, charlieId));
     }
 
     @Test
     @DisplayName("Cannot request twice if one is pending")
     void requestFriendZoneDuplicate() {
         service.requestFriendZone(aliceId, bobId);
-        UUID fromUserId = aliceId;
-        UUID targetUserId = bobId;
-        // noinspection ThrowableNotThrown - intentionally ignoring return value
-        assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(fromUserId, targetUserId));
+        assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(aliceId, bobId));
     }
 
     @Test
@@ -105,7 +99,6 @@ class RelationshipTransitionServiceTest {
         FriendRequest request = service.requestFriendZone(aliceId, bobId);
         UUID requestId = request.id();
         UUID responderId = aliceId;
-        // noinspection ThrowableNotThrown - intentionally ignoring return value
         assertThrows(TransitionValidationException.class, () -> service.acceptFriendZone(requestId, responderId));
     }
 

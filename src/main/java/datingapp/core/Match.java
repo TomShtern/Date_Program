@@ -103,7 +103,7 @@ public class Match {
             userB = a;
         }
 
-        String id = userA.toString() + "_" + userB.toString();
+        String id = userA + "_" + userB;
         return new Match(id, userA, userB, Instant.now(), State.ACTIVE, null, null, null);
     }
 
@@ -128,7 +128,7 @@ public class Match {
 
     /** Unmatch - ends the match. Can be done from ACTIVE or FRIENDS state. */
     public void unmatch(UUID userId) {
-        if (!isValidTransition(this.state, State.UNMATCHED)) {
+        if (isInvalidTransition(this.state, State.UNMATCHED)) {
             throw new IllegalStateException("Cannot unmatch from " + this.state + " state");
         }
         if (!involves(userId)) {
@@ -154,7 +154,7 @@ public class Match {
 
     /** transitionToFriends - transitions the match to FRIENDS state. */
     public void transitionToFriends(UUID initiatorId) {
-        if (!isValidTransition(this.state, State.FRIENDS)) {
+        if (isInvalidTransition(this.state, State.FRIENDS)) {
             throw new IllegalStateException("Cannot transition to FRIENDS from " + state);
         }
         this.state = State.FRIENDS;
@@ -164,7 +164,7 @@ public class Match {
 
     /** gracefulExit - ends the match kindly. */
     public void gracefulExit(UUID initiatorId) {
-        if (!isValidTransition(this.state, State.GRACEFUL_EXIT)) {
+        if (isInvalidTransition(this.state, State.GRACEFUL_EXIT)) {
             throw new IllegalStateException("Cannot transition to GRACEFUL_EXIT from " + state);
         }
         this.state = State.GRACEFUL_EXIT;
@@ -173,14 +173,14 @@ public class Match {
         this.endReason = ArchiveReason.GRACEFUL_EXIT;
     }
 
-    private boolean isValidTransition(State from, State to) {
+    private boolean isInvalidTransition(State from, State to) {
         return switch (from) {
             case ACTIVE ->
-                Set.of(State.FRIENDS, State.UNMATCHED, State.GRACEFUL_EXIT, State.BLOCKED)
+                !Set.of(State.FRIENDS, State.UNMATCHED, State.GRACEFUL_EXIT, State.BLOCKED)
                         .contains(to);
             case FRIENDS ->
-                Set.of(State.UNMATCHED, State.GRACEFUL_EXIT, State.BLOCKED).contains(to);
-            case UNMATCHED, GRACEFUL_EXIT, BLOCKED -> false;
+                !Set.of(State.UNMATCHED, State.GRACEFUL_EXIT, State.BLOCKED).contains(to);
+            case UNMATCHED, GRACEFUL_EXIT, BLOCKED -> true;
         };
     }
 

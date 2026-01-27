@@ -425,8 +425,7 @@ class MatchQualityServiceTest {
         @DisplayName("Asymmetric sizes uses smallest denominator")
         void asymmetricSizes_usesSmallestDenominator() {
             Set<Interest> setA = EnumSet.of(Interest.HIKING, Interest.COFFEE);
-            Set<Interest> setB =
-                    EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL, Interest.MOVIES, Interest.COFFEE);
+            Set<Interest> setB = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL, Interest.MOVIES);
 
             InterestMatcher.MatchResult result = InterestMatcher.compare(setA, setB);
 

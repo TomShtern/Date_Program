@@ -54,20 +54,7 @@ class H2StorageIntegrationTest {
 
     @BeforeAll
     static void setUpOnce() {
-
-        DatabaseManager.setJdbcUrl("jdbc:h2:./data/dating_test");
-        DatabaseManager.resetInstance();
-        dbManager = DatabaseManager.getInstance();
-
-        // Clean database by dropping all tables to ensure fresh schema
-        try (var conn = dbManager.getConnection();
-                var stmt = conn.createStatement()) {
-            stmt.execute("DROP ALL OBJECTS");
-        } catch (Exception _) {
-            // Ignore errors if tables don't exist yet
-        }
-
-        // Reset instance again so schema gets recreated on next getConnection()
+        DatabaseManager.setJdbcUrl("jdbc:h2:mem:storage-integration-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
         DatabaseManager.resetInstance();
         dbManager = DatabaseManager.getInstance();
 
@@ -280,30 +267,36 @@ class H2StorageIntegrationTest {
         @Test
         @DisplayName("Block is bidirectional in isBlocked")
         void blockIsBidirectional() {
-            UUID blocker = UUID.randomUUID();
-            UUID blocked = UUID.randomUUID();
+            User blockerUser = createCompleteUser("Blocker_" + UUID.randomUUID());
+            User blockedUser = createCompleteUser("Blocked_" + UUID.randomUUID());
+            userStorage.save(blockerUser);
+            userStorage.save(blockedUser);
 
-            Block block = Block.create(blocker, blocked);
+            Block block = Block.create(blockerUser.getId(), blockedUser.getId());
             blockStorage.save(block);
 
-            assertTrue(blockStorage.isBlocked(blocker, blocked), "A→B should be blocked");
-            assertTrue(blockStorage.isBlocked(blocked, blocker), "B→A should also show blocked");
+            assertTrue(blockStorage.isBlocked(blockerUser.getId(), blockedUser.getId()), "A→B should be blocked");
+            assertTrue(
+                    blockStorage.isBlocked(blockedUser.getId(), blockerUser.getId()), "B→A should also show blocked");
         }
 
         @Test
         @DisplayName("getBlockedUserIds returns both directions")
         void getBlockedUserIdsReturnsBothDirections() {
-            UUID user = UUID.randomUUID();
-            UUID blockedByUser = UUID.randomUUID();
-            UUID userBlockedBy = UUID.randomUUID();
+            User user = createCompleteUser("BlockUser_" + UUID.randomUUID());
+            User blockedByUser = createCompleteUser("BlockedByUser_" + UUID.randomUUID());
+            User userBlockedBy = createCompleteUser("UserBlockedBy_" + UUID.randomUUID());
+            userStorage.save(user);
+            userStorage.save(blockedByUser);
+            userStorage.save(userBlockedBy);
 
-            blockStorage.save(Block.create(user, blockedByUser)); // user blocked someone
-            blockStorage.save(Block.create(userBlockedBy, user)); // someone blocked user
+            blockStorage.save(Block.create(user.getId(), blockedByUser.getId())); // user blocked someone
+            blockStorage.save(Block.create(userBlockedBy.getId(), user.getId())); // someone blocked user
 
-            var blockedIds = blockStorage.getBlockedUserIds(user);
+            var blockedIds = blockStorage.getBlockedUserIds(user.getId());
 
-            assertTrue(blockedIds.contains(blockedByUser), "Should include users blocked by this user");
-            assertTrue(blockedIds.contains(userBlockedBy), "Should include users who blocked this user");
+            assertTrue(blockedIds.contains(blockedByUser.getId()), "Should include users blocked by this user");
+            assertTrue(blockedIds.contains(userBlockedBy.getId()), "Should include users who blocked this user");
         }
     }
 
@@ -493,8 +486,10 @@ class H2StorageIntegrationTest {
             conversationStorage.save(conversation);
 
             // Send 5 messages
+            Instant base = Instant.parse("2026-01-01T00:00:00Z");
             for (int i = 1; i <= 5; i++) {
-                messageStorage.save(Message.create(conversation.getId(), userA.getId(), "Message " + i));
+                messageStorage.save(new Message(
+                        UUID.randomUUID(), conversation.getId(), userA.getId(), "Message " + i, base.plusSeconds(i)));
             }
 
             List<Message> firstPage = messageStorage.getMessages(conversation.getId(), 2, 0);
@@ -582,9 +577,12 @@ class H2StorageIntegrationTest {
             Conversation conversation = Conversation.create(userA.getId(), userB.getId());
             conversationStorage.save(conversation);
 
-            messageStorage.save(Message.create(conversation.getId(), userA.getId(), "First"));
-            messageStorage.save(Message.create(conversation.getId(), userB.getId(), "Second"));
-            messageStorage.save(Message.create(conversation.getId(), userA.getId(), "Third"));
+            Instant base = Instant.parse("2026-01-01T00:00:00Z");
+            messageStorage.save(new Message(UUID.randomUUID(), conversation.getId(), userA.getId(), "First", base));
+            messageStorage.save(
+                    new Message(UUID.randomUUID(), conversation.getId(), userB.getId(), "Second", base.plusSeconds(1)));
+            messageStorage.save(
+                    new Message(UUID.randomUUID(), conversation.getId(), userA.getId(), "Third", base.plusSeconds(2)));
 
             Optional<Message> latest = messageStorage.getLatestMessage(conversation.getId());
 

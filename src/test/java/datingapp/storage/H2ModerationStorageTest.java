@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Report;
 import java.util.Set;
@@ -20,6 +21,7 @@ class H2ModerationStorageTest {
 
     private H2ModerationStorage.Blocks blocks;
     private H2ModerationStorage.Reports reports;
+    private H2UserStorage userStorage;
 
     @BeforeEach
     void setUp() {
@@ -29,6 +31,7 @@ class H2ModerationStorageTest {
 
         blocks = new H2ModerationStorage.Blocks(dbManager);
         reports = new H2ModerationStorage.Reports(dbManager);
+        userStorage = new H2UserStorage(dbManager);
     }
 
     @Test
@@ -37,6 +40,8 @@ class H2ModerationStorageTest {
         UUID blocker = UUID.randomUUID();
         UUID blocked = UUID.randomUUID();
 
+        saveUser(blocker);
+        saveUser(blocked);
         Block block = Block.create(blocker, blocked);
         blocks.save(block);
 
@@ -52,6 +57,8 @@ class H2ModerationStorageTest {
         UUID blocker = UUID.randomUUID();
         UUID blocked = UUID.randomUUID();
 
+        saveUser(blocker);
+        saveUser(blocked);
         Block block = Block.create(blocker, blocked);
         blocks.save(block);
 
@@ -84,6 +91,10 @@ class H2ModerationStorageTest {
         UUID blocked2 = UUID.randomUUID();
         UUID blocked3 = UUID.randomUUID();
 
+        saveUser(blocker);
+        saveUser(blocked1);
+        saveUser(blocked2);
+        saveUser(blocked3);
         Block block1 = Block.create(blocker, blocked1);
         Block block2 = Block.create(blocker, blocked2);
         Block block3 = Block.create(blocker, blocked3);
@@ -106,6 +117,8 @@ class H2ModerationStorageTest {
         UUID reporter = UUID.randomUUID();
         UUID reported = UUID.randomUUID();
 
+        saveUser(reporter);
+        saveUser(reported);
         Report report = Report.create(reporter, reported, Report.Reason.SPAM, "spam");
         reports.save(report);
 
@@ -113,5 +126,9 @@ class H2ModerationStorageTest {
         assertEquals(1, reports.countReportsBy(reporter));
         assertEquals(1, reports.countReportsAgainst(reported));
         assertFalse(reports.hasReported(reporter, UUID.randomUUID()));
+    }
+
+    private void saveUser(UUID userId) {
+        userStorage.save(new User(userId, "User_" + userId));
     }
 }

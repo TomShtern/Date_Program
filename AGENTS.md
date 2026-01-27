@@ -155,7 +155,11 @@ private static class InMemoryUserStorage implements UserStorage {
 Keep in-memory storages aligned with core interfaces when new methods are added.
 18|2026-01-27 04:30:52|agent:codex|scope:tests-sync|Align in-memory test storages with updated interfaces|src/test/java/datingapp/cli/ProfileCreateSelectTest.java;src/test/java/datingapp/core/DailyPickServiceTest.java;src/test/java/datingapp/core/LikerBrowserServiceTest.java;src/test/java/datingapp/core/StatsServiceTest.java;src/test/java/datingapp/core/testutil/TestStorages.java;src/test/java/datingapp/core/MessagingServiceTest.java;AGENTS.md
 
+<!--ARCHIVE:20:agent:codex:storage-tests-->
 **Integration Tests:** Use real H2 database with unique test DB name per test class.
+<!--/ARCHIVE-->
+**Integration Tests:** Use real H2 database with unique test DB name per test class. Create required user rows before inserting records with user_id foreign keys.
+20|2026-01-27 19:17:26|agent:codex|scope:storage-tests|Harden SQL helpers and fix FK-aware storage tests|src/main/java/datingapp/storage/AbstractH2Storage.java;src/main/java/datingapp/storage/DatabaseManager.java;src/main/java/datingapp/core/UndoService.java;src/main/java/datingapp/cli/MatchingHandler.java;src/main/java/datingapp/ui/viewmodel/MatchingViewModel.java;src/main/java/datingapp/core/Match.java;src/main/java/datingapp/core/Messaging.java;src/main/java/datingapp/core/User.java;src/main/java/datingapp/core/Dealbreakers.java;src/main/java/datingapp/ui/controller/BaseController.java;src/main/java/datingapp/ui/util/UiAnimations.java;src/test/java/datingapp/core/StatsMetricsTest.java;src/main/java/datingapp/storage/H2UserStorage.java;src/test/java/datingapp/core/RelationshipTransitionServiceTest.java;src/main/java/datingapp/core/MatchQualityService.java;src/test/java/datingapp/core/UndoServiceTest.java;src/main/java/datingapp/ui/controller/PreferencesController.java;src/main/java/datingapp/ui/viewmodel/PreferencesViewModel.java;src/main/java/datingapp/ui/controller/LoginController.java;src/main/java/datingapp/ui/controller/MatchingController.java;src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/util/UiServices.java;src/test/java/datingapp/ui/JavaFxCssValidationTest.java;src/test/java/datingapp/core/MatchQualityServiceTest.java;src/test/java/datingapp/core/SwipeSessionTest.java;src/test/java/datingapp/storage/H2ProfileDataStorageTest.java;src/test/java/datingapp/storage/H2DailyPickViewStorageTest.java;src/test/java/datingapp/storage/H2MetricsStorageTest.java;src/test/java/datingapp/storage/H2ModerationStorageTest.java;src/test/java/datingapp/storage/H2StorageIntegrationTest.java;AGENTS.md
 
 **Coverage:** Minimum 80% line coverage (enforced by JaCoCo)
 
@@ -167,8 +171,13 @@ Keep in-memory storages aligned with core interfaces when new methods are added.
 
 **Defensive Copying:** Always return defensive copies of collections: `return EnumSet.copyOf(interests);`
 
+<!--ARCHIVE:23:agent:codex:core-candidate-distance-->
 **Daily Pick Exclusions:** Use `LikeStorage.getLikedOrPassedUserIds()` to avoid resurfacing users already liked or passed.
 16|2026-01-27 04:06:40|agent:codex|scope:core-daily|Use liked-or-passed set for daily pick exclusions|src/main/java/datingapp/core/DailyService.java;AGENTS.md
+<!--/ARCHIVE-->
+**Daily Pick Exclusions:** Use `LikeStorage.getLikedOrPassedUserIds()` to avoid resurfacing users already liked or passed.
+**Candidate Distance:** If either user lacks a location (0,0), skip distance filtering and sort unknown distances last to avoid empty queues.
+23|2026-01-27 20:16:10|agent:codex|scope:core-candidate-distance|Relax distance filtering when location is missing|src/main/java/datingapp/core/CandidateFinder.java;AGENTS.md
 
 **Touch Pattern:** Update `updatedAt` timestamp on entity changes:
 ```java
@@ -381,6 +390,7 @@ public void handleMenu() {
 - Log confirmation messages
 - Handle all NumberFormatExceptions gracefully
 <!--/ARCHIVE-->
+<!--ARCHIVE:19:agent:codex:ui-stylesheet-->
 - Use `CliConstants` for all display strings
 - Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
 - Always save to storage after user edits
@@ -388,6 +398,271 @@ public void handleMenu() {
 - Handle all NumberFormatExceptions gracefully
 - Load persisted profile photos into profile views and keep avatar bindings in sync
 17|2026-01-27 04:19:23|agent:codex|scope:ui-profile-photo|Sync profile photo UI with stored URLs|src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:21:agent:codex:ui-profile-completion-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+19|2026-01-27 18:14:38|agent:codex|scope:ui-stylesheet|Guard stylesheet lookups and clean up UI diagnostics|src/main/java/datingapp/ui/controller/LoginController.java;src/main/java/datingapp/ui/controller/MatchingController.java;src/main/java/datingapp/ui/controller/PreferencesController.java;src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/util/UiServices.java;src/main/java/datingapp/ui/viewmodel/PreferencesViewModel.java;src/test/java/datingapp/ui/JavaFxCssValidationTest.java;src/test/java/datingapp/core/MatchQualityServiceTest.java;src/test/java/datingapp/core/SwipeSessionTest.java;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:22:agent:codex:ui-profile-completion-details-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+21|2026-01-27 19:41:11|agent:codex|scope:ui-profile-completion|Add birth date editing to match completion scoring|src/main/resources/fxml/profile.fxml;src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java;src/main/java/datingapp/core/ProfileCompletionService.java;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:24:agent:codex:ui-preferences-age-label-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+22|2026-01-27 20:01:31|agent:codex|scope:ui-profile-completion-details|Show missing completion details in profile header|src/main/resources/fxml/profile.fxml;src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:25:agent:codex:ui-likes-sections-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+24|2026-01-27 20:16:52|agent:codex|scope:ui-preferences-age-label|Add explicit age range separator in discovery header|src/main/resources/fxml/preferences.fxml;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:26:agent:codex:ui-likes-checkstyle-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+25|2026-01-27 21:05:53|agent:codex|scope:ui-likes-sections|Add likes tabs and actions to matches screen|src/main/resources/fxml/matches.fxml;src/main/java/datingapp/ui/controller/MatchesController.java;src/main/java/datingapp/ui/viewmodel/MatchesViewModel.java;src/main/java/datingapp/ui/ViewModelFactory.java;src/main/resources/css/theme.css;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:27:agent:codex:ui-login-polish-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Include default branches in UI switches to satisfy Checkstyle
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+26|2026-01-27 21:09:00|agent:codex|scope:ui-likes-checkstyle|Add default switch branches for matches sections|src/main/java/datingapp/ui/controller/MatchesController.java;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:28:agent:codex:ui-login-cell-reset-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Include default branches in UI switches to satisfy Checkstyle
+- Polish login screen visuals and allow double-click login from user list
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+27|2026-01-27 21:19:03|agent:codex|scope:ui-login-polish|Polish login screen and add double-click login|src/main/resources/fxml/login.fxml;src/main/java/datingapp/ui/controller/LoginController.java;src/main/resources/css/theme.css;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:29:agent:codex:ui-login-ux-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Include default branches in UI switches to satisfy Checkstyle
+- Polish login screen visuals and allow double-click login from user list
+- Clear login list cell text on reuse to avoid stale content
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+28|2026-01-27 21:20:30|agent:codex|scope:ui-login-cell-reset|Reset login list cell text for reuse safety|src/main/java/datingapp/ui/controller/LoginController.java;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:30:agent:codex:ui-login-layout-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Include default branches in UI switches to satisfy Checkstyle
+- Polish login screen visuals and allow double-click login from user list
+- Clear login list cell text on reuse to avoid stale content
+- Add login search filtering, keyboard navigation, and dynamic empty-state hints
+- Show avatars, completion/last-active badges, and selection animation in login list
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+29|2026-01-27 21:35:44|agent:codex|scope:ui-login-ux|Enhance login search, badges, and keyboard navigation|src/main/resources/fxml/login.fxml;src/main/java/datingapp/ui/controller/LoginController.java;src/main/java/datingapp/ui/viewmodel/LoginViewModel.java;src/main/resources/css/theme.css;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:31:agent:codex:ui-login-avatar-fallback-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Include default branches in UI switches to satisfy Checkstyle
+- Polish login screen visuals and allow double-click login from user list
+- Clear login list cell text on reuse to avoid stale content
+- Add login search filtering, keyboard navigation, and dynamic empty-state hints
+- Show avatars, completion/last-active badges, and selection animation in login list
+- Tighten login layout spacing and width constraints for cleaner alignment
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+30|2026-01-27 21:46:43|agent:codex|scope:ui-login-layout|Adjust login spacing and widths for cleaner layout|src/main/resources/fxml/login.fxml;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:32:agent:codex:ui-login-scroll-height-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Include default branches in UI switches to satisfy Checkstyle
+- Polish login screen visuals and allow double-click login from user list
+- Clear login list cell text on reuse to avoid stale content
+- Add login search filtering, keyboard navigation, and dynamic empty-state hints
+- Show avatars, completion/last-active badges, and selection animation in login list
+- Tighten login layout spacing and width constraints for cleaner alignment
+- Skip placeholder avatar URLs when rendering login list images
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+31|2026-01-27 21:47:59|agent:codex|scope:ui-login-avatar-fallback|Ignore placeholder avatar URLs in login list|src/main/java/datingapp/ui/controller/LoginController.java;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:34:agent:codex:ui-login-scroll-space-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Include default branches in UI switches to satisfy Checkstyle
+- Polish login screen visuals and allow double-click login from user list
+- Clear login list cell text on reuse to avoid stale content
+- Add login search filtering, keyboard navigation, and dynamic empty-state hints
+- Show avatars, completion/last-active badges, and selection animation in login list
+- Tighten login layout spacing and width constraints for cleaner alignment
+- Skip placeholder avatar URLs when rendering login list images
+- Expand login list height for more visible rows
+- Increase login list height again for larger scroll area
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+33|2026-01-27 21:53:33|agent:codex|scope:ui-login-scroll-height-2|Increase login list height for larger scroll area|src/main/resources/fxml/login.fxml;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:35:agent:codex:ui-login-scroll-balance-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Include default branches in UI switches to satisfy Checkstyle
+- Polish login screen visuals and allow double-click login from user list
+- Clear login list cell text on reuse to avoid stale content
+- Add login search filtering, keyboard navigation, and dynamic empty-state hints
+- Show avatars, completion/last-active badges, and selection animation in login list
+- Tighten login layout spacing and width constraints for cleaner alignment
+- Skip placeholder avatar URLs when rendering login list images
+- Expand login list height for more visible rows
+- Increase login list height again for larger scroll area
+- Let the login card and account list expand by removing height caps and increasing default window height
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+34|2026-01-27 22:03:53|agent:codex|scope:ui-login-scroll-space|Expand login window and list area for more visible rows|src/main/resources/fxml/login.fxml;src/main/java/datingapp/ui/DatingApp.java;src/main/java/datingapp/ui/NavigationService.java;AGENTS.md
+<!--/ARCHIVE-->
+<!--ARCHIVE:36:agent:codex:ui-login-top-spacing-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Include default branches in UI switches to satisfy Checkstyle
+- Polish login screen visuals and allow double-click login from user list
+- Clear login list cell text on reuse to avoid stale content
+- Add login search filtering, keyboard navigation, and dynamic empty-state hints
+- Show avatars, completion/last-active badges, and selection animation in login list
+- Tighten login layout spacing and width constraints for cleaner alignment
+- Skip placeholder avatar URLs when rendering login list images
+- Expand login list height for more visible rows
+- Increase login list height again for larger scroll area
+- Let the login card and account list expand by removing height caps and increasing default window height
+- Rebalance login window and list height so actions remain visible without collapsing the list
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+35|2026-01-27 22:06:57|agent:codex|scope:ui-login-scroll-balance|Reduce login window height and list size to keep actions visible|src/main/resources/fxml/login.fxml;src/main/java/datingapp/ui/DatingApp.java;src/main/java/datingapp/ui/NavigationService.java;AGENTS.md
+<!--/ARCHIVE-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+- Expose birth date inputs in profile editors so completion scoring can reach 100%
+- Surface missing completion details in profile headers to guide users to 100%
+- Display age ranges with explicit separators to avoid concatenated labels
+- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+- Include default branches in UI switches to satisfy Checkstyle
+- Polish login screen visuals and allow double-click login from user list
+- Clear login list cell text on reuse to avoid stale content
+- Add login search filtering, keyboard navigation, and dynamic empty-state hints
+- Show avatars, completion/last-active badges, and selection animation in login list
+- Tighten login layout spacing and width constraints for cleaner alignment
+- Skip placeholder avatar URLs when rendering login list images
+- Expand login list height for more visible rows
+- Increase login list height again for larger scroll area
+- Let the login card and account list expand by removing height caps and increasing default window height
+- Rebalance login window and list height so actions remain visible without collapsing the list
+- Reduce top padding and header icon size to reclaim vertical space
+- Guard stylesheet resource lookups and log missing stylesheets before applying them
+36|2026-01-27 22:11:35|agent:codex|scope:ui-login-top-spacing|Trim login header padding to reduce top whitespace|src/main/resources/fxml/login.fxml;AGENTS.md
 
 ## Logging Standards
 
@@ -537,4 +812,22 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 16|2026-01-27 04:06:40|agent:codex|scope:core-daily|Use liked-or-passed set for daily pick exclusions|src/main/java/datingapp/core/DailyService.java;AGENTS.md
 17|2026-01-27 04:19:23|agent:codex|scope:ui-profile-photo|Sync profile photo UI with stored URLs|src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java;AGENTS.md
 18|2026-01-27 04:30:52|agent:codex|scope:tests-sync|Align in-memory test storages with updated interfaces|src/test/java/datingapp/cli/ProfileCreateSelectTest.java;src/test/java/datingapp/core/DailyPickServiceTest.java;src/test/java/datingapp/core/LikerBrowserServiceTest.java;src/test/java/datingapp/core/StatsServiceTest.java;src/test/java/datingapp/core/testutil/TestStorages.java;src/test/java/datingapp/core/MessagingServiceTest.java;AGENTS.md
+19|2026-01-27 18:14:38|agent:codex|scope:ui-stylesheet|Guard stylesheet lookups and clean up UI diagnostics|src/main/java/datingapp/ui/controller/LoginController.java;src/main/java/datingapp/ui/controller/MatchingController.java;src/main/java/datingapp/ui/controller/PreferencesController.java;src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/util/UiServices.java;src/main/java/datingapp/ui/viewmodel/PreferencesViewModel.java;src/test/java/datingapp/ui/JavaFxCssValidationTest.java;src/test/java/datingapp/core/MatchQualityServiceTest.java;src/test/java/datingapp/core/SwipeSessionTest.java;AGENTS.md
+20|2026-01-27 19:17:26|agent:codex|scope:storage-tests|Harden SQL helpers and fix FK-aware storage tests|src/main/java/datingapp/storage/AbstractH2Storage.java;src/main/java/datingapp/storage/DatabaseManager.java;src/main/java/datingapp/core/UndoService.java;src/main/java/datingapp/cli/MatchingHandler.java;src/main/java/datingapp/ui/viewmodel/MatchingViewModel.java;src/main/java/datingapp/core/Match.java;src/main/java/datingapp/core/Messaging.java;src/main/java/datingapp/core/User.java;src/main/java/datingapp/core/Dealbreakers.java;src/main/java/datingapp/ui/controller/BaseController.java;src/main/java/datingapp/ui/util/UiAnimations.java;src/test/java/datingapp/core/StatsMetricsTest.java;src/main/java/datingapp/storage/H2UserStorage.java;src/test/java/datingapp/core/RelationshipTransitionServiceTest.java;src/main/java/datingapp/core/MatchQualityService.java;src/test/java/datingapp/core/UndoServiceTest.java;src/main/java/datingapp/ui/controller/PreferencesController.java;src/main/java/datingapp/ui/viewmodel/PreferencesViewModel.java;src/main/java/datingapp/ui/controller/LoginController.java;src/main/java/datingapp/ui/controller/MatchingController.java;src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/util/UiServices.java;src/test/java/datingapp/ui/JavaFxCssValidationTest.java;src/test/java/datingapp/core/MatchQualityServiceTest.java;src/test/java/datingapp/core/SwipeSessionTest.java;src/test/java/datingapp/storage/H2ProfileDataStorageTest.java;src/test/java/datingapp/storage/H2DailyPickViewStorageTest.java;src/test/java/datingapp/storage/H2MetricsStorageTest.java;src/test/java/datingapp/storage/H2ModerationStorageTest.java;src/test/java/datingapp/storage/H2StorageIntegrationTest.java;AGENTS.md
+21|2026-01-27 19:41:11|agent:codex|scope:ui-profile-completion|Add birth date editing to match completion scoring|src/main/resources/fxml/profile.fxml;src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java;src/main/java/datingapp/core/ProfileCompletionService.java;AGENTS.md
+22|2026-01-27 20:01:31|agent:codex|scope:ui-profile-completion-details|Show missing completion details in profile header|src/main/resources/fxml/profile.fxml;src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java;AGENTS.md
+23|2026-01-27 20:16:10|agent:codex|scope:core-candidate-distance|Relax distance filtering when location is missing|src/main/java/datingapp/core/CandidateFinder.java;AGENTS.md
+24|2026-01-27 20:16:52|agent:codex|scope:ui-preferences-age-label|Add explicit age range separator in discovery header|src/main/resources/fxml/preferences.fxml;AGENTS.md
+25|2026-01-27 21:05:53|agent:codex|scope:ui-likes-sections|Add likes tabs and actions to matches screen|src/main/resources/fxml/matches.fxml;src/main/java/datingapp/ui/controller/MatchesController.java;src/main/java/datingapp/ui/viewmodel/MatchesViewModel.java;src/main/java/datingapp/ui/ViewModelFactory.java;src/main/resources/css/theme.css;AGENTS.md
+26|2026-01-27 21:09:00|agent:codex|scope:ui-likes-checkstyle|Add default switch branches for matches sections|src/main/java/datingapp/ui/controller/MatchesController.java;AGENTS.md
+27|2026-01-27 21:19:03|agent:codex|scope:ui-login-polish|Polish login screen and add double-click login|src/main/resources/fxml/login.fxml;src/main/java/datingapp/ui/controller/LoginController.java;src/main/resources/css/theme.css;AGENTS.md
+28|2026-01-27 21:20:30|agent:codex|scope:ui-login-cell-reset|Reset login list cell text for reuse safety|src/main/java/datingapp/ui/controller/LoginController.java;AGENTS.md
+29|2026-01-27 21:35:44|agent:codex|scope:ui-login-ux|Enhance login search, badges, and keyboard navigation|src/main/resources/fxml/login.fxml;src/main/java/datingapp/ui/controller/LoginController.java;src/main/java/datingapp/ui/viewmodel/LoginViewModel.java;src/main/resources/css/theme.css;AGENTS.md
+30|2026-01-27 21:46:43|agent:codex|scope:ui-login-layout|Adjust login spacing and widths for cleaner layout|src/main/resources/fxml/login.fxml;AGENTS.md
+31|2026-01-27 21:47:59|agent:codex|scope:ui-login-avatar-fallback|Ignore placeholder avatar URLs in login list|src/main/java/datingapp/ui/controller/LoginController.java;AGENTS.md
+32|2026-01-27 21:50:46|agent:codex|scope:ui-login-scroll-height|Increase login list height for better visibility|src/main/resources/fxml/login.fxml;AGENTS.md
+33|2026-01-27 21:53:33|agent:codex|scope:ui-login-scroll-height-2|Increase login list height for larger scroll area|src/main/resources/fxml/login.fxml;AGENTS.md
+34|2026-01-27 22:03:53|agent:codex|scope:ui-login-scroll-space|Expand login window and list area for more visible rows|src/main/resources/fxml/login.fxml;src/main/java/datingapp/ui/DatingApp.java;src/main/java/datingapp/ui/NavigationService.java;AGENTS.md
+35|2026-01-27 22:06:57|agent:codex|scope:ui-login-scroll-balance|Reduce login window height and list size to keep actions visible|src/main/resources/fxml/login.fxml;src/main/java/datingapp/ui/DatingApp.java;src/main/java/datingapp/ui/NavigationService.java;AGENTS.md
+36|2026-01-27 22:11:35|agent:codex|scope:ui-login-top-spacing|Trim login header padding to reduce top whitespace|src/main/resources/fxml/login.fxml;AGENTS.md
 ---AGENT-LOG-END---

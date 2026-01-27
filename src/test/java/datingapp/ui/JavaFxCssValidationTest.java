@@ -207,8 +207,8 @@ class JavaFxCssValidationTest {
         }
 
         if (braceCount != 0) {
-            errors.add(filename + " - Unbalanced braces (missing " + Math.abs(braceCount)
-                    + (braceCount > 0 ? " closing" : " opening") + " brace(s))");
+            int missingClosing = Math.abs(braceCount);
+            errors.add(filename + " - Unbalanced braces (missing " + missingClosing + " closing brace(s))");
         }
 
         // Check for empty rule blocks (selector {})

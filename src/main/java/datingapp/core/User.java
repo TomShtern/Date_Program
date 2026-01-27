@@ -102,7 +102,7 @@ public class User {
     private Dealbreakers dealbreakers;
 
     // Interests (Phase 1 feature)
-    private Set<Interest> interests = EnumSet.noneOf(Interest.class);
+    private Set<Interest> interests;
 
     // Verification fields
     private String email;

@@ -307,11 +307,8 @@ public record Dealbreakers(
             if (db.hasAgeDealbreaker()) {
                 int seekerAge = seeker.getAge();
                 int candidateAge = candidate.getAge();
-                if (seekerAge > 0 && candidateAge > 0) {
-                    int ageDiff = Math.abs(seekerAge - candidateAge);
-                    if (ageDiff > db.maxAgeDifference()) {
-                        return false;
-                    }
+                if (seekerAge > 0 && candidateAge > 0 && Math.abs(seekerAge - candidateAge) > db.maxAgeDifference()) {
+                    return false;
                 }
             }
 

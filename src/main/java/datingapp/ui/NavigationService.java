@@ -96,7 +96,7 @@ public class NavigationService {
         this.primaryStage = stage;
         this.rootLayout = new BorderPane();
 
-        Scene scene = new Scene(rootLayout, 900, 700);
+        Scene scene = new Scene(rootLayout, 900, 760);
         // Load CSS theme
         String css =
                 Objects.requireNonNull(getClass().getResource("/css/theme.css")).toExternalForm();

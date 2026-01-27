@@ -342,9 +342,10 @@ public class MatchingController extends BaseController implements Initializable 
         dialog.setTitle("It's a Match!");
 
         // Apply theme
-        dialog.getDialogPane()
-                .getStylesheets()
-                .add(getClass().getResource("/css/theme.css").toExternalForm());
+        String themeStylesheet = resolveStylesheet("/css/theme.css");
+        if (themeStylesheet != null) {
+            dialog.getDialogPane().getStylesheets().add(themeStylesheet);
+        }
         dialog.getDialogPane().getStyleClass().add("dialog-pane");
 
         // Create content
@@ -437,5 +438,14 @@ public class MatchingController extends BaseController implements Initializable 
     private void handleImproveProfile() {
         logger.info("User clicked Improve Profile - navigating to Profile");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE);
+    }
+
+    private String resolveStylesheet(String path) {
+        URL resource = getClass().getResource(path);
+        if (resource == null) {
+            logger.warn("Stylesheet not found: {}", path);
+            return null;
+        }
+        return resource.toExternalForm();
     }
 }

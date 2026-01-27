@@ -4,6 +4,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Objects;
+import java.util.regex.Pattern;
 
 /** Manages H2 database connections and schema initialization. */
 public class DatabaseManager {
@@ -11,6 +13,7 @@ public class DatabaseManager {
     private static String jdbcUrl = "jdbc:h2:./data/dating";
     private static final String DEFAULT_DEV_PASSWORD = "dev";
     private static final String USER = "sa";
+    private static final Pattern SQL_IDENTIFIER = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
 
     // Password is determined at connection time based on JDBC URL
     // This allows tests to set a different URL before password is resolved
@@ -499,122 +502,84 @@ public class DatabaseManager {
      * Silently skips tables that don't exist yet (they'll be created with FKs by their storage classes).
      */
     private void addMissingForeignKeys(Statement stmt) throws SQLException {
-        // Helper to safely add FK constraints - ignores if table doesn't exist
-        java.util.function.Consumer<String> safeAddFK = sql -> {
-            try {
-                stmt.execute(sql);
-            } catch (SQLException e) {
-                // Table doesn't exist yet - that's fine, it will be created with FKs by storage class
-                if (!e.getMessage().contains("not found")) {
-                    throw new RuntimeException(e);
-                }
-            }
-        };
-
         // daily_pick_views - add FK to users
-        safeAddFK.accept("""
-                ALTER TABLE daily_pick_views
-                ADD CONSTRAINT IF NOT EXISTS fk_daily_pick_views_user
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
+        addForeignKeyIfPresent(stmt, "daily_pick_views", "fk_daily_pick_views_user", "user_id", "users", "id");
 
         // user_achievements - add FK to users
-        safeAddFK.accept("""
-                ALTER TABLE user_achievements
-                ADD CONSTRAINT IF NOT EXISTS fk_user_achievements_user
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
+        addForeignKeyIfPresent(stmt, "user_achievements", "fk_user_achievements_user", "user_id", "users", "id");
 
         // friend_requests - add FKs (table may not exist yet)
-        safeAddFK.accept("""
-                ALTER TABLE friend_requests
-                ADD CONSTRAINT IF NOT EXISTS fk_friend_requests_from
-                FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
-        safeAddFK.accept("""
-                ALTER TABLE friend_requests
-                ADD CONSTRAINT IF NOT EXISTS fk_friend_requests_to
-                FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
+        addForeignKeyIfPresent(stmt, "friend_requests", "fk_friend_requests_from", "from_user_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "friend_requests", "fk_friend_requests_to", "to_user_id", "users", "id");
 
         // notifications - add FK to users
-        safeAddFK.accept("""
-                ALTER TABLE notifications
-                ADD CONSTRAINT IF NOT EXISTS fk_notifications_user
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
+        addForeignKeyIfPresent(stmt, "notifications", "fk_notifications_user", "user_id", "users", "id");
 
         // blocks - add FKs
-        safeAddFK.accept("""
-                ALTER TABLE blocks
-                ADD CONSTRAINT IF NOT EXISTS fk_blocks_blocker
-                FOREIGN KEY (blocker_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
-        safeAddFK.accept("""
-                ALTER TABLE blocks
-                ADD CONSTRAINT IF NOT EXISTS fk_blocks_blocked
-                FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
+        addForeignKeyIfPresent(stmt, "blocks", "fk_blocks_blocker", "blocker_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "blocks", "fk_blocks_blocked", "blocked_id", "users", "id");
 
         // reports - add FKs
-        safeAddFK.accept("""
-                ALTER TABLE reports
-                ADD CONSTRAINT IF NOT EXISTS fk_reports_reporter
-                FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
-        safeAddFK.accept("""
-                ALTER TABLE reports
-                ADD CONSTRAINT IF NOT EXISTS fk_reports_reported
-                FOREIGN KEY (reported_user_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
+        addForeignKeyIfPresent(stmt, "reports", "fk_reports_reporter", "reporter_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "reports", "fk_reports_reported", "reported_user_id", "users", "id");
 
         // conversations - add FKs
-        safeAddFK.accept("""
-                ALTER TABLE conversations
-                ADD CONSTRAINT IF NOT EXISTS fk_conversations_user_a
-                FOREIGN KEY (user_a_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
-        safeAddFK.accept("""
-                ALTER TABLE conversations
-                ADD CONSTRAINT IF NOT EXISTS fk_conversations_user_b
-                FOREIGN KEY (user_b_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
+        addForeignKeyIfPresent(stmt, "conversations", "fk_conversations_user_a", "user_a_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "conversations", "fk_conversations_user_b", "user_b_id", "users", "id");
 
         // messages - add FKs
-        safeAddFK.accept("""
-                ALTER TABLE messages
-                ADD CONSTRAINT IF NOT EXISTS fk_messages_sender
-                FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
-        safeAddFK.accept("""
-                ALTER TABLE messages
-                ADD CONSTRAINT IF NOT EXISTS fk_messages_conversation
-                FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
-                """);
+        addForeignKeyIfPresent(stmt, "messages", "fk_messages_sender", "sender_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "messages", "fk_messages_conversation", "conversation_id", "conversations", "id");
 
         // profile_notes - add FKs
-        safeAddFK.accept("""
-                ALTER TABLE profile_notes
-                ADD CONSTRAINT IF NOT EXISTS fk_profile_notes_author
-                FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
-        safeAddFK.accept("""
-                ALTER TABLE profile_notes
-                ADD CONSTRAINT IF NOT EXISTS fk_profile_notes_subject
-                FOREIGN KEY (subject_user_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
+        addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_author", "author_user_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_subject", "subject_user_id", "users", "id");
 
         // profile_views - add FKs
-        safeAddFK.accept("""
-                ALTER TABLE profile_views
-                ADD CONSTRAINT IF NOT EXISTS fk_profile_views_viewer
-                FOREIGN KEY (viewer_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
-        safeAddFK.accept("""
-                ALTER TABLE profile_views
-                ADD CONSTRAINT IF NOT EXISTS fk_profile_views_viewed
-                FOREIGN KEY (viewed_user_id) REFERENCES users(id) ON DELETE CASCADE
-                """);
+        addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewer", "viewer_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewed", "viewed_user_id", "users", "id");
+    }
+
+    private void addForeignKeyIfPresent(
+            Statement stmt,
+            String table,
+            String constraint,
+            String column,
+            String referenceTable,
+            String referenceColumn)
+            throws SQLException {
+        String sql = "ALTER TABLE "
+                + requireIdentifier(table, "table")
+                + " ADD CONSTRAINT IF NOT EXISTS "
+                + requireIdentifier(constraint, "constraint")
+                + " FOREIGN KEY ("
+                + requireIdentifier(column, "column")
+                + ") REFERENCES "
+                + requireIdentifier(referenceTable, "reference table")
+                + "("
+                + requireIdentifier(referenceColumn, "reference column")
+                + ") ON DELETE CASCADE";
+
+        try {
+            stmt.execute(sql);
+        } catch (SQLException e) {
+            if (!isMissingTable(e)) {
+                throw e;
+            }
+        }
+    }
+
+    private static boolean isMissingTable(SQLException e) {
+        String message = e.getMessage();
+        return message != null && message.contains("not found");
+    }
+
+    private static String requireIdentifier(String value, String label) {
+        Objects.requireNonNull(value, label + " cannot be null");
+        if (!SQL_IDENTIFIER.matcher(value).matches()) {
+            throw new IllegalArgumentException("Invalid SQL " + label + ": " + value);
+        }
+        return value;
     }
 
     /**

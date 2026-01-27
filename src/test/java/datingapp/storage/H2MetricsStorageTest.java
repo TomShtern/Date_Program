@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Achievement;
 import datingapp.core.Stats.PlatformStats;
+import datingapp.core.User;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +24,7 @@ class H2MetricsStorageTest {
     private H2MetricsStorage.Achievements achievements;
     private H2MetricsStorage.PlatformStatistics platformStats;
     private H2MetricsStorage.DailyPicks dailyPicks;
+    private H2UserStorage userStorage;
 
     @BeforeEach
     void setUp() {
@@ -33,6 +35,7 @@ class H2MetricsStorageTest {
         achievements = new H2MetricsStorage.Achievements(dbManager);
         platformStats = new H2MetricsStorage.PlatformStatistics(dbManager);
         dailyPicks = new H2MetricsStorage.DailyPicks(dbManager);
+        userStorage = new H2UserStorage(dbManager);
     }
 
     @Test
@@ -42,6 +45,7 @@ class H2MetricsStorageTest {
         Achievement.UserAchievement achievement =
                 new Achievement.UserAchievement(UUID.randomUUID(), userId, Achievement.FIRST_SPARK, Instant.now());
 
+        saveUser(userId);
         achievements.save(achievement);
 
         assertTrue(achievements.hasAchievement(userId, Achievement.FIRST_SPARK));
@@ -70,9 +74,14 @@ class H2MetricsStorageTest {
         UUID userId = UUID.randomUUID();
         java.time.LocalDate today = java.time.LocalDate.now();
 
+        saveUser(userId);
         dailyPicks.markViewed(userId, today);
 
         assertTrue(dailyPicks.hasViewed(userId, today));
         assertFalse(dailyPicks.hasViewed(userId, today.plusDays(1)));
+    }
+
+    private void saveUser(UUID userId) {
+        userStorage.save(new User(userId, "User_" + userId));
     }
 }

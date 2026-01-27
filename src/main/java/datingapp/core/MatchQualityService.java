@@ -57,7 +57,6 @@ public class MatchQualityService {
             // === Aggregates ===
             String paceSyncLevel, // e.g., "Perfect Sync", "Good Sync", etc.
             int compatibilityScore, // 0-100
-            @SuppressWarnings("MismatchedQueryAndUpdateOfCollection") // False positive
             List<String> highlights // Human-readable highlights
             ) {
         public MatchQuality {

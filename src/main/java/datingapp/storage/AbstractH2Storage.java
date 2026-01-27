@@ -7,13 +7,18 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * Base class for all H2 storage implementations.
  * Provides shared infrastructure: schema management, nullable handling, error wrapping.
  */
 public abstract class AbstractH2Storage {
+
+    private static final Pattern SQL_IDENTIFIER = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
+    private static final Pattern COLUMN_DEFINITION = Pattern.compile("[A-Za-z0-9_(),\\s'\\-]+");
 
     /**
      * Unchecked exception for storage-related errors. Wraps SQLException and other storage exceptions.
@@ -55,16 +60,20 @@ public abstract class AbstractH2Storage {
      * Safe to call multiple times (idempotent).
      */
     protected void addColumnIfNotExists(String tableName, String columnName, String columnDefinition) {
+        String safeTable = requireIdentifier(tableName, "table");
+        String safeColumn = requireIdentifier(columnName, "column");
+        String safeDefinition = requireColumnDefinition(columnDefinition);
+
         String checkSql = """
             SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_NAME = ? AND COLUMN_NAME = ?
             """;
-        String alterSql = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition;
+        String alterSql = "ALTER TABLE " + safeTable + " ADD COLUMN " + safeColumn + " " + safeDefinition;
 
         try (Connection conn = dbManager.getConnection();
                 PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
-            checkStmt.setString(1, tableName.toUpperCase());
-            checkStmt.setString(2, columnName.toUpperCase());
+            checkStmt.setString(1, safeTable.toUpperCase(Locale.ROOT));
+            checkStmt.setString(2, safeColumn.toUpperCase(Locale.ROOT));
             try (ResultSet rs = checkStmt.executeQuery()) {
                 if (rs.next() && rs.getInt(1) == 0) {
                     try (PreparedStatement alterStmt = conn.prepareStatement(alterSql)) {
@@ -75,6 +84,30 @@ public abstract class AbstractH2Storage {
         } catch (SQLException e) {
             throw new StorageException("Failed to add column " + columnName + " to " + tableName, e);
         }
+    }
+
+    private static String requireIdentifier(String value, String label) {
+        Objects.requireNonNull(value, label + " cannot be null");
+        if (!SQL_IDENTIFIER.matcher(value).matches()) {
+            throw new IllegalArgumentException("Invalid SQL " + label + ": " + value);
+        }
+        return value;
+    }
+
+    private static String requireColumnDefinition(String value) {
+        Objects.requireNonNull(value, "column definition cannot be null");
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("column definition cannot be empty");
+        }
+        String lowered = trimmed.toLowerCase(Locale.ROOT);
+        if (lowered.contains(";") || lowered.contains("--") || lowered.contains("/*")) {
+            throw new IllegalArgumentException("Unsafe SQL column definition: " + value);
+        }
+        if (!COLUMN_DEFINITION.matcher(trimmed).matches()) {
+            throw new IllegalArgumentException("Invalid SQL column definition: " + value);
+        }
+        return trimmed;
     }
 
     // ========== Nullable Parameter Helpers ==========

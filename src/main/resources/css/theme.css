@@ -291,6 +291,149 @@
 }
 
 /* ============================================
+   Login Screen Enhancements
+   ============================================ */
+
+.login-card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
+    -fx-border-color: rgba(148, 163, 184, 0.2);
+}
+
+.login-glow {
+    -fx-min-width: 260;
+    -fx-min-height: 260;
+    -fx-max-width: 320;
+    -fx-max-height: 320;
+    -fx-background-radius: 200;
+    -fx-background-color: radial-gradient(center 50% 50%, radius 55%, rgba(102, 126, 234, 0.45), transparent 70%);
+}
+
+.login-glow-left {
+    -fx-translate-x: -140;
+    -fx-translate-y: -120;
+}
+
+.login-glow-right {
+    -fx-translate-x: 160;
+    -fx-translate-y: 140;
+    -fx-background-color: radial-gradient(center 50% 50%, radius 55%, rgba(244, 63, 94, 0.35), transparent 70%);
+}
+
+.login-kicker {
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #a78bfa;
+    -fx-letter-spacing: 1.2;
+}
+
+.login-user-list {
+    -fx-background-color: rgba(15, 23, 42, 0.5);
+    -fx-background-radius: 16;
+    -fx-border-color: rgba(148, 163, 184, 0.2);
+    -fx-border-radius: 16;
+    -fx-padding: 6;
+}
+
+.login-user-list .viewport {
+    -fx-background-color: transparent;
+}
+
+.login-user-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 10 12;
+}
+
+.login-user-list .list-cell:filled:hover {
+    -fx-background-color: rgba(148, 163, 184, 0.08);
+    -fx-background-radius: 12;
+}
+
+.login-user-list .list-cell:filled:selected {
+    -fx-background-color: linear-gradient(to right, rgba(244, 63, 94, 0.2), rgba(102, 126, 234, 0.1));
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(244, 63, 94, 0.35);
+    -fx-border-width: 0 0 0 3;
+}
+
+.login-user-cell {
+    -fx-background-radius: 12;
+}
+
+.login-user-name {
+    -fx-font-size: 15px;
+    -fx-font-weight: 700;
+    -fx-text-fill: white;
+}
+
+.login-user-details {
+    -fx-font-size: 12px;
+}
+
+.login-hint {
+    -fx-font-size: 11px;
+    -fx-text-fill: #94a3b8;
+}
+
+.login-search-container {
+    -fx-background-color: rgba(15, 23, 42, 0.6);
+    -fx-background-radius: 14;
+    -fx-border-color: rgba(148, 163, 184, 0.2);
+    -fx-border-radius: 14;
+    -fx-padding: 6 12;
+}
+
+.login-search-field {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-prompt-text-fill: #64748b;
+    -fx-padding: 6 4;
+    -fx-border-color: transparent;
+}
+
+.login-search-icon {
+    -fx-icon-color: #94a3b8;
+}
+
+.login-avatar-container {
+    -fx-background-color: rgba(148, 163, 184, 0.12);
+    -fx-background-radius: 24;
+    -fx-padding: 4;
+    -fx-border-color: rgba(148, 163, 184, 0.2);
+    -fx-border-radius: 24;
+}
+
+.login-badge-row {
+    -fx-alignment: center-left;
+}
+
+.login-badge {
+    -fx-background-radius: 10;
+    -fx-padding: 2 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: 600;
+}
+
+.login-badge-primary {
+    -fx-background-color: rgba(99, 102, 241, 0.25);
+    -fx-text-fill: #c7d2fe;
+}
+
+.login-badge-success {
+    -fx-background-color: rgba(34, 197, 94, 0.25);
+    -fx-text-fill: #bbf7d0;
+}
+
+.login-badge-warning {
+    -fx-background-color: rgba(245, 158, 11, 0.25);
+    -fx-text-fill: #fde68a;
+}
+
+.login-badge-muted {
+    -fx-background-color: rgba(148, 163, 184, 0.2);
+    -fx-text-fill: #e2e8f0;
+}
+
+/* ============================================
    Lists - Clean & Readable
    ============================================ */
 .list-view {
@@ -1186,6 +1329,146 @@
     -fx-hgap: 24;
     -fx-vgap: 24;
     -fx-alignment: center;
+}
+
+/* Matches Tabs */
+.matches-tabs-container {
+    -fx-padding: 0 24 16 24;
+    -fx-alignment: center-left;
+}
+
+.matches-tab-button {
+    -fx-background-color: rgba(30, 41, 59, 0.6);
+    -fx-background-radius: 18;
+    -fx-border-color: rgba(148, 163, 184, 0.2);
+    -fx-border-radius: 18;
+    -fx-padding: 6 14;
+    -fx-cursor: hand;
+}
+
+.matches-tab-button:hover {
+    -fx-background-color: rgba(51, 65, 85, 0.75);
+}
+
+.matches-tab-button:selected {
+    -fx-background-color: linear-gradient(to bottom right, rgba(244, 63, 94, 0.25), rgba(168, 85, 247, 0.2));
+    -fx-border-color: rgba(244, 63, 94, 0.45);
+}
+
+.matches-tab-text {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.matches-tab-count {
+    -fx-background-color: rgba(148, 163, 184, 0.2);
+    -fx-background-radius: 10;
+    -fx-padding: 2 8;
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.matches-tab-button:selected .matches-tab-count {
+    -fx-background-color: rgba(244, 63, 94, 0.35);
+    -fx-text-fill: white;
+}
+
+/* Likes Cards */
+.like-card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(30, 30, 46, 0.96), rgba(20, 20, 35, 0.92));
+    -fx-background-radius: 22;
+    -fx-border-radius: 22;
+    -fx-border-width: 1;
+    -fx-border-color: rgba(148, 163, 184, 0.2);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 14, 0, 0, 6);
+}
+
+.like-card:hover {
+    -fx-background-color: linear-gradient(to bottom right, rgba(35, 35, 55, 0.98), rgba(25, 25, 42, 0.95));
+    -fx-translate-y: -6;
+    -fx-scale-x: 1.01;
+    -fx-scale-y: 1.01;
+}
+
+.like-card-received {
+    -fx-border-color: rgba(244, 63, 94, 0.35);
+}
+
+.like-card-sent {
+    -fx-border-color: rgba(168, 85, 247, 0.35);
+}
+
+.like-avatar-container {
+    -fx-background-color: rgba(226, 232, 240, 0.08);
+    -fx-background-radius: 36;
+    -fx-padding: 10;
+    -fx-border-color: rgba(226, 232, 240, 0.15);
+    -fx-border-radius: 36;
+    -fx-border-width: 1;
+}
+
+.like-user-name {
+    -fx-font-size: 16px;
+    -fx-font-weight: 700;
+    -fx-text-fill: white;
+}
+
+.like-bio-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #94a3b8;
+    -fx-text-alignment: center;
+}
+
+.like-time-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: #64748b;
+}
+
+.like-status-label {
+    -fx-background-color: rgba(148, 163, 184, 0.15);
+    -fx-background-radius: 12;
+    -fx-padding: 4 10;
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+}
+
+.like-action-row {
+    -fx-alignment: center;
+}
+
+.like-action-primary {
+    -fx-background-color: linear-gradient(to bottom right, #f43f5e, #ec4899);
+    -fx-background-radius: 18;
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-cursor: hand;
+}
+
+.like-action-primary:hover {
+    -fx-effect: dropshadow(gaussian, rgba(244, 63, 94, 0.5), 12, 0.3, 0, 4);
+    -fx-scale-x: 1.04;
+    -fx-scale-y: 1.04;
+}
+
+.like-action-secondary {
+    -fx-background-color: rgba(148, 163, 184, 0.15);
+    -fx-background-radius: 18;
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-cursor: hand;
+}
+
+.like-action-secondary:hover {
+    -fx-background-color: rgba(148, 163, 184, 0.25);
+    -fx-scale-x: 1.03;
+    -fx-scale-y: 1.03;
 }
 
 /* Section Header for Matches */

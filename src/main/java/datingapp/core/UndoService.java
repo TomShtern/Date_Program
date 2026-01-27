@@ -8,7 +8,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -64,13 +63,12 @@ public class UndoService {
      *
      * @param userId The user who swiped
      * @param like The like/pass that was recorded
-     * @param matchCreated Optional match if the swipe created a match
+     * @param matchCreated Match created by the swipe, or null if none
      */
-    public void recordSwipe(UUID userId, Like like, Optional<Match> matchCreated) {
+    public void recordSwipe(UUID userId, Like like, Match matchCreated) {
         Instant expiresAt = Instant.now(clock).plusSeconds(config.undoWindowSeconds());
 
-        UndoState state =
-                new UndoState(userId, like, matchCreated.map(Match::getId).orElse(null), expiresAt);
+        UndoState state = new UndoState(userId, like, matchCreated != null ? matchCreated.getId() : null, expiresAt);
 
         undoStates.put(userId, state);
     }

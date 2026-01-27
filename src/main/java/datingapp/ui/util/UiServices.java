@@ -249,7 +249,7 @@ public final class UiServices {
 
                 // Check for load errors
                 if (image.isError()) {
-                    logger.warn("Failed to load image: {} - {}", path, image.getException());
+                    logger.warn("Failed to load image: {}", path, image.getException());
                     return getDefaultAvatar(width, height);
                 }
 

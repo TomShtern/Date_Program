@@ -18,6 +18,7 @@ import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -51,6 +52,9 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private Label completionLabel;
+
+    @FXML
+    private Label completionDetailsLabel;
 
     @FXML
     private TextArea bioArea;
@@ -93,6 +97,9 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private Label interestedInLabel;
+
+    @FXML
+    private DatePicker birthDatePicker;
 
     // Lifestyle fields
     @FXML
@@ -146,6 +153,9 @@ public class ProfileController extends BaseController implements Initializable {
         if (completionLabel != null) {
             completionLabel.textProperty().bind(viewModel.completionStatusProperty());
         }
+        if (completionDetailsLabel != null) {
+            completionDetailsLabel.textProperty().bind(viewModel.completionDetailsProperty());
+        }
         if (bioArea != null) {
             bioArea.textProperty().bindBidirectional(viewModel.bioProperty());
         }
@@ -154,6 +164,9 @@ public class ProfileController extends BaseController implements Initializable {
         }
         if (interestsField != null) {
             interestsField.textProperty().bindBidirectional(viewModel.interestsProperty());
+        }
+        if (birthDatePicker != null) {
+            birthDatePicker.valueProperty().bindBidirectional(viewModel.birthDateProperty());
         }
 
         // Setup lifestyle combo boxes
@@ -693,7 +706,9 @@ public class ProfileController extends BaseController implements Initializable {
 
         // Get current dealbreakers
         Dealbreakers current = viewModel.getDealbreakers();
-        Dealbreakers.Builder builder = current != null ? current.toBuilder() : Dealbreakers.builder();
+        if (current == null) {
+            current = Dealbreakers.none();
+        }
 
         // Create scrollable content
         VBox content = new VBox(16);
