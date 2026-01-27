@@ -206,6 +206,61 @@ public class SafetyHandler {
         }
     }
 
+    /**
+     * Displays blocked users and allows the current user to unblock them.
+     */
+    public void manageBlockedUsers() {
+        if (!userSession.isLoggedIn()) {
+            logger.info(CliConstants.PLEASE_SELECT_USER);
+            return;
+        }
+
+        User currentUser = userSession.getCurrentUser();
+        List<User> blockedUsers = trustSafetyService.getBlockedUsers(currentUser.getId());
+
+        if (blockedUsers.isEmpty()) {
+            logger.info("\nYou haven't blocked anyone.\n");
+            return;
+        }
+
+        logger.info(CliConstants.HEADER_BLOCKED_USERS);
+        for (int i = 0; i < blockedUsers.size(); i++) {
+            User user = blockedUsers.get(i);
+            logger.info("  {}. {} ({})", i + 1, user.getName(), user.getState());
+        }
+
+        String input = inputReader.readLine("\nEnter number to unblock (or 0 to go back): ");
+        try {
+            int choice = Integer.parseInt(input);
+            if (choice == 0) {
+                return;
+            }
+
+            if (choice < 1 || choice > blockedUsers.size()) {
+                logger.info(CliConstants.INVALID_INPUT);
+                return;
+            }
+
+            User toUnblock = blockedUsers.get(choice - 1);
+            String confirm = inputReader.readLine("Unblock " + toUnblock.getName() + CliConstants.CONFIRM_SUFFIX);
+
+            if (confirm.equalsIgnoreCase("y")) {
+                boolean success = trustSafetyService.unblock(currentUser.getId(), toUnblock.getId());
+
+                if (success) {
+                    logger.info("✅ Unblocked {}.\n", toUnblock.getName());
+                } else {
+                    logger.info("❌ Failed to unblock user.\n");
+                }
+            } else {
+                logger.info(CliConstants.CANCELLED);
+            }
+
+        } catch (NumberFormatException _) {
+            logger.info(CliConstants.INVALID_INPUT);
+        }
+    }
+
     // =========================================================================
     // Profile Verification (merged from ProfileVerificationHandler)
     // =========================================================================

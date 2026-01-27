@@ -2,12 +2,10 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.MatchQualityService.InterestMatcher;
 import datingapp.core.MatchQualityService.MatchQuality;
-import datingapp.core.MatchQualityService.MatchQualityConfig;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
@@ -42,7 +40,7 @@ class MatchQualityServiceTest {
     void setUp() {
         userStorage = new TestUserStorage();
         likeStorage = new TestLikeStorage();
-        service = new MatchQualityService(userStorage, likeStorage);
+        service = new MatchQualityService(userStorage, likeStorage, AppConfig.defaults());
     }
 
     @Nested
@@ -305,13 +303,13 @@ class MatchQualityServiceTest {
     // ==================== MATCH QUALITY CONFIG TESTS ====================
 
     @Nested
-    @DisplayName("MatchQualityConfig Validation")
-    class ConfigValidationTests {
+    @DisplayName("AppConfig Match Quality Weights")
+    class ConfigWeightTests {
 
         @Test
         @DisplayName("Default config weights sum to 1.0")
         void defaultConfigSumsToOne() {
-            MatchQualityConfig config = MatchQualityConfig.defaults();
+            AppConfig config = AppConfig.defaults();
 
             double total = config.distanceWeight()
                     + config.ageWeight()
@@ -324,97 +322,55 @@ class MatchQualityServiceTest {
         }
 
         @Test
-        @DisplayName("Proximity focused config weights sum to 1.0")
-        void proximityFocusedSumsToOne() {
-            MatchQualityConfig config = MatchQualityConfig.proximityFocused();
+        @DisplayName("Custom weights can be configured")
+        void customWeightsCanBeConfigured() {
+            AppConfig config = AppConfig.builder()
+                    .distanceWeight(0.3)
+                    .ageWeight(0.1)
+                    .interestWeight(0.2)
+                    .lifestyleWeight(0.2)
+                    .paceWeight(0.1)
+                    .responseWeight(0.1)
+                    .build();
 
-            double total = config.distanceWeight()
-                    + config.ageWeight()
-                    + config.interestWeight()
-                    + config.lifestyleWeight()
-                    + config.paceWeight()
-                    + config.responseWeight();
-
-            assertEquals(1.0, total, 0.001);
-        }
-
-        @Test
-        @DisplayName("Lifestyle focused config weights sum to 1.0")
-        void lifestyleFocusedSumsToOne() {
-            MatchQualityConfig config = MatchQualityConfig.lifestyleFocused();
-
-            double total = config.distanceWeight()
-                    + config.ageWeight()
-                    + config.interestWeight()
-                    + config.lifestyleWeight()
-                    + config.paceWeight()
-                    + config.responseWeight();
-
-            assertEquals(1.0, total, 0.001);
-        }
-
-        @Test
-        @DisplayName("Throws if weights don't sum to 1.0")
-        void throwsIfWeightsDontSumToOne() {
-            assertThrows(IllegalArgumentException.class, () -> new MatchQualityConfig(0.5, 0.5, 0.5, 0.5, 0.5, 0.5));
-        }
-
-        @Test
-        @DisplayName("Throws if any weight is negative")
-        void throwsIfNegativeWeight() {
-            assertThrows(IllegalArgumentException.class, () -> new MatchQualityConfig(-0.1, 0.3, 0.2, 0.2, 0.2, 0.2));
-        }
-
-        @Test
-        @DisplayName("Allows custom valid weights")
-        void allowsCustomValidWeights() {
-            MatchQualityConfig config = new MatchQualityConfig(0.1, 0.1, 0.2, 0.2, 0.2, 0.2);
-
-            assertEquals(0.1, config.distanceWeight());
+            assertEquals(0.3, config.distanceWeight());
             assertEquals(0.1, config.ageWeight());
             assertEquals(0.2, config.interestWeight());
             assertEquals(0.2, config.lifestyleWeight());
-            assertEquals(0.2, config.paceWeight());
-            assertEquals(0.2, config.responseWeight());
+            assertEquals(0.1, config.paceWeight());
+            assertEquals(0.1, config.responseWeight());
         }
 
         @Test
-        @DisplayName("Allows zero weights if sum is 1.0")
-        void allowsZeroWeights() {
-            MatchQualityConfig config = new MatchQualityConfig(0.0, 0.0, 0.5, 0.5, 0.0, 0.0);
+        @DisplayName("Service uses config weights for scoring")
+        void serviceUsesConfigWeights() {
+            // Create config with distance weight = 1.0, all others = 0.0
+            AppConfig config = AppConfig.builder()
+                    .distanceWeight(1.0)
+                    .ageWeight(0.0)
+                    .interestWeight(0.0)
+                    .lifestyleWeight(0.0)
+                    .paceWeight(0.0)
+                    .responseWeight(0.0)
+                    .build();
 
-            assertEquals(0.0, config.distanceWeight());
-            assertEquals(0.0, config.ageWeight());
-            assertEquals(0.5, config.interestWeight());
-            assertEquals(0.5, config.lifestyleWeight());
-        }
+            MatchQualityService customService = new MatchQualityService(userStorage, likeStorage, config);
 
-        @Test
-        @DisplayName("Allows all weight in one category")
-        void allowsAllWeightInOneCategory() {
-            MatchQualityConfig config = new MatchQualityConfig(1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            User alice = createUser("Alice", 25, 32.0, 34.0);
+            User bob = createUser("Bob", 26, 32.0, 34.0); // Very close
+            alice.setMaxDistanceKm(50);
+            bob.setMaxDistanceKm(50);
 
-            assertEquals(1.0, config.distanceWeight());
-            assertEquals(0.0, config.ageWeight());
-        }
+            userStorage.save(alice);
+            userStorage.save(bob);
 
-        @Test
-        @DisplayName("Throws if weights sum slightly below 1.0")
-        void throwsIfWeightsSumBelowOne() {
-            assertThrows(
-                    IllegalArgumentException.class, () -> new MatchQualityConfig(0.15, 0.15, 0.15, 0.15, 0.15, 0.15));
-        }
+            Match match = Match.create(alice.getId(), bob.getId());
+            addMutualLikes(alice.getId(), bob.getId());
 
-        @Test
-        @DisplayName("Throws if weights sum slightly above 1.0")
-        void throwsIfWeightsSumAboveOne() {
-            assertThrows(IllegalArgumentException.class, () -> new MatchQualityConfig(0.2, 0.2, 0.2, 0.2, 0.2, 0.2));
-        }
+            MatchQuality quality = customService.computeQuality(match, alice.getId());
 
-        @Test
-        @DisplayName("Throws if any weight exceeds 1.0")
-        void throwsIfWeightExceedsOne() {
-            assertThrows(IllegalArgumentException.class, () -> new MatchQualityConfig(1.5, 0.0, 0.0, 0.0, 0.0, -0.5));
+            // Score should be very high since distance is the only factor
+            assertTrue(quality.compatibilityScore() > 90);
         }
     }
 

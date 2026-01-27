@@ -21,10 +21,11 @@ public class DailyService {
     private final LikeStorage likeStorage;
     private final BlockStorage blockStorage;
     private final DailyPickStorage dailyPickStorage;
+    private final CandidateFinder candidateFinder;
     private final AppConfig config;
 
     public DailyService(LikeStorage likeStorage, AppConfig config) {
-        this(null, likeStorage, null, null, config);
+        this(null, likeStorage, null, null, null, config);
     }
 
     public DailyService(
@@ -32,11 +33,13 @@ public class DailyService {
             LikeStorage likeStorage,
             BlockStorage blockStorage,
             DailyPickStorage dailyPickStorage,
+            CandidateFinder candidateFinder,
             AppConfig config) {
         this.userStorage = userStorage;
         this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
         this.blockStorage = blockStorage;
         this.dailyPickStorage = dailyPickStorage;
+        this.candidateFinder = candidateFinder;
         this.config = Objects.requireNonNull(config, "config cannot be null");
     }
 
@@ -92,16 +95,32 @@ public class DailyService {
         ensureDailyPickDependencies();
         LocalDate today = getToday();
 
-        List<User> candidates = userStorage.findActive().stream()
-                .filter(u -> !u.getId().equals(seeker.getId()))
-                .filter(u -> !blockStorage.isBlocked(seeker.getId(), u.getId()))
-                .filter(u -> !likeStorage.exists(seeker.getId(), u.getId()))
-                .toList();
+        // Get all active users
+        List<User> allActive = userStorage.findActive();
+
+        // Build exclusion set: already liked or passed users
+        java.util.Set<UUID> alreadyInteracted = new java.util.HashSet<>();
+        alreadyInteracted.addAll(likeStorage.getLikedOrPassedUserIds(seeker.getId()));
+
+        // Use CandidateFinder to apply comprehensive preference filtering
+        // This filters by: self, active state, blocks, mutual gender, mutual age, distance, dealbreakers
+        List<User> candidates;
+        if (candidateFinder != null) {
+            candidates = candidateFinder.findCandidates(seeker, allActive, alreadyInteracted);
+        } else {
+            // Fallback for tests/configurations without CandidateFinder
+            candidates = allActive.stream()
+                    .filter(u -> !u.getId().equals(seeker.getId()))
+                    .filter(u -> !blockStorage.isBlocked(seeker.getId(), u.getId()))
+                    .filter(u -> !alreadyInteracted.contains(u.getId()))
+                    .toList();
+        }
 
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
 
+        // Deterministic random selection based on date + user ID
         long seed = today.toEpochDay() + seeker.getId().hashCode();
         Random random = new Random(seed);
         User picked = candidates.get(random.nextInt(candidates.size()));
@@ -133,16 +152,16 @@ public class DailyService {
         List<String> reasons = new ArrayList<>();
 
         double distance = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), picked.getLat(), picked.getLon());
-        if (distance < 5) {
+        if (distance < config.nearbyDistanceKm()) {
             reasons.add("Lives nearby!");
-        } else if (distance < 10) {
+        } else if (distance < config.closeDistanceKm()) {
             reasons.add("Close enough for coffee!");
         }
 
         int ageDiff = Math.abs(seeker.getAge() - picked.getAge());
-        if (ageDiff <= 2) {
+        if (ageDiff <= config.similarAgeDiff()) {
             reasons.add("Similar age");
-        } else if (ageDiff <= 5) {
+        } else if (ageDiff <= config.compatibleAgeDiff()) {
             reasons.add("Age-appropriate match");
         }
 
@@ -165,7 +184,7 @@ public class DailyService {
         long sharedInterests = seeker.getInterests().stream()
                 .filter(picked.getInterests()::contains)
                 .count();
-        if (sharedInterests >= 3) {
+        if (sharedInterests >= config.minSharedInterests()) {
             reasons.add("Many shared interests!");
         } else if (sharedInterests >= 1) {
             reasons.add("Some shared interests");

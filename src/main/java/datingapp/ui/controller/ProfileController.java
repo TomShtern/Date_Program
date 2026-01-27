@@ -176,6 +176,10 @@ public class ProfileController extends BaseController implements Initializable {
         // Load current user data
         viewModel.loadCurrentUser();
 
+        // Sync profile photo from ViewModel and keep it updated
+        updateProfilePhoto(viewModel.primaryPhotoUrlProperty().get());
+        addSubscription(viewModel.primaryPhotoUrlProperty().subscribe(this::updateProfilePhoto));
+
         // Refresh interested in buttons AFTER user data is loaded (they show the actual preferences)
         if (interestedInFlow != null) {
             populateInterestedInButtons();
@@ -454,6 +458,28 @@ public class ProfileController extends BaseController implements Initializable {
         if (interestCountLabel != null) {
             int count = viewModel.getSelectedInterests().size();
             interestCountLabel.setText(count + "/" + Interest.MAX_PER_USER + " selected");
+        }
+    }
+
+    private void updateProfilePhoto(String photoUrl) {
+        if (profileImageView == null) {
+            return;
+        }
+
+        if (photoUrl == null || photoUrl.isBlank()) {
+            profileImageView.setImage(null);
+            profileImageView.setVisible(false);
+            if (avatarPlaceholderIcon != null) {
+                avatarPlaceholderIcon.setVisible(true);
+            }
+            return;
+        }
+
+        Image image = UiServices.ImageCache.getImage(photoUrl, 200, 200);
+        profileImageView.setImage(image);
+        profileImageView.setVisible(true);
+        if (avatarPlaceholderIcon != null) {
+            avatarPlaceholderIcon.setVisible(false);
         }
     }
 

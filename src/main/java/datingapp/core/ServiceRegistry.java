@@ -316,10 +316,10 @@ public class ServiceRegistry {
                     new TrustSafetyService(reportStorage, userStorage, blockStorage, config);
             StatsService statsService = new StatsService(
                     likeStorage, matchStorage, blockStorage, reportStorage, userStatsStorage, platformStatsStorage);
-            MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage);
+            MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
             ProfilePreviewService profilePreviewService = new ProfilePreviewService();
             DailyService dailyService =
-                    new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, config);
+                    new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, candidateFinder, config);
             UndoService undoService = new UndoService(likeStorage, matchStorage, config);
 
             // Achievement Service (Phase 1)
@@ -329,7 +329,8 @@ public class ServiceRegistry {
                     likeStorage,
                     userStorage,
                     reportStorage,
-                    profilePreviewService);
+                    profilePreviewService,
+                    config);
 
             // Messaging Service (Phase 2)
             MessagingService messagingService =

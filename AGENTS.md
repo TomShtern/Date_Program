@@ -136,6 +136,7 @@ mvn verify                           # Full build + all quality checks
 - Test methods: `@DisplayName("Description")` + descriptive method name
 - Use `@SuppressWarnings("unused")` on test classes with `@Nested`
 
+<!--ARCHIVE:18:agent:codex:tests-sync-->
 **Mocking:** Create in-memory implementations inline in tests (NO Mockito). Example:
 ```java
 private static class InMemoryUserStorage implements UserStorage {
@@ -143,6 +144,16 @@ private static class InMemoryUserStorage implements UserStorage {
     // Implement only methods needed for tests
 }
 ```
+<!--/ARCHIVE-->
+**Mocking:** Create in-memory implementations inline in tests (NO Mockito). Example:
+```java
+private static class InMemoryUserStorage implements UserStorage {
+    private final Map<UUID, User> users = new HashMap<>();
+    // Implement only methods needed for tests
+}
+```
+Keep in-memory storages aligned with core interfaces when new methods are added.
+18|2026-01-27 04:30:52|agent:codex|scope:tests-sync|Align in-memory test storages with updated interfaces|src/test/java/datingapp/cli/ProfileCreateSelectTest.java;src/test/java/datingapp/core/DailyPickServiceTest.java;src/test/java/datingapp/core/LikerBrowserServiceTest.java;src/test/java/datingapp/core/StatsServiceTest.java;src/test/java/datingapp/core/testutil/TestStorages.java;src/test/java/datingapp/core/MessagingServiceTest.java;AGENTS.md
 
 **Integration Tests:** Use real H2 database with unique test DB name per test class.
 
@@ -155,6 +166,9 @@ private static class InMemoryUserStorage implements UserStorage {
 **Factory Methods:** `create()`, `of()`, `fromDatabase()` for object construction.
 
 **Defensive Copying:** Always return defensive copies of collections: `return EnumSet.copyOf(interests);`
+
+**Daily Pick Exclusions:** Use `LikeStorage.getLikedOrPassedUserIds()` to avoid resurfacing users already liked or passed.
+16|2026-01-27 04:06:40|agent:codex|scope:core-daily|Use liked-or-passed set for daily pick exclusions|src/main/java/datingapp/core/DailyService.java;AGENTS.md
 
 **Touch Pattern:** Update `updatedAt` timestamp on entity changes:
 ```java
@@ -360,11 +374,20 @@ public void handleMenu() {
 ```
 
 **Common UI Patterns:**
+<!--ARCHIVE:17:agent:codex:ui-profile-photo-->
 - Use `CliConstants` for all display strings
 - Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
 - Always save to storage after user edits
 - Log confirmation messages
 - Handle all NumberFormatExceptions gracefully
+<!--/ARCHIVE-->
+- Use `CliConstants` for all display strings
+- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Always save to storage after user edits
+- Log confirmation messages
+- Handle all NumberFormatExceptions gracefully
+- Load persisted profile photos into profile views and keep avatar bindings in sync
+17|2026-01-27 04:19:23|agent:codex|scope:ui-profile-photo|Sync profile photo UI with stored URLs|src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java;AGENTS.md
 
 ## Logging Standards
 
@@ -511,4 +534,7 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 13|2026-01-24 18:40:00|agent:github_copilot|core-daily|Consolidate DailyLimitService + DailyPickService into DailyService; update CLI/UI/tests; remove old files|src/main/java/datingapp/core/DailyService.java;src/main/java/datingapp/core/ServiceRegistry.java;src/main/java/datingapp/cli/MatchingHandler.java;src/main/java/datingapp/Main.java;src/main/java/datingapp/ui/viewmodel/DashboardViewModel.java;src/main/java/datingapp/ui/ViewModelFactory.java;src/test/java/datingapp/core/DailyLimitServiceTest.java;src/test/java/datingapp/core/DailyPickServiceTest.java;docs/core-consolidation-plan.md
 14|2026-01-25 05:05:00|agent:github_copilot|file-consolidation|Complete Batches 4-6: Nested 10 storage interfaces into domain files; merged ProfileVerificationHandler→SafetyHandler, UserManagementHandler→ProfileHandler. Reduced from 159 to 132 Java files (-27, -17%). All 464 tests pass.|src/main/java/datingapp/core/Messaging.java;src/main/java/datingapp/core/Social.java;src/main/java/datingapp/core/Stats.java;src/main/java/datingapp/core/Match.java;src/main/java/datingapp/core/Achievement.java;src/main/java/datingapp/core/ProfilePreviewService.java;src/main/java/datingapp/core/User.java;src/main/java/datingapp/core/SwipeSession.java;src/main/java/datingapp/cli/SafetyHandler.java;src/main/java/datingapp/cli/ProfileHandler.java;src/main/java/datingapp/Main.java;src/test/java/datingapp/cli/ProfileCreateSelectTest.java;FILE_CONSOLIDATION_IMPLEMENTATION_PLAN.md
 15|2026-01-25 08:30:00|agent:github_copilot|doc-finalize|Verify file consolidation complete (159→128 files, -31, -19.5%); update docs with actual results; mark plan complete|FILE_COUNT_REDUCTION_REPORT.md;docs/architecture.md;FILE_CONSOLIDATION_IMPLEMENTATION_PLAN.md;AGENTS.md
+16|2026-01-27 04:06:40|agent:codex|scope:core-daily|Use liked-or-passed set for daily pick exclusions|src/main/java/datingapp/core/DailyService.java;AGENTS.md
+17|2026-01-27 04:19:23|agent:codex|scope:ui-profile-photo|Sync profile photo UI with stored URLs|src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java;AGENTS.md
+18|2026-01-27 04:30:52|agent:codex|scope:tests-sync|Align in-memory test storages with updated interfaces|src/test/java/datingapp/cli/ProfileCreateSelectTest.java;src/test/java/datingapp/core/DailyPickServiceTest.java;src/test/java/datingapp/core/LikerBrowserServiceTest.java;src/test/java/datingapp/core/StatsServiceTest.java;src/test/java/datingapp/core/testutil/TestStorages.java;src/test/java/datingapp/core/MessagingServiceTest.java;AGENTS.md
 ---AGENT-LOG-END---

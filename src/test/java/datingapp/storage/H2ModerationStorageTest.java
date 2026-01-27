@@ -47,6 +47,60 @@ class H2ModerationStorageTest {
     }
 
     @Test
+    @DisplayName("Deletes blocks successfully")
+    void deletesBlocksSuccessfully() {
+        UUID blocker = UUID.randomUUID();
+        UUID blocked = UUID.randomUUID();
+
+        Block block = Block.create(blocker, blocked);
+        blocks.save(block);
+
+        assertTrue(blocks.isBlocked(blocker, blocked), "Block should exist");
+
+        boolean deleted = blocks.delete(blocker, blocked);
+
+        assertTrue(deleted, "Delete should return true");
+        assertFalse(blocks.isBlocked(blocker, blocked), "Block should no longer exist");
+        assertEquals(0, blocks.countBlocksGiven(blocker), "Blocker should have 0 blocks");
+        assertEquals(0, blocks.countBlocksReceived(blocked), "Blocked user should have 0 blocks received");
+    }
+
+    @Test
+    @DisplayName("Returns false when deleting non-existent block")
+    void returnsFalseWhenDeletingNonexistentBlock() {
+        UUID blocker = UUID.randomUUID();
+        UUID blocked = UUID.randomUUID();
+
+        boolean deleted = blocks.delete(blocker, blocked);
+
+        assertFalse(deleted, "Delete should return false when block doesn't exist");
+    }
+
+    @Test
+    @DisplayName("Finds blocks by blocker")
+    void findsBlocksByBlocker() {
+        UUID blocker = UUID.randomUUID();
+        UUID blocked1 = UUID.randomUUID();
+        UUID blocked2 = UUID.randomUUID();
+        UUID blocked3 = UUID.randomUUID();
+
+        Block block1 = Block.create(blocker, blocked1);
+        Block block2 = Block.create(blocker, blocked2);
+        Block block3 = Block.create(blocker, blocked3);
+
+        blocks.save(block1);
+        blocks.save(block2);
+        blocks.save(block3);
+
+        var foundBlocks = blocks.findByBlocker(blocker);
+
+        assertEquals(3, foundBlocks.size(), "Should find 3 blocks");
+        assertTrue(foundBlocks.stream().anyMatch(b -> b.blockedId().equals(blocked1)), "Should contain block1");
+        assertTrue(foundBlocks.stream().anyMatch(b -> b.blockedId().equals(blocked2)), "Should contain block2");
+        assertTrue(foundBlocks.stream().anyMatch(b -> b.blockedId().equals(blocked3)), "Should contain block3");
+    }
+
+    @Test
     @DisplayName("Saves and queries reports")
     void savesAndQueriesReports() {
         UUID reporter = UUID.randomUUID();

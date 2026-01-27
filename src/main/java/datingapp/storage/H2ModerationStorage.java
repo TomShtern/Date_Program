@@ -62,7 +62,9 @@ public final class H2ModerationStorage {
                         blocker_id UUID NOT NULL,
                         blocked_id UUID NOT NULL,
                         created_at TIMESTAMP NOT NULL,
-                        UNIQUE (blocker_id, blocked_id)
+                        UNIQUE (blocker_id, blocked_id),
+                        FOREIGN KEY (blocker_id) REFERENCES users(id) ON DELETE CASCADE,
+                        FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE
                     )
                     """;
 
@@ -167,6 +169,57 @@ public final class H2ModerationStorage {
             }
         }
 
+        @Override
+        public List<Block> findByBlocker(UUID blockerId) {
+            String sql = """
+                    SELECT id, blocker_id, blocked_id, created_at
+                    FROM blocks
+                    WHERE blocker_id = ?
+                    ORDER BY created_at DESC
+                    """;
+
+            List<Block> result = new ArrayList<>();
+
+            try (Connection conn = dbManager.getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+                stmt.setObject(1, blockerId);
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        result.add(new Block(
+                                rs.getObject("id", UUID.class),
+                                rs.getObject("blocker_id", UUID.class),
+                                rs.getObject("blocked_id", UUID.class),
+                                rs.getTimestamp("created_at").toInstant()));
+                    }
+                }
+
+                return result;
+
+            } catch (SQLException e) {
+                throw new StorageException("Failed to find blocks by blocker", e);
+            }
+        }
+
+        @Override
+        public boolean delete(UUID blockerId, UUID blockedId) {
+            String sql = "DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?";
+
+            try (Connection conn = dbManager.getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+                stmt.setObject(1, blockerId);
+                stmt.setObject(2, blockedId);
+
+                int rowsDeleted = stmt.executeUpdate();
+                return rowsDeleted > 0;
+
+            } catch (SQLException e) {
+                throw new StorageException("Failed to delete block: " + blockerId + " -> " + blockedId, e);
+            }
+        }
+
         // === Statistics Methods (Phase 0.5b) ===
 
         @Override
@@ -232,7 +285,9 @@ public final class H2ModerationStorage {
                         reason VARCHAR(50) NOT NULL,
                         description VARCHAR(500),
                         created_at TIMESTAMP NOT NULL,
-                        UNIQUE (reporter_id, reported_user_id)
+                        UNIQUE (reporter_id, reported_user_id),
+                        FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
+                        FOREIGN KEY (reported_user_id) REFERENCES users(id) ON DELETE CASCADE
                     )
                     """;
 

@@ -124,7 +124,7 @@ public class MatchingHandler {
             showDailyPick(dailyPick.get(), currentUser);
         }
 
-        logger.info("\nCliConstants.HEADER_BROWSE_CANDIDATES\n");
+        logger.info("\n" + CliConstants.HEADER_BROWSE_CANDIDATES + "\n");
 
         List<User> activeUsers = userStorage.findActive();
         Set<UUID> alreadyInteracted = likeStorage.getLikedOrPassedUserIds(currentUser.getId());
@@ -173,7 +173,20 @@ public class MatchingHandler {
 
         logger.info(CliConstants.BOX_BOTTOM);
 
-        String action = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_QUIT).toLowerCase();
+        // Validate input and re-prompt until valid choice is entered
+        String action;
+        while (true) {
+            String input = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_QUIT);
+            java.util.Optional<String> validated = CliUtilities.validateChoice(input, "l", "p", "q");
+
+            if (validated.isEmpty()) {
+                logger.info("❌ Invalid choice. Please enter L (like), P (pass), or Q (quit).");
+                continue;
+            }
+
+            action = validated.get();
+            break;
+        }
 
         if (action.equals("q")) {
             logger.info(CliConstants.MSG_STOPPING_BROWSE);
@@ -529,13 +542,27 @@ public class MatchingHandler {
         logger.info("  This pick resets tomorrow at midnight!");
         logger.info("");
 
-        String action = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_SKIP).toLowerCase();
+        // Validate input and re-prompt until valid choice is entered
+        String action;
+        while (true) {
+            String input = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_SKIP);
+            java.util.Optional<String> validated = CliUtilities.validateChoice(input, "l", "p", "s");
+
+            if (validated.isEmpty()) {
+                logger.info("❌ Invalid choice. Please enter L (like), P (pass), or S (skip).");
+                continue;
+            }
+
+            action = validated.get();
+            break;
+        }
 
         if (action.equals("s")) {
             logger.info("  👋 You can see this pick again later today.\n");
             return;
         }
 
+        // Only mark as viewed after valid action (not on skip)
         dailyService.markDailyPickViewed(currentUser.getId());
 
         Like.Direction direction = action.equals("l") ? Like.Direction.LIKE : Like.Direction.PASS;

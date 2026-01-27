@@ -12,6 +12,26 @@ import org.slf4j.LoggerFactory;
 public final class CliUtilities {
     private CliUtilities() {} // Utility class - prevent instantiation
 
+    /**
+     * Validates user input against a set of valid choices (case-insensitive).
+     *
+     * @param input The user input to validate
+     * @param validChoices Array of valid choices (e.g., "l", "p", "v", "b")
+     * @return Optional containing normalized lowercase input if valid, empty otherwise
+     */
+    public static java.util.Optional<String> validateChoice(String input, String... validChoices) {
+        if (input == null || input.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        String normalized = input.trim().toLowerCase();
+        for (String valid : validChoices) {
+            if (normalized.equals(valid.toLowerCase())) {
+                return java.util.Optional.of(normalized);
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
     /** Tracks the currently logged-in user for the CLI session. */
     public static class UserSession {
         private User currentUser;

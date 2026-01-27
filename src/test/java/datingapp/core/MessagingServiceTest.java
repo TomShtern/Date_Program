@@ -643,6 +643,14 @@ class MessagingServiceTest {
                     .filter(m -> !m.senderId().equals(senderId))
                     .count();
         }
+
+        @Override
+        public int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId) {
+            return (int) messagesByConvo.getOrDefault(conversationId, List.of()).stream()
+                    .filter(m -> m.createdAt().isAfter(after))
+                    .filter(m -> !m.senderId().equals(excludeSenderId))
+                    .count();
+        }
     }
 
     static class InMemoryMatchStorage implements MatchStorage {

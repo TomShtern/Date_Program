@@ -14,6 +14,7 @@ import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfilePreviewService;
 import datingapp.core.User;
+import datingapp.core.ValidationService;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -34,6 +35,7 @@ public class ProfileHandler {
     private final User.Storage userStorage;
     private final ProfilePreviewService profilePreviewService;
     private final AchievementService achievementService;
+    private final ValidationService validationService;
     private final CliUtilities.UserSession userSession;
     private final CliUtilities.InputReader inputReader;
 
@@ -44,11 +46,14 @@ public class ProfileHandler {
             User.Storage userStorage,
             ProfilePreviewService profilePreviewService,
             AchievementService achievementService,
+            ValidationService validationService,
             CliUtilities.UserSession userSession,
             CliUtilities.InputReader inputReader) {
         this.userStorage = userStorage;
         this.profilePreviewService = profilePreviewService;
         this.achievementService = achievementService;
+        this.validationService =
+                java.util.Objects.requireNonNull(validationService, "validationService cannot be null");
         this.userSession = userSession;
         this.inputReader = inputReader;
     }
@@ -365,7 +370,13 @@ public class ProfileHandler {
         try {
             double lat = Double.parseDouble(latStr);
             double lon = Double.parseDouble(lonStr);
-            currentUser.setLocation(lat, lon);
+            ValidationService.ValidationResult result = validationService.validateLocation(lat, lon);
+            if (!result.valid()) {
+                logger.info("⚠️  Invalid coordinates:");
+                result.errors().forEach(e -> logger.info("    - {}", e));
+            } else {
+                currentUser.setLocation(lat, lon);
+            }
         } catch (NumberFormatException e) {
             logger.debug("Invalid coordinates: {}", e.getMessage());
             logger.info("⚠️  Invalid coordinates, skipping.");
@@ -379,12 +390,21 @@ public class ProfileHandler {
      */
     private void promptPreferences(User currentUser) {
         String distStr = inputReader.readLine("Max distance (km, default 50): ");
-        try {
-            int dist = Integer.parseInt(distStr);
-            currentUser.setMaxDistanceKm(dist);
-        } catch (NumberFormatException e) {
-            logger.trace("Using default distance, input was: {}", e.getMessage());
-            // Keep default - user entered non-numeric or empty input
+        if (!distStr.isBlank()) {
+            try {
+                int dist = Integer.parseInt(distStr);
+                ValidationService.ValidationResult result = validationService.validateDistance(dist);
+                if (!result.valid()) {
+                    logger.info("⚠️  Invalid distance:");
+                    result.errors().forEach(e -> logger.info("    - {}", e));
+                    logger.info("    Using default (50km)");
+                } else {
+                    currentUser.setMaxDistanceKm(dist);
+                }
+            } catch (NumberFormatException e) {
+                logger.trace("Using default distance, input was: {}", e.getMessage());
+                // Keep default - user entered non-numeric or empty input
+            }
         }
 
         String minAgeStr = inputReader.readLine("Min age preference (default 18): ");
@@ -392,8 +412,15 @@ public class ProfileHandler {
         try {
             int minAge = minAgeStr.isBlank() ? 18 : Integer.parseInt(minAgeStr);
             int maxAge = maxAgeStr.isBlank() ? 99 : Integer.parseInt(maxAgeStr);
-            currentUser.setAgeRange(minAge, maxAge);
-        } catch (IllegalArgumentException _) {
+            ValidationService.ValidationResult result = validationService.validateAgeRange(minAge, maxAge);
+            if (!result.valid()) {
+                logger.info("⚠️  Invalid age range:");
+                result.errors().forEach(e -> logger.info("    - {}", e));
+                logger.info("    Using defaults (18-99)");
+            } else {
+                currentUser.setAgeRange(minAge, maxAge);
+            }
+        } catch (NumberFormatException _) {
             logger.info("⚠️  Invalid age range, using defaults.");
         }
     }
@@ -416,7 +443,14 @@ public class ProfileHandler {
         String heightStr = inputReader.readLine("Height in cm (e.g., 175, or Enter to skip): ");
         if (!heightStr.isBlank()) {
             try {
-                currentUser.setHeightCm(Integer.valueOf(heightStr));
+                int height = Integer.parseInt(heightStr);
+                ValidationService.ValidationResult result = validationService.validateHeight(height);
+                if (!result.valid()) {
+                    logger.info("⚠️  Invalid height:");
+                    result.errors().forEach(e -> logger.info("    - {}", e));
+                } else {
+                    currentUser.setHeightCm(height);
+                }
             } catch (NumberFormatException _) {
                 logger.info("⚠️  Invalid height, skipping.");
             }

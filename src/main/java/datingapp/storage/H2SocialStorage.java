@@ -69,8 +69,8 @@ public final class H2SocialStorage {
                         created_at TIMESTAMP NOT NULL,
                         status VARCHAR(20) NOT NULL,
                         responded_at TIMESTAMP,
-                        FOREIGN KEY (from_user_id) REFERENCES users(id),
-                        FOREIGN KEY (to_user_id) REFERENCES users(id)
+                        FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+                        FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
                     )
                     """;
             // Regular index for lookup performance (H2 doesn't support partial indexes with
@@ -272,7 +272,7 @@ public final class H2SocialStorage {
                         created_at TIMESTAMP NOT NULL,
                         is_read BOOLEAN DEFAULT FALSE,
                         data_json TEXT,
-                        FOREIGN KEY (user_id) REFERENCES users(id)
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                     )
                     """;
             String index = "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read)";

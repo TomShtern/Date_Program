@@ -375,6 +375,17 @@ public final class Messaging {
         int countMessagesNotFromSender(String conversationId, UUID senderId);
 
         /**
+         * Counts messages sent after a timestamp, excluding messages from a specific sender.
+         * Used for accurate unread count calculation.
+         *
+         * @param conversationId The conversation to count messages for
+         * @param after Count messages created after this timestamp
+         * @param excludeSenderId The user whose messages to exclude from the count
+         * @return The count of messages after the timestamp not from the excluded sender
+         */
+        int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId);
+
+        /**
          * Deletes all messages for a conversation. Called when conversation is deleted.
          *
          * @param conversationId The conversation to delete messages for

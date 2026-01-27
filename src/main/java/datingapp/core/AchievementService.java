@@ -25,6 +25,7 @@ public class AchievementService {
     private final User.Storage userStorage;
     private final ReportStorage reportStorage;
     private final ProfilePreviewService profilePreviewService;
+    private final AppConfig config;
 
     public AchievementService(
             UserAchievementStorage achievementStorage,
@@ -32,13 +33,15 @@ public class AchievementService {
             LikeStorage likeStorage,
             User.Storage userStorage,
             ReportStorage reportStorage,
-            ProfilePreviewService profilePreviewService) {
+            ProfilePreviewService profilePreviewService,
+            AppConfig config) {
         this.achievementStorage = Objects.requireNonNull(achievementStorage);
         this.matchStorage = Objects.requireNonNull(matchStorage);
         this.likeStorage = Objects.requireNonNull(likeStorage);
         this.userStorage = Objects.requireNonNull(userStorage);
         this.reportStorage = Objects.requireNonNull(reportStorage);
         this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
+        this.config = Objects.requireNonNull(config);
     }
 
     /** Progress towards an achievement. */

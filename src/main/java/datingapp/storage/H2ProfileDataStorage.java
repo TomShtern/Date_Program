@@ -69,7 +69,9 @@ public final class H2ProfileDataStorage {
                         content VARCHAR(500) NOT NULL,
                         created_at TIMESTAMP NOT NULL,
                         updated_at TIMESTAMP NOT NULL,
-                        PRIMARY KEY (author_id, subject_id)
+                        PRIMARY KEY (author_id, subject_id),
+                        FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+                        FOREIGN KEY (subject_id) REFERENCES users(id) ON DELETE CASCADE
                     );
                     CREATE INDEX IF NOT EXISTS idx_profile_notes_author ON profile_notes(author_id);
                     """;
@@ -199,7 +201,9 @@ public final class H2ProfileDataStorage {
                         id BIGINT AUTO_INCREMENT PRIMARY KEY,
                         viewer_id UUID NOT NULL,
                         viewed_id UUID NOT NULL,
-                        viewed_at TIMESTAMP NOT NULL
+                        viewed_at TIMESTAMP NOT NULL,
+                        FOREIGN KEY (viewer_id) REFERENCES users(id) ON DELETE CASCADE,
+                        FOREIGN KEY (viewed_id) REFERENCES users(id) ON DELETE CASCADE
                     );
                     CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_id ON profile_views(viewed_id);
                     CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_at ON

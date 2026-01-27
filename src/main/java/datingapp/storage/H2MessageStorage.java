@@ -34,7 +34,8 @@ public class H2MessageStorage extends AbstractH2Storage implements MessageStorag
                     conversation_id VARCHAR(100) NOT NULL,
                     sender_id UUID NOT NULL,
                     content VARCHAR(1000) NOT NULL,
-                    created_at TIMESTAMP NOT NULL
+                    created_at TIMESTAMP NOT NULL,
+                    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """;
         String index = "CREATE INDEX IF NOT EXISTS idx_messages_conversation_created "
@@ -215,6 +216,34 @@ public class H2MessageStorage extends AbstractH2Storage implements MessageStorag
 
         } catch (SQLException e) {
             throw new StorageException("Failed to count messages not from sender: " + conversationId, e);
+        }
+    }
+
+    @Override
+    public int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId) {
+        String sql = """
+                SELECT COUNT(*) FROM messages
+                WHERE conversation_id = ?
+                AND created_at > ?
+                AND sender_id != ?
+                """;
+
+        try (Connection conn = dbManager.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, conversationId);
+            stmt.setTimestamp(2, Timestamp.from(after));
+            stmt.setObject(3, excludeSenderId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
+            }
+
+        } catch (SQLException e) {
+            throw new StorageException(
+                    "Failed to count messages after timestamp not from sender: " + conversationId, e);
         }
     }
 

@@ -43,7 +43,14 @@ public record AppConfig(
         int achievementMatchTier5, // Fifth match milestone (50)
         int minSwipesForBehaviorAchievement, // Min swipes to evaluate behavior (50)
         int maxDistanceKm, // Max allowed search distance (500km)
-        int maxAge // Max valid age (120)
+        int maxAge, // Max valid age (120)
+        // Match quality weights (MED-01: consolidated from MatchQualityConfig)
+        double distanceWeight, // Weight for distance score (0.15 default)
+        double ageWeight, // Weight for age score (0.10 default)
+        double interestWeight, // Weight for interest score (0.25 default)
+        double lifestyleWeight, // Weight for lifestyle score (0.25 default)
+        double paceWeight, // Weight for pace score (0.15 default)
+        double responseWeight // Weight for response time score (0.10 default)
         ) {
     /** Default configuration values. */
     public static AppConfig defaults() {
@@ -78,7 +85,14 @@ public record AppConfig(
                 50, // achievementMatchTier5
                 50, // minSwipesForBehaviorAchievement
                 500, // maxDistanceKm
-                120 // maxAge
+                120, // maxAge
+                // Match quality weights
+                0.15, // distanceWeight
+                0.10, // ageWeight
+                0.25, // interestWeight
+                0.25, // lifestyleWeight
+                0.15, // paceWeight
+                0.10 // responseWeight
                 );
     }
 
@@ -135,6 +149,13 @@ public record AppConfig(
         private int minSwipesForBehaviorAchievement = 50;
         private int maxDistanceKm = 500;
         private int maxAge = 120;
+        // Match quality weights
+        private double distanceWeight = 0.15;
+        private double ageWeight = 0.10;
+        private double interestWeight = 0.25;
+        private double lifestyleWeight = 0.25;
+        private double paceWeight = 0.15;
+        private double responseWeight = 0.10;
 
         public Builder autoBanThreshold(int v) {
             this.autoBanThreshold = v;
@@ -286,6 +307,36 @@ public record AppConfig(
             return this;
         }
 
+        public Builder distanceWeight(double v) {
+            this.distanceWeight = v;
+            return this;
+        }
+
+        public Builder ageWeight(double v) {
+            this.ageWeight = v;
+            return this;
+        }
+
+        public Builder interestWeight(double v) {
+            this.interestWeight = v;
+            return this;
+        }
+
+        public Builder lifestyleWeight(double v) {
+            this.lifestyleWeight = v;
+            return this;
+        }
+
+        public Builder paceWeight(double v) {
+            this.paceWeight = v;
+            return this;
+        }
+
+        public Builder responseWeight(double v) {
+            this.responseWeight = v;
+            return this;
+        }
+
         public AppConfig build() {
             return new AppConfig(
                     autoBanThreshold,
@@ -317,7 +368,13 @@ public record AppConfig(
                     achievementMatchTier5,
                     minSwipesForBehaviorAchievement,
                     maxDistanceKm,
-                    maxAge);
+                    maxAge,
+                    distanceWeight,
+                    ageWeight,
+                    interestWeight,
+                    lifestyleWeight,
+                    paceWeight,
+                    responseWeight);
         }
     }
 }

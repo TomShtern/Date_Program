@@ -788,8 +788,8 @@ public class User {
     }
 
     public void setHeightCm(Integer heightCm) {
-        if (heightCm != null && (heightCm < 100 || heightCm > 250)) {
-            throw new IllegalArgumentException("Height must be 100-250 cm");
+        if (heightCm != null && (heightCm < 50 || heightCm > 300)) {
+            throw new IllegalArgumentException("Height must be 50-300cm");
         }
         this.heightCm = heightCm;
         touch();

@@ -54,7 +54,7 @@ class LikerBrowserServiceTest {
         likeStorage.addAlreadyInteracted(alreadyInteractedId);
 
         InMemoryBlockStorage blockStorage = new InMemoryBlockStorage();
-        blockStorage.blocked.add(blockedId);
+        blockStorage.save(Block.create(currentUserId, blockedId));
 
         InMemoryMatchStorage matchStorage = new InMemoryMatchStorage();
         matchStorage.matches.add(Match.create(currentUserId, matchedId));
@@ -302,31 +302,54 @@ class LikerBrowserServiceTest {
     }
 
     private static class InMemoryBlockStorage implements BlockStorage {
-        private final Set<UUID> blocked = new HashSet<>();
+        private final List<Block> blocks = new ArrayList<>();
 
         @Override
         public void save(Block block) {
-            throw new UnsupportedOperationException();
+            blocks.add(block);
         }
 
         @Override
         public boolean isBlocked(UUID userA, UUID userB) {
-            throw new UnsupportedOperationException();
+            return blocks.stream()
+                    .anyMatch(b -> (b.blockerId().equals(userA) && b.blockedId().equals(userB))
+                            || (b.blockerId().equals(userB) && b.blockedId().equals(userA)));
         }
 
         @Override
         public Set<UUID> getBlockedUserIds(UUID userId) {
-            return blocked;
+            Set<UUID> result = new HashSet<>();
+            for (Block block : blocks) {
+                if (block.blockerId().equals(userId)) {
+                    result.add(block.blockedId());
+                } else if (block.blockedId().equals(userId)) {
+                    result.add(block.blockerId());
+                }
+            }
+            return result;
+        }
+
+        @Override
+        public List<Block> findByBlocker(UUID blockerId) {
+            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
+        }
+
+        @Override
+        public boolean delete(UUID blockerId, UUID blockedId) {
+            return blocks.removeIf(
+                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
         }
 
         @Override
         public int countBlocksGiven(UUID userId) {
-            throw new UnsupportedOperationException();
+            return (int)
+                    blocks.stream().filter(b -> b.blockerId().equals(userId)).count();
         }
 
         @Override
         public int countBlocksReceived(UUID userId) {
-            throw new UnsupportedOperationException();
+            return (int)
+                    blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
         }
     }
 }

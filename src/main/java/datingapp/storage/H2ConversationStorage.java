@@ -39,7 +39,9 @@ public class H2ConversationStorage extends AbstractH2Storage implements Conversa
                     archive_reason VARCHAR(20),
                     visible_to_user_a BOOLEAN DEFAULT TRUE,
                     visible_to_user_b BOOLEAN DEFAULT TRUE,
-                    CONSTRAINT unq_conversation_users UNIQUE (user_a, user_b)
+                    CONSTRAINT unq_conversation_users UNIQUE (user_a, user_b),
+                    FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """;
         String indexA = "CREATE INDEX IF NOT EXISTS idx_conversations_user_a ON conversations(user_a)";

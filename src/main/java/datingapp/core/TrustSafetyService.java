@@ -6,13 +6,17 @@ import datingapp.core.UserInteractions.Report;
 import datingapp.core.UserInteractions.ReportStorage;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Consolidated safety and verification workflows. */
 public class TrustSafetyService {
 
+    private static final Logger logger = LoggerFactory.getLogger(TrustSafetyService.class);
     public static final Duration DEFAULT_VERIFICATION_TTL = Duration.ofMinutes(15);
 
     private final ReportStorage reportStorage;
@@ -136,6 +140,49 @@ public class TrustSafetyService {
         if (reportStorage == null || userStorage == null || blockStorage == null || config == null) {
             throw new IllegalStateException("Report dependencies are not configured");
         }
+    }
+
+    /**
+     * Unblocks a previously blocked user.
+     *
+     * @param blockerId the user who created the block
+     * @param blockedId the user who was blocked
+     * @return true if the block was removed, false if no block existed
+     */
+    public boolean unblock(UUID blockerId, UUID blockedId) {
+        Objects.requireNonNull(blockerId, "blockerId cannot be null");
+        Objects.requireNonNull(blockedId, "blockedId cannot be null");
+
+        if (blockStorage == null) {
+            throw new IllegalStateException("BlockStorage is not configured");
+        }
+
+        boolean deleted = blockStorage.delete(blockerId, blockedId);
+        if (deleted) {
+            logger.info("User {} unblocked user {}", blockerId, blockedId);
+        } else {
+            logger.debug("No block found between {} and {}", blockerId, blockedId);
+        }
+        return deleted;
+    }
+
+    /**
+     * Retrieves all users that the given user has blocked.
+     *
+     * @param userId the user whose blocked users to retrieve
+     * @return list of blocked users
+     */
+    public List<User> getBlockedUsers(UUID userId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+
+        if (blockStorage == null || userStorage == null) {
+            throw new IllegalStateException("BlockStorage or UserStorage is not configured");
+        }
+
+        return blockStorage.findByBlocker(userId).stream()
+                .map(block -> userStorage.get(block.blockedId()))
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     /** Result of a report action, including moderation outcome. */

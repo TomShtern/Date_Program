@@ -103,6 +103,17 @@ public final class TestStorages {
         }
 
         @Override
+        public List<Block> findByBlocker(UUID blockerId) {
+            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
+        }
+
+        @Override
+        public boolean delete(UUID blockerId, UUID blockedId) {
+            return blocks.removeIf(
+                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
+        }
+
+        @Override
         public int countBlocksGiven(UUID userId) {
             return (int)
                     blocks.stream().filter(b -> b.blockerId().equals(userId)).count();

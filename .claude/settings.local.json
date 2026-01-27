@@ -16,7 +16,14 @@
       "Bash(mvn compile:*)",
       "Bash(mvn clean compile:*)",
       "Bash(mvn verify:*)",
-      "Bash(mvn jacoco:report:*)"
+      "Bash(mvn jacoco:report:*)",
+      "Bash(mvn clean test:*)",
+      "Bash(javac:*)",
+      "Bash(mvn --version:*)",
+      "Bash(mvn -q test:*)",
+      "Bash(mvn:*)",
+      "Bash(tee:*)",
+      "Bash(Select-String -Pattern \"ERROR\" -Context 2,2)"
     ]
   },
   "outputStyle": "Explanatory"

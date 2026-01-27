@@ -182,7 +182,8 @@ public class MessagingService {
             return countMessagesNotFromUser(conversationId, userId);
         }
 
-        return messageStorage.countMessagesAfter(conversationId, lastReadAt);
+        // Count messages after last read, excluding user's own messages
+        return messageStorage.countMessagesAfterNotFrom(conversationId, lastReadAt, userId);
     }
 
     /**

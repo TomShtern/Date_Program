@@ -15,6 +15,7 @@ import datingapp.core.DailyService;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.SessionService;
 import datingapp.core.User;
+import datingapp.core.ValidationService;
 import datingapp.storage.DatabaseManager;
 import java.util.Scanner;
 import org.slf4j.Logger;
@@ -63,17 +64,18 @@ public class Main {
                     case "5" -> matchingHandler.viewMatches();
                     case "6" -> safetyHandler.blockUser();
                     case "7" -> safetyHandler.reportUser();
-                    case "8" -> profileHandler.setDealbreakers();
-                    case "9" -> statsHandler.viewStatistics();
-                    case "10" -> profileHandler.previewProfile();
-                    case "11" -> statsHandler.viewAchievements();
-                    case "12" -> profileNotesHandler.viewAllNotes();
-                    case "13" -> profileHandler.viewProfileScore();
-                    case "14" -> safetyHandler.verifyProfile();
-                    case "15" -> likerBrowserHandler.browseWhoLikedMe();
-                    case "16" -> messagingHandler.showConversations();
-                    case "17" -> relationshipHandler.viewNotifications();
-                    case "18" -> relationshipHandler.viewPendingRequests();
+                    case "8" -> safetyHandler.manageBlockedUsers();
+                    case "9" -> profileHandler.setDealbreakers();
+                    case "10" -> statsHandler.viewStatistics();
+                    case "11" -> profileHandler.previewProfile();
+                    case "12" -> statsHandler.viewAchievements();
+                    case "13" -> profileNotesHandler.viewAllNotes();
+                    case "14" -> profileHandler.viewProfileScore();
+                    case "15" -> safetyHandler.verifyProfile();
+                    case "16" -> likerBrowserHandler.browseWhoLikedMe();
+                    case "17" -> messagingHandler.showConversations();
+                    case "18" -> relationshipHandler.viewNotifications();
+                    case "19" -> relationshipHandler.viewPendingRequests();
                     case "0" -> {
                         running = false;
                         logger.info("\n👋 Goodbye!\n");
@@ -100,11 +102,15 @@ public class Main {
         inputReader = new CliUtilities.InputReader(scanner);
         userSession = new CliUtilities.UserSession();
 
+        // Initialize validation service (stateless, no dependencies)
+        ValidationService validationService = new ValidationService();
+
         // Initialize Handlers
         profileHandler = new ProfileHandler(
                 services.getUserStorage(),
                 services.getProfilePreviewService(),
                 services.getAchievementService(),
+                validationService,
                 userSession,
                 inputReader);
 
@@ -195,19 +201,20 @@ public class Main {
         logger.info("  5. View my matches");
         logger.info("  6. 🚫 Block a user");
         logger.info("  7. ⚠️  Report a user");
-        logger.info("  8. 🎯 Set dealbreakers");
-        logger.info("  9. 📊 View my statistics");
-        logger.info("  10. 👤 Preview my profile");
-        logger.info("  11. 🏆 View achievements");
-        logger.info("  12. 📝 My profile notes");
-        logger.info("  13. 📊 Profile completion score");
-        logger.info("  14. ✅ Verify my profile");
-        logger.info("  15. 💌 Who liked me");
+        logger.info("  8. 🔓 Manage blocked users");
+        logger.info("  9. 🎯 Set dealbreakers");
+        logger.info("  10. 📊 View my statistics");
+        logger.info("  11. 👤 Preview my profile");
+        logger.info("  12. 🏆 View achievements");
+        logger.info("  13. 📝 My profile notes");
+        logger.info("  14. 📊 Profile completion score");
+        logger.info("  15. ✅ Verify my profile");
+        logger.info("  16. 💌 Who liked me");
         int unreadCount = messagingHandler.getTotalUnreadCount();
         String unreadStr = unreadCount > 0 ? " (" + unreadCount + " new)" : "";
-        logger.info("  16. 💬 Conversations{}", unreadStr);
-        logger.info("  17. 🔔 Notifications");
-        logger.info("  18. 🤝 Friend Requests");
+        logger.info("  17. 💬 Conversations{}", unreadStr);
+        logger.info("  18. 🔔 Notifications");
+        logger.info("  19. 🤝 Friend Requests");
         logger.info("  0. Exit");
         logger.info(CliConstants.SEPARATOR_LINE + "\n");
     }

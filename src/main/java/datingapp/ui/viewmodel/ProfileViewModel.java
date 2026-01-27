@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ProfileViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
+    private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
 
     private final User.Storage userStorage;
 
@@ -135,6 +136,9 @@ public class ProfileViewModel {
             dealbreakersStatus.set("None set");
         }
 
+        // Primary photo
+        updatePrimaryPhoto(user);
+
         // Calculate completion using static method
         updateCompletion(user);
     }
@@ -176,6 +180,24 @@ public class ProfileViewModel {
         } catch (Exception e) {
             logger.error("Failed to calculate profile completion", e);
             completionStatus.set("--");
+        }
+    }
+
+    private void updatePrimaryPhoto(User user) {
+        if (user == null) {
+            primaryPhotoUrl.set("");
+            return;
+        }
+        List<String> urls = user.getPhotoUrls();
+        if (urls == null || urls.isEmpty()) {
+            primaryPhotoUrl.set("");
+            return;
+        }
+        String first = urls.getFirst();
+        if (first == null || first.isBlank() || PLACEHOLDER_PHOTO_URL.equals(first)) {
+            primaryPhotoUrl.set("");
+        } else {
+            primaryPhotoUrl.set(first);
         }
     }
 
@@ -472,6 +494,11 @@ public class ProfileViewModel {
             logger.warn("No current user for photo save");
             return;
         }
+        if (photoFile == null || !photoFile.isFile()) {
+            logger.warn("Invalid photo file selected: {}", photoFile);
+            UiServices.Toast.getInstance().showError("Invalid photo file selected");
+            return;
+        }
 
         Thread.ofVirtual().name("photo-save").start(() -> {
             try {
@@ -494,6 +521,7 @@ public class ProfileViewModel {
                 // 5. Update UI on FX thread
                 Platform.runLater(() -> {
                     primaryPhotoUrl.set(photoUrl);
+                    updateCompletion(user);
                     UiServices.Toast.getInstance().showSuccess("Photo saved!");
                     logger.info("Profile photo saved: {}", destination);
                 });

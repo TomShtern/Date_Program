@@ -31,6 +31,7 @@ public class CliConstants {
     public static final String HEADER_BROWSE_CANDIDATES = "--- Browse Candidates ---";
     public static final String HEADER_BLOCK_USER = "\n--- Block a User ---\n";
     public static final String HEADER_REPORT_USER = "\n--- Report a User ---\n";
+    public static final String HEADER_BLOCKED_USERS = "\n--- Blocked Users ---\n";
     public static final String HEADER_INTERESTS_HOBBIES = "--- Interests & Hobbies (max 10) ---";
     public static final String HEADER_LIFESTYLE = "--- Lifestyle (optional, helps with matching) ---";
     public static final String HEADER_YOUR_STATISTICS = "         YOUR DATING STATISTICS";

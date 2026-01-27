@@ -3,6 +3,7 @@ package datingapp.cli;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.User;
+import datingapp.core.ValidationService;
 import java.io.StringReader;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -33,7 +34,7 @@ class ProfileCreateSelectTest {
         CliUtilities.InputReader inputReader = new CliUtilities.InputReader(new Scanner(new StringReader(input)));
         // ProfilePreviewService and AchievementService can be null for create/select tests
         // since they aren't used by these methods
-        return new ProfileHandler(userStorage, null, null, userSession, inputReader);
+        return new ProfileHandler(userStorage, null, null, new ValidationService(), userSession, inputReader);
     }
 
     @Nested

@@ -55,7 +55,13 @@ class AchievementServiceTest {
         profilePreviewService = new ProfilePreviewService();
 
         service = new AchievementService(
-                achievementStorage, matchStorage, likeStorage, userStorage, reportStorage, profilePreviewService);
+                achievementStorage,
+                matchStorage,
+                likeStorage,
+                userStorage,
+                reportStorage,
+                profilePreviewService,
+                AppConfig.defaults());
 
         userId = UUID.randomUUID();
         user = createActiveUser(userId, "Test User");

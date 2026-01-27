@@ -44,7 +44,7 @@ class DailyPickServiceTest {
         dailyPickStorage = new InMemoryDailyPickStorage();
         config = AppConfig.defaults();
 
-        service = new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, config);
+        service = new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, null, config);
     }
 
     @Test
@@ -386,16 +386,33 @@ class DailyPickServiceTest {
         @Override
         public boolean isBlocked(UUID blockerId, UUID blockedId) {
             return blocks.stream()
-                    .anyMatch(b ->
-                            b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
+                    .anyMatch(b -> (b.blockerId().equals(blockerId)
+                                    && b.blockedId().equals(blockedId))
+                            || (b.blockerId().equals(blockedId) && b.blockedId().equals(blockerId)));
         }
 
         @Override
         public java.util.Set<UUID> getBlockedUserIds(UUID blockerId) {
-            return blocks.stream()
-                    .filter(b -> b.blockerId().equals(blockerId))
-                    .map(Block::blockedId)
-                    .collect(java.util.stream.Collectors.toSet());
+            java.util.Set<UUID> blockedIds = new java.util.HashSet<>();
+            for (Block block : blocks) {
+                if (block.blockerId().equals(blockerId)) {
+                    blockedIds.add(block.blockedId());
+                } else if (block.blockedId().equals(blockerId)) {
+                    blockedIds.add(block.blockerId());
+                }
+            }
+            return blockedIds;
+        }
+
+        @Override
+        public List<Block> findByBlocker(UUID blockerId) {
+            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
+        }
+
+        @Override
+        public boolean delete(UUID blockerId, UUID blockedId) {
+            return blocks.removeIf(
+                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
         }
 
         @Override

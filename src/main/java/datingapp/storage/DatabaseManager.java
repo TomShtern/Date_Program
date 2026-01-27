@@ -278,11 +278,343 @@ public class DatabaseManager {
             // User achievements index
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_achievements_user_id ON user_achievements(user_id)");
 
+            // Create all feature tables (Phase 4 consolidation)
+            createMessagingSchema(stmt);
+            createSocialSchema(stmt);
+            createModerationSchema(stmt);
+            createProfileSchema(stmt);
+
+            // Add missing foreign key constraints
+            addMissingForeignKeys(stmt);
+
+            // Track schema version
+            createSchemaVersionTable(stmt);
+            recordSchemaVersion(stmt, 1, "Initial consolidated schema with all tables and FK constraints");
+
             initialized = true;
 
         } catch (SQLException e) {
             throw new AbstractH2Storage.StorageException("Failed to initialize database schema", e);
         }
+    }
+
+    /**
+     * Creates messaging-related tables (conversations, messages).
+     * Consolidated from H2ConversationStorage and H2MessageStorage.
+     */
+    private void createMessagingSchema(Statement stmt) throws SQLException {
+        // Conversations table
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id VARCHAR(100) PRIMARY KEY,
+                    user_a UUID NOT NULL,
+                    user_b UUID NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    last_message_at TIMESTAMP,
+                    user_a_last_read_at TIMESTAMP,
+                    user_b_last_read_at TIMESTAMP,
+                    archived_at TIMESTAMP,
+                    archive_reason VARCHAR(20),
+                    visible_to_user_a BOOLEAN DEFAULT TRUE,
+                    visible_to_user_b BOOLEAN DEFAULT TRUE,
+                    CONSTRAINT unq_conversation_users UNIQUE (user_a, user_b),
+                    FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_a ON conversations(user_a)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_b ON conversations(user_b)");
+
+        // Messages table
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id UUID PRIMARY KEY,
+                    conversation_id VARCHAR(100) NOT NULL,
+                    sender_id UUID NOT NULL,
+                    content VARCHAR(1000) NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation_created "
+                + "ON messages(conversation_id, created_at)");
+    }
+
+    /**
+     * Creates social-related tables (friend_requests, notifications).
+     * Consolidated from H2SocialStorage.
+     */
+    private void createSocialSchema(Statement stmt) throws SQLException {
+        // Friend requests table
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS friend_requests (
+                    id UUID PRIMARY KEY,
+                    from_user_id UUID NOT NULL,
+                    to_user_id UUID NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    status VARCHAR(20) NOT NULL,
+                    responded_at TIMESTAMP,
+                    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_friend_req_users "
+                + "ON friend_requests(from_user_id, to_user_id, status)");
+
+        // Notifications table
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id UUID PRIMARY KEY,
+                    user_id UUID NOT NULL,
+                    type VARCHAR(30) NOT NULL,
+                    title VARCHAR(200) NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    is_read BOOLEAN DEFAULT FALSE,
+                    data_json TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read)");
+    }
+
+    /**
+     * Creates moderation-related tables (blocks, reports).
+     * Consolidated from H2ModerationStorage.
+     */
+    private void createModerationSchema(Statement stmt) throws SQLException {
+        // Blocks table
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS blocks (
+                    id UUID PRIMARY KEY,
+                    blocker_id UUID NOT NULL,
+                    blocked_id UUID NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    UNIQUE (blocker_id, blocked_id),
+                    FOREIGN KEY (blocker_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_blocks_blocker ON blocks(blocker_id)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON blocks(blocked_id)");
+
+        // Reports table
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS reports (
+                    id UUID PRIMARY KEY,
+                    reporter_id UUID NOT NULL,
+                    reported_user_id UUID NOT NULL,
+                    reason VARCHAR(50) NOT NULL,
+                    description VARCHAR(500),
+                    created_at TIMESTAMP NOT NULL,
+                    UNIQUE (reporter_id, reported_user_id),
+                    FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (reported_user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_user_id)");
+    }
+
+    /**
+     * Creates profile-related tables (profile_notes, profile_views).
+     * Consolidated from H2ProfileDataStorage.
+     */
+    private void createProfileSchema(Statement stmt) throws SQLException {
+        // Profile notes table
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS profile_notes (
+                    author_id UUID NOT NULL,
+                    subject_id UUID NOT NULL,
+                    content VARCHAR(500) NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL,
+                    PRIMARY KEY (author_id, subject_id),
+                    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (subject_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_profile_notes_author ON profile_notes(author_id)");
+
+        // Profile views table
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS profile_views (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    viewer_id UUID NOT NULL,
+                    viewed_id UUID NOT NULL,
+                    viewed_at TIMESTAMP NOT NULL,
+                    FOREIGN KEY (viewer_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (viewed_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_id ON profile_views(viewed_id)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_at ON profile_views(viewed_at DESC)");
+    }
+
+    /**
+     * Creates schema version tracking table for migration management.
+     */
+    private void createSchemaVersionTable(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS schema_version (
+                    version INT PRIMARY KEY,
+                    applied_at TIMESTAMP NOT NULL,
+                    description VARCHAR(255)
+                )
+                """);
+    }
+
+    /**
+     * Records a schema version if not already recorded.
+     *
+     * @param stmt The statement to use
+     * @param version The schema version number
+     * @param description Description of what this version includes
+     */
+    private void recordSchemaVersion(Statement stmt, int version, String description) throws SQLException {
+        String sql = """
+                MERGE INTO schema_version (version, applied_at, description)
+                KEY (version)
+                VALUES (?, CURRENT_TIMESTAMP, ?)
+                """;
+
+        try (var pstmt = stmt.getConnection().prepareStatement(sql)) {
+            pstmt.setInt(1, version);
+            pstmt.setString(2, description);
+            pstmt.executeUpdate();
+        }
+    }
+
+    /**
+     * Adds missing foreign key constraints to existing tables.
+     * Uses IF NOT EXISTS to safely handle already-constrained databases.
+     * Silently skips tables that don't exist yet (they'll be created with FKs by their storage classes).
+     */
+    private void addMissingForeignKeys(Statement stmt) throws SQLException {
+        // Helper to safely add FK constraints - ignores if table doesn't exist
+        java.util.function.Consumer<String> safeAddFK = sql -> {
+            try {
+                stmt.execute(sql);
+            } catch (SQLException e) {
+                // Table doesn't exist yet - that's fine, it will be created with FKs by storage class
+                if (!e.getMessage().contains("not found")) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+
+        // daily_pick_views - add FK to users
+        safeAddFK.accept("""
+                ALTER TABLE daily_pick_views
+                ADD CONSTRAINT IF NOT EXISTS fk_daily_pick_views_user
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+
+        // user_achievements - add FK to users
+        safeAddFK.accept("""
+                ALTER TABLE user_achievements
+                ADD CONSTRAINT IF NOT EXISTS fk_user_achievements_user
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+
+        // friend_requests - add FKs (table may not exist yet)
+        safeAddFK.accept("""
+                ALTER TABLE friend_requests
+                ADD CONSTRAINT IF NOT EXISTS fk_friend_requests_from
+                FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+        safeAddFK.accept("""
+                ALTER TABLE friend_requests
+                ADD CONSTRAINT IF NOT EXISTS fk_friend_requests_to
+                FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+
+        // notifications - add FK to users
+        safeAddFK.accept("""
+                ALTER TABLE notifications
+                ADD CONSTRAINT IF NOT EXISTS fk_notifications_user
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+
+        // blocks - add FKs
+        safeAddFK.accept("""
+                ALTER TABLE blocks
+                ADD CONSTRAINT IF NOT EXISTS fk_blocks_blocker
+                FOREIGN KEY (blocker_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+        safeAddFK.accept("""
+                ALTER TABLE blocks
+                ADD CONSTRAINT IF NOT EXISTS fk_blocks_blocked
+                FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+
+        // reports - add FKs
+        safeAddFK.accept("""
+                ALTER TABLE reports
+                ADD CONSTRAINT IF NOT EXISTS fk_reports_reporter
+                FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+        safeAddFK.accept("""
+                ALTER TABLE reports
+                ADD CONSTRAINT IF NOT EXISTS fk_reports_reported
+                FOREIGN KEY (reported_user_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+
+        // conversations - add FKs
+        safeAddFK.accept("""
+                ALTER TABLE conversations
+                ADD CONSTRAINT IF NOT EXISTS fk_conversations_user_a
+                FOREIGN KEY (user_a_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+        safeAddFK.accept("""
+                ALTER TABLE conversations
+                ADD CONSTRAINT IF NOT EXISTS fk_conversations_user_b
+                FOREIGN KEY (user_b_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+
+        // messages - add FKs
+        safeAddFK.accept("""
+                ALTER TABLE messages
+                ADD CONSTRAINT IF NOT EXISTS fk_messages_sender
+                FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+        safeAddFK.accept("""
+                ALTER TABLE messages
+                ADD CONSTRAINT IF NOT EXISTS fk_messages_conversation
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+                """);
+
+        // profile_notes - add FKs
+        safeAddFK.accept("""
+                ALTER TABLE profile_notes
+                ADD CONSTRAINT IF NOT EXISTS fk_profile_notes_author
+                FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+        safeAddFK.accept("""
+                ALTER TABLE profile_notes
+                ADD CONSTRAINT IF NOT EXISTS fk_profile_notes_subject
+                FOREIGN KEY (subject_user_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+
+        // profile_views - add FKs
+        safeAddFK.accept("""
+                ALTER TABLE profile_views
+                ADD CONSTRAINT IF NOT EXISTS fk_profile_views_viewer
+                FOREIGN KEY (viewer_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
+        safeAddFK.accept("""
+                ALTER TABLE profile_views
+                ADD CONSTRAINT IF NOT EXISTS fk_profile_views_viewed
+                FOREIGN KEY (viewed_user_id) REFERENCES users(id) ON DELETE CASCADE
+                """);
     }
 
     /**

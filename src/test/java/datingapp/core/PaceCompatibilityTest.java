@@ -34,7 +34,7 @@ class PaceCompatibilityTest {
 
     @BeforeEach
     void setUp() {
-        service = new MatchQualityService(new MinimalUserStorage(), new MinimalLikeStorage());
+        service = new MatchQualityService(new MinimalUserStorage(), new MinimalLikeStorage(), AppConfig.defaults());
     }
 
     @Test

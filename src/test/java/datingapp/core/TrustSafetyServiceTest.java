@@ -207,6 +207,70 @@ class TrustSafetyServiceTest {
                 assertEquals("Already reported this user", result.errorMessage());
             }
         }
+
+        @Nested
+        @DisplayName("Unblock Functionality")
+        class UnblockFunctionality {
+
+            @Test
+            @DisplayName("Successfully unblocks a blocked user")
+            void successfullyUnblocksBlockedUser() {
+                Block block = Block.create(activeReporter.getId(), reportedUser.getId());
+                blockStorage.save(block);
+
+                assertTrue(
+                        blockStorage.isBlocked(activeReporter.getId(), reportedUser.getId()),
+                        "Users should be blocked initially");
+
+                boolean result = trustSafetyService.unblock(activeReporter.getId(), reportedUser.getId());
+
+                assertTrue(result, "Unblock should succeed");
+                assertFalse(
+                        blockStorage.isBlocked(activeReporter.getId(), reportedUser.getId()),
+                        "Users should no longer be blocked");
+            }
+
+            @Test
+            @DisplayName("Returns false when unblocking non-existent block")
+            void returnsFalseForNonexistentBlock() {
+                boolean result = trustSafetyService.unblock(activeReporter.getId(), reportedUser.getId());
+
+                assertFalse(result, "Should return false when no block exists");
+            }
+
+            @Test
+            @DisplayName("Gets list of blocked users")
+            void getsListOfBlockedUsers() {
+                User user1 = createActiveUser("Blocked1");
+                User user2 = createActiveUser("Blocked2");
+                User user3 = createActiveUser("Blocked3");
+                userStorage.save(user1);
+                userStorage.save(user2);
+                userStorage.save(user3);
+
+                blockStorage.save(Block.create(activeReporter.getId(), user1.getId()));
+                blockStorage.save(Block.create(activeReporter.getId(), user2.getId()));
+                blockStorage.save(Block.create(activeReporter.getId(), user3.getId()));
+
+                List<User> blockedUsers = trustSafetyService.getBlockedUsers(activeReporter.getId());
+
+                assertEquals(3, blockedUsers.size(), "Should have 3 blocked users");
+                assertTrue(
+                        blockedUsers.stream().anyMatch(u -> u.getId().equals(user1.getId())), "Should contain user1");
+                assertTrue(
+                        blockedUsers.stream().anyMatch(u -> u.getId().equals(user2.getId())), "Should contain user2");
+                assertTrue(
+                        blockedUsers.stream().anyMatch(u -> u.getId().equals(user3.getId())), "Should contain user3");
+            }
+
+            @Test
+            @DisplayName("Returns empty list when no users are blocked")
+            void returnsEmptyListWhenNoUsersBlocked() {
+                List<User> blockedUsers = trustSafetyService.getBlockedUsers(activeReporter.getId());
+
+                assertTrue(blockedUsers.isEmpty(), "Should return empty list when no users blocked");
+            }
+        }
     }
 
     // ============================================================
@@ -381,40 +445,55 @@ class TrustSafetyServiceTest {
     }
 
     private static class InMemoryBlockStorage implements BlockStorage {
-        private final Set<String> blocks = new HashSet<>();
+        private final List<Block> blocks = new ArrayList<>();
 
         @Override
         public void save(Block block) {
-            blocks.add(block.blockerId() + "->" + block.blockedId());
+            blocks.add(block);
         }
 
         @Override
         public boolean isBlocked(UUID userA, UUID userB) {
-            return blocks.contains(userA + "->" + userB) || blocks.contains(userB + "->" + userA);
+            return blocks.stream()
+                    .anyMatch(b -> (b.blockerId().equals(userA) && b.blockedId().equals(userB))
+                            || (b.blockerId().equals(userB) && b.blockedId().equals(userA)));
         }
 
         @Override
         public Set<UUID> getBlockedUserIds(UUID userId) {
             Set<UUID> result = new HashSet<>();
-            for (String block : blocks) {
-                String[] parts = block.split("->");
-                UUID a = UUID.fromString(parts[0]);
-                UUID b = UUID.fromString(parts[1]);
-                if (a.equals(userId)) result.add(b);
-                if (b.equals(userId)) result.add(a);
+            for (Block block : blocks) {
+                if (block.blockerId().equals(userId)) {
+                    result.add(block.blockedId());
+                }
+                if (block.blockedId().equals(userId)) {
+                    result.add(block.blockerId());
+                }
             }
             return result;
         }
 
         @Override
+        public List<Block> findByBlocker(UUID blockerId) {
+            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
+        }
+
+        @Override
+        public boolean delete(UUID blockerId, UUID blockedId) {
+            return blocks.removeIf(
+                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
+        }
+
+        @Override
         public int countBlocksGiven(UUID userId) {
             return (int)
-                    blocks.stream().filter(s -> s.startsWith(userId + "->")).count();
+                    blocks.stream().filter(b -> b.blockerId().equals(userId)).count();
         }
 
         @Override
         public int countBlocksReceived(UUID userId) {
-            return (int) blocks.stream().filter(s -> s.endsWith("->" + userId)).count();
+            return (int)
+                    blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
         }
     }
 }
