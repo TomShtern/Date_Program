@@ -64,6 +64,9 @@ out/
 .vscode/settings.json
 .vscode/eclipse-settings.prefs
 
+# IDEA Diagnostics folder
+IDEA_Diagnostics/
+
 # JDT Language Server (critical for Java in VS Code)
 .jdtls/
 .jdt/
