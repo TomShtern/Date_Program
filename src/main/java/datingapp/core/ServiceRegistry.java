@@ -1,20 +1,21 @@
 package datingapp.core;
 
-import datingapp.core.Achievement.UserAchievementStorage;
-import datingapp.core.DailyService.DailyPickStorage;
-import datingapp.core.Match.MatchStorage;
-import datingapp.core.Messaging.ConversationStorage;
-import datingapp.core.Messaging.MessageStorage;
-import datingapp.core.Social.FriendRequestStorage;
-import datingapp.core.Social.NotificationStorage;
-import datingapp.core.Stats.PlatformStatsStorage;
-import datingapp.core.Stats.UserStatsStorage;
-import datingapp.core.SwipeSession.SwipeSessionStorage;
-import datingapp.core.User.ProfileNoteStorage;
-import datingapp.core.User.ProfileViewStorage;
-import datingapp.core.UserInteractions.BlockStorage;
-import datingapp.core.UserInteractions.LikeStorage;
-import datingapp.core.UserInteractions.ReportStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.ConversationStorage;
+import datingapp.core.storage.DailyPickStorage;
+import datingapp.core.storage.FriendRequestStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.MessageStorage;
+import datingapp.core.storage.NotificationStorage;
+import datingapp.core.storage.PlatformStatsStorage;
+import datingapp.core.storage.ProfileNoteStorage;
+import datingapp.core.storage.ProfileViewStorage;
+import datingapp.core.storage.ReportStorage;
+import datingapp.core.storage.SwipeSessionStorage;
+import datingapp.core.storage.UserAchievementStorage;
+import datingapp.core.storage.UserStatsStorage;
+import datingapp.core.storage.UserStorage;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.H2ConversationStorage;
 import datingapp.storage.H2LikeStorage;
@@ -43,42 +44,42 @@ public class ServiceRegistry {
     private final AppConfig config;
 
     // Storage layer
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
     private final BlockStorage blockStorage;
     private final ReportStorage reportStorage;
-    private final SwipeSessionStorage sessionStorage; // Phase 0.5b
-    private final UserStatsStorage userStatsStorage; // Phase 0.5b
-    private final PlatformStatsStorage platformStatsStorage; // Phase 0.5b
-    private final DailyPickStorage dailyPickStorage; // Phase 1
-    private final UserAchievementStorage userAchievementStorage; // Phase 1
-    private final ProfileViewStorage profileViewStorage; // Phase 1.5 - view counter
-    private final ProfileNoteStorage profileNoteStorage; // Phase 1.5 - private notes
+    private final SwipeSessionStorage sessionStorage;
+    private final UserStatsStorage userStatsStorage;
+    private final PlatformStatsStorage platformStatsStorage;
+    private final DailyPickStorage dailyPickStorage;
+    private final UserAchievementStorage userAchievementStorage;
+    private final ProfileViewStorage profileViewStorage;
+    private final ProfileNoteStorage profileNoteStorage;
     private final ConversationStorage conversationStorage; // Messaging
     private final MessageStorage messageStorage; // Messaging
-    private final FriendRequestStorage friendRequestStorage; // Phase 2
-    private final NotificationStorage notificationStorage; // Phase 3
+    private final FriendRequestStorage friendRequestStorage;
+    private final NotificationStorage notificationStorage;
 
     // Services
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
     private final TrustSafetyService trustSafetyService;
-    private final SessionService sessionService; // Phase 0.5b
-    private final StatsService statsService; // Phase 0.5b
-    private final MatchQualityService matchQualityService; // Phase 0.5b
-    private final ProfilePreviewService profilePreviewService; // Phase 1
-    private final DailyService dailyService; // Phase 1
-    private final UndoService undoService; // Phase 1
-    private final AchievementService achievementService; // Phase 1
+    private final SessionService sessionService;
+    private final StatsService statsService;
+    private final MatchQualityService matchQualityService;
+    private final ProfilePreviewService profilePreviewService;
+    private final DailyService dailyService;
+    private final UndoService undoService;
+    private final AchievementService achievementService;
     private final MessagingService messagingService; // Messaging
-    private final RelationshipTransitionService relationshipTransitionService; // Phase 2/3
+    private final RelationshipTransitionService relationshipTransitionService;
 
     /** Package-private constructor - use ServiceRegistry.Builder to create. */
     @SuppressWarnings("java:S107")
     ServiceRegistry(
             AppConfig config,
-            User.Storage userStorage,
+            UserStorage userStorage,
             LikeStorage likeStorage,
             MatchStorage matchStorage,
             BlockStorage blockStorage,
@@ -143,7 +144,7 @@ public class ServiceRegistry {
         return config;
     }
 
-    public User.Storage getUserStorage() {
+    public UserStorage getUserStorage() {
         return userStorage;
     }
 
@@ -276,7 +277,7 @@ public class ServiceRegistry {
          */
         public static ServiceRegistry buildH2(DatabaseManager dbManager, AppConfig config) {
             // Core storage layer
-            User.Storage userStorage = new H2UserStorage(dbManager);
+            UserStorage userStorage = new H2UserStorage(dbManager);
             LikeStorage likeStorage = new H2LikeStorage(dbManager);
             MatchStorage matchStorage = new H2MatchStorage(dbManager);
             SwipeSessionStorage sessionStorage = new H2SwipeSessionStorage(dbManager);
@@ -380,6 +381,46 @@ public class ServiceRegistry {
         /** Builds an in-memory ServiceRegistry for testing. Uses the same H2 in-memory mode. */
         public static ServiceRegistry buildInMemory(AppConfig config) {
             return buildH2(DatabaseManager.getInstance(), config);
+        }
+
+        /**
+         * Creates a ServiceRegistry from an AppContext for backward compatibility.
+         * This allows gradual migration from ServiceRegistry to AppContext.
+         *
+         * @param app The AppContext containing all modules
+         * @return A ServiceRegistry wrapping the AppContext's components
+         */
+        public static ServiceRegistry fromAppContext(datingapp.module.AppContext app) {
+            return new ServiceRegistry(
+                    app.config(),
+                    app.storage().users(),
+                    app.storage().likes(),
+                    app.storage().matches(),
+                    app.storage().blocks(),
+                    app.storage().reports(),
+                    app.storage().swipeSessions(),
+                    app.storage().userStats(),
+                    app.storage().platformStats(),
+                    app.storage().dailyPicks(),
+                    app.storage().achievements(),
+                    app.storage().profileViews(),
+                    app.storage().profileNotes(),
+                    app.storage().conversations(),
+                    app.storage().messages(),
+                    app.storage().friendRequests(),
+                    app.storage().notifications(),
+                    app.matching().finder(),
+                    app.matching().matching(),
+                    app.safety().trustSafety(),
+                    app.matching().session(),
+                    app.stats().stats(),
+                    app.matching().quality(),
+                    app.stats().profilePreview(),
+                    app.matching().daily(),
+                    app.matching().undo(),
+                    app.stats().achievements(),
+                    app.messaging().messaging(),
+                    app.messaging().transitions());
         }
     }
 }

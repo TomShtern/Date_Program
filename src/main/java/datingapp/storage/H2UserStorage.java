@@ -5,6 +5,7 @@ import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.User;
+import datingapp.core.storage.UserStorage;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -23,8 +24,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** H2 implementation of User.Storage. */
-public class H2UserStorage extends AbstractH2Storage implements User.Storage {
+/** H2 implementation of UserStorage. */
+public class H2UserStorage extends AbstractH2Storage implements UserStorage {
 
     private static final String VARCHAR_20 = "VARCHAR(20)";
     private static final String USER_COLUMNS = """
@@ -226,21 +227,17 @@ public class H2UserStorage extends AbstractH2Storage implements User.Storage {
     }
 
     private User mapUser(ResultSet rs) throws SQLException {
-        User.DatabaseRecord data = User.DatabaseRecord.builder()
-                .id(rs.getObject("id", UUID.class))
-                .name(rs.getString("name"))
+        User user = User.StorageBuilder.create(
+                        rs.getObject("id", UUID.class), rs.getString("name"), readInstant(rs, "created_at"))
                 .bio(rs.getString("bio"))
                 .birthDate(readLocalDate(rs, "birth_date"))
                 .gender(readEnum(rs, "gender", User.Gender.class))
                 .interestedIn(stringToGenders(rs.getString("interested_in")))
-                .lat(rs.getDouble("lat"))
-                .lon(rs.getDouble("lon"))
+                .location(rs.getDouble("lat"), rs.getDouble("lon"))
                 .maxDistanceKm(rs.getInt("max_distance_km"))
-                .minAge(rs.getInt("min_age"))
-                .maxAge(rs.getInt("max_age"))
+                .ageRange(rs.getInt("min_age"), rs.getInt("max_age"))
                 .photoUrls(stringToUrls(rs.getString("photo_urls")))
                 .state(User.State.valueOf(rs.getString("state")))
-                .createdAt(readInstant(rs, "created_at"))
                 .updatedAt(readInstant(rs, "updated_at"))
                 .interests(parseInterests(rs.getString("interests")))
                 .smoking(readEnum(rs, "smoking", Lifestyle.Smoking.class))
@@ -251,15 +248,13 @@ public class H2UserStorage extends AbstractH2Storage implements User.Storage {
                 .heightCm(readInteger(rs, "height_cm"))
                 .email(rs.getString("email"))
                 .phone(rs.getString("phone"))
-                .isVerified((Boolean) rs.getObject("is_verified"))
+                .verified((Boolean) rs.getObject("is_verified"))
                 .verificationMethod(readEnum(rs, "verification_method", User.VerificationMethod.class))
                 .verificationCode(rs.getString("verification_code"))
                 .verificationSentAt(readInstant(rs, "verification_sent_at"))
                 .verifiedAt(readInstant(rs, "verified_at"))
                 .pacePreferences(readPacePreferences(rs))
                 .build();
-
-        User user = User.fromDatabase(data);
 
         Dealbreakers dealbreakers = mapDealbreakers(rs);
         if (dealbreakers.hasAnyDealbreaker()) {

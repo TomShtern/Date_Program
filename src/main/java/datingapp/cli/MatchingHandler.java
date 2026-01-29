@@ -6,7 +6,6 @@ import datingapp.core.CandidateFinder;
 import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.DailyService;
 import datingapp.core.Match;
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.MatchQualityService;
 import datingapp.core.MatchQualityService.InterestMatcher;
 import datingapp.core.MatchQualityService.MatchQuality;
@@ -15,11 +14,13 @@ import datingapp.core.RelationshipTransitionService;
 import datingapp.core.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.UndoService;
 import datingapp.core.User;
-import datingapp.core.User.ProfileViewStorage;
 import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.ProfileViewStorage;
+import datingapp.core.storage.UserStorage;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -44,7 +45,7 @@ public class MatchingHandler {
     private final DailyService dailyService;
     private final UndoService undoService;
     private final MatchQualityService matchQualityService;
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final AchievementService achievementService;
     private final ProfileViewStorage profileViewStorage;
     private final RelationshipTransitionService transitionService;
@@ -77,7 +78,7 @@ public class MatchingHandler {
             DailyService dailyService,
             UndoService undoService,
             MatchQualityService matchQualityService,
-            User.Storage userStorage,
+            UserStorage userStorage,
             AchievementService achievementService,
             ProfileViewStorage profileViewStorage,
             RelationshipTransitionService transitionService,

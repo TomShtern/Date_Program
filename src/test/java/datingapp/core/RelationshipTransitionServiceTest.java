@@ -5,14 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.Messaging.Conversation;
-import datingapp.core.Messaging.ConversationStorage;
 import datingapp.core.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.Social.FriendRequest;
-import datingapp.core.Social.FriendRequestStorage;
 import datingapp.core.Social.Notification;
-import datingapp.core.Social.NotificationStorage;
+import datingapp.core.storage.ConversationStorage;
+import datingapp.core.storage.FriendRequestStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.NotificationStorage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

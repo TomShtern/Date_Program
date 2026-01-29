@@ -341,32 +341,27 @@ class UserTest {
     }
 
     @Nested
-    @DisplayName("DatabaseRecord.Builder")
+    @DisplayName("StorageBuilder")
     @SuppressWarnings("unused")
-    class DatabaseRecordBuilderTests {
+    class StorageBuilderTests {
 
-        private User.DatabaseRecord buildRecord() {
+        private User buildUserFromStorage() {
             Preferences.PacePreferences pace = new Preferences.PacePreferences(
                     MessagingFrequency.OFTEN,
                     TimeToFirstDate.FEW_DAYS,
                     CommunicationStyle.TEXT_ONLY,
                     DepthPreference.DEEP_CHAT);
 
-            return User.DatabaseRecord.builder()
-                    .id(UUID.randomUUID())
-                    .name("Alice")
+            return User.StorageBuilder.create(UUID.randomUUID(), "Alice", Instant.parse("2026-01-01T10:00:00Z"))
                     .bio("Bio")
                     .birthDate(LocalDate.of(1990, 1, 1))
                     .gender(User.Gender.FEMALE)
                     .interestedIn(EnumSet.of(User.Gender.MALE))
-                    .lat(32.1)
-                    .lon(34.8)
+                    .location(32.1, 34.8)
                     .maxDistanceKm(50)
-                    .minAge(20)
-                    .maxAge(30)
+                    .ageRange(20, 30)
                     .photoUrls(List.of("a.jpg", "b.jpg"))
                     .state(User.State.ACTIVE)
-                    .createdAt(Instant.parse("2026-01-01T10:00:00Z"))
                     .updatedAt(Instant.parse("2026-01-02T10:00:00Z"))
                     .interests(EnumSet.of(Interest.COFFEE))
                     .smoking(Preferences.Lifestyle.Smoking.NEVER)
@@ -377,7 +372,7 @@ class UserTest {
                     .heightCm(170)
                     .email("alice@example.com")
                     .phone("+123456789")
-                    .isVerified(true)
+                    .verified(true)
                     .verificationMethod(User.VerificationMethod.EMAIL)
                     .verificationCode("123456")
                     .verificationSentAt(Instant.parse("2026-01-01T10:00:00Z"))
@@ -387,28 +382,27 @@ class UserTest {
         }
 
         @Test
-        @DisplayName("Builds record with core fields")
-        void buildsRecordWithCoreFields() {
-            User.DatabaseRecord dbRecord = buildRecord();
+        @DisplayName("Builds user with core fields")
+        void buildsUserWithCoreFields() {
+            User user = buildUserFromStorage();
 
-            assertEquals("Alice", dbRecord.getName());
-            assertEquals(LocalDate.of(1990, 1, 1), dbRecord.getBirthDate());
-            assertEquals(User.Gender.FEMALE, dbRecord.getGender());
-            assertEquals(EnumSet.of(User.Gender.MALE), dbRecord.getInterestedIn());
-            assertEquals(32.1, dbRecord.getLat());
-            assertEquals(34.8, dbRecord.getLon());
-            assertEquals(50, dbRecord.getMaxDistanceKm());
-            assertEquals(20, dbRecord.getMinAge());
-            assertEquals(30, dbRecord.getMaxAge());
-            assertEquals(List.of("a.jpg", "b.jpg"), dbRecord.getPhotoUrls());
-            assertEquals(User.State.ACTIVE, dbRecord.getState());
+            assertEquals("Alice", user.getName());
+            assertEquals(LocalDate.of(1990, 1, 1), user.getBirthDate());
+            assertEquals(User.Gender.FEMALE, user.getGender());
+            assertEquals(EnumSet.of(User.Gender.MALE), user.getInterestedIn());
+            assertEquals(32.1, user.getLat());
+            assertEquals(34.8, user.getLon());
+            assertEquals(50, user.getMaxDistanceKm());
+            assertEquals(20, user.getMinAge());
+            assertEquals(30, user.getMaxAge());
+            assertEquals(List.of("a.jpg", "b.jpg"), user.getPhotoUrls());
+            assertEquals(User.State.ACTIVE, user.getState());
         }
 
         @Test
-        @DisplayName("fromDatabase maps optional fields")
-        void fromDatabaseMapsOptionalFields() {
-            User.DatabaseRecord dbRecord = buildRecord();
-            User user = User.fromDatabase(dbRecord);
+        @DisplayName("StorageBuilder maps optional fields")
+        void storageBuilderMapsOptionalFields() {
+            User user = buildUserFromStorage();
 
             assertEquals(EnumSet.of(Interest.COFFEE), user.getInterests());
             assertEquals(Preferences.Lifestyle.Smoking.NEVER, user.getSmoking());

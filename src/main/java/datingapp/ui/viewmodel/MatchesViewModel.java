@@ -1,13 +1,14 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.Match;
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.MatchingService;
 import datingapp.core.MatchingService.PendingLiker;
 import datingapp.core.User;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.UserStorage;
 import datingapp.ui.ViewModelFactory.UISession;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -35,7 +36,7 @@ public class MatchesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(MatchesViewModel.class);
 
     private final MatchStorage matchStorage;
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final LikeStorage likeStorage;
     private final BlockStorage blockStorage;
     private final MatchingService matchingService;
@@ -51,7 +52,7 @@ public class MatchesViewModel {
 
     public MatchesViewModel(
             MatchStorage matchStorage,
-            User.Storage userStorage,
+            UserStorage userStorage,
             LikeStorage likeStorage,
             BlockStorage blockStorage,
             MatchingService matchingService) {

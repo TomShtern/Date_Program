@@ -1,14 +1,14 @@
 package datingapp.core;
 
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.Stats.PlatformStats;
-import datingapp.core.Stats.PlatformStatsStorage;
 import datingapp.core.Stats.UserStats;
-import datingapp.core.Stats.UserStatsStorage;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
-import datingapp.core.UserInteractions.ReportStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.PlatformStatsStorage;
+import datingapp.core.storage.ReportStorage;
+import datingapp.core.storage.UserStatsStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;

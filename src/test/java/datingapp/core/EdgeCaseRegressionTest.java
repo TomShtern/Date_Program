@@ -5,13 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;

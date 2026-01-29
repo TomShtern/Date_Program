@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.LikeStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;

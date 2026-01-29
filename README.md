@@ -19,7 +19,7 @@ A command-line based dating application refactored for clean architecture and st
 ## Getting Started
 
 ### Prerequisites
-- Java 21+
+- Java 25
 - Maven
 - **Windows 11**: UTF-8 console encoding (see below)
 

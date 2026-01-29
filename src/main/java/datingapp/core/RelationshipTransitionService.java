@@ -1,12 +1,12 @@
 package datingapp.core;
 
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.Messaging.Conversation;
-import datingapp.core.Messaging.ConversationStorage;
 import datingapp.core.Social.FriendRequest;
-import datingapp.core.Social.FriendRequestStorage;
 import datingapp.core.Social.Notification;
-import datingapp.core.Social.NotificationStorage;
+import datingapp.core.storage.ConversationStorage;
+import datingapp.core.storage.FriendRequestStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.NotificationStorage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

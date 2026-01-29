@@ -1,9 +1,9 @@
 package datingapp.storage;
 
 import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Report;
-import datingapp.core.UserInteractions.ReportStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.ReportStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

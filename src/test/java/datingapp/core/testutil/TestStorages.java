@@ -1,12 +1,13 @@
 package datingapp.core.testutil;
 
 import datingapp.core.Match;
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.*;
 
@@ -26,9 +27,9 @@ public final class TestStorages {
     private TestStorages() {} // Utility class - no instantiation
 
     /**
-     * In-memory User.Storage implementation for testing.
+     * In-memory UserStorage implementation for testing.
      */
-    public static class Users implements User.Storage {
+    public static class Users implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
 
         @Override

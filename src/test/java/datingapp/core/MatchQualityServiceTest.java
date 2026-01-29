@@ -13,7 +13,8 @@ import datingapp.core.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.Optional;
@@ -533,7 +534,7 @@ class MatchQualityServiceTest {
 
     // === Test Doubles ===
 
-    private static class TestUserStorage implements User.Storage {
+    private static class TestUserStorage implements UserStorage {
         private final java.util.Map<UUID, User> users = new java.util.HashMap<>();
 
         @Override

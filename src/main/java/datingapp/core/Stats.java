@@ -220,38 +220,4 @@ public final class Stats {
             return new PlatformStats(UUID.randomUUID(), Instant.now(), 0, 0.0, 0.0, 0.0, 0.5);
         }
     }
-
-    // ========== STORAGE INTERFACES ==========
-
-    /** Storage interface for UserStats snapshots. */
-    public interface UserStatsStorage {
-
-        /** Save a new stats snapshot. */
-        void save(UserStats stats);
-
-        /** Get the most recent stats for a user. */
-        java.util.Optional<UserStats> getLatest(UUID userId);
-
-        /** Get historical snapshots for a user (most recent first). */
-        java.util.List<UserStats> getHistory(UUID userId, int limit);
-
-        /** Get latest stats for all users (for computing platform averages). */
-        java.util.List<UserStats> getAllLatestStats();
-
-        /** Delete snapshots older than a certain date (cleanup). */
-        int deleteOlderThan(Instant cutoff);
-    }
-
-    /** Storage interface for PlatformStats. */
-    public interface PlatformStatsStorage {
-
-        /** Save platform statistics snapshot. */
-        void save(PlatformStats stats);
-
-        /** Get the most recent platform stats. */
-        java.util.Optional<PlatformStats> getLatest();
-
-        /** Get historical platform stats (most recent first). */
-        java.util.List<PlatformStats> getHistory(int limit);
-    }
 }

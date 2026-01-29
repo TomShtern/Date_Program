@@ -1,7 +1,7 @@
 package datingapp.storage;
 
 import datingapp.core.Messaging.Message;
-import datingapp.core.Messaging.MessageStorage;
+import datingapp.core.storage.MessageStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

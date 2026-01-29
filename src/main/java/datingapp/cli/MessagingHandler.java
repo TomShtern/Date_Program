@@ -1,7 +1,6 @@
 package datingapp.cli;
 
 import datingapp.core.Match;
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.Messaging.Conversation;
 import datingapp.core.Messaging.Message;
 import datingapp.core.MessagingService;
@@ -10,6 +9,7 @@ import datingapp.core.MessagingService.SendResult;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
+import datingapp.core.storage.MatchStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;

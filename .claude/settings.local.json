@@ -23,7 +23,14 @@
       "Bash(mvn -q test:*)",
       "Bash(mvn:*)",
       "Bash(tee:*)",
-      "Bash(Select-String -Pattern \"ERROR\" -Context 2,2)"
+      "Bash(Select-String -Pattern \"ERROR\" -Context 2,2)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(Select-String -Pattern \"\\(Tests run|BUILD\\)\")",
+      "Bash(MAVEN_OPTS=\"-X\" mvn test:*)",
+      "Bash(MAVEN_OPTS=\"-Xmx2G\" mvn:*)",
+      "Bash(/c/ProgramData/chocolatey/lib/maven/apache-maven-3.9.12/bin/mvn:*)",
+      "Bash(timeout 60 bash:*)"
     ]
   },
   "outputStyle": "Explanatory"

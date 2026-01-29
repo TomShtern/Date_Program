@@ -2,13 +2,13 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.MatchingService.PendingLiker;
-import datingapp.core.Preferences.Interest;
 import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -109,40 +109,14 @@ class LikerBrowserServiceTest {
     }
 
     private static User baseUser(UUID id, String name, User.State state) {
-        User.DatabaseRecord data = User.DatabaseRecord.builder()
-                .id(id)
-                .name(name)
-                .bio(null)
+        return User.StorageBuilder.create(id, name, Instant.EPOCH)
                 .birthDate(LocalDate.of(1990, 1, 1))
                 .gender(User.Gender.OTHER)
                 .interestedIn(EnumSet.of(User.Gender.OTHER))
-                .lat(0.0)
-                .lon(0.0)
-                .maxDistanceKm(50)
-                .minAge(18)
-                .maxAge(99)
-                .photoUrls(List.of())
                 .state(state)
-                .createdAt(Instant.EPOCH)
                 .updatedAt(Instant.EPOCH)
-                .interests(EnumSet.noneOf(Interest.class))
-                .smoking(null)
-                .drinking(null)
-                .wantsKids(null)
-                .lookingFor(null)
-                .education(null)
-                .heightCm(null)
-                .email(null)
-                .phone(null)
-                .isVerified(false)
-                .verificationMethod(null)
-                .verificationCode(null)
-                .verificationSentAt(null)
-                .verifiedAt(null)
-                .pacePreferences(null)
+                .verified(false)
                 .build();
-
-        return User.fromDatabase(data);
     }
 
     private static class InMemoryLikeStorage implements LikeStorage {
@@ -229,7 +203,7 @@ class LikerBrowserServiceTest {
         }
     }
 
-    private static class InMemoryUserStorage implements User.Storage {
+    private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
 
         void put(User user) {

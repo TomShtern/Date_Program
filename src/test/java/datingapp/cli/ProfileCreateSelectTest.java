@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.User;
 import datingapp.core.ValidationService;
+import datingapp.core.storage.UserStorage;
 import java.io.StringReader;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -197,7 +198,7 @@ class ProfileCreateSelectTest {
 
     // === In-Memory Mock Storage ===
 
-    private static class InMemoryUserStorage implements User.Storage {
+    private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new LinkedHashMap<>();
 
         @Override

@@ -15,6 +15,7 @@ import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfilePreviewService;
 import datingapp.core.User;
 import datingapp.core.ValidationService;
+import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -32,7 +33,7 @@ public class ProfileHandler {
     private static final Logger logger = LoggerFactory.getLogger(ProfileHandler.class);
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final ProfilePreviewService profilePreviewService;
     private final AchievementService achievementService;
     private final ValidationService validationService;
@@ -40,10 +41,9 @@ public class ProfileHandler {
     private final CliUtilities.InputReader inputReader;
 
     private static final String PROMPT_CHOICE = "Your choice: ";
-    private static final String PROMPT_CHOICES = "Choices: ";
 
     public ProfileHandler(
-            User.Storage userStorage,
+            UserStorage userStorage,
             ProfilePreviewService profilePreviewService,
             AchievementService achievementService,
             ValidationService validationService,
@@ -456,57 +456,22 @@ public class ProfileHandler {
             }
         }
 
-        logger.info("Smoking: 1=Never, 2=Sometimes, 3=Regularly, 0=Skip");
-        String smokingChoice = inputReader.readLine(PROMPT_CHOICE);
-        Lifestyle.Smoking smoking =
-                switch (smokingChoice) {
-                    case "1" -> Lifestyle.Smoking.NEVER;
-                    case "2" -> Lifestyle.Smoking.SOMETIMES;
-                    case "3" -> Lifestyle.Smoking.REGULARLY;
-                    default -> null;
-                };
+        var smoking = EnumMenu.prompt(inputReader, Lifestyle.Smoking.class, "Select smoking:", true);
         if (smoking != null) {
             currentUser.setSmoking(smoking);
         }
 
-        logger.info("Drinking: 1=Never, 2=Socially, 3=Regularly, 0=Skip");
-        String drinkingChoice = inputReader.readLine(PROMPT_CHOICE);
-        Lifestyle.Drinking drinking =
-                switch (drinkingChoice) {
-                    case "1" -> Lifestyle.Drinking.NEVER;
-                    case "2" -> Lifestyle.Drinking.SOCIALLY;
-                    case "3" -> Lifestyle.Drinking.REGULARLY;
-                    default -> null;
-                };
+        var drinking = EnumMenu.prompt(inputReader, Lifestyle.Drinking.class, "Select drinking:", true);
         if (drinking != null) {
             currentUser.setDrinking(drinking);
         }
 
-        logger.info("Kids: 1=Don't want, 2=Open to it, 3=Want someday, 4=Have kids, 0=Skip");
-        String kidsChoice = inputReader.readLine(PROMPT_CHOICE);
-        Lifestyle.WantsKids wantsKids =
-                switch (kidsChoice) {
-                    case "1" -> Lifestyle.WantsKids.NO;
-                    case "2" -> Lifestyle.WantsKids.OPEN;
-                    case "3" -> Lifestyle.WantsKids.SOMEDAY;
-                    case "4" -> Lifestyle.WantsKids.HAS_KIDS;
-                    default -> null;
-                };
+        var wantsKids = EnumMenu.prompt(inputReader, Lifestyle.WantsKids.class, "Select kids preference:", true);
         if (wantsKids != null) {
             currentUser.setWantsKids(wantsKids);
         }
 
-        logger.info("Looking for: 1=Casual, 2=Short-term, 3=Long-term, 4=Marriage, 5=Unsure, 0=Skip");
-        String lookingForChoice = inputReader.readLine(PROMPT_CHOICE);
-        Lifestyle.LookingFor lookingFor =
-                switch (lookingForChoice) {
-                    case "1" -> Lifestyle.LookingFor.CASUAL;
-                    case "2" -> Lifestyle.LookingFor.SHORT_TERM;
-                    case "3" -> Lifestyle.LookingFor.LONG_TERM;
-                    case "4" -> Lifestyle.LookingFor.MARRIAGE;
-                    case "5" -> Lifestyle.LookingFor.UNSURE;
-                    default -> null;
-                };
+        var lookingFor = EnumMenu.prompt(inputReader, Lifestyle.LookingFor.class, "Select relationship goal:", true);
         if (lookingFor != null) {
             currentUser.setLookingFor(lookingFor);
         }
@@ -523,51 +488,25 @@ public class ProfileHandler {
 
         PacePreferences current = currentUser.getPacePreferences();
 
-        logger.info("Messaging Frequency: 1=Rarely, 2=Often, 3=Constantly, 0=Wildcard");
-        String freqStr = inputReader.readLine(PROMPT_CHOICE);
-        MessagingFrequency freq =
-                switch (freqStr) {
-                    case "1" -> MessagingFrequency.RARELY;
-                    case "2" -> MessagingFrequency.OFTEN;
-                    case "3" -> MessagingFrequency.CONSTANTLY;
-                    case "0" -> MessagingFrequency.WILDCARD;
-                    default -> current.messagingFrequency();
-                };
+        var freq = EnumMenu.prompt(inputReader, MessagingFrequency.class, "Messaging frequency:", false);
+        if (freq == null) {
+            freq = current.messagingFrequency();
+        }
 
-        logger.info("Time to First Date: 1=Quickly, 2=Few Days, 3=Weeks, 4=Months, 0=Wildcard");
-        String timeStr = inputReader.readLine(PROMPT_CHOICE);
-        TimeToFirstDate time =
-                switch (timeStr) {
-                    case "1" -> TimeToFirstDate.QUICKLY;
-                    case "2" -> TimeToFirstDate.FEW_DAYS;
-                    case "3" -> TimeToFirstDate.WEEKS;
-                    case "4" -> TimeToFirstDate.MONTHS;
-                    case "0" -> TimeToFirstDate.WILDCARD;
-                    default -> current.timeToFirstDate();
-                };
+        var time = EnumMenu.prompt(inputReader, TimeToFirstDate.class, "Time to first date:", false);
+        if (time == null) {
+            time = current.timeToFirstDate();
+        }
 
-        logger.info("Communication Style: 1=Text, 2=Voice, 3=Video, 4=In Person, 0=Wildcard");
-        String styleStr = inputReader.readLine(PROMPT_CHOICE);
-        CommunicationStyle style =
-                switch (styleStr) {
-                    case "1" -> CommunicationStyle.TEXT_ONLY;
-                    case "2" -> CommunicationStyle.VOICE_NOTES;
-                    case "3" -> CommunicationStyle.VIDEO_CALLS;
-                    case "4" -> CommunicationStyle.IN_PERSON_ONLY;
-                    case "0" -> CommunicationStyle.MIX_OF_EVERYTHING;
-                    default -> current.communicationStyle();
-                };
+        var style = EnumMenu.prompt(inputReader, CommunicationStyle.class, "Communication style:", false);
+        if (style == null) {
+            style = current.communicationStyle();
+        }
 
-        logger.info("Conversation Depth: 1=Small Talk, 2=Deep, 3=Existential, 0=Wildcard");
-        String depthStr = inputReader.readLine(PROMPT_CHOICE);
-        DepthPreference depth =
-                switch (depthStr) {
-                    case "1" -> DepthPreference.SMALL_TALK;
-                    case "2" -> DepthPreference.DEEP_CHAT;
-                    case "3" -> DepthPreference.EXISTENTIAL;
-                    case "0" -> DepthPreference.DEPENDS_ON_VIBE;
-                    default -> current.depthPreference();
-                };
+        var depth = EnumMenu.prompt(inputReader, DepthPreference.class, "Conversation depth:", false);
+        if (depth == null) {
+            depth = current.depthPreference();
+        }
 
         currentUser.setPacePreferences(new PacePreferences(freq, time, style, depth));
     }
@@ -645,88 +584,42 @@ public class ProfileHandler {
     }
 
     private void editSmokingDealbreaker(User currentUser, Dealbreakers current) {
-        logger.info("\nAcceptable smoking (comma-separated, e.g., 1,2):");
-        logger.info("  1=Never, 2=Sometimes, 3=Regularly, 0=Clear");
-        String input = inputReader.readLine(PROMPT_CHOICES);
-
+        var selected = EnumMenu.promptMultiple(inputReader, Lifestyle.Smoking.class, "Accept these smoking values:");
         Dealbreakers.Builder builder = current.toBuilder().clearSmoking();
-        if (!input.equals("0")) {
-            for (String s : input.split(",")) {
-                switch (s.trim()) {
-                    case "1" -> builder.acceptSmoking(Lifestyle.Smoking.NEVER);
-                    case "2" -> builder.acceptSmoking(Lifestyle.Smoking.SOMETIMES);
-                    case "3" -> builder.acceptSmoking(Lifestyle.Smoking.REGULARLY);
-                    default -> {
-                        // Ignore
-                    }
-                }
-            }
+        for (var value : selected) {
+            builder.acceptSmoking(value);
         }
         currentUser.setDealbreakers(builder.build());
         logger.info("✅ Smoking dealbreaker updated.\n");
     }
 
     private void editDrinkingDealbreaker(User currentUser, Dealbreakers current) {
-        logger.info("\nAcceptable drinking (comma-separated):");
-        logger.info("  1=Never, 2=Socially, 3=Regularly, 0=Clear");
-        String input = inputReader.readLine(PROMPT_CHOICES);
+        var selected = EnumMenu.promptMultiple(inputReader, Lifestyle.Drinking.class, "Accept these drinking values:");
         Dealbreakers.Builder builder = current.toBuilder().clearDrinking();
-        if (!input.equals("0")) {
-            for (String s : input.split(",")) {
-                switch (s.trim()) {
-                    case "1" -> builder.acceptDrinking(Lifestyle.Drinking.NEVER);
-                    case "2" -> builder.acceptDrinking(Lifestyle.Drinking.SOCIALLY);
-                    case "3" -> builder.acceptDrinking(Lifestyle.Drinking.REGULARLY);
-                    default -> {
-                        // Ignore
-                    }
-                }
-            }
+        for (var value : selected) {
+            builder.acceptDrinking(value);
         }
         currentUser.setDealbreakers(builder.build());
         logger.info("✅ Drinking dealbreaker updated.\n");
     }
 
     private void editKidsDealbreaker(User currentUser, Dealbreakers current) {
-        logger.info("\nAcceptable kids stance (comma-separated):");
-        logger.info("  1=Don't want, 2=Open, 3=Want someday, 4=Has kids, 0=Clear");
-        String input = inputReader.readLine(PROMPT_CHOICES);
+        var selected =
+                EnumMenu.promptMultiple(inputReader, Lifestyle.WantsKids.class, "Accept these kids preferences:");
         Dealbreakers.Builder builder = current.toBuilder().clearKids();
-        if (!input.equals("0")) {
-            for (String s : input.split(",")) {
-                switch (s.trim()) {
-                    case "1" -> builder.acceptKidsStance(Lifestyle.WantsKids.NO);
-                    case "2" -> builder.acceptKidsStance(Lifestyle.WantsKids.OPEN);
-                    case "3" -> builder.acceptKidsStance(Lifestyle.WantsKids.SOMEDAY);
-                    case "4" -> builder.acceptKidsStance(Lifestyle.WantsKids.HAS_KIDS);
-                    default -> {
-                        // Ignore
-                    }
-                }
-            }
+        for (var value : selected) {
+            builder.acceptKidsStance(value);
         }
         currentUser.setDealbreakers(builder.build());
         logger.info("✅ Kids stance dealbreaker updated.\n");
     }
 
     private void editLookingForDealbreaker(User currentUser, Dealbreakers current) {
-        logger.info("\nAcceptable relationship goals (comma-separated):");
-        logger.info("  1=Casual, 2=Short-term, 3=Long-term, 4=Marriage, 5=Unsure, 0=Clear");
-        String input = inputReader.readLine(PROMPT_CHOICES);
+        var selected =
+                EnumMenu.promptMultiple(inputReader, Lifestyle.LookingFor.class, "Accept these relationship goals:");
         Dealbreakers.Builder builder = current.toBuilder().clearLookingFor();
-        if (!input.equals("0")) {
-            for (String s : input.split(",")) {
-                switch (s.trim()) {
-                    case "1" -> builder.acceptLookingFor(Lifestyle.LookingFor.CASUAL);
-                    case "2" -> builder.acceptLookingFor(Lifestyle.LookingFor.SHORT_TERM);
-                    case "3" -> builder.acceptLookingFor(Lifestyle.LookingFor.LONG_TERM);
-                    case "4" -> builder.acceptLookingFor(Lifestyle.LookingFor.MARRIAGE);
-                    case "5" -> builder.acceptLookingFor(Lifestyle.LookingFor.UNSURE);
-                    default -> {
-                        // Ignore
-                    }
-                }
-            }
+        for (var value : selected) {
+            builder.acceptLookingFor(value);
         }
         currentUser.setDealbreakers(builder.build());
         logger.info("✅ Looking for dealbreaker updated.\n");

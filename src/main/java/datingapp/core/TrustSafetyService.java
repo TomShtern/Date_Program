@@ -1,9 +1,10 @@
 package datingapp.core;
 
 import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Report;
-import datingapp.core.UserInteractions.ReportStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.ReportStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -20,7 +21,7 @@ public class TrustSafetyService {
     public static final Duration DEFAULT_VERIFICATION_TTL = Duration.ofMinutes(15);
 
     private final ReportStorage reportStorage;
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final BlockStorage blockStorage;
     private final AppConfig config;
     private final Duration verificationTtl;
@@ -35,7 +36,7 @@ public class TrustSafetyService {
     }
 
     public TrustSafetyService(
-            ReportStorage reportStorage, User.Storage userStorage, BlockStorage blockStorage, AppConfig config) {
+            ReportStorage reportStorage, UserStorage userStorage, BlockStorage blockStorage, AppConfig config) {
         this(
                 Objects.requireNonNull(reportStorage, "reportStorage cannot be null"),
                 Objects.requireNonNull(userStorage, "userStorage cannot be null"),
@@ -47,7 +48,7 @@ public class TrustSafetyService {
 
     public TrustSafetyService(
             ReportStorage reportStorage,
-            User.Storage userStorage,
+            UserStorage userStorage,
             BlockStorage blockStorage,
             AppConfig config,
             Duration verificationTtl,

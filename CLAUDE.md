@@ -37,7 +37,7 @@ mvn jacoco:report                        # Generate coverage report
 
 **Phase 2.1** console dating app: **Java 25** + Maven + H2 embedded DB. Features: matching, messaging, relationship transitions (Friend Zone/Graceful Exit), pace compatibility, achievements, interests matching.
 
-**Post-Consolidation Stats (2026-01-25):** 128 Java files (81 main + 47 test), 464 tests passing, 60% coverage minimum.
+**Post-Consolidation Stats (2026-01-28):** 118 Java files (76 main + 42 test), 464 tests passing, 60% coverage minimum.
 
 ### Package Structure
 
@@ -47,6 +47,8 @@ mvn jacoco:report                        # Generate coverage report
 | `storage/` | H2 JDBC implementations  | Implements interfaces from `core/`  |
 | `cli/`     | Console UI handlers      | Thin layer calling services         |
 | `ui/`      | JavaFX UI (experimental) | Uses AtlantaFX theme                |
+
+> **Exception:** `ServiceRegistry` is the composition root—the **ONLY** file in `core/` allowed to import storage implementations for dependency injection wiring.
 
 ### Domain Models (`core/`)
 
@@ -62,7 +64,7 @@ mvn jacoco:report                        # Generate coverage report
 | `Social.Notification` | Immutable | `Social.java`; type, title, message, metadata, read status                      |
 | `Stats.UserStats`     | Immutable | `Stats.java`; user activity metrics                                             |
 | `Stats.MatchQuality`  | Immutable | `Stats.java`; score (0-100), star rating (1-5), highlights                      |
-| `Preferences.Interest`| Enum      | `Preferences.java`; 37 interests in 6 categories                                |
+| `Preferences.Interest`| Enum      | `Preferences.java`; 39 interests in 6 categories                                |
 | `Preferences.Lifestyle`| Records  | `Preferences.java`; Smoking, Drinking, WantsKids, etc.                          |
 | `Preferences.PacePreferences` | Immutable | `Preferences.java`; messaging frequency, communication style            |
 | `Achievement`         | Enum      | `Achievement.java`; 11 achievements in 4 categories; nested `Storage` interface |
@@ -74,7 +76,7 @@ mvn jacoco:report                        # Generate coverage report
 
 **Core**: `CandidateFinder` (7-stage filter), `MatchingService` (includes LikerBrowser, PaceCompatibility), `TrustSafetyService` (includes Verification, Reports)
 
-**Phase 1**: `UndoService`, `DailyService` (merged Limits + Picks), `MatchQualityService`, `SessionService`, `ProfilePreviewService`, `StatsService`
+**Phase 1**: `UndoService`, `DailyService` (merged Limits + Picks), `MatchQualityService`, `SessionService`, `ProfilePreviewService`, `StatsService`, `ValidationService`
 
 **Phase 1.5+**: `AchievementService`, `ProfileCompletionService`
 
@@ -256,10 +258,19 @@ static class InMemoryUserStorage implements User.Storage {
 | PMD        | 3.28.0  | Bug detection (advisory)              |
 | JaCoCo     | 0.8.14  | Coverage (60% min, excludes ui/cli)   |
 
-## Recent Updates (2026-01-25)
+## Recent Updates (2026-01-28)
 
-### Major Consolidation Complete
-The codebase underwent significant consolidation reducing file count by ~17%:
+### Latest Changes (2026-01-27)
+- **New `ValidationService`**: Centralized input validation with `ValidationResult` pattern for names, ages, heights, distances, bios, age ranges, and coordinates
+- **JavaFX UI Polish**: Enhanced login screen with search filtering, keyboard navigation, avatars, completion badges, double-click login
+- **Matches Screen**: Added tabs for received/sent likes with like-back, pass, and withdraw actions
+- **Profile Completion**: Birth date editing, missing completion details shown in header
+- **CandidateFinder**: Relaxed distance filtering when user location is (0,0) to avoid empty queues
+- **Storage Tests**: Hardened FK-aware tests—create user rows before inserting records with `user_id` foreign keys
+- **Daily Pick Exclusions**: Now uses `LikeStorage.getLikedOrPassedUserIds()` to avoid resurfacing already-interacted users
+
+### Major Consolidation Complete (2026-01-25)
+The codebase underwent significant consolidation reducing file count by ~26% (159→118 files):
 
 **Service Consolidations:**
 - `DailyLimitService` + `DailyPickService` → `DailyService`
@@ -284,7 +295,7 @@ The codebase underwent significant consolidation reducing file count by ~17%:
 - `Like` + `Block` + `Report` → `UserInteractions.java`
 
 **New Infrastructure:**
-- `AbstractH2Storage` base class reducing boilerplate across 16 storage implementations
+- `AbstractH2Storage` base class reducing boilerplate across 11 H2 storage implementations
 
 ## Known Limitations
 
@@ -309,4 +320,5 @@ The codebase underwent significant consolidation reducing file count by ~17%:
 2|2026-01-16 00:00:00|agent:claude_code|docs|CLAUDE.md slimmed 49k→20k chars|CLAUDE.md
 3|2026-01-16 01:00:00|agent:claude_code|docs|Enhanced with coding standards, patterns, anti-patterns|CLAUDE.md
 4|2026-01-25 12:00:00|agent:claude_code|docs|Updated CLAUDE.md for post-consolidation: nested Storage interfaces, new domain groupings (Messaging/Social/Stats/Preferences/UserInteractions), service merges, AbstractH2Storage|CLAUDE.md
+5|2026-01-28 12:00:00|agent:claude_code|docs|Updated stats (118 files), added ValidationService, ServiceRegistry exception note, 39 interests, 2026-01-27 UI/storage changes|CLAUDE.md
 ---AGENT-LOG-END---

@@ -1,11 +1,7 @@
 package datingapp.core;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 /** Container for user interaction domain models (likes, blocks, reports). */
@@ -143,100 +139,5 @@ public final class UserInteractions {
         public static Report create(UUID reporterId, UUID reportedUserId, Reason reason, String description) {
             return new Report(UUID.randomUUID(), reporterId, reportedUserId, reason, description, Instant.now());
         }
-    }
-
-    // ========== STORAGE INTERFACES ==========
-
-    /** Storage interface for Like entities. Defined in core, implemented in storage layer. */
-    public interface LikeStorage {
-
-        /** Get a specific like record (for Match Quality computation). */
-        Optional<Like> getLike(UUID fromUserId, UUID toUserId);
-
-        /** Saves a like/pass action. */
-        void save(Like like);
-
-        /** Checks if a like/pass already exists from one user to another. */
-        boolean exists(UUID from, UUID to);
-
-        /** Checks if both users have liked each other (mutual LIKE, not PASS). */
-        boolean mutualLikeExists(UUID a, UUID b);
-
-        /** Gets all user IDs that the given user has liked or passed. */
-        Set<UUID> getLikedOrPassedUserIds(UUID userId);
-
-        /** Gets all user IDs that liked the given user (direction=LIKE). */
-        Set<UUID> getUserIdsWhoLiked(UUID userId);
-
-        /** Returns like timestamps for each user who liked the given user (direction=LIKE). */
-        Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId);
-
-        /** Count likes/passes GIVEN BY a user with specific direction. */
-        int countByDirection(UUID userId, Like.Direction direction);
-
-        /** Count likes/passes RECEIVED BY a user with specific direction. */
-        int countReceivedByDirection(UUID userId, Like.Direction direction);
-
-        /** Count mutual likes (users this person liked who also liked them back). */
-        int countMutualLikes(UUID userId);
-
-        /** Count likes given by user since the specified start of day. */
-        int countLikesToday(UUID userId, Instant startOfDay);
-
-        /** Count passes given by user since the specified start of day. */
-        int countPassesToday(UUID userId, Instant startOfDay);
-
-        /** Delete a like by ID. Used for undo functionality. */
-        void delete(UUID likeId);
-    }
-
-    /** Storage interface for Block entities. Defined in core, implemented in storage layer. */
-    public interface BlockStorage {
-
-        /** Saves a block. */
-        void save(Block block);
-
-        /** Returns true if EITHER user has blocked the other. Block is bidirectional in effect. */
-        boolean isBlocked(UUID userA, UUID userB);
-
-        /** Returns all user IDs that the given user should not see. */
-        Set<UUID> getBlockedUserIds(UUID userId);
-
-        /** Returns all blocks created by the given user. */
-        List<Block> findByBlocker(UUID blockerId);
-
-        /**
-         * Deletes a block between two users.
-         *
-         * @param blockerId the user who created the block
-         * @param blockedId the user who was blocked
-         * @return true if a block was deleted, false if no block existed
-         */
-        boolean delete(UUID blockerId, UUID blockedId);
-
-        /** Count blocks GIVEN by a user (users they blocked). */
-        int countBlocksGiven(UUID userId);
-
-        /** Count blocks RECEIVED by a user (users who blocked them). */
-        int countBlocksReceived(UUID userId);
-    }
-
-    /** Storage interface for Report entities. Defined in core, implemented in storage layer. */
-    public interface ReportStorage {
-
-        /** Saves a report. */
-        void save(Report report);
-
-        /** Count reports against a user. */
-        int countReportsAgainst(UUID userId);
-
-        /** Check if reporter has already reported this user. */
-        boolean hasReported(UUID reporterId, UUID reportedUserId);
-
-        /** Get all reports against a user (for admin review later). */
-        List<Report> getReportsAgainst(UUID userId);
-
-        /** Count reports MADE BY a user (reports they filed). */
-        int countReportsBy(UUID userId);
     }
 }

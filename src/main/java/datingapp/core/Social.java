@@ -57,36 +57,4 @@ public final class Social {
             return new Notification(UUID.randomUUID(), userId, type, title, message, Instant.now(), false, data);
         }
     }
-
-    // ========== STORAGE INTERFACES ==========
-
-    /** Storage interface for FriendRequest entities. */
-    public interface FriendRequestStorage {
-        void save(FriendRequest request);
-
-        void update(FriendRequest request);
-
-        java.util.Optional<FriendRequest> get(UUID id);
-
-        java.util.Optional<FriendRequest> getPendingBetween(UUID user1, UUID user2);
-
-        java.util.List<FriendRequest> getPendingForUser(UUID userId);
-
-        void delete(UUID id);
-    }
-
-    /** Storage interface for Notification entities. */
-    public interface NotificationStorage {
-        void save(Notification notification);
-
-        void markAsRead(UUID id);
-
-        java.util.List<Notification> getForUser(UUID userId, boolean unreadOnly);
-
-        java.util.Optional<Notification> get(UUID id);
-
-        void delete(UUID id);
-
-        void deleteOldNotifications(Instant before);
-    }
 }

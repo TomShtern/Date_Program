@@ -4,6 +4,7 @@ import datingapp.core.Dealbreakers;
 import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.User;
 import datingapp.core.User.Gender;
+import datingapp.core.storage.UserStorage;
 import datingapp.ui.ViewModelFactory.UISession;
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -26,7 +27,7 @@ import org.slf4j.LoggerFactory;
 public class LoginViewModel {
     private static final Logger logger = LoggerFactory.getLogger(LoginViewModel.class);
 
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final FilteredList<User> filteredUsers;
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
@@ -40,7 +41,7 @@ public class LoginViewModel {
 
     private User selectedUser;
 
-    public LoginViewModel(User.Storage userStorage) {
+    public LoginViewModel(UserStorage userStorage) {
         this.userStorage = userStorage;
         this.filteredUsers = new FilteredList<>(users, user -> true);
         this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));

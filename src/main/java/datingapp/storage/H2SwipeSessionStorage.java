@@ -1,7 +1,7 @@
 package datingapp.storage;
 
 import datingapp.core.SwipeSession;
-import datingapp.core.SwipeSession.SwipeSessionStorage;
+import datingapp.core.storage.SwipeSessionStorage;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

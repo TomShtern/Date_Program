@@ -1,9 +1,10 @@
 package datingapp.core;
 
-import datingapp.core.Match.MatchStorage;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -22,7 +23,7 @@ public class MatchingService {
 
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final BlockStorage blockStorage;
     private SessionService sessionService; // Optional (Phase 0.5b)
 
@@ -36,7 +37,7 @@ public class MatchingService {
 
     /** Full constructor with all dependencies for liker browsing functionality. */
     public MatchingService(
-            LikeStorage likeStorage, MatchStorage matchStorage, User.Storage userStorage, BlockStorage blockStorage) {
+            LikeStorage likeStorage, MatchStorage matchStorage, UserStorage userStorage, BlockStorage blockStorage) {
         this.likeStorage = Objects.requireNonNull(likeStorage);
         this.matchStorage = Objects.requireNonNull(matchStorage);
         this.userStorage = userStorage;
@@ -47,7 +48,7 @@ public class MatchingService {
     public MatchingService(
             LikeStorage likeStorage,
             MatchStorage matchStorage,
-            User.Storage userStorage,
+            UserStorage userStorage,
             BlockStorage blockStorage,
             SessionService sessionService) {
         this.likeStorage = Objects.requireNonNull(likeStorage);

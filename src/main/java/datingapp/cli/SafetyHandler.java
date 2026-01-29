@@ -1,12 +1,13 @@
 package datingapp.cli;
 
 import datingapp.core.Match;
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.TrustSafetyService;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Report;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.UserStorage;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -18,7 +19,7 @@ import org.slf4j.LoggerFactory;
 public class SafetyHandler {
     private static final Logger logger = LoggerFactory.getLogger(SafetyHandler.class);
 
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final BlockStorage blockStorage;
     private final MatchStorage matchStorage;
     private final TrustSafetyService trustSafetyService;
@@ -26,7 +27,7 @@ public class SafetyHandler {
     private final CliUtilities.InputReader inputReader;
 
     public SafetyHandler(
-            User.Storage userStorage,
+            UserStorage userStorage,
             BlockStorage blockStorage,
             MatchStorage matchStorage,
             TrustSafetyService trustSafetyService,

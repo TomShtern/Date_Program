@@ -5,14 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Achievement.UserAchievement;
-import datingapp.core.Achievement.UserAchievementStorage;
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
 import datingapp.core.UserInteractions.Report;
-import datingapp.core.UserInteractions.ReportStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.ReportStorage;
+import datingapp.core.storage.UserAchievementStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -462,7 +463,7 @@ class AchievementServiceTest {
         }
     }
 
-    private static class InMemoryUserStorage implements User.Storage {
+    private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
 
         @Override

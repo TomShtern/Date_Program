@@ -6,15 +6,16 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.DailyService.DailyPickStorage;
 import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.DailyPickStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -242,7 +243,7 @@ class DailyPickServiceTest {
 
     // In-memory test storage implementations
 
-    private static class InMemoryUserStorage implements User.Storage {
+    private static class InMemoryUserStorage implements UserStorage {
         private final List<User> users = new ArrayList<>();
 
         @Override

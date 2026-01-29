@@ -113,22 +113,4 @@ public enum Achievement {
             return new UserAchievement(id, userId, achievement, unlockedAt);
         }
     }
-
-    // ========== STORAGE INTERFACE ==========
-
-    /** Storage interface for UserAchievement entities. Defined in core, implemented in storage layer. */
-    public interface UserAchievementStorage {
-
-        /** Saves a new achievement unlock. */
-        void save(UserAchievement achievement);
-
-        /** Gets all achievements unlocked by a user. */
-        java.util.List<UserAchievement> getUnlocked(java.util.UUID userId);
-
-        /** Checks if a user has a specific achievement. */
-        boolean hasAchievement(java.util.UUID userId, Achievement achievement);
-
-        /** Counts total achievements unlocked by a user. */
-        int countUnlocked(java.util.UUID userId);
-    }
 }

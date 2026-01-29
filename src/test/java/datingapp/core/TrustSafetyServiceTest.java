@@ -11,9 +11,10 @@ import datingapp.core.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.BlockStorage;
 import datingapp.core.UserInteractions.Report;
-import datingapp.core.UserInteractions.ReportStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.ReportStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -337,21 +338,16 @@ class TrustSafetyServiceTest {
     }
 
     private static User copyWithVerificationSentAt(User user, Instant sentAt) {
-        User.DatabaseRecord data = User.DatabaseRecord.builder()
-                .id(user.getId())
-                .name(user.getName())
+        return User.StorageBuilder.create(user.getId(), user.getName(), user.getCreatedAt())
                 .bio(user.getBio())
                 .birthDate(user.getBirthDate())
                 .gender(user.getGender())
                 .interestedIn(user.getInterestedIn())
-                .lat(user.getLat())
-                .lon(user.getLon())
+                .location(user.getLat(), user.getLon())
                 .maxDistanceKm(user.getMaxDistanceKm())
-                .minAge(user.getMinAge())
-                .maxAge(user.getMaxAge())
+                .ageRange(user.getMinAge(), user.getMaxAge())
                 .photoUrls(user.getPhotoUrls())
                 .state(user.getState())
-                .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .interests(user.getInterests())
                 .smoking(user.getSmoking())
@@ -362,15 +358,13 @@ class TrustSafetyServiceTest {
                 .heightCm(user.getHeightCm())
                 .email(user.getEmail())
                 .phone(user.getPhone())
-                .isVerified(user.isVerified())
+                .verified(user.isVerified())
                 .verificationMethod(user.getVerificationMethod())
                 .verificationCode(user.getVerificationCode())
                 .verificationSentAt(sentAt)
                 .verifiedAt(user.getVerifiedAt())
                 .pacePreferences(user.getPacePreferences())
                 .build();
-
-        return User.fromDatabase(data);
     }
 
     // ============================================================
@@ -413,7 +407,7 @@ class TrustSafetyServiceTest {
         }
     }
 
-    private static class InMemoryUserStorage implements User.Storage {
+    private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
 
         @Override

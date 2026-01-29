@@ -1,8 +1,10 @@
 package datingapp.core;
 
 import datingapp.core.CandidateFinder.GeoUtils;
-import datingapp.core.UserInteractions.BlockStorage;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.DailyPickStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,7 +19,7 @@ import java.util.UUID;
 /** Consolidated daily limit and daily pick workflows. */
 public class DailyService {
 
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final LikeStorage likeStorage;
     private final BlockStorage blockStorage;
     private final DailyPickStorage dailyPickStorage;
@@ -29,7 +31,7 @@ public class DailyService {
     }
 
     public DailyService(
-            User.Storage userStorage,
+            UserStorage userStorage,
             LikeStorage likeStorage,
             BlockStorage blockStorage,
             DailyPickStorage dailyPickStorage,
@@ -99,8 +101,8 @@ public class DailyService {
         List<User> allActive = userStorage.findActive();
 
         // Build exclusion set: already liked or passed users
-        java.util.Set<UUID> alreadyInteracted = new java.util.HashSet<>();
-        alreadyInteracted.addAll(likeStorage.getLikedOrPassedUserIds(seeker.getId()));
+        java.util.Set<UUID> alreadyInteracted =
+                new java.util.HashSet<>(likeStorage.getLikedOrPassedUserIds(seeker.getId()));
 
         // Use CandidateFinder to apply comprehensive preference filtering
         // This filters by: self, active state, blocks, mutual gender, mutual age, distance, dealbreakers
@@ -240,37 +242,4 @@ public class DailyService {
 
     /** Daily pick payload. */
     public record DailyPick(User user, LocalDate date, String reason, boolean alreadySeen) {}
-
-    // ========== STORAGE INTERFACE ==========
-
-    /**
-     * Storage interface for tracking when users view their daily picks.
-     */
-    public interface DailyPickStorage {
-
-        /**
-         * Mark that a user has viewed their daily pick for a specific date.
-         *
-         * @param userId the user who viewed the pick
-         * @param date the date of the pick
-         */
-        void markViewed(java.util.UUID userId, LocalDate date);
-
-        /**
-         * Check if a user has already viewed their daily pick for a date.
-         *
-         * @param userId the user to check
-         * @param date the date to check
-         * @return true if the user has viewed their pick for this date
-         */
-        boolean hasViewed(java.util.UUID userId, LocalDate date);
-
-        /**
-         * Remove view records older than a specified date. Used for cleanup/maintenance.
-         *
-         * @param before delete records before this date (exclusive)
-         * @return number of records deleted
-         */
-        int cleanup(LocalDate before);
-    }
 }

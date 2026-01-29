@@ -1,7 +1,7 @@
 package datingapp.core;
 
-import datingapp.core.SwipeSession.SwipeSessionStorage;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.storage.SwipeSessionStorage;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;

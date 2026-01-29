@@ -1,11 +1,12 @@
 package datingapp.core;
 
 import datingapp.core.Achievement.UserAchievement;
-import datingapp.core.Achievement.UserAchievementStorage;
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
-import datingapp.core.UserInteractions.ReportStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.ReportStorage;
+import datingapp.core.storage.UserAchievementStorage;
+import datingapp.core.storage.UserStorage;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -22,7 +23,7 @@ public class AchievementService {
     private final UserAchievementStorage achievementStorage;
     private final MatchStorage matchStorage;
     private final LikeStorage likeStorage;
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final ReportStorage reportStorage;
     private final ProfilePreviewService profilePreviewService;
     private final AppConfig config;
@@ -31,7 +32,7 @@ public class AchievementService {
             UserAchievementStorage achievementStorage,
             MatchStorage matchStorage,
             LikeStorage likeStorage,
-            User.Storage userStorage,
+            UserStorage userStorage,
             ReportStorage reportStorage,
             ProfilePreviewService profilePreviewService,
             AppConfig config) {

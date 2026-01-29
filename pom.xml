@@ -18,6 +18,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <h2.version>2.4.240</h2.version>
         <junit.version>5.14.2</junit.version>
+        <jdbi.version>3.51.0</jdbi.version>
     </properties>
 
     <dependencies>
@@ -26,6 +27,18 @@
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <version>${h2.version}</version>
+        </dependency>
+
+        <!-- JDBI 3 - Declarative SQL (requires Java 17+, we have Java 25) -->
+        <dependency>
+            <groupId>org.jdbi</groupId>
+            <artifactId>jdbi3-core</artifactId>
+            <version>${jdbi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jdbi</groupId>
+            <artifactId>jdbi3-sqlobject</artifactId>
+            <version>${jdbi.version}</version>
         </dependency>
 
         <!-- Testing -->

@@ -1,10 +1,11 @@
 package datingapp.core;
 
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.Messaging.Conversation;
-import datingapp.core.Messaging.ConversationStorage;
 import datingapp.core.Messaging.Message;
-import datingapp.core.Messaging.MessageStorage;
+import datingapp.core.storage.ConversationStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.MessageStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,13 +22,13 @@ public class MessagingService {
     private final ConversationStorage conversationStorage;
     private final MessageStorage messageStorage;
     private final MatchStorage matchStorage;
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
 
     public MessagingService(
             ConversationStorage conversationStorage,
             MessageStorage messageStorage,
             MatchStorage matchStorage,
-            User.Storage userStorage) {
+            UserStorage userStorage) {
         this.conversationStorage = Objects.requireNonNull(conversationStorage, "conversationStorage cannot be null");
         this.messageStorage = Objects.requireNonNull(messageStorage, "messageStorage cannot be null");
         this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");

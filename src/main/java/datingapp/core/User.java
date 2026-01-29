@@ -45,35 +45,6 @@ public class User {
         PHONE
     }
 
-    /** Storage interface for User entities. Defined in core, implemented in storage layer. */
-    public interface Storage {
-
-        /** Saves a user (insert or update). */
-        void save(User user);
-
-        /**
-         * Gets a user by ID.
-         *
-         * @param id The user ID
-         * @return The user, or null if not found
-         */
-        User get(UUID id);
-
-        /** Finds all active users. */
-        List<User> findActive();
-
-        /** Finds all users regardless of state. */
-        List<User> findAll();
-
-        /**
-         * Deletes a user and all their associated data. When combined with CASCADE DELETE on
-         * foreign keys, this will automatically remove likes, matches, sessions, and stats.
-         *
-         * @param id The user ID to delete
-         */
-        void delete(UUID id);
-    }
-
     private final UUID id;
     private String name;
     private String bio;
@@ -140,367 +111,153 @@ public class User {
         this.interests = EnumSet.noneOf(Interest.class);
     }
 
-    /** Builder-backed record of database fields used to reconstruct a User. */
-    public static final class DatabaseRecord {
-        private UUID id;
-        private String name;
-        private String bio;
-        private LocalDate birthDate;
-        private Gender gender;
-        private Set<Gender> interestedIn;
-        private double lat;
-        private double lon;
-        private int maxDistanceKm;
-        private int minAge;
-        private int maxAge;
-        private List<String> photoUrls;
-        private State state;
-        private Instant createdAt;
-        private Instant updatedAt;
-        private Set<Interest> interests;
-        private Lifestyle.Smoking smoking;
-        private Lifestyle.Drinking drinking;
-        private Lifestyle.WantsKids wantsKids;
-        private Lifestyle.LookingFor lookingFor;
-        private Lifestyle.Education education;
-        private Integer heightCm;
-        private String email;
-        private String phone;
-        private Boolean isVerified;
-        private VerificationMethod verificationMethod;
-        private String verificationCode;
-        private Instant verificationSentAt;
-        private Instant verifiedAt;
-        private PacePreferences pacePreferences;
-
-        private DatabaseRecord() {}
-
-        public static Builder builder() {
-            return new Builder();
-        }
-
-        public UUID getId() {
-            return id;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public String getBio() {
-            return bio;
-        }
-
-        public LocalDate getBirthDate() {
-            return birthDate;
-        }
-
-        public Gender getGender() {
-            return gender;
-        }
-
-        public Set<Gender> getInterestedIn() {
-            return interestedIn;
-        }
-
-        public double getLat() {
-            return lat;
-        }
-
-        public double getLon() {
-            return lon;
-        }
-
-        public int getMaxDistanceKm() {
-            return maxDistanceKm;
-        }
-
-        public int getMinAge() {
-            return minAge;
-        }
-
-        public int getMaxAge() {
-            return maxAge;
-        }
-
-        public List<String> getPhotoUrls() {
-            return photoUrls;
-        }
-
-        public State getState() {
-            return state;
-        }
-
-        public Instant getCreatedAt() {
-            return createdAt;
-        }
-
-        public Instant getUpdatedAt() {
-            return updatedAt;
-        }
-
-        public Set<Interest> getInterests() {
-            return interests;
-        }
-
-        public Lifestyle.Smoking getSmoking() {
-            return smoking;
-        }
-
-        public Lifestyle.Drinking getDrinking() {
-            return drinking;
-        }
-
-        public Lifestyle.WantsKids getWantsKids() {
-            return wantsKids;
-        }
-
-        public Lifestyle.LookingFor getLookingFor() {
-            return lookingFor;
-        }
-
-        public Lifestyle.Education getEducation() {
-            return education;
-        }
-
-        public Integer getHeightCm() {
-            return heightCm;
-        }
-
-        public String getEmail() {
-            return email;
-        }
-
-        public String getPhone() {
-            return phone;
-        }
-
-        public Boolean getIsVerified() {
-            return isVerified;
-        }
-
-        public VerificationMethod getVerificationMethod() {
-            return verificationMethod;
-        }
-
-        public String getVerificationCode() {
-            return verificationCode;
-        }
-
-        public Instant getVerificationSentAt() {
-            return verificationSentAt;
-        }
-
-        public Instant getVerifiedAt() {
-            return verifiedAt;
-        }
-
-        public PacePreferences getPacePreferences() {
-            return pacePreferences;
-        }
-
-        public static final class Builder {
-            private final DatabaseRecord data = new DatabaseRecord();
-
-            public Builder id(UUID id) {
-                data.id = id;
-                return this;
-            }
-
-            public Builder name(String name) {
-                data.name = name;
-                return this;
-            }
-
-            public Builder bio(String bio) {
-                data.bio = bio;
-                return this;
-            }
-
-            public Builder birthDate(LocalDate birthDate) {
-                data.birthDate = birthDate;
-                return this;
-            }
-
-            public Builder gender(Gender gender) {
-                data.gender = gender;
-                return this;
-            }
-
-            public Builder interestedIn(Set<Gender> interestedIn) {
-                data.interestedIn = interestedIn;
-                return this;
-            }
-
-            public Builder lat(double lat) {
-                data.lat = lat;
-                return this;
-            }
-
-            public Builder lon(double lon) {
-                data.lon = lon;
-                return this;
-            }
-
-            public Builder maxDistanceKm(int maxDistanceKm) {
-                data.maxDistanceKm = maxDistanceKm;
-                return this;
-            }
-
-            public Builder minAge(int minAge) {
-                data.minAge = minAge;
-                return this;
-            }
-
-            public Builder maxAge(int maxAge) {
-                data.maxAge = maxAge;
-                return this;
-            }
-
-            public Builder photoUrls(List<String> photoUrls) {
-                data.photoUrls = photoUrls;
-                return this;
-            }
-
-            public Builder state(State state) {
-                data.state = state;
-                return this;
-            }
-
-            public Builder createdAt(Instant createdAt) {
-                data.createdAt = createdAt;
-                return this;
-            }
-
-            public Builder updatedAt(Instant updatedAt) {
-                data.updatedAt = updatedAt;
-                return this;
-            }
-
-            public Builder interests(Set<Interest> interests) {
-                data.interests = interests;
-                return this;
-            }
-
-            public Builder smoking(Lifestyle.Smoking smoking) {
-                data.smoking = smoking;
-                return this;
-            }
-
-            public Builder drinking(Lifestyle.Drinking drinking) {
-                data.drinking = drinking;
-                return this;
-            }
-
-            public Builder wantsKids(Lifestyle.WantsKids wantsKids) {
-                data.wantsKids = wantsKids;
-                return this;
-            }
-
-            public Builder lookingFor(Lifestyle.LookingFor lookingFor) {
-                data.lookingFor = lookingFor;
-                return this;
-            }
-
-            public Builder education(Lifestyle.Education education) {
-                data.education = education;
-                return this;
-            }
-
-            public Builder heightCm(Integer heightCm) {
-                data.heightCm = heightCm;
-                return this;
-            }
-
-            public Builder email(String email) {
-                data.email = email;
-                return this;
-            }
-
-            public Builder phone(String phone) {
-                data.phone = phone;
-                return this;
-            }
-
-            public Builder isVerified(Boolean isVerified) {
-                data.isVerified = isVerified;
-                return this;
-            }
-
-            public Builder verificationMethod(VerificationMethod verificationMethod) {
-                data.verificationMethod = verificationMethod;
-                return this;
-            }
-
-            public Builder verificationCode(String verificationCode) {
-                data.verificationCode = verificationCode;
-                return this;
-            }
-
-            public Builder verificationSentAt(Instant verificationSentAt) {
-                data.verificationSentAt = verificationSentAt;
-                return this;
-            }
-
-            public Builder verifiedAt(Instant verifiedAt) {
-                data.verifiedAt = verifiedAt;
-                return this;
-            }
-
-            public Builder pacePreferences(PacePreferences pacePreferences) {
-                data.pacePreferences = pacePreferences;
-                return this;
-            }
-
-            public DatabaseRecord build() {
-                return data;
-            }
-        }
-    }
-
     /**
-     * Factory method for loading a user from the database. All 16 parameters are needed to fully
-     * reconstruct a user record from storage. This method encapsulates the database-to-domain
-     * conversion logic.
+     * Builder for constructing User instances from storage. Use this when loading users from the
+     * database to bypass normal validation and set all fields directly.
      */
-    public static User fromDatabase(DatabaseRecord data) {
-        Objects.requireNonNull(data, "record cannot be null");
+    public static final class StorageBuilder {
+        private final User user;
 
-        User user = new User(data.getId(), data.getName(), data.getCreatedAt());
+        private StorageBuilder(UUID id, String name, Instant createdAt) {
+            this.user = new User(id, name, createdAt);
+        }
 
-        user.bio = data.getBio();
-        user.birthDate = data.getBirthDate();
-        user.gender = data.getGender();
-        user.interestedIn =
-                data.getInterestedIn() != null ? EnumSet.copyOf(data.getInterestedIn()) : EnumSet.noneOf(Gender.class);
-        user.lat = data.getLat();
-        user.lon = data.getLon();
-        user.maxDistanceKm = data.getMaxDistanceKm();
-        user.minAge = data.getMinAge();
-        user.maxAge = data.getMaxAge();
-        user.photoUrls = data.getPhotoUrls() != null ? new ArrayList<>(data.getPhotoUrls()) : new ArrayList<>();
-        user.state = data.getState();
-        user.updatedAt = data.getUpdatedAt();
-        user.interests =
-                data.getInterests() != null ? EnumSet.copyOf(data.getInterests()) : EnumSet.noneOf(Interest.class);
+        /** Starts building a User from storage with required fields. */
+        public static StorageBuilder create(UUID id, String name, Instant createdAt) {
+            return new StorageBuilder(id, name, createdAt);
+        }
 
-        user.smoking = data.getSmoking();
-        user.drinking = data.getDrinking();
-        user.wantsKids = data.getWantsKids();
-        user.lookingFor = data.getLookingFor();
-        user.education = data.getEducation();
-        user.heightCm = data.getHeightCm();
+        public StorageBuilder bio(String bio) {
+            user.bio = bio;
+            return this;
+        }
 
-        user.email = data.getEmail();
-        user.phone = data.getPhone();
-        user.isVerified = data.getIsVerified() != null && data.getIsVerified();
-        user.verificationMethod = data.getVerificationMethod();
-        user.verificationCode = data.getVerificationCode();
-        user.verificationSentAt = data.getVerificationSentAt();
-        user.verifiedAt = data.getVerifiedAt();
-        user.pacePreferences = data.getPacePreferences();
+        public StorageBuilder birthDate(LocalDate birthDate) {
+            user.birthDate = birthDate;
+            return this;
+        }
 
-        return user;
+        public StorageBuilder gender(Gender gender) {
+            user.gender = gender;
+            return this;
+        }
+
+        public StorageBuilder interestedIn(Set<Gender> interestedIn) {
+            user.interestedIn = interestedIn != null ? EnumSet.copyOf(interestedIn) : EnumSet.noneOf(Gender.class);
+            return this;
+        }
+
+        public StorageBuilder location(double lat, double lon) {
+            user.lat = lat;
+            user.lon = lon;
+            return this;
+        }
+
+        public StorageBuilder maxDistanceKm(int maxDistanceKm) {
+            user.maxDistanceKm = maxDistanceKm;
+            return this;
+        }
+
+        public StorageBuilder ageRange(int minAge, int maxAge) {
+            user.minAge = minAge;
+            user.maxAge = maxAge;
+            return this;
+        }
+
+        public StorageBuilder photoUrls(List<String> photoUrls) {
+            user.photoUrls = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
+            return this;
+        }
+
+        public StorageBuilder state(State state) {
+            user.state = state;
+            return this;
+        }
+
+        public StorageBuilder updatedAt(Instant updatedAt) {
+            user.updatedAt = updatedAt;
+            return this;
+        }
+
+        public StorageBuilder interests(Set<Interest> interests) {
+            user.interests = interests != null ? EnumSet.copyOf(interests) : EnumSet.noneOf(Interest.class);
+            return this;
+        }
+
+        public StorageBuilder smoking(Lifestyle.Smoking smoking) {
+            user.smoking = smoking;
+            return this;
+        }
+
+        public StorageBuilder drinking(Lifestyle.Drinking drinking) {
+            user.drinking = drinking;
+            return this;
+        }
+
+        public StorageBuilder wantsKids(Lifestyle.WantsKids wantsKids) {
+            user.wantsKids = wantsKids;
+            return this;
+        }
+
+        public StorageBuilder lookingFor(Lifestyle.LookingFor lookingFor) {
+            user.lookingFor = lookingFor;
+            return this;
+        }
+
+        public StorageBuilder education(Lifestyle.Education education) {
+            user.education = education;
+            return this;
+        }
+
+        public StorageBuilder heightCm(Integer heightCm) {
+            user.heightCm = heightCm;
+            return this;
+        }
+
+        public StorageBuilder email(String email) {
+            user.email = email;
+            return this;
+        }
+
+        public StorageBuilder phone(String phone) {
+            user.phone = phone;
+            return this;
+        }
+
+        public StorageBuilder verified(Boolean isVerified) {
+            user.isVerified = isVerified != null && isVerified;
+            return this;
+        }
+
+        public StorageBuilder verificationMethod(VerificationMethod method) {
+            user.verificationMethod = method;
+            return this;
+        }
+
+        public StorageBuilder verificationCode(String code) {
+            user.verificationCode = code;
+            return this;
+        }
+
+        public StorageBuilder verificationSentAt(Instant sentAt) {
+            user.verificationSentAt = sentAt;
+            return this;
+        }
+
+        public StorageBuilder verifiedAt(Instant verifiedAt) {
+            user.verifiedAt = verifiedAt;
+            return this;
+        }
+
+        public StorageBuilder pacePreferences(PacePreferences pacePreferences) {
+            user.pacePreferences = pacePreferences;
+            return this;
+        }
+
+        /** Builds and returns the User instance. */
+        public User build() {
+            return user;
+        }
     }
 
     // Getters
@@ -1004,94 +761,5 @@ public class User {
             }
             return content.substring(0, 47) + "...";
         }
-    }
-
-    // ========== STORAGE INTERFACES ==========
-
-    /**
-     * Storage interface for private profile notes.
-     */
-    public interface ProfileNoteStorage {
-
-        /**
-         * Saves or updates a note about another user.
-         *
-         * @param note the profile note to save
-         */
-        void save(ProfileNote note);
-
-        /**
-         * Gets a user's note about another user.
-         *
-         * @param authorId ID of the note author
-         * @param subjectId ID of the user the note is about
-         * @return the note if it exists
-         */
-        java.util.Optional<ProfileNote> get(java.util.UUID authorId, java.util.UUID subjectId);
-
-        /**
-         * Gets all notes created by a user.
-         *
-         * @param authorId ID of the note author
-         * @return list of all notes by this user
-         */
-        java.util.List<ProfileNote> getAllByAuthor(java.util.UUID authorId);
-
-        /**
-         * Deletes a note.
-         *
-         * @param authorId ID of the note author
-         * @param subjectId ID of the user the note is about
-         * @return true if a note was deleted
-         */
-        boolean delete(java.util.UUID authorId, java.util.UUID subjectId);
-    }
-
-    /**
-     * Storage interface for tracking profile views.
-     */
-    public interface ProfileViewStorage {
-
-        /**
-         * Records a profile view.
-         *
-         * @param viewerId ID of the user who viewed the profile
-         * @param viewedId ID of the profile that was viewed
-         */
-        void recordView(java.util.UUID viewerId, java.util.UUID viewedId);
-
-        /**
-         * Gets the total number of views for a user's profile.
-         *
-         * @param userId ID of the user whose profile was viewed
-         * @return total view count
-         */
-        int getViewCount(java.util.UUID userId);
-
-        /**
-         * Gets the number of unique viewers for a user's profile.
-         *
-         * @param userId ID of the user whose profile was viewed
-         * @return unique viewer count
-         */
-        int getUniqueViewerCount(java.util.UUID userId);
-
-        /**
-         * Gets recent viewers of a user's profile.
-         *
-         * @param userId ID of the user whose profile was viewed
-         * @param limit maximum number of viewers to return
-         * @return list of viewer IDs (most recent first)
-         */
-        java.util.List<java.util.UUID> getRecentViewers(java.util.UUID userId, int limit);
-
-        /**
-         * Checks if a user has viewed another user's profile.
-         *
-         * @param viewerId ID of the potential viewer
-         * @param viewedId ID of the profile owner
-         * @return true if the viewer has viewed the profile
-         */
-        boolean hasViewed(java.util.UUID viewerId, java.util.UUID viewedId);
     }
 }

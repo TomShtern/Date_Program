@@ -5,7 +5,8 @@ import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,7 +26,7 @@ public class MatchQualityService {
     private static final int LOW_PACE_COMPATIBILITY_THRESHOLD = 50;
     private static final int WILDCARD_SCORE = 20;
 
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
     private final LikeStorage likeStorage;
     private final AppConfig config;
 
@@ -256,7 +257,7 @@ public class MatchQualityService {
         }
     }
 
-    public MatchQualityService(User.Storage userStorage, LikeStorage likeStorage, AppConfig config) {
+    public MatchQualityService(UserStorage userStorage, LikeStorage likeStorage, AppConfig config) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");

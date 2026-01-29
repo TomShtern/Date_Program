@@ -7,6 +7,7 @@ import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfileCompletionService.CompletionResult;
 import datingapp.core.User;
 import datingapp.core.User.Gender;
+import datingapp.core.storage.UserStorage;
 import datingapp.ui.ViewModelFactory.UISession;
 import datingapp.ui.util.UiServices;
 import java.io.File;
@@ -37,7 +38,7 @@ public class ProfileViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
     private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
 
-    private final User.Storage userStorage;
+    private final UserStorage userStorage;
 
     // Observable properties for form binding - Basic Info
     private final StringProperty name = new SimpleStringProperty("");
@@ -74,7 +75,7 @@ public class ProfileViewModel {
             FXCollections.observableSet(EnumSet.noneOf(Interest.class));
 
     @SuppressWarnings("unused")
-    public ProfileViewModel(User.Storage userStorage, ProfileCompletionService unused) {
+    public ProfileViewModel(UserStorage userStorage, ProfileCompletionService unused) {
         // ProfileCompletionService has static methods, so we ignore the parameter
         this.userStorage = userStorage;
     }

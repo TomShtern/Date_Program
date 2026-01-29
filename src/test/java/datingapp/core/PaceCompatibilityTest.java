@@ -10,7 +10,8 @@ import datingapp.core.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.LikeStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -165,7 +166,7 @@ class PaceCompatibilityTest {
 
     // Minimal mock storage implementations for constructor requirements
 
-    private static class MinimalUserStorage implements User.Storage {
+    private static class MinimalUserStorage implements UserStorage {
         @Override
         public void save(User user) {}
 

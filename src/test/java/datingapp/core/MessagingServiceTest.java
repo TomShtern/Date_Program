@@ -5,11 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.Match.MatchStorage;
 import datingapp.core.Messaging.Conversation;
-import datingapp.core.Messaging.ConversationStorage;
 import datingapp.core.Messaging.Message;
-import datingapp.core.Messaging.MessageStorage;
+import datingapp.core.storage.ConversationStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.MessageStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -56,40 +57,12 @@ class MessagingServiceTest {
     }
 
     private User createActiveUser(UUID id, String name) {
-        User.DatabaseRecord data = User.DatabaseRecord.builder()
-                .id(id)
-                .name(name)
+        Instant now = Instant.now();
+        return User.StorageBuilder.create(id, name, now)
                 .bio("Test bio")
-                .birthDate(null)
-                .gender(null)
-                .interestedIn(null)
-                .lat(0.0)
-                .lon(0.0)
-                .maxDistanceKm(50)
-                .minAge(18)
-                .maxAge(99)
-                .photoUrls(List.of())
                 .state(User.State.ACTIVE)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .interests(null)
-                .smoking(null)
-                .drinking(null)
-                .wantsKids(null)
-                .lookingFor(null)
-                .education(null)
-                .heightCm(null)
-                .email(null)
-                .phone(null)
-                .isVerified(null)
-                .verificationMethod(null)
-                .verificationCode(null)
-                .verificationSentAt(null)
-                .verifiedAt(null)
-                .pacePreferences(null)
+                .updatedAt(now)
                 .build();
-
-        return User.fromDatabase(data);
     }
 
     @Nested
@@ -694,7 +667,7 @@ class MessagingServiceTest {
         }
     }
 
-    static class InMemoryUserStorage implements User.Storage {
+    static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
 
         @Override

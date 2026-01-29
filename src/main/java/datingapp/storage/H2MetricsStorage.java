@@ -2,10 +2,10 @@ package datingapp.storage;
 
 import datingapp.core.Achievement;
 import datingapp.core.Achievement.UserAchievement;
-import datingapp.core.Achievement.UserAchievementStorage;
-import datingapp.core.DailyService.DailyPickStorage;
 import datingapp.core.Stats.PlatformStats;
-import datingapp.core.Stats.PlatformStatsStorage;
+import datingapp.core.storage.DailyPickStorage;
+import datingapp.core.storage.PlatformStatsStorage;
+import datingapp.core.storage.UserAchievementStorage;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
