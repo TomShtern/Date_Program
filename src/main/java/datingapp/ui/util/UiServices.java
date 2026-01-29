@@ -1,5 +1,6 @@
 package datingapp.ui.util;
 
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
@@ -20,10 +21,11 @@ import org.slf4j.LoggerFactory;
  * Consolidated UI service utilities for cross-cutting concerns.
  * Contains Toast notification service and Image caching utilities.
  *
- * <p>Access via nested classes:
+ * <p>
+ * Access via nested classes:
  * <ul>
- *   <li>{@link Toast} - Singleton toast notification service</li>
- *   <li>{@link ImageCache} - Static image caching with LRU eviction</li>
+ * <li>{@link Toast} - Toast notification helpers</li>
+ * <li>{@link ImageCache} - Static image caching with LRU eviction</li>
  * </ul>
  */
 public final class UiServices {
@@ -32,42 +34,39 @@ public final class UiServices {
         // Utility class - no instantiation
     }
 
+    /** Returns a cached avatar image or a default placeholder. */
+    public static Image getAvatar(String path, double size) {
+        return ImageCache.getAvatar(path, size);
+    }
+
     // ========================================================================
     // TOAST SERVICE - Non-blocking notification toasts
     // ========================================================================
 
     /**
-     * Singleton service for displaying toast notifications.
+     * Service for displaying toast notifications.
      *
-     * <p>Toasts are non-blocking, auto-dismissing notifications that appear at
-     * the bottom of the screen. They support four levels: SUCCESS, ERROR, WARNING, INFO.
+     * <p>
+     * Toasts are non-blocking, auto-dismissing notifications that appear at
+     * the bottom of the screen. They support four levels: SUCCESS, ERROR, WARNING,
+     * INFO.
      *
-     * <p>Usage:
+     * <p>
+     * Usage:
+     *
      * <pre>
      * // In controller's initialize():
-     * UiServices.Toast.getInstance().setContainer((StackPane) rootPane);
+     * UiServices.Toast.setContainer((StackPane) rootPane);
      *
      * // Show notifications:
-     * UiServices.Toast.getInstance().showSuccess("Profile saved!");
-     * UiServices.Toast.getInstance().showError("Connection failed");
+     * UiServices.Toast.showSuccess("Profile saved!");
+     * UiServices.Toast.showError("Connection failed");
      * </pre>
      */
     public static final class Toast {
+        private static StackPane toastContainer;
 
-        private static Toast instance;
-        private StackPane toastContainer;
-
-        private Toast() {
-            // Private constructor for singleton
-        }
-
-        /** Gets the singleton instance. Thread-safe lazy initialization. */
-        public static synchronized Toast getInstance() {
-            if (instance == null) {
-                instance = new Toast();
-            }
-            return instance;
-        }
+        private Toast() {}
 
         /**
          * Sets the container pane where toasts will be displayed.
@@ -75,31 +74,31 @@ public final class UiServices {
          *
          * @param container the StackPane to use as toast container
          */
-        public void setContainer(StackPane container) {
-            this.toastContainer = container;
+        public static void setContainer(StackPane container) {
+            toastContainer = container;
         }
 
         /** Shows a success toast with green accent. */
-        public void showSuccess(String message) {
+        public static void showSuccess(String message) {
             show(message, ToastLevel.SUCCESS, Duration.seconds(3));
         }
 
         /** Shows an error toast with red accent. */
-        public void showError(String message) {
+        public static void showError(String message) {
             show(message, ToastLevel.ERROR, Duration.seconds(5));
         }
 
         /** Shows a warning toast with amber accent. */
-        public void showWarning(String message) {
+        public static void showWarning(String message) {
             show(message, ToastLevel.WARNING, Duration.seconds(4));
         }
 
         /** Shows an info toast with blue accent. */
-        public void showInfo(String message) {
+        public static void showInfo(String message) {
             show(message, ToastLevel.INFO, Duration.seconds(3));
         }
 
-        private void show(String message, ToastLevel level, Duration duration) {
+        private static void show(String message, ToastLevel level, Duration duration) {
             if (toastContainer == null) {
                 return;
             }
@@ -125,18 +124,24 @@ public final class UiServices {
 
             // Auto-dismiss after duration
             PauseTransition pause = new PauseTransition(duration);
-            pause.setOnFinished(e -> dismiss(toast));
+            pause.setOnFinished(e -> {
+                e.consume();
+                dismiss(toast);
+            });
             pause.play();
         }
 
-        private void dismiss(HBox toast) {
+        private static void dismiss(HBox toast) {
             FadeTransition fadeOut = new FadeTransition(Duration.millis(300), toast);
             fadeOut.setToValue(0);
-            fadeOut.setOnFinished(e -> toastContainer.getChildren().remove(toast));
+            fadeOut.setOnFinished(e -> {
+                e.consume();
+                toastContainer.getChildren().remove(toast);
+            });
             fadeOut.play();
         }
 
-        private HBox createToast(String message, ToastLevel level) {
+        private static HBox createToast(String message, ToastLevel level) {
             HBox toastBox = new HBox(12);
             toastBox.getStyleClass().addAll("toast", "toast-" + level.name().toLowerCase(java.util.Locale.ROOT));
             toastBox.setAlignment(Pos.CENTER_LEFT);
@@ -178,10 +183,13 @@ public final class UiServices {
     /**
      * Thread-safe LRU-style image cache for avatars and profile photos.
      *
-     * <p>Uses ConcurrentHashMap for thread safety. Cache keys are composed of
+     * <p>
+     * Uses ConcurrentHashMap for thread safety. Cache keys are composed of
      * path and requested size for efficient lookups.
      *
-     * <p>Usage:
+     * <p>
+     * Usage:
+     *
      * <pre>
      * Image avatar = UiServices.ImageCache.getAvatar("/photos/user123.jpg", 64);
      * Image profile = UiServices.ImageCache.getImage("/photos/user123.jpg", 200, 200);
@@ -231,7 +239,10 @@ public final class UiServices {
             String key = path + "@" + width + "x" + height;
 
             // computeIfAbsent is atomic with ConcurrentHashMap
-            Image image = CACHE.computeIfAbsent(key, k -> loadImage(path, width, height));
+            Image image = CACHE.computeIfAbsent(key, k -> {
+                Objects.requireNonNull(k, "cacheKey");
+                return loadImage(path, width, height);
+            });
 
             // Simple eviction: remove oldest entry when over size
             if (CACHE.size() > MAX_CACHE_SIZE) {
@@ -261,15 +272,16 @@ public final class UiServices {
         }
 
         /** Returns the default avatar placeholder image. */
-        @SuppressWarnings("java:S2095") // InputStream closed by Image constructor
         private static Image getDefaultAvatar(double width, double height) {
             String key = "default@" + width + "x" + height;
 
             return CACHE.computeIfAbsent(key, k -> {
+                Objects.requireNonNull(k, "cacheKey");
                 try {
-                    var stream = ImageCache.class.getResourceAsStream(DEFAULT_AVATAR_PATH);
-                    if (stream != null) {
-                        return new Image(stream, width, height, true, true);
+                    try (var stream = ImageCache.class.getResourceAsStream(DEFAULT_AVATAR_PATH)) {
+                        if (stream != null) {
+                            return new Image(stream, width, height, true, true);
+                        }
                     }
                 } catch (Exception e) {
                     logger.warn("Failed to load default avatar", e);
@@ -287,7 +299,10 @@ public final class UiServices {
             return new Image(base64Png, width, height, true, true);
         }
 
-        /** Evicts the oldest entry from the cache. Simple strategy - just remove first entry found. */
+        /**
+         * Evicts the oldest entry from the cache. Simple strategy - just remove first
+         * entry found.
+         */
         private static void evictOldest() {
             CACHE.keySet().stream().findFirst().ifPresent(key -> {
                 CACHE.remove(key);

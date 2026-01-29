@@ -2,12 +2,16 @@ package datingapp.core;
 
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.Objects;
 
 /**
- * Centralized, immutable application configuration. All configurable values should be defined here
+ * Centralized, immutable application configuration. All configurable values
+ * should be defined here
  * for easy modification.
  *
- * <p>This enables future drop-in changes: - Different profiles (dev/prod) - External configuration
+ * <p>
+ * This enables future drop-in changes: - Different profiles (dev/prod) -
+ * External configuration
  * (properties files, env vars) - Testing with different thresholds
  */
 public record AppConfig(
@@ -52,6 +56,64 @@ public record AppConfig(
         double paceWeight, // Weight for pace score (0.15 default)
         double responseWeight // Weight for response time score (0.10 default)
         ) {
+    public AppConfig {
+        Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
+
+        requireNonNegative("autoBanThreshold", autoBanThreshold);
+        // dailyLikeLimit allows -1 for unlimited
+        if (dailyLikeLimit < -1) {
+            throw new IllegalArgumentException("dailyLikeLimit must be >= -1 (use -1 for unlimited)");
+        }
+        requireNonNegative("dailySuperLikeLimit", dailySuperLikeLimit);
+        // dailyPassLimit allows -1 for unlimited - validate separately
+        if (dailyPassLimit < -1) {
+            throw new IllegalArgumentException("dailyPassLimit must be >= -1 (use -1 for unlimited)");
+        }
+        requireNonNegative("maxInterests", maxInterests);
+        requireNonNegative("maxPhotos", maxPhotos);
+        requireNonNegative("maxBioLength", maxBioLength);
+        requireNonNegative("maxReportDescLength", maxReportDescLength);
+        requireNonNegative("sessionTimeoutMinutes", sessionTimeoutMinutes);
+        requireNonNegative("maxSwipesPerSession", maxSwipesPerSession);
+        requireNonNegative("suspiciousSwipeVelocity", suspiciousSwipeVelocity);
+        requireNonNegative("undoWindowSeconds", undoWindowSeconds);
+        requireNonNegative("nearbyDistanceKm", nearbyDistanceKm);
+        requireNonNegative("closeDistanceKm", closeDistanceKm);
+        requireNonNegative("similarAgeDiff", similarAgeDiff);
+        requireNonNegative("compatibleAgeDiff", compatibleAgeDiff);
+        requireNonNegative("minSharedInterests", minSharedInterests);
+        requireNonNegative("paceCompatibilityThreshold", paceCompatibilityThreshold);
+        requireNonNegative("responseTimeExcellentHours", responseTimeExcellentHours);
+        requireNonNegative("responseTimeGreatHours", responseTimeGreatHours);
+        requireNonNegative("responseTimeGoodHours", responseTimeGoodHours);
+        requireNonNegative("achievementMatchTier1", achievementMatchTier1);
+        requireNonNegative("achievementMatchTier2", achievementMatchTier2);
+        requireNonNegative("achievementMatchTier3", achievementMatchTier3);
+        requireNonNegative("achievementMatchTier4", achievementMatchTier4);
+        requireNonNegative("achievementMatchTier5", achievementMatchTier5);
+        requireNonNegative("minSwipesForBehaviorAchievement", minSwipesForBehaviorAchievement);
+        requireNonNegative("maxDistanceKm", maxDistanceKm);
+        requireNonNegative("maxAge", maxAge);
+        requireNonNegative("distanceWeight", distanceWeight);
+        requireNonNegative("ageWeight", ageWeight);
+        requireNonNegative("interestWeight", interestWeight);
+        requireNonNegative("lifestyleWeight", lifestyleWeight);
+        requireNonNegative("paceWeight", paceWeight);
+        requireNonNegative("responseWeight", responseWeight);
+    }
+
+    private static void requireNonNegative(String name, int value) {
+        if (value < 0) {
+            throw new IllegalArgumentException(name + " must be non-negative");
+        }
+    }
+
+    private static void requireNonNegative(String name, double value) {
+        if (value < 0) {
+            throw new IllegalArgumentException(name + " must be non-negative");
+        }
+    }
+
     /** Default configuration values. */
     public static AppConfig defaults() {
         return new AppConfig(

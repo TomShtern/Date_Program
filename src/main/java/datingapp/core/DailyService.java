@@ -105,7 +105,8 @@ public class DailyService {
                 new java.util.HashSet<>(likeStorage.getLikedOrPassedUserIds(seeker.getId()));
 
         // Use CandidateFinder to apply comprehensive preference filtering
-        // This filters by: self, active state, blocks, mutual gender, mutual age, distance, dealbreakers
+        // This filters by: self, active state, blocks, mutual gender, mutual age,
+        // distance, dealbreakers
         List<User> candidates;
         if (candidateFinder != null) {
             candidates = candidateFinder.findCandidates(seeker, allActive, alreadyInteracted);
@@ -231,6 +232,14 @@ public class DailyService {
     public record DailyStatus(
             int likesUsed, int likesRemaining, int passesUsed, int passesRemaining, LocalDate date, Instant resetsAt) {
 
+        public DailyStatus {
+            if (likesUsed < 0 || passesUsed < 0) {
+                throw new IllegalArgumentException("Usage counts cannot be negative");
+            }
+            Objects.requireNonNull(date, "date cannot be null");
+            Objects.requireNonNull(resetsAt, "resetsAt cannot be null");
+        }
+
         public boolean hasUnlimitedLikes() {
             return likesRemaining < 0;
         }
@@ -241,5 +250,15 @@ public class DailyService {
     }
 
     /** Daily pick payload. */
-    public record DailyPick(User user, LocalDate date, String reason, boolean alreadySeen) {}
+    public record DailyPick(User user, LocalDate date, String reason, boolean alreadySeen) {
+
+        public DailyPick {
+            Objects.requireNonNull(user, "user cannot be null");
+            Objects.requireNonNull(date, "date cannot be null");
+            Objects.requireNonNull(reason, "reason cannot be null");
+            if (reason.isBlank()) {
+                throw new IllegalArgumentException("reason cannot be blank");
+            }
+        }
+    }
 }

@@ -14,7 +14,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Service for messaging between matched users. Handles authorization, message creation, and
+ * Service for messaging between matched users. Handles authorization, message
+ * creation, and
  * conversation management.
  */
 public class MessagingService {
@@ -38,9 +39,9 @@ public class MessagingService {
     /**
      * Sends a message from one user to another.
      *
-     * @param senderId The user sending the message
+     * @param senderId    The user sending the message
      * @param recipientId The user receiving the message
-     * @param content The message content
+     * @param content     The message content
      * @return SendResult indicating success or failure with details
      */
     public SendResult sendMessage(UUID senderId, UUID recipientId, String content) {
@@ -98,10 +99,10 @@ public class MessagingService {
     /**
      * Gets messages for a conversation with pagination.
      *
-     * @param userId The requesting user (must be part of conversation)
+     * @param userId      The requesting user (must be part of conversation)
      * @param otherUserId The other user in the conversation
-     * @param limit Maximum messages to return
-     * @param offset Number of messages to skip
+     * @param limit       Maximum messages to return
+     * @param offset      Number of messages to skip
      * @return List of messages, ordered oldest first
      */
     public List<Message> getMessages(UUID userId, UUID otherUserId, int limit, int offset) {
@@ -147,7 +148,7 @@ public class MessagingService {
     /**
      * Marks a conversation as read for a user.
      *
-     * @param userId The user marking as read
+     * @param userId         The user marking as read
      * @param conversationId The conversation to mark read
      */
     public void markAsRead(UUID userId, String conversationId) {
@@ -162,7 +163,7 @@ public class MessagingService {
     /**
      * Gets unread message count for a user in a conversation.
      *
-     * @param userId The user to count unread for
+     * @param userId         The user to count unread for
      * @param conversationId The conversation to count
      * @return Number of unread messages
      */
@@ -216,7 +217,8 @@ public class MessagingService {
     }
 
     /**
-     * Gets or creates a conversation between two users. Does not check for match - caller should
+     * Gets or creates a conversation between two users. Does not check for match -
+     * caller should
      * verify.
      */
     public Conversation getOrCreateConversation(UUID userA, UUID userB) {
@@ -238,6 +240,18 @@ public class MessagingService {
     /** Result of sending a message. */
     public record SendResult(boolean success, Message message, String errorMessage, ErrorCode errorCode) {
 
+        public SendResult {
+            if (success) {
+                Objects.requireNonNull(message, "message cannot be null when success is true");
+                if (errorMessage != null || errorCode != null) {
+                    throw new IllegalArgumentException("Error details must be null on success");
+                }
+            } else {
+                Objects.requireNonNull(errorMessage, "errorMessage cannot be null when success is false");
+                Objects.requireNonNull(errorCode, "errorCode cannot be null when success is false");
+            }
+        }
+
         /** Error codes for message sending failures. */
         public enum ErrorCode {
             NO_ACTIVE_MATCH,
@@ -257,5 +271,15 @@ public class MessagingService {
 
     /** Preview of a conversation for list display. */
     public record ConversationPreview(
-            Conversation conversation, User otherUser, Optional<Message> lastMessage, int unreadCount) {}
+            Conversation conversation, User otherUser, Optional<Message> lastMessage, int unreadCount) {
+
+        public ConversationPreview {
+            Objects.requireNonNull(conversation, "conversation cannot be null");
+            Objects.requireNonNull(otherUser, "otherUser cannot be null");
+            Objects.requireNonNull(lastMessage, "lastMessage cannot be null");
+            if (unreadCount < 0) {
+                throw new IllegalArgumentException("unreadCount cannot be negative");
+            }
+        }
+    }
 }

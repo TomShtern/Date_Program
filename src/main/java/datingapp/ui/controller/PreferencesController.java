@@ -10,6 +10,7 @@ import java.util.ResourceBundle;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.control.ToggleButton;
@@ -64,6 +65,12 @@ public class PreferencesController extends BaseController implements Initializab
     @FXML
     private ToggleButton themeToggle;
 
+    @FXML
+    private Button backButton;
+
+    @FXML
+    private Button saveButton;
+
     private final PreferencesViewModel viewModel;
 
     public PreferencesController(PreferencesViewModel viewModel) {
@@ -77,6 +84,7 @@ public class PreferencesController extends BaseController implements Initializab
         setupAgeControls();
         setupDistanceControls();
         setupGenderControls();
+        wireActionButtons();
 
         UiAnimations.fadeIn(rootPane, 600);
     }
@@ -166,7 +174,6 @@ public class PreferencesController extends BaseController implements Initializab
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleSave() {
         logger.info("Saving preferences...");
         viewModel.savePreferences();
@@ -174,7 +181,6 @@ public class PreferencesController extends BaseController implements Initializab
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleBack() {
         logger.info("Canceling preferences changes...");
         // Just go back without saving
@@ -182,7 +188,6 @@ public class PreferencesController extends BaseController implements Initializab
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleThemeToggle() {
         boolean isDarkMode = themeToggle.isSelected();
         logger.info("Toggling theme to: {}", isDarkMode ? "Dark" : "Light");
@@ -219,5 +224,26 @@ public class PreferencesController extends BaseController implements Initializab
             return null;
         }
         return resource.toExternalForm();
+    }
+
+    private void wireActionButtons() {
+        if (backButton != null) {
+            backButton.setOnAction(event -> {
+                event.consume();
+                handleBack();
+            });
+        }
+        if (saveButton != null) {
+            saveButton.setOnAction(event -> {
+                event.consume();
+                handleSave();
+            });
+        }
+        if (themeToggle != null) {
+            themeToggle.setOnAction(event -> {
+                event.consume();
+                handleThemeToggle();
+            });
+        }
     }
 }

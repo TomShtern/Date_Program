@@ -4,15 +4,27 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Centralized validation service for user input. Provides consistent validation logic for profile
+ * Centralized validation service for user input. Provides consistent validation
+ * logic for profile
  * fields and preferences with user-friendly error messages.
  */
 public class ValidationService {
 
     /**
-     * Result of a validation operation. Contains success status and any error messages.
+     * Result of a validation operation. Contains success status and any error
+     * messages.
      */
     public record ValidationResult(boolean valid, List<String> errors) {
+        public ValidationResult {
+            errors = errors != null ? List.copyOf(errors) : List.of();
+            if (valid && !errors.isEmpty()) {
+                throw new IllegalArgumentException("Valid results cannot contain errors");
+            }
+            if (!valid && errors.isEmpty()) {
+                throw new IllegalArgumentException("Invalid results must include errors");
+            }
+        }
+
         public static ValidationResult success() {
             return new ValidationResult(true, List.of());
         }
@@ -135,7 +147,7 @@ public class ValidationService {
     /**
      * Validates geographic coordinates.
      *
-     * @param latitude the latitude to validate
+     * @param latitude  the latitude to validate
      * @param longitude the longitude to validate
      * @return validation result
      */

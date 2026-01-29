@@ -10,56 +10,81 @@ import org.slf4j.LoggerFactory;
 /**
  * Finds candidate users for matching based on preferences and filters.
  *
- * <p><strong>Architectural Note:</strong> This class intentionally stays in the {@code core/}
- * package (not {@code service/}) because it is a <strong>pure stateless algorithm</strong> with
- * zero infrastructure dependencies. Unlike services that depend on storage interfaces or maintain
- * state, CandidateFinder is a pure function: {@code (User, List<User>, Set<UUID>) -> List<User>}.
+ * <p>
+ * <strong>Architectural Note:</strong> This class intentionally stays in the
+ * {@code core/}
+ * package (not {@code service/}) because it is a <strong>pure stateless
+ * algorithm</strong> with
+ * zero infrastructure dependencies. Unlike services that depend on storage
+ * interfaces or maintain
+ * state, CandidateFinder is a pure function:
+ * {@code (User, List<User>, Set<UUID>) -> List<User>}.
  *
  * <h3>Why This Design?</h3>
  *
  * <ul>
- *   <li><strong>Zero Framework Dependencies:</strong> Operates only on in-memory collections passed
- *       by callers. Never queries storage directly, maintaining the "core stays pure" architectural
- *       rule.
- *   <li><strong>Strategy Pattern:</strong> Designed for easy algorithm swapping (e.g., ML-based
- *       ranking, A/B testing different filters) via dependency injection or adapter interfaces.
- *   <li><strong>Stateless Transform:</strong> No mutable state, no persistence concerns. Each call
- *       is independent and deterministic given the same inputs.
- *   <li><strong>Performance:</strong> Operates on in-memory lists for speed. Callers are
- *       responsible for fetching active users from storage and passing them in.
+ * <li><strong>Zero Framework Dependencies:</strong> Operates only on in-memory
+ * collections passed
+ * by callers. Never queries storage directly, maintaining the "core stays pure"
+ * architectural
+ * rule.
+ * <li><strong>Strategy Pattern:</strong> Designed for easy algorithm swapping
+ * (e.g., ML-based
+ * ranking, A/B testing different filters) via dependency injection or adapter
+ * interfaces.
+ * <li><strong>Stateless Transform:</strong> No mutable state, no persistence
+ * concerns. Each call
+ * is independent and deterministic given the same inputs.
+ * <li><strong>Performance:</strong> Operates on in-memory lists for speed.
+ * Callers are
+ * responsible for fetching active users from storage and passing them in.
  * </ul>
  *
  * <h3>Naming Rationale</h3>
  *
- * <p>This class does NOT follow the {@code *Service} naming convention (e.g., {@code
- * MatchingService}, {@code DailyService}) because it is not a service in the architectural
+ * <p>
+ * This class does NOT follow the {@code *Service} naming convention (e.g.,
+ * {@code
+ * MatchingService}, {@code DailyService}) because it is not a service in the
+ * architectural
  * sense. Services in this codebase:
  *
  * <ul>
- *   <li>Depend on storage interfaces (e.g., {@code User.Storage}, {@code LikeStorage})
- *   <li>Manage state or coordinate persistence operations
- *   <li>Handle business workflows with side effects
+ * <li>Depend on storage interfaces (e.g., {@code User.Storage},
+ * {@code LikeStorage})
+ * <li>Manage state or coordinate persistence operations
+ * <li>Handle business workflows with side effects
  * </ul>
  *
- * <p>CandidateFinder is a pure filter/transform utility, more similar to {@code GeoUtils} or {@code
- * InterestMatcher} than to services like {@code MatchingService}. The {@code Finder} suffix
+ * <p>
+ * CandidateFinder is a pure filter/transform utility, more similar to
+ * {@code GeoUtils} or {@code
+ * InterestMatcher} than to services like {@code MatchingService}. The
+ * {@code Finder} suffix
  * emphasizes its role as a stateless search algorithm.
  *
  * <h3>Related Naming Inconsistencies</h3>
  *
- * <p>For historical consistency, {@code Dealbreakers.Evaluator} and {@code InterestMatcher} should
- * also be renamed to follow either the {@code *Service} pattern or remain as utilities. This is
- * tracked in <a href="file:///DEVELOPMENT_PLAN.md">DEVELOPMENT_PLAN.md</a> items #6 and #15.
+ * <p>
+ * For historical consistency, {@code Dealbreakers.Evaluator} and
+ * {@code InterestMatcher} should
+ * also be renamed to follow either the {@code *Service} pattern or remain as
+ * utilities. This is
+ * tracked in <a href="file:///DEVELOPMENT_PLAN.md">DEVELOPMENT_PLAN.md</a>
+ * items #6 and #15.
  *
  * <h3>Future Improvements</h3>
  *
  * <ul>
- *   <li><strong>Pagination:</strong> Currently returns all matches in memory. Future versions could
- *       support cursor-based pagination for large result sets.
- *   <li><strong>Caching Layer:</strong> Filter results could be cached (Redis/in-memory) to avoid
- *       recomputing for repeated queries.
- *   <li><strong>Scoring/Ranking:</strong> Beyond distance sorting, could incorporate match quality
- *       scores for intelligent ranking.
+ * <li><strong>Pagination:</strong> Currently returns all matches in memory.
+ * Future versions could
+ * support cursor-based pagination for large result sets.
+ * <li><strong>Caching Layer:</strong> Filter results could be cached
+ * (Redis/in-memory) to avoid
+ * recomputing for repeated queries.
+ * <li><strong>Scoring/Ranking:</strong> Beyond distance sorting, could
+ * incorporate match quality
+ * scores for intelligent ranking.
  * </ul>
  *
  * @see Dealbreakers.Evaluator
@@ -80,7 +105,8 @@ public class CandidateFinder {
         }
 
         /**
-         * Calculates the distance in kilometers between two geographic points using the Haversine
+         * Calculates the distance in kilometers between two geographic points using the
+         * Haversine
          * formula.
          *
          * @param lat1 Latitude of point 1 in degrees
@@ -108,11 +134,16 @@ public class CandidateFinder {
     /**
      * Finds candidates for the given seeker from a list of active users.
      *
-     * <p>Filtering rules (ALL must be true for a candidate): 1. Not self 2. Not already interacted
-     * (liked/passed) 3. Mutual gender preferences (both ways) 4. Mutual age preferences (both ways)
-     * 5. Within seeker's distance preference 6. Passes seeker's dealbreakers (Phase 0.5b)
+     * <p>
+     * Filtering rules (ALL must be true for a candidate): 1. Not self 2. Not
+     * already interacted
+     * (liked/passed) 3. Mutual gender preferences (both ways) 4. Mutual age
+     * preferences (both ways)
+     * 5. Within seeker's distance preference 6. Passes seeker's dealbreakers (Phase
+     * 0.5b)
      *
-     * <p>Results are sorted by distance (closest first).
+     * <p>
+     * Results are sorted by distance (closest first).
      */
     public List<User> findCandidates(User seeker, List<User> allActive, Set<UUID> alreadyInteracted) {
         logger.debug(
@@ -216,7 +247,8 @@ public class CandidateFinder {
     }
 
     /**
-     * Checks if gender preferences match both ways: - Seeker is interested in candidate's gender -
+     * Checks if gender preferences match both ways: - Seeker is interested in
+     * candidate's gender -
      * Candidate is interested in seeker's gender.
      */
     private boolean hasMatchingGenderPreferences(User seeker, User candidate) {
@@ -234,7 +266,8 @@ public class CandidateFinder {
     }
 
     /**
-     * Checks if age preferences match both ways: - Candidate's age is within seeker's age range -
+     * Checks if age preferences match both ways: - Candidate's age is within
+     * seeker's age range -
      * Seeker's age is within candidate's age range.
      */
     private boolean hasMatchingAgePreferences(User seeker, User candidate) {
@@ -254,12 +287,14 @@ public class CandidateFinder {
     /** Checks if the candidate is within the seeker's max distance preference. */
     private boolean isWithinDistance(User seeker, User candidate) {
         if (!hasLocation(seeker) || !hasLocation(candidate)) {
-            logger.debug(
-                    "Skipping distance filter for {} ({}): missing location (seekerLatLon={}, candidateLatLon={}).",
-                    candidate.getName(),
-                    candidate.getId(),
-                    formatLatLon(seeker),
-                    formatLatLon(candidate));
+            if (logger.isDebugEnabled()) {
+                logger.debug(
+                        "Skipping distance filter for {} ({}): missing location (seekerLatLon={}, candidateLatLon={}).",
+                        candidate.getName(),
+                        candidate.getId(),
+                        formatLatLon(seeker),
+                        formatLatLon(candidate));
+            }
             return true;
         }
         double distance = distanceTo(seeker, candidate);

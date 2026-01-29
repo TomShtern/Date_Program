@@ -6,10 +6,12 @@ import datingapp.ui.util.UiAnimations;
 import datingapp.ui.util.UiHelpers;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
+import java.util.Objects;
 import java.util.ResourceBundle;
 import javafx.animation.FadeTransition;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.util.Duration;
@@ -45,6 +47,27 @@ public class DashboardController extends BaseController implements Initializable
 
     @FXML
     private ListView<String> achievementsListView;
+
+    @FXML
+    private Button logoutButton;
+
+    @FXML
+    private Button browseButton;
+
+    @FXML
+    private Button matchesButton;
+
+    @FXML
+    private Button chatButton;
+
+    @FXML
+    private Button profileButton;
+
+    @FXML
+    private Button dailyPickButton;
+
+    @FXML
+    private Button statsButton;
 
     private final DashboardViewModel viewModel;
 
@@ -82,6 +105,8 @@ public class DashboardController extends BaseController implements Initializable
         // Setup responsive window size listener
         setupResponsiveListener();
 
+        wireNavigationButtons();
+
         // Load initial data (will trigger loading skeleton)
         viewModel.refresh();
     }
@@ -118,59 +143,108 @@ public class DashboardController extends BaseController implements Initializable
     private void setupResponsiveListener() {
         // Wait for scene to be available
         rootPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            Objects.requireNonNull(obs, "sceneProperty listener source cannot be null");
+            if (Objects.equals(oldScene, newScene)) {
+                return;
+            }
             if (newScene != null && newScene.getWindow() != null) {
                 javafx.stage.Stage stage = (javafx.stage.Stage) newScene.getWindow();
                 // Apply initial state
                 setCompactMode(stage.getWidth() < 900);
                 // Listen for resize
-                stage.widthProperty().addListener((o, oldW, newW) -> setCompactMode(newW.doubleValue() < 900));
+                stage.widthProperty().addListener((o, oldW, newW) -> {
+                    if (o == null) {
+                        return;
+                    }
+                    if (Double.compare(oldW.doubleValue(), newW.doubleValue()) != 0) {
+                        setCompactMode(newW.doubleValue() < 900);
+                    }
+                });
             }
         });
     }
 
-    @SuppressWarnings("unused") // Called by FXML
+    private void wireNavigationButtons() {
+        if (browseButton != null) {
+            browseButton.setOnAction(event -> {
+                event.consume();
+                handleBrowse();
+            });
+        }
+        if (matchesButton != null) {
+            matchesButton.setOnAction(event -> {
+                event.consume();
+                handleMatches();
+            });
+        }
+        if (chatButton != null) {
+            chatButton.setOnAction(event -> {
+                event.consume();
+                handleChat();
+            });
+        }
+        if (profileButton != null) {
+            profileButton.setOnAction(event -> {
+                event.consume();
+                handleProfile();
+            });
+        }
+        if (dailyPickButton != null) {
+            dailyPickButton.setOnAction(event -> {
+                event.consume();
+                handleViewDailyPick();
+            });
+        }
+        if (statsButton != null) {
+            statsButton.setOnAction(event -> {
+                event.consume();
+                handleStats();
+            });
+        }
+        if (logoutButton != null) {
+            logoutButton.setOnAction(event -> {
+                event.consume();
+                handleLogout();
+            });
+        }
+    }
+
     @FXML
     private void handleBrowse() {
         logger.info("Navigating to Matching screen");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
     }
 
-    @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleMatches() {
         logger.info("Navigating to Matches screen");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHES);
     }
 
-    @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleStats() {
         logger.info("Navigating to Stats screen");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.STATS);
     }
 
-    @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleChat() {
         logger.info("Navigating to Chat screen");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.CHAT);
     }
 
-    @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleProfile() {
         logger.info("Navigating to Profile screen");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE);
     }
 
-    @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleViewDailyPick() {
         logger.info("Viewing daily pick - navigating to Matching");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
     }
 
-    @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleLogout() {
         javafx.scene.control.Alert alert =

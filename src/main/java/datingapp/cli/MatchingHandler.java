@@ -32,7 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handler for matching-related CLI operations. Manages swiping, match discovery, daily picks, and
+ * Handler for matching-related CLI operations. Manages swiping, match
+ * discovery, daily picks, and
  * match quality display.
  */
 public class MatchingHandler {
@@ -105,7 +106,8 @@ public class MatchingHandler {
     }
 
     /**
-     * Displays the candidate browsing interface, showing potential matches to the user. Handles daily
+     * Displays the candidate browsing interface, showing potential matches to the
+     * user. Handles daily
      * picks, candidate filtering, and user interactions (like/pass).
      */
     public void browseCandidates() {
@@ -176,18 +178,15 @@ public class MatchingHandler {
         logger.info(CliConstants.BOX_BOTTOM);
 
         // Validate input and re-prompt until valid choice is entered
-        String action;
-        while (true) {
+        String action = null;
+        while (action == null) {
             String input = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_QUIT);
             Optional<String> validated = CliUtilities.validateChoice(input, "l", "p", "q");
-
             if (validated.isEmpty()) {
                 logger.info("❌ Invalid choice. Please enter L (like), P (pass), or Q (quit).");
-                continue;
+            } else {
+                action = validated.get();
             }
-
-            action = validated.get();
-            break;
         }
 
         if ("q".equals(action)) {
@@ -226,7 +225,8 @@ public class MatchingHandler {
     }
 
     /**
-     * Displays the user's active matches with compatibility scores and options to view details,
+     * Displays the user's active matches with compatibility scores and options to
+     * view details,
      * unmatch, or block matches.
      */
     public void viewMatches() {
@@ -486,7 +486,8 @@ public class MatchingHandler {
     }
 
     /**
-     * Displays a message when the user has reached their daily like limit, showing remaining time
+     * Displays a message when the user has reached their daily like limit, showing
+     * remaining time
      * until reset and tips for better matching.
      *
      * @param currentUser The user who reached the limit
@@ -545,18 +546,15 @@ public class MatchingHandler {
         logger.info("");
 
         // Validate input and re-prompt until valid choice is entered
-        String action;
-        while (true) {
+        String action = null;
+        while (action == null) {
             String input = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_SKIP);
             Optional<String> validated = CliUtilities.validateChoice(input, "l", "p", "s");
-
             if (validated.isEmpty()) {
                 logger.info("❌ Invalid choice. Please enter L (like), P (pass), or S (skip).");
-                continue;
+            } else {
+                action = validated.get();
             }
-
-            action = validated.get();
-            break;
         }
 
         if ("s".equals(action)) {
@@ -631,7 +629,8 @@ public class MatchingHandler {
     }
 
     /**
-     * Returns an emoji badge based on the number of shared interests. More matches = more exciting
+     * Returns an emoji badge based on the number of shared interests. More matches
+     * = more exciting
      * badge!
      */
     private String getMutualInterestsBadge(int sharedCount) {

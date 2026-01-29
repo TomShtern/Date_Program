@@ -6,10 +6,13 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Immutable record representing a user's hard filters (dealbreakers). Candidates who don't meet
+ * Immutable record representing a user's hard filters (dealbreakers).
+ * Candidates who don't meet
  * these criteria will be excluded from matching.
  *
- * <p>Dealbreakers are one-way: if I have a dealbreaker against smokers, I won't see smokers, but
+ * <p>
+ * Dealbreakers are one-way: if I have a dealbreaker against smokers, I won't
+ * see smokers, but
  * smokers can still see me (unless they have their own dealbreakers).
  */
 public record Dealbreakers(
@@ -107,7 +110,8 @@ public record Dealbreakers(
     }
 
     /**
-     * Creates a Builder pre-populated with this record's values. Enables partial updates without
+     * Creates a Builder pre-populated with this record's values. Enables partial
+     * updates without
      * copying every field manually.
      *
      * @return a new Builder with all current values
@@ -225,10 +229,13 @@ public record Dealbreakers(
     }
 
     /**
-     * Evaluates whether a candidate passes all of a seeker's dealbreakers. Stateless utility class -
+     * Evaluates whether a candidate passes all of a seeker's dealbreakers.
+     * Stateless utility class -
      * all methods are static.
      *
-     * <p>Design decision: Missing candidate fields FAIL dealbreakers. This encourages profile
+     * <p>
+     * Design decision: Missing candidate fields FAIL dealbreakers. This encourages
+     * profile
      * completion and is the safer default.
      */
     public static final class Evaluator {
@@ -240,7 +247,7 @@ public record Dealbreakers(
         /**
          * Check if candidate passes all of seeker's dealbreakers.
          *
-         * @param seeker The user looking for matches
+         * @param seeker    The user looking for matches
          * @param candidate The potential match
          * @return true if candidate passes all dealbreakers, false if any fails
          */
@@ -252,73 +259,19 @@ public record Dealbreakers(
                 return true;
             }
 
-            // Check smoking dealbreaker
-            if (db.hasSmokingDealbreaker()) {
-                if (candidate.getSmoking() == null || !db.acceptableSmoking().contains(candidate.getSmoking())) {
-                    return false;
-                }
-            }
-
-            // Check drinking dealbreaker
-            if (db.hasDrinkingDealbreaker()) {
-                if (candidate.getDrinking() == null || !db.acceptableDrinking().contains(candidate.getDrinking())) {
-                    return false;
-                }
-            }
-
-            // Check kids stance dealbreaker
-            if (db.hasKidsDealbreaker()) {
-                if (candidate.getWantsKids() == null
-                        || !db.acceptableKidsStance().contains(candidate.getWantsKids())) {
-                    return false;
-                }
-            }
-
-            // Check looking for dealbreaker
-            if (db.hasLookingForDealbreaker()) {
-                if (candidate.getLookingFor() == null
-                        || !db.acceptableLookingFor().contains(candidate.getLookingFor())) {
-                    return false;
-                }
-            }
-
-            // Check education dealbreaker
-            if (db.hasEducationDealbreaker()) {
-                if (candidate.getEducation() == null
-                        || !db.acceptableEducation().contains(candidate.getEducation())) {
-                    return false;
-                }
-            }
-
-            // Check height dealbreaker
-            // Note: If candidate hasn't set height but seeker has height dealbreaker, we PASS
-            // (height is optional, don't exclude people who haven't entered it)
-            if (db.hasHeightDealbreaker() && candidate.getHeightCm() != null) {
-                Integer candidateHeight = candidate.getHeightCm();
-                if (db.minHeightCm() != null && candidateHeight < db.minHeightCm()) {
-                    return false;
-                }
-                if (db.maxHeightCm() != null && candidateHeight > db.maxHeightCm()) {
-                    return false;
-                }
-            }
-
-            // Check age difference dealbreaker
-            if (db.hasAgeDealbreaker()) {
-                int seekerAge = seeker.getAge();
-                int candidateAge = candidate.getAge();
-                if (seekerAge > 0 && candidateAge > 0 && Math.abs(seekerAge - candidateAge) > db.maxAgeDifference()) {
-                    return false;
-                }
-            }
-
-            return true;
+            return passesSmoking(db, candidate)
+                    && passesDrinking(db, candidate)
+                    && passesKids(db, candidate)
+                    && passesLookingFor(db, candidate)
+                    && passesEducation(db, candidate)
+                    && passesHeight(db, candidate)
+                    && passesAgeDifference(db, seeker, candidate);
         }
 
         /**
          * Get a list of which dealbreakers a candidate fails (for debugging/display).
          *
-         * @param seeker The user looking for matches
+         * @param seeker    The user looking for matches
          * @param candidate The potential match
          * @return List of human-readable failure descriptions
          */
@@ -326,75 +279,177 @@ public record Dealbreakers(
             java.util.List<String> failures = new java.util.ArrayList<>();
             Dealbreakers db = seeker.getDealbreakers();
 
-            // Smoking
-            if (db.hasSmokingDealbreaker()) {
-                if (candidate.getSmoking() == null) {
-                    failures.add("Smoking status not specified");
-                } else if (!db.acceptableSmoking().contains(candidate.getSmoking())) {
-                    failures.add("Smoking: " + candidate.getSmoking().getDisplayName());
-                }
-            }
-
-            // Drinking
-            if (db.hasDrinkingDealbreaker()) {
-                if (candidate.getDrinking() == null) {
-                    failures.add("Drinking status not specified");
-                } else if (!db.acceptableDrinking().contains(candidate.getDrinking())) {
-                    failures.add("Drinking: " + candidate.getDrinking().getDisplayName());
-                }
-            }
-
-            // Kids stance
-            if (db.hasKidsDealbreaker()) {
-                if (candidate.getWantsKids() == null) {
-                    failures.add("Kids stance not specified");
-                } else if (!db.acceptableKidsStance().contains(candidate.getWantsKids())) {
-                    failures.add("Kids: " + candidate.getWantsKids().getDisplayName());
-                }
-            }
-
-            // Looking for
-            if (db.hasLookingForDealbreaker()) {
-                if (candidate.getLookingFor() == null) {
-                    failures.add("Relationship goal not specified");
-                } else if (!db.acceptableLookingFor().contains(candidate.getLookingFor())) {
-                    failures.add("Looking for: " + candidate.getLookingFor().getDisplayName());
-                }
-            }
-
-            // Education
-            if (db.hasEducationDealbreaker()) {
-                if (candidate.getEducation() == null) {
-                    failures.add("Education not specified");
-                } else if (!db.acceptableEducation().contains(candidate.getEducation())) {
-                    failures.add("Education: " + candidate.getEducation().getDisplayName());
-                }
-            }
-
-            // Height
-            if (db.hasHeightDealbreaker() && candidate.getHeightCm() != null) {
-                Integer candidateHeight = candidate.getHeightCm();
-                if (db.minHeightCm() != null && candidateHeight < db.minHeightCm()) {
-                    failures.add("Height too short: " + candidateHeight + " cm");
-                }
-                if (db.maxHeightCm() != null && candidateHeight > db.maxHeightCm()) {
-                    failures.add("Height too tall: " + candidateHeight + " cm");
-                }
-            }
-
-            // Age difference
-            if (db.hasAgeDealbreaker()) {
-                int seekerAge = seeker.getAge();
-                int candidateAge = candidate.getAge();
-                if (seekerAge > 0 && candidateAge > 0) {
-                    int ageDiff = Math.abs(seekerAge - candidateAge);
-                    if (ageDiff > db.maxAgeDifference()) {
-                        failures.add("Age difference: " + ageDiff + " years (max: " + db.maxAgeDifference() + ")");
-                    }
-                }
-            }
+            addSmokingFailure(db, candidate, failures);
+            addDrinkingFailure(db, candidate, failures);
+            addKidsFailure(db, candidate, failures);
+            addLookingForFailure(db, candidate, failures);
+            addEducationFailure(db, candidate, failures);
+            addHeightFailure(db, candidate, failures);
+            addAgeFailure(db, seeker, candidate, failures);
 
             return failures;
+        }
+
+        private static boolean passesSmoking(Dealbreakers db, User candidate) {
+            if (!db.hasSmokingDealbreaker()) {
+                return true;
+            }
+            Preferences.Lifestyle.Smoking smoking = candidate.getSmoking();
+            return smoking != null && db.acceptableSmoking().contains(smoking);
+        }
+
+        private static boolean passesDrinking(Dealbreakers db, User candidate) {
+            if (!db.hasDrinkingDealbreaker()) {
+                return true;
+            }
+            Preferences.Lifestyle.Drinking drinking = candidate.getDrinking();
+            return drinking != null && db.acceptableDrinking().contains(drinking);
+        }
+
+        private static boolean passesKids(Dealbreakers db, User candidate) {
+            if (!db.hasKidsDealbreaker()) {
+                return true;
+            }
+            Preferences.Lifestyle.WantsKids wantsKids = candidate.getWantsKids();
+            return wantsKids != null && db.acceptableKidsStance().contains(wantsKids);
+        }
+
+        private static boolean passesLookingFor(Dealbreakers db, User candidate) {
+            if (!db.hasLookingForDealbreaker()) {
+                return true;
+            }
+            Preferences.Lifestyle.LookingFor lookingFor = candidate.getLookingFor();
+            return lookingFor != null && db.acceptableLookingFor().contains(lookingFor);
+        }
+
+        private static boolean passesEducation(Dealbreakers db, User candidate) {
+            if (!db.hasEducationDealbreaker()) {
+                return true;
+            }
+            Preferences.Lifestyle.Education education = candidate.getEducation();
+            return education != null && db.acceptableEducation().contains(education);
+        }
+
+        private static boolean passesHeight(Dealbreakers db, User candidate) {
+            if (!db.hasHeightDealbreaker()) {
+                return true;
+            }
+            Integer candidateHeight = candidate.getHeightCm();
+            if (candidateHeight == null) {
+                return true;
+            }
+            Integer minHeight = db.minHeightCm();
+            if (minHeight != null && candidateHeight < minHeight) {
+                return false;
+            }
+            Integer maxHeight = db.maxHeightCm();
+            return maxHeight == null || candidateHeight <= maxHeight;
+        }
+
+        private static boolean passesAgeDifference(Dealbreakers db, User seeker, User candidate) {
+            if (!db.hasAgeDealbreaker()) {
+                return true;
+            }
+            int seekerAge = seeker.getAge();
+            int candidateAge = candidate.getAge();
+            if (seekerAge <= 0 || candidateAge <= 0) {
+                return true;
+            }
+            return Math.abs(seekerAge - candidateAge) <= db.maxAgeDifference();
+        }
+
+        private static void addSmokingFailure(Dealbreakers db, User candidate, java.util.List<String> failures) {
+            if (!db.hasSmokingDealbreaker()) {
+                return;
+            }
+            Preferences.Lifestyle.Smoking smoking = candidate.getSmoking();
+            if (smoking == null) {
+                failures.add("Smoking status not specified");
+            } else if (!db.acceptableSmoking().contains(smoking)) {
+                failures.add("Smoking: " + smoking.getDisplayName());
+            }
+        }
+
+        private static void addDrinkingFailure(Dealbreakers db, User candidate, java.util.List<String> failures) {
+            if (!db.hasDrinkingDealbreaker()) {
+                return;
+            }
+            Preferences.Lifestyle.Drinking drinking = candidate.getDrinking();
+            if (drinking == null) {
+                failures.add("Drinking status not specified");
+            } else if (!db.acceptableDrinking().contains(drinking)) {
+                failures.add("Drinking: " + drinking.getDisplayName());
+            }
+        }
+
+        private static void addKidsFailure(Dealbreakers db, User candidate, java.util.List<String> failures) {
+            if (!db.hasKidsDealbreaker()) {
+                return;
+            }
+            Preferences.Lifestyle.WantsKids wantsKids = candidate.getWantsKids();
+            if (wantsKids == null) {
+                failures.add("Kids stance not specified");
+            } else if (!db.acceptableKidsStance().contains(wantsKids)) {
+                failures.add("Kids: " + wantsKids.getDisplayName());
+            }
+        }
+
+        private static void addLookingForFailure(Dealbreakers db, User candidate, java.util.List<String> failures) {
+            if (!db.hasLookingForDealbreaker()) {
+                return;
+            }
+            Preferences.Lifestyle.LookingFor lookingFor = candidate.getLookingFor();
+            if (lookingFor == null) {
+                failures.add("Relationship goal not specified");
+            } else if (!db.acceptableLookingFor().contains(lookingFor)) {
+                failures.add("Looking for: " + lookingFor.getDisplayName());
+            }
+        }
+
+        private static void addEducationFailure(Dealbreakers db, User candidate, java.util.List<String> failures) {
+            if (!db.hasEducationDealbreaker()) {
+                return;
+            }
+            Preferences.Lifestyle.Education education = candidate.getEducation();
+            if (education == null) {
+                failures.add("Education not specified");
+            } else if (!db.acceptableEducation().contains(education)) {
+                failures.add("Education: " + education.getDisplayName());
+            }
+        }
+
+        private static void addHeightFailure(Dealbreakers db, User candidate, java.util.List<String> failures) {
+            if (!db.hasHeightDealbreaker()) {
+                return;
+            }
+            Integer candidateHeight = candidate.getHeightCm();
+            if (candidateHeight == null) {
+                return;
+            }
+            Integer minHeight = db.minHeightCm();
+            if (minHeight != null && candidateHeight < minHeight) {
+                failures.add("Height too short: " + candidateHeight + " cm");
+            }
+            Integer maxHeight = db.maxHeightCm();
+            if (maxHeight != null && candidateHeight > maxHeight) {
+                failures.add("Height too tall: " + candidateHeight + " cm");
+            }
+        }
+
+        private static void addAgeFailure(
+                Dealbreakers db, User seeker, User candidate, java.util.List<String> failures) {
+            if (!db.hasAgeDealbreaker()) {
+                return;
+            }
+            int seekerAge = seeker.getAge();
+            int candidateAge = candidate.getAge();
+            if (seekerAge <= 0 || candidateAge <= 0) {
+                return;
+            }
+            int ageDiff = Math.abs(seekerAge - candidateAge);
+            if (ageDiff > db.maxAgeDifference()) {
+                failures.add("Age difference: " + ageDiff + " years (max: " + db.maxAgeDifference() + ")");
+            }
         }
     }
 }

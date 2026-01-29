@@ -25,7 +25,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Tests for pace compatibility calculation in MatchQualityService. Formerly PaceCompatibilityServiceTest.
+ * Tests for pace compatibility calculation in MatchQualityService. Formerly
+ * PaceCompatibilityServiceTest.
  */
 @SuppressWarnings("unused")
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
@@ -122,18 +123,18 @@ class PaceCompatibilityTest {
     }
 
     @Test
-    @DisplayName("Incomplete preferences return -1")
-    void incompletePreferences_returnsNegativeOne() {
-        PacePreferences p1 = new Preferences.PacePreferences(
-                MessagingFrequency.OFTEN, null, CommunicationStyle.VOICE_NOTES, DepthPreference.SMALL_TALK);
+    @DisplayName("Null preferences return -1")
+    void nullPreferences_returnsNegativeOne() {
         PacePreferences p2 = new Preferences.PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
                 DepthPreference.SMALL_TALK);
 
-        assertEquals(-1, service.calculatePaceCompatibility(p1, p2));
+        // Null PacePreferences should return -1
         assertEquals(-1, service.calculatePaceCompatibility(null, p2));
+        assertEquals(-1, service.calculatePaceCompatibility(p2, null));
+        assertEquals(-1, service.calculatePaceCompatibility(null, null));
     }
 
     @Test

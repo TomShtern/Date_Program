@@ -41,11 +41,31 @@ import org.slf4j.LoggerFactory;
  * Extends BaseController for automatic subscription cleanup.
  */
 public class ProfileController extends BaseController implements Initializable {
-
     private static final Logger logger = LoggerFactory.getLogger(ProfileController.class);
 
     @FXML
     private javafx.scene.layout.BorderPane rootPane;
+
+    private void wireAuxiliaryActions() {
+        if (cameraButton != null) {
+            cameraButton.setOnAction(event -> {
+                event.consume();
+                handleUploadPhoto();
+            });
+        }
+        if (avatarInner != null) {
+            avatarInner.setOnMouseClicked(event -> {
+                event.consume();
+                handleUploadPhoto();
+            });
+        }
+        if (editDealbreakersBtn != null) {
+            editDealbreakersBtn.setOnAction(event -> {
+                event.consume();
+                handleEditDealbreakers();
+            });
+        }
+    }
 
     @FXML
     private Label nameLabel;
@@ -77,11 +97,9 @@ public class ProfileController extends BaseController implements Initializable {
     @FXML
     private FontIcon avatarPlaceholderIcon;
 
-    @SuppressWarnings("unused")
     @FXML
     private Button cameraButton;
 
-    @SuppressWarnings("unused")
     @FXML
     private StackPane avatarInner;
 
@@ -131,7 +149,6 @@ public class ProfileController extends BaseController implements Initializable {
     @FXML
     private Label dealbreakersStatusLabel;
 
-    @SuppressWarnings("unused")
     @FXML
     private Button editDealbreakersBtn;
 
@@ -175,6 +192,9 @@ public class ProfileController extends BaseController implements Initializable {
         // Setup gender and interested in
         setupGenderPreferences();
 
+        // Wire auxiliary UI actions (photo upload, dealbreakers button)
+        wireAuxiliaryActions();
+
         // Bind lifestyle fields to ViewModel
         bindLifestyleFields();
 
@@ -193,7 +213,8 @@ public class ProfileController extends BaseController implements Initializable {
         updateProfilePhoto(viewModel.primaryPhotoUrlProperty().get());
         addSubscription(viewModel.primaryPhotoUrlProperty().subscribe(this::updateProfilePhoto));
 
-        // Refresh interested in buttons AFTER user data is loaded (they show the actual preferences)
+        // Refresh interested in buttons AFTER user data is loaded (they show the actual
+        // preferences)
         if (interestedInFlow != null) {
             populateInterestedInButtons();
         }
@@ -204,7 +225,8 @@ public class ProfileController extends BaseController implements Initializable {
         // Update interest count label
         updateInterestCountLabel();
 
-        // Listen for interests changes to update chips using Subscription API (memory-safe)
+        // Listen for interests changes to update chips using Subscription API
+        // (memory-safe)
         if (interestsField != null) {
             addSubscription(interestsField.textProperty().subscribe(text -> {
                 populateInterestChips();
@@ -260,7 +282,8 @@ public class ProfileController extends BaseController implements Initializable {
 
     /**
      * Sets up gender ComboBox and Interested In selection buttons.
-     * Critical for matching - users must have compatible gender preferences to see each other.
+     * Critical for matching - users must have compatible gender preferences to see
+     * each other.
      */
     private void setupGenderPreferences() {
         // Gender ComboBox
@@ -327,7 +350,8 @@ public class ProfileController extends BaseController implements Initializable {
             boolean isSelected = viewModel.getInterestedInGenders().contains(g);
             updateInterestedInButtonStyle(btn, isSelected);
 
-            btn.setOnAction(_ -> {
+            btn.setOnAction(event -> {
+                event.consume();
                 boolean nowSelected = viewModel.toggleInterestedIn(g);
                 updateInterestedInButtonStyle(btn, nowSelected);
                 updateInterestedInLabel();
@@ -390,6 +414,7 @@ public class ProfileController extends BaseController implements Initializable {
      */
     private <T extends Enum<T>> ListCell<T> createDisplayCell(java.util.function.Function<T, String> displayNameFunc) {
         return new ListCell<>() {
+
             @Override
             protected void updateItem(T item, boolean empty) {
                 super.updateItem(item, empty);
@@ -496,7 +521,10 @@ public class ProfileController extends BaseController implements Initializable {
         }
     }
 
-    /** Setup the character counter binding for the bio text area using Subscription API. */
+    /**
+     * Setup the character counter binding for the bio text area using Subscription
+     * API.
+     */
     private void setupCharacterCounter() {
         if (charCountLabel == null || bioArea == null) {
             return;
@@ -557,7 +585,6 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleSave() {
         cleanup(); // Clean up subscriptions before navigating away
         viewModel.save();
@@ -565,14 +592,12 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleCancel() {
         cleanup(); // Clean up subscriptions before navigating away
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleBack() {
         handleCancel(); // Delegate to avoid duplicate code
     }
@@ -581,7 +606,6 @@ public class ProfileController extends BaseController implements Initializable {
      * Opens a dialog to select interests.
      */
     @FXML
-    @SuppressWarnings("unused")
     private void handleEditInterests() {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("Select Interests");
@@ -606,7 +630,8 @@ public class ProfileController extends BaseController implements Initializable {
                 boolean isSelected = viewModel.getSelectedInterests().contains(interest);
                 updateInterestChipStyle(chipBtn, isSelected);
 
-                chipBtn.setOnAction(_ -> {
+                chipBtn.setOnAction(event -> {
+                    event.consume();
                     boolean nowSelected = viewModel.toggleInterest(interest);
                     updateInterestChipStyle(chipBtn, nowSelected);
                     updateInterestCountLabel();
@@ -650,15 +675,9 @@ public class ProfileController extends BaseController implements Initializable {
      * Saves the photo via ViewModel for persistence.
      */
     @FXML
-    @SuppressWarnings("unused")
     private void handleUploadPhoto() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Select Profile Photo");
-        fileChooser
-                .getExtensionFilters()
-                .addAll(
-                        new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif"),
-                        new FileChooser.ExtensionFilter("All Files", "*.*"));
 
         // Show file chooser dialog
         File selectedFile = fileChooser.showOpenDialog(rootPane.getScene().getWindow());
@@ -684,11 +703,11 @@ public class ProfileController extends BaseController implements Initializable {
                     viewModel.savePhoto(selectedFile);
                 } else {
                     logger.warn("Failed to load image: {}", selectedFile.getAbsolutePath());
-                    UiServices.Toast.getInstance().showError("Failed to load image");
+                    UiServices.Toast.showError("Failed to load image");
                 }
             } catch (Exception e) {
                 logger.error("Error loading profile photo", e);
-                UiServices.Toast.getInstance().showError("Error loading photo: " + e.getMessage());
+                UiServices.Toast.showError("Error loading photo: " + e.getMessage());
             }
         }
     }
@@ -698,7 +717,6 @@ public class ProfileController extends BaseController implements Initializable {
      * Users can set hard filters like smoking, drinking, height, etc.
      */
     @FXML
-    @SuppressWarnings("unused")
     private void handleEditDealbreakers() {
         Dialog<Dealbreakers> dialog = new Dialog<>();
         dialog.setTitle("Configure Dealbreakers");
@@ -763,13 +781,14 @@ public class ProfileController extends BaseController implements Initializable {
         Button clearAllBtn = new Button("Clear All Dealbreakers");
         clearAllBtn.setStyle(
                 "-fx-background-color: #64748b; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 8 16;");
-        clearAllBtn.setOnAction(_ -> {
+        clearAllBtn.setOnAction(event -> {
+            event.consume();
             selectedSmoking.clear();
             selectedDrinking.clear();
             selectedKids.clear();
             selectedLookingFor.clear();
             // Rebuild dialog to show cleared state
-            UiServices.Toast.getInstance().showSuccess("All dealbreakers cleared");
+            UiServices.Toast.showSuccess("All dealbreakers cleared");
         });
         content.getChildren().add(clearAllBtn);
 

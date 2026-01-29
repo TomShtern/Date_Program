@@ -13,7 +13,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/** Represents a user in the dating app. Mutable entity - state can change over time. */
+/**
+ * Represents a user in the dating app. Mutable entity - state can change over
+ * time.
+ */
 public class User {
 
     /** Represents the gender options available for users. */
@@ -24,7 +27,8 @@ public class User {
     }
 
     /**
-     * Represents the lifecycle state of a user account. Valid transitions: INCOMPLETE → ACTIVE ↔
+     * Represents the lifecycle state of a user account. Valid transitions:
+     * INCOMPLETE → ACTIVE ↔
      * PAUSED → BANNED
      */
     public enum State {
@@ -37,7 +41,9 @@ public class User {
     /**
      * Represents the verification method used to verify a profile.
      *
-     * <p>NOTE: Currently simulated - email/phone not sent externally. Future enhancement: integrate
+     * <p>
+     * NOTE: Currently simulated - email/phone not sent externally. Future
+     * enhancement: integrate
      * real email/SMS service for actual code delivery.
      */
     public enum VerificationMethod {
@@ -86,13 +92,17 @@ public class User {
 
     private PacePreferences pacePreferences;
 
-    /** Creates a new incomplete user with just an ID and name. Timestamps are set to current time. */
+    /**
+     * Creates a new incomplete user with just an ID and name. Timestamps are set to
+     * current time.
+     */
     public User(UUID id, String name) {
         this(id, name, Instant.now());
     }
 
     /**
-     * Private constructor for full initialization. Used by public constructor and fromDatabase()
+     * Private constructor for full initialization. Used by public constructor and
+     * fromDatabase()
      * factory method.
      */
     private User(UUID id, String name, Instant createdAt) {
@@ -112,7 +122,8 @@ public class User {
     }
 
     /**
-     * Builder for constructing User instances from storage. Use this when loading users from the
+     * Builder for constructing User instances from storage. Use this when loading
+     * users from the
      * database to bypass normal validation and set all fields directly.
      */
     public static final class StorageBuilder {
@@ -558,7 +569,8 @@ public class User {
     }
 
     /**
-     * Sets the user's interests. Maximum of {@link Interest#MAX_PER_USER} interests allowed.
+     * Sets the user's interests. Maximum of {@link Interest#MAX_PER_USER} interests
+     * allowed.
      *
      * @param interests set of interests (null treated as empty)
      * @throws IllegalArgumentException if more than MAX_PER_USER interests
@@ -603,7 +615,10 @@ public class User {
 
     // State transitions
 
-    /** Activates the user. Only valid from INCOMPLETE or PAUSED state. Profile must be complete. */
+    /**
+     * Activates the user. Only valid from INCOMPLETE or PAUSED state. Profile must
+     * be complete.
+     */
     public void activate() {
         if (state == State.BANNED) {
             throw new IllegalStateException("Cannot activate a banned user");
@@ -633,7 +648,10 @@ public class User {
         touch();
     }
 
-    /** Checks if the user profile is complete. A complete profile has all required fields filled. */
+    /**
+     * Checks if the user profile is complete. A complete profile has all required
+     * fields filled.
+     */
     public boolean isComplete() {
         return name != null
                 && !name.isBlank()
@@ -687,15 +705,17 @@ public class User {
     // ================================
 
     /**
-     * A private note that a user can attach to another user's profile. Notes are only visible to the
+     * A private note that a user can attach to another user's profile. Notes are
+     * only visible to the
      * author - the subject never sees them.
      *
-     * <p>Use cases:
+     * <p>
+     * Use cases:
      *
      * <ul>
-     *   <li>Remember where you met someone ("Coffee shop downtown")
-     *   <li>Note conversation topics ("Loves hiking, has a dog named Max")
-     *   <li>Track date plans ("Dinner Thursday @ Olive Garden")
+     * <li>Remember where you met someone ("Coffee shop downtown")
+     * <li>Note conversation topics ("Loves hiking, has a dog named Max")
+     * <li>Track date plans ("Dinner Thursday @ Olive Garden")
      * </ul>
      */
     public record ProfileNote(UUID authorId, UUID subjectId, String content, Instant createdAt, Instant updatedAt) {
@@ -703,12 +723,34 @@ public class User {
         /** Maximum length for note content. */
         public static final int MAX_LENGTH = 500;
 
+        public ProfileNote {
+            Objects.requireNonNull(authorId, "authorId cannot be null");
+            Objects.requireNonNull(subjectId, "subjectId cannot be null");
+            Objects.requireNonNull(content, "content cannot be null");
+            Objects.requireNonNull(createdAt, "createdAt cannot be null");
+            Objects.requireNonNull(updatedAt, "updatedAt cannot be null");
+
+            if (authorId.equals(subjectId)) {
+                throw new IllegalArgumentException("Cannot create a note about yourself");
+            }
+            if (content.isBlank()) {
+                throw new IllegalArgumentException("Note content cannot be blank");
+            }
+            if (content.length() > MAX_LENGTH) {
+                throw new IllegalArgumentException(
+                        "Note content exceeds maximum length of " + MAX_LENGTH + " characters");
+            }
+            if (updatedAt.isBefore(createdAt)) {
+                throw new IllegalArgumentException("updatedAt cannot be before createdAt");
+            }
+        }
+
         /**
          * Creates a new profile note with current timestamp.
          *
-         * @param authorId ID of the user creating the note
+         * @param authorId  ID of the user creating the note
          * @param subjectId ID of the user the note is about
-         * @param content the note content
+         * @param content   the note content
          * @return a new ProfileNote
          * @throws IllegalArgumentException if content exceeds MAX_LENGTH or is blank
          */

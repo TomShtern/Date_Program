@@ -2,34 +2,17 @@ package datingapp.core;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
- * Service for calculating detailed profile completion scores. Provides granular breakdown of
- * profile completeness with tips for improvement.
- *
- * <p>Profile fields are weighted by importance:
- *
- * <ul>
- *   <li>Essential (required for matching): bio, photo, gender, interested in
- *   <li>Important (improve match quality): interests, lifestyle, dealbreakers
- *   <li>Optional (nice to have): height, education details
- * </ul>
+ * Service for calculating profile completion percentage.
  */
 public final class ProfileCompletionService {
 
-    private ProfileCompletionService() {
-        // Utility class
-    }
+    private ProfileCompletionService() {}
 
     /**
-     * The result of a profile completion analysis.
-     *
-     * @param score overall completion percentage (0-100)
-     * @param tier completion tier label (Starter, Bronze, Silver, Gold, Diamond)
-     * @param filledFields number of fields that are filled
-     * @param totalFields total number of scored fields
-     * @param breakdown category-by-category breakdown
-     * @param nextSteps prioritized suggestions for improvement
+     * Result of completion analysis.
      */
     public record CompletionResult(
             int score,
@@ -39,48 +22,110 @@ public final class ProfileCompletionService {
             List<CategoryBreakdown> breakdown,
             List<String> nextSteps) {
 
-        /** Returns a formatted display string like "78% Silver". */
-        public String getDisplayString() {
-            return score + "% " + tier;
+        public CompletionResult {
+            if (score < 0 || score > 100) {
+                throw new IllegalArgumentException("score must be 0-100, got: " + score);
+            }
+            if (filledFields < 0 || totalFields < 0) {
+                throw new IllegalArgumentException("field counts must be non-negative");
+            }
+            Objects.requireNonNull(tier, "tier cannot be null");
+            breakdown = breakdown != null ? List.copyOf(breakdown) : List.of();
+            nextSteps = nextSteps != null ? List.copyOf(nextSteps) : List.of();
         }
 
-        /** Returns an emoji for the tier. */
+        /**
+         * @return percentage of completion score.
+         */
+        public int getPercentage() {
+            return score;
+        }
+
+        /**
+         * @return human-readable tier label.
+         */
+        public String getTierLabel() {
+            return tier;
+        }
+
         public String getTierEmoji() {
-            return switch (tier) {
-                case "Diamond" -> "💎";
-                case "Gold" -> "🥇";
-                case "Silver" -> "🥈";
-                case "Bronze" -> "🥉";
-                default -> "🌱";
-            };
+            return ProfileCompletionService.tierEmojiForScore(score);
+        }
+
+        public String getDisplayString() {
+            return score + "% " + tier;
         }
     }
 
     /**
-     * Breakdown of a single category (e.g., "Basic Info", "Lifestyle").
-     *
-     * @param category category name
-     * @param score percentage complete (0-100)
-     * @param filledItems items that are filled
-     * @param missingItems items that are missing
+     * Breakdown of completion by category.
      */
-    public record CategoryBreakdown(String category, int score, List<String> filledItems, List<String> missingItems) {}
+    public record CategoryBreakdown(String category, int score, List<String> filledItems, List<String> missingItems) {
+
+        public CategoryBreakdown {
+            Objects.requireNonNull(category, "category cannot be null");
+            if (score < 0 || score > 100) {
+                throw new IllegalArgumentException("score must be 0-100, got: " + score);
+            }
+            filledItems = filledItems != null ? List.copyOf(filledItems) : List.of();
+            missingItems = missingItems != null ? List.copyOf(missingItems) : List.of();
+        }
+    }
+
+    private record CategoryResult(
+            int earnedPoints,
+            int totalPoints,
+            int filledCount,
+            int totalCount,
+            CategoryBreakdown breakdown,
+            List<String> nextSteps) {}
 
     /**
-     * Calculates the detailed completion score for a user.
-     *
-     * @param user the user to analyze
-     * @return the completion result with breakdown
+     * Calculate the completion result for a user.
      */
     public static CompletionResult calculate(User user) {
+        Objects.requireNonNull(user, "user cannot be null");
+
+        CategoryResult basic = scoreBasicInfo(user);
+        CategoryResult interests = scoreInterests(user);
+        CategoryResult lifestyle = scoreLifestyle(user);
+        CategoryResult preferences = scorePreferences(user);
+
+        int earnedPoints =
+                basic.earnedPoints() + interests.earnedPoints() + lifestyle.earnedPoints() + preferences.earnedPoints();
+        int totalPoints =
+                basic.totalPoints() + interests.totalPoints() + lifestyle.totalPoints() + preferences.totalPoints();
+
+        int filledCount =
+                basic.filledCount() + interests.filledCount() + lifestyle.filledCount() + preferences.filledCount();
+        int totalCount =
+                basic.totalCount() + interests.totalCount() + lifestyle.totalCount() + preferences.totalCount();
+
+        List<CategoryBreakdown> breakdown = new ArrayList<>();
+        breakdown.add(basic.breakdown());
+        breakdown.add(interests.breakdown());
+        breakdown.add(lifestyle.breakdown());
+        breakdown.add(preferences.breakdown());
+
+        List<String> nextSteps = new ArrayList<>();
+        appendSteps(nextSteps, basic.nextSteps());
+        appendSteps(nextSteps, interests.nextSteps());
+        appendSteps(nextSteps, lifestyle.nextSteps());
+        appendSteps(nextSteps, preferences.nextSteps());
+
+        int finalScore = totalPoints == 0 ? 0 : earnedPoints * 100 / totalPoints;
+        String tier = calculateTier(finalScore);
+
+        return new CompletionResult(finalScore, tier, filledCount, totalCount, breakdown, nextSteps);
+    }
+
+    private static CategoryResult scoreBasicInfo(User user) {
         int totalPoints = 0;
         int earnedPoints = 0;
-
-        // === BASIC INFO (40 points max) ===
         List<String> basicFilled = new ArrayList<>();
         List<String> basicMissing = new ArrayList<>();
+        List<String> nextSteps = new ArrayList<>();
 
-        // Name (always filled, 5 pts)
         totalPoints += 5;
         if (user.getName() != null && !user.getName().isBlank()) {
             earnedPoints += 5;
@@ -89,9 +134,7 @@ public final class ProfileCompletionService {
             basicMissing.add("Name");
         }
 
-        // Bio (10 pts)
         totalPoints += 10;
-        List<String> nextSteps = new ArrayList<>();
         if (user.getBio() != null && !user.getBio().isBlank()) {
             earnedPoints += 10;
             basicFilled.add("Bio");
@@ -100,7 +143,6 @@ public final class ProfileCompletionService {
             nextSteps.add("📝 Add a bio to tell others about yourself");
         }
 
-        // Birth date (5 pts)
         totalPoints += 5;
         if (user.getBirthDate() != null) {
             earnedPoints += 5;
@@ -110,7 +152,6 @@ public final class ProfileCompletionService {
             nextSteps.add("Add your birth date to complete your profile");
         }
 
-        // Gender (5 pts)
         totalPoints += 5;
         if (user.getGender() != null) {
             earnedPoints += 5;
@@ -119,7 +160,6 @@ public final class ProfileCompletionService {
             basicMissing.add("Gender");
         }
 
-        // Interested in (5 pts)
         totalPoints += 5;
         if (user.getInterestedIn() != null && !user.getInterestedIn().isEmpty()) {
             earnedPoints += 5;
@@ -128,7 +168,6 @@ public final class ProfileCompletionService {
             basicMissing.add("Interested in");
         }
 
-        // Photo (10 pts)
         totalPoints += 10;
         if (user.getPhotoUrls() != null && !user.getPhotoUrls().isEmpty()) {
             earnedPoints += 10;
@@ -140,14 +179,24 @@ public final class ProfileCompletionService {
 
         int basicScore =
                 basicFilled.isEmpty() ? 0 : basicFilled.size() * 100 / (basicFilled.size() + basicMissing.size());
-        List<CategoryBreakdown> breakdown = new ArrayList<>();
-        breakdown.add(new CategoryBreakdown("Basic Info", basicScore, basicFilled, basicMissing));
+        CategoryBreakdown breakdown = new CategoryBreakdown("Basic Info", basicScore, basicFilled, basicMissing);
 
-        // === INTERESTS (20 points max) ===
+        return new CategoryResult(
+                earnedPoints,
+                totalPoints,
+                basicFilled.size(),
+                basicFilled.size() + basicMissing.size(),
+                breakdown,
+                nextSteps);
+    }
+
+    private static CategoryResult scoreInterests(User user) {
+        int totalPoints = 20;
+        int earnedPoints = 0;
         List<String> interestsFilled = new ArrayList<>();
         List<String> interestsMissing = new ArrayList<>();
+        List<String> nextSteps = new ArrayList<>();
 
-        totalPoints += 20;
         int interestCount = user.getInterests() != null ? user.getInterests().size() : 0;
         if (interestCount >= 5) {
             earnedPoints += 20;
@@ -168,13 +217,20 @@ public final class ProfileCompletionService {
         }
 
         int interestsScore = (interestCount >= 5) ? 100 : (interestCount * 100 / 5);
-        breakdown.add(new CategoryBreakdown("Interests", interestsScore, interestsFilled, interestsMissing));
+        CategoryBreakdown breakdown =
+                new CategoryBreakdown("Interests", interestsScore, interestsFilled, interestsMissing);
 
-        // === LIFESTYLE (25 points max) ===
+        int filledCount = interestCount > 0 ? 1 : 0;
+        return new CategoryResult(earnedPoints, totalPoints, filledCount, 1, breakdown, nextSteps);
+    }
+
+    private static CategoryResult scoreLifestyle(User user) {
+        int totalPoints = 0;
+        int earnedPoints = 0;
         List<String> lifestyleFilled = new ArrayList<>();
         List<String> lifestyleMissing = new ArrayList<>();
+        List<String> nextSteps = new ArrayList<>();
 
-        // Height (5 pts)
         totalPoints += 5;
         if (user.getHeightCm() != null) {
             earnedPoints += 5;
@@ -183,7 +239,6 @@ public final class ProfileCompletionService {
             lifestyleMissing.add("Height");
         }
 
-        // Smoking (5 pts)
         totalPoints += 5;
         if (user.getSmoking() != null) {
             earnedPoints += 5;
@@ -192,7 +247,6 @@ public final class ProfileCompletionService {
             lifestyleMissing.add("Smoking");
         }
 
-        // Drinking (5 pts)
         totalPoints += 5;
         if (user.getDrinking() != null) {
             earnedPoints += 5;
@@ -201,7 +255,6 @@ public final class ProfileCompletionService {
             lifestyleMissing.add("Drinking");
         }
 
-        // Kids (5 pts)
         totalPoints += 5;
         if (user.getWantsKids() != null) {
             earnedPoints += 5;
@@ -210,7 +263,6 @@ public final class ProfileCompletionService {
             lifestyleMissing.add("Kids preference");
         }
 
-        // Looking for (5 pts)
         totalPoints += 5;
         if (user.getLookingFor() != null) {
             earnedPoints += 5;
@@ -219,20 +271,31 @@ public final class ProfileCompletionService {
             lifestyleMissing.add("Looking for");
         }
 
-        if (!lifestyleMissing.isEmpty() && nextSteps.size() < 3) {
+        if (!lifestyleMissing.isEmpty()) {
             nextSteps.add("💫 Complete your lifestyle section for better matches");
         }
 
         int lifestyleScore = lifestyleFilled.isEmpty()
                 ? 0
                 : lifestyleFilled.size() * 100 / (lifestyleFilled.size() + lifestyleMissing.size());
-        breakdown.add(new CategoryBreakdown("Lifestyle", lifestyleScore, lifestyleFilled, lifestyleMissing));
+        CategoryBreakdown breakdown =
+                new CategoryBreakdown("Lifestyle", lifestyleScore, lifestyleFilled, lifestyleMissing);
 
-        // === PREFERENCES (15 points max) ===
+        return new CategoryResult(
+                earnedPoints,
+                totalPoints,
+                lifestyleFilled.size(),
+                lifestyleFilled.size() + lifestyleMissing.size(),
+                breakdown,
+                nextSteps);
+    }
+
+    private static CategoryResult scorePreferences(User user) {
+        int totalPoints = 0;
+        int earnedPoints = 0;
         List<String> prefsFilled = new ArrayList<>();
         List<String> prefsMissing = new ArrayList<>();
 
-        // Location (5 pts)
         totalPoints += 5;
         if (user.getLat() != 0.0 || user.getLon() != 0.0) {
             earnedPoints += 5;
@@ -241,7 +304,6 @@ public final class ProfileCompletionService {
             prefsMissing.add("Location");
         }
 
-        // Age range (5 pts) - give points if valid range is set (even if using full 18-99 range)
         totalPoints += 5;
         if (user.getMinAge() >= 18 && user.getMaxAge() <= 120 && user.getMinAge() <= user.getMaxAge()) {
             earnedPoints += 5;
@@ -250,7 +312,6 @@ public final class ProfileCompletionService {
             prefsMissing.add("Age preferences (invalid range)");
         }
 
-        // Dealbreakers (5 pts) - give points if dealbreakers are configured (even if set to "none")
         totalPoints += 5;
         if (user.getDealbreakers() != null) {
             earnedPoints += 5;
@@ -265,45 +326,68 @@ public final class ProfileCompletionService {
 
         int prefsScore =
                 prefsFilled.isEmpty() ? 0 : prefsFilled.size() * 100 / (prefsFilled.size() + prefsMissing.size());
-        breakdown.add(new CategoryBreakdown("Preferences", prefsScore, prefsFilled, prefsMissing));
+        CategoryBreakdown breakdown = new CategoryBreakdown("Preferences", prefsScore, prefsFilled, prefsMissing);
 
-        // === CALCULATE FINAL SCORE ===
-        int finalScore = earnedPoints * 100 / totalPoints;
-        String tier = calculateTier(finalScore);
+        return new CategoryResult(
+                earnedPoints,
+                totalPoints,
+                prefsFilled.size(),
+                prefsFilled.size() + prefsMissing.size(),
+                breakdown,
+                List.of());
+    }
 
-        int filledCount =
-                basicFilled.size() + (interestCount > 0 ? 1 : 0) + lifestyleFilled.size() + prefsFilled.size();
-        int totalCount = 6 + 1 + 5 + 3; // basic fields + interests + lifestyle + prefs
-
-        return new CompletionResult(finalScore, tier, filledCount, totalCount, breakdown, nextSteps);
+    private static void appendSteps(List<String> nextSteps, List<String> additions) {
+        for (String step : additions) {
+            if (nextSteps.size() >= 3) {
+                return;
+            }
+            nextSteps.add(step);
+        }
     }
 
     private static String calculateTier(int score) {
-        if (score >= 90) {
+        if (score >= 95) {
             return "Diamond";
         }
-        if (score >= 75) {
+        if (score >= 85) {
             return "Gold";
         }
-        if (score >= 50) {
+        if (score >= 70) {
             return "Silver";
         }
-        if (score >= 25) {
+        if (score >= 50) {
             return "Bronze";
         }
         return "Starter";
     }
 
+    private static String tierEmojiForScore(int score) {
+        if (score >= 95) {
+            return "💎";
+        }
+        if (score >= 85) {
+            return "🥇";
+        }
+        if (score >= 70) {
+            return "🥈";
+        }
+        if (score >= 50) {
+            return "🥉";
+        }
+        return "🌱";
+    }
+
     /**
-     * Renders a progress bar for the given completion percentage.
-     *
-     * @param percentage 0-100 percentage
-     * @param width bar width in characters
-     * @return ASCII progress bar string
+     * Render a simple ASCII progress bar.
      */
     public static String renderProgressBar(int percentage, int width) {
         int filled = percentage * width / 100;
-        int empty = width - filled;
-        return "[" + "█".repeat(filled) + "░".repeat(empty) + "]";
+        StringBuilder bar = new StringBuilder("[");
+        for (int i = 0; i < width; i++) {
+            bar.append(i < filled ? "#" : "-");
+        }
+        bar.append("] ").append(percentage).append("%");
+        return bar.toString();
     }
 }

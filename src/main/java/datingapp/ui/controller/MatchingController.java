@@ -23,6 +23,8 @@ import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -39,7 +41,7 @@ public class MatchingController extends BaseController implements Initializable 
     private static final Logger logger = LoggerFactory.getLogger(MatchingController.class);
 
     @FXML
-    private javafx.scene.layout.BorderPane rootPane;
+    private BorderPane rootPane;
 
     @FXML
     private VBox candidateCard;
@@ -60,14 +62,12 @@ public class MatchingController extends BaseController implements Initializable 
     private VBox noCandidatesContainer;
 
     @FXML
-    @SuppressWarnings("unused")
     private Button undoButton;
 
     @FXML
     private HBox actionButtonsContainer;
 
     @FXML
-    @SuppressWarnings("unused")
     private StackPane cardStackContainer;
 
     @FXML
@@ -75,6 +75,15 @@ public class MatchingController extends BaseController implements Initializable 
 
     @FXML
     private Label passOverlay;
+
+    @FXML
+    private VBox expandPreferencesCard;
+
+    @FXML
+    private VBox checkLikesCard;
+
+    @FXML
+    private VBox improveProfileCard;
 
     // Swipe gesture state
     private double dragStartX;
@@ -132,6 +141,8 @@ public class MatchingController extends BaseController implements Initializable 
         // Setup keyboard shortcuts
         setupKeyboardShortcuts();
 
+        wireActionHandlers();
+
         // Setup swipe gestures
         setupSwipeGestures();
     }
@@ -156,7 +167,6 @@ public class MatchingController extends BaseController implements Initializable 
     }
 
     /** Setup drag-to-swipe gestures on the candidate card. */
-    @SuppressWarnings("unused")
     private void setupSwipeGestures() {
         candidateCard.setOnMousePressed(e -> {
             dragStartX = e.getSceneX();
@@ -246,6 +256,7 @@ public class MatchingController extends BaseController implements Initializable 
 
         ParallelTransition exit = new ParallelTransition(translate, rotate, fade);
         exit.setOnFinished(e -> {
+            e.consume();
             resetCardPosition();
             hideAllOverlays();
             onComplete.run();
@@ -262,7 +273,10 @@ public class MatchingController extends BaseController implements Initializable 
         rotate.setToAngle(0);
 
         ParallelTransition snapBack = new ParallelTransition(translate, rotate);
-        snapBack.setOnFinished(e -> hideAllOverlays());
+        snapBack.setOnFinished(e -> {
+            e.consume();
+            hideAllOverlays();
+        });
         snapBack.play();
     }
 
@@ -288,15 +302,14 @@ public class MatchingController extends BaseController implements Initializable 
                 return;
             }
 
+            if (e.isControlDown() && e.getCode() == KeyCode.Z) {
+                handleUndo();
+                return;
+            }
             switch (e.getCode()) {
                 case LEFT -> handlePass();
                 case RIGHT -> handleLike();
                 case UP -> handleSuperLike();
-                case Z -> {
-                    if (e.isControlDown()) {
-                        handleUndo();
-                    }
-                }
                 case ESCAPE -> handleBack();
                 default -> {
                     /* no action */
@@ -309,9 +322,42 @@ public class MatchingController extends BaseController implements Initializable 
         Platform.runLater(rootPane::requestFocus);
     }
 
+    private void wireActionHandlers() {
+        if (undoButton != null) {
+            undoButton.setOnAction(event -> {
+                event.consume();
+                handleUndo();
+            });
+            undoButton.disableProperty().bind(viewModel.loadingProperty());
+        }
+        if (cardStackContainer != null) {
+            cardStackContainer.setOnMouseClicked(event -> {
+                event.consume();
+                rootPane.requestFocus();
+            });
+        }
+        if (expandPreferencesCard != null) {
+            expandPreferencesCard.setOnMouseClicked(event -> {
+                event.consume();
+                handleExpandPreferences();
+            });
+        }
+        if (checkLikesCard != null) {
+            checkLikesCard.setOnMouseClicked(event -> {
+                event.consume();
+                handleCheckLikes();
+            });
+        }
+        if (improveProfileCard != null) {
+            improveProfileCard.setOnMouseClicked(event -> {
+                event.consume();
+                handleImproveProfile();
+            });
+        }
+    }
+
     /** Super like action - triggered by button or UP key. */
     @FXML
-    @SuppressWarnings("unused")
     private void handleSuperLike() {
         logger.info("Super Like triggered");
         // Pulse the card for micro-interaction feedback
@@ -334,9 +380,11 @@ public class MatchingController extends BaseController implements Initializable 
     /**
      * Shows the "IT'S A MATCH!" popup dialog.
      */
-    @SuppressWarnings("unused")
     private void showMatchPopup(User matchedUser, Match match) {
         logger.info("Showing match popup for: {}", matchedUser.getName());
+        if (match != null) {
+            logger.debug("Match id: {}", match.getId());
+        }
 
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("It's a Match!");
@@ -390,7 +438,6 @@ public class MatchingController extends BaseController implements Initializable 
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleLike() {
         // Pulse the card for micro-interaction feedback
         UiAnimations.pulseScale(candidateCard);
@@ -398,7 +445,6 @@ public class MatchingController extends BaseController implements Initializable 
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handlePass() {
         // Pulse the card for micro-interaction feedback
         UiAnimations.pulseScale(candidateCard);
@@ -406,19 +452,16 @@ public class MatchingController extends BaseController implements Initializable 
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleUndo() {
         viewModel.undo();
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleBack() {
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleExpandPreferences() {
         logger.info("User clicked Expand Preferences - navigating to Profile settings");
         // Navigate to filter/preferences screen
@@ -426,7 +469,6 @@ public class MatchingController extends BaseController implements Initializable 
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleCheckLikes() {
         logger.info("User clicked Check Likes - navigating to Matches");
         // Navigate to Matches screen where they can see who liked them
@@ -434,7 +476,6 @@ public class MatchingController extends BaseController implements Initializable 
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleImproveProfile() {
         logger.info("User clicked Improve Profile - navigating to Profile");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE);

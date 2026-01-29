@@ -58,10 +58,12 @@ public final class UiAnimations {
         st.setToY(1.05);
 
         node.setOnMouseEntered(e -> {
+            e.consume();
             st.setRate(1.0);
             st.play();
         });
         node.setOnMouseExited(e -> {
+            e.consume();
             st.setRate(-1.0);
             st.play();
         });
@@ -83,7 +85,7 @@ public final class UiAnimations {
     /**
      * Adds a continuous pulsing glow effect to a node.
      *
-     * @param node The node to apply the glow effect to
+     * @param node      The node to apply the glow effect to
      * @param glowColor The color of the glow
      */
     public static void addPulsingGlow(Node node, Color glowColor) {
@@ -114,7 +116,7 @@ public final class UiAnimations {
     /**
      * Creates a fade-in animation.
      *
-     * @param node The node to fade in
+     * @param node     The node to fade in
      * @param duration The duration of the fade
      * @return The FadeTransition (not yet played)
      */
@@ -128,7 +130,7 @@ public final class UiAnimations {
     /**
      * Creates a fade-out animation.
      *
-     * @param node The node to fade out
+     * @param node     The node to fade out
      * @param duration The duration of the fade
      * @return The FadeTransition (not yet played)
      */
@@ -167,7 +169,10 @@ public final class UiAnimations {
         shake.setToX(10);
         shake.setCycleCount(6);
         shake.setAutoReverse(true);
-        shake.setOnFinished(e -> node.setTranslateX(0));
+        shake.setOnFinished(e -> {
+            e.consume();
+            node.setTranslateX(0);
+        });
         shake.play();
     }
 
@@ -196,15 +201,18 @@ public final class UiAnimations {
         overshoot.setAutoReverse(true);
         overshoot.setCycleCount(2);
 
-        scale.setOnFinished(e -> overshoot.play());
+        scale.setOnFinished(e -> {
+            e.consume();
+            overshoot.play();
+        });
         scale.play();
     }
 
     /**
      * Creates a slide transition for a node.
      *
-     * @param node The node to slide
-     * @param toX Target X translation
+     * @param node     The node to slide
+     * @param toX      Target X translation
      * @param duration The duration of the slide
      * @return The TranslateTransition (not yet played)
      */
@@ -218,13 +226,20 @@ public final class UiAnimations {
     /**
      * Adds a parallax effect that moves a node based on mouse position.
      *
-     * @param node The node to apply parallax to
+     * @param node      The node to apply parallax to
      * @param intensity The intensity of the parallax effect (5-20 recommended)
      */
     public static void addParallaxEffect(Node node, double intensity) {
         node.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (obs == null) {
+                return;
+            }
             if (newScene == null) {
                 return;
+            }
+
+            if (oldScene != null) {
+                oldScene.setOnMouseMoved(null);
             }
 
             newScene.setOnMouseMoved(e -> {

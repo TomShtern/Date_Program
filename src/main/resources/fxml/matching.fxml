@@ -87,21 +87,21 @@
         <Label text="WHAT YOU CAN DO" styleClass="empty-state-label"/>
         <HBox spacing="16" alignment="CENTER">
           <!-- Expand Preferences -->
-          <VBox alignment="CENTER" spacing="8" styleClass="suggestion-card" onMouseClicked="#handleExpandPreferences">
+          <VBox fx:id="expandPreferencesCard" alignment="CENTER" spacing="8" styleClass="suggestion-card">
             <StackPane styleClass="suggestion-icon-container">
               <FontIcon iconLiteral="mdi2t-tune" iconSize="24" iconColor="#a855f7"/>
             </StackPane>
             <Label text="Expand Search" styleClass="action-label"/>
           </VBox>
           <!-- Check Likes -->
-          <VBox alignment="CENTER" spacing="8" styleClass="suggestion-card" onMouseClicked="#handleCheckLikes">
+          <VBox fx:id="checkLikesCard" alignment="CENTER" spacing="8" styleClass="suggestion-card">
             <StackPane styleClass="suggestion-icon-container">
               <FontIcon iconLiteral="mdi2h-heart-multiple" iconSize="24" iconColor="#f43f5e"/>
             </StackPane>
             <Label text="Who Liked You" styleClass="action-label"/>
           </VBox>
           <!-- Improve Profile -->
-          <VBox alignment="CENTER" spacing="8" styleClass="suggestion-card" onMouseClicked="#handleImproveProfile">
+          <VBox fx:id="improveProfileCard" alignment="CENTER" spacing="8" styleClass="suggestion-card">
             <StackPane styleClass="suggestion-icon-container">
               <FontIcon iconLiteral="mdi2a-account-edit" iconSize="24" iconColor="#10b981"/>
             </StackPane>

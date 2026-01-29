@@ -174,21 +174,23 @@ class ProfileCompletionServiceTest {
         @Test
         @DisplayName("getTierEmoji returns correct emoji")
         void getTierEmojiReturnsCorrectEmoji() {
+            // Tier thresholds: <50=Starter, 50-69=Bronze, 70-84=Silver, 85-94=Gold,
+            // 95+=Diamond
             assertEquals(
                     "🌱",
                     new ProfileCompletionService.CompletionResult(10, "Starter", 1, 10, List.of(), List.of())
                             .getTierEmoji());
             assertEquals(
                     "🥉",
-                    new ProfileCompletionService.CompletionResult(30, "Bronze", 3, 10, List.of(), List.of())
+                    new ProfileCompletionService.CompletionResult(50, "Bronze", 5, 10, List.of(), List.of())
                             .getTierEmoji());
             assertEquals(
                     "🥈",
-                    new ProfileCompletionService.CompletionResult(60, "Silver", 6, 10, List.of(), List.of())
+                    new ProfileCompletionService.CompletionResult(70, "Silver", 7, 10, List.of(), List.of())
                             .getTierEmoji());
             assertEquals(
                     "🥇",
-                    new ProfileCompletionService.CompletionResult(80, "Gold", 8, 10, List.of(), List.of())
+                    new ProfileCompletionService.CompletionResult(85, "Gold", 8, 10, List.of(), List.of())
                             .getTierEmoji());
             assertEquals(
                     "💎",
@@ -205,21 +207,21 @@ class ProfileCompletionServiceTest {
         @DisplayName("renders empty bar for 0%")
         void rendersEmptyBarForZero() {
             String bar = ProfileCompletionService.renderProgressBar(0, 10);
-            assertEquals("[░░░░░░░░░░]", bar);
+            assertEquals("[----------] 0%", bar);
         }
 
         @Test
         @DisplayName("renders full bar for 100%")
         void rendersFullBarFor100() {
             String bar = ProfileCompletionService.renderProgressBar(100, 10);
-            assertEquals("[██████████]", bar);
+            assertEquals("[##########] 100%", bar);
         }
 
         @Test
         @DisplayName("renders partial bar for 50%")
         void rendersPartialBarFor50() {
             String bar = ProfileCompletionService.renderProgressBar(50, 10);
-            assertEquals("[█████░░░░░]", bar);
+            assertEquals("[#####-----] 50%", bar);
         }
     }
 }

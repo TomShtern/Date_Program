@@ -16,7 +16,7 @@ import java.util.ResourceBundle;
 import javafx.animation.Interpolator;
 import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
-import javafx.collections.ListChangeListener;
+import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
@@ -53,6 +53,74 @@ public class LoginController extends BaseController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
     private static final String SECONDARY_TEXT_STYLE = "-fx-text-fill: -fx-text-secondary;";
 
+    // CSS Class Names
+    private static final String CSS_LOGIN_HINT = "login-hint";
+    private static final String CSS_LOGIN_AVATAR_CONTAINER = "login-avatar-container";
+    private static final String CSS_LOGIN_USER_CELL = "login-user-cell";
+    private static final String CSS_LOGIN_USER_NAME = "login-user-name";
+    private static final String CSS_TEXT_SECONDARY = "text-secondary";
+    private static final String CSS_LOGIN_USER_DETAILS = "login-user-details";
+    private static final String CSS_LOGIN_BADGE_ROW = "login-badge-row";
+    private static final String CSS_LOGIN_BADGE = "login-badge";
+    private static final String CSS_LOGIN_BADGE_PRIMARY = "login-badge-primary";
+    private static final String CSS_LOGIN_BADGE_MUTED = "login-badge-muted";
+    private static final String CSS_LOGIN_BADGE_SUCCESS = "login-badge-success";
+    private static final String CSS_LOGIN_BADGE_WARNING = "login-badge-warning";
+    private static final String CSS_DIALOG_PANE = "dialog-pane";
+
+    // UI Text
+    private static final String TEXT_UNKNOWN = "Unknown";
+    private static final String TEXT_ACTIVE_RECENTLY = "Active recently";
+    private static final String TEXT_ACTIVE_JUST_NOW = "Active just now";
+    private static final String TEXT_VERIFIED = " • Verified";
+    private static final String TEXT_PROFILE_PREFIX = "Profile ";
+    private static final String TEXT_PERCENT_SUFFIX = "%";
+    private static final String TEXT_ACTIVE_PREFIX = "Active ";
+    private static final String TEXT_MINUTES_SUFFIX = "m ago";
+    private static final String TEXT_HOURS_SUFFIX = "h ago";
+    private static final String TEXT_DAYS_SUFFIX = "d ago";
+    private static final String TEXT_WEEKS_SUFFIX = "w ago";
+    private static final String TEXT_MONTHS_SUFFIX = "mo ago";
+
+    // Placeholder Messages
+    private static final String MSG_NO_PROFILES_YET = "No profiles yet. Create one to get started.";
+    private static final String MSG_NO_PROFILES_MATCH = "No profiles match \"";
+    private static final String MSG_NO_PROFILES_TO_SHOW = "No profiles to show.";
+
+    // Dialog Labels
+    private static final String DIALOG_TITLE = "Create New Account";
+    private static final String BUTTON_CREATE = "Create";
+    private static final String LABEL_NAME = "Name:";
+    private static final String LABEL_AGE = "Age:";
+    private static final String LABEL_GENDER = "Gender:";
+    private static final String LABEL_INTERESTED_IN = "Interested In:";
+    private static final String PROMPT_ENTER_NAME = "Enter your name";
+    private static final int AGE_MIN = 18;
+    private static final int AGE_MAX = 100;
+    private static final int AGE_DEFAULT = 25;
+
+    // Log Messages
+    private static final String LOG_LOGIN_SUCCESS = "Login successful, navigating to Dashboard";
+    private static final String LOG_OPENING_DIALOG = "Opening account creation dialog";
+    private static final String LOG_USER_CREATED = "Created new user: {}";
+    private static final String LOG_STYLESHEET_NOT_FOUND = "Stylesheet not found: {}";
+
+    // Paths
+    private static final String STYLESHEET_PATH = "/css/theme.css";
+
+    // CSS Styles
+    private static final String STYLE_SURFACE_DARK = "-fx-background-color: -fx-surface-dark;";
+    private static final String STYLE_TITLE =
+            "-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-text-primary;";
+    private static final String STYLE_FIELD_BACKGROUND =
+            "-fx-background-color: -fx-surface-elevated; -fx-text-fill: white; "
+                    + "-fx-prompt-text-fill: -fx-text-muted; -fx-background-radius: 8;";
+    private static final String STYLE_COMBO_BACKGROUND = "-fx-background-color: #1e293b; -fx-background-radius: 8;";
+    private static final String STYLE_CELL_BACKGROUND = "-fx-background-color: #1e293b;";
+    private static final String STYLE_CELL_WITH_TEXT =
+            "-fx-background-color: #1e293b; -fx-text-fill: white; -fx-padding: 8 12;";
+    private static final String STYLE_ERROR_LABEL = "-fx-text-fill: #ef4444; -fx-font-size: 13px;";
+
     @FXML
     private StackPane rootPane;
 
@@ -77,21 +145,29 @@ public class LoginController extends BaseController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        // Bind ListView items to ViewModel's filtered list
+        bindUserList();
+        setupUserListInteractions();
+        setupFilterField();
+        setupSelectionDefaults();
+        setupGlobalShortcuts();
+
+        wireCreateAccountButton();
+
+        UiAnimations.fadeIn(rootPane, 800);
+        updatePlaceholderText();
+    }
+
+    private void bindUserList() {
         userListView.setItems(viewModel.getFilteredUsers());
-
-        // Custom cell factory to show user name, status, and completion
         userListView.setCellFactory(lv -> new UserListCell());
-
-        // Listen for selection changes using Subscription API
         addSubscription(userListView.getSelectionModel().selectedItemProperty().subscribe(viewModel::setSelectedUser));
-
-        // Bind button disable state to ViewModel property
         loginButton.disableProperty().bind(viewModel.loginDisabledProperty());
 
-        emptyListPlaceholder.getStyleClass().add("login-hint");
+        emptyListPlaceholder.getStyleClass().add(CSS_LOGIN_HINT);
         userListView.setPlaceholder(emptyListPlaceholder);
+    }
 
+    private void setupUserListInteractions() {
         userListView.setOnMouseClicked(event -> {
             if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() != 2) {
                 return;
@@ -111,15 +187,24 @@ public class LoginController extends BaseController implements Initializable {
             }
         });
 
-        rootPane.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() == KeyCode.ENTER) {
-                attemptLogin();
-                event.consume();
+        viewModel.getFilteredUsers().addListener((InvalidationListener) obs -> {
+            Objects.requireNonNull(obs, "filtered users listener source cannot be null");
+            updatePlaceholderText();
+            if (userListView.getSelectionModel().getSelectedItem() == null
+                    && !viewModel.getFilteredUsers().isEmpty()) {
+                userListView.getSelectionModel().selectFirst();
             }
         });
+    }
 
+    private void setupFilterField() {
         filterField.textProperty().bindBidirectional(viewModel.filterTextProperty());
-        filterField.textProperty().addListener((obs, oldVal, newVal) -> updatePlaceholderText());
+        filterField.textProperty().addListener((obs, oldVal, newVal) -> {
+            Objects.requireNonNull(obs, "filter text listener source cannot be null");
+            if (!Objects.equals(oldVal, newVal)) {
+                updatePlaceholderText();
+            }
+        });
         filterField.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.DOWN) {
                 moveSelection(1);
@@ -131,26 +216,37 @@ public class LoginController extends BaseController implements Initializable {
                 event.consume();
             }
         });
+    }
 
-        viewModel.getFilteredUsers().addListener((ListChangeListener<User>) change -> {
-            updatePlaceholderText();
-            if (userListView.getSelectionModel().getSelectedItem() == null
-                    && !viewModel.getFilteredUsers().isEmpty()) {
-                userListView.getSelectionModel().selectFirst();
-            }
-        });
-
-        // Select first user if available
+    private void setupSelectionDefaults() {
         if (!viewModel.getFilteredUsers().isEmpty()) {
             userListView.getSelectionModel().selectFirst();
         }
-
-        // Apply fade-in animation
-        UiAnimations.fadeIn(rootPane, 800);
-        updatePlaceholderText();
     }
 
-    /** Custom list cell for displaying user accounts with avatars, badges, and selection animation. */
+    private void setupGlobalShortcuts() {
+        rootPane.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                attemptLogin();
+                event.consume();
+            }
+        });
+    }
+
+    private void wireCreateAccountButton() {
+        if (createAccountButton == null) {
+            return;
+        }
+        createAccountButton.setOnAction(event -> {
+            event.consume();
+            handleCreateAccount();
+        });
+    }
+
+    /**
+     * Custom list cell for displaying user accounts with avatars, badges, and
+     * selection animation.
+     */
     private static class UserListCell extends ListCell<User> {
         private static final double AVATAR_SIZE = 44;
         private static final double SELECT_SCALE = 1.03;
@@ -173,16 +269,16 @@ public class LoginController extends BaseController implements Initializable {
             avatarClip.setCenterY(AVATAR_SIZE / 2);
             avatarView.setClip(avatarClip);
 
-            avatarContainer.getStyleClass().add("login-avatar-container");
+            avatarContainer.getStyleClass().add(CSS_LOGIN_AVATAR_CONTAINER);
             avatarContainer.getChildren().add(avatarView);
 
-            container.getStyleClass().add("login-user-cell");
-            nameLabel.getStyleClass().add("login-user-name");
-            detailsLabel.getStyleClass().addAll("text-secondary", "login-user-details");
+            container.getStyleClass().add(CSS_LOGIN_USER_CELL);
+            nameLabel.getStyleClass().add(CSS_LOGIN_USER_NAME);
+            detailsLabel.getStyleClass().addAll(CSS_TEXT_SECONDARY, CSS_LOGIN_USER_DETAILS);
 
-            badgeRow.getStyleClass().add("login-badge-row");
-            completionBadge.getStyleClass().addAll("login-badge", "login-badge-primary");
-            activityBadge.getStyleClass().addAll("login-badge", "login-badge-muted");
+            badgeRow.getStyleClass().add(CSS_LOGIN_BADGE_ROW);
+            completionBadge.getStyleClass().addAll(CSS_LOGIN_BADGE, CSS_LOGIN_BADGE_PRIMARY);
+            activityBadge.getStyleClass().addAll(CSS_LOGIN_BADGE, CSS_LOGIN_BADGE_MUTED);
             badgeRow.getChildren().addAll(completionBadge, activityBadge);
 
             textBox.getChildren().addAll(nameLabel, detailsLabel, badgeRow);
@@ -207,13 +303,13 @@ public class LoginController extends BaseController implements Initializable {
 
                 StringBuilder sb = new StringBuilder(formatState(user.getState()));
                 if (Boolean.TRUE.equals(user.isVerified())) {
-                    sb.append(" • Verified");
+                    sb.append(TEXT_VERIFIED);
                 }
                 detailsLabel.setText(sb.toString());
 
                 updateCompletionBadge(user);
                 activityBadge.setText(formatActivity(user.getUpdatedAt()));
-                avatarView.setImage(UiServices.ImageCache.getAvatar(resolveAvatarPath(user), AVATAR_SIZE));
+                avatarView.setImage(UiServices.getAvatar(resolveAvatarPath(user), AVATAR_SIZE));
 
                 setGraphic(container);
             }
@@ -222,17 +318,17 @@ public class LoginController extends BaseController implements Initializable {
         private void updateCompletionBadge(User user) {
             ProfileCompletionService.CompletionResult result = ProfileCompletionService.calculate(user);
             int score = result.score();
-            completionBadge.setText("Profile " + score + "%");
+            completionBadge.setText(TEXT_PROFILE_PREFIX + score + TEXT_PERCENT_SUFFIX);
 
             completionBadge
                     .getStyleClass()
-                    .removeAll("login-badge-primary", "login-badge-success", "login-badge-warning");
+                    .removeAll(CSS_LOGIN_BADGE_PRIMARY, CSS_LOGIN_BADGE_SUCCESS, CSS_LOGIN_BADGE_WARNING);
             if (score >= 90) {
-                completionBadge.getStyleClass().add("login-badge-success");
+                completionBadge.getStyleClass().add(CSS_LOGIN_BADGE_SUCCESS);
             } else if (score >= 60) {
-                completionBadge.getStyleClass().add("login-badge-primary");
+                completionBadge.getStyleClass().add(CSS_LOGIN_BADGE_PRIMARY);
             } else {
-                completionBadge.getStyleClass().add("login-badge-warning");
+                completionBadge.getStyleClass().add(CSS_LOGIN_BADGE_WARNING);
             }
         }
 
@@ -262,7 +358,7 @@ public class LoginController extends BaseController implements Initializable {
 
         private static String formatState(User.State state) {
             if (state == null) {
-                return "Unknown";
+                return TEXT_UNKNOWN;
             }
             String raw = state.name().toLowerCase(java.util.Locale.ROOT);
             return Character.toUpperCase(raw.charAt(0)) + raw.substring(1);
@@ -271,7 +367,7 @@ public class LoginController extends BaseController implements Initializable {
         private static String formatActivity(Instant updatedAt) {
             // Use updatedAt as a lightweight proxy for recent activity.
             if (updatedAt == null) {
-                return "Active recently";
+                return TEXT_ACTIVE_RECENTLY;
             }
 
             java.time.Duration duration = java.time.Duration.between(updatedAt, Instant.now());
@@ -281,29 +377,29 @@ public class LoginController extends BaseController implements Initializable {
 
             long minutes = duration.toMinutes();
             if (minutes < 1) {
-                return "Active just now";
+                return TEXT_ACTIVE_JUST_NOW;
             }
             if (minutes < 60) {
-                return "Active " + minutes + "m ago";
+                return TEXT_ACTIVE_PREFIX + minutes + TEXT_MINUTES_SUFFIX;
             }
 
             long hours = duration.toHours();
             if (hours < 24) {
-                return "Active " + hours + "h ago";
+                return TEXT_ACTIVE_PREFIX + hours + TEXT_HOURS_SUFFIX;
             }
 
             long days = duration.toDays();
             if (days < 7) {
-                return "Active " + days + "d ago";
+                return TEXT_ACTIVE_PREFIX + days + TEXT_DAYS_SUFFIX;
             }
 
             long weeks = days / 7;
             if (weeks < 5) {
-                return "Active " + weeks + "w ago";
+                return TEXT_ACTIVE_PREFIX + weeks + TEXT_WEEKS_SUFFIX;
             }
 
             long months = days / 30;
-            return "Active " + months + "mo ago";
+            return TEXT_ACTIVE_PREFIX + months + TEXT_MONTHS_SUFFIX;
         }
     }
 
@@ -311,7 +407,7 @@ public class LoginController extends BaseController implements Initializable {
     @FXML
     private void handleLogin() {
         if (viewModel.login()) {
-            logger.info("Login successful, navigating to Dashboard");
+            logger.info(LOG_LOGIN_SUCCESS);
             NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
         }
     }
@@ -319,7 +415,7 @@ public class LoginController extends BaseController implements Initializable {
     @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleCreateAccount() {
-        logger.info("Opening account creation dialog");
+        logger.info(LOG_OPENING_DIALOG);
         showCreateAccountDialog();
     }
 
@@ -332,16 +428,16 @@ public class LoginController extends BaseController implements Initializable {
     private void updatePlaceholderText() {
         String filter = viewModel.filterTextProperty().get();
         if (viewModel.getUsers().isEmpty()) {
-            emptyListPlaceholder.setText("No profiles yet. Create one to get started.");
+            emptyListPlaceholder.setText(MSG_NO_PROFILES_YET);
             return;
         }
 
         if (filter != null && !filter.isBlank() && viewModel.getFilteredUsers().isEmpty()) {
-            emptyListPlaceholder.setText("No profiles match \"" + formatFilter(filter) + "\".");
+            emptyListPlaceholder.setText(MSG_NO_PROFILES_MATCH + formatFilter(filter) + "\".");
             return;
         }
 
-        emptyListPlaceholder.setText("No profiles to show.");
+        emptyListPlaceholder.setText(MSG_NO_PROFILES_TO_SHOW);
     }
 
     private String formatFilter(String filter) {
@@ -359,7 +455,8 @@ public class LoginController extends BaseController implements Initializable {
         }
 
         int current = userListView.getSelectionModel().getSelectedIndex();
-        int target = Math.max(0, Math.min(size - 1, current + delta));
+        double candidate = (double) current + delta;
+        int target = (int) Math.clamp(candidate, 0.0, size - 1.0);
         userListView.getSelectionModel().select(target);
         userListView.scrollTo(target);
     }
@@ -367,79 +464,94 @@ public class LoginController extends BaseController implements Initializable {
     private void showCreateAccountDialog() {
         // Create the dialog
         Dialog<User> dialog = new Dialog<>();
-        dialog.setTitle("Create New Account");
+        dialog.setTitle(DIALOG_TITLE);
         dialog.setHeaderText(null); // No header for cleaner look
 
         // Apply dark styling to dialog
-        String themeStylesheet = resolveStylesheet("/css/theme.css");
+        String themeStylesheet = resolveStylesheet(STYLESHEET_PATH);
         if (themeStylesheet != null) {
             dialog.getDialogPane().getStylesheets().add(themeStylesheet);
         }
-        dialog.getDialogPane().getStyleClass().add("dialog-pane");
+        dialog.getDialogPane().getStyleClass().add(CSS_DIALOG_PANE);
 
         // Set the button types
-        ButtonType createButtonType = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
+        ButtonType createButtonType = new ButtonType(BUTTON_CREATE, ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(createButtonType, ButtonType.CANCEL);
 
         // Create the form with VBox for better spacing
         VBox content = new VBox(20);
         content.setPadding(new Insets(30, 40, 20, 40));
-        content.setStyle("-fx-background-color: -fx-surface-dark;");
+        content.setStyle(STYLE_SURFACE_DARK);
 
         // Title
-        Label titleLabel = new Label("Create New Account");
-        titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-text-primary;");
+        Label titleLabel = new Label(DIALOG_TITLE);
+        titleLabel.setStyle(STYLE_TITLE);
 
         // Name field
         VBox nameBox = new VBox(8);
-        Label nameLabel = new Label("Name:");
+        Label nameLabel = new Label(LABEL_NAME);
         nameLabel.setStyle(SECONDARY_TEXT_STYLE);
         TextField nameField = new TextField();
-        nameField.setPromptText("Enter your name");
+        nameField.setPromptText(PROMPT_ENTER_NAME);
         nameField.setPrefWidth(280);
-        nameField.setStyle("-fx-background-color: -fx-surface-elevated; -fx-text-fill: white; "
-                + "-fx-prompt-text-fill: -fx-text-muted; -fx-background-radius: 8;");
+        nameField.setStyle(STYLE_FIELD_BACKGROUND);
         nameBox.getChildren().addAll(nameLabel, nameField);
 
         // Age spinner
         VBox ageBox = new VBox(8);
-        Label ageLabel = new Label("Age:");
+        Label ageLabel = new Label(LABEL_AGE);
         ageLabel.setStyle(SECONDARY_TEXT_STYLE);
         Spinner<Integer> ageSpinner = new Spinner<>();
-        ageSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(18, 100, 25));
+        SpinnerValueFactory<Integer> ageValueFactory = new SpinnerValueFactory<>() {
+            @Override
+            public void decrement(int steps) {
+                int current = getValue() == null ? AGE_DEFAULT : getValue();
+                int next = Math.max(AGE_MIN, current - steps);
+                setValue(next);
+            }
+
+            @Override
+            public void increment(int steps) {
+                int current = getValue() == null ? AGE_DEFAULT : getValue();
+                int next = Math.min(AGE_MAX, current + steps);
+                setValue(next);
+            }
+        };
+        ageValueFactory.setValue(AGE_DEFAULT);
+        ageSpinner.setValueFactory(ageValueFactory);
         ageSpinner.setEditable(true);
         ageSpinner.setPrefWidth(120);
         ageBox.getChildren().addAll(ageLabel, ageSpinner);
 
         // Gender combo
         VBox genderBox = new VBox(8);
-        Label genderLabel = new Label("Gender:");
+        Label genderLabel = new Label(LABEL_GENDER);
         genderLabel.setStyle(SECONDARY_TEXT_STYLE);
         ComboBox<Gender> genderCombo = new ComboBox<>();
         genderCombo.getItems().addAll(Gender.values());
         genderCombo.setValue(Gender.OTHER);
         genderCombo.setPrefWidth(200);
-        genderCombo.setStyle("-fx-background-color: #1e293b; -fx-background-radius: 8;");
+        genderCombo.setStyle(STYLE_COMBO_BACKGROUND);
         genderCombo.setCellFactory(lv -> createStyledCell());
         genderCombo.setButtonCell(createStyledCell());
         genderBox.getChildren().addAll(genderLabel, genderCombo);
 
         // Interested In combo
         VBox interestedBox = new VBox(8);
-        Label interestedLabel = new Label("Interested In:");
+        Label interestedLabel = new Label(LABEL_INTERESTED_IN);
         interestedLabel.setStyle(SECONDARY_TEXT_STYLE);
         ComboBox<Gender> interestedInCombo = new ComboBox<>();
         interestedInCombo.getItems().addAll(Gender.values());
         interestedInCombo.setValue(Gender.OTHER);
         interestedInCombo.setPrefWidth(200);
-        interestedInCombo.setStyle("-fx-background-color: #1e293b; -fx-background-radius: 8;");
+        interestedInCombo.setStyle(STYLE_COMBO_BACKGROUND);
         interestedInCombo.setCellFactory(lv -> createStyledCell());
         interestedInCombo.setButtonCell(createStyledCell());
         interestedBox.getChildren().addAll(interestedLabel, interestedInCombo);
 
         // Error label
         Label errorLabel = new Label();
-        errorLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 13px;");
+        errorLabel.setStyle(STYLE_ERROR_LABEL);
         errorLabel.textProperty().bind(viewModel.errorMessageProperty());
 
         content.getChildren().addAll(titleLabel, nameBox, ageBox, genderBox, interestedBox, errorLabel);
@@ -475,7 +587,7 @@ public class LoginController extends BaseController implements Initializable {
 
         Optional<User> result = dialog.showAndWait();
         result.ifPresent(user -> {
-            logger.info("Created new user: {}", user.getName());
+            logger.info(LOG_USER_CREATED, user.getName());
             // Select the newly created user
             userListView.getSelectionModel().select(user);
         });
@@ -494,10 +606,10 @@ public class LoginController extends BaseController implements Initializable {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setText(null);
-                    setStyle("-fx-background-color: #1e293b;");
+                    setStyle(STYLE_CELL_BACKGROUND);
                 } else {
                     setText(item.name());
-                    setStyle("-fx-background-color: #1e293b; -fx-text-fill: white; -fx-padding: 8 12;");
+                    setStyle(STYLE_CELL_WITH_TEXT);
                 }
             }
         };
@@ -506,7 +618,7 @@ public class LoginController extends BaseController implements Initializable {
     private String resolveStylesheet(String path) {
         URL resource = getClass().getResource(path);
         if (resource == null) {
-            logger.warn("Stylesheet not found: {}", path);
+            logger.warn(LOG_STYLESHEET_NOT_FOUND, path);
             return null;
         }
         return resource.toExternalForm();

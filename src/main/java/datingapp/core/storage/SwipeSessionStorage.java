@@ -26,7 +26,7 @@ public interface SwipeSessionStorage {
      * Get recent sessions for a user (most recent first).
      *
      * @param userId the user ID
-     * @param limit maximum number of sessions to return
+     * @param limit  maximum number of sessions to return
      */
     List<SwipeSession> getSessionsFor(UUID userId, int limit);
 
@@ -34,8 +34,8 @@ public interface SwipeSessionStorage {
      * Get sessions for a user within a time range.
      *
      * @param userId the user ID
-     * @param start start of time range (inclusive)
-     * @param end end of time range (inclusive)
+     * @param start  start of time range (inclusive)
+     * @param end    end of time range (inclusive)
      */
     List<SwipeSession> getSessionsInRange(UUID userId, Instant start, Instant end);
 
@@ -60,6 +60,15 @@ public interface SwipeSessionStorage {
             double avgSessionDurationSeconds,
             double avgSwipesPerSession,
             double avgSwipeVelocity) {
+        public SessionAggregates {
+            if (totalSessions < 0 || totalSwipes < 0 || totalLikes < 0 || totalPasses < 0 || totalMatches < 0) {
+                throw new IllegalArgumentException("Aggregate counts cannot be negative");
+            }
+            if (avgSessionDurationSeconds < 0 || avgSwipesPerSession < 0 || avgSwipeVelocity < 0) {
+                throw new IllegalArgumentException("Aggregate averages cannot be negative");
+            }
+        }
+
         /** Empty aggregates for users with no sessions. */
         public static SessionAggregates empty() {
             return new SessionAggregates(0, 0, 0, 0, 0, 0.0, 0.0, 0.0);

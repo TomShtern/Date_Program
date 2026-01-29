@@ -26,8 +26,9 @@ public class EnumSetColumnMapper implements ColumnMapper<EnumSet<Preferences.Int
         for (String name : csv.split(",")) {
             try {
                 result.add(Preferences.Interest.valueOf(name.trim()));
-            } catch (IllegalArgumentException e) {
-                // Skip invalid enum values from database migration - allows graceful handling of legacy data
+            } catch (IllegalArgumentException _) {
+                // Skip invalid enum values from database migration - allows graceful handling
+                // of legacy data
             }
         }
         return result;

@@ -32,7 +32,8 @@ public class MatchQualityService {
     private final AppConfig config;
 
     /**
-     * Immutable record representing the quality/compatibility of a match. Computed from one user's
+     * Immutable record representing the quality/compatibility of a match. Computed
+     * from one user's
      * perspective (scores may differ slightly between perspectives).
      */
     public record MatchQuality(
@@ -79,6 +80,15 @@ public class MatchQualityService {
             if (compatibilityScore < 0 || compatibilityScore > 100) {
                 throw new IllegalArgumentException("compatibilityScore must be 0-100, got: " + compatibilityScore);
             }
+
+            if (distanceKm < 0) {
+                throw new IllegalArgumentException("distanceKm cannot be negative");
+            }
+            if (ageDifference < 0) {
+                throw new IllegalArgumentException("ageDifference cannot be negative");
+            }
+            Objects.requireNonNull(timeBetweenLikes, "timeBetweenLikes cannot be null");
+            Objects.requireNonNull(paceSyncLevel, "paceSyncLevel cannot be null");
 
             // Defensive copies
             sharedInterests = sharedInterests == null ? List.of() : List.copyOf(sharedInterests);
@@ -147,17 +157,21 @@ public class MatchQualityService {
     }
 
     /**
-     * Utility class for comparing interest sets between users. Used by MatchQualityService to
+     * Utility class for comparing interest sets between users. Used by
+     * MatchQualityService to
      * compute interest-based compatibility.
      *
-     * <p>This class computes two metrics:
+     * <p>
+     * This class computes two metrics:
      *
      * <ul>
-     *   <li><b>Overlap Ratio</b>: shared / min(a.size, b.size) - rewards having all interests match
-     *   <li><b>Jaccard Index</b>: shared / union - standard similarity metric
+     * <li><b>Overlap Ratio</b>: shared / min(a.size, b.size) - rewards having all
+     * interests match
+     * <li><b>Jaccard Index</b>: shared / union - standard similarity metric
      * </ul>
      *
-     * <p>Thread-safe: This class is stateless and all methods are static.
+     * <p>
+     * Thread-safe: This class is stateless and all methods are static.
      */
     public static final class InterestMatcher {
 
@@ -168,12 +182,25 @@ public class MatchQualityService {
         /**
          * Result of comparing two interest sets.
          *
-         * @param shared the interests both users have in common
-         * @param sharedCount number of shared interests (convenience)
+         * @param shared       the interests both users have in common
+         * @param sharedCount  number of shared interests (convenience)
          * @param overlapRatio shared / min(a.size, b.size), range [0.0, 1.0]
          * @param jaccardIndex shared / union, range [0.0, 1.0]
          */
         public record MatchResult(Set<Interest> shared, int sharedCount, double overlapRatio, double jaccardIndex) {
+            public MatchResult {
+                Objects.requireNonNull(shared, "shared cannot be null");
+                if (sharedCount < 0) {
+                    throw new IllegalArgumentException("sharedCount cannot be negative");
+                }
+                if (overlapRatio < 0.0 || overlapRatio > 1.0) {
+                    throw new IllegalArgumentException("overlapRatio must be 0.0-1.0");
+                }
+                if (jaccardIndex < 0.0 || jaccardIndex > 1.0) {
+                    throw new IllegalArgumentException("jaccardIndex must be 0.0-1.0");
+                }
+            }
+
             /** Returns true if there are any shared interests. */
             public boolean hasSharedInterests() {
                 return sharedCount > 0;
@@ -216,11 +243,13 @@ public class MatchQualityService {
         }
 
         /**
-         * Formats shared interests as a human-readable string. Shows up to 3 interests, with "and X
+         * Formats shared interests as a human-readable string. Shows up to 3 interests,
+         * with "and X
          * more" if exceeded.
          *
          * @param shared set of shared interests
-         * @return formatted string like "Hiking, Coffee, and 2 more" or empty string if none
+         * @return formatted string like "Hiking, Coffee, and 2 more" or empty string if
+         *         none
          */
         public static String formatSharedInterests(Set<Interest> shared) {
             if (shared == null || shared.isEmpty()) {
@@ -682,7 +711,7 @@ public class MatchQualityService {
         if (comp == -1) {
             return 0.5; // Neutral
         }
-        return (double) comp / 100.0;
+        return comp / 100.0;
     }
 
     private int dimensionScore(Enum<?> a, Enum<?> b, boolean hasWildcard) {

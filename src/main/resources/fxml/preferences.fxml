@@ -17,14 +17,14 @@
     xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.PreferencesController">
   <top>
     <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="header-surface">
-      <Button onAction="#handleBack" styleClass="icon-button">
+      <Button fx:id="backButton" onAction="#handleBack" styleClass="icon-button">
         <graphic>
           <FontIcon iconLiteral="mdi2a-arrow-left" iconSize="24" iconColor="white"/>
         </graphic>
       </Button>
       <Label styleClass="screen-title" text="Discovery Settings"/>
       <Region HBox.hgrow="ALWAYS"/>
-      <Button text="Save" onAction="#handleSave" styleClass="button-accent-text"/>
+      <Button fx:id="saveButton" text="Save" onAction="#handleSave" styleClass="button-accent-text"/>
     </HBox>
   </top>
 

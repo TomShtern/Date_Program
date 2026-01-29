@@ -6,10 +6,13 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Represents a match between two users who mutually liked each other. Mutable - state can change
+ * Represents a match between two users who mutually liked each other. Mutable -
+ * state can change
  * (ACTIVE -> UNMATCHED/BLOCKED).
  *
- * <p>The ID is deterministic: sorted concatenation of both user UUIDs. userA is always the
+ * <p>
+ * The ID is deterministic: sorted concatenation of both user UUIDs. userA is
+ * always the
  * lexicographically smaller UUID.
  */
 public class Match {
@@ -76,7 +79,8 @@ public class Match {
     }
 
     /**
-     * Creates a new Match with deterministic ID based on sorted user UUIDs. Starts in ACTIVE state.
+     * Creates a new Match with deterministic ID based on sorted user UUIDs. Starts
+     * in ACTIVE state.
      *
      * @param a First user UUID
      * @param b Second user UUID
@@ -156,6 +160,9 @@ public class Match {
     public void transitionToFriends(UUID initiatorId) {
         if (isInvalidTransition(this.state, State.FRIENDS)) {
             throw new IllegalStateException("Cannot transition to FRIENDS from " + state);
+        }
+        if (!involves(initiatorId)) {
+            throw new IllegalArgumentException("User is not part of this match");
         }
         this.state = State.FRIENDS;
         // We don't set endedAt/endedBy because the relationship is still "active" in a

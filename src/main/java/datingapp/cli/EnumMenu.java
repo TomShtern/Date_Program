@@ -19,10 +19,10 @@ public final class EnumMenu {
     /**
      * Prompts user to select a single value from an enum.
      *
-     * @param <E> Enum type
-     * @param reader Input reader
+     * @param <E>       Enum type
+     * @param reader    Input reader
      * @param enumClass The enum class
-     * @param prompt The prompt to display
+     * @param prompt    The prompt to display
      * @param allowSkip If true, adds "0=Skip" option
      * @return Selected value, or null if skipped/invalid
      */
@@ -31,12 +31,14 @@ public final class EnumMenu {
 
         E[] values = enumClass.getEnumConstants();
 
-        logger.info("\n{}", prompt);
-        for (int i = 0; i < values.length; i++) {
-            logger.info("  {}. {}", i + 1, getDisplayName(values[i]));
-        }
-        if (allowSkip) {
-            logger.info("  0. Skip");
+        if (logger.isInfoEnabled()) {
+            logger.info("\n{}", prompt);
+            for (int i = 0; i < values.length; i++) {
+                logger.info("  {}. {}", i + 1, getDisplayName(values[i]));
+            }
+            if (allowSkip) {
+                logger.info("  0. Skip");
+            }
         }
 
         String input = reader.readLine("Your choice: ");
@@ -49,7 +51,7 @@ public final class EnumMenu {
                 return values[choice - 1];
             }
         } catch (NumberFormatException ignored) {
-            // Fall through to invalid selection message
+            logger.debug("Invalid numeric selection", ignored);
         }
 
         logger.info("⚠️ Invalid selection, skipping.");
@@ -60,22 +62,25 @@ public final class EnumMenu {
      * Prompts for multiple selections (comma-separated).
      * Used for dealbreakers where user can accept multiple values.
      *
-     * @param <E> Enum type
-     * @param reader Input reader
+     * @param <E>       Enum type
+     * @param reader    Input reader
      * @param enumClass The enum class
-     * @param prompt The prompt to display
-     * @return Set of selected values (may be empty if user chooses "0" or enters invalid input)
+     * @param prompt    The prompt to display
+     * @return Set of selected values (may be empty if user chooses "0" or enters
+     *         invalid input)
      */
     public static <E extends Enum<E>> Set<E> promptMultiple(
             CliUtilities.InputReader reader, Class<E> enumClass, String prompt) {
 
         E[] values = enumClass.getEnumConstants();
 
-        logger.info("\n{} (comma-separated, e.g., 1,2,3)", prompt);
-        for (int i = 0; i < values.length; i++) {
-            logger.info("  {}. {}", i + 1, getDisplayName(values[i]));
+        if (logger.isInfoEnabled()) {
+            logger.info("\n{} (comma-separated, e.g., 1,2,3)", prompt);
+            for (int i = 0; i < values.length; i++) {
+                logger.info("  {}. {}", i + 1, getDisplayName(values[i]));
+            }
+            logger.info("  0. Clear/None");
         }
-        logger.info("  0. Clear/None");
 
         String input = reader.readLine("Your choices: ");
         if ("0".equals(input.trim())) {
@@ -90,7 +95,7 @@ public final class EnumMenu {
                     result.add(values[choice - 1]);
                 }
             } catch (NumberFormatException ignored) {
-                // Skip invalid entries
+                logger.debug("Skipping invalid selection entry", ignored);
             }
         }
         return result;
@@ -100,7 +105,7 @@ public final class EnumMenu {
      * Gets display name for an enum value.
      * Tries getDisplayName() method first, falls back to formatted name.
      *
-     * @param <E> Enum type
+     * @param <E>   Enum type
      * @param value The enum value
      * @return Display-friendly string
      */

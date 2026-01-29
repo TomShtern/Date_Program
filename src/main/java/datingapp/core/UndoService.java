@@ -12,23 +12,37 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Service for managing undo state and executing undo operations. Tracks the last swipe per user
+ * Service for managing undo state and executing undo operations. Tracks the
+ * last swipe per user
  * with a configurable time window (default 30 seconds).
  *
- * <p>Undo state is stored in-memory per user (not persisted to database). When a user swipes, their
- * undo state is recorded. If they undo within the time window, the Like is deleted and any
+ * <p>
+ * Undo state is stored in-memory per user (not persisted to database). When a
+ * user swipes, their
+ * undo state is recorded. If they undo within the time window, the Like is
+ * deleted and any
  * resulting Match is also deleted.
  *
- * <p>Phase 1 feature: Undo Last Swipe
+ * <p>
+ * Phase 1 feature: Undo Last Swipe
  *
- * <p>KNOWN LIMITATIONS: - Like and Match deletions are NOT in a transaction. If Match deletion
- * fails after Like deletion, the system may be left in an inconsistent state. For production
- * systems with concurrent writes, wrap deletions in database transactions. - In-memory undo state
- * uses lazy cleanup (expired entries removed on access). Long-running applications with many users
- * may accumulate stale entries. Consider implementing periodic cleanup or using a time-expiring
- * cache library (e.g., Caffeine) for future versions. - For multi-threaded or web deployments,
- * TOCTOU (time-of-check-to-time-of-use) race conditions may occur between expiry checks and user
- * input. Current implementation is acceptable for single-user console application.
+ * <p>
+ * KNOWN LIMITATIONS: - Like and Match deletions are NOT in a transaction. If
+ * Match deletion
+ * fails after Like deletion, the system may be left in an inconsistent state.
+ * For production
+ * systems with concurrent writes, wrap deletions in database transactions. -
+ * In-memory undo state
+ * uses lazy cleanup (expired entries removed on access). Long-running
+ * applications with many users
+ * may accumulate stale entries. Consider implementing periodic cleanup or using
+ * a time-expiring
+ * cache library (e.g., Caffeine) for future versions. - For multi-threaded or
+ * web deployments,
+ * TOCTOU (time-of-check-to-time-of-use) race conditions may occur between
+ * expiry checks and user
+ * input. Current implementation is acceptable for single-user console
+ * application.
  */
 public class UndoService {
 
@@ -43,9 +57,9 @@ public class UndoService {
     /**
      * Constructor for UndoService.
      *
-     * @param likeStorage Storage interface for managing likes
+     * @param likeStorage  Storage interface for managing likes
      * @param matchStorage Storage interface for managing matches
-     * @param config Application configuration with undo window setting
+     * @param config       Application configuration with undo window setting
      */
     public UndoService(LikeStorage likeStorage, MatchStorage matchStorage, AppConfig config) {
         this(likeStorage, matchStorage, config, Clock.systemUTC());
@@ -59,10 +73,11 @@ public class UndoService {
     }
 
     /**
-     * Records a swipe for potential undo. Called after each like/pass action to store the undo state.
+     * Records a swipe for potential undo. Called after each like/pass action to
+     * store the undo state.
      *
-     * @param userId The user who swiped
-     * @param like The like/pass that was recorded
+     * @param userId       The user who swiped
+     * @param like         The like/pass that was recorded
      * @param matchCreated Match created by the swipe, or null if none
      */
     public void recordSwipe(UUID userId, Like like, Match matchCreated) {
@@ -74,7 +89,8 @@ public class UndoService {
     }
 
     /**
-     * Checks if a user can undo their last swipe. Returns false if no undo state exists or the window
+     * Checks if a user can undo their last swipe. Returns false if no undo state
+     * exists or the window
      * has expired. Lazy cleanup: removes expired state on access.
      *
      * @param userId The user to check
@@ -97,7 +113,8 @@ public class UndoService {
     }
 
     /**
-     * Gets the seconds remaining for the current undo window. Returns 0 if no undo available or
+     * Gets the seconds remaining for the current undo window. Returns 0 if no undo
+     * available or
      * expired.
      *
      * @param userId The user to check
@@ -115,8 +132,10 @@ public class UndoService {
     }
 
     /**
-     * Executes an undo operation. Validates that undo is available, then deletes the Like and any
-     * resulting Match. Clears the undo state so the same action cannot be undone twice.
+     * Executes an undo operation. Validates that undo is available, then deletes
+     * the Like and any
+     * resulting Match. Clears the undo state so the same action cannot be undone
+     * twice.
      *
      * @param userId The user requesting the undo
      * @return UndoResult with success status, message, and side effects
@@ -160,7 +179,8 @@ public class UndoService {
     }
 
     /**
-     * Manually clears the undo state for a user. Called when starting a new swipe or on explicit
+     * Manually clears the undo state for a user. Called when starting a new swipe
+     * or on explicit
      * expiry.
      *
      * @param userId The user to clear
@@ -172,7 +192,8 @@ public class UndoService {
     // ===== Inner Classes =====
 
     /**
-     * Represents the undo state for a single swipe action. Immutable - created once, never modified.
+     * Represents the undo state for a single swipe action. Immutable - created
+     * once, never modified.
      */
     private static class UndoState {
         final UUID userId;
@@ -189,7 +210,8 @@ public class UndoService {
     }
 
     /**
-     * Result of an undo operation. Immutable record containing success status, message, and side
+     * Result of an undo operation. Immutable record containing success status,
+     * message, and side
      * effects.
      */
     public record UndoResult(boolean success, String message, Like undoneSwipe, boolean matchDeleted) {
@@ -197,7 +219,7 @@ public class UndoService {
         /**
          * Creates a successful undo result.
          *
-         * @param like The swipe that was undone
+         * @param like         The swipe that was undone
          * @param matchDeleted Whether a match was also deleted
          * @return Success UndoResult
          */
@@ -213,6 +235,19 @@ public class UndoService {
          */
         public static UndoResult failure(String message) {
             return new UndoResult(false, message, null, false);
+        }
+
+        public UndoResult {
+            if (success) {
+                Objects.requireNonNull(undoneSwipe, "undoneSwipe cannot be null on success");
+            } else {
+                if (message == null || message.isBlank()) {
+                    throw new IllegalArgumentException("message is required on failure");
+                }
+                if (undoneSwipe != null || matchDeleted) {
+                    throw new IllegalArgumentException("undo details must be empty on failure");
+                }
+            }
         }
     }
 }

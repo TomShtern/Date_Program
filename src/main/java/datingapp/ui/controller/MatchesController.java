@@ -8,6 +8,7 @@ import datingapp.ui.viewmodel.MatchesViewModel.MatchCardData;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.ResourceBundle;
 import javafx.animation.FadeTransition;
@@ -49,6 +50,11 @@ import org.slf4j.LoggerFactory;
  * Extends BaseController for automatic subscription cleanup.
  */
 public class MatchesController extends BaseController implements Initializable {
+
+    private static final String START_BROWSING_LABEL = "Start Browsing";
+    private static final String ICON_HEART = "mdi2h-heart";
+    private static final String COLOR_PINK = "#f43f5e";
+    private static final String COLOR_SLATE = "#e2e8f0";
     private static final Logger logger = LoggerFactory.getLogger(MatchesController.class);
     private static final Random RANDOM = new Random();
 
@@ -112,6 +118,9 @@ public class MatchesController extends BaseController implements Initializable {
     @FXML
     private Button emptyActionButton;
 
+    @FXML
+    private Button backButton;
+
     private final MatchesViewModel viewModel;
     private Pane particleLayer;
     private boolean emptyStateAnimated;
@@ -142,6 +151,8 @@ public class MatchesController extends BaseController implements Initializable {
 
         // Start empty state animations if visible
         startEmptyStateAnimations();
+
+        wireNavigationButtons();
     }
 
     private void onSectionDataChanged() {
@@ -159,6 +170,9 @@ public class MatchesController extends BaseController implements Initializable {
         updateHeader();
 
         sectionGroup.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+            if (obs == null || Objects.equals(oldToggle, newToggle)) {
+                return;
+            }
             if (newToggle == null) {
                 matchesTabButton.setSelected(true);
                 return;
@@ -232,14 +246,20 @@ public class MatchesController extends BaseController implements Initializable {
         }
 
         // Spawn floating hearts periodically
-        Timeline spawnTimeline = new Timeline(new KeyFrame(Duration.millis(800), e -> spawnFloatingHeart()));
+        Timeline spawnTimeline = new Timeline(new KeyFrame(Duration.millis(800), e -> {
+            e.consume();
+            spawnFloatingHeart();
+        }));
         spawnTimeline.setCycleCount(javafx.animation.Animation.INDEFINITE);
         spawnTimeline.play();
 
         // Spawn initial batch
         for (int i = 0; i < 5; i++) {
             PauseTransition delay = new PauseTransition(Duration.millis(RANDOM.nextInt(500)));
-            delay.setOnFinished(e -> spawnFloatingHeart());
+            delay.setOnFinished(e -> {
+                e.consume();
+                spawnFloatingHeart();
+            });
             delay.play();
         }
     }
@@ -250,9 +270,9 @@ public class MatchesController extends BaseController implements Initializable {
             return;
         }
 
-        FontIcon heart = new FontIcon("mdi2h-heart");
+        FontIcon heart = new FontIcon(ICON_HEART);
         heart.setIconSize(12 + RANDOM.nextInt(16)); // 12-28 size
-        heart.setIconColor(Color.web("#f43f5e", 0.3 + RANDOM.nextDouble() * 0.4)); // 30-70% opacity
+        heart.setIconColor(Color.web(COLOR_PINK, 0.3 + RANDOM.nextDouble() * 0.4)); // 30-70% opacity
         heart.setOpacity(0);
 
         // Random horizontal position
@@ -295,7 +315,10 @@ public class MatchesController extends BaseController implements Initializable {
         rotate.setAutoReverse(true);
 
         ParallelTransition animation = new ParallelTransition(floatUp, sway, fadeIn, fadeOut, rotate);
-        animation.setOnFinished(e -> particleLayer.getChildren().remove(heart));
+        animation.setOnFinished(e -> {
+            e.consume();
+            particleLayer.getChildren().remove(heart);
+        });
         animation.play();
     }
 
@@ -303,7 +326,7 @@ public class MatchesController extends BaseController implements Initializable {
     private void animateMainIcon() {
         // Apply pulsing glow
         DropShadow glow = new DropShadow();
-        glow.setColor(Color.web("#f43f5e"));
+        glow.setColor(Color.web(COLOR_PINK));
         glow.setRadius(30);
         glow.setSpread(0.4);
         emptyStateIcon.setEffect(glow);
@@ -503,16 +526,21 @@ public class MatchesController extends BaseController implements Initializable {
         msgIcon.setIconSize(16);
         msgIcon.setIconColor(Color.WHITE);
         messageBtn.setGraphic(msgIcon);
-        messageBtn.setOnAction(e -> handleStartChat(match));
+        messageBtn.setOnAction(e -> {
+            e.consume();
+            handleStartChat(match);
+        });
 
         // Button hover animation
         messageBtn.setOnMouseEntered(e -> {
+            e.consume();
             ScaleTransition bounce = new ScaleTransition(Duration.millis(100), messageBtn);
             bounce.setToX(1.08);
             bounce.setToY(1.08);
             bounce.play();
         });
         messageBtn.setOnMouseExited(e -> {
+            e.consume();
             ScaleTransition unbounce = new ScaleTransition(Duration.millis(100), messageBtn);
             unbounce.setToX(1.0);
             unbounce.setToY(1.0);
@@ -529,19 +557,25 @@ public class MatchesController extends BaseController implements Initializable {
 
         Button likeBackBtn = new Button("Like back");
         likeBackBtn.getStyleClass().add("like-action-primary");
-        FontIcon likeIcon = new FontIcon("mdi2h-heart");
+        FontIcon likeIcon = new FontIcon(ICON_HEART);
         likeIcon.setIconSize(14);
         likeIcon.setIconColor(Color.WHITE);
         likeBackBtn.setGraphic(likeIcon);
-        likeBackBtn.setOnAction(e -> viewModel.likeBack(like));
+        likeBackBtn.setOnAction(e -> {
+            e.consume();
+            viewModel.likeBack(like);
+        });
 
         Button passBtn = new Button("Pass");
         passBtn.getStyleClass().add("like-action-secondary");
         FontIcon passIcon = new FontIcon("mdi2c-close");
         passIcon.setIconSize(14);
-        passIcon.setIconColor(Color.web("#e2e8f0"));
+        passIcon.setIconColor(Color.web(COLOR_SLATE));
         passBtn.setGraphic(passIcon);
-        passBtn.setOnAction(e -> viewModel.passOn(like));
+        passBtn.setOnAction(e -> {
+            e.consume();
+            viewModel.passOn(like);
+        });
 
         HBox actions = new HBox(10, likeBackBtn, passBtn);
         actions.getStyleClass().add("like-action-row");
@@ -561,9 +595,12 @@ public class MatchesController extends BaseController implements Initializable {
         withdrawBtn.getStyleClass().add("like-action-secondary");
         FontIcon withdrawIcon = new FontIcon("mdi2a-arrow-left");
         withdrawIcon.setIconSize(14);
-        withdrawIcon.setIconColor(Color.web("#e2e8f0"));
+        withdrawIcon.setIconColor(Color.web(COLOR_SLATE));
         withdrawBtn.setGraphic(withdrawIcon);
-        withdrawBtn.setOnAction(e -> viewModel.withdrawLike(like));
+        withdrawBtn.setOnAction(e -> {
+            e.consume();
+            viewModel.withdrawLike(like);
+        });
 
         HBox actions = new HBox(10, status, withdrawBtn);
         actions.getStyleClass().add("like-action-row");
@@ -583,7 +620,7 @@ public class MatchesController extends BaseController implements Initializable {
         avatarContainer.getStyleClass().add("like-avatar-container");
         FontIcon avatarIcon = new FontIcon("mdi2a-account");
         avatarIcon.setIconSize(34);
-        avatarIcon.setIconColor(Color.web("#e2e8f0"));
+        avatarIcon.setIconColor(Color.web(COLOR_SLATE));
         avatarIcon.getStyleClass().add("like-avatar-icon");
         avatarContainer.getChildren().add(avatarIcon);
 
@@ -610,16 +647,29 @@ public class MatchesController extends BaseController implements Initializable {
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleBack() {
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleBrowse() {
         logger.info("Navigating to browse/matching screen");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
+    }
+
+    private void wireNavigationButtons() {
+        if (backButton != null) {
+            backButton.setOnAction(event -> {
+                event.consume();
+                handleBack();
+            });
+        }
+        if (emptyActionButton != null) {
+            emptyActionButton.setOnAction(event -> {
+                event.consume();
+                handleBrowse();
+            });
+        }
     }
 
     private void updateHeader() {
@@ -627,7 +677,7 @@ public class MatchesController extends BaseController implements Initializable {
             case MATCHES -> {
                 headerTitleLabel.setText("Your Matches");
                 headerIcon.setIconLiteral("mdi2h-heart-multiple");
-                headerIcon.setIconColor(Color.web("#f43f5e"));
+                headerIcon.setIconColor(Color.web(COLOR_PINK));
                 matchCountLabel.setText(
                         String.valueOf(viewModel.matchCountProperty().get()));
             }
@@ -640,7 +690,7 @@ public class MatchesController extends BaseController implements Initializable {
             }
             case YOU_LIKED -> {
                 headerTitleLabel.setText("You Liked");
-                headerIcon.setIconLiteral("mdi2h-heart");
+                headerIcon.setIconLiteral(ICON_HEART);
                 headerIcon.setIconColor(Color.web("#a855f7"));
                 matchCountLabel.setText(
                         String.valueOf(viewModel.likesSentCountProperty().get()));
@@ -649,7 +699,7 @@ public class MatchesController extends BaseController implements Initializable {
                 logger.warn("Unknown section {}, defaulting to matches header", currentSection);
                 headerTitleLabel.setText("Your Matches");
                 headerIcon.setIconLiteral("mdi2h-heart-multiple");
-                headerIcon.setIconColor(Color.web("#f43f5e"));
+                headerIcon.setIconColor(Color.web(COLOR_PINK));
                 matchCountLabel.setText(
                         String.valueOf(viewModel.matchCountProperty().get()));
             }
@@ -667,7 +717,7 @@ public class MatchesController extends BaseController implements Initializable {
                 emptySubtitleLabel.setText(
                         "Your perfect match is waiting! Start browsing to connect with amazing people.");
                 emptyHintLabel.setText("Like someone and if they like you back, it's a match!");
-                emptyActionButton.setText("Start Browsing");
+                emptyActionButton.setText(START_BROWSING_LABEL);
             }
             case LIKES_YOU -> {
                 emptyStateIcon.setIconLiteral("mdi2h-heart-flash");
@@ -678,12 +728,12 @@ public class MatchesController extends BaseController implements Initializable {
                 emptyActionButton.setText("Browse More");
             }
             case YOU_LIKED -> {
-                emptyStateIcon.setIconLiteral("mdi2h-heart");
+                emptyStateIcon.setIconLiteral(ICON_HEART);
                 emptyStateIcon.setIconColor(Color.web("#a855f7"));
                 emptyTitleLabel.setText("No likes sent yet");
                 emptySubtitleLabel.setText("Swipe right on people you like to start conversations.");
                 emptyHintLabel.setText("Sent likes stay here until they respond.");
-                emptyActionButton.setText("Start Browsing");
+                emptyActionButton.setText(START_BROWSING_LABEL);
             }
             default -> {
                 logger.warn("Unknown section {}, defaulting to matches empty state", currentSection);
@@ -693,7 +743,7 @@ public class MatchesController extends BaseController implements Initializable {
                 emptySubtitleLabel.setText(
                         "Your perfect match is waiting! Start browsing to connect with amazing people.");
                 emptyHintLabel.setText("Like someone and if they like you back, it's a match!");
-                emptyActionButton.setText("Start Browsing");
+                emptyActionButton.setText(START_BROWSING_LABEL);
             }
         }
     }

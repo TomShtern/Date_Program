@@ -2,6 +2,7 @@ package datingapp.core;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /** Container for social domain models: friend requests and notifications. */
@@ -14,6 +15,20 @@ public final class Social {
     /** Represents a request to transition a match to the "Friend Zone". */
     public record FriendRequest(
             UUID id, UUID fromUserId, UUID toUserId, Instant createdAt, Status status, Instant respondedAt) {
+
+        public FriendRequest {
+            Objects.requireNonNull(id, "id cannot be null");
+            Objects.requireNonNull(fromUserId, "fromUserId cannot be null");
+            Objects.requireNonNull(toUserId, "toUserId cannot be null");
+            Objects.requireNonNull(createdAt, "createdAt cannot be null");
+            Objects.requireNonNull(status, "status cannot be null");
+            if (fromUserId.equals(toUserId)) {
+                throw new IllegalArgumentException("fromUserId cannot equal toUserId");
+            }
+            if (status == Status.PENDING && respondedAt != null) {
+                throw new IllegalArgumentException("respondedAt must be null for pending requests");
+            }
+        }
 
         /** Status of a friend zone request. */
         public enum Status {
@@ -42,6 +57,22 @@ public final class Social {
             Instant createdAt,
             boolean isRead,
             Map<String, String> data) {
+
+        public Notification {
+            Objects.requireNonNull(id, "id cannot be null");
+            Objects.requireNonNull(userId, "userId cannot be null");
+            Objects.requireNonNull(type, "type cannot be null");
+            Objects.requireNonNull(title, "title cannot be null");
+            Objects.requireNonNull(message, "message cannot be null");
+            Objects.requireNonNull(createdAt, "createdAt cannot be null");
+            if (title.isBlank()) {
+                throw new IllegalArgumentException("title cannot be blank");
+            }
+            if (message.isBlank()) {
+                throw new IllegalArgumentException("message cannot be blank");
+            }
+            data = data != null ? Map.copyOf(data) : Map.of();
+        }
 
         /** Types of notifications in the system. */
         public enum Type {

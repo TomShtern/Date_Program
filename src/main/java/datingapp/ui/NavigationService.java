@@ -124,7 +124,8 @@ public final class NavigationService {
     }
 
     /**
-     * Navigates to a view with the specified transition animation, optionally tracking history.
+     * Navigates to a view with the specified transition animation, optionally
+     * tracking history.
      *
      * @param viewType     The view to navigate to
      * @param type         The type of transition animation
@@ -199,7 +200,10 @@ public final class NavigationService {
         fadeIn.setDelay(Duration.millis(100));
 
         ParallelTransition parallel = new ParallelTransition(fadeOut, fadeIn);
-        parallel.setOnFinished(e -> rootLayout.setCenter(newView));
+        parallel.setOnFinished(e -> {
+            e.consume();
+            rootLayout.setCenter(newView);
+        });
         parallel.play();
     }
 
@@ -221,6 +225,7 @@ public final class NavigationService {
 
         ParallelTransition parallel = new ParallelTransition(slideOut, slideIn);
         parallel.setOnFinished(e -> {
+            e.consume();
             newView.setTranslateX(0);
             rootLayout.setCenter(newView);
         });

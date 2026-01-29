@@ -12,7 +12,8 @@ public final class Stats {
     }
 
     /**
-     * Immutable snapshot of user engagement statistics. Stored periodically for historical trends
+     * Immutable snapshot of user engagement statistics. Stored periodically for
+     * historical trends
      * and faster reads.
      */
     public record UserStats(
@@ -117,7 +118,8 @@ public final class Stats {
         }
 
         /**
-         * Builder for constructing stats during computation. Fields are public for direct assignment
+         * Builder for constructing stats during computation. Fields are public for
+         * direct assignment
          * during computation.
          */
         @SuppressWarnings("java:S1104") // Public fields are intentional for builder pattern
@@ -161,7 +163,8 @@ public final class Stats {
     }
 
     /**
-     * Platform-wide statistics for computing relative scores. Used to determine if a user is
+     * Platform-wide statistics for computing relative scores. Used to determine if
+     * a user is
      * "above average" or "below average".
      */
     public record PlatformStats(
@@ -172,8 +175,22 @@ public final class Stats {
             double avgLikesGiven,
             double avgMatchRate,
             double avgLikeRatio) {
-
-        // Record auto-generates canonical constructor - no explicit constructor needed
+        public PlatformStats {
+            Objects.requireNonNull(id, "id cannot be null");
+            Objects.requireNonNull(computedAt, "computedAt cannot be null");
+            if (totalActiveUsers < 0) {
+                throw new IllegalArgumentException("totalActiveUsers cannot be negative");
+            }
+            if (avgLikesReceived < 0 || avgLikesGiven < 0) {
+                throw new IllegalArgumentException("average like counts cannot be negative");
+            }
+            if (avgMatchRate < 0 || avgMatchRate > 1) {
+                throw new IllegalArgumentException("avgMatchRate must be 0-1");
+            }
+            if (avgLikeRatio < 0 || avgLikeRatio > 1) {
+                throw new IllegalArgumentException("avgLikeRatio must be 0-1");
+            }
+        }
 
         public static PlatformStats create(
                 int totalActiveUsers,

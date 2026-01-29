@@ -32,7 +32,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Profile Editor screen.
- * Handles editing of user bio, location, interests, lifestyle, and profile photo.
+ * Handles editing of user bio, location, interests, lifestyle, and profile
+ * photo.
  */
 public class ProfileViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
@@ -309,7 +310,7 @@ public class ProfileViewModel {
                 user.activate();
                 userStorage.save(user);
                 logger.info("User {} activated after profile completion", user.getName());
-                UiServices.Toast.getInstance().showSuccess("Profile complete! You're now active!");
+                UiServices.Toast.showSuccess("Profile complete! You're now active!");
             } catch (IllegalStateException e) {
                 logger.warn("Could not activate user: {}", e.getMessage());
             }
@@ -477,7 +478,7 @@ public class ProfileViewModel {
                 updateInterestsDisplay();
                 return true;
             } else {
-                UiServices.Toast.getInstance().showWarning("Maximum " + Interest.MAX_PER_USER + " interests allowed");
+                UiServices.Toast.showWarning("Maximum " + Interest.MAX_PER_USER + " interests allowed");
                 return false;
             }
         }
@@ -513,7 +514,7 @@ public class ProfileViewModel {
         }
         if (photoFile == null || !photoFile.isFile()) {
             logger.warn("Invalid photo file selected: {}", photoFile);
-            UiServices.Toast.getInstance().showError("Invalid photo file selected");
+            UiServices.Toast.showError("Invalid photo file selected");
             return;
         }
 
@@ -539,14 +540,13 @@ public class ProfileViewModel {
                 Platform.runLater(() -> {
                     primaryPhotoUrl.set(photoUrl);
                     updateCompletion(user);
-                    UiServices.Toast.getInstance().showSuccess("Photo saved!");
+                    UiServices.Toast.showSuccess("Photo saved!");
                     logger.info("Profile photo saved: {}", destination);
                 });
 
             } catch (IOException e) {
                 logger.error("Failed to save profile photo", e);
-                Platform.runLater(
-                        () -> UiServices.Toast.getInstance().showError("Failed to save photo: " + e.getMessage()));
+                Platform.runLater(() -> UiServices.Toast.showError("Failed to save photo: " + e.getMessage()));
             }
         });
     }
@@ -566,7 +566,7 @@ public class ProfileViewModel {
         }
         List<String> missing = result.breakdown().stream()
                 .flatMap(breakdown -> breakdown.missingItems().stream())
-                .map(String::trim)
+                .map(item -> item == null ? "" : item.toString().trim())
                 .filter(item -> !item.isEmpty())
                 .distinct()
                 .toList();
@@ -590,13 +590,13 @@ public class ProfileViewModel {
         LocalDate today = LocalDate.now();
         if (selected.isAfter(today)) {
             logger.warn("Birth date cannot be in the future: {}", selected);
-            UiServices.Toast.getInstance().showWarning("Birth date cannot be in the future");
+            UiServices.Toast.showWarning("Birth date cannot be in the future");
             return;
         }
         int age = Period.between(selected, today).getYears();
         if (age < 18 || age > 120) {
             logger.warn("Birth date outside allowed age range: {}", selected);
-            UiServices.Toast.getInstance().showWarning("Birth date must be for ages 18-120");
+            UiServices.Toast.showWarning("Birth date must be for ages 18-120");
             return;
         }
         user.setBirthDate(selected);

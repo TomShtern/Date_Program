@@ -6,7 +6,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Service for generating profile previews. Shows users how their profile appears to others, with
+ * Service for generating profile previews. Shows users how their profile
+ * appears to others, with
  * completeness scoring and improvement tips.
  */
 public class ProfilePreviewService {
@@ -15,6 +16,9 @@ public class ProfilePreviewService {
     public record ProfileCompleteness(int percentage, List<String> filledFields, List<String> missingFields) {
 
         public ProfileCompleteness {
+            if (percentage < 0 || percentage > 100) {
+                throw new IllegalArgumentException("percentage must be 0-100, got: " + percentage);
+            }
             filledFields = filledFields != null ? List.copyOf(filledFields) : List.of();
             missingFields = missingFields != null ? List.copyOf(missingFields) : List.of();
         }
@@ -32,6 +36,8 @@ public class ProfilePreviewService {
             Objects.requireNonNull(user);
             Objects.requireNonNull(completeness);
             improvementTips = improvementTips != null ? List.copyOf(improvementTips) : List.of();
+            displayBio = displayBio != null ? displayBio.trim() : null;
+            displayLookingFor = displayLookingFor != null ? displayLookingFor.trim() : null;
         }
     }
 

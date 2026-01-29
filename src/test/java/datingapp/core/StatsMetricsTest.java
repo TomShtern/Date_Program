@@ -20,11 +20,12 @@ import org.junit.jupiter.api.Timeout;
 /**
  * Consolidated unit tests for statistics and metrics domain models.
  *
- * <p>Includes tests for:
+ * <p>
+ * Includes tests for:
  * <ul>
- *   <li>{@link PlatformStats} - platform-wide statistics</li>
- *   <li>{@link UserAchievement} - user achievement records</li>
- *   <li>{@link UserStats} - individual user statistics</li>
+ * <li>{@link PlatformStats} - platform-wide statistics</li>
+ * <li>{@link UserAchievement} - user achievement records</li>
+ * <li>{@link UserStats} - individual user statistics</li>
  * </ul>
  */
 @SuppressWarnings("unused") // Test class with @Nested
@@ -115,11 +116,18 @@ class StatsMetricsTest {
         }
 
         @Test
-        @DisplayName("Accepts zero and negative values without validation")
-        void acceptsZeroAndNegativeValues() {
-            // Note: PlatformStats has no compact constructor validation
-            // This test documents the current behavior
-            assertDoesNotThrow(() -> PlatformStats.create(0, -10.0, -5.0, -0.5, -1.0));
+        @DisplayName("Rejects negative values for like counts")
+        void rejectsNegativeValues() {
+            // PlatformStats validates that like counts cannot be negative
+            assertThrows(IllegalArgumentException.class, () -> PlatformStats.create(0, -10.0, 5.0, 0.5, 0.5));
+            assertThrows(IllegalArgumentException.class, () -> PlatformStats.create(0, 5.0, -10.0, 0.5, 0.5));
+        }
+
+        @Test
+        @DisplayName("Accepts zero values")
+        void acceptsZeroValues() {
+            // Zero values are valid for all fields
+            assertDoesNotThrow(() -> PlatformStats.create(0, 0.0, 0.0, 0.0, 0.0));
         }
     }
 

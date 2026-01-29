@@ -397,16 +397,90 @@ public void performMultiStepOperation() {
 
 **Suggested Fix**: Standardize on one singleton pattern (preferably enum-based for thread safety).
 
-## 20. Security Vulnerabilities
+## 20. Resource Management and Memory Issues
 
-### 20.1 Hardcoded Database Credentials
+### 20.1 JDBI Connection Lifecycle Management
+**Issue**: The application creates a single JDBI instance in `StorageModule.forH2()` that is never explicitly closed, potentially leading to connection leaks and resource exhaustion.
+
+**Current State**: The JDBI instance is created once and stored in the storage adapters without a proper cleanup mechanism.
+
+**Suggested Fix**: Implement proper resource management by implementing the `AutoCloseable` interface on the `StorageModule` and ensuring JDBI connections are properly closed during application shutdown.
+
+### 20.2 Virtual Thread Lifecycle Management
+**Issue**: The application uses virtual threads extensively in the UI layer but doesn't properly manage their lifecycle, potentially leading to thread leaks.
+
+**Current State**: Classes like `MatchingViewModel` and `ProfileViewModel` create virtual threads using `Thread.ofVirtual().start()` without keeping references or ensuring proper termination.
+
+**Suggested Fix**: Implement proper thread lifecycle management with proper cleanup in destroy/close methods and consider using `ExecutorService` for better thread management.
+
+### 20.3 In-Memory State Accumulation
+**Issue**: The `UndoService` stores undo states in-memory using `ConcurrentHashMap` without proper expiration or cleanup mechanisms, which can lead to memory accumulation over time.
+
+**Current State**: The undo states map only removes entries when accessed after expiration, but stale entries may accumulate in long-running applications.
+
+**Suggested Fix**: Implement a scheduled cleanup task or use a time-expiring cache like Caffeine to automatically remove stale entries.
+
+## 21. Architecture and Design Issues
+
+### 21.1 Dual Architecture Pattern Confusion
+**Issue**: The application implements two competing architectural patterns - the traditional `ServiceRegistry` and the newer `AppContext` module system. This creates confusion and maintenance overhead.
+
+**Current State**: Both `ServiceRegistry` and `AppContext` exist with different approaches to dependency injection and service creation. The `ServiceRegistry` has a `fromAppContext` method to bridge them, indicating architectural inconsistency.
+
+**Suggested Fix**: Choose one architectural approach and migrate all services to use it consistently. The `AppContext` module system appears more modern and modular, so consider deprecating the `ServiceRegistry` approach.
+
+### 21.2 Feature Duplication Across Layers
+**Issue**: Similar functionality exists in both CLI and UI layers, leading to code duplication and maintenance challenges.
+
+**Current State**: Both CLI handlers (e.g., `ProfileHandler`, `MatchingHandler`) and UI ViewModels (e.g., `ProfileViewModel`, `MatchingViewModel`) implement similar business logic with different implementations.
+
+**Suggested Fix**: Create a unified service layer that both CLI and UI layers can use, eliminating duplication.
+
+### 21.3 Overly Complex Configuration Management
+**Issue**: Configuration is scattered across multiple classes (`AppConfig`, individual service configs) making it difficult to manage and modify.
+
+**Current State**: `AppConfig` contains many parameters, but some services have their own configuration logic, leading to inconsistency.
+
+**Suggested Fix**: Consolidate all configuration into the `AppConfig` record and remove redundant configuration mechanisms.
+
+### 21.4 Excessive Use of Records for Domain Entities
+**Issue**: The application uses records for domain entities like `User.ProfileNote` and `Messaging.Message`, which limits flexibility for future extensions since records are immutable by design.
+
+**Current State**: Domain entities are defined as records which cannot be extended or modified after creation.
+
+**Suggested Fix**: Consider using abstract classes or interfaces for domain entities that might need extension in the future, reserving records for pure data transfer objects.
+
+### 21.5 Tight Coupling Between Business Logic and UI Concerns
+**Issue**: Business logic services are tightly coupled with UI-specific concerns, making them harder to test and reuse.
+
+**Current State**: Services like `MessagingService` return UI-specific result types (`SendResult`) that include UI-focused error codes.
+
+**Suggested Fix**: Separate business logic from UI concerns by using pure domain objects for service results and letting UI layers handle presentation logic.
+
+### 21.6 Over-Engineering with Multiple Abstraction Layers
+**Issue**: The application has multiple layers of abstraction that may be unnecessary for its size and complexity, making the code harder to navigate and understand.
+
+**Current State**: The application has `StorageModule` -> `JDBI interfaces` -> `JDBI adapters` -> `Storage interfaces` -> `Core services`, creating multiple layers of indirection.
+
+**Suggested Fix**: Simplify the architecture by reducing unnecessary abstraction layers while maintaining clean separation of concerns.
+
+### 21.7 Inconsistent Error Handling Patterns
+**Issue**: Different parts of the application use different error handling patterns (exceptions, Optional, custom Result types), making it difficult to handle errors consistently.
+
+**Current State**: Some methods throw exceptions, others return Optional, and some return custom Result types like `UndoService.UndoResult`.
+
+**Suggested Fix**: Standardize on a single error handling approach across the entire application.
+
+## 22. Security Vulnerabilities
+
+### 22.1 Hardcoded Database Credentials
 **Issue**: The `DatabaseManager` contains a hardcoded default password ("dev") for development environments, which could accidentally be used in production.
 
 **Current State**: `private static final String DEFAULT_DEV_PASSWORD = "dev";` in DatabaseManager.java
 
 **Suggested Fix**: Remove hardcoded credentials and enforce environment variables for all sensitive information. Add checks to ensure production environments don't use default passwords.
 
-### 20.2 Insufficient Authentication
+### 22.2 Insufficient Authentication
 **Issue**: The application lacks proper authentication. Any user can select any existing user account.
 
 **Current State**: `CliUtilities.UserSession` allows selecting any user without authentication.
@@ -425,6 +499,10 @@ public void performMultiStepOperation() {
 7. Optimize the CandidateFinder filtering algorithm
 8. Improve exception handling to be more specific
 9. Standardize architectural patterns across the codebase
+10. Fix resource management issues with JDBI connections and virtual threads
+11. Consolidate the dual architecture (ServiceRegistry vs AppContext) into a single approach
+12. Eliminate feature duplication between CLI and UI layers
+13. Standardize error handling patterns across the application
 
 ### Medium Priority
 1. Improve error handling consistency
@@ -434,6 +512,9 @@ public void performMultiStepOperation() {
 5. Implement proper resource management and cleanup
 6. Address ignored exceptions by adding logging or proper handling
 7. Fix separation of concerns violations
+8. Implement proper memory management for in-memory caches
+9. Simplify over-engineered abstraction layers
+10. Address tight coupling between business logic and UI concerns
 
 ### Low Priority
 1. Refactor large methods and improve naming
@@ -445,4 +526,4 @@ public void performMultiStepOperation() {
 
 ## Conclusion
 
-The dating application has a solid foundation with clean architecture, but requires improvements in security, performance, and maintainability to be production-ready. The most critical issues relate to authentication, data validation, hardcoded credentials, performance bottlenecks in candidate filtering, poor exception handling, inconsistent architectural patterns, and potential race conditions in concurrent operations. The suggested fixes will improve the application's robustness, security, and maintainability.
+The dating application has a solid foundation with clean architecture, but requires improvements in security, performance, and maintainability to be production-ready. The most critical issues relate to authentication, data validation, hardcoded credentials, performance bottlenecks in candidate filtering, poor exception handling, inconsistent architectural patterns, resource management issues, and potential race conditions in concurrent operations. The suggested fixes will improve the application's robustness, security, and maintainability.

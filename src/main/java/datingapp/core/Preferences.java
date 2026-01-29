@@ -12,9 +12,11 @@ public final class Preferences {
     }
 
     /**
-     * Predefined interests for user profiles. Organized by category for easier selection in CLI.
+     * Predefined interests for user profiles. Organized by category for easier
+     * selection in CLI.
      *
-     * <p>Usage example:
+     * <p>
+     * Usage example:
      *
      * <pre>
      * Set&lt;Interest&gt; interests = EnumSet.of(Interest.HIKING, Interest.COFFEE);
@@ -74,7 +76,10 @@ public final class Preferences {
         CATS("Cats", Category.SOCIAL),
         NIGHTLIFE("Nightlife", Category.SOCIAL);
 
-        /** Maximum number of interests a user can select. Enforced in User.setInterests(). */
+        /**
+         * Maximum number of interests a user can select. Enforced in
+         * User.setInterests().
+         */
         public static final int MAX_PER_USER = 10;
 
         /** Minimum interests for "interests complete" in ProfilePreviewService. */
@@ -135,7 +140,10 @@ public final class Preferences {
         }
     }
 
-    /** Container for lifestyle-related enums. Used for profile data and dealbreaker filtering. */
+    /**
+     * Container for lifestyle-related enums. Used for profile data and dealbreaker
+     * filtering.
+     */
     public static final class Lifestyle {
 
         private Lifestyle() {
@@ -245,6 +253,22 @@ public final class Preferences {
             TimeToFirstDate timeToFirstDate,
             CommunicationStyle communicationStyle,
             DepthPreference depthPreference) {
+
+        public PacePreferences {
+            boolean anySet = messagingFrequency != null
+                    || timeToFirstDate != null
+                    || communicationStyle != null
+                    || depthPreference != null;
+            boolean anyMissing = messagingFrequency == null
+                    || timeToFirstDate == null
+                    || communicationStyle == null
+                    || depthPreference == null;
+
+            if (anySet && anyMissing) {
+                throw new IllegalArgumentException("PacePreferences must be all set or all null");
+            }
+        }
+
         public boolean isComplete() {
             return messagingFrequency != null
                     && timeToFirstDate != null

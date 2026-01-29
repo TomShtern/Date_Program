@@ -16,7 +16,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Business logic for processing likes, creating matches, and browsing pending likers. Pure Java - no
+ * Business logic for processing likes, creating matches, and browsing pending
+ * likers. Pure Java - no
  * framework dependencies.
  */
 public class MatchingService {
@@ -59,7 +60,8 @@ public class MatchingService {
     }
 
     /**
-     * Records a like action and checks for mutual match. If session tracking is enabled, also updates
+     * Records a like action and checks for mutual match. If session tracking is
+     * enabled, also updates
      * the user's session.
      *
      * @param like The like to record
@@ -119,7 +121,8 @@ public class MatchingService {
     // ================== Liker Browser Methods ==================
 
     /**
-     * Returns all users that liked {@code currentUserId} and the current user has not responded to.
+     * Returns all users that liked {@code currentUserId} and the current user has
+     * not responded to.
      * Requires userStorage and blockStorage to be initialized.
      */
     public List<User> findPendingLikers(UUID currentUserId) {
@@ -129,7 +132,8 @@ public class MatchingService {
     }
 
     /**
-     * Same as {@link #findPendingLikers(UUID)}, but also includes when the like happened. Requires
+     * Same as {@link #findPendingLikers(UUID)}, but also includes when the like
+     * happened. Requires
      * userStorage and blockStorage to be initialized.
      */
     public List<PendingLiker> findPendingLikersWithTimes(UUID currentUserId) {
@@ -174,6 +178,14 @@ public class MatchingService {
         return match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
     }
 
-    /** Represents a user who liked the current user but hasn't been responded to yet. */
-    public record PendingLiker(User user, Instant likedAt) {}
+    /**
+     * Represents a user who liked the current user but hasn't been responded to
+     * yet.
+     */
+    public record PendingLiker(User user, Instant likedAt) {
+        public PendingLiker {
+            Objects.requireNonNull(user, "user cannot be null");
+            Objects.requireNonNull(likedAt, "likedAt cannot be null");
+        }
+    }
 }

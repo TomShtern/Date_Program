@@ -75,7 +75,7 @@ public class TrustSafetyService {
     /**
      * Validates a user-provided verification code against stored user data.
      *
-     * @param user the user to verify
+     * @param user      the user to verify
      * @param inputCode the user-provided code
      * @return true if the code matches and is not expired
      */
@@ -92,7 +92,7 @@ public class TrustSafetyService {
     /**
      * Validates a user-provided verification code against stored user data.
      *
-     * @param user the user to verify
+     * @param user      the user to verify
      * @param inputCode the user-provided code
      * @return true if the code matches and is not expired
      */
@@ -197,5 +197,18 @@ public class TrustSafetyService {
     }
 
     /** Result of a report action, including moderation outcome. */
-    public record ReportResult(boolean success, boolean userWasBanned, String errorMessage) {}
+    public record ReportResult(boolean success, boolean userWasBanned, String errorMessage) {
+
+        public ReportResult {
+            if (success && errorMessage != null) {
+                throw new IllegalArgumentException("errorMessage must be null on success");
+            }
+            if (!success && (errorMessage == null || errorMessage.isBlank())) {
+                throw new IllegalArgumentException("errorMessage is required on failure");
+            }
+            if (!success && userWasBanned) {
+                throw new IllegalArgumentException("userWasBanned cannot be true on failure");
+            }
+        }
+    }
 }

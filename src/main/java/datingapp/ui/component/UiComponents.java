@@ -45,7 +45,7 @@ public final class UiComponents {
      * Animated typing indicator showing bouncing dots.
      * Used in chat interfaces to indicate the other user is typing.
      */
-    public static class TypingIndicator extends HBox {
+    public static final class TypingIndicator extends HBox {
 
         private static final int DOT_COUNT = 3;
         private static final double DOT_RADIUS = 4;
@@ -70,7 +70,7 @@ public final class UiComponents {
                 bounce.setAutoReverse(true);
                 bounce.setCycleCount(Animation.INDEFINITE);
                 bounce.setDelay(Duration.millis(i * 150L));
-                bounce.play();
+                Platform.runLater(bounce::play);
             }
 
             // Start hidden
@@ -97,7 +97,7 @@ public final class UiComponents {
      * Animated circular progress ring with percentage display.
      * Shows a smooth arc animation as progress changes.
      */
-    public static class ProgressRing extends StackPane {
+    public static final class ProgressRing extends StackPane {
 
         private final Arc progressArc;
         private final Label percentLabel;
@@ -133,9 +133,17 @@ public final class UiComponents {
             percentLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white;");
 
             // Bind arc length to progress
+            Arc progressArcRef = progressArc;
+            Label percentLabelRef = percentLabel;
             progress.addListener((obs, oldVal, newVal) -> {
-                progressArc.setLength(-360 * newVal.doubleValue());
-                percentLabel.setText(String.format("%.0f%%", newVal.doubleValue() * 100));
+                if (obs == null) {
+                    return;
+                }
+                if (Double.compare(oldVal.doubleValue(), newVal.doubleValue()) == 0) {
+                    return;
+                }
+                progressArcRef.setLength(-360 * newVal.doubleValue());
+                percentLabelRef.setText(String.format("%.0f%%", newVal.doubleValue() * 100));
             });
 
             getChildren().addAll(track, progressArc, percentLabel);
@@ -180,11 +188,9 @@ public final class UiComponents {
      * Animated skeleton loading placeholder with shimmer effect.
      * Displays a gradient animation while content is loading.
      */
-    public static class SkeletonLoader extends Region {
+    public static final class SkeletonLoader extends Region {
 
-        private final Rectangle skeleton;
         private final Timeline shimmerAnimation;
-        private double animationProgress = 0;
 
         /**
          * Creates a skeleton loader with specified dimensions.
@@ -193,30 +199,32 @@ public final class UiComponents {
          * @param height Height of the skeleton placeholder
          */
         public SkeletonLoader(double width, double height) {
-            skeleton = new Rectangle(width, height);
-            skeleton.setArcWidth(8);
-            skeleton.setArcHeight(8);
+            Rectangle localSkeleton = new Rectangle(width, height);
+            localSkeleton.setArcWidth(8);
+            localSkeleton.setArcHeight(8);
 
             // Initial gradient
-            updateGradient(0);
+            updateGradient(localSkeleton, 0);
 
             // Animate gradient position
+            double[] animationProgress = {0};
             shimmerAnimation = new Timeline(new KeyFrame(Duration.millis(50), e -> {
-                animationProgress += 0.033;
-                if (animationProgress > 1) {
-                    animationProgress = 0;
+                e.consume();
+                animationProgress[0] += 0.033;
+                if (animationProgress[0] > 1) {
+                    animationProgress[0] = 0;
                 }
-                updateGradient(animationProgress);
+                updateGradient(localSkeleton, animationProgress[0]);
             }));
-            shimmerAnimation.setCycleCount(Timeline.INDEFINITE);
+            shimmerAnimation.setCycleCount(Animation.INDEFINITE);
             shimmerAnimation.play();
 
-            getChildren().add(skeleton);
+            getChildren().add(localSkeleton);
             setMinSize(width, height);
             setMaxSize(width, height);
         }
 
-        private void updateGradient(double position) {
+        private static void updateGradient(Rectangle skeleton, double position) {
             double startX = -0.5 + position * 2;
             double endX = startX + 0.5;
 
@@ -270,7 +278,7 @@ public final class UiComponents {
                         fade.setToValue(1.0);
                         fade.play();
                     });
-                } catch (Exception ignored) {
+                } catch (Exception _) {
                     Platform.runLater(() -> {
                         skeletonLoader.stop();
                         // Show error state or placeholder
@@ -282,7 +290,8 @@ public final class UiComponents {
 
         /**
          * Shows a skeleton loader with a Runnable callback when loading completes.
-         * Useful when content is already in the container and just needs data population.
+         * Useful when content is already in the container and just needs data
+         * population.
          *
          * @param container  the pane to overlay with skeleton
          * @param width      skeleton width

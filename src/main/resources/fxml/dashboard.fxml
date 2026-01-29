@@ -30,7 +30,7 @@
         <FontIcon iconLiteral="mdi2h-heart-pulse" iconSize="16" iconColor="#10b981"/>
         <Label fx:id="statusLabel" styleClass="likes-counter-text" text="0/50"/>
       </HBox>
-      <Button onAction="#handleLogout" styleClass="button-danger" text="Logout">
+      <Button fx:id="logoutButton" onAction="#handleLogout" styleClass="button-danger" text="Logout">
         <tooltip><Tooltip text="Sign out of your account"/></tooltip>
       </Button>
     </HBox>
@@ -50,7 +50,7 @@
           <ColumnConstraints hgrow="SOMETIMES" minWidth="180" prefWidth="200"/>
         </columnConstraints>
         <!-- Browse Card - Amber -->
-        <Button onAction="#handleBrowse" maxHeight="160" maxWidth="Infinity"
+        <Button fx:id="browseButton" onAction="#handleBrowse" maxHeight="160" maxWidth="Infinity"
                                                             prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
                                                             GridPane.columnIndex="0" GridPane.rowIndex="0">
           <graphic>
@@ -63,7 +63,7 @@
           </graphic>
         </Button>
         <!-- Matches Card - Rose -->
-        <Button onAction="#handleMatches" maxHeight="160" maxWidth="Infinity"
+        <Button fx:id="matchesButton" onAction="#handleMatches" maxHeight="160" maxWidth="Infinity"
                                                             prefHeight="160" styleClass="dashboard-card dashboard-card-matches"
                                                             GridPane.columnIndex="1" GridPane.rowIndex="0">
           <graphic>
@@ -76,7 +76,7 @@
           </graphic>
         </Button>
         <!-- Chat Card - Blue -->
-        <Button onAction="#handleChat" maxHeight="160" maxWidth="Infinity"
+        <Button fx:id="chatButton" onAction="#handleChat" maxHeight="160" maxWidth="Infinity"
                                                             prefHeight="160" styleClass="dashboard-card dashboard-card-chat"
                                                             GridPane.columnIndex="0" GridPane.rowIndex="1">
           <graphic>
@@ -89,7 +89,7 @@
           </graphic>
         </Button>
         <!-- Profile Card - Purple -->
-        <Button onAction="#handleProfile" maxHeight="160" maxWidth="Infinity"
+        <Button fx:id="profileButton" onAction="#handleProfile" maxHeight="160" maxWidth="Infinity"
                                                             prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
                                                             GridPane.columnIndex="1" GridPane.rowIndex="1">
           <graphic>
@@ -110,7 +110,7 @@
         </HBox>
         <Label fx:id="dailyPickLabel" styleClass="text-secondary"
                                                             text="Loading your daily pick..."/>
-        <Button onAction="#handleViewDailyPick" styleClass="matches-browse-btn" text="View Profile">
+        <Button fx:id="dailyPickButton" onAction="#handleViewDailyPick" styleClass="matches-browse-btn" text="View Profile">
           <graphic>
             <FontIcon iconLiteral="mdi2e-eye" iconSize="16" iconColor="white"/>
           </graphic>
@@ -155,7 +155,7 @@
           </HBox>
         </VBox>
         <Region styleClass="matches-separator" prefHeight="1"/>
-        <Button onAction="#handleStats" styleClass="button-transparent" text="View All Stats →"/>
+        <Button fx:id="statsButton" onAction="#handleStats" styleClass="button-transparent" text="View All Stats →"/>
       </VBox>
     </VBox>
   </right>

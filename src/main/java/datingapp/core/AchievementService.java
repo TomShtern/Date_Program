@@ -15,7 +15,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Service for checking and unlocking achievements. Evaluates user activity against achievement
+ * Service for checking and unlocking achievements. Evaluates user activity
+ * against achievement
  * criteria and awards new achievements.
  */
 public class AchievementService {
@@ -46,6 +47,16 @@ public class AchievementService {
 
     /** Progress towards an achievement. */
     public record AchievementProgress(Achievement achievement, int current, int target, boolean unlocked) {
+
+        public AchievementProgress {
+            Objects.requireNonNull(achievement, "achievement cannot be null");
+            if (current < 0 || target <= 0) {
+                throw new IllegalArgumentException("current and target must be positive");
+            }
+            if (unlocked && current < target) {
+                throw new IllegalArgumentException("unlocked achievements must meet target");
+            }
+        }
 
         /**
          * Gets the progress percentage (0-100).
