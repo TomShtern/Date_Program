@@ -564,7 +564,6 @@ Before you burn everything down, here's what's working well:
 ### When Time Permits
 - [ ] Add CLI handler tests
 - [ ] Consider ServiceRegistry Builder pattern
-- [ ] Clean git history of large binaries (coordinate with team)
 - [ ] Delete `docs/archived-utils/`
 
 ---

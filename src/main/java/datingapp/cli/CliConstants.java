@@ -4,7 +4,7 @@ package datingapp.cli;
  * Constants for CLI display elements including separators, box characters, and
  * messages.
  */
-public class CliConstants {
+public final class CliConstants {
     private CliConstants() {} // Prevent instantiation
 
     public static final String SEPARATOR_LINE = "═══════════════════════════════════════";

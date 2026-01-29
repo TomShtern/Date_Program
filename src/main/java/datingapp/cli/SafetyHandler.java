@@ -82,7 +82,7 @@ public class SafetyHandler {
             User toBlock = blockableUsers.get(idx);
             String confirm =
                     inputReader.readLine(CliConstants.BLOCK_PREFIX + toBlock.getName() + CliConstants.CONFIRM_SUFFIX);
-            if (confirm.equalsIgnoreCase("y")) {
+            if ("y".equalsIgnoreCase(confirm)) {
                 Block block = Block.create(currentUser.getId(), toBlock.getId());
                 blockStorage.save(block);
 
@@ -245,7 +245,7 @@ public class SafetyHandler {
             User toUnblock = blockedUsers.get(choice - 1);
             String confirm = inputReader.readLine("Unblock " + toUnblock.getName() + CliConstants.CONFIRM_SUFFIX);
 
-            if (confirm.equalsIgnoreCase("y")) {
+            if ("y".equalsIgnoreCase(confirm)) {
                 boolean success = trustSafetyService.unblock(currentUser.getId(), toUnblock.getId());
 
                 if (success) {

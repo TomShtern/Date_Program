@@ -69,10 +69,24 @@ public class TrustSafetyService {
 
     /** Returns true if the verification code has expired. */
     public boolean isExpired(Instant sentAt) {
-        if (sentAt == null) {
-            return true;
+        return sentAt == null || sentAt.plus(verificationTtl).isBefore(Instant.now());
+    }
+
+    /**
+     * Validates a user-provided verification code against stored user data.
+     *
+     * @param user the user to verify
+     * @param inputCode the user-provided code
+     * @return true if the code matches and is not expired
+     */
+    public boolean verifyCodeSimplified(User user, String inputCode) {
+        Objects.requireNonNull(user, "user cannot be null");
+        if (inputCode == null || inputCode.isBlank()) {
+            return false;
         }
-        return sentAt.plus(verificationTtl).isBefore(Instant.now());
+
+        String expected = user.getVerificationCode();
+        return expected != null && !isExpired(user.getVerificationSentAt()) && expected.equals(inputCode.trim());
     }
 
     /**
@@ -93,11 +107,7 @@ public class TrustSafetyService {
             return false;
         }
 
-        if (isExpired(user.getVerificationSentAt())) {
-            return false;
-        }
-
-        return expected.equals(inputCode.trim());
+        return !isExpired(user.getVerificationSentAt()) && expected.equals(inputCode.trim());
     }
 
     /** Report a user for inappropriate behavior and return moderation action. */

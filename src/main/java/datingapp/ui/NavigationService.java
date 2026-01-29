@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
  * application.
  * Manages the primary stage and root layout.
  */
-public class NavigationService {
+public final class NavigationService {
     private static final Logger logger = LoggerFactory.getLogger(NavigationService.class);
     private static NavigationService instance;
 
@@ -148,7 +148,7 @@ public class NavigationService {
             }
 
             FXMLLoader loader = new FXMLLoader(getClass().getResource(viewType.getFxmlPath()));
-            loader.setControllerFactory(param -> viewModelFactory.createController(param));
+            loader.setControllerFactory(viewModelFactory::createController);
 
             // Cleanup old controller before loading new one
             if (currentController instanceof BaseController bc) {

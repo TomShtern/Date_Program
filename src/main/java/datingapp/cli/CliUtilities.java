@@ -1,6 +1,7 @@
 package datingapp.cli;
 
 import datingapp.core.User;
+import java.util.Locale;
 import java.util.Scanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +24,9 @@ public final class CliUtilities {
         if (input == null || input.isBlank()) {
             return java.util.Optional.empty();
         }
-        String normalized = input.trim().toLowerCase();
+        String normalized = input.trim().toLowerCase(Locale.ROOT);
         for (String valid : validChoices) {
-            if (normalized.equals(valid.toLowerCase())) {
+            if (normalized.equals(valid.toLowerCase(Locale.ROOT))) {
                 return java.util.Optional.of(normalized);
             }
         }

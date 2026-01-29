@@ -54,7 +54,7 @@ public class LoginController extends BaseController implements Initializable {
     private static final String SECONDARY_TEXT_STYLE = "-fx-text-fill: -fx-text-secondary;";
 
     @FXML
-    private javafx.scene.layout.StackPane rootPane;
+    private StackPane rootPane;
 
     @FXML
     private ListView<User> userListView;
@@ -264,7 +264,7 @@ public class LoginController extends BaseController implements Initializable {
             if (state == null) {
                 return "Unknown";
             }
-            String raw = state.name().toLowerCase();
+            String raw = state.name().toLowerCase(java.util.Locale.ROOT);
             return Character.toUpperCase(raw.charAt(0)) + raw.substring(1);
         }
 

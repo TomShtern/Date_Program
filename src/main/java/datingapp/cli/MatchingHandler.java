@@ -23,6 +23,7 @@ import datingapp.core.storage.ProfileViewStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -178,7 +179,7 @@ public class MatchingHandler {
         String action;
         while (true) {
             String input = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_QUIT);
-            java.util.Optional<String> validated = CliUtilities.validateChoice(input, "l", "p", "q");
+            Optional<String> validated = CliUtilities.validateChoice(input, "l", "p", "q");
 
             if (validated.isEmpty()) {
                 logger.info("❌ Invalid choice. Please enter L (like), P (pass), or Q (quit).");
@@ -189,12 +190,12 @@ public class MatchingHandler {
             break;
         }
 
-        if (action.equals("q")) {
+        if ("q".equals(action)) {
             logger.info(CliConstants.MSG_STOPPING_BROWSE);
             return false;
         }
 
-        Like.Direction direction = action.equals("l") ? Like.Direction.LIKE : Like.Direction.PASS;
+        Like.Direction direction = "l".equals(action) ? Like.Direction.LIKE : Like.Direction.PASS;
 
         // Check daily limit before recording a like
         if (direction == Like.Direction.LIKE && !dailyService.canLike(currentUser.getId())) {
@@ -271,7 +272,7 @@ public class MatchingHandler {
 
         logger.info(CliConstants.MENU_DIVIDER_WITH_NEWLINES);
         logger.info("  " + CliConstants.PROMPT_VIEW_UNMATCH_BLOCK);
-        String action = inputReader.readLine("\nYour choice: ").toLowerCase();
+        String action = inputReader.readLine("\nYour choice: ").toLowerCase(Locale.ROOT);
 
         switch (action) {
             case "v" -> viewMatchDetails(matches, currentUser);
@@ -301,7 +302,7 @@ public class MatchingHandler {
 
             logger.info(CliConstants.MENU_DIVIDER_WITH_NEWLINES);
             logger.info("  (U)nmatch | (B)lock | (F)riend Zone | (G)raceful Exit | back");
-            String action = inputReader.readLine("  Your choice: ").toLowerCase();
+            String action = inputReader.readLine("  Your choice: ").toLowerCase(Locale.ROOT);
 
             handleMatchDetailAction(action, match, otherUser, otherUserId, currentUser);
 
@@ -311,7 +312,7 @@ public class MatchingHandler {
     }
 
     private void displayMatchQuality(User otherUser, MatchQuality quality) {
-        String nameUpper = otherUser.getName().toUpperCase();
+        String nameUpper = otherUser.getName().toUpperCase(Locale.ROOT);
         logger.info("\n" + CliConstants.SEPARATOR_LINE);
         logger.info("         MATCH WITH {}", nameUpper);
         logger.info(CliConstants.SEPARATOR_LINE + "\n");
@@ -387,7 +388,7 @@ public class MatchingHandler {
         switch (action) {
             case "u" -> {
                 String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
-                if (confirm.equalsIgnoreCase("y")) {
+                if ("y".equalsIgnoreCase(confirm)) {
                     match.unmatch(currentUser.getId());
                     matchStorage.update(match);
                     logger.info("✅ Unmatched with {}.\n", otherUser.getName());
@@ -396,7 +397,7 @@ public class MatchingHandler {
             case "b" -> {
                 String confirm = inputReader.readLine(
                         CliConstants.BLOCK_PREFIX + otherUser.getName() + CliConstants.CONFIRM_SUFFIX);
-                if (confirm.equalsIgnoreCase("y")) {
+                if ("y".equalsIgnoreCase(confirm)) {
                     Block block = Block.create(currentUser.getId(), otherUserId);
                     blockStorage.save(block);
                     match.block(currentUser.getId());
@@ -415,7 +416,7 @@ public class MatchingHandler {
             }
             case "g" -> {
                 String confirm = inputReader.readLine("Are you sure you want to exit gracefully? (y/n): ");
-                if (confirm.equalsIgnoreCase("y")) {
+                if ("y".equalsIgnoreCase(confirm)) {
                     try {
                         transitionService.gracefulExit(currentUser.getId(), otherUserId);
                         logger.info("🕊️ Graceful exit successful. Match ended.\n");
@@ -443,7 +444,7 @@ public class MatchingHandler {
             User otherUser = userStorage.get(otherUserId);
 
             String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
-            if (confirm.equalsIgnoreCase("y")) {
+            if ("y".equalsIgnoreCase(confirm)) {
                 match.unmatch(currentUser.getId());
                 matchStorage.update(match);
                 logger.info("✅ Unmatched with {}.\n", otherUser.getName());
@@ -470,7 +471,7 @@ public class MatchingHandler {
 
             String confirm = inputReader.readLine(
                     CliConstants.BLOCK_PREFIX + otherUser.getName() + "? This will end your match. (y/n): ");
-            if (confirm.equalsIgnoreCase("y")) {
+            if ("y".equalsIgnoreCase(confirm)) {
                 Block block = Block.create(currentUser.getId(), otherUserId);
                 blockStorage.save(block);
                 match.block(currentUser.getId());
@@ -547,7 +548,7 @@ public class MatchingHandler {
         String action;
         while (true) {
             String input = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_SKIP);
-            java.util.Optional<String> validated = CliUtilities.validateChoice(input, "l", "p", "s");
+            Optional<String> validated = CliUtilities.validateChoice(input, "l", "p", "s");
 
             if (validated.isEmpty()) {
                 logger.info("❌ Invalid choice. Please enter L (like), P (pass), or S (skip).");
@@ -558,7 +559,7 @@ public class MatchingHandler {
             break;
         }
 
-        if (action.equals("s")) {
+        if ("s".equals(action)) {
             logger.info("  👋 You can see this pick again later today.\n");
             return;
         }
@@ -566,7 +567,7 @@ public class MatchingHandler {
         // Only mark as viewed after valid action (not on skip)
         dailyService.markDailyPickViewed(currentUser.getId());
 
-        Like.Direction direction = action.equals("l") ? Like.Direction.LIKE : Like.Direction.PASS;
+        Like.Direction direction = "l".equals(action) ? Like.Direction.LIKE : Like.Direction.PASS;
 
         if (direction == Like.Direction.LIKE && !dailyService.canLike(currentUser.getId())) {
             showDailyLimitReached(currentUser);
@@ -595,9 +596,9 @@ public class MatchingHandler {
 
         int secondsLeft = undoService.getSecondsRemaining(currentUser.getId());
         String prompt = String.format("⏪ Undo last swipe? (%ds remaining) (Y/N): ", secondsLeft);
-        String response = inputReader.readLine(prompt).toLowerCase();
+        String response = inputReader.readLine(prompt).toLowerCase(Locale.ROOT);
 
-        if (response.equals("y")) {
+        if ("y".equals(response)) {
             UndoService.UndoResult result = undoService.undo(currentUser.getId());
 
             if (result.success()) {

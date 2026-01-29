@@ -8,6 +8,7 @@ import datingapp.core.User;
 import datingapp.core.storage.NotificationStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.List;
+import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +61,7 @@ public class RelationshipHandler {
         }
 
         String choice = inputReader.readLine("\nEnter request number to respond (or 'b' to go back): ");
-        if (choice.equalsIgnoreCase("b")) {
+        if ("b".equalsIgnoreCase(choice)) {
             return;
         }
 
@@ -78,12 +79,12 @@ public class RelationshipHandler {
             logger.info("\nFriend Request from {}", fromName);
             String action = inputReader
                     .readLine("Do you want to (A)ccept or (D)ecline? ")
-                    .toLowerCase();
+                    .toLowerCase(Locale.ROOT);
 
-            if (action.equals("a")) {
+            if ("a".equals(action)) {
                 transitionService.acceptFriendZone(req.id(), currentUser.getId());
                 logger.info("✅ You are now friends with {}! You can find them in your matches.\n", fromName);
-            } else if (action.equals("d")) {
+            } else if ("d".equals(action)) {
                 transitionService.declineFriendZone(req.id(), currentUser.getId());
                 logger.info("Declined friend request from {}.\n", fromName);
             }

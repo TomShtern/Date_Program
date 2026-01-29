@@ -25,9 +25,13 @@ import org.slf4j.LoggerFactory;
  * Console-based dating app - Phase 0.5. Main entry point with interactive menu. Refactored to
  * delegate logic to specialized handlers.
  */
-public class Main {
+public final class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
+
+    private Main() {
+        /* Utility class with only static methods */
+    }
 
     // Application context
     private static DatabaseManager dbManager;

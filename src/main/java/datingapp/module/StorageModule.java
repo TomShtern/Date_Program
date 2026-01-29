@@ -17,17 +17,6 @@ import datingapp.core.storage.UserAchievementStorage;
 import datingapp.core.storage.UserStatsStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.storage.DatabaseManager;
-import datingapp.storage.H2ConversationStorage;
-import datingapp.storage.H2LikeStorage;
-import datingapp.storage.H2MatchStorage;
-import datingapp.storage.H2MessageStorage;
-import datingapp.storage.H2MetricsStorage;
-import datingapp.storage.H2ModerationStorage;
-import datingapp.storage.H2ProfileDataStorage;
-import datingapp.storage.H2SocialStorage;
-import datingapp.storage.H2SwipeSessionStorage;
-import datingapp.storage.H2UserStatsStorage;
-import datingapp.storage.H2UserStorage;
 import java.util.Objects;
 
 /**
@@ -76,45 +65,49 @@ public record StorageModule(
     }
 
     /**
-     * Creates a StorageModule using H2 database implementations.
+     * Creates a StorageModule using JDBI declarative SQL implementations.
+     * All 16 storage interfaces now use JDBI for declarative, type-safe database access.
      *
-     * @param dbManager The H2 database manager
-     * @return Fully configured StorageModule
+     * @param dbManager The database manager (used for JDBI connection supplier)
+     * @return Fully configured StorageModule with all JDBI implementations
      */
     public static StorageModule forH2(DatabaseManager dbManager) {
         Objects.requireNonNull(dbManager, "dbManager cannot be null");
 
-        // Core storage
-        UserStorage userStorage = new H2UserStorage(dbManager);
-        LikeStorage likeStorage = new H2LikeStorage(dbManager);
-        MatchStorage matchStorage = new H2MatchStorage(dbManager);
-        SwipeSessionStorage sessionStorage = new H2SwipeSessionStorage(dbManager);
-        UserStatsStorage userStatsStorage = new H2UserStatsStorage(dbManager);
+        // Initialize JDBI for declarative SQL
+        org.jdbi.v3.core.Jdbi jdbi = org.jdbi.v3.core.Jdbi.create(() -> {
+                    try {
+                        return dbManager.getConnection();
+                    } catch (java.sql.SQLException e) {
+                        throw new RuntimeException("Failed to get database connection", e);
+                    }
+                })
+                .installPlugin(new org.jdbi.v3.sqlobject.SqlObjectPlugin());
 
-        // Consolidated moderation storage (blocks + reports)
-        H2ModerationStorage moderationStorage = new H2ModerationStorage(dbManager);
-        BlockStorage blockStorage = moderationStorage.blocks();
-        ReportStorage reportStorage = moderationStorage.reports();
+        // Register custom type handlers
+        jdbi.registerArgument(new datingapp.storage.jdbi.EnumSetArgumentFactory());
+        jdbi.registerColumnMapper(new datingapp.storage.jdbi.EnumSetColumnMapper());
 
-        // Consolidated metrics storage (platform stats, daily picks, achievements)
-        H2MetricsStorage metricsStorage = new H2MetricsStorage(dbManager);
-        PlatformStatsStorage platformStatsStorage = metricsStorage.platformStats();
-        DailyPickStorage dailyPickStorage = metricsStorage.dailyPicks();
-        UserAchievementStorage userAchievementStorage = metricsStorage.achievements();
-
-        // Consolidated profile data storage (views + notes)
-        H2ProfileDataStorage profileDataStorage = new H2ProfileDataStorage(dbManager);
-        ProfileViewStorage profileViewStorage = profileDataStorage.views();
-        ProfileNoteStorage profileNoteStorage = profileDataStorage.notes();
-
-        // Messaging storage
-        ConversationStorage conversationStorage = new H2ConversationStorage(dbManager);
-        MessageStorage messageStorage = new H2MessageStorage(dbManager);
-
-        // Consolidated social storage (friend requests + notifications)
-        H2SocialStorage socialStorage = new H2SocialStorage(dbManager);
-        FriendRequestStorage friendRequestStorage = socialStorage.friendRequests();
-        NotificationStorage notificationStorage = socialStorage.notifications();
+        // All storage implementations now use JDBI declarative SQL
+        UserStorage userStorage = new datingapp.storage.jdbi.JdbiUserStorageAdapter(jdbi);
+        LikeStorage likeStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiLikeStorage.class);
+        MatchStorage matchStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiMatchStorage.class);
+        BlockStorage blockStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiBlockStorage.class);
+        ReportStorage reportStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiReportStorage.class);
+        SwipeSessionStorage sessionStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiSwipeSessionStorage.class);
+        UserStatsStorage userStatsStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiUserStatsStorage.class);
+        PlatformStatsStorage platformStatsStorage =
+                jdbi.onDemand(datingapp.storage.jdbi.JdbiPlatformStatsStorage.class);
+        DailyPickStorage dailyPickStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiDailyPickStorage.class);
+        UserAchievementStorage userAchievementStorage =
+                jdbi.onDemand(datingapp.storage.jdbi.JdbiUserAchievementStorage.class);
+        ProfileViewStorage profileViewStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiProfileViewStorage.class);
+        ProfileNoteStorage profileNoteStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiProfileNoteStorage.class);
+        ConversationStorage conversationStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiConversationStorage.class);
+        MessageStorage messageStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiMessageStorage.class);
+        FriendRequestStorage friendRequestStorage =
+                jdbi.onDemand(datingapp.storage.jdbi.JdbiFriendRequestStorage.class);
+        NotificationStorage notificationStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiNotificationStorage.class);
 
         return new StorageModule(
                 userStorage,

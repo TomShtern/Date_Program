@@ -139,7 +139,7 @@ public final class ProfileCompletionService {
         }
 
         int basicScore =
-                basicFilled.isEmpty() ? 0 : (basicFilled.size() * 100) / (basicFilled.size() + basicMissing.size());
+                basicFilled.isEmpty() ? 0 : basicFilled.size() * 100 / (basicFilled.size() + basicMissing.size());
         List<CategoryBreakdown> breakdown = new ArrayList<>();
         breakdown.add(new CategoryBreakdown("Basic Info", basicScore, basicFilled, basicMissing));
 
@@ -225,7 +225,7 @@ public final class ProfileCompletionService {
 
         int lifestyleScore = lifestyleFilled.isEmpty()
                 ? 0
-                : (lifestyleFilled.size() * 100) / (lifestyleFilled.size() + lifestyleMissing.size());
+                : lifestyleFilled.size() * 100 / (lifestyleFilled.size() + lifestyleMissing.size());
         breakdown.add(new CategoryBreakdown("Lifestyle", lifestyleScore, lifestyleFilled, lifestyleMissing));
 
         // === PREFERENCES (15 points max) ===
@@ -264,11 +264,11 @@ public final class ProfileCompletionService {
         }
 
         int prefsScore =
-                prefsFilled.isEmpty() ? 0 : (prefsFilled.size() * 100) / (prefsFilled.size() + prefsMissing.size());
+                prefsFilled.isEmpty() ? 0 : prefsFilled.size() * 100 / (prefsFilled.size() + prefsMissing.size());
         breakdown.add(new CategoryBreakdown("Preferences", prefsScore, prefsFilled, prefsMissing));
 
         // === CALCULATE FINAL SCORE ===
-        int finalScore = (earnedPoints * 100) / totalPoints;
+        int finalScore = earnedPoints * 100 / totalPoints;
         String tier = calculateTier(finalScore);
 
         int filledCount =
@@ -302,7 +302,7 @@ public final class ProfileCompletionService {
      * @return ASCII progress bar string
      */
     public static String renderProgressBar(int percentage, int width) {
-        int filled = (percentage * width) / 100;
+        int filled = percentage * width / 100;
         int empty = width - filled;
         return "[" + "█".repeat(filled) + "░".repeat(empty) + "]";
     }

@@ -92,7 +92,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.5.4</version>
         <configuration>
-          <argLine>--enable-preview</argLine>
+          <argLine>--enable-preview --enable-native-access=ALL-UNNAMED</argLine>
         </configuration>
       </plugin>
       <plugin>
@@ -109,6 +109,10 @@
         <version>0.0.8</version>
         <configuration>
           <mainClass>datingapp.ui.DatingApp</mainClass>
+          <options>
+            <option>--enable-preview</option>
+            <option>--enable-native-access=ALL-UNNAMED</option>
+          </options>
         </configuration>
       </plugin>
       <plugin>

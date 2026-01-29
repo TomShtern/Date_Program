@@ -17,17 +17,6 @@ import datingapp.core.storage.UserAchievementStorage;
 import datingapp.core.storage.UserStatsStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.storage.DatabaseManager;
-import datingapp.storage.H2ConversationStorage;
-import datingapp.storage.H2LikeStorage;
-import datingapp.storage.H2MatchStorage;
-import datingapp.storage.H2MessageStorage;
-import datingapp.storage.H2MetricsStorage;
-import datingapp.storage.H2ModerationStorage;
-import datingapp.storage.H2ProfileDataStorage;
-import datingapp.storage.H2SocialStorage;
-import datingapp.storage.H2SwipeSessionStorage;
-import datingapp.storage.H2UserStatsStorage;
-import datingapp.storage.H2UserStorage;
 import java.util.Objects;
 
 /**
@@ -262,115 +251,23 @@ public class ServiceRegistry {
      * <p>Extension point: Add new build methods for different backends: - buildPostgres(config,
      * connectionPool) - buildInMemory(config) // for testing
      */
-    public static class Builder {
+    public static final class Builder {
 
         private Builder() {
             // Utility class
         }
 
         /**
-         * Builds a ServiceRegistry with H2 database storage.
+         * Builds a ServiceRegistry with H2 database storage using the new modular architecture.
+         * Delegates to AppContext for storage/service wiring, then wraps in ServiceRegistry.
          *
          * @param dbManager The H2 database manager
          * @param config Application configuration
          * @return Fully wired ServiceRegistry
          */
         public static ServiceRegistry buildH2(DatabaseManager dbManager, AppConfig config) {
-            // Core storage layer
-            UserStorage userStorage = new H2UserStorage(dbManager);
-            LikeStorage likeStorage = new H2LikeStorage(dbManager);
-            MatchStorage matchStorage = new H2MatchStorage(dbManager);
-            SwipeSessionStorage sessionStorage = new H2SwipeSessionStorage(dbManager);
-            UserStatsStorage userStatsStorage = new H2UserStatsStorage(dbManager);
-
-            // Consolidated moderation storage (blocks + reports)
-            H2ModerationStorage moderationStorage = new H2ModerationStorage(dbManager);
-            BlockStorage blockStorage = moderationStorage.blocks();
-            ReportStorage reportStorage = moderationStorage.reports();
-
-            // Consolidated metrics storage (platform stats, daily picks, achievements)
-            H2MetricsStorage metricsStorage = new H2MetricsStorage(dbManager);
-            PlatformStatsStorage platformStatsStorage = metricsStorage.platformStats();
-            DailyPickStorage dailyPickStorage = metricsStorage.dailyPicks();
-            UserAchievementStorage userAchievementStorage = metricsStorage.achievements();
-
-            // Consolidated profile data storage (views + notes)
-            H2ProfileDataStorage profileDataStorage = new H2ProfileDataStorage(dbManager);
-            ProfileViewStorage profileViewStorage = profileDataStorage.views();
-            ProfileNoteStorage profileNoteStorage = profileDataStorage.notes();
-
-            // Messaging storage (Phase 2)
-            ConversationStorage conversationStorage = new H2ConversationStorage(dbManager);
-            MessageStorage messageStorage = new H2MessageStorage(dbManager);
-
-            // Consolidated social storage (friend requests + notifications)
-            H2SocialStorage socialStorage = new H2SocialStorage(dbManager);
-            FriendRequestStorage friendRequestStorage = socialStorage.friendRequests();
-            NotificationStorage notificationStorage = socialStorage.notifications();
-
-            // Services
-            CandidateFinder candidateFinder = new CandidateFinder();
-            SessionService sessionService = new SessionService(sessionStorage, config);
-            MatchingService matchingService =
-                    new MatchingService(likeStorage, matchStorage, userStorage, blockStorage, sessionService);
-            TrustSafetyService trustSafetyService =
-                    new TrustSafetyService(reportStorage, userStorage, blockStorage, config);
-            StatsService statsService = new StatsService(
-                    likeStorage, matchStorage, blockStorage, reportStorage, userStatsStorage, platformStatsStorage);
-            MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
-            ProfilePreviewService profilePreviewService = new ProfilePreviewService();
-            DailyService dailyService =
-                    new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, candidateFinder, config);
-            UndoService undoService = new UndoService(likeStorage, matchStorage, config);
-
-            // Achievement Service (Phase 1)
-            AchievementService achievementService = new AchievementService(
-                    userAchievementStorage,
-                    matchStorage,
-                    likeStorage,
-                    userStorage,
-                    reportStorage,
-                    profilePreviewService,
-                    config);
-
-            // Messaging Service (Phase 2)
-            MessagingService messagingService =
-                    new MessagingService(conversationStorage, messageStorage, matchStorage, userStorage);
-
-            // Relationship Lifecycle Service (Phase 2 & 3)
-            RelationshipTransitionService relationshipTransitionService = new RelationshipTransitionService(
-                    matchStorage, friendRequestStorage, conversationStorage, notificationStorage);
-
-            return new ServiceRegistry(
-                    config,
-                    userStorage,
-                    likeStorage,
-                    matchStorage,
-                    blockStorage,
-                    reportStorage,
-                    sessionStorage,
-                    userStatsStorage,
-                    platformStatsStorage,
-                    dailyPickStorage,
-                    userAchievementStorage,
-                    profileViewStorage,
-                    profileNoteStorage,
-                    conversationStorage,
-                    messageStorage,
-                    friendRequestStorage,
-                    notificationStorage,
-                    candidateFinder,
-                    matchingService,
-                    trustSafetyService,
-                    sessionService,
-                    statsService,
-                    matchQualityService,
-                    profilePreviewService,
-                    dailyService,
-                    undoService,
-                    achievementService,
-                    messagingService,
-                    relationshipTransitionService);
+            datingapp.module.AppContext app = datingapp.module.AppContext.create(dbManager, config);
+            return fromAppContext(app);
         }
 
         /** Builds a ServiceRegistry with H2 database and default configuration. */

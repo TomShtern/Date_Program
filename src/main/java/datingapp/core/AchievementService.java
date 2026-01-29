@@ -26,7 +26,6 @@ public class AchievementService {
     private final UserStorage userStorage;
     private final ReportStorage reportStorage;
     private final ProfilePreviewService profilePreviewService;
-    private final AppConfig config;
 
     public AchievementService(
             UserAchievementStorage achievementStorage,
@@ -42,7 +41,7 @@ public class AchievementService {
         this.userStorage = Objects.requireNonNull(userStorage);
         this.reportStorage = Objects.requireNonNull(reportStorage);
         this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
-        this.config = Objects.requireNonNull(config);
+        Objects.requireNonNull(config); // Validate but don't store (reserved for future use)
     }
 
     /** Progress towards an achievement. */
@@ -57,7 +56,7 @@ public class AchievementService {
             if (unlocked || target == 0) {
                 return 100;
             }
-            return Math.min(100, (current * 100) / target);
+            return Math.min(100, current * 100 / target);
         }
 
         /**

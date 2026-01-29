@@ -55,11 +55,11 @@ public class DashboardController extends BaseController implements Initializable
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         // Use Subscription API for memory-safe listener management
-        addSubscription(viewModel.userNameProperty().subscribe(val -> userNameLabel.setText(val)));
-        addSubscription(viewModel.dailyLikesStatusProperty().subscribe(val -> statusLabel.setText(val)));
-        addSubscription(viewModel.dailyPickNameProperty().subscribe(val -> dailyPickLabel.setText(val)));
-        addSubscription(viewModel.totalMatchesProperty().subscribe(val -> totalMatchesLabel.setText(val)));
-        addSubscription(viewModel.profileCompletionProperty().subscribe(val -> completionLabel.setText(val)));
+        addSubscription(viewModel.userNameProperty().subscribe(userNameLabel::setText));
+        addSubscription(viewModel.dailyLikesStatusProperty().subscribe(statusLabel::setText));
+        addSubscription(viewModel.dailyPickNameProperty().subscribe(dailyPickLabel::setText));
+        addSubscription(viewModel.totalMatchesProperty().subscribe(totalMatchesLabel::setText));
+        addSubscription(viewModel.profileCompletionProperty().subscribe(completionLabel::setText));
 
         // Handle loading state changes for skeleton display
         addSubscription(viewModel.loadingProperty().subscribe(this::handleLoadingChange));

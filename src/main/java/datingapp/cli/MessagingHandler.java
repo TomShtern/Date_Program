@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -62,7 +63,7 @@ public class MessagingHandler {
             displayConversationPreviews(previews);
             String choice = input.readLine("> ").trim();
 
-            if (choice.equalsIgnoreCase("b") || choice.isEmpty()) {
+            if ("b".equalsIgnoreCase(choice) || choice.isEmpty()) {
                 return;
             }
 
@@ -273,11 +274,11 @@ public class MessagingHandler {
     private ConversationAction processConversationInput(
             String userInput, boolean canMessage, User currentUser, User otherUser, MessagingService messagingService) {
 
-        if (userInput.equalsIgnoreCase("/back") || userInput.equalsIgnoreCase("b")) {
+        if ("/back".equalsIgnoreCase(userInput) || "b".equalsIgnoreCase(userInput)) {
             return ConversationAction.EXIT;
         }
 
-        if (userInput.equalsIgnoreCase("/older")) {
+        if ("/older".equalsIgnoreCase(userInput)) {
             return ConversationAction.SHOW_OLDER;
         }
 
@@ -286,7 +287,7 @@ public class MessagingHandler {
             return ConversationAction.CONTINUE;
         }
 
-        if (userInput.equalsIgnoreCase("/block")) {
+        if ("/block".equalsIgnoreCase(userInput)) {
             if (confirmAction("Block " + otherUser.getName())) {
                 blockUser(currentUser, otherUser);
                 return ConversationAction.EXIT;
@@ -294,7 +295,7 @@ public class MessagingHandler {
             return ConversationAction.CONTINUE;
         }
 
-        if (userInput.equalsIgnoreCase("/unmatch")) {
+        if ("/unmatch".equalsIgnoreCase(userInput)) {
             if (confirmAction("Unmatch from " + otherUser.getName())) {
                 unmatchUser(currentUser, otherUser);
                 return ConversationAction.EXIT;
@@ -359,8 +360,8 @@ public class MessagingHandler {
 
     /** Asks for confirmation of an action. */
     private boolean confirmAction(String action) {
-        String response = input.readLine("\n" + action + "? (y/n): ").trim().toLowerCase();
-        return response.equals("y") || response.equals("yes");
+        String response = input.readLine("\n" + action + "? (y/n): ").trim().toLowerCase(Locale.ROOT);
+        return "y".equals(response) || "yes".equals(response);
     }
 
     /** Blocks another user. */

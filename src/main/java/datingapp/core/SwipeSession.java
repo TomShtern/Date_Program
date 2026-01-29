@@ -159,7 +159,7 @@ public class SwipeSession {
     public String getFormattedDuration() {
         long seconds = getDurationSeconds();
         long hours = seconds / 3600;
-        long minutes = (seconds % 3600) / 60;
+        long minutes = seconds % 3600 / 60;
         long secs = seconds % 60;
 
         if (hours > 0) {

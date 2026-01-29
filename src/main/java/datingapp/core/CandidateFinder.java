@@ -105,10 +105,6 @@ public class CandidateFinder {
         }
     }
 
-    public CandidateFinder() {
-        // No-arg constructor for utility class
-    }
-
     /**
      * Finds candidates for the given seeker from a list of active users.
      *

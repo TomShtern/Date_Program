@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -34,7 +35,7 @@ public class MatchQualityService {
      * Immutable record representing the quality/compatibility of a match. Computed from one user's
      * perspective (scores may differ slightly between perspectives).
      */
-    public static record MatchQuality(
+    public record MatchQuality(
             String matchId,
             UUID perspectiveUserId, // Whose perspective (for directional metrics)
             UUID otherUserId,
@@ -512,7 +513,7 @@ public class MatchQualityService {
     private void addRelationshipGoalsHighlight(User me, User them, List<String> matches) {
         if (me.getLookingFor() != null && me.getLookingFor() == them.getLookingFor()) {
             matches.add(
-                    "Both looking for " + me.getLookingFor().getDisplayName().toLowerCase());
+                    "Both looking for " + me.getLookingFor().getDisplayName().toLowerCase(Locale.ROOT));
         }
     }
 

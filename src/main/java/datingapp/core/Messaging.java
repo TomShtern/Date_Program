@@ -21,15 +21,7 @@ public final class Messaging {
 
         public static final int MAX_LENGTH = 1000;
 
-        /**
-         * Creates a Message record with validation.
-         *
-         * @param id the unique identifier for this message
-         * @param conversationId the conversation this message belongs to
-         * @param senderId the user who sent this message
-         * @param content the message content (validated for length and emptiness)
-         * @param createdAt when the message was sent
-         */
+        // Compact constructor - validates parameters
         public Message {
             Objects.requireNonNull(id, "id cannot be null");
             Objects.requireNonNull(conversationId, "conversationId cannot be null");

@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /** Manages H2 database connections and schema initialization. */
-public class DatabaseManager {
+public final class DatabaseManager {
 
     private static String jdbcUrl = "jdbc:h2:./data/dating";
     private static final String DEFAULT_DEV_PASSWORD = "dev";
@@ -297,7 +297,7 @@ public class DatabaseManager {
             initialized = true;
 
         } catch (SQLException e) {
-            throw new AbstractH2Storage.StorageException("Failed to initialize database schema", e);
+            throw new StorageException("Failed to initialize database schema", e);
         }
     }
 

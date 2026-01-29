@@ -75,7 +75,7 @@ public class ProfilePreviewService {
         checkField("Interests", user.getInterests().size() >= Interest.MIN_FOR_COMPLETE, filled, missing);
 
         int total = filled.size() + missing.size();
-        int percentage = total > 0 ? (filled.size() * 100) / total : 0;
+        int percentage = total > 0 ? filled.size() * 100 / total : 0;
 
         return new ProfileCompleteness(percentage, filled, missing);
     }

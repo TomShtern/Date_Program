@@ -12,16 +12,22 @@ public interface Module extends AutoCloseable {
      * Called after construction. Validates wiring is correct, connections work, required resources
      * exist. Should fail fast on any misconfiguration.
      */
-    default void validate() {}
+    default void validate() {
+        /* No-op: subclasses override as needed */
+    }
 
     /**
      * Called once at application startup. Initialize resources, start background tasks.
      */
-    default void start() {}
+    default void start() {
+        /* No-op: subclasses override as needed */
+    }
 
     /**
      * Called at application shutdown. Release resources, close connections, stop tasks.
      */
     @Override
-    default void close() {}
+    default void close() {
+        /* No-op: subclasses override as needed */
+    }
 }

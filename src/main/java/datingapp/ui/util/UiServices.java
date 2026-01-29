@@ -138,7 +138,7 @@ public final class UiServices {
 
         private HBox createToast(String message, ToastLevel level) {
             HBox toastBox = new HBox(12);
-            toastBox.getStyleClass().addAll("toast", "toast-" + level.name().toLowerCase());
+            toastBox.getStyleClass().addAll("toast", "toast-" + level.name().toLowerCase(java.util.Locale.ROOT));
             toastBox.setAlignment(Pos.CENTER_LEFT);
 
             FontIcon icon = new FontIcon(level.getIcon());

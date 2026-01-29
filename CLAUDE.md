@@ -37,14 +37,14 @@ mvn jacoco:report                        # Generate coverage report
 
 **Phase 2.1** console dating app: **Java 25** + Maven + H2 embedded DB. Features: matching, messaging, relationship transitions (Friend Zone/Graceful Exit), pace compatibility, achievements, interests matching.
 
-**Post-Consolidation Stats (2026-01-28):** 118 Java files (76 main + 42 test), 464 tests passing, 60% coverage minimum.
+**Post-JDBI Migration Stats (2026-01-29):** ~100 Java files, 581 tests passing, 60% coverage minimum.
 
 ### Package Structure
 
 | Package    | Purpose                  | Rule                                |
 |------------|--------------------------|-------------------------------------|
 | `core/`    | Pure Java business logic | **ZERO** framework/database imports |
-| `storage/` | H2 JDBC implementations  | Implements interfaces from `core/`  |
+| `storage/` | JDBI declarative SQL     | Implements interfaces from `core/`  |
 | `cli/`     | Console UI handlers      | Thin layer calling services         |
 | `ui/`      | JavaFX UI (experimental) | Uses AtlantaFX theme                |
 
@@ -93,14 +93,14 @@ public class User {
 
 This applies to: `User.Storage`, `Match.Storage`, `Achievement.Storage`, `SwipeSession.Storage`, plus interfaces in `UserInteractions`, `Messaging`, `Social`, `Stats`.
 
-All implementations remain as `H2*Storage` classes in `storage/` extending `AbstractH2Storage`. Data: `./data/dating.mv.db`
+All implementations use **JDBI declarative SQL** interfaces in `storage/jdbi/` with `@SqlQuery`/`@SqlUpdate` annotations. Data: `./data/dating.mv.db`
 
 ## Coding Standards Quick Reference
 
 ### Naming Conventions
 | Element    | Convention              | Example                                        |
 |------------|-------------------------|------------------------------------------------|
-| Classes    | PascalCase              | `UserService`, `H2UserStorage`                 |
+| Classes    | PascalCase              | `UserService`, `JdbiUserStorage`               |
 | Methods    | camelCase               | `getUserById()`, `createMatch()`               |
 | Predicates | `is`/`has`/`can` prefix | `isActive()`, `hasInterests()`, `canMessage()` |
 | Constants  | UPPER_SNAKE             | `MAX_DISTANCE_KM`, `DEFAULT_TIMEOUT`           |
@@ -176,37 +176,47 @@ public static String generateId(UUID a, UUID b) {
 - **Throw exceptions from CLI handlers** - Return user-friendly messages
 - **Mix business logic in storage** - Storage does mapping only
 - **Use `new ArrayList<>()` for EnumSets** - Use `EnumSet.noneOf()`
+- **Write manual JDBC in storage** - Use JDBI declarative SQL interfaces
 
-## Storage Layer Patterns
+## Storage Layer Patterns (JDBI)
 
-**AbstractH2Storage Base Class (NEW):**
-All H2 storage classes extend `AbstractH2Storage` which provides:
-- `addColumnIfNotExists()` - Schema migration helper
-- Common error handling wrapping `SQLException` → `StorageException`
-- DatabaseManager injection via constructor
-
-**JDBC Pattern:**
+**Declarative SQL Interfaces:**
+All storage implementations use JDBI interfaces with `@SqlQuery`/`@SqlUpdate` annotations:
 ```java
-try (Connection conn = dbManager.getConnection();
-     PreparedStatement stmt = conn.prepareStatement(sql)) {
-    stmt.setObject(1, uuid);  // UUIDs
-    stmt.setString(2, enum.name());  // Enums as VARCHAR
-    stmt.setTimestamp(3, Timestamp.from(instant));  // Timestamps
-    // ...
-} catch (SQLException e) {
-    throw new StorageException("Failed to save: " + id, e);
+@RegisterRowMapper(UserMapper.class)
+public interface JdbiUserStorage extends User.Storage {
+    @SqlUpdate("MERGE INTO users (id, name, email) KEY (id) VALUES (:id, :name, :email)")
+    @Override void save(@BindBean User user);
+
+    @SqlQuery("SELECT * FROM users WHERE id = :id")
+    @Override User get(@Bind("id") UUID id);
 }
 ```
 
-**Null Handling:**
+**Row Mappers (in `storage/mapper/`):**
 ```java
-if (value != null) { stmt.setTimestamp(i, Timestamp.from(value)); }
-else { stmt.setNull(i, Types.TIMESTAMP); }
-
-int val = rs.getInt("col"); if (rs.wasNull()) { val = null; }
+public class UserMapper implements RowMapper<User> {
+    @Override
+    public User map(ResultSet rs, StatementContext ctx) throws SQLException {
+        return User.fromDatabase(
+            MapperHelper.readUuid(rs, "id"),
+            rs.getString("name"),
+            MapperHelper.readInstant(rs, "created_at")
+        );
+    }
+}
 ```
 
-**H2 Upsert:** `MERGE INTO table (id, col) KEY (id) VALUES (?, ?)`
+**Custom Type Handling:**
+- `EnumSetArgumentFactory` - Serializes `EnumSet<Interest>` to CSV for storage
+- `EnumSetColumnMapper` - Deserializes CSV back to `EnumSet<Interest>`
+- `MapperHelper` - Null-safe ResultSet reading utilities
+
+**Instantiation via StorageModule:**
+```java
+StorageModule storage = StorageModule.forH2(dbManager);
+UserStorage users = storage.users();  // Returns jdbi.onDemand(JdbiUserStorage.class)
+```
 
 ## Testing Standards
 
@@ -249,18 +259,37 @@ static class InMemoryUserStorage implements User.Storage {
 
 **Messaging:** Requires `ACTIVE` match → validates users → creates conversation → saves message → returns `SendResult`
 
-## Build Tools
+## Build Tools & Dependencies
 
-| Tool       | Version | Purpose                               |
+| Tool/Lib   | Version | Purpose                               |
 |------------|---------|---------------------------------------|
+| **JDBI**   | 3.51.0  | Declarative SQL (SqlObject plugin)    |
+| H2         | 2.4.240 | Embedded database                     |
 | Spotless   | 3.1.0   | Palantir Java Format (4-space indent) |
 | Checkstyle | 3.6.0   | Style validation (advisory)           |
 | PMD        | 3.28.0  | Bug detection (advisory)              |
 | JaCoCo     | 0.8.14  | Coverage (60% min, excludes ui/cli)   |
 
-## Recent Updates (2026-01-28)
+## Recent Updates (2026-01-29)
 
-### Latest Changes (2026-01-27)
+### JDBI Migration Complete (2026-01-29)
+All 16 storage implementations migrated from manual JDBC (`H2*Storage`) to **JDBI declarative SQL** (`Jdbi*Storage`):
+
+**What Changed:**
+- Deleted 12 `H2*Storage` classes (~1,500 lines of boilerplate)
+- Created 17 JDBI interfaces with `@SqlQuery`/`@SqlUpdate` annotations
+- Added `storage/mapper/` package with `RowMapper` implementations
+- Added `storage/jdbi/` package with type handlers (`EnumSetArgumentFactory`, `EnumSetColumnMapper`)
+- Updated `StorageModule.forH2()` to use `jdbi.onDemand()` for zero-boilerplate instantiation
+- Refactored `ServiceRegistry` to use `StorageModule` instead of direct H2 instantiation
+
+**Benefits:**
+- Zero manual `Connection`/`PreparedStatement` management
+- Type-safe parameter binding with `@Bind`/`@BindBean`
+- Declarative SQL in annotations (easier to read and maintain)
+- Automatic resource cleanup
+
+### Previous Changes (2026-01-27)
 - **New `ValidationService`**: Centralized input validation with `ValidationResult` pattern for names, ages, heights, distances, bios, age ranges, and coordinates
 - **JavaFX UI Polish**: Enhanced login screen with search filtering, keyboard navigation, avatars, completion badges, double-click login
 - **Matches Screen**: Added tabs for received/sent likes with like-back, pass, and withdraw actions
@@ -321,4 +350,5 @@ The codebase underwent significant consolidation reducing file count by ~26% (15
 3|2026-01-16 01:00:00|agent:claude_code|docs|Enhanced with coding standards, patterns, anti-patterns|CLAUDE.md
 4|2026-01-25 12:00:00|agent:claude_code|docs|Updated CLAUDE.md for post-consolidation: nested Storage interfaces, new domain groupings (Messaging/Social/Stats/Preferences/UserInteractions), service merges, AbstractH2Storage|CLAUDE.md
 5|2026-01-28 12:00:00|agent:claude_code|docs|Updated stats (118 files), added ValidationService, ServiceRegistry exception note, 39 interests, 2026-01-27 UI/storage changes|CLAUDE.md
+6|2026-01-29 16:30:00|agent:claude_code|storage|JDBI migration complete: H2*Storage→Jdbi*Storage, declarative SQL, deleted 12 files (~1500 LOC), 581 tests passing|storage/jdbi/*,storage/mapper/*,CLAUDE.md
 ---AGENT-LOG-END---

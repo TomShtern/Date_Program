@@ -26,15 +26,7 @@ public final class UserInteractions {
             PASS
         }
 
-        /**
-         * Creates a Like record with validation.
-         *
-         * @param id the unique identifier for this like
-         * @param whoLikes the user who performed the like/pass action
-         * @param whoGotLiked the user who received the like/pass action
-         * @param direction whether this is a LIKE or PASS
-         * @param createdAt when the action was performed
-         */
+        // Compact constructor - validates parameters
         public Like {
             Objects.requireNonNull(id, ID_REQUIRED);
             Objects.requireNonNull(whoLikes, "whoLikes cannot be null");
@@ -63,14 +55,7 @@ public final class UserInteractions {
             UUID blockedId, // User who got blocked
             Instant createdAt) {
 
-        /**
-         * Creates a Block record with validation.
-         *
-         * @param id the unique identifier for this block
-         * @param blockerId the user who initiated the block
-         * @param blockedId the user who got blocked
-         * @param createdAt when the block was created
-         */
+        // Compact constructor - validates parameters
         public Block {
             Objects.requireNonNull(id, ID_REQUIRED);
             Objects.requireNonNull(blockerId, "blockerId cannot be null");
@@ -110,16 +95,7 @@ public final class UserInteractions {
             OTHER
         }
 
-        /**
-         * Creates a Report record with validation.
-         *
-         * @param id the unique identifier for this report
-         * @param reporterId the user who filed the report
-         * @param reportedUserId the user being reported
-         * @param reason the reason for the report
-         * @param description optional description (max 500 characters)
-         * @param createdAt when the report was filed
-         */
+        // Compact constructor - validates parameters
         public Report {
             Objects.requireNonNull(id, ID_REQUIRED);
             Objects.requireNonNull(reporterId, "reporterId cannot be null");

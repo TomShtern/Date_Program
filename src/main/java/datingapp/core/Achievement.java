@@ -88,14 +88,7 @@ public enum Achievement {
     /** Record representing a user's unlocked achievement. Immutable and stored in the database. */
     public record UserAchievement(UUID id, UUID userId, Achievement achievement, Instant unlockedAt) {
 
-        /**
-         * Creates a UserAchievement record with validation.
-         *
-         * @param id the unique identifier for this achievement unlock
-         * @param userId the user who unlocked the achievement
-         * @param achievement the achievement that was unlocked
-         * @param unlockedAt when the achievement was unlocked
-         */
+        // Compact constructor - validates parameters
         public UserAchievement {
             Objects.requireNonNull(id, "id cannot be null");
             Objects.requireNonNull(userId, "userId cannot be null");

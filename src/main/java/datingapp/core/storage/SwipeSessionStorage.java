@@ -51,7 +51,7 @@ public interface SwipeSessionStorage {
     int endStaleSessions(Duration timeout);
 
     /** Aggregate statistics across all sessions for a user. */
-    record SessionAggregates(
+    public record SessionAggregates(
             int totalSessions,
             int totalSwipes,
             int totalLikes,

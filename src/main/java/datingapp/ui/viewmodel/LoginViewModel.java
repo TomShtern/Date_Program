@@ -9,6 +9,7 @@ import datingapp.ui.ViewModelFactory.UISession;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -298,7 +299,7 @@ public class LoginViewModel {
     }
 
     private void applyFilter(String text) {
-        String normalized = text == null ? "" : text.trim().toLowerCase();
+        String normalized = text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
         if (normalized.isBlank()) {
             filteredUsers.setPredicate(user -> true);
             return;
@@ -309,8 +310,8 @@ public class LoginViewModel {
                 return false;
             }
 
-            String name = user.getName() == null ? "" : user.getName().toLowerCase();
-            String state = user.getState() == null ? "" : user.getState().name().toLowerCase();
+            String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);
+            String state = user.getState() == null ? "" : user.getState().name().toLowerCase(Locale.ROOT);
             String ageText = user.getAge() > 0 ? String.valueOf(user.getAge()) : "";
             String verifiedTag = Boolean.TRUE.equals(user.isVerified()) ? "verified" : "";
 

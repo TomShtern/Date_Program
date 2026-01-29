@@ -29,7 +29,7 @@ public record Dealbreakers(
         Integer maxAgeDifference // null = use standard age preference
         ) {
 
-    /** Compact constructor with validation and defensive copies. */
+    // Compact constructor - validates and creates defensive copies
     public Dealbreakers {
         // Defensive copies - null becomes empty set
         acceptableSmoking = acceptableSmoking == null ? Set.of() : Set.copyOf(acceptableSmoking);
@@ -231,7 +231,7 @@ public record Dealbreakers(
      * <p>Design decision: Missing candidate fields FAIL dealbreakers. This encourages profile
      * completion and is the safer default.
      */
-    public static class Evaluator {
+    public static final class Evaluator {
 
         private Evaluator() {
             // Prevent instantiation - all methods are static

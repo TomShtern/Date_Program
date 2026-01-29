@@ -60,9 +60,6 @@ public class DashboardViewModel {
     }
 
     /**
-     * Refreshes all dashboard data from the services.
-     */
-    /**
      * Refreshes all dashboard data from the services asynchronously.
      */
     public void refresh() {

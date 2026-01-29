@@ -306,7 +306,7 @@ public class MatchingController extends BaseController implements Initializable 
 
         // Ensure root pane can receive keyboard events
         rootPane.setFocusTraversable(true);
-        Platform.runLater(() -> rootPane.requestFocus());
+        Platform.runLater(rootPane::requestFocus);
     }
 
     /** Super like action - triggered by button or UP key. */

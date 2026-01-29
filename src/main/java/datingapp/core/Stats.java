@@ -49,31 +49,7 @@ public final class Stats {
             double attractivenessScore // likes received vs platform average
             ) {
 
-        /**
-         * Creates a UserStats record with validation.
-         *
-         * @param id the unique identifier for this stats snapshot
-         * @param userId the user these stats belong to
-         * @param computedAt when these stats were computed
-         * @param totalSwipesGiven total swipes (likes + passes) given by the user
-         * @param likesGiven number of likes given
-         * @param passesGiven number of passes given
-         * @param likeRatio ratio of likes to total swipes (0.0-1.0)
-         * @param totalSwipesReceived total swipes received by the user
-         * @param likesReceived number of likes received
-         * @param passesReceived number of passes received
-         * @param incomingLikeRatio ratio of likes received to total swipes received
-         * @param totalMatches total matches created
-         * @param activeMatches currently active matches
-         * @param matchRate ratio of matches to likes given
-         * @param blocksGiven users blocked by this user
-         * @param blocksReceived users who blocked this user
-         * @param reportsGiven reports filed by this user
-         * @param reportsReceived reports filed against this user
-         * @param reciprocityScore percentage of likes that were mutual
-         * @param selectivenessScore how selective compared to platform average
-         * @param attractivenessScore how attractive compared to platform average
-         */
+        // Compact constructor - validates parameters
         public UserStats {
             Objects.requireNonNull(id);
             Objects.requireNonNull(userId);

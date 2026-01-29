@@ -1,6 +1,7 @@
 package datingapp.cli;
 
 import java.util.EnumSet;
+import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,7 +78,7 @@ public final class EnumMenu {
         logger.info("  0. Clear/None");
 
         String input = reader.readLine("Your choices: ");
-        if (input.trim().equals("0")) {
+        if ("0".equals(input.trim())) {
             return EnumSet.noneOf(enumClass);
         }
 
@@ -109,7 +110,7 @@ public final class EnumMenu {
             return (String) method.invoke(value);
         } catch (ReflectiveOperationException e) {
             // Fallback: convert ENUM_NAME to "Enum name"
-            String name = value.name().replace("_", " ").toLowerCase();
+            String name = value.name().replace("_", " ").toLowerCase(Locale.ROOT);
             return Character.toUpperCase(name.charAt(0)) + name.substring(1);
         }
     }

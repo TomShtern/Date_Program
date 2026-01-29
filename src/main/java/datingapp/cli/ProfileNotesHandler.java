@@ -4,6 +4,7 @@ import datingapp.core.User;
 import datingapp.core.storage.ProfileNoteStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -48,7 +49,7 @@ public class ProfileNotesHandler {
         User currentUser = userSession.getCurrentUser();
 
         logger.info("\n" + CliConstants.MENU_DIVIDER);
-        logger.info("       📝 NOTES ABOUT {}", subjectName.toUpperCase());
+        logger.info("       📝 NOTES ABOUT {}", subjectName.toUpperCase(Locale.ROOT));
         logger.info(CliConstants.MENU_DIVIDER);
 
         Optional<User.ProfileNote> existingNote = profileNoteStorage.get(currentUser.getId(), subjectId);
@@ -73,7 +74,7 @@ public class ProfileNotesHandler {
             logger.info("  0. Back");
 
             String choice = inputReader.readLine("\nChoice: ");
-            if (choice.equals("1")) {
+            if ("1".equals(choice)) {
                 addNote(currentUser.getId(), subjectId, subjectName);
             }
         }
@@ -150,7 +151,7 @@ public class ProfileNotesHandler {
      */
     private void deleteNote(UUID authorId, UUID subjectId, String subjectName) {
         String confirm = inputReader.readLine("Delete note about " + subjectName + "? (y/n): ");
-        if (confirm.equalsIgnoreCase("y")) {
+        if ("y".equalsIgnoreCase(confirm)) {
             if (profileNoteStorage.delete(authorId, subjectId)) {
                 logger.info("✅ Note deleted.\n");
             } else {
