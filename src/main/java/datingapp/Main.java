@@ -1,15 +1,15 @@
 package datingapp;
 
-import datingapp.cli.CliConstants;
-import datingapp.cli.CliUtilities;
-import datingapp.cli.LikerBrowserHandler;
-import datingapp.cli.MatchingHandler;
-import datingapp.cli.MessagingHandler;
-import datingapp.cli.ProfileHandler;
-import datingapp.cli.ProfileNotesHandler;
-import datingapp.cli.RelationshipHandler;
-import datingapp.cli.SafetyHandler;
-import datingapp.cli.StatsHandler;
+import datingapp.app.cli.CliConstants;
+import datingapp.app.cli.CliUtilities;
+import datingapp.app.cli.LikerBrowserHandler;
+import datingapp.app.cli.MatchingHandler;
+import datingapp.app.cli.MessagingHandler;
+import datingapp.app.cli.ProfileHandler;
+import datingapp.app.cli.ProfileNotesHandler;
+import datingapp.app.cli.RelationshipHandler;
+import datingapp.app.cli.SafetyHandler;
+import datingapp.app.cli.StatsHandler;
 import datingapp.core.AppConfig;
 import datingapp.core.DailyService;
 import datingapp.core.ServiceRegistry;
@@ -22,7 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Console-based dating app - Phase 0.5. Main entry point with interactive menu. Refactored to
+ * Console-based dating app - Phase 0.5. Main entry point with interactive menu.
+ * Refactored to
  * delegate logic to specialized handlers.
  */
 public final class Main {
@@ -155,7 +156,7 @@ public final class Main {
 
         relationshipHandler = new RelationshipHandler(
                 services.getRelationshipTransitionService(),
-                services.getNotificationStorage(),
+                services.getSocialStorage(),
                 services.getUserStorage(),
                 userSession,
                 inputReader);

@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.Report;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
@@ -17,9 +18,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Consolidated unit tests for UserInteractions domain models (Like, Block, Report).
+ * Consolidated unit tests for UserInteractions domain models (Like, Block,
+ * Report).
  *
- * <p>Grouped using JUnit 5 {@code @Nested} classes for logical organization.
+ * <p>
+ * Grouped using JUnit 5 {@code @Nested} classes for logical organization.
  */
 @SuppressWarnings("unused") // Test class with @Nested
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
@@ -133,6 +136,47 @@ class UserInteractionsTest {
             assertEquals(Like.Direction.LIKE, Like.Direction.valueOf("LIKE"));
             assertEquals(Like.Direction.PASS, Like.Direction.valueOf("PASS"));
         }
+
+        @Test
+        @DisplayName("Like direct constructor throws on null ID")
+        void nullIdThrows() {
+            UUID user1 = UUID.randomUUID();
+            UUID user2 = UUID.randomUUID();
+            Instant now = Instant.now();
+
+            NullPointerException ex = assertThrows(
+                    NullPointerException.class, () -> new Like(null, user1, user2, Like.Direction.LIKE, now));
+            assertNotNull(ex);
+        }
+
+        @Test
+        @DisplayName("Like direct constructor throws on null createdAt")
+        void nullCreatedAtThrows() {
+            UUID user1 = UUID.randomUUID();
+            UUID user2 = UUID.randomUUID();
+            UUID id = UUID.randomUUID();
+
+            NullPointerException ex = assertThrows(
+                    NullPointerException.class, () -> new Like(id, user1, user2, Like.Direction.LIKE, null));
+            assertNotNull(ex);
+        }
+
+        @Test
+        @DisplayName("Like equality contract")
+        void likeEquality() {
+            UUID id = UUID.randomUUID();
+            UUID u1 = UUID.randomUUID();
+            UUID u2 = UUID.randomUUID();
+            Instant now = Instant.now();
+
+            Like like1 = new Like(id, u1, u2, Like.Direction.LIKE, now);
+            Like like2 = new Like(id, u1, u2, Like.Direction.LIKE, now);
+            Like diffId = new Like(UUID.randomUUID(), u1, u2, Like.Direction.LIKE, now);
+
+            assertEquals(like1, like2, "Same data should be equal");
+            assertEquals(like1.hashCode(), like2.hashCode(), "Same data should have same hash");
+            assertNotEquals(like1, diffId, "Different ID should not be equal");
+        }
     }
 
     // ==================== BLOCK TESTS ====================
@@ -195,6 +239,46 @@ class UserInteractionsTest {
 
             NullPointerException ex = assertThrows(NullPointerException.class, () -> Block.create(blockerId, null));
             assertNotNull(ex);
+        }
+
+        @Test
+        @DisplayName("Block direct constructor throws on null ID")
+        void nullIdThrows() {
+            UUID user1 = UUID.randomUUID();
+            UUID user2 = UUID.randomUUID();
+            Instant now = Instant.now();
+
+            NullPointerException ex =
+                    assertThrows(NullPointerException.class, () -> new Block(null, user1, user2, now));
+            assertNotNull(ex);
+        }
+
+        @Test
+        @DisplayName("Block direct constructor throws on null createdAt")
+        void nullCreatedAtThrows() {
+            UUID user1 = UUID.randomUUID();
+            UUID user2 = UUID.randomUUID();
+            UUID id = UUID.randomUUID();
+
+            NullPointerException ex = assertThrows(NullPointerException.class, () -> new Block(id, user1, user2, null));
+            assertNotNull(ex);
+        }
+
+        @Test
+        @DisplayName("Block equality contract")
+        void blockEquality() {
+            UUID id = UUID.randomUUID();
+            UUID u1 = UUID.randomUUID();
+            UUID u2 = UUID.randomUUID();
+            Instant now = Instant.now();
+
+            Block b1 = new Block(id, u1, u2, now);
+            Block b2 = new Block(id, u1, u2, now);
+            Block diff = new Block(id, u2, u1, now);
+
+            assertEquals(b1, b2, "Same data should be equal");
+            assertEquals(b1.hashCode(), b2.hashCode(), "Same data should have same hash");
+            assertNotEquals(b1, diff, "Different data should not be equal");
         }
     }
 
@@ -291,6 +375,47 @@ class UserInteractionsTest {
             NullPointerException ex =
                     assertThrows(NullPointerException.class, () -> Report.create(reporterId, reportedId, null, null));
             assertNotNull(ex);
+        }
+
+        @Test
+        @DisplayName("Report direct constructor throws on null ID")
+        void nullIdThrows() {
+            UUID u1 = UUID.randomUUID();
+            UUID u2 = UUID.randomUUID();
+            Instant now = Instant.now();
+
+            NullPointerException ex = assertThrows(
+                    NullPointerException.class, () -> new Report(null, u1, u2, Report.Reason.SPAM, "desc", now));
+            assertNotNull(ex);
+        }
+
+        @Test
+        @DisplayName("Report direct constructor throws on null createdAt")
+        void nullCreatedAtThrows() {
+            UUID u1 = UUID.randomUUID();
+            UUID u2 = UUID.randomUUID();
+            UUID id = UUID.randomUUID();
+
+            NullPointerException ex = assertThrows(
+                    NullPointerException.class, () -> new Report(id, u1, u2, Report.Reason.SPAM, "desc", null));
+            assertNotNull(ex);
+        }
+
+        @Test
+        @DisplayName("Report equality contract")
+        void reportEquality() {
+            UUID id = UUID.randomUUID();
+            UUID u1 = UUID.randomUUID();
+            UUID u2 = UUID.randomUUID();
+            Instant now = Instant.now();
+
+            Report r1 = new Report(id, u1, u2, Report.Reason.SPAM, "desc", now);
+            Report r2 = new Report(id, u1, u2, Report.Reason.SPAM, "desc", now);
+            Report diff = new Report(id, u1, u2, Report.Reason.SPAM, "diff", now);
+
+            assertEquals(r1, r2, "Same data should be equal");
+            assertEquals(r1.hashCode(), r2.hashCode(), "Same data should have same hash");
+            assertNotEquals(r1, diff, "Different data should not be equal");
         }
     }
 }

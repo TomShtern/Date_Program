@@ -2,9 +2,8 @@ package datingapp.core;
 
 import datingapp.core.Messaging.Conversation;
 import datingapp.core.Messaging.Message;
-import datingapp.core.storage.ConversationStorage;
 import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.MessageStorage;
+import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -20,18 +19,12 @@ import java.util.UUID;
  */
 public class MessagingService {
 
-    private final ConversationStorage conversationStorage;
-    private final MessageStorage messageStorage;
+    private final MessagingStorage messagingStorage;
     private final MatchStorage matchStorage;
     private final UserStorage userStorage;
 
-    public MessagingService(
-            ConversationStorage conversationStorage,
-            MessageStorage messageStorage,
-            MatchStorage matchStorage,
-            UserStorage userStorage) {
-        this.conversationStorage = Objects.requireNonNull(conversationStorage, "conversationStorage cannot be null");
-        this.messageStorage = Objects.requireNonNull(messageStorage, "messageStorage cannot be null");
+    public MessagingService(MessagingStorage messagingStorage, MatchStorage matchStorage, UserStorage userStorage) {
+        this.messagingStorage = Objects.requireNonNull(messagingStorage, "messagingStorage cannot be null");
         this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
     }
@@ -78,17 +71,17 @@ public class MessagingService {
 
         // Get or create conversation
         String conversationId = Conversation.generateId(senderId, recipientId);
-        if (conversationStorage.get(conversationId).isEmpty()) {
+        if (messagingStorage.getConversation(conversationId).isEmpty()) {
             Conversation newConvo = Conversation.create(senderId, recipientId);
-            conversationStorage.save(newConvo);
+            messagingStorage.saveConversation(newConvo);
         }
 
         // Create and save message
         Message message = Message.create(conversationId, senderId, content);
-        messageStorage.save(message);
+        messagingStorage.saveMessage(message);
 
         // Update conversation's last message timestamp
-        conversationStorage.updateLastMessageAt(conversationId, message.createdAt());
+        messagingStorage.updateConversationLastMessageAt(conversationId, message.createdAt());
 
         // Update sender's lastActiveAt (Phase 3.1 feature)
         userStorage.save(sender);
@@ -109,12 +102,12 @@ public class MessagingService {
         String conversationId = Conversation.generateId(userId, otherUserId);
 
         // Verify user is part of conversation
-        Optional<Conversation> convoOpt = conversationStorage.get(conversationId);
+        Optional<Conversation> convoOpt = messagingStorage.getConversation(conversationId);
         if (convoOpt.isEmpty() || !convoOpt.get().involves(userId)) {
             return List.of();
         }
 
-        return messageStorage.getMessages(conversationId, limit, offset);
+        return messagingStorage.getMessages(conversationId, limit, offset);
     }
 
     /**
@@ -124,7 +117,7 @@ public class MessagingService {
      * @return List of conversation previews, sorted by most recent activity
      */
     public List<ConversationPreview> getConversations(UUID userId) {
-        List<Conversation> conversations = conversationStorage.getConversationsFor(userId);
+        List<Conversation> conversations = messagingStorage.getConversationsFor(userId);
         List<ConversationPreview> previews = new ArrayList<>();
 
         for (Conversation convo : conversations) {
@@ -136,7 +129,7 @@ public class MessagingService {
                 continue;
             }
 
-            Optional<Message> lastMessage = messageStorage.getLatestMessage(convo.getId());
+            Optional<Message> lastMessage = messagingStorage.getLatestMessage(convo.getId());
             int unreadCount = getUnreadCount(userId, convo.getId());
 
             previews.add(new ConversationPreview(convo, otherUser, lastMessage, unreadCount));
@@ -152,12 +145,12 @@ public class MessagingService {
      * @param conversationId The conversation to mark read
      */
     public void markAsRead(UUID userId, String conversationId) {
-        Optional<Conversation> convoOpt = conversationStorage.get(conversationId);
+        Optional<Conversation> convoOpt = messagingStorage.getConversation(conversationId);
         if (convoOpt.isEmpty() || !convoOpt.get().involves(userId)) {
             return;
         }
 
-        conversationStorage.updateReadTimestamp(conversationId, userId, Instant.now());
+        messagingStorage.updateConversationReadTimestamp(conversationId, userId, Instant.now());
     }
 
     /**
@@ -168,7 +161,7 @@ public class MessagingService {
      * @return Number of unread messages
      */
     public int getUnreadCount(UUID userId, String conversationId) {
-        Optional<Conversation> convoOpt = conversationStorage.get(conversationId);
+        Optional<Conversation> convoOpt = messagingStorage.getConversation(conversationId);
         if (convoOpt.isEmpty()) {
             return 0;
         }
@@ -185,7 +178,7 @@ public class MessagingService {
         }
 
         // Count messages after last read, excluding user's own messages
-        return messageStorage.countMessagesAfterNotFrom(conversationId, lastReadAt, userId);
+        return messagingStorage.countMessagesAfterNotFrom(conversationId, lastReadAt, userId);
     }
 
     /**
@@ -195,7 +188,7 @@ public class MessagingService {
      * @return Total unread messages
      */
     public int getTotalUnreadCount(UUID userId) {
-        List<Conversation> conversations = conversationStorage.getConversationsFor(userId);
+        List<Conversation> conversations = messagingStorage.getConversationsFor(userId);
         int total = 0;
         for (Conversation convo : conversations) {
             total += getUnreadCount(userId, convo.getId());
@@ -223,16 +216,16 @@ public class MessagingService {
      */
     public Conversation getOrCreateConversation(UUID userA, UUID userB) {
         String conversationId = Conversation.generateId(userA, userB);
-        return conversationStorage.get(conversationId).orElseGet(() -> {
+        return messagingStorage.getConversation(conversationId).orElseGet(() -> {
             Conversation newConvo = Conversation.create(userA, userB);
-            conversationStorage.save(newConvo);
+            messagingStorage.saveConversation(newConvo);
             return newConvo;
         });
     }
 
     /** Counts messages not sent by the given user (for initial unread count). */
     private int countMessagesNotFromUser(String conversationId, UUID userId) {
-        return messageStorage.countMessagesNotFromSender(conversationId, userId);
+        return messagingStorage.countMessagesNotFromSender(conversationId, userId);
     }
 
     // === Data Transfer Objects ===

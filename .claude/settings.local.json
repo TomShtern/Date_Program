@@ -47,7 +47,8 @@
       "Bash(Test-Path \"src/main/java/datingapp/storage/jdbi\")",
       "Bash(if [ -d \"src/main/java/datingapp/storage/jdbi\" ])",
       "Bash(then echo \"EXISTS\")",
-      "Bash(else echo \"NOT_FOUND\")"
+      "Bash(else echo \"NOT_FOUND\")",
+      "Bash(javap:*)"
     ]
   },
   "outputStyle": "Explanatory"

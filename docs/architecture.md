@@ -16,12 +16,15 @@
 
 ## Overview
 
-The Dating App follows a clean, three-layer architecture with strict separation of concerns:
+The Dating App follows a clean, four-layer architecture with strict separation of concerns:
 
 - **`core/`** - Pure Java business logic (framework/database-free)
-- **`storage/`** - H2 database implementations of storage interfaces
+- **`storage/`** - JDBI declarative SQL implementations of storage interfaces
 - **`cli/`** - Console UI handlers and user interaction
+- **`ui/`** - JavaFX GUI with MVVM pattern and AtlantaFX theme
 - **`Main.java`** - Application orchestrator and dependency wiring
+
+**Current Stats (2026-01-30):** ~126 Java files, 581 tests passing, 60% coverage minimum.
 
 ## Package Structure Diagram
 
@@ -31,17 +34,38 @@ graph TB
         Main[datingapp.Main<br/>Orchestrator<br/>Menu Loop]
     end
 
+    subgraph "UI Layer (ui/)"
+        direction TB
+        subgraph "Controllers"
+            BaseController[BaseController<br/>Subscription Lifecycle]
+            LoginController[LoginController<br/>User Selection]
+            DashboardController[DashboardController<br/>Navigation Hub]
+            MatchingController[MatchingController<br/>Swipe Interface]
+            MatchesController[MatchesController<br/>Match Management]
+            ProfileController[ProfileController<br/>Profile Editing]
+            PreferencesController[PreferencesController<br/>Discovery Settings]
+        end
+        subgraph "ViewModels"
+            ProfileViewModel[ProfileViewModel]
+            MatchingViewModel[MatchingViewModel]
+            PreferencesViewModel[PreferencesViewModel]
+        end
+        subgraph "Utilities"
+            UiAnimations[UiAnimations<br/>Animation Effects]
+            UiServices[UiServices<br/>Toast + ImageCache]
+            UiComponents[UiComponents<br/>Reusable Factories]
+        end
+    end
+
     subgraph "CLI Layer (cli/)"
         direction TB
-        UserSession[UserSession<br/>Current User Tracker]
-        InputReader[InputReader<br/>I/O Abstraction]
+        CliUtilities[CliUtilities<br/>UserSession + InputReader]
         CliConstants[CliConstants<br/>UI Strings]
 
         subgraph "Handlers"
-            UserManagementHandler[UserManagementHandler<br/>User Creation/Selection]
-            ProfileHandler[ProfileHandler<br/>Profile Completion/Dealbreakers]
+            ProfileHandler[ProfileHandler<br/>Profile + User Management]
             MatchingHandler[MatchingHandler<br/>Candidate Browsing/Daily Pick]
-            SafetyHandler[SafetyHandler<br/>Blocking/Reporting]
+            SafetyHandler[SafetyHandler<br/>Blocking/Reporting/Verification]
             StatsHandler[StatsHandler<br/>Statistics/Achievements]
         end
     end
@@ -49,76 +73,61 @@ graph TB
     subgraph "Core Layer (core/)"
         direction TB
 
-        subgraph "Domain Models"
-            User[User<br/>Entity with State Machine]
-            Like[Like<br/>Immutable Record]
-            Match[Match<br/>Entity with State Machine]
-            Block[Block<br/>Immutable Record]
-            Report[Report<br/>Immutable Record]
-            SwipeSession[SwipeSession<br/>Session Lifecycle]
-            MatchQuality[MatchQuality<br/>Compatibility Score]
-            Dealbreakers[Dealbreakers<br/>Filter Preferences]
-            Interest[Interest<br/>Enum: 37 Interests]
-            Achievement[Achievement<br/>Gamification Enum]
-            UserAchievement[UserAchievement<br/>User-Achievement Link]
-            Lifestyle[Lifestyle<br/>Lifestyle Data]
-            UserStats[UserStats<br/>User Metrics]
-            PlatformStats[PlatformStats<br/>Platform Metrics]
+        subgraph "Domain Models (Grouped)"
+            User[User<br/>+ nested Storage]
+            Match[Match<br/>+ nested Storage]
+            UserInteractions[UserInteractions<br/>Like/Block/Report + Storage]
+            Messaging[Messaging<br/>Message/Conversation + Storage]
+            Social[Social<br/>FriendRequest/Notification + Storage]
+            Stats[Stats<br/>UserStats/MatchQuality + Storage]
+            Preferences[Preferences<br/>Interest/Lifestyle/Pace]
+            Achievement[Achievement<br/>+ nested Storage]
+            SwipeSession[SwipeSession<br/>+ nested Storage]
+            Dealbreakers[Dealbreakers<br/>+ nested Evaluator]
         end
 
-        subgraph "Core Services"
-            CandidateFinderService[CandidateFinderService<br/>Discovery Interface]
+        subgraph "Core Services (Consolidated)"
             CandidateFinder[CandidateFinder<br/>7-Stage Filter Pipeline]
-            MatchingService[MatchingService<br/>Like Recording & Match Creation]
+            MatchingService[MatchingService<br/>Likes + LikerBrowser + PaceCompat]
+            DailyService[DailyService<br/>Limits + Picks]
+            TrustSafetyService[TrustSafetyService<br/>Verification + Reports]
             UndoService[UndoService<br/>30s Undo Window]
-            DailyLimitService[DailyLimitService<br/>Quota Enforcement]
             SessionService[SessionService<br/>Session Lifecycle]
             MatchQualityService[MatchQualityService<br/>5-Factor Scoring]
-            DealbreakersEvaluator[DealbreakersEvaluator<br/>One-Way Filter]
-            ProfilePreviewService[ProfilePreviewService<br/>Completeness Score]
-            DailyPickService[DailyPickService<br/>Serendipitous Discovery]
-            InterestMatcher[InterestMatcher<br/>Interest Overlap]
+            ProfileCompletionService[ProfileCompletionService<br/>Completeness Score]
             AchievementService[AchievementService<br/>Gamification System]
-            ReportService[ReportService<br/>Reporting & Moderation]
+            MessagingService[MessagingService<br/>Conversation Management]
+            RelationshipTransitionService[RelationshipTransitionService<br/>Friend Zone/Graceful Exit]
             StatsService[StatsService<br/>Statistics Aggregation]
-        end
-
-        subgraph "Storage Interfaces"
-            UserStorage[UserStorage]
-            LikeStorage[LikeStorage]
-            MatchStorage[MatchStorage]
-            BlockStorage[BlockStorage]
-            ReportStorage[ReportStorage]
-            SwipeSessionStorage[SwipeSessionStorage]
-            UserStatsStorage[UserStatsStorage]
-            PlatformStatsStorage[PlatformStatsStorage]
-            DailyPickStorage[DailyPickStorage]
-            UserAchievementStorage[UserAchievementStorage]
+            ValidationService[ValidationService<br/>Input Validation]
         end
 
         subgraph "Utilities"
             GeoUtils[GeoUtils<br/>Haversine Distance]
             AppConfig[AppConfig<br/>Configuration Record]
             ServiceRegistry[ServiceRegistry<br/>DI Container]
-            ServiceRegistryBuilder[ServiceRegistryBuilder<br/>Factory]
-            MatchQualityConfig[MatchQualityConfig<br/>Weight Presets]
         end
     end
 
     subgraph "Storage Layer (storage/)"
         direction TB
-        DatabaseManager[DatabaseManager<br/>H2 Connection Manager]
-        H2UserStorage[H2UserStorage<br/>Users Table]
-        H2LikeStorage[H2LikeStorage<br/>Likes Table]
-        H2MatchStorage[H2MatchStorage<br/>Matches Table]
-        H2BlockStorage[H2BlockStorage<br/>Blocks Table]
-        H2ReportStorage[H2ReportStorage<br/>Reports Table]
-        H2SwipeSessionStorage[H2SwipeSessionStorage<br/>Swipe Sessions Table]
-        H2UserStatsStorage[H2UserStatsStorage<br/>User Stats Table]
-        H2PlatformStatsStorage[H2PlatformStatsStorage<br/>Platform Stats Table]
-        H2DailyPickViewStorage[H2DailyPickViewStorage<br/>Daily Pick Views Table]
-        H2UserAchievementStorage[H2UserAchievementStorage<br/>User Achievements Table]
-        StorageException[StorageException<br/>Custom Exception]
+        StorageModule[StorageModule<br/>JDBI Factory]
+        DatabaseManager[DatabaseManager<br/>H2 + JDBI Setup]
+
+        subgraph "JDBI Interfaces (jdbi/)"
+            JdbiUserStorage[JdbiUserStorage]
+            JdbiLikeStorage[JdbiLikeStorage]
+            JdbiMatchStorage[JdbiMatchStorage]
+            JdbiBlockStorage[JdbiBlockStorage]
+            JdbiMessageStorage[JdbiMessageStorage]
+        end
+
+        subgraph "Row Mappers (mapper/)"
+            UserMapper[UserMapper]
+            MatchMapper[MatchMapper]
+            MessageMapper[MessageMapper]
+            EnumSetColumnMapper[EnumSetColumnMapper]
+        end
     end
 
     subgraph "Infrastructure"
@@ -126,114 +135,45 @@ graph TB
     end
 
     %% Main orchestration
-    Main --> UserManagementHandler
+    Main --> CliUtilities
     Main --> ProfileHandler
     Main --> MatchingHandler
     Main --> SafetyHandler
     Main --> StatsHandler
-    Main --> UserSession
+    Main --> ServiceRegistry
 
-    %% CLI to Services
-    UserManagementHandler --> UserStorage
-    UserManagementHandler --> User
+    %% UI Controller relationships
+    BaseController --> UiAnimations
+    BaseController --> UiServices
+    LoginController --> BaseController
+    DashboardController --> BaseController
+    MatchingController --> BaseController
+    MatchesController --> BaseController
+    ProfileController --> BaseController
+    PreferencesController --> BaseController
 
-    ProfileHandler --> ProfilePreviewService
-    ProfileHandler --> AchievementService
-    ProfileHandler --> UserStorage
-    ProfileHandler --> UserSession
-    ProfileHandler --> Dealbreakers
-    ProfileHandler --> Lifestyle
-    ProfileHandler --> Interest
+    %% Controllers to ViewModels
+    ProfileController --> ProfileViewModel
+    MatchingController --> MatchingViewModel
+    PreferencesController --> PreferencesViewModel
 
-    MatchingHandler --> CandidateFinderService
-    MatchingHandler --> DailyPickService
-    MatchingHandler --> MatchingService
-    MatchingHandler --> UndoService
-    MatchingHandler --> DailyLimitService
-    MatchingHandler --> MatchQualityService
-    MatchingHandler --> AchievementService
-    MatchingHandler --> UserSession
-    MatchingHandler --> UserStorage
-    MatchingHandler --> LikeStorage
-    MatchingHandler --> MatchStorage
-    MatchingHandler --> BlockStorage
-
-    SafetyHandler --> ReportService
-    SafetyHandler --> BlockStorage
-    SafetyHandler --> MatchStorage
-    SafetyHandler --> UserStorage
-    SafetyHandler --> UserSession
-
-    StatsHandler --> StatsService
-    StatsHandler --> AchievementService
-    StatsHandler --> UserSession
-    StatsHandler --> UserStats
-    StatsHandler --> UserAchievement
-
-    %% Service dependencies
-    CandidateFinder -.-> CandidateFinderService
-    CandidateFinder --> GeoUtils
-    CandidateFinder --> DealbreakersEvaluator
-    CandidateFinder --> UserStorage
-    CandidateFinder --> LikeStorage
-    CandidateFinder --> BlockStorage
-
-    MatchingService --> LikeStorage
-    MatchingService --> MatchStorage
-    MatchingService --> UndoService
-    MatchingService --> SessionService
-
-    UndoService -> LikeStorage
-    UndoService -> MatchStorage
-
-    DailyLimitService -> LikeStorage
-
-    SessionService -> SwipeSessionStorage
-
-    MatchQualityService -> MatchQualityConfig
-    MatchQualityService -> InterestMatcher
-    MatchQualityService -> User
-
-    DailyPickService -> UserStorage
-    DailyPickService -> BlockStorage
-    DailyPickService -> LikeStorage
-    DailyPickService -> DailyPickStorage
-    DailyPickService -> MatchQualityService
-
-    InterestMatcher -> Interest
-
-    ReportService -> ReportStorage
-    ReportService -> BlockStorage
-    ReportService -> UserStorage
-
-    AchievementService -> UserAchievementStorage
-    AchievementService -> UserStorage
-    AchievementService -> MatchStorage
-    AchievementService -> UserAchievement
-
-    StatsService -> UserStatsStorage
-    StatsService -> PlatformStatsStorage
-    StatsService -> UserStorage
-
-    ProfilePreviewService -> User
+    %% Services use Storage interfaces
+    CandidateFinder --> User
+    MatchingService --> UserInteractions
+    MatchingService --> Match
+    MessagingService --> Messaging
+    TrustSafetyService --> UserInteractions
+    DailyService --> User
 
     %% Storage implementations
-    H2UserStorage --> DatabaseManager
-    H2LikeStorage --> DatabaseManager
-    H2MatchStorage --> DatabaseManager
-    H2BlockStorage --> DatabaseManager
-    H2ReportStorage --> DatabaseManager
-    H2SwipeSessionStorage --> DatabaseManager
-    H2UserStatsStorage --> DatabaseManager
-    H2PlatformStatsStorage --> DatabaseManager
-    H2DailyPickViewStorage --> DatabaseManager
-    H2UserAchievementStorage --> DatabaseManager
+    StorageModule --> DatabaseManager
+    JdbiUserStorage --> StorageModule
+    JdbiLikeStorage --> StorageModule
+    JdbiMatchStorage --> StorageModule
+    JdbiBlockStorage --> StorageModule
+    JdbiMessageStorage --> StorageModule
 
     DatabaseManager --> H2Database
-
-    %% DI wiring
-    Main --> ServiceRegistry
-    ServiceRegistryBuilder --> ServiceRegistry
 ```
 
 ## Layer Responsibilities

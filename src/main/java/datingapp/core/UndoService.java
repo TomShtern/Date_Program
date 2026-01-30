@@ -83,7 +83,7 @@ public class UndoService {
     public void recordSwipe(UUID userId, Like like, Match matchCreated) {
         Instant expiresAt = Instant.now(clock).plusSeconds(config.undoWindowSeconds());
 
-        UndoState state = new UndoState(userId, like, matchCreated != null ? matchCreated.getId() : null, expiresAt);
+        UndoState state = new UndoState(like, matchCreated != null ? matchCreated.getId() : null, expiresAt);
 
         undoStates.put(userId, state);
     }
@@ -196,13 +196,11 @@ public class UndoService {
      * once, never modified.
      */
     private static class UndoState {
-        final UUID userId;
         final Like like;
         final String matchId; // null if no match was created
         final Instant expiresAt;
 
-        UndoState(UUID userId, Like like, String matchId, Instant expiresAt) {
-            this.userId = userId;
+        UndoState(Like like, String matchId, Instant expiresAt) {
             this.like = like;
             this.matchId = matchId;
             this.expiresAt = expiresAt;

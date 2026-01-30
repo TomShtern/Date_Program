@@ -7,11 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Messaging.Conversation;
 import datingapp.core.Messaging.Message;
-import datingapp.core.storage.ConversationStorage;
 import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.MessageStorage;
+import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,8 +28,7 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MessagingServiceTest {
 
-    private InMemoryConversationStorage conversationStorage;
-    private InMemoryMessageStorage messageStorage;
+    private InMemoryMessagingStorage messagingStorage;
     private InMemoryMatchStorage matchStorage;
     private InMemoryUserStorage userStorage;
     private MessagingService messagingService;
@@ -38,13 +37,13 @@ class MessagingServiceTest {
     private UUID userB;
     private UUID userC;
 
+    @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
-        conversationStorage = new InMemoryConversationStorage();
-        messageStorage = new InMemoryMessageStorage();
+        messagingStorage = new InMemoryMessagingStorage();
         matchStorage = new InMemoryMatchStorage();
         userStorage = new InMemoryUserStorage();
-        messagingService = new MessagingService(conversationStorage, messageStorage, matchStorage, userStorage);
+        messagingService = new MessagingService(messagingStorage, matchStorage, userStorage);
 
         // Create test users
         userA = UUID.randomUUID();
@@ -65,6 +64,7 @@ class MessagingServiceTest {
                 .build();
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("sendMessage")
     class SendMessage {
@@ -91,11 +91,11 @@ class MessagingServiceTest {
             matchStorage.save(match);
 
             String conversationId = Conversation.generateId(userA, userB);
-            assertTrue(conversationStorage.get(conversationId).isEmpty());
+            assertTrue(messagingStorage.getConversation(conversationId).isEmpty());
 
             messagingService.sendMessage(userA, userB, "First message!");
 
-            assertTrue(conversationStorage.get(conversationId).isPresent());
+            assertTrue(messagingStorage.getConversation(conversationId).isPresent());
         }
 
         @Test
@@ -180,11 +180,13 @@ class MessagingServiceTest {
             messagingService.sendMessage(userA, userB, "Hello!");
 
             String conversationId = Conversation.generateId(userA, userB);
-            Conversation convo = conversationStorage.get(conversationId).orElseThrow();
+            Conversation convo =
+                    messagingStorage.getConversation(conversationId).orElseThrow();
             assertNotNull(convo.getLastMessageAt());
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("getMessages")
     class GetMessages {
@@ -213,6 +215,7 @@ class MessagingServiceTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("canMessage")
     class CanMessage {
@@ -243,6 +246,7 @@ class MessagingServiceTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("markAsRead")
     class MarkAsRead {
@@ -261,7 +265,8 @@ class MessagingServiceTest {
             messagingService.markAsRead(userB, conversationId);
 
             // Verify timestamp was updated
-            Conversation convo = conversationStorage.get(conversationId).orElseThrow();
+            Conversation convo =
+                    messagingStorage.getConversation(conversationId).orElseThrow();
             assertNotNull(convo.getLastReadAt(userB));
         }
 
@@ -278,10 +283,11 @@ class MessagingServiceTest {
             messagingService.markAsRead(userC, conversationId);
 
             // Verify conversation still exists and is unchanged
-            assertTrue(conversationStorage.get(conversationId).isPresent());
+            assertTrue(messagingStorage.getConversation(conversationId).isPresent());
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("getUnreadCount")
     class GetUnreadCount {
@@ -352,6 +358,7 @@ class MessagingServiceTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("getTotalUnreadCount")
     class GetTotalUnreadCount {
@@ -386,6 +393,7 @@ class MessagingServiceTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("getConversations")
     class GetConversations {
@@ -405,8 +413,8 @@ class MessagingServiceTest {
             String convoIdAB = Conversation.generateId(userA, userB);
             String convoIdAC = Conversation.generateId(userA, userC);
             Instant now = Instant.now();
-            conversationStorage.updateLastMessageAt(convoIdAB, now);
-            conversationStorage.updateLastMessageAt(convoIdAC, now.plusSeconds(1));
+            messagingStorage.updateConversationLastMessageAt(convoIdAB, now);
+            messagingStorage.updateConversationLastMessageAt(convoIdAC, now.plusSeconds(1));
 
             List<MessagingService.ConversationPreview> previews = messagingService.getConversations(userA);
 
@@ -443,8 +451,8 @@ class MessagingServiceTest {
             String conversationId = Conversation.generateId(userA, userB);
             Instant later = Instant.now().plusSeconds(1);
             Message lastMessage = new Message(UUID.randomUUID(), conversationId, userB, "Last message", later);
-            messageStorage.save(lastMessage);
-            conversationStorage.updateLastMessageAt(conversationId, later);
+            messagingStorage.saveMessage(lastMessage);
+            messagingStorage.updateConversationLastMessageAt(conversationId, later);
 
             List<MessagingService.ConversationPreview> previews = messagingService.getConversations(userA);
 
@@ -462,6 +470,7 @@ class MessagingServiceTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
     @DisplayName("getOrCreateConversation")
     class GetOrCreateConversation {
@@ -470,12 +479,12 @@ class MessagingServiceTest {
         @DisplayName("should create if not exists")
         void createIfNotExists() {
             String conversationId = Conversation.generateId(userA, userB);
-            assertTrue(conversationStorage.get(conversationId).isEmpty());
+            assertTrue(messagingStorage.getConversation(conversationId).isEmpty());
 
             Conversation convo = messagingService.getOrCreateConversation(userA, userB);
 
             assertNotNull(convo);
-            assertTrue(conversationStorage.get(conversationId).isPresent());
+            assertTrue(messagingStorage.getConversation(conversationId).isPresent());
         }
 
         @Test
@@ -487,7 +496,8 @@ class MessagingServiceTest {
             messagingService.sendMessage(userA, userB, "Hello!");
 
             String conversationId = Conversation.generateId(userA, userB);
-            Conversation existing = conversationStorage.get(conversationId).orElseThrow();
+            Conversation existing =
+                    messagingStorage.getConversation(conversationId).orElseThrow();
 
             // Get or create should return the same one
             Conversation returned = messagingService.getOrCreateConversation(userA, userB);
@@ -499,22 +509,24 @@ class MessagingServiceTest {
 
     // ===== In-Memory Test Implementations =====
 
-    static class InMemoryConversationStorage implements ConversationStorage {
+    static class InMemoryMessagingStorage implements MessagingStorage {
         private final Map<String, Conversation> conversations = new HashMap<>();
+        private final Map<String, List<Message>> messagesByConvo = new HashMap<>();
 
+        // Conversation operations
         @Override
-        public void save(Conversation conversation) {
+        public void saveConversation(Conversation conversation) {
             conversations.put(conversation.getId(), conversation);
         }
 
         @Override
-        public Optional<Conversation> get(String conversationId) {
+        public Optional<Conversation> getConversation(String conversationId) {
             return Optional.ofNullable(conversations.get(conversationId));
         }
 
         @Override
-        public Optional<Conversation> getByUsers(UUID userA, UUID userB) {
-            return get(Conversation.generateId(userA, userB));
+        public Optional<Conversation> getConversationByUsers(UUID userA, UUID userB) {
+            return getConversation(Conversation.generateId(userA, userB));
         }
 
         @Override
@@ -530,7 +542,7 @@ class MessagingServiceTest {
         }
 
         @Override
-        public void updateLastMessageAt(String conversationId, Instant timestamp) {
+        public void updateConversationLastMessageAt(String conversationId, Instant timestamp) {
             Conversation convo = conversations.get(conversationId);
             if (convo != null) {
                 convo.updateLastMessageAt(timestamp);
@@ -538,7 +550,7 @@ class MessagingServiceTest {
         }
 
         @Override
-        public void updateReadTimestamp(String conversationId, UUID userId, Instant timestamp) {
+        public void updateConversationReadTimestamp(String conversationId, UUID userId, Instant timestamp) {
             Conversation convo = conversations.get(conversationId);
             if (convo != null) {
                 convo.updateReadTimestamp(userId, timestamp);
@@ -546,7 +558,7 @@ class MessagingServiceTest {
         }
 
         @Override
-        public void archive(String conversationId, Match.ArchiveReason reason) {
+        public void archiveConversation(String conversationId, Match.ArchiveReason reason) {
             Conversation convo = conversations.get(conversationId);
             if (convo != null) {
                 convo.archive(reason);
@@ -554,7 +566,7 @@ class MessagingServiceTest {
         }
 
         @Override
-        public void setVisibility(String conversationId, UUID userId, boolean visible) {
+        public void setConversationVisibility(String conversationId, UUID userId, boolean visible) {
             Conversation convo = conversations.get(conversationId);
             if (convo != null) {
                 convo.setVisibility(userId, visible);
@@ -562,18 +574,16 @@ class MessagingServiceTest {
         }
 
         @Override
-        public void delete(String conversationId) {
+        public void deleteConversation(String conversationId) {
             conversations.remove(conversationId);
+            messagesByConvo.remove(conversationId);
         }
-    }
 
-    static class InMemoryMessageStorage implements MessageStorage {
-        private final Map<String, List<Message>> messagesByConvo = new HashMap<>();
-
+        // Message operations
         @Override
-        public void save(Message message) {
+        public void saveMessage(Message message) {
             messagesByConvo
-                    .computeIfAbsent(message.conversationId(), k -> new java.util.ArrayList<>())
+                    .computeIfAbsent(message.conversationId(), k -> new ArrayList<>())
                     .add(message);
         }
 
@@ -606,11 +616,6 @@ class MessagingServiceTest {
         }
 
         @Override
-        public void deleteByConversation(String conversationId) {
-            messagesByConvo.remove(conversationId);
-        }
-
-        @Override
         public int countMessagesNotFromSender(String conversationId, UUID senderId) {
             return (int) messagesByConvo.getOrDefault(conversationId, List.of()).stream()
                     .filter(m -> !m.senderId().equals(senderId))
@@ -623,6 +628,11 @@ class MessagingServiceTest {
                     .filter(m -> m.createdAt().isAfter(after))
                     .filter(m -> !m.senderId().equals(excludeSenderId))
                     .count();
+        }
+
+        @Override
+        public void deleteMessagesByConversation(String conversationId) {
+            messagesByConvo.remove(conversationId);
         }
     }
 

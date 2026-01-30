@@ -16,7 +16,8 @@ import org.junit.jupiter.api.Timeout;
 /**
  * Tests for ServiceRegistry - central dependency registry and service wiring.
  *
- * <p>Verifies that the Builder correctly creates all services and storages,
+ * <p>
+ * Verifies that the Builder correctly creates all services and storages,
  * and that getters return non-null instances.
  */
 @SuppressWarnings("unused")
@@ -112,15 +113,9 @@ class ServiceRegistryTest {
         }
 
         @Test
-        @DisplayName("getUserStatsStorage returns non-null")
-        void getUserStatsStorage() {
-            assertNotNull(registry.getUserStatsStorage());
-        }
-
-        @Test
-        @DisplayName("getPlatformStatsStorage returns non-null")
-        void getPlatformStatsStorage() {
-            assertNotNull(registry.getPlatformStatsStorage());
+        @DisplayName("getStatsStorage returns non-null")
+        void getStatsStorage() {
+            assertNotNull(registry.getStatsStorage());
         }
 
         @Test
@@ -148,27 +143,15 @@ class ServiceRegistryTest {
         }
 
         @Test
-        @DisplayName("getConversationStorage returns non-null")
-        void getConversationStorage() {
-            assertNotNull(registry.getConversationStorage());
+        @DisplayName("getMessagingStorage returns non-null")
+        void getMessagingStorage() {
+            assertNotNull(registry.getMessagingStorage());
         }
 
         @Test
-        @DisplayName("getMessageStorage returns non-null")
-        void getMessageStorage() {
-            assertNotNull(registry.getMessageStorage());
-        }
-
-        @Test
-        @DisplayName("getFriendRequestStorage returns non-null")
-        void getFriendRequestStorage() {
-            assertNotNull(registry.getFriendRequestStorage());
-        }
-
-        @Test
-        @DisplayName("getNotificationStorage returns non-null")
-        void getNotificationStorage() {
-            assertNotNull(registry.getNotificationStorage());
+        @DisplayName("getSocialStorage returns non-null")
+        void getSocialStorage() {
+            assertNotNull(registry.getSocialStorage());
         }
     }
 

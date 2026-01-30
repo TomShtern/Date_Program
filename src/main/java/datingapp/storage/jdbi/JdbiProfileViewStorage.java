@@ -1,10 +1,14 @@
 package datingapp.storage.jdbi;
 
 import datingapp.core.storage.ProfileViewStorage;
-import datingapp.storage.mapper.ProfileViewMapper;
+import datingapp.storage.mapper.MapperHelper;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jdbi.v3.core.mapper.RowMapper;
+import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
@@ -14,7 +18,7 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  * JDBI storage implementation for ProfileView entities.
  * Uses declarative SQL methods instead of manual JDBC.
  */
-@RegisterRowMapper(ProfileViewMapper.class)
+@RegisterRowMapper(JdbiProfileViewStorage.Mapper.class)
 public interface JdbiProfileViewStorage extends ProfileViewStorage {
 
     @SqlUpdate("""
@@ -64,4 +68,26 @@ public interface JdbiProfileViewStorage extends ProfileViewStorage {
             """)
     @Override
     boolean hasViewed(@Bind("viewerId") UUID viewerId, @Bind("viewedId") UUID viewedId);
+
+    /**
+     * Simple record to hold profile view data from the database.
+     * Internal to the mapper, used for full row mapping when needed.
+     */
+    record ProfileView(long id, UUID viewerId, UUID viewedId, Instant viewedAt) {}
+
+    /**
+     * Row mapper for ProfileView records - inlined from former ProfileViewMapper
+     * class.
+     */
+    class Mapper implements RowMapper<ProfileView> {
+        @Override
+        public ProfileView map(ResultSet rs, StatementContext ctx) throws SQLException {
+            long id = rs.getLong("id");
+            UUID viewerId = MapperHelper.readUuid(rs, "viewer_id");
+            UUID viewedId = MapperHelper.readUuid(rs, "viewed_id");
+            Instant viewedAt = MapperHelper.readInstant(rs, "viewed_at");
+
+            return new ProfileView(id, viewerId, viewedId, viewedAt);
+        }
+    }
 }

@@ -1,29 +1,29 @@
 package datingapp.core;
 
 import datingapp.core.storage.BlockStorage;
-import datingapp.core.storage.ConversationStorage;
 import datingapp.core.storage.DailyPickStorage;
-import datingapp.core.storage.FriendRequestStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.MessageStorage;
-import datingapp.core.storage.NotificationStorage;
-import datingapp.core.storage.PlatformStatsStorage;
+import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.ProfileNoteStorage;
 import datingapp.core.storage.ProfileViewStorage;
 import datingapp.core.storage.ReportStorage;
+import datingapp.core.storage.SocialStorage;
+import datingapp.core.storage.StatsStorage;
 import datingapp.core.storage.SwipeSessionStorage;
 import datingapp.core.storage.UserAchievementStorage;
-import datingapp.core.storage.UserStatsStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.storage.DatabaseManager;
 import java.util.Objects;
 
 /**
- * Central registry holding all storage and service instances. Provides a single point of access for
+ * Central registry holding all storage and service instances. Provides a single
+ * point of access for
  * all application components.
  *
- * <p>This pattern enables: - Easy testing with mock implementations - Swapping storage backends (H2
+ * <p>
+ * This pattern enables: - Easy testing with mock implementations - Swapping
+ * storage backends (H2
  * -> PostgreSQL) - Adding new services without modifying Main
  */
 @SuppressWarnings("java:S6539")
@@ -39,16 +39,13 @@ public class ServiceRegistry {
     private final BlockStorage blockStorage;
     private final ReportStorage reportStorage;
     private final SwipeSessionStorage sessionStorage;
-    private final UserStatsStorage userStatsStorage;
-    private final PlatformStatsStorage platformStatsStorage;
+    private final StatsStorage statsStorage; // Consolidated: user + platform stats
     private final DailyPickStorage dailyPickStorage;
     private final UserAchievementStorage userAchievementStorage;
     private final ProfileViewStorage profileViewStorage;
     private final ProfileNoteStorage profileNoteStorage;
-    private final ConversationStorage conversationStorage; // Messaging
-    private final MessageStorage messageStorage; // Messaging
-    private final FriendRequestStorage friendRequestStorage;
-    private final NotificationStorage notificationStorage;
+    private final MessagingStorage messagingStorage; // Consolidated: conversation + message
+    private final SocialStorage socialStorage; // Consolidated: friend request + notification
 
     // Services
     private final CandidateFinder candidateFinder;
@@ -74,16 +71,13 @@ public class ServiceRegistry {
             BlockStorage blockStorage,
             ReportStorage reportStorage,
             SwipeSessionStorage sessionStorage,
-            UserStatsStorage userStatsStorage,
-            PlatformStatsStorage platformStatsStorage,
+            StatsStorage statsStorage,
             DailyPickStorage dailyPickStorage,
             UserAchievementStorage userAchievementStorage,
             ProfileViewStorage profileViewStorage,
             ProfileNoteStorage profileNoteStorage,
-            ConversationStorage conversationStorage,
-            MessageStorage messageStorage,
-            FriendRequestStorage friendRequestStorage,
-            NotificationStorage notificationStorage,
+            MessagingStorage messagingStorage,
+            SocialStorage socialStorage,
             CandidateFinder candidateFinder,
             MatchingService matchingService,
             TrustSafetyService trustSafetyService,
@@ -103,16 +97,13 @@ public class ServiceRegistry {
         this.blockStorage = Objects.requireNonNull(blockStorage);
         this.reportStorage = Objects.requireNonNull(reportStorage);
         this.sessionStorage = Objects.requireNonNull(sessionStorage);
-        this.userStatsStorage = Objects.requireNonNull(userStatsStorage);
-        this.platformStatsStorage = Objects.requireNonNull(platformStatsStorage);
+        this.statsStorage = Objects.requireNonNull(statsStorage);
         this.dailyPickStorage = Objects.requireNonNull(dailyPickStorage);
         this.userAchievementStorage = Objects.requireNonNull(userAchievementStorage);
         this.profileViewStorage = Objects.requireNonNull(profileViewStorage);
         this.profileNoteStorage = Objects.requireNonNull(profileNoteStorage);
-        this.conversationStorage = Objects.requireNonNull(conversationStorage);
-        this.messageStorage = Objects.requireNonNull(messageStorage);
-        this.friendRequestStorage = Objects.requireNonNull(friendRequestStorage);
-        this.notificationStorage = Objects.requireNonNull(notificationStorage);
+        this.messagingStorage = Objects.requireNonNull(messagingStorage);
+        this.socialStorage = Objects.requireNonNull(socialStorage);
         this.candidateFinder = Objects.requireNonNull(candidateFinder);
         this.matchingService = Objects.requireNonNull(matchingService);
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
@@ -157,12 +148,8 @@ public class ServiceRegistry {
         return sessionStorage;
     }
 
-    public UserStatsStorage getUserStatsStorage() {
-        return userStatsStorage;
-    }
-
-    public PlatformStatsStorage getPlatformStatsStorage() {
-        return platformStatsStorage;
+    public StatsStorage getStatsStorage() {
+        return statsStorage;
     }
 
     public CandidateFinder getCandidateFinder() {
@@ -221,24 +208,16 @@ public class ServiceRegistry {
         return profileNoteStorage;
     }
 
-    public ConversationStorage getConversationStorage() {
-        return conversationStorage;
-    }
-
-    public MessageStorage getMessageStorage() {
-        return messageStorage;
+    public MessagingStorage getMessagingStorage() {
+        return messagingStorage;
     }
 
     public MessagingService getMessagingService() {
         return messagingService;
     }
 
-    public FriendRequestStorage getFriendRequestStorage() {
-        return friendRequestStorage;
-    }
-
-    public NotificationStorage getNotificationStorage() {
-        return notificationStorage;
+    public SocialStorage getSocialStorage() {
+        return socialStorage;
     }
 
     public RelationshipTransitionService getRelationshipTransitionService() {
@@ -246,11 +225,15 @@ public class ServiceRegistry {
     }
 
     /**
-     * Builder for creating ServiceRegistry instances with different storage backends.
+     * Builder for creating ServiceRegistry instances with different storage
+     * backends.
      *
-     * <p>Extension point: Add new build methods for different backends: - buildPostgres(config,
+     * <p>
+     * Extension point: Add new build methods for different backends: -
+     * buildPostgres(config,
      * connectionPool) - buildInMemory(config) // for testing
      */
+    @SuppressWarnings("java:S1192") // Allow repeated literal strings for clarity in this builder
     public static final class Builder {
 
         private Builder() {
@@ -258,16 +241,123 @@ public class ServiceRegistry {
         }
 
         /**
-         * Builds a ServiceRegistry with H2 database storage using the new modular architecture.
-         * Delegates to AppContext for storage/service wiring, then wraps in ServiceRegistry.
+         * Builds a ServiceRegistry with H2 database storage.
+         * All storage and service instantiation happens directly here (inlined from
+         * former module classes: StorageModule, MatchingModule, MessagingModule,
+         * SafetyModule, StatsModule).
          *
          * @param dbManager The H2 database manager
-         * @param config Application configuration
+         * @param config    Application configuration
          * @return Fully wired ServiceRegistry
          */
         public static ServiceRegistry buildH2(DatabaseManager dbManager, AppConfig config) {
-            datingapp.module.AppContext app = datingapp.module.AppContext.create(dbManager, config);
-            return fromAppContext(app);
+            Objects.requireNonNull(dbManager, "dbManager cannot be null");
+            Objects.requireNonNull(config, "config cannot be null");
+
+            // ═══════════════════════════════════════════════════════════════
+            // JDBI Setup (inlined from StorageModule.forH2)
+            // ═══════════════════════════════════════════════════════════════
+            org.jdbi.v3.core.Jdbi jdbi = org.jdbi.v3.core.Jdbi.create(() -> {
+                        try {
+                            return dbManager.getConnection();
+                        } catch (java.sql.SQLException e) {
+                            throw new datingapp.storage.StorageException("Failed to get database connection", e);
+                        }
+                    })
+                    .installPlugin(new org.jdbi.v3.sqlobject.SqlObjectPlugin());
+
+            jdbi.registerArgument(new datingapp.storage.jdbi.EnumSetArgumentFactory());
+            jdbi.registerColumnMapper(new datingapp.storage.jdbi.EnumSetColumnMapper());
+
+            // ═══════════════════════════════════════════════════════════════
+            // Storage Instantiation (inlined from StorageModule.forH2)
+            // ═══════════════════════════════════════════════════════════════
+            UserStorage userStorage = new datingapp.storage.jdbi.JdbiUserStorageAdapter(jdbi);
+            LikeStorage likeStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiLikeStorage.class);
+            MatchStorage matchStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiMatchStorage.class);
+            BlockStorage blockStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiBlockStorage.class);
+            ReportStorage reportStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiReportStorage.class);
+            SwipeSessionStorage sessionStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiSwipeSessionStorage.class);
+            StatsStorage statsStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiStatsStorage.class);
+            DailyPickStorage dailyPickStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiDailyPickStorage.class);
+            UserAchievementStorage userAchievementStorage =
+                    jdbi.onDemand(datingapp.storage.jdbi.JdbiUserAchievementStorage.class);
+            ProfileViewStorage profileViewStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiProfileViewStorage.class);
+            ProfileNoteStorage profileNoteStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiProfileNoteStorage.class);
+            MessagingStorage messagingStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiMessagingStorage.class);
+            SocialStorage socialStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiSocialStorage.class);
+
+            // ═══════════════════════════════════════════════════════════════
+            // Matching Services (inlined from MatchingModule.create)
+            // ═══════════════════════════════════════════════════════════════
+            CandidateFinder candidateFinder = new CandidateFinder();
+            SessionService sessionService = new SessionService(sessionStorage, config);
+            MatchingService matchingService =
+                    new MatchingService(likeStorage, matchStorage, userStorage, blockStorage, sessionService);
+            MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
+            DailyService dailyService =
+                    new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, candidateFinder, config);
+            UndoService undoService = new UndoService(likeStorage, matchStorage, config);
+
+            // ═══════════════════════════════════════════════════════════════
+            // Messaging Services (inlined from MessagingModule.create)
+            // ═══════════════════════════════════════════════════════════════
+            MessagingService messagingService = new MessagingService(messagingStorage, matchStorage, userStorage);
+            RelationshipTransitionService relationshipTransitionService =
+                    new RelationshipTransitionService(matchStorage, socialStorage, messagingStorage);
+
+            // ═══════════════════════════════════════════════════════════════
+            // Safety Services (inlined from SafetyModule.create)
+            // ═══════════════════════════════════════════════════════════════
+            TrustSafetyService trustSafetyService =
+                    new TrustSafetyService(reportStorage, userStorage, blockStorage, config);
+            // ValidationService is now a utility class - instances not tracked in registry
+
+            // ═══════════════════════════════════════════════════════════════
+            // Stats Services (inlined from StatsModule.create)
+            // ═══════════════════════════════════════════════════════════════
+            ProfilePreviewService profilePreviewService = new ProfilePreviewService();
+            StatsService statsService =
+                    new StatsService(likeStorage, matchStorage, blockStorage, reportStorage, statsStorage);
+            AchievementService achievementService = new AchievementService(
+                    userAchievementStorage,
+                    matchStorage,
+                    likeStorage,
+                    userStorage,
+                    reportStorage,
+                    profilePreviewService,
+                    config);
+
+            // ═══════════════════════════════════════════════════════════════
+            // Build ServiceRegistry
+            // ═══════════════════════════════════════════════════════════════
+            return new ServiceRegistry(
+                    config,
+                    userStorage,
+                    likeStorage,
+                    matchStorage,
+                    blockStorage,
+                    reportStorage,
+                    sessionStorage,
+                    statsStorage,
+                    dailyPickStorage,
+                    userAchievementStorage,
+                    profileViewStorage,
+                    profileNoteStorage,
+                    messagingStorage,
+                    socialStorage,
+                    candidateFinder,
+                    matchingService,
+                    trustSafetyService,
+                    sessionService,
+                    statsService,
+                    matchQualityService,
+                    profilePreviewService,
+                    dailyService,
+                    undoService,
+                    achievementService,
+                    messagingService,
+                    relationshipTransitionService);
         }
 
         /** Builds a ServiceRegistry with H2 database and default configuration. */
@@ -275,49 +365,12 @@ public class ServiceRegistry {
             return buildH2(dbManager, AppConfig.defaults());
         }
 
-        /** Builds an in-memory ServiceRegistry for testing. Uses the same H2 in-memory mode. */
+        /**
+         * Builds an in-memory ServiceRegistry for testing. Uses the same H2 in-memory
+         * mode.
+         */
         public static ServiceRegistry buildInMemory(AppConfig config) {
             return buildH2(DatabaseManager.getInstance(), config);
-        }
-
-        /**
-         * Creates a ServiceRegistry from an AppContext for backward compatibility.
-         * This allows gradual migration from ServiceRegistry to AppContext.
-         *
-         * @param app The AppContext containing all modules
-         * @return A ServiceRegistry wrapping the AppContext's components
-         */
-        public static ServiceRegistry fromAppContext(datingapp.module.AppContext app) {
-            return new ServiceRegistry(
-                    app.config(),
-                    app.storage().users(),
-                    app.storage().likes(),
-                    app.storage().matches(),
-                    app.storage().blocks(),
-                    app.storage().reports(),
-                    app.storage().swipeSessions(),
-                    app.storage().userStats(),
-                    app.storage().platformStats(),
-                    app.storage().dailyPicks(),
-                    app.storage().achievements(),
-                    app.storage().profileViews(),
-                    app.storage().profileNotes(),
-                    app.storage().conversations(),
-                    app.storage().messages(),
-                    app.storage().friendRequests(),
-                    app.storage().notifications(),
-                    app.matching().finder(),
-                    app.matching().matching(),
-                    app.safety().trustSafety(),
-                    app.matching().session(),
-                    app.stats().stats(),
-                    app.matching().quality(),
-                    app.stats().profilePreview(),
-                    app.matching().daily(),
-                    app.matching().undo(),
-                    app.stats().achievements(),
-                    app.messaging().messaging(),
-                    app.messaging().transitions());
         }
     }
 }

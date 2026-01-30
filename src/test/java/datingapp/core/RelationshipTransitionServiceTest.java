@@ -6,18 +6,21 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Messaging.Conversation;
+import datingapp.core.Messaging.Message;
 import datingapp.core.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.Social.FriendRequest;
 import datingapp.core.Social.Notification;
-import datingapp.core.storage.ConversationStorage;
-import datingapp.core.storage.FriendRequestStorage;
 import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.NotificationStorage;
+import datingapp.core.storage.MessagingStorage;
+import datingapp.core.storage.SocialStorage;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,9 +32,8 @@ import org.junit.jupiter.api.Timeout;
 class RelationshipTransitionServiceTest {
 
     private InMemoryMatchStorage matchStorage;
-    private InMemoryFriendRequestStorage friendRequestStorage;
-    private InMemoryConversationStorage conversationStorage;
-    private InMemoryNotificationStorage notificationStorage;
+    private InMemorySocialStorage socialStorage;
+    private InMemoryMessagingStorage messagingStorage;
     private RelationshipTransitionService service;
 
     private final UUID aliceId = UUID.randomUUID();
@@ -41,11 +43,9 @@ class RelationshipTransitionServiceTest {
     @BeforeEach
     void setUp() {
         matchStorage = new InMemoryMatchStorage();
-        friendRequestStorage = new InMemoryFriendRequestStorage();
-        conversationStorage = new InMemoryConversationStorage();
-        notificationStorage = new InMemoryNotificationStorage();
-        service = new RelationshipTransitionService(
-                matchStorage, friendRequestStorage, conversationStorage, notificationStorage);
+        socialStorage = new InMemorySocialStorage();
+        messagingStorage = new InMemoryMessagingStorage();
+        service = new RelationshipTransitionService(matchStorage, socialStorage, messagingStorage);
 
         // Create a match between Alice and Bob
         Match match = Match.create(aliceId, bobId);
@@ -61,21 +61,25 @@ class RelationshipTransitionServiceTest {
         assertEquals(aliceId, request.fromUserId());
         assertEquals(bobId, request.toUserId());
         assertEquals(FriendRequest.Status.PENDING, request.status());
-        assertTrue(friendRequestStorage.get(request.id()).isPresent());
+        assertTrue(socialStorage.getFriendRequest(request.id()).isPresent());
     }
 
     @Test
     @DisplayName("Cannot request friend zone if no active match")
     void requestFriendZoneNoMatch() {
         UUID charlieId = UUID.randomUUID();
-        assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(aliceId, charlieId));
+        TransitionValidationException ex =
+                assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(aliceId, charlieId));
+        assertNotNull(ex.getMessage());
     }
 
     @Test
     @DisplayName("Cannot request twice if one is pending")
     void requestFriendZoneDuplicate() {
         service.requestFriendZone(aliceId, bobId);
-        assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(aliceId, bobId));
+        TransitionValidationException ex =
+                assertThrows(TransitionValidationException.class, () -> service.requestFriendZone(aliceId, bobId));
+        assertNotNull(ex.getMessage());
     }
 
     @Test
@@ -88,7 +92,7 @@ class RelationshipTransitionServiceTest {
         Match match = matchStorage.get(Match.generateId(aliceId, bobId)).orElseThrow();
         assertEquals(Match.State.FRIENDS, match.getState());
 
-        FriendRequest updated = friendRequestStorage.get(request.id()).orElseThrow();
+        FriendRequest updated = socialStorage.getFriendRequest(request.id()).orElseThrow();
         assertEquals(FriendRequest.Status.ACCEPTED, updated.status());
         assertNotNull(updated.respondedAt());
     }
@@ -99,7 +103,9 @@ class RelationshipTransitionServiceTest {
         FriendRequest request = service.requestFriendZone(aliceId, bobId);
         UUID requestId = request.id();
         UUID responderId = aliceId;
-        assertThrows(TransitionValidationException.class, () -> service.acceptFriendZone(requestId, responderId));
+        TransitionValidationException ex = assertThrows(
+                TransitionValidationException.class, () -> service.acceptFriendZone(requestId, responderId));
+        assertNotNull(ex.getMessage());
     }
 
     @Test
@@ -108,7 +114,7 @@ class RelationshipTransitionServiceTest {
         FriendRequest request = service.requestFriendZone(aliceId, bobId);
         service.declineFriendZone(request.id(), bobId);
 
-        FriendRequest updated = friendRequestStorage.get(request.id()).orElseThrow();
+        FriendRequest updated = socialStorage.getFriendRequest(request.id()).orElseThrow();
         assertEquals(FriendRequest.Status.DECLINED, updated.status());
 
         // Match should still be ACTIVE
@@ -121,7 +127,7 @@ class RelationshipTransitionServiceTest {
     void gracefulExitSuccess() {
         // Create a conversation
         Conversation convo = Conversation.create(aliceId, bobId);
-        conversationStorage.save(convo);
+        messagingStorage.saveConversation(convo);
 
         service.gracefulExit(aliceId, bobId);
 
@@ -131,10 +137,10 @@ class RelationshipTransitionServiceTest {
         assertEquals(aliceId, match.getEndedBy());
 
         // Check conversation archive
-        assertTrue(conversationStorage.isArchived(convo.getId()));
+        assertTrue(messagingStorage.isArchived(convo.getId()));
 
         // Check notification
-        List<Notification> notifications = notificationStorage.getForUser(bobId, true);
+        List<Notification> notifications = socialStorage.getNotificationsForUser(bobId, true);
         assertEquals(1, notifications.size());
         assertEquals(Notification.Type.GRACEFUL_EXIT, notifications.get(0).type());
     }
@@ -193,26 +199,28 @@ class RelationshipTransitionServiceTest {
         }
     }
 
-    private static class InMemoryFriendRequestStorage implements FriendRequestStorage {
+    private static class InMemorySocialStorage implements SocialStorage {
         private final Map<UUID, FriendRequest> requests = new HashMap<>();
+        private final Map<UUID, List<Notification>> userNotifications = new HashMap<>();
 
+        // Friend request operations
         @Override
-        public void save(FriendRequest req) {
+        public void saveFriendRequest(FriendRequest req) {
             requests.put(req.id(), req);
         }
 
         @Override
-        public void update(FriendRequest req) {
+        public void updateFriendRequest(FriendRequest req) {
             requests.put(req.id(), req);
         }
 
         @Override
-        public Optional<FriendRequest> get(UUID id) {
+        public Optional<FriendRequest> getFriendRequest(UUID id) {
             return Optional.ofNullable(requests.get(id));
         }
 
         @Override
-        public Optional<FriendRequest> getPendingBetween(UUID u1, UUID u2) {
+        public Optional<FriendRequest> getPendingFriendRequestBetween(UUID u1, UUID u2) {
             return requests.values().stream()
                     .filter(r -> r.isPending()
                             && ((r.fromUserId().equals(u1) && r.toUserId().equals(u2))
@@ -222,34 +230,69 @@ class RelationshipTransitionServiceTest {
         }
 
         @Override
-        public List<FriendRequest> getPendingForUser(UUID userId) {
+        public List<FriendRequest> getPendingFriendRequestsForUser(UUID userId) {
             return requests.values().stream()
                     .filter(r -> r.isPending() && r.toUserId().equals(userId))
                     .toList();
         }
 
         @Override
-        public void delete(UUID id) {
+        public void deleteFriendRequest(UUID id) {
             requests.remove(id);
+        }
+
+        // Notification operations
+        @Override
+        public void saveNotification(Notification n) {
+            userNotifications
+                    .computeIfAbsent(n.userId(), k -> new ArrayList<>())
+                    .add(n);
+        }
+
+        @Override
+        public void markNotificationAsRead(UUID id) {
+            // No-op: mock stub for testing
+        }
+
+        @Override
+        public List<Notification> getNotificationsForUser(UUID userId, boolean unreadOnly) {
+            return userNotifications.getOrDefault(userId, List.of());
+        }
+
+        @Override
+        public Optional<Notification> getNotification(UUID id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void deleteNotification(UUID id) {
+            // No-op: mock stub for testing
+        }
+
+        @Override
+        public void deleteOldNotifications(Instant before) {
+            // No-op: mock stub for testing
         }
     }
 
-    private static class InMemoryConversationStorage implements ConversationStorage {
+    private static class InMemoryMessagingStorage implements MessagingStorage {
         private final Map<String, Conversation> conversations = new HashMap<>();
+        private final Set<String> archived = new HashSet<>();
 
+        // Conversation operations
         @Override
-        public void save(Conversation c) {
+        public void saveConversation(Conversation c) {
             conversations.put(c.getId(), c);
         }
 
         @Override
-        public Optional<Conversation> get(String id) {
+        public Optional<Conversation> getConversation(String id) {
             return Optional.ofNullable(conversations.get(id));
         }
 
         @Override
-        public Optional<Conversation> getByUsers(UUID u1, UUID u2) {
-            return get(Conversation.generateId(u1, u2));
+        public Optional<Conversation> getConversationByUsers(UUID u1, UUID u2) {
+            return getConversation(Conversation.generateId(u1, u2));
         }
 
         @Override
@@ -258,70 +301,73 @@ class RelationshipTransitionServiceTest {
         }
 
         @Override
-        public void updateLastMessageAt(String id, java.time.Instant ts) {
+        public void updateConversationLastMessageAt(String id, Instant ts) {
             // No-op: mock stub for testing
         }
 
         @Override
-        public void updateReadTimestamp(String id, UUID u, java.time.Instant ts) {
+        public void updateConversationReadTimestamp(String id, UUID u, Instant ts) {
             // No-op: mock stub for testing
         }
 
         @Override
-        public void archive(String id, Match.ArchiveReason r) {
+        public void archiveConversation(String id, Match.ArchiveReason r) {
             archived.add(id);
         }
 
         @Override
-        public void setVisibility(String id, UUID u, boolean v) {
+        public void setConversationVisibility(String id, UUID u, boolean v) {
             // No-op: mock stub for testing
         }
 
         @Override
-        public void delete(String id) {
-            // No-op: mock stub for testing
+        public void deleteConversation(String id) {
+            conversations.remove(id);
         }
 
-        private final java.util.Set<String> archived = new java.util.HashSet<>();
-
-        public boolean isArchived(String id) {
-            return archived.contains(id);
-        }
-    }
-
-    private static class InMemoryNotificationStorage implements NotificationStorage {
-        private final Map<UUID, List<Notification>> userNotifications = new HashMap<>();
-
+        // Message operations - minimal implementations for tests
         @Override
-        public void save(Notification n) {
-            userNotifications
-                    .computeIfAbsent(n.userId(), k -> new ArrayList<>())
-                    .add(n);
-        }
-
-        @Override
-        public void markAsRead(UUID id) {
+        public void saveMessage(Message message) {
             // No-op: mock stub for testing
         }
 
         @Override
-        public List<Notification> getForUser(UUID userId, boolean unreadOnly) {
-            return userNotifications.getOrDefault(userId, List.of());
+        public List<Message> getMessages(String conversationId, int limit, int offset) {
+            return List.of();
         }
 
         @Override
-        public Optional<Notification> get(UUID id) {
+        public Optional<Message> getLatestMessage(String conversationId) {
             return Optional.empty();
         }
 
         @Override
-        public void delete(UUID id) {
-            // No-op: mock stub for testing
+        public int countMessages(String conversationId) {
+            return 0;
         }
 
         @Override
-        public void deleteOldNotifications(java.time.Instant before) {
+        public int countMessagesAfter(String conversationId, Instant after) {
+            return 0;
+        }
+
+        @Override
+        public int countMessagesNotFromSender(String conversationId, UUID senderId) {
+            return 0;
+        }
+
+        @Override
+        public int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId) {
+            return 0;
+        }
+
+        @Override
+        public void deleteMessagesByConversation(String conversationId) {
             // No-op: mock stub for testing
+        }
+
+        public boolean isArchived(String id) {
+            return archived.contains(id);
         }
     }
 }

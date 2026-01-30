@@ -6,9 +6,8 @@ import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.PlatformStatsStorage;
 import datingapp.core.storage.ReportStorage;
-import datingapp.core.storage.UserStatsStorage;
+import datingapp.core.storage.StatsStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -17,7 +16,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Service for computing and managing user statistics. Computes statistics from various data sources
+ * Service for computing and managing user statistics. Computes statistics from
+ * various data sources
  * and stores as snapshots.
  */
 public class StatsService {
@@ -26,22 +26,19 @@ public class StatsService {
     private final MatchStorage matchStorage;
     private final BlockStorage blockStorage;
     private final ReportStorage reportStorage;
-    private final UserStatsStorage userStatsStorage;
-    private final PlatformStatsStorage platformStatsStorage;
+    private final StatsStorage statsStorage;
 
     public StatsService(
             LikeStorage likeStorage,
             MatchStorage matchStorage,
             BlockStorage blockStorage,
             ReportStorage reportStorage,
-            UserStatsStorage userStatsStorage,
-            PlatformStatsStorage platformStatsStorage) {
+            StatsStorage statsStorage) {
         this.likeStorage = Objects.requireNonNull(likeStorage);
         this.matchStorage = Objects.requireNonNull(matchStorage);
         this.blockStorage = Objects.requireNonNull(blockStorage);
         this.reportStorage = Objects.requireNonNull(reportStorage);
-        this.userStatsStorage = Objects.requireNonNull(userStatsStorage);
-        this.platformStatsStorage = Objects.requireNonNull(platformStatsStorage);
+        this.statsStorage = Objects.requireNonNull(statsStorage);
     }
 
     /**
@@ -87,7 +84,7 @@ public class StatsService {
                 builder.likesGiven > 0 ? Math.min(1.0, (double) mutualLikes / builder.likesGiven) : 0.0;
 
         // --- Derived Scores (require platform averages) ---
-        Optional<PlatformStats> platformStats = platformStatsStorage.getLatest();
+        Optional<PlatformStats> platformStats = statsStorage.getLatestPlatformStats();
         if (platformStats.isPresent()) {
             PlatformStats ps = platformStats.get();
 
@@ -106,7 +103,7 @@ public class StatsService {
         }
 
         UserStats stats = UserStats.create(userId, builder);
-        userStatsStorage.save(stats);
+        statsStorage.saveUserStats(stats);
         return stats;
     }
 
@@ -117,7 +114,7 @@ public class StatsService {
      * @return the latest or freshly computed statistics
      */
     public UserStats getOrComputeStats(UUID userId) {
-        Optional<UserStats> existing = userStatsStorage.getLatest(userId);
+        Optional<UserStats> existing = statsStorage.getLatestUserStats(userId);
 
         if (existing.isPresent()) {
             // Check if stale (older than 24 hours)
@@ -137,7 +134,7 @@ public class StatsService {
      * @return the latest statistics if available
      */
     public Optional<UserStats> getStats(UUID userId) {
-        return userStatsStorage.getLatest(userId);
+        return statsStorage.getLatestUserStats(userId);
     }
 
     /**
@@ -146,11 +143,11 @@ public class StatsService {
      * @return the computed platform statistics
      */
     public PlatformStats computeAndSavePlatformStats() {
-        List<UserStats> allStats = userStatsStorage.getAllLatestStats();
+        List<UserStats> allStats = statsStorage.getAllLatestUserStats();
 
         if (allStats.isEmpty()) {
             PlatformStats stats = PlatformStats.empty();
-            platformStatsStorage.save(stats);
+            statsStorage.savePlatformStats(stats);
             return stats;
         }
 
@@ -170,7 +167,7 @@ public class StatsService {
         PlatformStats stats = PlatformStats.create(
                 n, totalLikesReceived / n, totalLikesGiven / n, totalMatchRate / n, totalLikeRatio / n);
 
-        platformStatsStorage.save(stats);
+        statsStorage.savePlatformStats(stats);
         return stats;
     }
 
@@ -180,6 +177,6 @@ public class StatsService {
      * @return the latest platform statistics if available
      */
     public Optional<PlatformStats> getPlatformStats() {
-        return platformStatsStorage.getLatest();
+        return statsStorage.getLatestPlatformStats();
     }
 }

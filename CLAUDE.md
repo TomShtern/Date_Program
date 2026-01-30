@@ -37,7 +37,7 @@ mvn jacoco:report                        # Generate coverage report
 
 **Phase 2.1** console dating app: **Java 25** + Maven + H2 embedded DB. Features: matching, messaging, relationship transitions (Friend Zone/Graceful Exit), pace compatibility, achievements, interests matching.
 
-**Post-JDBI Migration Stats (2026-01-29):** ~100 Java files, 581 tests passing, 60% coverage minimum.
+**Current Stats (2026-01-30):** ~126 Java files, 581 tests passing, 60% coverage minimum.
 
 ### Package Structure
 
@@ -49,6 +49,43 @@ mvn jacoco:report                        # Generate coverage report
 | `ui/`      | JavaFX UI (experimental) | Uses AtlantaFX theme                |
 
 > **Exception:** `ServiceRegistry` is the composition root—the **ONLY** file in `core/` allowed to import storage implementations for dependency injection wiring.
+
+### UI Controller Architecture (`ui/`)
+
+All JavaFX controllers follow the **Action Handler Pattern** introduced in 2026-01-30:
+
+| Component | Purpose | Location |
+|-----------|---------|----------|
+| `BaseController` | Abstract base with subscription lifecycle management | `ui/controller/` |
+| `UiAnimations` | Reusable animation utilities (pulse, fade, shake, bounce) | `ui/util/` |
+| `UiServices` | Toast notifications + ImageCache | `ui/util/` |
+| `UiComponents` | Reusable UI component factories | `ui/component/` |
+
+**Action Handler Wiring Pattern:**
+```java
+public class MyController extends BaseController {
+    @Override
+    public void initialize(URL url, ResourceBundle rb) {
+        wireActionHandlers();  // Centralized event binding
+    }
+
+    private void wireActionHandlers() {
+        if (myButton != null) {
+            myButton.setOnAction(event -> {
+                event.consume();  // Prevent event bubbling
+                handleMyAction();
+            });
+            myButton.disableProperty().bind(viewModel.loadingProperty());
+        }
+    }
+}
+```
+
+**Key Patterns:**
+- Null-check FXML elements before binding (some views may not have all elements)
+- Always call `event.consume()` to prevent unintended propagation
+- Bind disable properties to loading states for async operations
+- Use `BaseController.addSubscription()` for listener cleanup
 
 ### Domain Models (`core/`)
 
@@ -270,7 +307,31 @@ static class InMemoryUserStorage implements User.Storage {
 | PMD        | 3.28.0  | Bug detection (advisory)              |
 | JaCoCo     | 0.8.14  | Coverage (60% min, excludes ui/cli)   |
 
-## Recent Updates (2026-01-29)
+## Recent Updates
+
+### UI Controller Action Handlers (2026-01-30)
+All 6 JavaFX controllers enhanced with consistent action handler patterns:
+
+**What Changed:**
+- Introduced `BaseController` abstract class with subscription lifecycle management
+- All event handlers moved to dedicated `wireActionHandlers()` / `wireNavigationButtons()` / `wireAuxiliaryActions()` methods
+- Added keyboard shortcuts in `MatchingController` (Ctrl+Z for undo, arrow keys for swipe)
+- Enhanced `UiAnimations` with 8+ reusable animation utilities (pulse, fade, shake, bounce, parallax)
+- Consolidated `UiServices` with Toast notification system and ImageCache
+
+**Controllers Updated:**
+- `MatchingController` - Action handlers + keyboard shortcuts
+- `PreferencesController` - Save/back/theme toggle buttons
+- `ProfileController` - Photo upload + dealbreakers editor
+- `DashboardController` - Six navigation buttons
+- `MatchesController` - Navigation wiring
+- `LoginController` - Create account button + keyboard setup
+
+**Benefits:**
+- Separation of concerns (action binding isolated from initialization)
+- Memory leak prevention via `BaseController.addSubscription()`
+- Consistent `event.consume()` pattern prevents event bubbling
+- Accessibility improvements with keyboard shortcuts
 
 ### JDBI Migration Complete (2026-01-29)
 All 16 storage implementations migrated from manual JDBC (`H2*Storage`) to **JDBI declarative SQL** (`Jdbi*Storage`):
@@ -351,4 +412,5 @@ The codebase underwent significant consolidation reducing file count by ~26% (15
 4|2026-01-25 12:00:00|agent:claude_code|docs|Updated CLAUDE.md for post-consolidation: nested Storage interfaces, new domain groupings (Messaging/Social/Stats/Preferences/UserInteractions), service merges, AbstractH2Storage|CLAUDE.md
 5|2026-01-28 12:00:00|agent:claude_code|docs|Updated stats (118 files), added ValidationService, ServiceRegistry exception note, 39 interests, 2026-01-27 UI/storage changes|CLAUDE.md
 6|2026-01-29 16:30:00|agent:claude_code|storage|JDBI migration complete: H2*Storage→Jdbi*Storage, declarative SQL, deleted 12 files (~1500 LOC), 581 tests passing|storage/jdbi/*,storage/mapper/*,CLAUDE.md
+7|2026-01-30 14:00:00|agent:claude_code|ui-controllers|Action handler pattern: BaseController, wireActionHandlers(), UiAnimations, UiServices, keyboard shortcuts|ui/controller/*,ui/util/*,CLAUDE.md
 ---AGENT-LOG-END---

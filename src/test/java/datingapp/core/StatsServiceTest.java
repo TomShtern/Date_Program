@@ -12,9 +12,8 @@ import datingapp.core.UserInteractions.Report;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.PlatformStatsStorage;
 import datingapp.core.storage.ReportStorage;
-import datingapp.core.storage.UserStatsStorage;
+import datingapp.core.storage.StatsStorage;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,8 +42,7 @@ class StatsServiceTest {
     private InMemoryMatchStorage matchStorage;
     private InMemoryBlockStorage blockStorage;
     private InMemoryReportStorage reportStorage;
-    private InMemoryUserStatsStorage userStatsStorage;
-    private InMemoryPlatformStatsStorage platformStatsStorage;
+    private InMemoryStatsStorage statsStorage;
     private StatsService statsService;
 
     private UUID userId;
@@ -56,11 +54,9 @@ class StatsServiceTest {
         matchStorage = new InMemoryMatchStorage();
         blockStorage = new InMemoryBlockStorage();
         reportStorage = new InMemoryReportStorage();
-        userStatsStorage = new InMemoryUserStatsStorage();
-        platformStatsStorage = new InMemoryPlatformStatsStorage();
+        statsStorage = new InMemoryStatsStorage();
 
-        statsService = new StatsService(
-                likeStorage, matchStorage, blockStorage, reportStorage, userStatsStorage, platformStatsStorage);
+        statsService = new StatsService(likeStorage, matchStorage, blockStorage, reportStorage, statsStorage);
 
         userId = UUID.randomUUID();
         otherUserId = UUID.randomUUID();
@@ -197,7 +193,7 @@ class StatsServiceTest {
         void savesStatsToStorage() {
             statsService.computeAndSaveStats(userId);
 
-            Optional<UserStats> saved = userStatsStorage.getLatest(userId);
+            Optional<UserStats> saved = statsStorage.getLatestUserStats(userId);
             assertTrue(saved.isPresent());
             assertEquals(userId, saved.get().userId());
         }
@@ -313,7 +309,7 @@ class StatsServiceTest {
         void savesPlatformStatsToStorage() {
             statsService.computeAndSavePlatformStats();
 
-            Optional<PlatformStats> saved = platformStatsStorage.getLatest();
+            Optional<PlatformStats> saved = statsStorage.getLatestPlatformStats();
             assertTrue(saved.isPresent());
         }
     }
@@ -601,53 +597,50 @@ class StatsServiceTest {
         }
     }
 
-    private static class InMemoryUserStatsStorage implements UserStatsStorage {
-        private final Map<UUID, UserStats> stats = new HashMap<>();
+    private static class InMemoryStatsStorage implements StatsStorage {
+        private final Map<UUID, UserStats> userStats = new HashMap<>();
+        private PlatformStats latestPlatformStats;
 
         @Override
-        public void save(UserStats userStats) {
-            stats.put(userStats.userId(), userStats);
+        public void saveUserStats(UserStats stats) {
+            userStats.put(stats.userId(), stats);
         }
 
         @Override
-        public Optional<UserStats> getLatest(UUID userId) {
-            return Optional.ofNullable(stats.get(userId));
+        public Optional<UserStats> getLatestUserStats(UUID userId) {
+            return Optional.ofNullable(userStats.get(userId));
         }
 
         @Override
-        public List<UserStats> getHistory(UUID userId, int limit) {
-            UserStats s = stats.get(userId);
+        public List<UserStats> getUserStatsHistory(UUID userId, int limit) {
+            UserStats s = userStats.get(userId);
             return s == null ? List.of() : List.of(s);
         }
 
         @Override
-        public List<UserStats> getAllLatestStats() {
-            return new ArrayList<>(stats.values());
+        public List<UserStats> getAllLatestUserStats() {
+            return new ArrayList<>(userStats.values());
         }
 
         @Override
-        public int deleteOlderThan(Instant cutoff) {
+        public int deleteUserStatsOlderThan(Instant cutoff) {
             // No-op for tests - all stats are fresh
             return 0;
         }
-    }
-
-    private static class InMemoryPlatformStatsStorage implements PlatformStatsStorage {
-        private PlatformStats latest;
 
         @Override
-        public void save(PlatformStats stats) {
-            this.latest = stats;
+        public void savePlatformStats(PlatformStats stats) {
+            this.latestPlatformStats = stats;
         }
 
         @Override
-        public Optional<PlatformStats> getLatest() {
-            return Optional.ofNullable(latest);
+        public Optional<PlatformStats> getLatestPlatformStats() {
+            return Optional.ofNullable(latestPlatformStats);
         }
 
         @Override
-        public List<PlatformStats> getHistory(int limit) {
-            return latest == null ? List.of() : List.of(latest);
+        public List<PlatformStats> getPlatformStatsHistory(int limit) {
+            return latestPlatformStats == null ? List.of() : List.of(latestPlatformStats);
         }
     }
 }
