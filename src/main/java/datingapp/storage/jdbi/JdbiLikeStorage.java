@@ -6,10 +6,12 @@ import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
@@ -71,12 +73,42 @@ public interface JdbiLikeStorage extends LikeStorage {
     @Override
     Set<UUID> getUserIdsWhoLiked(@Bind("userId") UUID userId);
 
+    /**
+     * Internal query that returns like times as DTOs.
+     * Not exposed in LikeStorage interface - used by default methods.
+     */
     @SqlQuery("""
       SELECT who_likes, created_at FROM likes
       WHERE who_got_liked = :userId AND direction = 'LIKE'
       """)
+    @RegisterRowMapper(LikeTimeEntryMapper.class)
+    List<LikeTimeEntry> getLikeTimesInternal(@Bind("userId") UUID userId);
+
     @Override
-    Map<UUID, Instant> getLikeTimesForUsersWhoLiked(@Bind("userId") UUID userId);
+    default List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
+        return getLikeTimesInternal(userId).stream()
+                .map(e -> Map.entry(e.userId(), e.likedAt()))
+                .toList();
+    }
+
+    @Override
+    default Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
+        return getLikeTimesInternal(userId).stream()
+                .collect(Collectors.toMap(LikeTimeEntry::userId, LikeTimeEntry::likedAt));
+    }
+
+    /** Simple DTO to hold liker ID and like timestamp. */
+    record LikeTimeEntry(UUID userId, Instant likedAt) {}
+
+    /** Row mapper for LikeTimeEntry. */
+    class LikeTimeEntryMapper implements RowMapper<LikeTimeEntry> {
+        @Override
+        public LikeTimeEntry map(ResultSet rs, StatementContext ctx) throws SQLException {
+            UUID userId = MapperHelper.readUuid(rs, "who_likes");
+            Instant likedAt = MapperHelper.readInstant(rs, "created_at");
+            return new LikeTimeEntry(userId, likedAt);
+        }
+    }
 
     @SqlQuery("""
       SELECT COUNT(*) FROM likes

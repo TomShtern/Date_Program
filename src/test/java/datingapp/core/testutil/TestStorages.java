@@ -250,6 +250,11 @@ public final class TestStorages {
         }
 
         @Override
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
+            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
+        }
+
+        @Override
         public boolean mutualLikeExists(UUID user1, UUID user2) {
             Like like1 = likes.get(key(user1, user2));
             Like like2 = likes.get(key(user2, user1));

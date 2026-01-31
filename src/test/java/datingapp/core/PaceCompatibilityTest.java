@@ -227,6 +227,11 @@ class PaceCompatibilityTest {
         }
 
         @Override
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
+            return List.of();
+        }
+
+        @Override
         public int countByDirection(UUID userId, Like.Direction direction) {
             return 0;
         }

@@ -13,6 +13,7 @@ import datingapp.core.storage.MatchStorage;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -387,6 +388,11 @@ class UndoServiceTest {
                 }
             }
             return result;
+        }
+
+        @Override
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
+            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
         }
 
         @Override

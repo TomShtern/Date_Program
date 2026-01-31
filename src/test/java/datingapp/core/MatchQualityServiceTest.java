@@ -614,6 +614,13 @@ class MatchQualityServiceTest {
         }
 
         @Override
+        public java.util.List<java.util.Map.Entry<UUID, java.time.Instant>> getLikeTimesForUsersWhoLikedAsList(
+                UUID userId) {
+            return new java.util.ArrayList<>(
+                    getLikeTimesForUsersWhoLiked(userId).entrySet());
+        }
+
+        @Override
         public int countByDirection(UUID userId, Like.Direction direction) {
             return 0;
         }

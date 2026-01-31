@@ -328,6 +328,11 @@ class DailyPickServiceTest {
         }
 
         @Override
+        public List<java.util.Map.Entry<UUID, java.time.Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
+            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
+        }
+
+        @Override
         public int countByDirection(UUID userId, Like.Direction direction) {
             return (int) likes.stream()
                     .filter(l -> l.whoLikes().equals(userId))

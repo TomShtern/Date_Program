@@ -79,8 +79,10 @@
             <Region HBox.hgrow="ALWAYS"/>
             <Label styleClass="text-secondary, stat-label-secondary" text="Coming Soon"/>
           </HBox>
-          <!-- Achievement Cards Grid -->
-          <VBox spacing="12" styleClass="achievements-container">
+          <!-- Achievement List -->
+          <ListView fx:id="achievementListView" styleClass="achievement-list-view" maxHeight="Infinity" minHeight="400"/>
+          <!-- Alternative static content if ListView is not populated -->
+          <VBox fx:id="staticAchievementsContainer" spacing="12" styleClass="achievements-container" visible="false">
             <!-- First Match Achievement -->
             <HBox styleClass="achievement-card" spacing="16" alignment="CENTER_LEFT">
               <StackPane styleClass="achievement-badge-icon">

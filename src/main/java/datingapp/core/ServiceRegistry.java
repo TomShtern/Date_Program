@@ -314,6 +314,11 @@ public class ServiceRegistry {
 
             jdbi.registerArgument(new datingapp.storage.jdbi.EnumSetArgumentFactory());
             jdbi.registerColumnMapper(new datingapp.storage.jdbi.EnumSetColumnMapper());
+            // Register mapper for Instant type to handle Map<UUID, Instant> mappings
+            jdbi.registerColumnMapper(java.time.Instant.class, (rs, col, ctx) -> {
+                java.sql.Timestamp ts = rs.getTimestamp(col);
+                return ts != null ? ts.toInstant() : null;
+            });
 
             // ═══════════════════════════════════════════════════════════════
             // Storage Instantiation (inlined from StorageModule.forH2)

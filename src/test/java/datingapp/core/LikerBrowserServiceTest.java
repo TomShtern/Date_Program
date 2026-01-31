@@ -173,6 +173,11 @@ class LikerBrowserServiceTest {
         }
 
         @Override
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
+            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
+        }
+
+        @Override
         public int countByDirection(UUID userId, Like.Direction direction) {
             throw new UnsupportedOperationException();
         }

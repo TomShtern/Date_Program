@@ -157,10 +157,10 @@ public class MatchingService {
         excluded.addAll(blocked);
         excluded.addAll(matched);
 
-        var likeTimes = likeStorage.getLikeTimesForUsersWhoLiked(currentUserId);
+        var likeTimes = likeStorage.getLikeTimesForUsersWhoLikedAsList(currentUserId);
 
         List<PendingLiker> result = new ArrayList<>();
-        for (var entry : likeTimes.entrySet()) {
+        for (var entry : likeTimes) {
             UUID likerId = entry.getKey();
             User liker = userStorage.get(likerId);
             if (excluded.contains(likerId) || liker == null || liker.getState() != User.State.ACTIVE) {
