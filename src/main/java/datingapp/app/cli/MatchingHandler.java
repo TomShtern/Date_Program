@@ -1,6 +1,5 @@
 package datingapp.app.cli;
 
-import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
 import datingapp.core.CandidateFinder;
 import datingapp.core.CandidateFinder.GeoUtils;
@@ -609,17 +608,29 @@ public class MatchingHandler {
     }
 
     private void checkAndDisplayNewAchievements(User currentUser) {
-        List<UserAchievement> newAchievements = achievementService.checkAndUnlock(currentUser.getId());
-        if (!newAchievements.isEmpty()) {
-            logger.info("\n🏆 NEW ACHIEVEMENTS UNLOCKED! 🏆");
-            for (UserAchievement ua : newAchievements) {
-                logger.info(
-                        "  ✨ {} - {}",
-                        ua.achievement().getDisplayName(),
-                        ua.achievement().getDescription());
-            }
-            logger.info("");
+        // The nested UserAchievement type is package-private; avoid directly
+        // referencing it to prevent access issues. Use a generic List and
+        // reflection to read the public Achievement data.
+        Object raw = achievementService.checkAndUnlock(currentUser.getId());
+        if (!(raw instanceof java.util.List<?> newAchievements) || newAchievements.isEmpty()) {
+            return;
         }
+
+        logger.info("\n🏆 NEW ACHIEVEMENTS UNLOCKED! 🏆");
+        for (Object ua : newAchievements) {
+            try {
+                java.lang.reflect.Method achievementMethod = ua.getClass().getMethod("achievement");
+                Object achievement = achievementMethod.invoke(ua);
+                java.lang.reflect.Method nameMethod = achievement.getClass().getMethod("getDisplayName");
+                java.lang.reflect.Method descMethod = achievement.getClass().getMethod("getDescription");
+                Object name = nameMethod.invoke(achievement);
+                Object desc = descMethod.invoke(achievement);
+                logger.info("  ✨ {} - {}", String.valueOf(name), String.valueOf(desc));
+            } catch (ReflectiveOperationException e) {
+                logger.warn("Could not display achievement details", e);
+            }
+        }
+        logger.info("");
     }
 
     /**

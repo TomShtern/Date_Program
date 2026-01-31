@@ -29,35 +29,65 @@ import java.util.Objects;
 @SuppressWarnings("java:S6539")
 public class ServiceRegistry {
 
+    // ─────────────────────────────────────────────
     // Configuration
+    // ─────────────────────────────────────────────
     private final AppConfig config;
 
-    // Storage layer
+    // ─────────────────────────────────────────────
+    // Core Storage (Users, Likes, Matches)
+    // ─────────────────────────────────────────────
     private final UserStorage userStorage;
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
     private final BlockStorage blockStorage;
-    private final ReportStorage reportStorage;
     private final SwipeSessionStorage sessionStorage;
+
+    // ─────────────────────────────────────────────
+    // Trust & Safety Storage
+    // ─────────────────────────────────────────────
+    private final ReportStorage reportStorage;
+
+    // ─────────────────────────────────────────────
+    // Profile & Stats Storage
+    // ─────────────────────────────────────────────
     private final StatsStorage statsStorage; // Consolidated: user + platform stats
     private final DailyPickStorage dailyPickStorage;
     private final UserAchievementStorage userAchievementStorage;
     private final ProfileViewStorage profileViewStorage;
     private final ProfileNoteStorage profileNoteStorage;
+
+    // ─────────────────────────────────────────────
+    // Messaging & Social Storage
+    // ─────────────────────────────────────────────
     private final MessagingStorage messagingStorage; // Consolidated: conversation + message
     private final SocialStorage socialStorage; // Consolidated: friend request + notification
 
-    // Services
+    // ─────────────────────────────────────────────
+    // Core Services (Matching)
+    // ─────────────────────────────────────────────
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
-    private final TrustSafetyService trustSafetyService;
     private final SessionService sessionService;
-    private final StatsService statsService;
     private final MatchQualityService matchQualityService;
-    private final ProfilePreviewService profilePreviewService;
     private final DailyService dailyService;
     private final UndoService undoService;
+
+    // ─────────────────────────────────────────────
+    // Trust & Safety Services
+    // ─────────────────────────────────────────────
+    private final TrustSafetyService trustSafetyService;
+
+    // ─────────────────────────────────────────────
+    // Stats & Achievement Services
+    // ─────────────────────────────────────────────
+    private final StatsService statsService;
+    private final ProfilePreviewService profilePreviewService;
     private final AchievementService achievementService;
+
+    // ─────────────────────────────────────────────
+    // Messaging & Relationship Services
+    // ─────────────────────────────────────────────
     private final MessagingService messagingService; // Messaging
     private final RelationshipTransitionService relationshipTransitionService;
 
@@ -118,11 +148,13 @@ public class ServiceRegistry {
         this.relationshipTransitionService = Objects.requireNonNull(relationshipTransitionService);
     }
 
-    // === Getters ===
+    // === Configuration ===
 
     public AppConfig getConfig() {
         return config;
     }
+
+    // === Core Storage ===
 
     public UserStorage getUserStorage() {
         return userStorage;
@@ -140,52 +172,20 @@ public class ServiceRegistry {
         return blockStorage;
     }
 
-    public ReportStorage getReportStorage() {
-        return reportStorage;
-    }
-
     public SwipeSessionStorage getSessionStorage() {
         return sessionStorage;
     }
 
+    // === Trust & Safety Storage ===
+
+    public ReportStorage getReportStorage() {
+        return reportStorage;
+    }
+
+    // === Profile & Stats Storage ===
+
     public StatsStorage getStatsStorage() {
         return statsStorage;
-    }
-
-    public CandidateFinder getCandidateFinder() {
-        return candidateFinder;
-    }
-
-    public MatchingService getMatchingService() {
-        return matchingService;
-    }
-
-    public TrustSafetyService getTrustSafetyService() {
-        return trustSafetyService;
-    }
-
-    public SessionService getSessionService() {
-        return sessionService;
-    }
-
-    public StatsService getStatsService() {
-        return statsService;
-    }
-
-    public MatchQualityService getMatchQualityService() {
-        return matchQualityService;
-    }
-
-    public ProfilePreviewService getProfilePreviewService() {
-        return profilePreviewService;
-    }
-
-    public DailyService getDailyService() {
-        return dailyService;
-    }
-
-    public UndoService getUndoService() {
-        return undoService;
     }
 
     public DailyPickStorage getDailyPickStorage() {
@@ -196,10 +196,6 @@ public class ServiceRegistry {
         return userAchievementStorage;
     }
 
-    public AchievementService getAchievementService() {
-        return achievementService;
-    }
-
     public ProfileViewStorage getProfileViewStorage() {
         return profileViewStorage;
     }
@@ -208,16 +204,66 @@ public class ServiceRegistry {
         return profileNoteStorage;
     }
 
+    // === Messaging & Social Storage ===
+
     public MessagingStorage getMessagingStorage() {
         return messagingStorage;
     }
 
-    public MessagingService getMessagingService() {
-        return messagingService;
-    }
-
     public SocialStorage getSocialStorage() {
         return socialStorage;
+    }
+
+    // === Matching Services ===
+
+    public CandidateFinder getCandidateFinder() {
+        return candidateFinder;
+    }
+
+    public MatchingService getMatchingService() {
+        return matchingService;
+    }
+
+    public SessionService getSessionService() {
+        return sessionService;
+    }
+
+    public MatchQualityService getMatchQualityService() {
+        return matchQualityService;
+    }
+
+    public DailyService getDailyService() {
+        return dailyService;
+    }
+
+    public UndoService getUndoService() {
+        return undoService;
+    }
+
+    // === Trust & Safety Services ===
+
+    public TrustSafetyService getTrustSafetyService() {
+        return trustSafetyService;
+    }
+
+    // === Stats & Achievement Services ===
+
+    public StatsService getStatsService() {
+        return statsService;
+    }
+
+    public ProfilePreviewService getProfilePreviewService() {
+        return profilePreviewService;
+    }
+
+    public AchievementService getAchievementService() {
+        return achievementService;
+    }
+
+    // === Messaging & Relationship Services ===
+
+    public MessagingService getMessagingService() {
+        return messagingService;
     }
 
     public RelationshipTransitionService getRelationshipTransitionService() {

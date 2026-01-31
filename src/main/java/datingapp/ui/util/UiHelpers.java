@@ -15,7 +15,8 @@ import javafx.scene.paint.Color;
 
 /**
  * Consolidated UI helper utilities for the JavaFX application.
- * Contains: ResponsiveController (interface), ValidationHelper, ConfettiAnimation
+ * Contains: ResponsiveController (interface), ValidationHelper,
+ * ConfettiAnimation
  */
 public final class UiHelpers {
 
@@ -27,13 +28,15 @@ public final class UiHelpers {
 
     /**
      * Interface for controllers that support responsive layout changes.
-     * Implement this in controllers that need to adapt their UI based on window size.
+     * Implement this in controllers that need to adapt their UI based on window
+     * size.
      */
     public interface ResponsiveController {
 
         /**
          * Called when the window enters compact mode (width < 900px).
-         * Controllers should hide non-essential UI elements and use single-column layouts.
+         * Controllers should hide non-essential UI elements and use single-column
+         * layouts.
          *
          * @param compact true to enable compact mode, false for normal mode
          */

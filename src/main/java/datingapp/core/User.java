@@ -19,6 +19,9 @@ import java.util.UUID;
  */
 public class User {
 
+    /** Configuration for validation thresholds. */
+    private static final AppConfig CONFIG = AppConfig.defaults();
+
     /** Represents the gender options available for users. */
     public enum Gender {
         MALE,
@@ -485,22 +488,22 @@ public class User {
     }
 
     public void setMaxDistanceKm(int maxDistanceKm) {
-        if (maxDistanceKm < 1) {
-            throw new IllegalArgumentException("maxDistanceKm must be at least 1");
+        if (maxDistanceKm < CONFIG.minDistanceKm()) {
+            throw new IllegalArgumentException("maxDistanceKm must be at least " + CONFIG.minDistanceKm());
         }
-        if (maxDistanceKm > 500) {
-            throw new IllegalArgumentException("maxDistanceKm cannot exceed 500");
+        if (maxDistanceKm > CONFIG.maxDistanceKm()) {
+            throw new IllegalArgumentException("maxDistanceKm cannot exceed " + CONFIG.maxDistanceKm());
         }
         this.maxDistanceKm = maxDistanceKm;
         touch();
     }
 
     public void setAgeRange(int minAge, int maxAge) {
-        if (minAge < 18) {
-            throw new IllegalArgumentException("minAge must be at least 18");
+        if (minAge < CONFIG.minAge()) {
+            throw new IllegalArgumentException("minAge must be at least " + CONFIG.minAge());
         }
-        if (maxAge > 120) {
-            throw new IllegalArgumentException("maxAge cannot exceed 120");
+        if (maxAge > CONFIG.maxAge()) {
+            throw new IllegalArgumentException("maxAge cannot exceed " + CONFIG.maxAge());
         }
         if (maxAge < minAge) {
             throw new IllegalArgumentException("maxAge cannot be less than minAge");
@@ -556,8 +559,9 @@ public class User {
     }
 
     public void setHeightCm(Integer heightCm) {
-        if (heightCm != null && (heightCm < 50 || heightCm > 300)) {
-            throw new IllegalArgumentException("Height must be 50-300cm");
+        if (heightCm != null && (heightCm < CONFIG.minHeightCm() || heightCm > CONFIG.maxHeightCm())) {
+            throw new IllegalArgumentException(
+                    "Height must be " + CONFIG.minHeightCm() + "-" + CONFIG.maxHeightCm() + "cm");
         }
         this.heightCm = heightCm;
         touch();

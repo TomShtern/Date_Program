@@ -92,54 +92,54 @@ public final class DatabaseManager {
 
             // Users table
             stmt.execute("""
-                            CREATE TABLE IF NOT EXISTS users (
-                                id UUID PRIMARY KEY,
-                                name VARCHAR(100) NOT NULL,
-                                bio VARCHAR(500),
-                                birth_date DATE,
-                                gender VARCHAR(20),
-                                interested_in VARCHAR(100),
-                                lat DOUBLE,
-                                lon DOUBLE,
-                                max_distance_km INT DEFAULT 50,
-                                min_age INT DEFAULT 18,
-                                max_age INT DEFAULT 99,
-                                photo_urls VARCHAR(1000),
-                                state VARCHAR(20) NOT NULL DEFAULT 'INCOMPLETE',
-                                created_at TIMESTAMP NOT NULL,
-                                updated_at TIMESTAMP NOT NULL,
-                                -- Lifestyle fields (Phase 0.5b)
-                                smoking VARCHAR(20),
-                                drinking VARCHAR(20),
-                                wants_kids VARCHAR(20),
-                                looking_for VARCHAR(20),
-                                education VARCHAR(20),
-                                height_cm INT,
-                                -- Dealbreaker fields (Phase 0.5b) - CSV storage
-                                db_smoking VARCHAR(100),
-                                db_drinking VARCHAR(100),
-                                db_wants_kids VARCHAR(100),
-                                db_looking_for VARCHAR(100),
-                                db_education VARCHAR(200),
-                                db_min_height_cm INT,
-                                db_max_height_cm INT,
-                                db_max_age_diff INT,
-                                interests VARCHAR(500),
-                                -- Profile verification fields (Phase 2)
-                                email VARCHAR(200),
-                                phone VARCHAR(50),
-                                is_verified BOOLEAN,
-                                verification_method VARCHAR(10),
-                                verification_code VARCHAR(10),
-                                verification_sent_at TIMESTAMP,
-                                verified_at TIMESTAMP,
-                                -- Pace preference fields (Phase 4)
-                                pace_messaging_frequency VARCHAR(30),
-                                pace_time_to_first_date VARCHAR(30),
-                                pace_communication_style VARCHAR(30),
-                                pace_depth_preference VARCHAR(30)
-                            )
-                            """);
+                    CREATE TABLE IF NOT EXISTS users (
+                        id UUID PRIMARY KEY,
+                        name VARCHAR(100) NOT NULL,
+                        bio VARCHAR(500),
+                        birth_date DATE,
+                        gender VARCHAR(20),
+                        interested_in VARCHAR(100),
+                        lat DOUBLE,
+                        lon DOUBLE,
+                        max_distance_km INT DEFAULT 50,
+                        min_age INT DEFAULT 18,
+                        max_age INT DEFAULT 99,
+                        photo_urls VARCHAR(1000),
+                        state VARCHAR(20) NOT NULL DEFAULT 'INCOMPLETE',
+                        created_at TIMESTAMP NOT NULL,
+                        updated_at TIMESTAMP NOT NULL,
+                        -- Lifestyle fields (Phase 0.5b)
+                        smoking VARCHAR(20),
+                        drinking VARCHAR(20),
+                        wants_kids VARCHAR(20),
+                        looking_for VARCHAR(20),
+                        education VARCHAR(20),
+                        height_cm INT,
+                        -- Dealbreaker fields (Phase 0.5b) - CSV storage
+                        db_smoking VARCHAR(100),
+                        db_drinking VARCHAR(100),
+                        db_wants_kids VARCHAR(100),
+                        db_looking_for VARCHAR(100),
+                        db_education VARCHAR(200),
+                        db_min_height_cm INT,
+                        db_max_height_cm INT,
+                        db_max_age_diff INT,
+                        interests VARCHAR(500),
+                        -- Profile verification fields (Phase 2)
+                        email VARCHAR(200),
+                        phone VARCHAR(50),
+                        is_verified BOOLEAN,
+                        verification_method VARCHAR(10),
+                        verification_code VARCHAR(10),
+                        verification_sent_at TIMESTAMP,
+                        verified_at TIMESTAMP,
+                        -- Pace preference fields (Phase 4)
+                        pace_messaging_frequency VARCHAR(30),
+                        pace_time_to_first_date VARCHAR(30),
+                        pace_communication_style VARCHAR(30),
+                        pace_depth_preference VARCHAR(30)
+                    )
+                    """);
 
             // Add columns for existing databases (Phase 0.5b migration)
             migrateSchemaColumns(stmt);
@@ -160,37 +160,37 @@ public final class DatabaseManager {
 
             // Matches table
             stmt.execute("""
-                            CREATE TABLE IF NOT EXISTS matches (
-                                id VARCHAR(100) PRIMARY KEY,
-                                user_a UUID NOT NULL,
-                                user_b UUID NOT NULL,
-                                created_at TIMESTAMP NOT NULL,
-                                state VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-                                ended_at TIMESTAMP,
-                                ended_by UUID,
-                                end_reason VARCHAR(30),
-                                CONSTRAINT fk_matches_user_a FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
-                                CONSTRAINT fk_matches_user_b FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE,
-                                CONSTRAINT uk_matches UNIQUE (user_a, user_b)
-                            )
-                            """);
+                    CREATE TABLE IF NOT EXISTS matches (
+                        id VARCHAR(100) PRIMARY KEY,
+                        user_a UUID NOT NULL,
+                        user_b UUID NOT NULL,
+                        created_at TIMESTAMP NOT NULL,
+                        state VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+                        ended_at TIMESTAMP,
+                        ended_by UUID,
+                        end_reason VARCHAR(30),
+                        CONSTRAINT fk_matches_user_a FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
+                        CONSTRAINT fk_matches_user_b FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE,
+                        CONSTRAINT uk_matches UNIQUE (user_a, user_b)
+                    )
+                    """);
 
             // Swipe sessions table (Phase 0.5b)
             stmt.execute("""
-                            CREATE TABLE IF NOT EXISTS swipe_sessions (
-                                id UUID PRIMARY KEY,
-                                user_id UUID NOT NULL,
-                                started_at TIMESTAMP NOT NULL,
-                                last_activity_at TIMESTAMP NOT NULL,
-                                ended_at TIMESTAMP,
-                                state VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-                                swipe_count INT NOT NULL DEFAULT 0,
-                                like_count INT NOT NULL DEFAULT 0,
-                                pass_count INT NOT NULL DEFAULT 0,
-                                match_count INT NOT NULL DEFAULT 0,
-                                CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                            )
-                            """);
+                    CREATE TABLE IF NOT EXISTS swipe_sessions (
+                        id UUID PRIMARY KEY,
+                        user_id UUID NOT NULL,
+                        started_at TIMESTAMP NOT NULL,
+                        last_activity_at TIMESTAMP NOT NULL,
+                        ended_at TIMESTAMP,
+                        state VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+                        swipe_count INT NOT NULL DEFAULT 0,
+                        like_count INT NOT NULL DEFAULT 0,
+                        pass_count INT NOT NULL DEFAULT 0,
+                        match_count INT NOT NULL DEFAULT 0,
+                        CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    )
+                    """);
 
             // Indexes
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_likes_who_likes ON likes(who_likes)");
@@ -208,44 +208,44 @@ public final class DatabaseManager {
 
             // User stats snapshots table (Phase 0.5b)
             stmt.execute("""
-                            CREATE TABLE IF NOT EXISTS user_stats (
-                                id UUID PRIMARY KEY,
-                                user_id UUID NOT NULL,
-                                computed_at TIMESTAMP NOT NULL,
-                                total_swipes_given INT NOT NULL DEFAULT 0,
-                                likes_given INT NOT NULL DEFAULT 0,
-                                passes_given INT NOT NULL DEFAULT 0,
-                                like_ratio DOUBLE NOT NULL DEFAULT 0.0,
-                                total_swipes_received INT NOT NULL DEFAULT 0,
-                                likes_received INT NOT NULL DEFAULT 0,
-                                passes_received INT NOT NULL DEFAULT 0,
-                                incoming_like_ratio DOUBLE NOT NULL DEFAULT 0.0,
-                                total_matches INT NOT NULL DEFAULT 0,
-                                active_matches INT NOT NULL DEFAULT 0,
-                                match_rate DOUBLE NOT NULL DEFAULT 0.0,
-                                blocks_given INT NOT NULL DEFAULT 0,
-                                blocks_received INT NOT NULL DEFAULT 0,
-                                reports_given INT NOT NULL DEFAULT 0,
-                                reports_received INT NOT NULL DEFAULT 0,
-                                reciprocity_score DOUBLE NOT NULL DEFAULT 0.0,
-                                selectiveness_score DOUBLE NOT NULL DEFAULT 0.5,
-                                attractiveness_score DOUBLE NOT NULL DEFAULT 0.5,
-                                CONSTRAINT fk_user_stats_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                            )
-                            """);
+                    CREATE TABLE IF NOT EXISTS user_stats (
+                        id UUID PRIMARY KEY,
+                        user_id UUID NOT NULL,
+                        computed_at TIMESTAMP NOT NULL,
+                        total_swipes_given INT NOT NULL DEFAULT 0,
+                        likes_given INT NOT NULL DEFAULT 0,
+                        passes_given INT NOT NULL DEFAULT 0,
+                        like_ratio DOUBLE NOT NULL DEFAULT 0.0,
+                        total_swipes_received INT NOT NULL DEFAULT 0,
+                        likes_received INT NOT NULL DEFAULT 0,
+                        passes_received INT NOT NULL DEFAULT 0,
+                        incoming_like_ratio DOUBLE NOT NULL DEFAULT 0.0,
+                        total_matches INT NOT NULL DEFAULT 0,
+                        active_matches INT NOT NULL DEFAULT 0,
+                        match_rate DOUBLE NOT NULL DEFAULT 0.0,
+                        blocks_given INT NOT NULL DEFAULT 0,
+                        blocks_received INT NOT NULL DEFAULT 0,
+                        reports_given INT NOT NULL DEFAULT 0,
+                        reports_received INT NOT NULL DEFAULT 0,
+                        reciprocity_score DOUBLE NOT NULL DEFAULT 0.0,
+                        selectiveness_score DOUBLE NOT NULL DEFAULT 0.5,
+                        attractiveness_score DOUBLE NOT NULL DEFAULT 0.5,
+                        CONSTRAINT fk_user_stats_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    )
+                    """);
 
             // Platform stats table (Phase 0.5b)
             stmt.execute("""
-                            CREATE TABLE IF NOT EXISTS platform_stats (
-                                id UUID PRIMARY KEY,
-                                computed_at TIMESTAMP NOT NULL,
-                                total_active_users INT NOT NULL DEFAULT 0,
-                                avg_likes_received DOUBLE NOT NULL DEFAULT 0.0,
-                                avg_likes_given DOUBLE NOT NULL DEFAULT 0.0,
-                                avg_match_rate DOUBLE NOT NULL DEFAULT 0.0,
-                                avg_like_ratio DOUBLE NOT NULL DEFAULT 0.5
-                            )
-                            """);
+                    CREATE TABLE IF NOT EXISTS platform_stats (
+                        id UUID PRIMARY KEY,
+                        computed_at TIMESTAMP NOT NULL,
+                        total_active_users INT NOT NULL DEFAULT 0,
+                        avg_likes_received DOUBLE NOT NULL DEFAULT 0.0,
+                        avg_likes_given DOUBLE NOT NULL DEFAULT 0.0,
+                        avg_match_rate DOUBLE NOT NULL DEFAULT 0.0,
+                        avg_like_ratio DOUBLE NOT NULL DEFAULT 0.5
+                    )
+                    """);
 
             // Stats indexes
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_user_stats_user_id ON user_stats(user_id)");
@@ -256,27 +256,27 @@ public final class DatabaseManager {
 
             // Daily pick views table (Phase 1)
             stmt.execute("""
-                            CREATE TABLE IF NOT EXISTS daily_pick_views (
-                                user_id UUID NOT NULL,
-                                viewed_date DATE NOT NULL,
-                                viewed_at TIMESTAMP NOT NULL,
-                                PRIMARY KEY (user_id, viewed_date)
-                            )
-                            """);
+                    CREATE TABLE IF NOT EXISTS daily_pick_views (
+                        user_id UUID NOT NULL,
+                        viewed_date DATE NOT NULL,
+                        viewed_at TIMESTAMP NOT NULL,
+                        PRIMARY KEY (user_id, viewed_date)
+                    )
+                    """);
 
             // Daily pick views index
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_daily_pick_views_date ON daily_pick_views(viewed_date)");
 
             // User achievements table (Phase 1)
             stmt.execute("""
-                            CREATE TABLE IF NOT EXISTS user_achievements (
-                                id UUID PRIMARY KEY,
-                                user_id UUID NOT NULL,
-                                achievement VARCHAR(50) NOT NULL,
-                                unlocked_at TIMESTAMP NOT NULL,
-                                UNIQUE (user_id, achievement)
-                            )
-                            """);
+                    CREATE TABLE IF NOT EXISTS user_achievements (
+                        id UUID PRIMARY KEY,
+                        user_id UUID NOT NULL,
+                        achievement VARCHAR(50) NOT NULL,
+                        unlocked_at TIMESTAMP NOT NULL,
+                        UNIQUE (user_id, achievement)
+                    )
+                    """);
 
             // User achievements index
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_achievements_user_id ON user_achievements(user_id)");
@@ -478,8 +478,8 @@ public final class DatabaseManager {
     /**
      * Records a schema version if not already recorded.
      *
-     * @param stmt The statement to use
-     * @param version The schema version number
+     * @param stmt        The statement to use
+     * @param version     The schema version number
      * @param description Description of what this version includes
      */
     private void recordSchemaVersion(Statement stmt, int version, String description) throws SQLException {
@@ -499,7 +499,8 @@ public final class DatabaseManager {
     /**
      * Adds missing foreign key constraints to existing tables.
      * Uses IF NOT EXISTS to safely handle already-constrained databases.
-     * Silently skips tables that don't exist yet (they'll be created with FKs by their storage classes).
+     * Silently skips tables that don't exist yet (they'll be created with FKs by
+     * their storage classes).
      */
     private void addMissingForeignKeys(Statement stmt) throws SQLException {
         // daily_pick_views - add FK to users

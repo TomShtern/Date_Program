@@ -7,8 +7,15 @@ import java.util.List;
  * Centralized validation service for user input. Provides consistent validation
  * logic for profile
  * fields and preferences with user-friendly error messages.
+ *
+ * <p>
+ * All validation thresholds are sourced from {@link AppConfig#defaults()} for
+ * consistency with domain model validation (FI-CONS-004).
  */
 public class ValidationService {
+
+    /** Shared configuration for validation thresholds. */
+    private static final AppConfig CONFIG = AppConfig.defaults();
 
     /**
      * Result of a validation operation. Contains success status and any error
@@ -48,8 +55,8 @@ public class ValidationService {
         if (name == null || name.isBlank()) {
             return ValidationResult.failure("Name cannot be empty");
         }
-        if (name.length() > 100) {
-            return ValidationResult.failure("Name too long (max 100 chars)");
+        if (name.length() > CONFIG.maxNameLength()) {
+            return ValidationResult.failure("Name too long (max " + CONFIG.maxNameLength() + " chars)");
         }
         return ValidationResult.success();
     }
@@ -61,10 +68,10 @@ public class ValidationService {
      * @return validation result
      */
     public ValidationResult validateAge(int age) {
-        if (age < 18) {
-            return ValidationResult.failure("Must be 18 or older");
+        if (age < CONFIG.minAge()) {
+            return ValidationResult.failure("Must be " + CONFIG.minAge() + " or older");
         }
-        if (age > 120) {
+        if (age > CONFIG.maxAge()) {
             return ValidationResult.failure("Invalid age");
         }
         return ValidationResult.success();
@@ -77,11 +84,11 @@ public class ValidationService {
      * @return validation result
      */
     public ValidationResult validateHeight(int heightCm) {
-        if (heightCm < 50) {
-            return ValidationResult.failure("Height too short (min 50cm)");
+        if (heightCm < CONFIG.minHeightCm()) {
+            return ValidationResult.failure("Height too short (min " + CONFIG.minHeightCm() + "cm)");
         }
-        if (heightCm > 300) {
-            return ValidationResult.failure("Height too tall (max 300cm)");
+        if (heightCm > CONFIG.maxHeightCm()) {
+            return ValidationResult.failure("Height too tall (max " + CONFIG.maxHeightCm() + "cm)");
         }
         return ValidationResult.success();
     }
@@ -93,11 +100,11 @@ public class ValidationService {
      * @return validation result
      */
     public ValidationResult validateDistance(int distanceKm) {
-        if (distanceKm < 1) {
-            return ValidationResult.failure("Distance must be at least 1km");
+        if (distanceKm < CONFIG.minDistanceKm()) {
+            return ValidationResult.failure("Distance must be at least " + CONFIG.minDistanceKm() + "km");
         }
-        if (distanceKm > 500) {
-            return ValidationResult.failure("Distance too far (max 500km)");
+        if (distanceKm > CONFIG.maxDistanceKm()) {
+            return ValidationResult.failure("Distance too far (max " + CONFIG.maxDistanceKm() + "km)");
         }
         return ValidationResult.success();
     }
@@ -112,8 +119,8 @@ public class ValidationService {
         if (bio == null) {
             return ValidationResult.success();
         }
-        if (bio.length() > 1000) {
-            return ValidationResult.failure("Bio too long (max 1000 chars)");
+        if (bio.length() > CONFIG.maxBioLength()) {
+            return ValidationResult.failure("Bio too long (max " + CONFIG.maxBioLength() + " chars)");
         }
         return ValidationResult.success();
     }
@@ -128,17 +135,17 @@ public class ValidationService {
     public ValidationResult validateAgeRange(int min, int max) {
         List<String> errors = new ArrayList<>();
 
-        if (min < 18) {
-            errors.add("Minimum age must be 18+");
+        if (min < CONFIG.minAge()) {
+            errors.add("Minimum age must be " + CONFIG.minAge() + "+");
         }
-        if (max > 120) {
+        if (max > CONFIG.maxAge()) {
             errors.add("Maximum age invalid");
         }
         if (min > max) {
             errors.add("Min age cannot exceed max age");
         }
-        if (max - min < 5) {
-            errors.add("Age range too narrow (min 5 years)");
+        if (max - min < CONFIG.minAgeRangeSpan()) {
+            errors.add("Age range too narrow (min " + CONFIG.minAgeRangeSpan() + " years)");
         }
 
         return errors.isEmpty() ? ValidationResult.success() : ValidationResult.failure(errors);

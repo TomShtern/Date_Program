@@ -7,11 +7,15 @@ import javafx.util.Subscription;
 /**
  * Base class for all controllers providing common lifecycle management.
  *
- * <p>Provides automatic cleanup of Subscription listeners to prevent memory leaks.
- * Controllers should register subscriptions via {@link #addSubscription(Subscription)}
+ * <p>
+ * Provides automatic cleanup of Subscription listeners to prevent memory leaks.
+ * Controllers should register subscriptions via
+ * {@link #addSubscription(Subscription)}
  * and call {@link #cleanup()} when navigating away.
  *
- * <p>Usage:
+ * <p>
+ * Usage:
+ *
  * <pre>
  * public class MyController extends BaseController {
  *     &#64;Override

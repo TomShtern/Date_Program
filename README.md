@@ -12,74 +12,154 @@
 
 
 
-# Dating App CLI
+# Dating App
 
-A command-line based dating application refactored for clean architecture and strict code quality.
+A modern dating application built with **Clean Architecture** principles, featuring both a JavaFX graphical interface and a command-line interface.
 
-## Getting Started
+## ✨ Features
+
+- **User Profiles** — Complete profile management with state machine (Incomplete → Active ↔ Paused → Banned)
+- **Smart Matching** — Bidirectional preference filtering with distance, age, and dealbreaker support
+- **Match System** — Deterministic match IDs, match quality scoring, and relationship transitions
+- **Messaging** — Real-time chat between matched users with read receipts
+- **Statistics & Achievements** — Track activity metrics and unlock achievements
+- **Undo Actions** — Reverse accidental swipes within a configurable window
+- **Daily Picks** — Seeded-random daily recommendations
+
+## 🛠 Tech Stack
+
+| Category            | Technology               | Version                       |
+|---------------------|--------------------------|-------------------------------|
+| **Language**        | Java                     | 25 (preview features enabled) |
+| **UI Framework**    | JavaFX                   | 25.0.1                        |
+| **UI Theme**        | AtlantaFX (Primer-based) | 2.1.0                         |
+| **Icons**           | Ikonli (Material Design 2) | 12.4.0                      |
+| **Database Access** | JDBI 3 (Declarative SQL) | 3.51.0                        |
+| **Database**        | H2 (embedded)            | 2.4.240                       |
+| **JSON**            | Jackson                  | 2.21.0                        |
+| **Testing**         | JUnit 5                  | 5.14.2                        |
+| **Logging**         | SLF4J + Logback          | 2.0.17 / 1.5.25               |
+| **Build**           | Maven                    | 3.8+                          |
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- Java 25
-- Maven
-- **Windows 11**: UTF-8 console encoding (see below)
 
-### Windows 11 Setup (REQUIRED)
+- **Java 25** (JDK with preview features support)
+- **Maven 3.8+**
+- **Windows 11**: Enable UTF-8 encoding (see [Windows Setup](#-windows-setup))
 
-**Enable UTF-8 in PowerShell/CMD** to display emojis correctly:
+### Running the Application
+
+#### GUI Mode (JavaFX) — *Recommended*
+
+```bash
+mvn javafx:run
+```
+
+#### CLI Mode
+
+**Option 1:** Via Maven (may have input buffering)
+```bash
+mvn compile exec:java
+```
+
+**Option 2:** Via shaded JAR (better terminal support)
+```bash
+mvn package
+java --enable-preview -jar target/dating-app-1.0.0-shaded.jar
+```
+
+## 🧪 Testing
+
+Run the full test suite:
+
+```bash
+mvn clean test
+```
+
+**576+ tests** covering core domain, services, and storage layers.
+
+## � Code Quality
+
+| Tool           | Purpose                                | Enforcement          |
+|----------------|----------------------------------------|----------------------|
+| **Spotless**   | Code formatting (Palantir Java Format) | Blocking on `verify` |
+| **Checkstyle** | Style validation                       | Non-blocking         |
+| **PMD**        | Bug & code smell detection             | Non-blocking         |
+| **JaCoCo**     | Test coverage (60% min on `core/`)     | Blocking on `verify` |
+
+### Commands
+
+```bash
+# Format code
+mvn spotless:apply
+
+# Run all checks + tests
+mvn verify
+```
+
+## 🏗 Architecture
+
+```
+datingapp/
+├── core/           # Pure domain models & business logic (no framework deps)
+│   └── storage/    # Storage interfaces (dependency inversion)
+├── storage/        # JDBI-based persistence (H2 database)
+│   └── jdbi/       # SQLObject interfaces
+├── ui/             # JavaFX GUI (MVVM pattern)
+│   ├── controller/ # FXML controllers
+│   └── viewmodel/  # UI state management
+└── app/cli/        # Command-line interface handlers
+```
+
+**Key Principles:**
+- **Core stays pure** — Only `java.*` imports in domain layer
+- **Manual DI** — `ServiceRegistry` pattern (no Spring/framework annotations)
+- **Fail-fast validation** — Constructor validation with `Objects.requireNonNull`
+
+## 💾 Database
+
+Embedded H2 database stored at `./data/dating.mv.db`
+
+| Setting      | Value                                                                  |
+|--------------|------------------------------------------------------------------------|
+| **User**     | `sa`                                                                   |
+| **Password** | Environment variable `DATING_APP_DB_PASSWORD` or default: `changeit`   |
+
+> **Note:** In production, use the environment variable for password management.
+
+## 📚 Documentation
+
+| Document                 | Description                                     |
+|--------------------------|-------------------------------------------------|
+| [GEMINI.md](GEMINI.md)   | AI agent operational context & coding standards |
+| [STATUS.md](STATUS.md)   | Implementation status vs Product Requirements   |
+| [docs/](docs/)           | Additional documentation and completed plans    |
+
+## 📈 Project Statistics
+
+| Metric              | Value               |
+|---------------------|---------------------|
+| **Lines of Code**   | ~16,200             |
+| **Test Cases**      | 576+                |
+| **Core Services**   | 15+                 |
+| **GUI Views**       | 10 FXML screens     |
+| **CLI Handlers**    | 11 command handlers |
+
+## 🪟 Windows Setup
+
+Enable UTF-8 encoding in PowerShell/CMD for proper emoji display:
 
 ```powershell
 chcp 65001
 ```
 
-Then run the application. Or set permanently:
+**Permanent fix:**
 1. Run `intl.cpl`
 2. Administrative → Change system locale
 3. Check "Beta: Use Unicode UTF-8 for worldwide language support"
 4. Restart
-
-### Running the Application
-
-**Option 1: Via Maven** (may have input buffering)
-```bash
-mvn compile exec:java
-```
-
-**Option 2: Via JAR** (recommended for better terminal support)
-```bash
-mvn package
-java -jar target/dating-app-1.0.0-shaded.jar
-```
-
-### Running Tests
-To run the full test suite (99 tests):
-```bash
-mvn clean test
-```
-
-## Code formatting (Spotless) 🔧
-We use Spotless (com.diffplug.spotless:spotless-maven-plugin v3.1.0) with `google-java-format` (v1.19.1) to keep code style consistent.
-
-- Format locally: `mvn spotless:apply`
-- Verify in CI: `mvn spotless:check` (bound to `verify` by default)
-- Optional: install pre-push hook: `mvn spotless:install-git-pre-push-hook`
-
-Note: The first-time run may reformat many files; review `git diff` before committing.
-
-## Important Configuration
-
-### Database
-The application uses an embedded H2 database located in `./data/dating`.
-
-**Credentials:**
-- **User**: `sa`
-- **Password**: `changeit`
-
-> **Note**: The password was added to satisfy security warnings. In a production environment, this would be managed via environment variables.
-
-## Recent Changes
-- Fixed H2 database locking issues by removing `AUTO_SERVER=TRUE` during tests.
-- Refactored `Main.java` for better resource management.
-- Resolved all IDE warnings and compilation errors.
 
 
 
@@ -89,4 +169,5 @@ The application uses an embedded H2 database located in `./data/dating`.
 # Format: SEQ|TS|agent|scope|summary|files
 # Append-only. Do not edit past entries. If SEQ conflict after 3 tries append ":CONFLICT".
 example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples regen|src/ui/*
+1|2026-01-30 20:45:00|agent:antigravity|docs|Complete README rewrite: updated title, tech stack, architecture, test count (99→576), formatting tool (Google→Palantir), added GUI docs, removed stale Recent Changes|README.md
 ---AGENT-LOG-END---

@@ -663,14 +663,14 @@
 
 /* Avatar Glow Ring - Animated outer ring */
 .profile-avatar-glow {
-    -fx-stroke: linear-gradient(to bottom right, #667eea, #764ba2);
+    -fx-stroke: linear-gradient(to bottom right, -fx-primary, -fx-primary-dark);
     -fx-stroke-width: 3;
     -fx-fill: transparent;
 }
 
 /* Avatar Inner Circle */
 .profile-avatar-inner {
-    -fx-background-color: linear-gradient(to bottom right, #1e293b, #0f172a);
+    -fx-background-color: linear-gradient(to bottom right, -fx-surface-dark, -fx-background-dark);
     -fx-background-radius: 60;
     -fx-border-color: rgba(255, 255, 255, 0.1);
     -fx-border-radius: 60;
@@ -706,7 +706,7 @@
 
 /* Progress Fill Arc */
 .progress-fill {
-    -fx-stroke: linear-gradient(to bottom right, #667eea, #764ba2);
+    -fx-stroke: linear-gradient(to bottom right, -fx-primary, -fx-primary-dark);
     -fx-stroke-width: 6;
     -fx-stroke-line-cap: round;
     -fx-fill: transparent;
@@ -810,7 +810,7 @@
 
 /* Primary CTA Button - Full Width */
 .cta-primary-full {
-    -fx-background-color: linear-gradient(to right, #667eea, #764ba2);
+    -fx-background-color: linear-gradient(to right, -fx-primary, -fx-primary-dark);
     -fx-text-fill: white;
     -fx-font-weight: bold;
     -fx-font-size: 16px;
@@ -2012,7 +2012,7 @@
 .match-avatar-wrapper {
     -fx-min-width: 100;
     -fx-min-height: 100;
-    -fx-background-color: linear-gradient(to bottom right, #667eea, #764ba2);
+    -fx-background-color: linear-gradient(to bottom right, -fx-primary, -fx-primary-dark);
     -fx-background-radius: 50;
     -fx-alignment: center;
 }
@@ -2223,7 +2223,7 @@
    Profile Photo Upload Button
    ============================================ */
 .profile-camera-btn {
-    -fx-background-color: linear-gradient(to bottom right, #667eea, #764ba2);
+    -fx-background-color: linear-gradient(to bottom right, -fx-primary, -fx-primary-dark);
     -fx-background-radius: 50;
     -fx-min-width: 36;
     -fx-min-height: 36;

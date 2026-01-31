@@ -5,7 +5,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Enum defining all achievements in the gamification system. Achievements encourage engagement and
+ * Enum defining all achievements in the gamification system. Achievements
+ * encourage engagement and
  * add personality to profiles.
  */
 public enum Achievement {
@@ -85,7 +86,10 @@ public enum Achievement {
         return icon + " " + displayName;
     }
 
-    /** Record representing a user's unlocked achievement. Immutable and stored in the database. */
+    /**
+     * Record representing a user's unlocked achievement. Immutable and stored in
+     * the database.
+     */
     public record UserAchievement(UUID id, UUID userId, Achievement achievement, Instant unlockedAt) {
 
         // Compact constructor - validates parameters

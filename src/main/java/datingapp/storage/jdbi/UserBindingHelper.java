@@ -10,7 +10,8 @@ import java.util.stream.Collectors;
 
 /**
  * Helper class for binding User objects to JDBI SQL parameters.
- * Provides methods to serialize complex fields (EnumSets, Lists) as CSV strings.
+ * Provides methods to serialize complex fields (EnumSets, Lists) as CSV
+ * strings.
  */
 public class UserBindingHelper {
 

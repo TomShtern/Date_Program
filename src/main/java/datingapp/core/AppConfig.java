@@ -48,6 +48,14 @@ public record AppConfig(
         int minSwipesForBehaviorAchievement, // Min swipes to evaluate behavior (50)
         int maxDistanceKm, // Max allowed search distance (500km)
         int maxAge, // Max valid age (120)
+        // Validation bounds (FI-CONS-010: consolidated from User.java and
+        // ValidationService)
+        int minAge, // Min legal age (18)
+        int minHeightCm, // Min valid height (50cm)
+        int maxHeightCm, // Max valid height (300cm)
+        int minDistanceKm, // Min search distance (1km)
+        int maxNameLength, // Max name length (100 chars)
+        int minAgeRangeSpan, // Min age range span (5 years)
         // Match quality weights (MED-01: consolidated from MatchQualityConfig)
         double distanceWeight, // Weight for distance score (0.15 default)
         double ageWeight, // Weight for age score (0.10 default)
@@ -94,6 +102,12 @@ public record AppConfig(
         requireNonNegative("minSwipesForBehaviorAchievement", minSwipesForBehaviorAchievement);
         requireNonNegative("maxDistanceKm", maxDistanceKm);
         requireNonNegative("maxAge", maxAge);
+        requireNonNegative("minAge", minAge);
+        requireNonNegative("minHeightCm", minHeightCm);
+        requireNonNegative("maxHeightCm", maxHeightCm);
+        requireNonNegative("minDistanceKm", minDistanceKm);
+        requireNonNegative("maxNameLength", maxNameLength);
+        requireNonNegative("minAgeRangeSpan", minAgeRangeSpan);
         requireNonNegative("distanceWeight", distanceWeight);
         requireNonNegative("ageWeight", ageWeight);
         requireNonNegative("interestWeight", interestWeight);
@@ -148,6 +162,13 @@ public record AppConfig(
                 50, // minSwipesForBehaviorAchievement
                 500, // maxDistanceKm
                 120, // maxAge
+                // Validation bounds
+                18, // minAge
+                50, // minHeightCm
+                300, // maxHeightCm
+                1, // minDistanceKm
+                100, // maxNameLength
+                5, // minAgeRangeSpan
                 // Match quality weights
                 0.15, // distanceWeight
                 0.10, // ageWeight
@@ -211,6 +232,13 @@ public record AppConfig(
         private int minSwipesForBehaviorAchievement = 50;
         private int maxDistanceKm = 500;
         private int maxAge = 120;
+        // Validation bounds
+        private int minAge = 18;
+        private int minHeightCm = 50;
+        private int maxHeightCm = 300;
+        private int minDistanceKm = 1;
+        private int maxNameLength = 100;
+        private int minAgeRangeSpan = 5;
         // Match quality weights
         private double distanceWeight = 0.15;
         private double ageWeight = 0.10;
@@ -369,6 +397,36 @@ public record AppConfig(
             return this;
         }
 
+        public Builder minAge(int v) {
+            this.minAge = v;
+            return this;
+        }
+
+        public Builder minHeightCm(int v) {
+            this.minHeightCm = v;
+            return this;
+        }
+
+        public Builder maxHeightCm(int v) {
+            this.maxHeightCm = v;
+            return this;
+        }
+
+        public Builder minDistanceKm(int v) {
+            this.minDistanceKm = v;
+            return this;
+        }
+
+        public Builder maxNameLength(int v) {
+            this.maxNameLength = v;
+            return this;
+        }
+
+        public Builder minAgeRangeSpan(int v) {
+            this.minAgeRangeSpan = v;
+            return this;
+        }
+
         public Builder distanceWeight(double v) {
             this.distanceWeight = v;
             return this;
@@ -431,6 +489,12 @@ public record AppConfig(
                     minSwipesForBehaviorAchievement,
                     maxDistanceKm,
                     maxAge,
+                    minAge,
+                    minHeightCm,
+                    maxHeightCm,
+                    minDistanceKm,
+                    maxNameLength,
+                    minAgeRangeSpan,
                     distanceWeight,
                     ageWeight,
                     interestWeight,

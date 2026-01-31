@@ -91,10 +91,8 @@ public class MyController extends BaseController {
 
 | Model                 | Type      | Location / Key Fields                                                           |
 |-----------------------|-----------|---------------------------------------------------------------------------------|
-| `User`                | Mutable   | Own file; `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`; nested `Storage` interface |
-| `User.Storage`        | Interface | Nested in `User.java` - storage contract for users                              |
+| `User`                | Mutable   | Own file; `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`                              |
 | `Match`               | Mutable   | Own file; `ACTIVE → FRIENDS \| UNMATCHED \| GRACEFUL_EXIT \| BLOCKED`        |
-| `Match.Storage`       | Interface | Nested in `Match.java` - storage contract for matches                           |
 | `Messaging.Message`   | Immutable | `Messaging.java`; max 1000 chars, sender, timestamp                             |
 | `Messaging.Conversation` | Mutable | `Messaging.java`; deterministic ID (`userA_userB`), per-user read timestamps   |
 | `Social.FriendRequest`| Immutable | `Social.java`; status: `PENDING → ACCEPTED \| DECLINED \| EXPIRED`           |
@@ -104,8 +102,8 @@ public class MyController extends BaseController {
 | `Preferences.Interest`| Enum      | `Preferences.java`; 39 interests in 6 categories                                |
 | `Preferences.Lifestyle`| Records  | `Preferences.java`; Smoking, Drinking, WantsKids, etc.                          |
 | `Preferences.PacePreferences` | Immutable | `Preferences.java`; messaging frequency, communication style            |
-| `Achievement`         | Enum      | `Achievement.java`; 11 achievements in 4 categories; nested `Storage` interface |
-| `SwipeSession`        | Mutable   | Own file; `ACTIVE → COMPLETED`, velocity tracking; nested `Storage` interface |
+| `Achievement`         | Enum      | `Achievement.java`; 11 achievements in 4 categories                             |
+| `SwipeSession`        | Mutable   | Own file; `ACTIVE → COMPLETED`, velocity tracking                              |
 | `Dealbreakers`        | Immutable | Own file; lifestyle, physical, age filters + `Evaluator` inner class            |
 | `UserInteractions`    | Container | `UserInteractions.java`; `Like`, `Block`, `Report` records + storage interfaces |
 
@@ -119,18 +117,20 @@ public class MyController extends BaseController {
 
 **Phase 2.0+**: `MessagingService`, `RelationshipTransitionService`
 
-### Storage Interfaces (Consolidated Pattern)
+### Storage Interfaces (`core/storage/`)
 
-Storage interfaces are now **nested inside their domain classes** following the pattern:
-```java
-public class User {
-    public interface Storage { void save(User user); User get(UUID id); ... }
-}
-```
+Storage interfaces are **standalone files** in the `core/storage/` package:
 
-This applies to: `User.Storage`, `Match.Storage`, `Achievement.Storage`, `SwipeSession.Storage`, plus interfaces in `UserInteractions`, `Messaging`, `Social`, `Stats`.
+| Interface | Purpose |
+|-----------|----------|
+| `UserStorage` | User CRUD and queries |
+| `MatchStorage` | Match persistence |
+| `LikeStorage` | Like/pass tracking |
+| `BlockStorage` | Block lists |
+| `MessagingStorage` | Conversations and messages |
+| ... | 13 total interfaces |
 
-All implementations use **JDBI declarative SQL** interfaces in `storage/jdbi/` with `@SqlQuery`/`@SqlUpdate` annotations. Data: `./data/dating.mv.db`
+All implementations use **JDBI declarative SQL** interfaces in `storage/jdbi/` (e.g., `JdbiUserStorage implements UserStorage`) with `@SqlQuery`/`@SqlUpdate` annotations. Data: `./data/dating.mv.db`
 
 ## Coding Standards Quick Reference
 

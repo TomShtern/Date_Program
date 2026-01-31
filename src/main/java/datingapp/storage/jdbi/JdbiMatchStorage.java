@@ -26,17 +26,17 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 public interface JdbiMatchStorage extends MatchStorage {
 
     @SqlUpdate("""
-                        MERGE INTO matches (id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason)
-                        KEY (id)
-                        VALUES (:id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason)
-                        """)
+            MERGE INTO matches (id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason)
+            KEY (id)
+            VALUES (:id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason)
+            """)
     @Override
     void save(@BindBean Match match);
 
     @SqlUpdate("""
-                        UPDATE matches SET state = :state, ended_at = :endedAt, ended_by = :endedBy, end_reason = :endReason
-                        WHERE id = :id
-                        """)
+            UPDATE matches SET state = :state, ended_at = :endedAt, ended_by = :endedBy, end_reason = :endReason
+            WHERE id = :id
+            """)
     @Override
     void update(@BindBean Match match);
 
@@ -45,25 +45,25 @@ public interface JdbiMatchStorage extends MatchStorage {
     Optional<Match> get(@Bind("matchId") String matchId);
 
     @SqlQuery("""
-                        SELECT EXISTS (
-                            SELECT 1 FROM matches WHERE id = :matchId
-                        )
-                        """)
+            SELECT EXISTS (
+                SELECT 1 FROM matches WHERE id = :matchId
+            )
+            """)
     @Override
     boolean exists(@Bind("matchId") String matchId);
 
     @SqlQuery("""
-                        SELECT * FROM matches
-                        WHERE (user_a = :userId OR user_b = :userId)
-                        AND state = 'ACTIVE'
-                        """)
+            SELECT * FROM matches
+            WHERE (user_a = :userId OR user_b = :userId)
+            AND state = 'ACTIVE'
+            """)
     @Override
     List<Match> getActiveMatchesFor(@Bind("userId") UUID userId);
 
     @SqlQuery("""
-                        SELECT * FROM matches
-                        WHERE user_a = :userId OR user_b = :userId
-                        """)
+            SELECT * FROM matches
+            WHERE user_a = :userId OR user_b = :userId
+            """)
     @Override
     List<Match> getAllMatchesFor(@Bind("userId") UUID userId);
 

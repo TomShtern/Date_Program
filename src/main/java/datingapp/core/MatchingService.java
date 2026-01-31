@@ -104,8 +104,9 @@ public class MatchingService {
                 }
 
                 return Optional.of(match);
-            } catch (Exception _) {
-                // Race condition or duplicate: return existing match
+            } catch (RuntimeException _) {
+                // Handle storage conflicts (duplicate key, race condition)
+                // JdbiException extends RuntimeException
                 return matchStorage.get(match.getId());
             }
         }

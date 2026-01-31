@@ -1,6 +1,8 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.ValidationService.ValidationResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -229,20 +231,23 @@ class ValidationServiceTest {
         }
 
         @Test
-        @DisplayName("Bio at 1000 chars passes validation")
+        @DisplayName("Bio at max limit passes validation")
         void bioAtLimit() {
-            String bio = "a".repeat(1000);
+            int maxBio = AppConfig.defaults().maxBioLength();
+            String bio = "a".repeat(maxBio);
             ValidationResult result = validator.validateBio(bio);
             assertTrue(result.valid());
         }
 
         @Test
-        @DisplayName("Bio over 1000 chars fails validation")
+        @DisplayName("Bio over max limit fails validation")
         void bioTooLong() {
-            String bio = "a".repeat(1001);
+            int maxBio = AppConfig.defaults().maxBioLength();
+            String bio = "a".repeat(maxBio + 1);
             ValidationResult result = validator.validateBio(bio);
             assertFalse(result.valid());
-            assertEquals("Bio too long (max 1000 chars)", result.errors().get(0));
+            assertEquals(
+                    "Bio too long (max " + maxBio + " chars)", result.errors().get(0));
         }
     }
 

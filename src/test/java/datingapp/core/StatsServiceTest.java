@@ -208,7 +208,7 @@ class StatsServiceTest {
         void returnsCachedIfFresh() {
             // First compute
             likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);
-            UserStats first = statsService.computeAndSaveStats(userId);
+            statsService.computeAndSaveStats(userId);
 
             // Add more likes but don't recompute
             likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);

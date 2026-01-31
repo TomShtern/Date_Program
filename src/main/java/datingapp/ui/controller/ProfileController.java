@@ -585,6 +585,7 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     @FXML
+    @SuppressWarnings("unused")
     private void handleSave() {
         cleanup(); // Clean up subscriptions before navigating away
         viewModel.save();
@@ -598,6 +599,7 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     @FXML
+    @SuppressWarnings("unused")
     private void handleBack() {
         handleCancel(); // Delegate to avoid duplicate code
     }
@@ -606,6 +608,7 @@ public class ProfileController extends BaseController implements Initializable {
      * Opens a dialog to select interests.
      */
     @FXML
+    @SuppressWarnings("unused")
     private void handleEditInterests() {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("Select Interests");

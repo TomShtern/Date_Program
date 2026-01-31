@@ -27,7 +27,8 @@ import org.slf4j.LoggerFactory;
  * Controller for the Achievement Popup overlay.
  * Displays achievement unlocked notifications with animations and confetti.
  *
- * <p>FXML controller reference:
+ * <p>
+ * FXML controller reference:
  * {@code fx:controller="datingapp.ui.controller.AchievementPopupController"}
  */
 public class AchievementPopupController implements Initializable {
@@ -46,7 +47,7 @@ public class AchievementPopupController implements Initializable {
 
     @FXML
     @SuppressWarnings("unused")
-    private Label titleLabel;
+    private Label titleLabel; // Injected from FXML but not used in code
 
     @FXML
     private Label nameLabel;
@@ -72,9 +73,9 @@ public class AchievementPopupController implements Initializable {
      * Shows the achievement with specified details and plays entrance animation.
      *
      * @param iconLiteral The Material Design icon literal (e.g., "mdi2t-trophy")
-     * @param name The achievement name
+     * @param name        The achievement name
      * @param description The achievement description
-     * @param xpAmount The XP/points earned
+     * @param xpAmount    The XP/points earned
      */
     public void showAchievement(String iconLiteral, String name, String description, int xpAmount) {
         // Set content
