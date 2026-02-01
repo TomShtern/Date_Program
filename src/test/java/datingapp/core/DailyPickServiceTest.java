@@ -44,7 +44,7 @@ class DailyPickServiceTest {
         blockStorage = new InMemoryBlockStorage();
         config = AppConfig.defaults();
 
-        candidateFinder = new CandidateFinder();
+        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage);
         service = new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config);
     }
 

@@ -99,21 +99,17 @@ public class DailyService {
         ensureDailyPickDependencies();
         LocalDate today = getToday();
 
-        // Get all active users
-        List<User> allActive = userStorage.findActive();
-
-        // Build exclusion set: already liked or passed users
-        java.util.Set<UUID> alreadyInteracted =
-                new java.util.HashSet<>(likeStorage.getLikedOrPassedUserIds(seeker.getId()));
-
-        // Use CandidateFinder to apply comprehensive preference filtering
-        // This filters by: self, active state, blocks, mutual gender, mutual age,
-        // distance, dealbreakers
+        // Use CandidateFinder to get filtered candidates
+        // This filters by: self, active state, blocks, already-interacted, mutual gender,
+        // mutual age, distance, dealbreakers
         List<User> candidates;
         if (candidateFinder != null) {
-            candidates = candidateFinder.findCandidates(seeker, allActive, alreadyInteracted);
+            candidates = candidateFinder.findCandidatesForUser(seeker);
         } else {
             // Fallback for tests/configurations without CandidateFinder
+            List<User> allActive = userStorage.findActive();
+            java.util.Set<UUID> alreadyInteracted =
+                    new java.util.HashSet<>(likeStorage.getLikedOrPassedUserIds(seeker.getId()));
             candidates = allActive.stream()
                     .filter(u -> !u.getId().equals(seeker.getId()))
                     .filter(u -> !blockStorage.isBlocked(seeker.getId(), u.getId()))

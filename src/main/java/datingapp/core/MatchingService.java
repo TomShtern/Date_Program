@@ -27,6 +27,8 @@ public class MatchingService {
     private final UserStorage userStorage;
     private final BlockStorage blockStorage;
     private SessionService sessionService; // Optional (Phase 0.5b)
+    private UndoService undoService; // Optional
+    private DailyService dailyService; // Optional
 
     /** Basic constructor for minimal usage. */
     public MatchingService(LikeStorage likeStorage, MatchStorage matchStorage) {
@@ -57,6 +59,26 @@ public class MatchingService {
         this.userStorage = userStorage;
         this.blockStorage = blockStorage;
         this.sessionService = sessionService;
+        this.undoService = null;
+        this.dailyService = null;
+    }
+
+    /** Enhanced constructor with swipe processing capabilities. */
+    public MatchingService(
+            LikeStorage likeStorage,
+            MatchStorage matchStorage,
+            UserStorage userStorage,
+            BlockStorage blockStorage,
+            SessionService sessionService,
+            UndoService undoService,
+            DailyService dailyService) {
+        this.likeStorage = Objects.requireNonNull(likeStorage);
+        this.matchStorage = Objects.requireNonNull(matchStorage);
+        this.userStorage = userStorage;
+        this.blockStorage = blockStorage;
+        this.sessionService = sessionService;
+        this.undoService = Objects.requireNonNull(undoService, "undoService cannot be null");
+        this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
     }
 
     /**
@@ -117,6 +139,31 @@ public class MatchingService {
     /** Get the session service (for UI access to session info). */
     public Optional<SessionService> getSessionService() {
         return Optional.ofNullable(sessionService);
+    }
+
+    /**
+     * Processes a swipe action (like or pass) for the current user on a candidate.
+     * Checks daily limits, records the interaction, and returns the result.
+     *
+     * @param currentUser The user performing the swipe
+     * @param candidate The candidate being swiped on
+     * @param liked True if liking, false if passing
+     * @return SwipeResult containing success status and match information
+     */
+    public SwipeResult processSwipe(User currentUser, User candidate, boolean liked) {
+        if (liked && !dailyService.canLike(currentUser.getId())) {
+            return SwipeResult.dailyLimitReached();
+        }
+
+        Like.Direction direction = liked ? Like.Direction.LIKE : Like.Direction.PASS;
+        Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
+        Optional<Match> match = recordLike(like);
+        undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
+
+        if (match.isPresent()) {
+            return SwipeResult.matched(match.get(), like);
+        }
+        return liked ? SwipeResult.liked(like) : SwipeResult.passed(like);
     }
 
     // ================== Liker Browser Methods ==================
@@ -187,6 +234,36 @@ public class MatchingService {
         public PendingLiker {
             Objects.requireNonNull(user, "user cannot be null");
             Objects.requireNonNull(likedAt, "likedAt cannot be null");
+        }
+    }
+
+    /**
+     * Result of a swipe action containing success status, match information, and
+     * user-friendly message.
+     */
+    public record SwipeResult(boolean success, boolean matched, Match match, Like like, String message) {
+        public SwipeResult {
+            Objects.requireNonNull(message, "message cannot be null");
+        }
+
+        public static SwipeResult matched(Match m, Like l) {
+            Objects.requireNonNull(m, "match cannot be null");
+            Objects.requireNonNull(l, "like cannot be null");
+            return new SwipeResult(true, true, m, l, "It's a match!");
+        }
+
+        public static SwipeResult liked(Like l) {
+            Objects.requireNonNull(l, "like cannot be null");
+            return new SwipeResult(true, false, null, l, "Liked!");
+        }
+
+        public static SwipeResult passed(Like l) {
+            Objects.requireNonNull(l, "like cannot be null");
+            return new SwipeResult(true, false, null, l, "Passed.");
+        }
+
+        public static SwipeResult dailyLimitReached() {
+            return new SwipeResult(false, false, null, null, "Daily like limit reached.");
         }
     }
 }

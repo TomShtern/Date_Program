@@ -304,14 +304,14 @@ public class ServiceRegistry {
             // ═══════════════════════════════════════════════════════════════
             // Matching Services (inlined from MatchingModule.create)
             // ═══════════════════════════════════════════════════════════════
-            CandidateFinder candidateFinder = new CandidateFinder();
-            SessionService sessionService = new SessionService(sessionStorage, config);
-            MatchingService matchingService =
-                    new MatchingService(likeStorage, matchStorage, userStorage, blockStorage, sessionService);
-            MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
+            CandidateFinder candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage);
             DailyService dailyService =
                     new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config);
             UndoService undoService = new UndoService(likeStorage, matchStorage, config);
+            SessionService sessionService = new SessionService(sessionStorage, config);
+            MatchingService matchingService = new MatchingService(
+                    likeStorage, matchStorage, userStorage, blockStorage, sessionService, undoService, dailyService);
+            MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
 
             // ═══════════════════════════════════════════════════════════════
             // Messaging Services (inlined from MessagingModule.create)

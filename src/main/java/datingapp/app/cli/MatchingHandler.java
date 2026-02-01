@@ -21,12 +21,10 @@ import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.StatsStorage;
 import datingapp.core.storage.UserStorage;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,14 +124,7 @@ public class MatchingHandler {
 
             logger.info("\n" + CliConstants.HEADER_BROWSE_CANDIDATES + "\n");
 
-            List<User> activeUsers = userStorage.findActive();
-            Set<UUID> alreadyInteracted = likeStorage.getLikedOrPassedUserIds(currentUser.getId());
-            Set<UUID> blockedUsers = blockStorage.getBlockedUserIds(currentUser.getId());
-
-            Set<UUID> excluded = new HashSet<>(alreadyInteracted);
-            excluded.addAll(blockedUsers);
-
-            List<User> candidates = candidateFinderService.findCandidates(currentUser, activeUsers, excluded);
+            List<User> candidates = candidateFinderService.findCandidatesForUser(currentUser);
 
             if (candidates.isEmpty()) {
                 logger.info("😔 No candidates found. Try again later!\n");
@@ -191,31 +182,22 @@ public class MatchingHandler {
             return false;
         }
 
-        Like.Direction direction = "l".equals(action) ? Like.Direction.LIKE : Like.Direction.PASS;
+        MatchingService.SwipeResult result = matchingService.processSwipe(currentUser, candidate, "l".equals(action));
 
-        // Check daily limit before recording a like
-        if (direction == Like.Direction.LIKE && !dailyService.canLike(currentUser.getId())) {
+        if (!result.success()) {
             showDailyLimitReached(currentUser);
             return false;
         }
 
-        Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
-        Optional<Match> match = matchingService.recordLike(like);
-
-        if (match.isPresent()) {
+        if (result.matched()) {
             logger.info("\n🎉🎉🎉 IT'S A MATCH! 🎉🎉🎉");
             logger.info("You and {} like each other!\n", candidate.getName());
-        } else if (direction == Like.Direction.LIKE) {
+            checkAndDisplayNewAchievements(currentUser);
+        } else if (result.like().direction() == Like.Direction.LIKE) {
             logger.info("❤️  Liked!\n");
         } else {
             logger.info("👋 Passed.\n");
         }
-
-        if (match.isPresent()) {
-            checkAndDisplayNewAchievements(currentUser);
-        }
-
-        undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
         promptUndo(candidate.getName(), currentUser);
 
         return true;
@@ -559,25 +541,20 @@ public class MatchingHandler {
         // Only mark as viewed after valid action (not on skip)
         dailyService.markDailyPickViewed(currentUser.getId());
 
-        Like.Direction direction = "l".equals(action) ? Like.Direction.LIKE : Like.Direction.PASS;
+        MatchingService.SwipeResult result = matchingService.processSwipe(currentUser, candidate, "l".equals(action));
 
-        if (direction == Like.Direction.LIKE && !dailyService.canLike(currentUser.getId())) {
+        if (!result.success()) {
             showDailyLimitReached(currentUser);
             return;
         }
 
-        Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
-        Optional<Match> match = matchingService.recordLike(like);
-
-        if (match.isPresent()) {
+        if (result.matched()) {
             logger.info("\n🎉🎉🎉 IT'S A MATCH WITH YOUR DAILY PICK! 🎉🎉🎉\n");
-        } else if (direction == Like.Direction.LIKE) {
+        } else if (result.like().direction() == Like.Direction.LIKE) {
             logger.info("❤️  Liked your daily pick!\n");
         } else {
             logger.info("👋 Passed on daily pick.\n");
         }
-
-        undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
         promptUndo(candidate.getName(), currentUser);
     }
 

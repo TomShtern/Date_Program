@@ -2,21 +2,13 @@ package datingapp;
 
 import datingapp.app.cli.CliConstants;
 import datingapp.app.cli.CliUtilities;
-import datingapp.app.cli.LikerBrowserHandler;
-import datingapp.app.cli.MatchingHandler;
-import datingapp.app.cli.MessagingHandler;
-import datingapp.app.cli.ProfileHandler;
-import datingapp.app.cli.ProfileNotesHandler;
-import datingapp.app.cli.RelationshipHandler;
-import datingapp.app.cli.SafetyHandler;
-import datingapp.app.cli.StatsHandler;
+import datingapp.app.cli.HandlerFactory;
 import datingapp.core.AppBootstrap;
 import datingapp.core.AppSession;
 import datingapp.core.DailyService;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.SessionService;
 import datingapp.core.User;
-import datingapp.core.ValidationService;
 import java.util.Scanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,14 +31,7 @@ public final class Main {
 
     // CLI Components
     private static CliUtilities.InputReader inputReader;
-    private static ProfileHandler profileHandler;
-    private static MatchingHandler matchingHandler;
-    private static SafetyHandler safetyHandler;
-    private static StatsHandler statsHandler;
-    private static ProfileNotesHandler profileNotesHandler;
-    private static LikerBrowserHandler likerBrowserHandler;
-    private static MessagingHandler messagingHandler;
-    private static RelationshipHandler relationshipHandler;
+    private static HandlerFactory handlers;
 
     public static void main(String[] args) {
         try (Scanner scanner = new Scanner(System.in)) {
@@ -60,25 +45,25 @@ public final class Main {
                 String choice = inputReader.readLine("Choose an option: ");
 
                 switch (choice) {
-                    case "1" -> profileHandler.createUser();
-                    case "2" -> profileHandler.selectUser();
-                    case "3" -> profileHandler.completeProfile();
-                    case "4" -> matchingHandler.browseCandidates();
-                    case "5" -> matchingHandler.viewMatches();
-                    case "6" -> safetyHandler.blockUser();
-                    case "7" -> safetyHandler.reportUser();
-                    case "8" -> safetyHandler.manageBlockedUsers();
-                    case "9" -> profileHandler.setDealbreakers();
-                    case "10" -> statsHandler.viewStatistics();
-                    case "11" -> profileHandler.previewProfile();
-                    case "12" -> statsHandler.viewAchievements();
-                    case "13" -> profileNotesHandler.viewAllNotes();
-                    case "14" -> profileHandler.viewProfileScore();
-                    case "15" -> safetyHandler.verifyProfile();
-                    case "16" -> likerBrowserHandler.browseWhoLikedMe();
-                    case "17" -> messagingHandler.showConversations();
-                    case "18" -> relationshipHandler.viewNotifications();
-                    case "19" -> relationshipHandler.viewPendingRequests();
+                    case "1" -> handlers.profile().createUser();
+                    case "2" -> handlers.profile().selectUser();
+                    case "3" -> handlers.profile().completeProfile();
+                    case "4" -> handlers.matching().browseCandidates();
+                    case "5" -> handlers.matching().viewMatches();
+                    case "6" -> handlers.safety().blockUser();
+                    case "7" -> handlers.safety().reportUser();
+                    case "8" -> handlers.safety().manageBlockedUsers();
+                    case "9" -> handlers.profile().setDealbreakers();
+                    case "10" -> handlers.stats().viewStatistics();
+                    case "11" -> handlers.profile().previewProfile();
+                    case "12" -> handlers.stats().viewAchievements();
+                    case "13" -> handlers.profileNotes().viewAllNotes();
+                    case "14" -> handlers.profile().viewProfileScore();
+                    case "15" -> handlers.safety().verifyProfile();
+                    case "16" -> handlers.likerBrowser().browseWhoLikedMe();
+                    case "17" -> handlers.messaging().showConversations();
+                    case "18" -> handlers.relationship().viewNotifications();
+                    case "19" -> handlers.relationship().viewPendingRequests();
                     case "0" -> {
                         running = false;
                         logger.info("\n👋 Goodbye!\n");
@@ -98,59 +83,8 @@ public final class Main {
         // Initialize CLI Infrastructure
         inputReader = new CliUtilities.InputReader(scanner);
 
-        // Initialize validation service (stateless, no dependencies)
-        ValidationService validationService = new ValidationService();
-
-        // Initialize Handlers
-        profileHandler = new ProfileHandler(
-                services.getUserStorage(),
-                services.getProfilePreviewService(),
-                services.getAchievementService(),
-                validationService,
-                AppSession.getInstance(),
-                inputReader);
-
-        MatchingHandler.Dependencies matchingDependencies = new MatchingHandler.Dependencies(
-                services.getCandidateFinder(),
-                services.getMatchingService(),
-                services.getLikeStorage(),
-                services.getMatchStorage(),
-                services.getBlockStorage(),
-                services.getDailyService(),
-                services.getUndoService(),
-                services.getMatchQualityService(),
-                services.getUserStorage(),
-                services.getAchievementService(),
-                services.getStatsStorage(),
-                services.getRelationshipTransitionService(),
-                AppSession.getInstance(),
-                inputReader);
-        matchingHandler = new MatchingHandler(matchingDependencies);
-
-        safetyHandler = new SafetyHandler(
-                services.getUserStorage(),
-                services.getBlockStorage(),
-                services.getMatchStorage(),
-                services.getTrustSafetyService(),
-                AppSession.getInstance(),
-                inputReader);
-
-        statsHandler = new StatsHandler(
-                services.getStatsService(), services.getAchievementService(), AppSession.getInstance(), inputReader);
-
-        profileNotesHandler = new ProfileNotesHandler(services.getUserStorage(), AppSession.getInstance(), inputReader);
-
-        likerBrowserHandler =
-                new LikerBrowserHandler(services.getMatchingService(), AppSession.getInstance(), inputReader);
-
-        messagingHandler = new MessagingHandler(services, inputReader, AppSession.getInstance());
-
-        relationshipHandler = new RelationshipHandler(
-                services.getRelationshipTransitionService(),
-                services.getSocialStorage(),
-                services.getUserStorage(),
-                AppSession.getInstance(),
-                inputReader);
+        // Initialize Handlers via factory
+        handlers = new HandlerFactory(services, AppSession.getInstance(), inputReader);
     }
 
     private static void printMenu() {
@@ -206,7 +140,7 @@ public final class Main {
         logger.info("  14. 📊 Profile completion score");
         logger.info("  15. ✅ Verify my profile");
         logger.info("  16. 💌 Who liked me");
-        int unreadCount = messagingHandler.getTotalUnreadCount();
+        int unreadCount = handlers.messaging().getTotalUnreadCount();
         String unreadStr = unreadCount > 0 ? " (" + unreadCount + " new)" : "";
         logger.info("  17. 💬 Conversations{}", unreadStr);
         logger.info("  18. 🔔 Notifications");

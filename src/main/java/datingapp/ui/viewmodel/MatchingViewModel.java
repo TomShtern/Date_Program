@@ -5,20 +5,16 @@ import static datingapp.core.CandidateFinder.GeoUtils.distanceKm;
 import datingapp.core.AppSession;
 import datingapp.core.CandidateFinder;
 import datingapp.core.Match;
+import datingapp.core.MatchQualityService;
 import datingapp.core.MatchingService;
 import datingapp.core.UndoService;
 import datingapp.core.User;
-import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Optional;
 import java.util.Queue;
-import java.util.Set;
-import java.util.UUID;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -40,6 +36,7 @@ public class MatchingViewModel {
     private final LikeStorage likeStorage;
     private final BlockStorage blockStorage;
     private final UndoService undoService;
+    private final MatchQualityService matchQualityService;
 
     private final Queue<User> candidateQueue = new LinkedList<>();
     private final ObjectProperty<User> currentCandidate = new SimpleObjectProperty<>();
@@ -64,13 +61,15 @@ public class MatchingViewModel {
             UserStorage userStorage,
             LikeStorage likeStorage,
             BlockStorage blockStorage,
-            UndoService undoService) {
+            UndoService undoService,
+            MatchQualityService matchQualityService) {
         this.candidateFinder = candidateFinder;
         this.matchingService = matchingService;
         this.userStorage = userStorage;
         this.likeStorage = likeStorage;
         this.blockStorage = blockStorage;
         this.undoService = undoService;
+        this.matchQualityService = matchQualityService;
     }
 
     /**
@@ -141,37 +140,12 @@ public class MatchingViewModel {
                     currentUser.isComplete());
         }
 
-        List<User> activeUsers = userStorage.findActive();
-        logger.info("Found {} ACTIVE users in database", activeUsers.size());
-
-        // Log each active user for debugging
-        if (activeUsers.isEmpty()) {
-            logger.warn("NO ACTIVE users in database! All users may be INCOMPLETE.");
-            List<User> allUsers = userStorage.findAll();
-            logger.info("Total users in database: {}", allUsers.size());
-            for (User u : allUsers) {
-                logger.debug("  User: {} (state={}, isComplete={})", u.getName(), u.getState(), u.isComplete());
-            }
-        }
-
-        Set<UUID> alreadyInteracted = likeStorage.getLikedOrPassedUserIds(currentUser.getId());
-        Set<UUID> blockedUsers = blockStorage.getBlockedUserIds(currentUser.getId());
-
-        Set<UUID> excluded = new HashSet<>(alreadyInteracted);
-        excluded.addAll(blockedUsers);
-
-        List<User> candidates = candidateFinder.findCandidates(currentUser, activeUsers, excluded);
+        List<User> candidates = candidateFinder.findCandidatesForUser(currentUser);
+        logger.info("Found {} candidates after filtering", candidates.size());
 
         javafx.application.Platform.runLater(() -> {
             candidateQueue.clear();
             candidateQueue.addAll(candidates);
-
-            logger.info("Found {} candidates after filtering", candidates.size());
-            if (candidates.isEmpty() && !activeUsers.isEmpty()) {
-                logger.warn(
-                        "No candidates found despite {} active users. Check CandidateFinder logs for filter details.",
-                        activeUsers.size());
-            }
 
             loading.set(false);
             nextCandidate();
@@ -211,18 +185,20 @@ public class MatchingViewModel {
 
         logger.info("User {} {} candidate {}", currentUser.getName(), liked ? "liked" : "passed", candidate.getName());
 
-        Like.Direction direction = liked ? Like.Direction.LIKE : Like.Direction.PASS;
-        Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
+        MatchingService.SwipeResult result = matchingService.processSwipe(currentUser, candidate, liked);
 
-        Optional<Match> match = matchingService.recordLike(like);
-        undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
+        if (!result.success()) {
+            logger.warn("Swipe failed: {}", result.message());
+            // TODO: Notify UI about daily limit
+            return;
+        }
 
         lastSwipedCandidate = candidate;
 
         // Check for a match and notify UI
-        if (match.isPresent()) {
+        if (result.matched()) {
             logger.info("IT'S A MATCH! {} matched with {}", currentUser.getName(), candidate.getName());
-            lastMatch.set(match.get());
+            lastMatch.set(result.match());
             matchedUser.set(candidate);
         }
 
@@ -270,24 +246,28 @@ public class MatchingViewModel {
             return "--";
         }
 
+        // Use MatchQualityService's InterestMatcher for more accurate calculation
+        MatchQualityService.InterestMatcher.MatchResult interestMatch =
+                MatchQualityService.InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
+
+        // Simplified pre-match compatibility formula
+        // (Full MatchQuality calculation requires a Match object)
         int score = 50; // Base score
 
-        // Shared interests bonus (+5 per shared interest, max 25)
-        if (currentUser.getInterests() != null && candidate.getInterests() != null) {
-            long sharedCount = currentUser.getInterests().stream()
-                    .filter(i -> candidate.getInterests().contains(i))
-                    .count();
-            score += Math.min((int) sharedCount * 5, 25);
-        }
+        // Interest compatibility (0-30 points based on Jaccard similarity)
+        score += (int) (interestMatch.jaccardIndex() * 30);
 
-        // Age range match bonus (+15)
+        // Age compatibility (0-15 points)
         int theirAge = candidate.getAge();
         if (theirAge >= currentUser.getMinAge() && theirAge <= currentUser.getMaxAge()) {
-            score += 15;
+            int ageDiff = Math.abs(theirAge - currentUser.getAge());
+            score += Math.max(0, 15 - ageDiff); // Closer ages score higher
         }
 
-        // Distance (assume nearby for now) (+10)
-        score += 10;
+        // Proximity bonus (+5 points for having location data)
+        if (candidate.getLat() != 0.0 && candidate.getLon() != 0.0) {
+            score += 5;
+        }
 
         return Math.min(score, 99) + "%";
     }

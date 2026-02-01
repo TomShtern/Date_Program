@@ -190,7 +190,9 @@ class EdgeCaseRegressionTest {
         @Test
         @DisplayName("Empty active users list returns empty candidates")
         void emptyActiveUsersReturnsEmpty() {
-            CandidateFinder finder = new CandidateFinder();
+            // Create minimal stubs for storage dependencies (not used by findCandidates)
+            CandidateFinder finder =
+                    new CandidateFinder(createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage());
             User seeker = createCompleteActiveUser("Seeker");
 
             var candidates = finder.findCandidates(seeker, List.of(), Set.of());
@@ -201,7 +203,9 @@ class EdgeCaseRegressionTest {
         @Test
         @DisplayName("Seeker with null interestedIn returns no candidates")
         void seekerWithNullInterestedIn() {
-            CandidateFinder finder = new CandidateFinder();
+            // Create minimal stubs for storage dependencies (not used by findCandidates)
+            CandidateFinder finder =
+                    new CandidateFinder(createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage());
             User seeker = createCompleteActiveUser("Seeker");
             seeker.setInterestedIn(null);
 
@@ -215,7 +219,9 @@ class EdgeCaseRegressionTest {
         @Test
         @DisplayName("Banned users are filtered out")
         void candidateFinderFiltersBannedUsers() {
-            CandidateFinder finder = new CandidateFinder();
+            // Create minimal stubs for storage dependencies (not used by findCandidates)
+            CandidateFinder finder =
+                    new CandidateFinder(createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage());
 
             User seeker = createCompleteActiveUser("Seeker");
             User bannedUser = createCompleteActiveUser("Banned");
@@ -415,5 +421,156 @@ class EdgeCaseRegressionTest {
         public void delete(UUID likeId) {
             likes.removeIf(like -> like.id().equals(likeId));
         }
+    }
+
+    // Helper methods to create stub storage for CandidateFinder tests
+    private static datingapp.core.storage.UserStorage createStubUserStorage() {
+        return new datingapp.core.storage.UserStorage() {
+            @Override
+            public void save(User user) {}
+
+            @Override
+            public User get(UUID id) {
+                return null;
+            }
+
+            @Override
+            public List<User> findAll() {
+                return List.of();
+            }
+
+            @Override
+            public List<User> findActive() {
+                return List.of();
+            }
+
+            @Override
+            public void delete(UUID id) {}
+
+            @Override
+            public void saveProfileNote(User.ProfileNote note) {}
+
+            @Override
+            public Optional<User.ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public List<User.ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+                return List.of();
+            }
+
+            @Override
+            public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+                return false;
+            }
+        };
+    }
+
+    private static datingapp.core.storage.LikeStorage createStubLikeStorage() {
+        return new datingapp.core.storage.LikeStorage() {
+            @Override
+            public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
+                return Set.of();
+            }
+
+            @Override
+            public void save(UserInteractions.Like like) {}
+
+            @Override
+            public boolean exists(UUID from, UUID to) {
+                return false;
+            }
+
+            @Override
+            public boolean mutualLikeExists(UUID a, UUID b) {
+                return false;
+            }
+
+            @Override
+            public Set<UUID> getUserIdsWhoLiked(UUID userId) {
+                return Set.of();
+            }
+
+            @Override
+            public Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
+                return Map.of();
+            }
+
+            @Override
+            public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
+                return List.of();
+            }
+
+            @Override
+            public int countByDirection(UUID userId, UserInteractions.Like.Direction direction) {
+                return 0;
+            }
+
+            @Override
+            public int countReceivedByDirection(UUID userId, UserInteractions.Like.Direction direction) {
+                return 0;
+            }
+
+            @Override
+            public Optional<UserInteractions.Like> getLike(UUID fromUserId, UUID toUserId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public int countLikesToday(UUID userId, Instant startOfDay) {
+                return 0;
+            }
+
+            @Override
+            public int countPassesToday(UUID userId, Instant startOfDay) {
+                return 0;
+            }
+
+            @Override
+            public int countMutualLikes(UUID userId) {
+                return 0;
+            }
+
+            @Override
+            public void delete(UUID likeId) {}
+        };
+    }
+
+    private static datingapp.core.storage.BlockStorage createStubBlockStorage() {
+        return new datingapp.core.storage.BlockStorage() {
+            @Override
+            public Set<UUID> getBlockedUserIds(UUID userId) {
+                return Set.of();
+            }
+
+            @Override
+            public void save(UserInteractions.Block block) {}
+
+            @Override
+            public boolean isBlocked(UUID userA, UUID userB) {
+                return false;
+            }
+
+            @Override
+            public List<UserInteractions.Block> findByBlocker(UUID blockerId) {
+                return List.of();
+            }
+
+            @Override
+            public boolean delete(UUID blockerId, UUID blockedId) {
+                return false;
+            }
+
+            @Override
+            public int countBlocksGiven(UUID userId) {
+                return 0;
+            }
+
+            @Override
+            public int countBlocksReceived(UUID userId) {
+                return 0;
+            }
+        };
     }
 }

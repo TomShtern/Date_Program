@@ -144,12 +144,20 @@ All implementations use **JDBI declarative SQL** interfaces in `storage/jdbi/` (
 | Timestamps | `*At` suffix            | `createdAt`, `updatedAt`, `endedAt`            |
 
 ### Type Usage
-| Use           | When                                             |
-|---------------|--------------------------------------------------|
-| `record`      | Immutable data (Message, Like, Block)            |
-| `class`       | Mutable entities with state (User, Match)        |
-| `enum`        | Fixed sets with metadata (Interest, Achievement) |
-| `Optional<T>` | Nullable return values                           |
+| Use           | When                                             | Nested? Add `static`! |
+|---------------|--------------------------------------------------|-----------------------|
+| `record`      | Immutable data (Message, Like, Block)            | ✅ `public static record` |
+| `class`       | Mutable entities with state (User, Match)        | ✅ `public static class` |
+| `enum`        | Fixed sets with metadata (Interest, Achievement) | ✅ `public static enum` |
+| `Optional<T>` | Nullable return values                           | N/A |
+
+**⚠️ Nested Type Visibility:**
+- **Rule:** Nested classes/records/interfaces MUST be `static` to be accessible outside their package
+- **Why:** Non-static nested types are inner classes with implicit references to the enclosing instance—this makes them package-private regardless of `public` modifier
+- **Error:** `"X is not public in Y; cannot be accessed from outside package"`
+- **Fix:** Add `static` keyword: `public static record ProfileNote(...)`
+- **Prevention:** Always write `public static` when nesting types (e.g., `User.ProfileNote`, `User.Storage`)
+- **Exception:** Truly internal types never used outside the class (rare; usually interfaces/records should be static)
 
 ### Key Patterns
 
@@ -208,6 +216,7 @@ public static String generateId(UUID a, UUID b) {
 - **Import framework/database in `core/`** - Zero coupling rule
 - **Skip constructor null checks** - Always `Objects.requireNonNull()`
 - **Return direct collection references** - Always defensive copy
+- **Forget `static` on nested types** - Non-static nested classes/records/interfaces are NOT accessible outside the package (see "Nested Type Visibility" above)
 - **Use Mockito** - Use in-memory implementations instead
 - **Commit without `mvn spotless:apply`** - Formatting is enforced
 - **Throw exceptions from CLI handlers** - Return user-friendly messages
@@ -413,4 +422,5 @@ The codebase underwent significant consolidation reducing file count by ~26% (15
 5|2026-01-28 12:00:00|agent:claude_code|docs|Updated stats (118 files), added ValidationService, ServiceRegistry exception note, 39 interests, 2026-01-27 UI/storage changes|CLAUDE.md
 6|2026-01-29 16:30:00|agent:claude_code|storage|JDBI migration complete: H2*Storage→Jdbi*Storage, declarative SQL, deleted 12 files (~1500 LOC), 581 tests passing|storage/jdbi/*,storage/mapper/*,CLAUDE.md
 7|2026-01-30 14:00:00|agent:claude_code|ui-controllers|Action handler pattern: BaseController, wireActionHandlers(), UiAnimations, UiServices, keyboard shortcuts|ui/controller/*,ui/util/*,CLAUDE.md
+8|2026-02-01 17:30:00|agent:claude_code|docs-fix|Fixed User.ProfileNote visibility (static); added nested type visibility rules to Type Usage table and anti-patterns|User.java,CLAUDE.md
 ---AGENT-LOG-END---

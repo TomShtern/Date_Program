@@ -1,7 +1,12 @@
 package datingapp.core;
 
+import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.UserStorage;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -94,6 +99,24 @@ import org.slf4j.LoggerFactory;
 public class CandidateFinder {
 
     private static final Logger logger = LoggerFactory.getLogger(CandidateFinder.class);
+
+    private final UserStorage userStorage;
+    private final LikeStorage likeStorage;
+    private final BlockStorage blockStorage;
+
+    /**
+     * Constructs a CandidateFinder with the required storage dependencies.
+     *
+     * @param userStorage the user storage implementation
+     * @param likeStorage the like storage implementation
+     * @param blockStorage the block storage implementation
+     * @throws NullPointerException if any parameter is null
+     */
+    public CandidateFinder(UserStorage userStorage, LikeStorage likeStorage, BlockStorage blockStorage) {
+        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+        this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
+        this.blockStorage = Objects.requireNonNull(blockStorage, "blockStorage cannot be null");
+    }
 
     /** Geographic utility functions. Pure Java - no external dependencies. */
     public static final class GeoUtils {
@@ -244,6 +267,20 @@ public class CandidateFinder {
                 allActive.size());
 
         return candidates;
+    }
+
+    /**
+     * Convenience method to find candidates for the given user by fetching active users and
+     * exclusions from storage.
+     *
+     * @param currentUser the user searching for candidates
+     * @return list of candidate users sorted by distance
+     */
+    public List<User> findCandidatesForUser(User currentUser) {
+        List<User> activeUsers = userStorage.findActive();
+        Set<UUID> excluded = new HashSet<>(likeStorage.getLikedOrPassedUserIds(currentUser.getId()));
+        excluded.addAll(blockStorage.getBlockedUserIds(currentUser.getId()));
+        return findCandidates(currentUser, activeUsers, excluded);
     }
 
     /**
