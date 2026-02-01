@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import datingapp.core.AppSession;
 import datingapp.core.User;
 import datingapp.core.ValidationService;
 import datingapp.core.storage.UserStorage;
@@ -12,8 +13,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Scanner;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,14 +37,15 @@ import org.junit.jupiter.params.provider.ValueSource;
 class ProfileCreateSelectTest {
 
     private InMemoryUserStorage userStorage;
-    private CliUtilities.UserSession userSession;
+    private AppSession userSession;
     private ProfileHandler handler;
 
     @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
         userStorage = new InMemoryUserStorage();
-        userSession = new CliUtilities.UserSession();
+        userSession = AppSession.getInstance();
+        userSession.reset(); // Clear state from previous tests
     }
 
     private ProfileHandler createHandler(String input) {
@@ -177,6 +181,7 @@ class ProfileCreateSelectTest {
 
     private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new LinkedHashMap<>();
+        private final Map<String, User.ProfileNote> profileNotes = new ConcurrentHashMap<>();
 
         @Override
         public void save(User user) {
@@ -203,6 +208,33 @@ class ProfileCreateSelectTest {
         @Override
         public void delete(UUID id) {
             users.remove(id);
+        }
+
+        private static String noteKey(UUID authorId, UUID subjectId) {
+            return authorId + "_" + subjectId;
+        }
+
+        @Override
+        public void saveProfileNote(User.ProfileNote note) {
+            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
+        }
+
+        @Override
+        public Optional<User.ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
+        }
+
+        @Override
+        public List<User.ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+            return profileNotes.values().stream()
+                    .filter(note -> note.authorId().equals(authorId))
+                    .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))
+                    .toList();
+        }
+
+        @Override
+        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            return profileNotes.remove(noteKey(authorId, subjectId)) != null;
         }
     }
 }

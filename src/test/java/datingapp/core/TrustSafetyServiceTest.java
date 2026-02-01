@@ -10,6 +10,7 @@ import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Report;
 import datingapp.core.storage.BlockStorage;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -409,6 +411,11 @@ class TrustSafetyServiceTest {
 
     private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
+        private final Map<String, ProfileNote> profileNotes = new java.util.concurrent.ConcurrentHashMap<>();
+
+        private static String noteKey(UUID authorId, UUID subjectId) {
+            return authorId + "_" + subjectId;
+        }
 
         @Override
         public void save(User user) {
@@ -435,6 +442,29 @@ class TrustSafetyServiceTest {
         @Override
         public void delete(UUID id) {
             users.remove(id);
+        }
+
+        @Override
+        public void saveProfileNote(ProfileNote note) {
+            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
+        }
+
+        @Override
+        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
+        }
+
+        @Override
+        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+            return profileNotes.values().stream()
+                    .filter(note -> note.authorId().equals(authorId))
+                    .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))
+                    .toList();
+        }
+
+        @Override
+        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            return profileNotes.remove(noteKey(authorId, subjectId)) != null;
         }
     }
 

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Messaging.Conversation;
 import datingapp.core.Messaging.Message;
+import datingapp.core.User.ProfileNote;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.UserStorage;
@@ -679,6 +680,11 @@ class MessagingServiceTest {
 
     static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
+        private final Map<String, ProfileNote> profileNotes = new java.util.concurrent.ConcurrentHashMap<>();
+
+        private static String noteKey(UUID authorId, UUID subjectId) {
+            return authorId + "_" + subjectId;
+        }
 
         @Override
         public void save(User user) {
@@ -705,6 +711,29 @@ class MessagingServiceTest {
         @Override
         public void delete(UUID id) {
             users.remove(id);
+        }
+
+        @Override
+        public void saveProfileNote(ProfileNote note) {
+            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
+        }
+
+        @Override
+        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
+        }
+
+        @Override
+        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+            return profileNotes.values().stream()
+                    .filter(note -> note.authorId().equals(authorId))
+                    .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))
+                    .toList();
+        }
+
+        @Override
+        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            return profileNotes.remove(noteKey(authorId, subjectId)) != null;
         }
     }
 }

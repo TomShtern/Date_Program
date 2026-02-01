@@ -5,6 +5,7 @@ import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.User;
+import datingapp.core.User.ProfileNote;
 import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -13,6 +14,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -29,6 +31,7 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  * Handles all database interactions for User entities.
  */
 @RegisterRowMapper(JdbiUserStorage.Mapper.class)
+@RegisterRowMapper(JdbiUserStorage.ProfileNoteMapper.class)
 public interface JdbiUserStorage {
 
     // ===== SQL Column Constants =====
@@ -103,6 +106,40 @@ public interface JdbiUserStorage {
      */
     @SqlUpdate("DELETE FROM users WHERE id = :id")
     void delete(@Bind("id") UUID id);
+
+    // ===== ProfileNote Methods =====
+
+    @SqlUpdate("""
+                        MERGE INTO profile_notes (author_id, subject_id, content, created_at, updated_at)
+                        KEY (author_id, subject_id)
+                        VALUES (:authorId, :subjectId, :content, :createdAt, :updatedAt)
+                        """)
+    void saveProfileNote(@BindBean ProfileNote note);
+
+    @SqlQuery("""
+                        SELECT author_id, subject_id, content, created_at, updated_at
+                        FROM profile_notes
+                        WHERE author_id = :authorId AND subject_id = :subjectId
+                        """)
+    Optional<ProfileNote> getProfileNote(@Bind("authorId") UUID authorId, @Bind("subjectId") UUID subjectId);
+
+    @SqlQuery("""
+                        SELECT author_id, subject_id, content, created_at, updated_at
+                        FROM profile_notes
+                        WHERE author_id = :authorId
+                        ORDER BY updated_at DESC
+                        """)
+    List<ProfileNote> getProfileNotesByAuthor(@Bind("authorId") UUID authorId);
+
+    @SqlUpdate("""
+                        DELETE FROM profile_notes
+                        WHERE author_id = :authorId AND subject_id = :subjectId
+                        """)
+    int deleteProfileNoteInternal(@Bind("authorId") UUID authorId, @Bind("subjectId") UUID subjectId);
+
+    default boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+        return deleteProfileNoteInternal(authorId, subjectId) > 0;
+    }
 
     /**
      * Row mapper for User entity - inlined from former UserMapper class.
@@ -248,6 +285,23 @@ public interface JdbiUserStorage {
                     .filter(s -> !s.isEmpty())
                     .map(s -> Enum.valueOf(enumClass, s))
                     .collect(Collectors.toSet());
+        }
+    }
+
+    /**
+     * Row mapper for ProfileNote entity.
+     * Maps database rows to ProfileNote objects.
+     */
+    class ProfileNoteMapper implements RowMapper<ProfileNote> {
+
+        @Override
+        public ProfileNote map(ResultSet rs, StatementContext ctx) throws SQLException {
+            return new ProfileNote(
+                    MapperHelper.readUuid(rs, "author_id"),
+                    MapperHelper.readUuid(rs, "subject_id"),
+                    rs.getString("content"),
+                    MapperHelper.readInstant(rs, "created_at"),
+                    MapperHelper.readInstant(rs, "updated_at"));
         }
     }
 }

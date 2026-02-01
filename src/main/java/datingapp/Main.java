@@ -10,13 +10,13 @@ import datingapp.app.cli.ProfileNotesHandler;
 import datingapp.app.cli.RelationshipHandler;
 import datingapp.app.cli.SafetyHandler;
 import datingapp.app.cli.StatsHandler;
-import datingapp.core.AppConfig;
+import datingapp.core.AppBootstrap;
+import datingapp.core.AppSession;
 import datingapp.core.DailyService;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.SessionService;
 import datingapp.core.User;
 import datingapp.core.ValidationService;
-import datingapp.storage.DatabaseManager;
 import java.util.Scanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,12 +35,10 @@ public final class Main {
     }
 
     // Application context
-    private static DatabaseManager dbManager;
     private static ServiceRegistry services;
 
     // CLI Components
     private static CliUtilities.InputReader inputReader;
-    private static CliUtilities.UserSession userSession;
     private static ProfileHandler profileHandler;
     private static MatchingHandler matchingHandler;
     private static SafetyHandler safetyHandler;
@@ -94,18 +92,11 @@ public final class Main {
     }
 
     private static void initializeApp(Scanner scanner) {
-        // Configuration
-        AppConfig config = AppConfig.defaults();
-
-        // Database
-        dbManager = DatabaseManager.getInstance();
-
-        // Wire up all services through the registry
-        services = ServiceRegistry.Builder.buildH2(dbManager, config);
+        // Initialize application with default configuration
+        services = AppBootstrap.initialize();
 
         // Initialize CLI Infrastructure
         inputReader = new CliUtilities.InputReader(scanner);
-        userSession = new CliUtilities.UserSession();
 
         // Initialize validation service (stateless, no dependencies)
         ValidationService validationService = new ValidationService();
@@ -116,7 +107,7 @@ public final class Main {
                 services.getProfilePreviewService(),
                 services.getAchievementService(),
                 validationService,
-                userSession,
+                AppSession.getInstance(),
                 inputReader);
 
         MatchingHandler.Dependencies matchingDependencies = new MatchingHandler.Dependencies(
@@ -130,9 +121,9 @@ public final class Main {
                 services.getMatchQualityService(),
                 services.getUserStorage(),
                 services.getAchievementService(),
-                services.getProfileViewStorage(),
+                services.getStatsStorage(),
                 services.getRelationshipTransitionService(),
-                userSession,
+                AppSession.getInstance(),
                 inputReader);
         matchingHandler = new MatchingHandler(matchingDependencies);
 
@@ -141,24 +132,24 @@ public final class Main {
                 services.getBlockStorage(),
                 services.getMatchStorage(),
                 services.getTrustSafetyService(),
-                userSession,
+                AppSession.getInstance(),
                 inputReader);
 
         statsHandler = new StatsHandler(
-                services.getStatsService(), services.getAchievementService(), userSession, inputReader);
+                services.getStatsService(), services.getAchievementService(), AppSession.getInstance(), inputReader);
 
-        profileNotesHandler = new ProfileNotesHandler(
-                services.getProfileNoteStorage(), services.getUserStorage(), userSession, inputReader);
+        profileNotesHandler = new ProfileNotesHandler(services.getUserStorage(), AppSession.getInstance(), inputReader);
 
-        likerBrowserHandler = new LikerBrowserHandler(services.getMatchingService(), userSession, inputReader);
+        likerBrowserHandler =
+                new LikerBrowserHandler(services.getMatchingService(), AppSession.getInstance(), inputReader);
 
-        messagingHandler = new MessagingHandler(services, inputReader, userSession);
+        messagingHandler = new MessagingHandler(services, inputReader, AppSession.getInstance());
 
         relationshipHandler = new RelationshipHandler(
                 services.getRelationshipTransitionService(),
                 services.getSocialStorage(),
                 services.getUserStorage(),
-                userSession,
+                AppSession.getInstance(),
                 inputReader);
     }
 
@@ -167,7 +158,7 @@ public final class Main {
         logger.info("         DATING APP - PHASE 0.5");
         logger.info(CliConstants.SEPARATOR_LINE);
 
-        User currentUser = userSession.getCurrentUser();
+        User currentUser = AppSession.getInstance().getCurrentUser();
 
         if (currentUser != null) {
             logger.info("  Current User: {} ({})", currentUser.getName(), currentUser.getState());
@@ -225,8 +216,6 @@ public final class Main {
     }
 
     private static void shutdown() {
-        if (dbManager != null) {
-            dbManager.shutdown();
-        }
+        AppBootstrap.shutdown();
     }
 }

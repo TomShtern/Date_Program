@@ -3,12 +3,12 @@ package datingapp.ui.viewmodel;
 import datingapp.core.Achievement;
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
+import datingapp.core.AppSession;
 import datingapp.core.Match;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
-import datingapp.ui.ViewModelFactory.UISession;
 import java.util.List;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -59,7 +59,7 @@ public class StatsViewModel {
      */
     private User ensureCurrentUser() {
         if (currentUser == null) {
-            currentUser = UISession.getInstance().getCurrentUser();
+            currentUser = AppSession.getInstance().getCurrentUser();
         }
         return currentUser;
     }

@@ -3,6 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import datingapp.core.MatchingService.PendingLiker;
+import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.BlockStorage;
@@ -210,9 +211,14 @@ class LikerBrowserServiceTest {
 
     private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
+        private final Map<String, ProfileNote> profileNotes = new java.util.concurrent.ConcurrentHashMap<>();
 
         void put(User user) {
             users.put(user.getId(), user);
+        }
+
+        private static String noteKey(UUID authorId, UUID subjectId) {
+            return authorId + "_" + subjectId;
         }
 
         @Override
@@ -238,6 +244,29 @@ class LikerBrowserServiceTest {
         @Override
         public void delete(UUID id) {
             users.remove(id);
+        }
+
+        @Override
+        public void saveProfileNote(ProfileNote note) {
+            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
+        }
+
+        @Override
+        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
+        }
+
+        @Override
+        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+            return profileNotes.values().stream()
+                    .filter(note -> note.authorId().equals(authorId))
+                    .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))
+                    .toList();
+        }
+
+        @Override
+        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            return profileNotes.remove(noteKey(authorId, subjectId)) != null;
         }
     }
 

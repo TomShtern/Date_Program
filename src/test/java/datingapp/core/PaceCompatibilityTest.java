@@ -9,6 +9,7 @@ import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -168,6 +170,8 @@ class PaceCompatibilityTest {
     // Minimal mock storage implementations for constructor requirements
 
     private static class MinimalUserStorage implements UserStorage {
+        private final Map<String, ProfileNote> profileNotes = new ConcurrentHashMap<>();
+
         @Override
         public void save(User user) {}
 
@@ -189,6 +193,33 @@ class PaceCompatibilityTest {
         @Override
         public void delete(UUID id) {
             // No-op for minimal storage
+        }
+
+        @Override
+        public void saveProfileNote(ProfileNote note) {
+            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
+        }
+
+        @Override
+        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
+        }
+
+        @Override
+        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+            return profileNotes.values().stream()
+                    .filter(note -> note.authorId().equals(authorId))
+                    .toList();
+        }
+
+        @Override
+        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            String key = noteKey(authorId, subjectId);
+            return profileNotes.remove(key) != null;
+        }
+
+        private static String noteKey(UUID authorId, UUID subjectId) {
+            return authorId + "_" + subjectId;
         }
     }
 

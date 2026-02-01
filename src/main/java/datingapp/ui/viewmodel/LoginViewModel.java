@@ -1,11 +1,11 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
 import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.User;
 import datingapp.core.User.Gender;
 import datingapp.core.storage.UserStorage;
-import datingapp.ui.ViewModelFactory.UISession;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
@@ -144,7 +144,7 @@ public class LoginViewModel {
         }
 
         // Set user in the global UI session
-        UISession.getInstance().setCurrentUser(selectedUser);
+        AppSession.getInstance().setCurrentUser(selectedUser);
 
         return true;
     }

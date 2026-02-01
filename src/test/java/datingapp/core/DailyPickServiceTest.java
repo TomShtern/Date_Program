@@ -10,10 +10,10 @@ import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.BlockStorage;
-import datingapp.core.storage.DailyPickStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
@@ -34,7 +34,7 @@ class DailyPickServiceTest {
     private InMemoryUserStorage userStorage;
     private InMemoryLikeStorage likeStorage;
     private InMemoryBlockStorage blockStorage;
-    private InMemoryDailyPickStorage dailyPickStorage;
+    private CandidateFinder candidateFinder;
     private AppConfig config;
 
     @BeforeEach
@@ -42,10 +42,10 @@ class DailyPickServiceTest {
         userStorage = new InMemoryUserStorage();
         likeStorage = new InMemoryLikeStorage();
         blockStorage = new InMemoryBlockStorage();
-        dailyPickStorage = new InMemoryDailyPickStorage();
         config = AppConfig.defaults();
 
-        service = new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, null, config);
+        candidateFinder = new CandidateFinder();
+        service = new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config);
     }
 
     @Test
@@ -215,21 +215,25 @@ class DailyPickServiceTest {
     void markDailyPickViewed_storesCorrectDate() {
         User seeker = createActiveUser("Alice", 25);
         userStorage.save(seeker);
-        LocalDate today = LocalDate.now(config.userTimeZone());
 
         service.markDailyPickViewed(seeker.getId());
 
-        assertTrue(dailyPickStorage.hasViewed(seeker.getId(), today));
+        assertTrue(service.hasViewedDailyPick(seeker.getId()));
     }
 
     // Helper methods
 
     private User createActiveUser(String name, int age) {
+        return createActiveUser(name, age, User.Gender.FEMALE);
+    }
+
+    private User createActiveUser(String name, int age, User.Gender gender) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio for " + name);
         user.setBirthDate(LocalDate.now().minusYears(age));
-        user.setGender(User.Gender.MALE);
-        user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
+        user.setGender(gender);
+        // Set mutual interest - everyone interested in everyone for simple test matching
+        user.setInterestedIn(EnumSet.of(User.Gender.MALE, User.Gender.FEMALE, User.Gender.OTHER));
         user.setLocation(40.7128, -74.0060); // NYC
         user.addPhotoUrl("http://example.com/" + name + ".jpg");
         user.setPacePreferences(new Preferences.PacePreferences(
@@ -245,6 +249,7 @@ class DailyPickServiceTest {
 
     private static class InMemoryUserStorage implements UserStorage {
         private final List<User> users = new ArrayList<>();
+        private final java.util.Map<String, ProfileNote> profileNotes = new java.util.concurrent.ConcurrentHashMap<>();
 
         @Override
         public void save(User user) {
@@ -270,6 +275,33 @@ class DailyPickServiceTest {
         @Override
         public void delete(UUID id) {
             users.removeIf(u -> u.getId().equals(id));
+        }
+
+        @Override
+        public void saveProfileNote(ProfileNote note) {
+            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
+        }
+
+        @Override
+        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
+        }
+
+        @Override
+        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+            return profileNotes.values().stream()
+                    .filter(note -> note.authorId().equals(authorId))
+                    .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))
+                    .toList();
+        }
+
+        @Override
+        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            return profileNotes.remove(noteKey(authorId, subjectId)) != null;
+        }
+
+        private static String noteKey(UUID authorId, UUID subjectId) {
+            return authorId + "_" + subjectId;
         }
     }
 
@@ -431,30 +463,6 @@ class DailyPickServiceTest {
         public int countBlocksReceived(UUID blockedId) {
             return (int)
                     blocks.stream().filter(b -> b.blockedId().equals(blockedId)).count();
-        }
-    }
-
-    private static class InMemoryDailyPickStorage implements DailyPickStorage {
-        private final List<ViewRecord> views = new ArrayList<>();
-
-        private record ViewRecord(UUID userId, LocalDate date) {}
-
-        @Override
-        public void markViewed(UUID userId, LocalDate date) {
-            views.removeIf(v -> v.userId.equals(userId) && v.date.equals(date));
-            views.add(new ViewRecord(userId, date));
-        }
-
-        @Override
-        public boolean hasViewed(UUID userId, LocalDate date) {
-            return views.stream().anyMatch(v -> v.userId.equals(userId) && v.date.equals(date));
-        }
-
-        @Override
-        public int cleanup(LocalDate before) {
-            int sizeBefore = views.size();
-            views.removeIf(v -> v.date.isBefore(before));
-            return sizeBefore - views.size();
         }
     }
 }

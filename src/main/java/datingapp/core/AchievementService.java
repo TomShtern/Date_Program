@@ -5,7 +5,7 @@ import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.ReportStorage;
-import datingapp.core.storage.UserAchievementStorage;
+import datingapp.core.storage.StatsStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -21,7 +21,7 @@ import java.util.UUID;
  */
 public class AchievementService {
 
-    private final UserAchievementStorage achievementStorage;
+    private final StatsStorage achievementStorage;
     private final MatchStorage matchStorage;
     private final LikeStorage likeStorage;
     private final UserStorage userStorage;
@@ -29,7 +29,7 @@ public class AchievementService {
     private final ProfilePreviewService profilePreviewService;
 
     public AchievementService(
-            UserAchievementStorage achievementStorage,
+            StatsStorage achievementStorage,
             MatchStorage matchStorage,
             LikeStorage likeStorage,
             UserStorage userStorage,
@@ -100,7 +100,7 @@ public class AchievementService {
         for (Achievement achievement : Achievement.values()) {
             if (!achievementStorage.hasAchievement(userId, achievement) && isEarned(userId, user, achievement)) {
                 UserAchievement unlocked = UserAchievement.create(userId, achievement);
-                achievementStorage.save(unlocked);
+                achievementStorage.saveUserAchievement(unlocked);
                 newlyUnlocked.add(unlocked);
             }
         }
@@ -110,7 +110,7 @@ public class AchievementService {
 
     /** Get all unlocked achievements for a user. */
     public List<UserAchievement> getUnlocked(UUID userId) {
-        return achievementStorage.getUnlocked(userId);
+        return achievementStorage.getUnlockedAchievements(userId);
     }
 
     /**
@@ -284,6 +284,6 @@ public class AchievementService {
 
     /** Count total unlocked achievements. */
     public int countUnlocked(UUID userId) {
-        return achievementStorage.countUnlocked(userId);
+        return achievementStorage.countUnlockedAchievements(userId);
     }
 }

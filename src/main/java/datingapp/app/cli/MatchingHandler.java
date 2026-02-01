@@ -1,6 +1,7 @@
 package datingapp.app.cli;
 
 import datingapp.core.AchievementService;
+import datingapp.core.AppSession;
 import datingapp.core.CandidateFinder;
 import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.DailyService;
@@ -18,7 +19,7 @@ import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.ProfileViewStorage;
+import datingapp.core.storage.StatsStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.HashSet;
 import java.util.List;
@@ -48,9 +49,9 @@ public class MatchingHandler {
     private final MatchQualityService matchQualityService;
     private final UserStorage userStorage;
     private final AchievementService achievementService;
-    private final ProfileViewStorage profileViewStorage;
+    private final StatsStorage statsStorage;
     private final RelationshipTransitionService transitionService;
-    private final CliUtilities.UserSession userSession;
+    private final AppSession session;
     private final CliUtilities.InputReader inputReader;
 
     public MatchingHandler(Dependencies dependencies) {
@@ -64,9 +65,9 @@ public class MatchingHandler {
         this.matchQualityService = dependencies.matchQualityService();
         this.userStorage = dependencies.userStorage();
         this.achievementService = dependencies.achievementService();
-        this.profileViewStorage = dependencies.profileViewStorage();
+        this.statsStorage = dependencies.statsStorage();
         this.transitionService = dependencies.transitionService();
-        this.userSession = dependencies.userSession();
+        this.session = dependencies.userSession();
         this.inputReader = dependencies.inputReader();
     }
 
@@ -81,9 +82,9 @@ public class MatchingHandler {
             MatchQualityService matchQualityService,
             UserStorage userStorage,
             AchievementService achievementService,
-            ProfileViewStorage profileViewStorage,
+            StatsStorage statsStorage,
             RelationshipTransitionService transitionService,
-            CliUtilities.UserSession userSession,
+            AppSession userSession,
             CliUtilities.InputReader inputReader) {
 
         public Dependencies {
@@ -97,7 +98,7 @@ public class MatchingHandler {
             Objects.requireNonNull(matchQualityService);
             Objects.requireNonNull(userStorage);
             Objects.requireNonNull(achievementService);
-            Objects.requireNonNull(profileViewStorage);
+            Objects.requireNonNull(statsStorage);
             Objects.requireNonNull(transitionService);
             Objects.requireNonNull(userSession);
             Objects.requireNonNull(inputReader);
@@ -110,8 +111,8 @@ public class MatchingHandler {
      * picks, candidate filtering, and user interactions (like/pass).
      */
     public void browseCandidates() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
             if (currentUser.getState() != User.State.ACTIVE) {
                 logger.info("\n⚠️  You must be ACTIVE to browse candidates. Complete your profile first.\n");
                 return;
@@ -150,7 +151,7 @@ public class MatchingHandler {
 
     private boolean processCandidateInteraction(User candidate, User currentUser) {
         // Record this profile view
-        profileViewStorage.recordView(currentUser.getId(), candidate.getId());
+        statsStorage.recordProfileView(currentUser.getId(), candidate.getId());
 
         double distance = GeoUtils.distanceKm(
                 currentUser.getLat(), currentUser.getLon(),
@@ -226,8 +227,8 @@ public class MatchingHandler {
      * unmatch, or block matches.
      */
     public void viewMatches() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
             logger.info("\n" + CliConstants.SEPARATOR_LINE);
             logger.info("         YOUR MATCHES");
             logger.info(CliConstants.SEPARATOR_LINE + "\n");

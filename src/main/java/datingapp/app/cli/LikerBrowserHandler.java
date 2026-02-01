@@ -1,5 +1,6 @@
 package datingapp.app.cli;
 
+import datingapp.core.AppSession;
 import datingapp.core.MatchingService;
 import datingapp.core.MatchingService.PendingLiker;
 import datingapp.core.User;
@@ -14,16 +15,14 @@ public class LikerBrowserHandler {
     private static final Logger logger = LoggerFactory.getLogger(LikerBrowserHandler.class);
 
     private final MatchingService matchingService;
-    private final CliUtilities.UserSession userSession;
+    private final AppSession session;
     private final CliUtilities.InputReader inputReader;
 
     /** Creates a new LikerBrowserHandler with the required dependencies. */
     public LikerBrowserHandler(
-            MatchingService matchingService,
-            CliUtilities.UserSession userSession,
-            CliUtilities.InputReader inputReader) {
+            MatchingService matchingService, AppSession session, CliUtilities.InputReader inputReader) {
         this.matchingService = Objects.requireNonNull(matchingService);
-        this.userSession = Objects.requireNonNull(userSession);
+        this.session = Objects.requireNonNull(session);
         this.inputReader = Objects.requireNonNull(inputReader);
     }
 
@@ -32,8 +31,8 @@ public class LikerBrowserHandler {
      * interaction.
      */
     public void browseWhoLikedMe() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
             List<PendingLiker> likers = matchingService.findPendingLikersWithTimes(currentUser.getId());
 
             if (likers.isEmpty()) {

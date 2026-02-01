@@ -1,5 +1,6 @@
 package datingapp.ui;
 
+import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.User;
 import datingapp.ui.controller.ChatController;
@@ -19,6 +20,7 @@ import datingapp.ui.viewmodel.PreferencesViewModel;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import datingapp.ui.viewmodel.StatsViewModel;
 import java.lang.reflect.InvocationTargetException;
+import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import org.slf4j.Logger;
@@ -31,51 +33,15 @@ import org.slf4j.LoggerFactory;
  */
 public class ViewModelFactory {
 
-    /**
-     * Singleton session manager for the JavaFX UI.
-     * Tracks the currently logged-in user and provides observable access for data
-     * binding.
-     */
-    public static final class UISession {
-        private static final UISession INSTANCE = new UISession();
-
-        private final ObjectProperty<User> currentUser = new SimpleObjectProperty<>();
-
-        private UISession() {}
-
-        public static UISession getInstance() {
-            return INSTANCE;
-        }
-
-        public User getCurrentUser() {
-            return currentUser.get();
-        }
-
-        public void setCurrentUser(User user) {
-            this.currentUser.set(user);
-        }
-
-        public ObjectProperty<User> currentUserProperty() {
-            return currentUser;
-        }
-
-        public boolean isLoggedIn() {
-            return currentUser.get() != null;
-        }
-
-        public boolean isActive() {
-            User user = currentUser.get();
-            return user != null && user.getState() == User.State.ACTIVE;
-        }
-
-        public void logout() {
-            currentUser.set(null);
-        }
-    }
-
     private static final Logger logger = LoggerFactory.getLogger(ViewModelFactory.class);
 
     private final ServiceRegistry services;
+
+    /**
+     * JavaFX-compatible wrapper for AppSession.
+     * Provides an ObjectProperty that synchronizes with the global AppSession singleton.
+     */
+    private final ObjectProperty<User> currentUserProperty = new SimpleObjectProperty<>();
 
     // Cached ViewModels (lazy-initialized singletons within UI context)
     private LoginViewModel loginViewModel;
@@ -89,6 +55,26 @@ public class ViewModelFactory {
 
     public ViewModelFactory(ServiceRegistry services) {
         this.services = services;
+        initializeSessionBinding();
+    }
+
+    /**
+     * Binds the JavaFX currentUserProperty to the global AppSession.
+     * Updates are pushed to the UI thread for thread-safety.
+     */
+    private void initializeSessionBinding() {
+        // Listen to AppSession changes and update UI property on JavaFX thread
+        AppSession.getInstance().addListener(user -> Platform.runLater(() -> currentUserProperty.set(user)));
+        // Sync initial state
+        currentUserProperty.set(AppSession.getInstance().getCurrentUser());
+    }
+
+    /**
+     * Gets the current user property for JavaFX binding.
+     * This property automatically synchronizes with AppSession.
+     */
+    public ObjectProperty<User> currentUserProperty() {
+        return currentUserProperty;
     }
 
     /**

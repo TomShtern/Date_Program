@@ -1,5 +1,6 @@
 package datingapp.app.cli;
 
+import datingapp.core.AppSession;
 import datingapp.core.RelationshipTransitionService;
 import datingapp.core.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.Social.FriendRequest;
@@ -22,25 +23,25 @@ public class RelationshipHandler {
     private final RelationshipTransitionService transitionService;
     private final SocialStorage socialStorage;
     private final UserStorage userStorage;
-    private final CliUtilities.UserSession userSession;
+    private final AppSession session;
     private final CliUtilities.InputReader inputReader;
 
     public RelationshipHandler(
             RelationshipTransitionService transitionService,
             SocialStorage socialStorage,
             UserStorage userStorage,
-            CliUtilities.UserSession userSession,
+            AppSession session,
             CliUtilities.InputReader inputReader) {
         this.transitionService = transitionService;
         this.socialStorage = socialStorage;
         this.userStorage = userStorage;
-        this.userSession = userSession;
+        this.session = session;
         this.inputReader = inputReader;
     }
 
     /** Displays and manages pending friend requests. */
     public void viewPendingRequests() {
-        User currentUser = userSession.getCurrentUser();
+        User currentUser = session.getCurrentUser();
         if (currentUser == null) {
             logger.info("\n⚠️ Please log in first.\n");
             return;
@@ -95,7 +96,7 @@ public class RelationshipHandler {
 
     /** Displays notifications for the current user. */
     public void viewNotifications() {
-        User currentUser = userSession.getCurrentUser();
+        User currentUser = session.getCurrentUser();
         if (currentUser == null) {
             logger.info("\n⚠️ Please log in first.\n");
             return;

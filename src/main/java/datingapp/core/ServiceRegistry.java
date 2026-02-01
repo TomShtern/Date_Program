@@ -1,17 +1,13 @@
 package datingapp.core;
 
 import datingapp.core.storage.BlockStorage;
-import datingapp.core.storage.DailyPickStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.MessagingStorage;
-import datingapp.core.storage.ProfileNoteStorage;
-import datingapp.core.storage.ProfileViewStorage;
 import datingapp.core.storage.ReportStorage;
 import datingapp.core.storage.SocialStorage;
 import datingapp.core.storage.StatsStorage;
 import datingapp.core.storage.SwipeSessionStorage;
-import datingapp.core.storage.UserAchievementStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.storage.DatabaseManager;
 import java.util.Objects;
@@ -52,10 +48,6 @@ public class ServiceRegistry {
     // Profile & Stats Storage
     // ─────────────────────────────────────────────
     private final StatsStorage statsStorage; // Consolidated: user + platform stats
-    private final DailyPickStorage dailyPickStorage;
-    private final UserAchievementStorage userAchievementStorage;
-    private final ProfileViewStorage profileViewStorage;
-    private final ProfileNoteStorage profileNoteStorage;
 
     // ─────────────────────────────────────────────
     // Messaging & Social Storage
@@ -102,10 +94,6 @@ public class ServiceRegistry {
             ReportStorage reportStorage,
             SwipeSessionStorage sessionStorage,
             StatsStorage statsStorage,
-            DailyPickStorage dailyPickStorage,
-            UserAchievementStorage userAchievementStorage,
-            ProfileViewStorage profileViewStorage,
-            ProfileNoteStorage profileNoteStorage,
             MessagingStorage messagingStorage,
             SocialStorage socialStorage,
             CandidateFinder candidateFinder,
@@ -128,10 +116,6 @@ public class ServiceRegistry {
         this.reportStorage = Objects.requireNonNull(reportStorage);
         this.sessionStorage = Objects.requireNonNull(sessionStorage);
         this.statsStorage = Objects.requireNonNull(statsStorage);
-        this.dailyPickStorage = Objects.requireNonNull(dailyPickStorage);
-        this.userAchievementStorage = Objects.requireNonNull(userAchievementStorage);
-        this.profileViewStorage = Objects.requireNonNull(profileViewStorage);
-        this.profileNoteStorage = Objects.requireNonNull(profileNoteStorage);
         this.messagingStorage = Objects.requireNonNull(messagingStorage);
         this.socialStorage = Objects.requireNonNull(socialStorage);
         this.candidateFinder = Objects.requireNonNull(candidateFinder);
@@ -186,22 +170,6 @@ public class ServiceRegistry {
 
     public StatsStorage getStatsStorage() {
         return statsStorage;
-    }
-
-    public DailyPickStorage getDailyPickStorage() {
-        return dailyPickStorage;
-    }
-
-    public UserAchievementStorage getUserAchievementStorage() {
-        return userAchievementStorage;
-    }
-
-    public ProfileViewStorage getProfileViewStorage() {
-        return profileViewStorage;
-    }
-
-    public ProfileNoteStorage getProfileNoteStorage() {
-        return profileNoteStorage;
     }
 
     // === Messaging & Social Storage ===
@@ -330,11 +298,6 @@ public class ServiceRegistry {
             ReportStorage reportStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiReportStorage.class);
             SwipeSessionStorage sessionStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiSwipeSessionStorage.class);
             StatsStorage statsStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiStatsStorage.class);
-            DailyPickStorage dailyPickStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiDailyPickStorage.class);
-            UserAchievementStorage userAchievementStorage =
-                    jdbi.onDemand(datingapp.storage.jdbi.JdbiUserAchievementStorage.class);
-            ProfileViewStorage profileViewStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiProfileViewStorage.class);
-            ProfileNoteStorage profileNoteStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiProfileNoteStorage.class);
             MessagingStorage messagingStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiMessagingStorage.class);
             SocialStorage socialStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiSocialStorage.class);
 
@@ -347,7 +310,7 @@ public class ServiceRegistry {
                     new MatchingService(likeStorage, matchStorage, userStorage, blockStorage, sessionService);
             MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
             DailyService dailyService =
-                    new DailyService(userStorage, likeStorage, blockStorage, dailyPickStorage, candidateFinder, config);
+                    new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config);
             UndoService undoService = new UndoService(likeStorage, matchStorage, config);
 
             // ═══════════════════════════════════════════════════════════════
@@ -371,13 +334,7 @@ public class ServiceRegistry {
             StatsService statsService =
                     new StatsService(likeStorage, matchStorage, blockStorage, reportStorage, statsStorage);
             AchievementService achievementService = new AchievementService(
-                    userAchievementStorage,
-                    matchStorage,
-                    likeStorage,
-                    userStorage,
-                    reportStorage,
-                    profilePreviewService,
-                    config);
+                    statsStorage, matchStorage, likeStorage, userStorage, reportStorage, profilePreviewService, config);
 
             // ═══════════════════════════════════════════════════════════════
             // Build ServiceRegistry
@@ -391,10 +348,6 @@ public class ServiceRegistry {
                     reportStorage,
                     sessionStorage,
                     statsStorage,
-                    dailyPickStorage,
-                    userAchievementStorage,
-                    profileViewStorage,
-                    profileNoteStorage,
                     messagingStorage,
                     socialStorage,
                     candidateFinder,

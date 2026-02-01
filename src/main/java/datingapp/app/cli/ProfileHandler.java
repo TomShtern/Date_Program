@@ -2,6 +2,7 @@ package datingapp.app.cli;
 
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
+import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
 import datingapp.core.MatchQualityService.InterestMatcher;
 import datingapp.core.Preferences.Interest;
@@ -38,7 +39,7 @@ public class ProfileHandler {
     private final ProfilePreviewService profilePreviewService;
     private final AchievementService achievementService;
     private final ValidationService validationService;
-    private final CliUtilities.UserSession userSession;
+    private final AppSession session;
     private final CliUtilities.InputReader inputReader;
 
     private static final String PROMPT_CHOICE = "Your choice: ";
@@ -48,14 +49,14 @@ public class ProfileHandler {
             ProfilePreviewService profilePreviewService,
             AchievementService achievementService,
             ValidationService validationService,
-            CliUtilities.UserSession userSession,
+            AppSession session,
             CliUtilities.InputReader inputReader) {
         this.userStorage = userStorage;
         this.profilePreviewService = profilePreviewService;
         this.achievementService = achievementService;
         this.validationService =
                 java.util.Objects.requireNonNull(validationService, "validationService cannot be null");
-        this.userSession = userSession;
+        this.session = session;
         this.inputReader = inputReader;
     }
 
@@ -65,8 +66,8 @@ public class ProfileHandler {
      * to activate the profile if complete.
      */
     public void completeProfile() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
             logger.info("\n--- Complete Profile for {} ---\n", currentUser.getName());
 
             promptBio(currentUser);
@@ -101,8 +102,8 @@ public class ProfileHandler {
      * percentage and improvement tips.
      */
     public void previewProfile() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
             ProfilePreviewService.ProfilePreview preview = profilePreviewService.generatePreview(currentUser);
 
             logger.info("\n" + CliConstants.SEPARATOR_LINE);
@@ -162,8 +163,8 @@ public class ProfileHandler {
      * based on lifestyle preferences.
      */
     public void setDealbreakers() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
             displayCurrentDealbreakers(currentUser);
             displayDealbreakerMenu();
 
@@ -674,7 +675,7 @@ public class ProfileHandler {
 
         User user = new User(UUID.randomUUID(), name);
         userStorage.save(user);
-        userSession.setCurrentUser(user);
+        session.setCurrentUser(user);
 
         logger.info("\n✅ User created! ID: {}", user.getId());
         logger.info("   Status: {} (Complete your profile to become ACTIVE)\n", user.getState());
@@ -704,8 +705,8 @@ public class ProfileHandler {
                 }
                 return;
             }
-            userSession.setCurrentUser(users.get(idx));
-            logger.info("\n✅ Selected: {}\n", userSession.getCurrentUser().getName());
+            session.setCurrentUser(users.get(idx));
+            logger.info("\n✅ Selected: {}\n", session.getCurrentUser().getName());
         } catch (NumberFormatException _) {
             logger.info("❌ Invalid input.\n");
         }
@@ -715,8 +716,8 @@ public class ProfileHandler {
      * Displays the profile completion score and breakdown for the current user.
      */
     public void viewProfileScore() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
             ProfileCompletionService.CompletionResult result = ProfileCompletionService.calculate(currentUser);
 
             logger.info("\n───────────────────────────────────────");

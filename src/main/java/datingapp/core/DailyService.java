@@ -2,7 +2,6 @@ package datingapp.core;
 
 import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.storage.BlockStorage;
-import datingapp.core.storage.DailyPickStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Duration;
@@ -10,11 +9,14 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Consolidated daily limit and daily pick workflows. */
 public class DailyService {
@@ -22,25 +24,25 @@ public class DailyService {
     private final UserStorage userStorage;
     private final LikeStorage likeStorage;
     private final BlockStorage blockStorage;
-    private final DailyPickStorage dailyPickStorage;
     private final CandidateFinder candidateFinder;
     private final AppConfig config;
 
+    /** In-memory tracking of daily pick views (userId -> set of dates viewed). */
+    private final ConcurrentHashMap<UUID, Set<LocalDate>> dailyPickViews = new ConcurrentHashMap<>();
+
     public DailyService(LikeStorage likeStorage, AppConfig config) {
-        this(null, likeStorage, null, null, null, config);
+        this(null, likeStorage, null, null, config);
     }
 
     public DailyService(
             UserStorage userStorage,
             LikeStorage likeStorage,
             BlockStorage blockStorage,
-            DailyPickStorage dailyPickStorage,
             CandidateFinder candidateFinder,
             AppConfig config) {
         this.userStorage = userStorage;
         this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
         this.blockStorage = blockStorage;
-        this.dailyPickStorage = dailyPickStorage;
         this.candidateFinder = candidateFinder;
         this.config = Objects.requireNonNull(config, "config cannot be null");
     }
@@ -128,7 +130,7 @@ public class DailyService {
         Random random = new Random(seed);
         User picked = candidates.get(random.nextInt(candidates.size()));
         String reason = generateReason(seeker, picked, random);
-        boolean alreadySeen = dailyPickStorage.hasViewed(seeker.getId(), today);
+        boolean alreadySeen = hasViewedDailyPick(seeker.getId(), today);
 
         return Optional.of(new DailyPick(picked, today, reason, alreadySeen));
     }
@@ -136,17 +138,41 @@ public class DailyService {
     /** Check whether user has viewed today's daily pick. */
     public boolean hasViewedDailyPick(UUID userId) {
         ensureDailyPickDependencies();
-        return dailyPickStorage.hasViewed(userId, getToday());
+        return hasViewedDailyPick(userId, getToday());
     }
 
     /** Mark today's daily pick as viewed for a user. */
     public void markDailyPickViewed(UUID userId) {
         ensureDailyPickDependencies();
-        dailyPickStorage.markViewed(userId, getToday());
+        markDailyPickViewed(userId, getToday());
+    }
+
+    /** Internal: Check if user has viewed daily pick for a specific date. */
+    private boolean hasViewedDailyPick(UUID userId, LocalDate date) {
+        Set<LocalDate> viewedDates = dailyPickViews.get(userId);
+        return viewedDates != null && viewedDates.contains(date);
+    }
+
+    /** Internal: Mark daily pick as viewed for a specific date. */
+    private void markDailyPickViewed(UUID userId, LocalDate date) {
+        dailyPickViews
+                .computeIfAbsent(userId, k -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
+                .add(date);
+    }
+
+    /** Cleanup old daily pick view records (for maintenance). */
+    public int cleanupOldDailyPickViews(LocalDate before) {
+        int removed = 0;
+        for (Set<LocalDate> dates : dailyPickViews.values()) {
+            long count = dates.stream().filter(date -> date.isBefore(before)).count();
+            dates.removeIf(date -> date.isBefore(before));
+            removed += count;
+        }
+        return removed;
     }
 
     private void ensureDailyPickDependencies() {
-        if (userStorage == null || blockStorage == null || dailyPickStorage == null) {
+        if (userStorage == null || blockStorage == null) {
             throw new IllegalStateException("Daily pick dependencies are not configured");
         }
     }

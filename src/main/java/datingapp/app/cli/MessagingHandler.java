@@ -1,5 +1,6 @@
 package datingapp.app.cli;
 
+import datingapp.core.AppSession;
 import datingapp.core.Match;
 import datingapp.core.Messaging.Conversation;
 import datingapp.core.Messaging.Message;
@@ -32,10 +33,9 @@ public class MessagingHandler {
 
     private final ServiceRegistry registry;
     private final CliUtilities.InputReader input;
-    private final CliUtilities.UserSession session;
+    private final AppSession session;
 
-    public MessagingHandler(
-            ServiceRegistry registry, CliUtilities.InputReader input, CliUtilities.UserSession session) {
+    public MessagingHandler(ServiceRegistry registry, CliUtilities.InputReader input, AppSession session) {
         this.registry = Objects.requireNonNull(registry, "registry cannot be null");
         this.input = Objects.requireNonNull(input, "input cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");

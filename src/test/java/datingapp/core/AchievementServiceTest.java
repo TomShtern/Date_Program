@@ -7,12 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
+import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.Report;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.ReportStorage;
-import datingapp.core.storage.UserAchievementStorage;
+import datingapp.core.storage.StatsStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +38,7 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class AchievementServiceTest {
 
-    private InMemoryUserAchievementStorage achievementStorage;
+    private InMemoryStatsStorage achievementStorage;
     private InMemoryMatchStorage matchStorage;
     private InMemoryLikeStorage likeStorage;
     private InMemoryUserStorage userStorage;
@@ -48,7 +50,7 @@ class AchievementServiceTest {
 
     @BeforeEach
     void setUp() {
-        achievementStorage = new InMemoryUserAchievementStorage();
+        achievementStorage = new InMemoryStatsStorage();
         matchStorage = new InMemoryMatchStorage();
         likeStorage = new InMemoryLikeStorage();
         userStorage = new InMemoryUserStorage();
@@ -307,16 +309,17 @@ class AchievementServiceTest {
 
     // === In-Memory Mock Storage Classes ===
 
-    private static class InMemoryUserAchievementStorage implements UserAchievementStorage {
+    private static class InMemoryStatsStorage implements StatsStorage {
         private final List<UserAchievement> achievements = new ArrayList<>();
 
+        // Achievement methods (only ones needed for tests)
         @Override
-        public void save(UserAchievement achievement) {
+        public void saveUserAchievement(UserAchievement achievement) {
             achievements.add(achievement);
         }
 
         @Override
-        public List<UserAchievement> getUnlocked(UUID userId) {
+        public List<UserAchievement> getUnlockedAchievements(UUID userId) {
             return achievements.stream().filter(a -> a.userId().equals(userId)).toList();
         }
 
@@ -326,7 +329,7 @@ class AchievementServiceTest {
         }
 
         @Override
-        public int countUnlocked(UUID userId) {
+        public int countUnlockedAchievements(UUID userId) {
             return (int)
                     achievements.stream().filter(a -> a.userId().equals(userId)).count();
         }
@@ -335,6 +338,74 @@ class AchievementServiceTest {
             return (int) achievements.stream()
                     .filter(a -> a.userId().equals(userId) && a.achievement() == achievement)
                     .count();
+        }
+
+        // User Stats methods (stubs - not needed for achievement tests)
+        @Override
+        public void saveUserStats(datingapp.core.Stats.UserStats stats) {
+            throw new UnsupportedOperationException("Not needed for achievement tests");
+        }
+
+        @Override
+        public Optional<datingapp.core.Stats.UserStats> getLatestUserStats(UUID userId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<datingapp.core.Stats.UserStats> getUserStatsHistory(UUID userId, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<datingapp.core.Stats.UserStats> getAllLatestUserStats() {
+            return List.of();
+        }
+
+        @Override
+        public int deleteUserStatsOlderThan(Instant cutoff) {
+            return 0;
+        }
+
+        // Platform Stats methods (stubs - not needed for achievement tests)
+        @Override
+        public void savePlatformStats(datingapp.core.Stats.PlatformStats stats) {
+            throw new UnsupportedOperationException("Not needed for achievement tests");
+        }
+
+        @Override
+        public Optional<datingapp.core.Stats.PlatformStats> getLatestPlatformStats() {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<datingapp.core.Stats.PlatformStats> getPlatformStatsHistory(int limit) {
+            return List.of();
+        }
+
+        // Profile View methods (stubs - not needed for achievement tests)
+        @Override
+        public void recordProfileView(UUID viewerId, UUID viewedId) {
+            throw new UnsupportedOperationException("Not needed for achievement tests");
+        }
+
+        @Override
+        public int getProfileViewCount(UUID userId) {
+            return 0;
+        }
+
+        @Override
+        public int getUniqueViewerCount(UUID userId) {
+            return 0;
+        }
+
+        @Override
+        public List<UUID> getRecentViewers(UUID userId, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
+            return false;
         }
     }
 
@@ -470,6 +541,7 @@ class AchievementServiceTest {
 
     private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
+        private final Map<String, ProfileNote> profileNotes = new ConcurrentHashMap<>();
 
         @Override
         public void save(User user) {
@@ -496,6 +568,32 @@ class AchievementServiceTest {
         @Override
         public void delete(UUID id) {
             users.remove(id);
+        }
+
+        @Override
+        public void saveProfileNote(ProfileNote note) {
+            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
+        }
+
+        @Override
+        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
+        }
+
+        @Override
+        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+            return profileNotes.values().stream()
+                    .filter(note -> note.authorId().equals(authorId))
+                    .toList();
+        }
+
+        @Override
+        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            return profileNotes.remove(noteKey(authorId, subjectId)) != null;
+        }
+
+        private static String noteKey(UUID authorId, UUID subjectId) {
+            return authorId + "_" + subjectId;
         }
     }
 

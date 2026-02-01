@@ -119,30 +119,6 @@ class ServiceRegistryTest {
         }
 
         @Test
-        @DisplayName("getDailyPickStorage returns non-null")
-        void getDailyPickStorage() {
-            assertNotNull(registry.getDailyPickStorage());
-        }
-
-        @Test
-        @DisplayName("getUserAchievementStorage returns non-null")
-        void getUserAchievementStorage() {
-            assertNotNull(registry.getUserAchievementStorage());
-        }
-
-        @Test
-        @DisplayName("getProfileViewStorage returns non-null")
-        void getProfileViewStorage() {
-            assertNotNull(registry.getProfileViewStorage());
-        }
-
-        @Test
-        @DisplayName("getProfileNoteStorage returns non-null")
-        void getProfileNoteStorage() {
-            assertNotNull(registry.getProfileNoteStorage());
-        }
-
-        @Test
         @DisplayName("getMessagingStorage returns non-null")
         void getMessagingStorage() {
             assertNotNull(registry.getMessagingStorage());

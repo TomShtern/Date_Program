@@ -2,6 +2,7 @@ package datingapp.ui.viewmodel;
 
 import static datingapp.core.CandidateFinder.GeoUtils.distanceKm;
 
+import datingapp.core.AppSession;
 import datingapp.core.CandidateFinder;
 import datingapp.core.Match;
 import datingapp.core.MatchingService;
@@ -11,7 +12,6 @@ import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
-import datingapp.ui.ViewModelFactory.UISession;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -78,7 +78,7 @@ public class MatchingViewModel {
      */
     private User ensureCurrentUser() {
         if (currentUser == null) {
-            currentUser = UISession.getInstance().getCurrentUser();
+            currentUser = AppSession.getInstance().getCurrentUser();
         }
         return currentUser;
     }

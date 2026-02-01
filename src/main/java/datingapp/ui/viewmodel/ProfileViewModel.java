@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
@@ -8,7 +9,6 @@ import datingapp.core.ProfileCompletionService.CompletionResult;
 import datingapp.core.User;
 import datingapp.core.User.Gender;
 import datingapp.core.storage.UserStorage;
-import datingapp.ui.ViewModelFactory.UISession;
 import datingapp.ui.util.UiServices;
 import java.io.File;
 import java.io.IOException;
@@ -85,7 +85,7 @@ public class ProfileViewModel {
      * Loads the current user's data into the form properties.
      */
     public void loadCurrentUser() {
-        User user = UISession.getInstance().getCurrentUser();
+        User user = AppSession.getInstance().getCurrentUser();
         if (user == null) {
             logger.warn("No current user to load");
             return;
@@ -221,7 +221,7 @@ public class ProfileViewModel {
      * Saves the profile changes to storage.
      */
     public void save() {
-        User user = UISession.getInstance().getCurrentUser();
+        User user = AppSession.getInstance().getCurrentUser();
         if (user == null) {
             logger.warn("No current user to save");
             return;
@@ -317,7 +317,7 @@ public class ProfileViewModel {
         }
 
         // Update the user in session
-        UISession.getInstance().setCurrentUser(user);
+        AppSession.getInstance().setCurrentUser(user);
 
         // Update completion display
         updateCompletion(user);
@@ -507,7 +507,7 @@ public class ProfileViewModel {
      * @param photoFile the selected photo file
      */
     public void savePhoto(File photoFile) {
-        User user = UISession.getInstance().getCurrentUser();
+        User user = AppSession.getInstance().getCurrentUser();
         if (user == null) {
             logger.warn("No current user for photo save");
             return;

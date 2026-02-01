@@ -1,8 +1,7 @@
 package datingapp.ui;
 
-import datingapp.core.AppConfig;
+import datingapp.core.AppBootstrap;
 import datingapp.core.ServiceRegistry;
-import datingapp.storage.DatabaseManager;
 import javafx.application.Application;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
@@ -24,31 +23,22 @@ public class DatingApp extends Application {
     public void init() throws Exception {
         logger.info("Initializing Dating App GUI...");
 
-        // 1. Initialize core infrastructure (same as Main.java)
-        logger.info("[DEBUG] Step 1: Loading AppConfig...");
-        AppConfig config = AppConfig.defaults();
-        logger.info("[DEBUG] Step 1: AppConfig loaded.");
+        // Initialize application with centralized bootstrap
+        logger.info("[DEBUG] Initializing application services...");
+        this.serviceRegistry = AppBootstrap.initialize();
+        logger.info("[DEBUG] ServiceRegistry initialized.");
 
-        logger.info("[DEBUG] Step 2: Getting DatabaseManager instance...");
-        DatabaseManager dbManager = DatabaseManager.getInstance();
-        logger.info("[DEBUG] Step 2: DatabaseManager obtained.");
-
-        // 2. Wire up all services
-        logger.info("[DEBUG] Step 3: Building ServiceRegistry...");
-        this.serviceRegistry = ServiceRegistry.Builder.buildH2(dbManager, config);
-        logger.info("[DEBUG] Step 3: ServiceRegistry built.");
-
-        // 3. Initialize UI framework components
-        logger.info("[DEBUG] Step 4: Creating ViewModelFactory...");
+        // Initialize UI framework components
+        logger.info("[DEBUG] Creating ViewModelFactory...");
         this.viewModelFactory = new ViewModelFactory(serviceRegistry);
-        logger.info("[DEBUG] Step 4: ViewModelFactory created.");
+        logger.info("[DEBUG] ViewModelFactory created.");
 
-        logger.info("[DEBUG] Step 5: Getting NavigationService...");
+        logger.info("[DEBUG] Setting up NavigationService...");
         this.navigationService = NavigationService.getInstance();
         this.navigationService.setViewModelFactory(viewModelFactory);
-        logger.info("[DEBUG] Step 5: NavigationService ready.");
+        logger.info("[DEBUG] NavigationService ready.");
 
-        logger.info("Legacy services and UI foundation warmed up.");
+        logger.info("Application services and UI foundation initialized.");
     }
 
     @Override
@@ -79,7 +69,7 @@ public class DatingApp extends Application {
     @Override
     public void stop() {
         logger.info("Shutting down Dating App GUI...");
-        // Cleanup resources if necessary
+        AppBootstrap.shutdown();
     }
 
     public static void main(String[] args) {

@@ -1,5 +1,6 @@
 package datingapp.app.cli;
 
+import datingapp.core.AppSession;
 import datingapp.core.Match;
 import datingapp.core.TrustSafetyService;
 import datingapp.core.User;
@@ -26,7 +27,7 @@ public class SafetyHandler {
     private final BlockStorage blockStorage;
     private final MatchStorage matchStorage;
     private final TrustSafetyService trustSafetyService;
-    private final CliUtilities.UserSession userSession;
+    private final AppSession session;
     private final CliUtilities.InputReader inputReader;
 
     public SafetyHandler(
@@ -34,22 +35,22 @@ public class SafetyHandler {
             BlockStorage blockStorage,
             MatchStorage matchStorage,
             TrustSafetyService trustSafetyService,
-            CliUtilities.UserSession userSession,
+            AppSession session,
             CliUtilities.InputReader inputReader) {
         this.userStorage = Objects.requireNonNull(userStorage);
         this.blockStorage = Objects.requireNonNull(blockStorage);
         this.matchStorage = Objects.requireNonNull(matchStorage);
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
-        this.userSession = Objects.requireNonNull(userSession);
+        this.session = Objects.requireNonNull(session);
         this.inputReader = Objects.requireNonNull(inputReader);
     }
 
     /** Allows the current user to block another user. */
     public void blockUser() {
-        userSession.requireLogin(() -> {
+        CliUtilities.requireLogin(() -> {
             logger.info(CliConstants.HEADER_BLOCK_USER);
 
-            User currentUser = userSession.getCurrentUser();
+            User currentUser = session.getCurrentUser();
             List<User> allUsers = userStorage.findAll();
             Set<UUID> alreadyBlocked = blockStorage.getBlockedUserIds(currentUser.getId());
 
@@ -106,8 +107,8 @@ public class SafetyHandler {
 
     /** Allows the current user to report another user for violations. */
     public void reportUser() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
             if (currentUser.getState() != User.State.ACTIVE) {
                 logger.info("\n⚠️  You must be ACTIVE to report users.\n");
                 return;
@@ -208,8 +209,8 @@ public class SafetyHandler {
      * Displays blocked users and allows the current user to unblock them.
      */
     public void manageBlockedUsers() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
             List<User> blockedUsers = trustSafetyService.getBlockedUsers(currentUser.getId());
 
             if (blockedUsers.isEmpty()) {
@@ -262,8 +263,8 @@ public class SafetyHandler {
 
     /** Starts the profile verification flow for the current user. */
     public void verifyProfile() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
 
             if (Boolean.TRUE.equals(currentUser.isVerified())) {
                 logger.info("\n✅ Profile already verified ({}).\n", currentUser.getVerifiedAt());

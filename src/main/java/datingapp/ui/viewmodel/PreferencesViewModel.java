@@ -1,8 +1,8 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppSession;
 import datingapp.core.User;
 import datingapp.core.storage.UserStorage;
-import datingapp.ui.ViewModelFactory.UISession;
 import java.util.EnumSet;
 import java.util.Set;
 import javafx.beans.property.IntegerProperty;
@@ -40,7 +40,7 @@ public class PreferencesViewModel {
     }
 
     public void initialize() {
-        currentUser = UISession.getInstance().getCurrentUser();
+        currentUser = AppSession.getInstance().getCurrentUser();
         if (currentUser != null) {
             loadPreferences();
         }

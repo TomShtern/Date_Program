@@ -1,5 +1,7 @@
 package datingapp.storage.jdbi;
 
+import datingapp.core.Achievement;
+import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.Stats.PlatformStats;
 import datingapp.core.Stats.UserStats;
 import datingapp.core.storage.StatsStorage;
@@ -21,8 +23,9 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 /**
  * Consolidated JDBI storage implementation for statistics.
  * Combines operations from former JdbiUserStatsStorage and
- * JdbiPlatformStatsStorage.
+ * JdbiPlatformStatsStorage, and now includes ProfileView and UserAchievement operations.
  */
+@RegisterRowMapper(JdbiStatsStorage.UserAchievementMapper.class)
 public interface JdbiStatsStorage extends StatsStorage {
 
     // ═══════════════════════════════════════════════════════════════
@@ -135,6 +138,90 @@ public interface JdbiStatsStorage extends StatsStorage {
     List<PlatformStats> getPlatformStatsHistory(@Bind("limit") int limit);
 
     // ═══════════════════════════════════════════════════════════════
+    // Profile View Operations
+    // ═══════════════════════════════════════════════════════════════
+
+    @SqlUpdate("""
+            INSERT INTO profile_views (viewer_id, viewed_id, viewed_at)
+            VALUES (:viewerId, :viewedId, :viewedAt)
+            """)
+    void insertView(
+            @Bind("viewerId") UUID viewerId, @Bind("viewedId") UUID viewedId, @Bind("viewedAt") Instant viewedAt);
+
+    @Override
+    default void recordProfileView(UUID viewerId, UUID viewedId) {
+        if (viewerId.equals(viewedId)) {
+            return; // Don't record self-views
+        }
+        insertView(viewerId, viewedId, Instant.now());
+    }
+
+    @SqlQuery("SELECT COUNT(*) FROM profile_views WHERE viewed_id = :userId")
+    @Override
+    int getProfileViewCount(@Bind("userId") UUID userId);
+
+    @SqlQuery("SELECT COUNT(DISTINCT viewer_id) FROM profile_views WHERE viewed_id = :userId")
+    @Override
+    int getUniqueViewerCount(@Bind("userId") UUID userId);
+
+    @SqlQuery("""
+            SELECT viewer_id, MAX(viewed_at) as last_view
+            FROM profile_views
+            WHERE viewed_id = :userId
+            GROUP BY viewer_id
+            ORDER BY last_view DESC
+            LIMIT :limit
+            """)
+    List<UUID> getRecentViewersRaw(@Bind("userId") UUID userId, @Bind("limit") int limit);
+
+    @Override
+    default List<UUID> getRecentViewers(UUID userId, int limit) {
+        return getRecentViewersRaw(userId, limit);
+    }
+
+    @SqlQuery("""
+            SELECT EXISTS (
+                SELECT 1 FROM profile_views
+                WHERE viewer_id = :viewerId AND viewed_id = :viewedId
+                LIMIT 1
+            )
+            """)
+    @Override
+    boolean hasViewedProfile(@Bind("viewerId") UUID viewerId, @Bind("viewedId") UUID viewedId);
+
+    // ═══════════════════════════════════════════════════════════════
+    // User Achievement Operations
+    // ═══════════════════════════════════════════════════════════════
+
+    @SqlUpdate("""
+                        MERGE INTO user_achievements (id, user_id, achievement, unlocked_at)
+                        KEY (user_id, achievement)
+                        VALUES (:id, :userId, :achievement, :unlockedAt)
+                        """)
+    @Override
+    void saveUserAchievement(@BindBean UserAchievement achievement);
+
+    @SqlQuery("""
+                        SELECT id, user_id, achievement, unlocked_at
+                        FROM user_achievements
+                        WHERE user_id = :userId
+                        ORDER BY unlocked_at DESC
+                        """)
+    @Override
+    List<UserAchievement> getUnlockedAchievements(@Bind("userId") UUID userId);
+
+    @SqlQuery("""
+                        SELECT COUNT(*) > 0 FROM user_achievements
+                        WHERE user_id = :userId AND achievement = :achievement
+                        """)
+    @Override
+    boolean hasAchievement(@Bind("userId") UUID userId, @Bind("achievement") Achievement achievement);
+
+    @SqlQuery("SELECT COUNT(*) FROM user_achievements WHERE user_id = :userId")
+    @Override
+    int countUnlockedAchievements(@Bind("userId") UUID userId);
+
+    // ═══════════════════════════════════════════════════════════════
     // Row Mappers
     // ═══════════════════════════════════════════════════════════════
 
@@ -179,6 +266,19 @@ public interface JdbiStatsStorage extends StatsStorage {
                     rs.getDouble("avg_likes_given"),
                     rs.getDouble("avg_match_rate"),
                     rs.getDouble("avg_like_ratio"));
+        }
+    }
+
+    /** Row mapper for UserAchievement records. */
+    class UserAchievementMapper implements RowMapper<UserAchievement> {
+        @Override
+        public UserAchievement map(ResultSet rs, StatementContext ctx) throws SQLException {
+            var id = MapperHelper.readUuid(rs, "id");
+            var userId = MapperHelper.readUuid(rs, "user_id");
+            var achievement = MapperHelper.readEnum(rs, "achievement", Achievement.class);
+            var unlockedAt = MapperHelper.readInstant(rs, "unlocked_at");
+
+            return UserAchievement.of(id, userId, achievement, unlockedAt);
         }
     }
 }

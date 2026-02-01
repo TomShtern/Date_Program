@@ -1,7 +1,7 @@
 package datingapp.ui.controller;
 
+import datingapp.core.AppSession;
 import datingapp.ui.NavigationService;
-import datingapp.ui.ViewModelFactory.UISession;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.util.UiHelpers;
 import datingapp.ui.viewmodel.DashboardViewModel;
@@ -255,7 +255,7 @@ public class DashboardController extends BaseController implements Initializable
 
         if (alert.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL) == javafx.scene.control.ButtonType.OK) {
             logger.info("Logging out");
-            UISession.getInstance().logout();
+            AppSession.getInstance().logout();
             NavigationService.getInstance().getViewModelFactory().reset();
             NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
         }

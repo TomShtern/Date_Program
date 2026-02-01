@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.AppSession;
 import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.Preferences.PacePreferences.DepthPreference;
@@ -21,16 +22,17 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-/** Unit tests for CliUtilities.UserSession. */
+/** Unit tests for AppSession. */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class UserSessionTest {
 
-    private CliUtilities.UserSession userSession;
+    private AppSession userSession;
 
     @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
-        userSession = new CliUtilities.UserSession();
+        userSession = AppSession.getInstance();
+        userSession.reset(); // Clear state from previous tests
     }
 
     @SuppressWarnings("unused") // JUnit 5 discovers via reflection

@@ -2,6 +2,7 @@ package datingapp.core.testutil;
 
 import datingapp.core.Match;
 import datingapp.core.User;
+import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.BlockStorage;
@@ -10,6 +11,7 @@ import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Consolidated in-memory storage implementations for unit testing.
@@ -31,6 +33,7 @@ public final class TestStorages {
      */
     public static class Users implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
+        private final Map<String, ProfileNote> profileNotes = new ConcurrentHashMap<>();
 
         @Override
         public void save(User user) {
@@ -54,6 +57,34 @@ public final class TestStorages {
             return new ArrayList<>(users.values());
         }
 
+        @Override
+        public void delete(UUID id) {
+            users.remove(id);
+        }
+
+        @Override
+        public void saveProfileNote(ProfileNote note) {
+            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
+        }
+
+        @Override
+        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
+        }
+
+        @Override
+        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+            return profileNotes.values().stream()
+                    .filter(note -> note.authorId().equals(authorId))
+                    .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))
+                    .toList();
+        }
+
+        @Override
+        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            return profileNotes.remove(noteKey(authorId, subjectId)) != null;
+        }
+
         // === Test Helpers ===
 
         /** Clears all users */
@@ -66,9 +97,8 @@ public final class TestStorages {
             return users.size();
         }
 
-        @Override
-        public void delete(UUID id) {
-            users.remove(id);
+        private static String noteKey(UUID authorId, UUID subjectId) {
+            return authorId + "_" + subjectId;
         }
     }
 

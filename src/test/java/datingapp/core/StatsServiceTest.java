@@ -16,6 +16,7 @@ import datingapp.core.storage.ReportStorage;
 import datingapp.core.storage.StatsStorage;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -604,6 +606,8 @@ class StatsServiceTest {
 
     private static class InMemoryStatsStorage implements StatsStorage {
         private final Map<UUID, UserStats> userStats = new HashMap<>();
+        private final Map<UUID, List<Achievement.UserAchievement>> achievements = new ConcurrentHashMap<>();
+        private final Map<String, Integer> profileViews = new ConcurrentHashMap<>();
         private PlatformStats latestPlatformStats;
 
         @Override
@@ -646,6 +650,58 @@ class StatsServiceTest {
         @Override
         public List<PlatformStats> getPlatformStatsHistory(int limit) {
             return latestPlatformStats == null ? List.of() : List.of(latestPlatformStats);
+        }
+
+        @Override
+        public void recordProfileView(UUID viewerId, UUID viewedId) {
+            if (!viewerId.equals(viewedId)) {
+                profileViews.merge(viewerId + "_" + viewedId, 1, Integer::sum);
+            }
+        }
+
+        @Override
+        public int getProfileViewCount(UUID userId) {
+            return (int) profileViews.keySet().stream()
+                    .filter(key -> key.endsWith("_" + userId))
+                    .count();
+        }
+
+        @Override
+        public int getUniqueViewerCount(UUID userId) {
+            return getProfileViewCount(userId); // Same for in-memory test
+        }
+
+        @Override
+        public List<UUID> getRecentViewers(UUID userId, int limit) {
+            return Collections.emptyList(); // Not needed for stats tests
+        }
+
+        @Override
+        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
+            return profileViews.containsKey(viewerId + "_" + viewedId);
+        }
+
+        @Override
+        public void saveUserAchievement(Achievement.UserAchievement achievement) {
+            achievements
+                    .computeIfAbsent(achievement.userId(), k -> new ArrayList<>())
+                    .add(achievement);
+        }
+
+        @Override
+        public List<Achievement.UserAchievement> getUnlockedAchievements(UUID userId) {
+            return achievements.getOrDefault(userId, Collections.emptyList());
+        }
+
+        @Override
+        public boolean hasAchievement(UUID userId, Achievement achievement) {
+            return achievements.getOrDefault(userId, Collections.emptyList()).stream()
+                    .anyMatch(ua -> ua.achievement() == achievement);
+        }
+
+        @Override
+        public int countUnlockedAchievements(UUID userId) {
+            return achievements.getOrDefault(userId, Collections.emptyList()).size();
         }
     }
 }

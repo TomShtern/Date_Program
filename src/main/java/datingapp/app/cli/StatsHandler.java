@@ -2,6 +2,7 @@ package datingapp.app.cli;
 
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
+import datingapp.core.AppSession;
 import datingapp.core.Stats.UserStats;
 import datingapp.core.StatsService;
 import datingapp.core.User;
@@ -15,17 +16,17 @@ public class StatsHandler {
 
     private final StatsService statsService;
     private final AchievementService achievementService;
-    private final CliUtilities.UserSession userSession;
+    private final AppSession session;
     private final CliUtilities.InputReader inputReader;
 
     public StatsHandler(
             StatsService statsService,
             AchievementService achievementService,
-            CliUtilities.UserSession userSession,
+            AppSession session,
             CliUtilities.InputReader inputReader) {
         this.statsService = statsService;
         this.achievementService = achievementService;
-        this.userSession = userSession;
+        this.session = session;
         this.inputReader = inputReader;
     }
 
@@ -34,8 +35,8 @@ public class StatsHandler {
      * scores.
      */
     public void viewStatistics() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
             logger.info("\n" + CliConstants.SEPARATOR_LINE);
             logger.info(CliConstants.HEADER_YOUR_STATISTICS);
             logger.info(CliConstants.SEPARATOR_LINE + "\n");
@@ -122,11 +123,11 @@ public class StatsHandler {
 
     /** Displays all unlocked achievements for the current user. */
     public void viewAchievements() {
-        userSession.requireLogin(() -> {
+        CliUtilities.requireLogin(() -> {
             // Check for any new achievements first
-            checkAndDisplayNewAchievements(userSession.getCurrentUser());
+            checkAndDisplayNewAchievements(session.getCurrentUser());
 
-            User currentUser = userSession.getCurrentUser();
+            User currentUser = session.getCurrentUser();
             final List<UserAchievement> unlocked = achievementService.getUnlocked(currentUser.getId());
 
             logger.info("\n" + CliConstants.SEPARATOR_LINE);

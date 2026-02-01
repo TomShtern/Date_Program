@@ -2,13 +2,13 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
+import datingapp.core.AppSession;
 import datingapp.core.DailyService;
 import datingapp.core.DailyService.DailyPick;
 import datingapp.core.DailyService.DailyStatus;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
 import datingapp.core.storage.MatchStorage;
-import datingapp.ui.ViewModelFactory.UISession;
 import java.util.List;
 import java.util.Optional;
 import javafx.beans.property.BooleanProperty;
@@ -56,7 +56,7 @@ public class DashboardViewModel {
      * Gets the current user from the UI session.
      */
     public User getCurrentUser() {
-        return UISession.getInstance().getCurrentUser();
+        return AppSession.getInstance().getCurrentUser();
     }
 
     /**

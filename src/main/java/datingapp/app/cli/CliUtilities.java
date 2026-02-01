@@ -1,6 +1,6 @@
 package datingapp.app.cli;
 
-import datingapp.core.User;
+import datingapp.core.AppSession;
 import java.util.Locale;
 import java.util.Scanner;
 import org.slf4j.Logger;
@@ -35,42 +35,22 @@ public final class CliUtilities {
         return java.util.Optional.empty();
     }
 
-    /** Tracks the currently logged-in user for the CLI session. */
-    public static class UserSession {
-        private static final Logger logger = LoggerFactory.getLogger(UserSession.class);
-        private User currentUser;
+    private static final Logger logger = LoggerFactory.getLogger(CliUtilities.class);
 
-        public User getCurrentUser() {
-            return currentUser;
+    /**
+     * Executes the action only if a user is logged in to AppSession.
+     * Logs "Please select a user first" if not logged in.
+     *
+     * @param action The action to execute if logged in
+     * @return true if action was executed, false if not logged in
+     */
+    public static boolean requireLogin(Runnable action) {
+        if (!AppSession.getInstance().isLoggedIn()) {
+            logger.info(CliConstants.PLEASE_SELECT_USER);
+            return false;
         }
-
-        public void setCurrentUser(User currentUser) {
-            this.currentUser = currentUser;
-        }
-
-        public boolean isLoggedIn() {
-            return currentUser != null;
-        }
-
-        public boolean isActive() {
-            return currentUser != null && currentUser.getState() == User.State.ACTIVE;
-        }
-
-        /**
-         * Executes the action only if a user is logged in.
-         * Logs "Please select a user first" if not logged in.
-         *
-         * @param action The action to execute if logged in
-         * @return true if action was executed, false if not logged in
-         */
-        public boolean requireLogin(Runnable action) {
-            if (!isLoggedIn()) {
-                logger.info(CliConstants.PLEASE_SELECT_USER);
-                return false;
-            }
-            action.run();
-            return true;
-        }
+        action.run();
+        return true;
     }
 
     /**

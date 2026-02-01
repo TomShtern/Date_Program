@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppSession;
 import datingapp.core.Match;
 import datingapp.core.MatchingService;
 import datingapp.core.MatchingService.PendingLiker;
@@ -9,7 +10,6 @@ import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.UserStorage;
-import datingapp.ui.ViewModelFactory.UISession;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -65,7 +65,7 @@ public class MatchesViewModel {
 
     /** Initialize and load matches for current user. */
     public void initialize() {
-        currentUser = UISession.getInstance().getCurrentUser();
+        currentUser = AppSession.getInstance().getCurrentUser();
         if (currentUser != null) {
             refreshAll();
         }
@@ -85,7 +85,7 @@ public class MatchesViewModel {
 
     private void refreshMatches() {
         if (currentUser == null) {
-            currentUser = UISession.getInstance().getCurrentUser();
+            currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
             logger.warn("No current user, cannot load matches");
@@ -115,7 +115,7 @@ public class MatchesViewModel {
 
     private void refreshLikesReceived() {
         if (currentUser == null) {
-            currentUser = UISession.getInstance().getCurrentUser();
+            currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
             logger.warn("No current user, cannot load likes received");
@@ -154,7 +154,7 @@ public class MatchesViewModel {
 
     private void refreshLikesSent() {
         if (currentUser == null) {
-            currentUser = UISession.getInstance().getCurrentUser();
+            currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
             logger.warn("No current user, cannot load likes sent");
@@ -199,7 +199,7 @@ public class MatchesViewModel {
     public void likeBack(LikeCardData like) {
         Objects.requireNonNull(like, "like cannot be null");
         if (currentUser == null) {
-            currentUser = UISession.getInstance().getCurrentUser();
+            currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
             logger.warn("No current user, cannot like back");
@@ -213,7 +213,7 @@ public class MatchesViewModel {
     public void passOn(LikeCardData like) {
         Objects.requireNonNull(like, "like cannot be null");
         if (currentUser == null) {
-            currentUser = UISession.getInstance().getCurrentUser();
+            currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
             logger.warn("No current user, cannot pass");

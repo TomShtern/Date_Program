@@ -1,7 +1,7 @@
 package datingapp.app.cli;
 
+import datingapp.core.AppSession;
 import datingapp.core.User;
-import datingapp.core.storage.ProfileNoteStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.List;
 import java.util.Locale;
@@ -19,19 +19,13 @@ public class ProfileNotesHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(ProfileNotesHandler.class);
 
-    private final ProfileNoteStorage profileNoteStorage;
     private final UserStorage userStorage;
-    private final CliUtilities.UserSession userSession;
+    private final AppSession session;
     private final CliUtilities.InputReader inputReader;
 
-    public ProfileNotesHandler(
-            ProfileNoteStorage profileNoteStorage,
-            UserStorage userStorage,
-            CliUtilities.UserSession userSession,
-            CliUtilities.InputReader inputReader) {
-        this.profileNoteStorage = profileNoteStorage;
+    public ProfileNotesHandler(UserStorage userStorage, AppSession session, CliUtilities.InputReader inputReader) {
         this.userStorage = userStorage;
-        this.userSession = userSession;
+        this.session = session;
         this.inputReader = inputReader;
     }
 
@@ -42,14 +36,14 @@ public class ProfileNotesHandler {
      * @param subjectName the name of the user (for display)
      */
     public void manageNoteFor(UUID subjectId, String subjectName) {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
 
             logger.info("\n" + CliConstants.MENU_DIVIDER);
             logger.info("       📝 NOTES ABOUT {}", subjectName.toUpperCase(Locale.ROOT));
             logger.info(CliConstants.MENU_DIVIDER);
 
-            Optional<User.ProfileNote> existingNote = profileNoteStorage.get(currentUser.getId(), subjectId);
+            Optional<User.ProfileNote> existingNote = userStorage.getProfileNote(currentUser.getId(), subjectId);
 
             if (existingNote.isPresent()) {
                 logger.info("\nCurrent note:");
@@ -103,7 +97,7 @@ public class ProfileNotesHandler {
 
         try {
             User.ProfileNote note = User.ProfileNote.create(authorId, subjectId, content);
-            profileNoteStorage.save(note);
+            userStorage.saveProfileNote(note);
             logger.info("✅ Note saved!\n");
         } catch (IllegalArgumentException e) {
             logger.info("❌ {}\n", e.getMessage());
@@ -133,7 +127,7 @@ public class ProfileNotesHandler {
 
         try {
             User.ProfileNote updated = existing.withContent(content);
-            profileNoteStorage.save(updated);
+            userStorage.saveProfileNote(updated);
             logger.info("✅ Note updated!\n");
         } catch (IllegalArgumentException e) {
             logger.info("❌ {}\n", e.getMessage());
@@ -150,7 +144,7 @@ public class ProfileNotesHandler {
     private void deleteNote(UUID authorId, UUID subjectId, String subjectName) {
         String confirm = inputReader.readLine("Delete note about " + subjectName + "? (y/n): ");
         if ("y".equalsIgnoreCase(confirm)) {
-            if (profileNoteStorage.delete(authorId, subjectId)) {
+            if (userStorage.deleteProfileNote(authorId, subjectId)) {
                 logger.info("✅ Note deleted.\n");
             } else {
                 logger.info("⚠️  Note not found.\n");
@@ -162,14 +156,14 @@ public class ProfileNotesHandler {
 
     /** Views all notes the current user has created. */
     public void viewAllNotes() {
-        userSession.requireLogin(() -> {
-            User currentUser = userSession.getCurrentUser();
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
 
             logger.info("\n" + CliConstants.MENU_DIVIDER);
             logger.info("         📝 MY PROFILE NOTES");
             logger.info(CliConstants.MENU_DIVIDER + "\n");
 
-            List<User.ProfileNote> notes = profileNoteStorage.getAllByAuthor(currentUser.getId());
+            List<User.ProfileNote> notes = userStorage.getProfileNotesByAuthor(currentUser.getId());
 
             if (notes.isEmpty()) {
                 logger.info("You haven't added any notes yet.");
@@ -213,14 +207,14 @@ public class ProfileNotesHandler {
      * @return the note preview, or empty string if no note exists
      */
     public String getNotePreview(UUID authorId, UUID subjectId) {
-        return profileNoteStorage
-                .get(authorId, subjectId)
+        return userStorage
+                .getProfileNote(authorId, subjectId)
                 .map(n -> "📝 " + n.getPreview())
                 .orElse("");
     }
 
     /** Checks if a note exists for the given subject. */
     public boolean hasNote(UUID authorId, UUID subjectId) {
-        return profileNoteStorage.get(authorId, subjectId).isPresent();
+        return userStorage.getProfileNote(authorId, subjectId).isPresent();
     }
 }

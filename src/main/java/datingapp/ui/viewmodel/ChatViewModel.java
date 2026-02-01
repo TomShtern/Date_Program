@@ -1,10 +1,10 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppSession;
 import datingapp.core.Messaging.Message;
 import datingapp.core.MessagingService;
 import datingapp.core.MessagingService.ConversationPreview;
 import datingapp.core.User;
-import datingapp.ui.ViewModelFactory.UISession;
 import java.util.List;
 import java.util.UUID;
 import javafx.beans.property.BooleanProperty;
@@ -53,7 +53,7 @@ public class ChatViewModel {
      */
     private User ensureCurrentUser() {
         if (currentUser == null) {
-            currentUser = UISession.getInstance().getCurrentUser();
+            currentUser = AppSession.getInstance().getCurrentUser();
         }
         return currentUser;
     }
