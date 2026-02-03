@@ -15,13 +15,13 @@ public final class UserInteractions {
     }
 
     /** Represents a like or pass action from one user to another. Immutable after creation. */
-    public record Like(UUID id, UUID whoLikes, UUID whoGotLiked, Direction direction, Instant createdAt) {
+    public static record Like(UUID id, UUID whoLikes, UUID whoGotLiked, Direction direction, Instant createdAt) {
 
         /**
          * The direction of a like action. LIKE = interested in the user PASS = not interested in
          * the user
          */
-        public enum Direction {
+        public static enum Direction {
             LIKE,
             PASS
         }
@@ -49,7 +49,7 @@ public final class UserInteractions {
      * Represents a block between two users. When user A blocks user B, neither can see the other
      * (bidirectional effect). Immutable after creation.
      */
-    public record Block(
+    public static record Block(
             UUID id,
             UUID blockerId, // User who initiated the block
             UUID blockedId, // User who got blocked
@@ -77,7 +77,7 @@ public final class UserInteractions {
     }
 
     /** Represents a report filed against a user. Immutable after creation. */
-    public record Report(
+    public static record Report(
             UUID id,
             UUID reporterId, // Who filed the report
             UUID reportedUserId, // Who is being reported
@@ -86,7 +86,7 @@ public final class UserInteractions {
             Instant createdAt) {
 
         /** Reasons why a user can be reported. */
-        public enum Reason {
+        public static enum Reason {
             SPAM,
             INAPPROPRIATE_CONTENT,
             HARASSMENT,

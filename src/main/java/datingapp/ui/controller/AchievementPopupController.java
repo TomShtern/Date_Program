@@ -3,14 +3,7 @@ package datingapp.ui.controller;
 import datingapp.ui.util.UiHelpers;
 import java.net.URL;
 import java.util.ResourceBundle;
-import javafx.animation.FadeTransition;
-import javafx.animation.Interpolator;
-import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
-import javafx.animation.ParallelTransition;
-import javafx.animation.PauseTransition;
-import javafx.animation.ScaleTransition;
-import javafx.animation.Timeline;
+import javafx.animation.*;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.canvas.Canvas;
@@ -32,7 +25,6 @@ import org.slf4j.LoggerFactory;
  * {@code fx:controller="datingapp.ui.controller.AchievementPopupController"}
  */
 public class AchievementPopupController implements Initializable {
-
     private static final Logger logger = LoggerFactory.getLogger(AchievementPopupController.class);
     private static final int AUTO_DISMISS_SECONDS = 5;
 
@@ -92,7 +84,7 @@ public class AchievementPopupController implements Initializable {
         // Auto-dismiss after delay
         if (autoDismiss) {
             PauseTransition delay = new PauseTransition(Duration.seconds(AUTO_DISMISS_SECONDS));
-            delay.setOnFinished(e -> close());
+            delay.setOnFinished(_ -> close());
             delay.play();
         }
     }
@@ -120,7 +112,7 @@ public class AchievementPopupController implements Initializable {
         iconPop.setToY(1.15);
         iconPop.setDelay(Duration.millis(200));
         iconPop.setInterpolator(Interpolator.EASE_OUT);
-        iconPop.setOnFinished(e -> {
+        iconPop.setOnFinished(_ -> {
             ScaleTransition settle = new ScaleTransition(Duration.millis(200), iconContainer);
             settle.setToX(1);
             settle.setToY(1);
@@ -173,7 +165,7 @@ public class AchievementPopupController implements Initializable {
 
         FadeTransition fadeOut = new FadeTransition(Duration.millis(200), rootPane);
         fadeOut.setToValue(0);
-        fadeOut.setOnFinished(e -> {
+        fadeOut.setOnFinished(_ -> {
             if (rootPane.getParent() instanceof StackPane parent) {
                 parent.getChildren().remove(rootPane);
             }

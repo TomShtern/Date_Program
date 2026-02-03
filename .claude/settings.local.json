@@ -48,7 +48,13 @@
       "Bash(if [ -d \"src/main/java/datingapp/storage/jdbi\" ])",
       "Bash(then echo \"EXISTS\")",
       "Bash(else echo \"NOT_FOUND\")",
-      "Bash(javap:*)"
+      "Bash(javap:*)",
+      "Bash(fc /b \"C:\\\\Users\\\\tom7s\\\\.claude\\\\plugins\\\\cache\\\\anthropic-agent-skills\\\\example-skills\\\\69c0b1a06741\\\\skills\\\\xlsx\\\\SKILL.md\" \"C:\\\\Users\\\\tom7s\\\\.claude\\\\plugins\\\\cache\\\\anthropic-agent-skills\\\\document-skills\\\\69c0b1a06741\\\\skills\\\\xlsx\\\\SKILL.md\")",
+      "Bash(code:*)",
+      "Bash(code-insiders:*)",
+      "Bash(Select-String -Pattern \"java|redhat|vscjava\")",
+      "Bash(Sort-Object)",
+      "Bash(1 -Dmaven.compiler.failOnWarning=false -X)"
     ]
   },
   "outputStyle": "Explanatory"

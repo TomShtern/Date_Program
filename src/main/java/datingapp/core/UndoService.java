@@ -212,7 +212,7 @@ public class UndoService {
      * message, and side
      * effects.
      */
-    public record UndoResult(boolean success, String message, Like undoneSwipe, boolean matchDeleted) {
+    public static record UndoResult(boolean success, String message, Like undoneSwipe, boolean matchDeleted) {
 
         /**
          * Creates a successful undo result.

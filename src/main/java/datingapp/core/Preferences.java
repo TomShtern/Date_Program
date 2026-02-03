@@ -24,7 +24,7 @@ public final class Preferences {
      * List&lt;Interest&gt; outdoorInterests = Interest.byCategory(Interest.Category.OUTDOORS);
      * </pre>
      */
-    public enum Interest {
+    public static enum Interest {
         // ===== OUTDOORS =====
         HIKING("Hiking", Category.OUTDOORS),
         CAMPING("Camping", Category.OUTDOORS),
@@ -86,7 +86,7 @@ public final class Preferences {
         public static final int MIN_FOR_COMPLETE = 3;
 
         /** Interest categories for organized display. */
-        public enum Category {
+        public static enum Category {
             OUTDOORS("🏕️ Outdoors"),
             ARTS("🎨 Arts & Culture"),
             FOOD("🍳 Food & Drink"),
@@ -151,7 +151,7 @@ public final class Preferences {
         }
 
         /** Smoking habits. */
-        public enum Smoking {
+        public static enum Smoking {
             NEVER("Never"),
             SOMETIMES("Sometimes"),
             REGULARLY("Regularly");
@@ -168,7 +168,7 @@ public final class Preferences {
         }
 
         /** Drinking habits. */
-        public enum Drinking {
+        public static enum Drinking {
             NEVER("Never"),
             SOCIALLY("Socially"),
             REGULARLY("Regularly");
@@ -185,7 +185,7 @@ public final class Preferences {
         }
 
         /** Stance on having children. */
-        public enum WantsKids {
+        public static enum WantsKids {
             NO("Don't want"),
             OPEN("Open to it"),
             SOMEDAY("Want someday"),
@@ -203,7 +203,7 @@ public final class Preferences {
         }
 
         /** Relationship goals. */
-        public enum LookingFor {
+        public static enum LookingFor {
             CASUAL("Something casual"),
             SHORT_TERM("Short-term dating"),
             LONG_TERM("Long-term relationship"),
@@ -222,7 +222,7 @@ public final class Preferences {
         }
 
         /** Education level. */
-        public enum Education {
+        public static enum Education {
             HIGH_SCHOOL("High school"),
             SOME_COLLEGE("Some college"),
             BACHELORS("Bachelor's degree"),
@@ -248,7 +248,7 @@ public final class Preferences {
     // ================================
 
     /** Consolidates communication and dating pace preference enums and record. */
-    public record PacePreferences(
+    public static record PacePreferences(
             MessagingFrequency messagingFrequency,
             TimeToFirstDate timeToFirstDate,
             CommunicationStyle communicationStyle,
@@ -277,7 +277,7 @@ public final class Preferences {
         }
 
         /** Dimensions for messaging frequency preferences. */
-        public enum MessagingFrequency {
+        public static enum MessagingFrequency {
             RARELY("Rarely"),
             OFTEN("Often"),
             CONSTANTLY("Constantly"),
@@ -295,7 +295,7 @@ public final class Preferences {
         }
 
         /** Dimensions for how soon a user wants to go on a first date. */
-        public enum TimeToFirstDate {
+        public static enum TimeToFirstDate {
             QUICKLY("Quickly (1-2 days)"),
             FEW_DAYS("A few days"),
             WEEKS("Weeks"),
@@ -314,7 +314,7 @@ public final class Preferences {
         }
 
         /** Dimensions for communication style preferences. */
-        public enum CommunicationStyle {
+        public static enum CommunicationStyle {
             TEXT_ONLY("Text only"),
             VOICE_NOTES("Voice notes"),
             VIDEO_CALLS("Video calls"),
@@ -333,7 +333,7 @@ public final class Preferences {
         }
 
         /** Dimensions for conversation depth preferences. */
-        public enum DepthPreference {
+        public static enum DepthPreference {
             SMALL_TALK("Small talk"),
             DEEP_CHAT("Deep chat"),
             EXISTENTIAL("Existential exploration"),

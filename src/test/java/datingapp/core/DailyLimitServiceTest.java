@@ -1,29 +1,13 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.time.*;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
 
 /** Unit tests for DailyService daily limits. Uses in-memory mock storage for isolated testing. */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
@@ -301,19 +285,14 @@ class DailyLimitServiceTest {
         }
 
         @Override
-        public java.util.Map<UUID, java.time.Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-            java.util.Map<UUID, java.time.Instant> result = new java.util.HashMap<>();
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
+            List<Map.Entry<UUID, Instant>> result = new ArrayList<>();
             for (Like like : likes.values()) {
                 if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
-                    result.put(like.whoLikes(), like.createdAt());
+                    result.add(Map.entry(like.whoLikes(), like.createdAt()));
                 }
             }
             return result;
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
-            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
         }
 
         @Override

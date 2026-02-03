@@ -55,7 +55,7 @@ public final class CliUtilities {
 
     /**
      * Handles user input from the console, providing prompt display and line
-     * reading.
+     * reading. Nested static class for cross-package accessibility.
      */
     public static class InputReader {
         private static final Logger logger = LoggerFactory.getLogger(InputReader.class);

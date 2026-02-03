@@ -13,7 +13,7 @@ public final class Social {
     }
 
     /** Represents a request to transition a match to the "Friend Zone". */
-    public record FriendRequest(
+    public static record FriendRequest(
             UUID id, UUID fromUserId, UUID toUserId, Instant createdAt, Status status, Instant respondedAt) {
 
         public FriendRequest {
@@ -31,7 +31,7 @@ public final class Social {
         }
 
         /** Status of a friend zone request. */
-        public enum Status {
+        public static enum Status {
             PENDING,
             ACCEPTED,
             DECLINED,
@@ -48,7 +48,7 @@ public final class Social {
     }
 
     /** Represents a system notification for a user. */
-    public record Notification(
+    public static record Notification(
             UUID id,
             UUID userId,
             Type type,
@@ -75,7 +75,7 @@ public final class Social {
         }
 
         /** Types of notifications in the system. */
-        public enum Type {
+        public static enum Type {
             MATCH_FOUND,
             NEW_MESSAGE,
             FRIEND_REQUEST,

@@ -1,10 +1,6 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.UndoService.UndoResult;
 import datingapp.core.UserInteractions.Like;
@@ -13,20 +9,9 @@ import datingapp.core.storage.MatchStorage;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
 
 /**
  * Tests for UndoService - time-windowed undo functionality for swipe actions.
@@ -380,19 +365,14 @@ class UndoServiceTest {
         }
 
         @Override
-        public Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-            Map<UUID, Instant> result = new HashMap<>();
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
+            List<Map.Entry<UUID, Instant>> result = new ArrayList<>();
             for (Like l : likesById.values()) {
                 if (l.whoGotLiked().equals(userId) && l.direction() == Like.Direction.LIKE) {
-                    result.put(l.whoLikes(), l.createdAt());
+                    result.add(Map.entry(l.whoLikes(), l.createdAt()));
                 }
             }
             return result;
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
-            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
         }
 
         @Override

@@ -12,15 +12,7 @@ import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -169,13 +161,8 @@ class LikerBrowserServiceTest {
         }
 
         @Override
-        public Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-            return new HashMap<>(likeTimes);
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
-            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
+            return new ArrayList<>(likeTimes.entrySet());
         }
 
         @Override

@@ -6,11 +6,7 @@ import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Service for messaging between matched users. Handles authorization, message
@@ -231,7 +227,7 @@ public class MessagingService {
     // === Data Transfer Objects ===
 
     /** Result of sending a message. */
-    public record SendResult(boolean success, Message message, String errorMessage, ErrorCode errorCode) {
+    public static record SendResult(boolean success, Message message, String errorMessage, ErrorCode errorCode) {
 
         public SendResult {
             if (success) {
@@ -246,7 +242,7 @@ public class MessagingService {
         }
 
         /** Error codes for message sending failures. */
-        public enum ErrorCode {
+        public static enum ErrorCode {
             NO_ACTIVE_MATCH,
             USER_NOT_FOUND,
             EMPTY_MESSAGE,
@@ -263,7 +259,7 @@ public class MessagingService {
     }
 
     /** Preview of a conversation for list display. */
-    public record ConversationPreview(
+    public static record ConversationPreview(
             Conversation conversation, User otherUser, Optional<Message> lastMessage, int unreadCount) {
 
         public ConversationPreview {

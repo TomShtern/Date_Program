@@ -17,7 +17,7 @@ public final class Messaging {
      * <p>Messages are validated on construction: content cannot be empty or exceed 1000
      * characters.
      */
-    public record Message(UUID id, String conversationId, UUID senderId, String content, Instant createdAt) {
+    public static record Message(UUID id, String conversationId, UUID senderId, String content, Instant createdAt) {
 
         public static final int MAX_LENGTH = 1000;
 

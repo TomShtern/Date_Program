@@ -6,12 +6,7 @@ import datingapp.core.Preferences.PacePreferences;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Represents a user in the dating app. Mutable entity - state can change over
@@ -23,7 +18,7 @@ public class User {
     private static final AppConfig CONFIG = AppConfig.defaults();
 
     /** Represents the gender options available for users. */
-    public enum Gender {
+    public static enum Gender {
         MALE,
         FEMALE,
         OTHER
@@ -34,7 +29,7 @@ public class User {
      * INCOMPLETE → ACTIVE ↔
      * PAUSED → BANNED
      */
-    public enum State {
+    public static enum State {
         INCOMPLETE,
         ACTIVE,
         PAUSED,
@@ -49,7 +44,7 @@ public class User {
      * enhancement: integrate
      * real email/SMS service for actual code delivery.
      */
-    public enum VerificationMethod {
+    public static enum VerificationMethod {
         EMAIL,
         PHONE
     }

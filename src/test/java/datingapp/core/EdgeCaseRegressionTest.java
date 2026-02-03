@@ -1,9 +1,6 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.Preferences.PacePreferences.DepthPreference;
@@ -14,16 +11,7 @@ import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -369,19 +357,14 @@ class EdgeCaseRegressionTest {
         }
 
         @Override
-        public Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-            Map<UUID, Instant> result = new HashMap<>();
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
+            List<Map.Entry<UUID, Instant>> result = new ArrayList<>();
             for (Like like : likes) {
                 if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
-                    result.put(like.whoLikes(), like.createdAt());
+                    result.add(Map.entry(like.whoLikes(), like.createdAt()));
                 }
             }
             return result;
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
-            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
         }
 
         @Override
@@ -493,12 +476,7 @@ class EdgeCaseRegressionTest {
             }
 
             @Override
-            public Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-                return Map.of();
-            }
-
-            @Override
-            public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
+            public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
                 return List.of();
             }
 

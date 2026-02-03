@@ -6,12 +6,7 @@ import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.*;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
@@ -85,16 +80,10 @@ public interface JdbiLikeStorage extends LikeStorage {
     List<LikeTimeEntry> getLikeTimesInternal(@Bind("userId") UUID userId);
 
     @Override
-    default List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
+    default List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
         return getLikeTimesInternal(userId).stream()
                 .map(e -> Map.entry(e.userId(), e.likedAt()))
                 .toList();
-    }
-
-    @Override
-    default Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-        return getLikeTimesInternal(userId).stream()
-                .collect(Collectors.toMap(LikeTimeEntry::userId, LikeTimeEntry::likedAt));
     }
 
     /** Simple DTO to hold liker ID and like timestamp. */

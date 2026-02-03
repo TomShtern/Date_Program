@@ -1,10 +1,6 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.Preferences.PacePreferences.DepthPreference;
@@ -17,11 +13,7 @@ import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -351,17 +343,12 @@ class DailyPickServiceTest {
         }
 
         @Override
-        public java.util.Map<UUID, java.time.Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
+        public List<java.util.Map.Entry<UUID, java.time.Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
             return likes.stream()
                     .filter(l -> l.whoGotLiked().equals(userId))
                     .filter(l -> l.direction() == Like.Direction.LIKE)
-                    .collect(java.util.stream.Collectors.toMap(
-                            Like::whoLikes, Like::createdAt, (existing, replacement) -> existing));
-        }
-
-        @Override
-        public List<java.util.Map.Entry<UUID, java.time.Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
-            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
+                    .map(l -> java.util.Map.entry(l.whoLikes(), l.createdAt()))
+                    .toList();
         }
 
         @Override

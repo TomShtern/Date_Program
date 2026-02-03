@@ -8,14 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** Consolidated daily limit and daily pick workflows. */
@@ -152,7 +145,7 @@ public class DailyService {
     /** Internal: Mark daily pick as viewed for a specific date. */
     private void markDailyPickViewed(UUID userId, LocalDate date) {
         dailyPickViews
-                .computeIfAbsent(userId, k -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
+                .computeIfAbsent(userId, _ -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
                 .add(date);
     }
 
@@ -251,7 +244,7 @@ public class DailyService {
     }
 
     /** Status snapshot for daily limits. */
-    public record DailyStatus(
+    public static record DailyStatus(
             int likesUsed, int likesRemaining, int passesUsed, int passesRemaining, LocalDate date, Instant resetsAt) {
 
         public DailyStatus {
@@ -272,7 +265,7 @@ public class DailyService {
     }
 
     /** Daily pick payload. */
-    public record DailyPick(User user, LocalDate date, String reason, boolean alreadySeen) {
+    public static record DailyPick(User user, LocalDate date, String reason, boolean alreadySeen) {
 
         public DailyPick {
             Objects.requireNonNull(user, "user cannot be null");

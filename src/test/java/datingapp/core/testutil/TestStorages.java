@@ -269,19 +269,14 @@ public final class TestStorages {
         }
 
         @Override
-        public Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-            Map<UUID, Instant> result = new HashMap<>();
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
+            List<Map.Entry<UUID, Instant>> result = new ArrayList<>();
             for (Like like : likes.values()) {
                 if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
-                    result.put(like.whoLikes(), like.createdAt());
+                    result.add(Map.entry(like.whoLikes(), like.createdAt()));
                 }
             }
             return result;
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
-            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
         }
 
         @Override

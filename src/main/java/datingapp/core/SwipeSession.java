@@ -16,7 +16,7 @@ import java.util.UUID;
 public class SwipeSession {
 
     /** Session state. */
-    public enum State {
+    public static enum State {
         ACTIVE, // Currently in progress
         COMPLETED // Ended (timeout or explicit)
     }

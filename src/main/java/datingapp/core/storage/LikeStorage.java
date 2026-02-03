@@ -2,11 +2,7 @@ package datingapp.core.storage;
 
 import datingapp.core.UserInteractions.Like;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Storage interface for Like entities.
@@ -33,11 +29,7 @@ public interface LikeStorage {
     Set<UUID> getUserIdsWhoLiked(UUID userId);
 
     /** Returns like timestamps for each user who liked the given user (direction=LIKE). */
-    @Deprecated
-    Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId);
-
-    /** Returns like timestamps for each user who liked the given user (direction=LIKE) as a list. */
-    List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId);
+    List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId);
 
     /** Count likes/passes GIVEN BY a user with specific direction. */
     int countByDirection(UUID userId, Like.Direction direction);

@@ -18,7 +18,7 @@ import java.util.UUID;
 public class Match {
 
     /** Represents the current state of a match. */
-    public enum State {
+    public static enum State {
         ACTIVE, // Both users are matched
         FRIENDS, // Mutual transition to platonic friendship
         UNMATCHED, // One user ended the match
@@ -27,7 +27,7 @@ public class Match {
     }
 
     /** Reasons why a relationship/match was archived or ended. */
-    public enum ArchiveReason {
+    public static enum ArchiveReason {
         FRIEND_ZONE,
         GRACEFUL_EXIT,
         UNMATCH,

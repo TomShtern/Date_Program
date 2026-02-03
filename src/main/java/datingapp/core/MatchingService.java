@@ -6,14 +6,7 @@ import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Business logic for processing likes, creating matches, and browsing pending
@@ -204,7 +197,7 @@ public class MatchingService {
         excluded.addAll(blocked);
         excluded.addAll(matched);
 
-        var likeTimes = likeStorage.getLikeTimesForUsersWhoLikedAsList(currentUserId);
+        var likeTimes = likeStorage.getLikeTimesForUsersWhoLiked(currentUserId);
 
         List<PendingLiker> result = new ArrayList<>();
         for (var entry : likeTimes) {
@@ -230,7 +223,7 @@ public class MatchingService {
      * Represents a user who liked the current user but hasn't been responded to
      * yet.
      */
-    public record PendingLiker(User user, Instant likedAt) {
+    public static record PendingLiker(User user, Instant likedAt) {
         public PendingLiker {
             Objects.requireNonNull(user, "user cannot be null");
             Objects.requireNonNull(likedAt, "likedAt cannot be null");
@@ -241,7 +234,7 @@ public class MatchingService {
      * Result of a swipe action containing success status, match information, and
      * user-friendly message.
      */
-    public record SwipeResult(boolean success, boolean matched, Match match, Like like, String message) {
+    public static record SwipeResult(boolean success, boolean matched, Match match, Like like, String message) {
         public SwipeResult {
             Objects.requireNonNull(message, "message cannot be null");
         }

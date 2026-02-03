@@ -14,7 +14,7 @@ public final class ProfileCompletionService {
     /**
      * Result of completion analysis.
      */
-    public record CompletionResult(
+    public static record CompletionResult(
             int score,
             String tier,
             int filledFields,
@@ -60,7 +60,8 @@ public final class ProfileCompletionService {
     /**
      * Breakdown of completion by category.
      */
-    public record CategoryBreakdown(String category, int score, List<String> filledItems, List<String> missingItems) {
+    public static record CategoryBreakdown(
+            String category, int score, List<String> filledItems, List<String> missingItems) {
 
         public CategoryBreakdown {
             Objects.requireNonNull(category, "category cannot be null");

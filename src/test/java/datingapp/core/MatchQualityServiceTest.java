@@ -1,8 +1,6 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.MatchQualityService.InterestMatcher;
 import datingapp.core.MatchQualityService.MatchQuality;
@@ -17,17 +15,9 @@ import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
 
 /** Tests for MatchQualityService. */
 @DisplayName("MatchQualityService Tests")
@@ -633,21 +623,14 @@ class MatchQualityServiceTest {
         }
 
         @Override
-        public java.util.Map<UUID, java.time.Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-            java.util.Map<UUID, java.time.Instant> result = new java.util.HashMap<>();
+        public java.util.List<java.util.Map.Entry<UUID, java.time.Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
+            java.util.List<java.util.Map.Entry<UUID, java.time.Instant>> result = new java.util.ArrayList<>();
             for (Like like : likes.values()) {
                 if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
-                    result.put(like.whoLikes(), like.createdAt());
+                    result.add(java.util.Map.entry(like.whoLikes(), like.createdAt()));
                 }
             }
             return result;
-        }
-
-        @Override
-        public java.util.List<java.util.Map.Entry<UUID, java.time.Instant>> getLikeTimesForUsersWhoLikedAsList(
-                UUID userId) {
-            return new java.util.ArrayList<>(
-                    getLikeTimesForUsersWhoLiked(userId).entrySet());
         }
 
         @Override

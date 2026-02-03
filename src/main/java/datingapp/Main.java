@@ -1,14 +1,9 @@
 package datingapp;
 
 import datingapp.app.cli.CliConstants;
-import datingapp.app.cli.CliUtilities;
+import datingapp.app.cli.CliUtilities.InputReader;
 import datingapp.app.cli.HandlerFactory;
-import datingapp.core.AppBootstrap;
-import datingapp.core.AppSession;
-import datingapp.core.DailyService;
-import datingapp.core.ServiceRegistry;
-import datingapp.core.SessionService;
-import datingapp.core.User;
+import datingapp.core.*;
 import java.util.Scanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +25,7 @@ public final class Main {
     private static ServiceRegistry services;
 
     // CLI Components
-    private static CliUtilities.InputReader inputReader;
+    private static InputReader inputReader;
     private static HandlerFactory handlers;
 
     public static void main(String[] args) {
@@ -81,7 +76,7 @@ public final class Main {
         services = AppBootstrap.initialize();
 
         // Initialize CLI Infrastructure
-        inputReader = new CliUtilities.InputReader(scanner);
+        inputReader = new InputReader(scanner);
 
         // Initialize Handlers via factory
         handlers = new HandlerFactory(services, AppSession.getInstance(), inputReader);

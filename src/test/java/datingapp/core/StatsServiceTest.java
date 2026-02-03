@@ -1,36 +1,18 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.Stats.PlatformStats;
 import datingapp.core.Stats.UserStats;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.Report;
-import datingapp.core.storage.BlockStorage;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.ReportStorage;
-import datingapp.core.storage.StatsStorage;
+import datingapp.core.storage.*;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
 
 /**
  * Tests for StatsService - user and platform statistics computation.
@@ -397,19 +379,14 @@ class StatsServiceTest {
         }
 
         @Override
-        public Map<UUID, Instant> getLikeTimesForUsersWhoLiked(UUID userId) {
-            Map<UUID, Instant> result = new HashMap<>();
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
+            List<Map.Entry<UUID, Instant>> result = new ArrayList<>();
             for (Like l : likes) {
                 if (l.whoGotLiked().equals(userId) && l.direction() == Like.Direction.LIKE) {
-                    result.put(l.whoLikes(), l.createdAt());
+                    result.add(Map.entry(l.whoLikes(), l.createdAt()));
                 }
             }
             return result;
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLikedAsList(UUID userId) {
-            return new ArrayList<>(getLikeTimesForUsersWhoLiked(userId).entrySet());
         }
 
         @Override

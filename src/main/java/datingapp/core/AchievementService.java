@@ -2,17 +2,8 @@ package datingapp.core;
 
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.ReportStorage;
-import datingapp.core.storage.StatsStorage;
-import datingapp.core.storage.UserStorage;
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import datingapp.core.storage.*;
+import java.util.*;
 
 /**
  * Service for checking and unlocking achievements. Evaluates user activity
@@ -46,7 +37,7 @@ public class AchievementService {
     }
 
     /** Progress towards an achievement. */
-    public record AchievementProgress(Achievement achievement, int current, int target, boolean unlocked) {
+    public static record AchievementProgress(Achievement achievement, int current, int target, boolean unlocked) {
 
         public AchievementProgress {
             Objects.requireNonNull(achievement, "achievement cannot be null");

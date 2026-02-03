@@ -9,14 +9,7 @@ import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Service for computing match quality/compatibility. Pure Java - no framework
@@ -36,7 +29,7 @@ public class MatchQualityService {
      * from one user's
      * perspective (scores may differ slightly between perspectives).
      */
-    public record MatchQuality(
+    public static record MatchQuality(
             String matchId,
             UUID perspectiveUserId, // Whose perspective (for directional metrics)
             UUID otherUserId,
@@ -187,7 +180,8 @@ public class MatchQualityService {
          * @param overlapRatio shared / min(a.size, b.size), range [0.0, 1.0]
          * @param jaccardIndex shared / union, range [0.0, 1.0]
          */
-        public record MatchResult(Set<Interest> shared, int sharedCount, double overlapRatio, double jaccardIndex) {
+        public static record MatchResult(
+                Set<Interest> shared, int sharedCount, double overlapRatio, double jaccardIndex) {
             public MatchResult {
                 Objects.requireNonNull(shared, "shared cannot be null");
                 if (sharedCount < 0) {
@@ -264,11 +258,11 @@ public class MatchQualityService {
             if (remaining > 0) {
                 return String.join(", ", names) + ", and " + remaining + " more";
             } else if (names.size() == 1) {
-                return names.get(0);
+                return names.getFirst();
             } else if (names.size() == 2) {
-                return names.get(0) + " and " + names.get(1);
+                return names.getFirst() + " and " + names.get(1);
             } else {
-                return names.get(0) + ", " + names.get(1) + ", and " + names.get(2);
+                return names.getFirst() + ", " + names.get(1) + ", and " + names.get(2);
             }
         }
 
@@ -618,7 +612,7 @@ public class MatchQualityService {
         // Interest highlights
         if (!sharedInterests.isEmpty()) {
             if (sharedInterests.size() == 1) {
-                highlights.add("You both enjoy " + sharedInterests.get(0));
+                highlights.add("You both enjoy " + sharedInterests.getFirst());
             } else {
                 InterestMatcher.MatchResult result = InterestMatcher.compare(me.getInterests(), them.getInterests());
                 highlights.add("You share "

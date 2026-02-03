@@ -79,23 +79,6 @@ public class TrustSafetyService {
      * @param inputCode the user-provided code
      * @return true if the code matches and is not expired
      */
-    public boolean verifyCodeSimplified(User user, String inputCode) {
-        Objects.requireNonNull(user, "user cannot be null");
-        if (inputCode == null || inputCode.isBlank()) {
-            return false;
-        }
-
-        String expected = user.getVerificationCode();
-        return expected != null && !isExpired(user.getVerificationSentAt()) && expected.equals(inputCode.trim());
-    }
-
-    /**
-     * Validates a user-provided verification code against stored user data.
-     *
-     * @param user      the user to verify
-     * @param inputCode the user-provided code
-     * @return true if the code matches and is not expired
-     */
     public boolean verifyCode(User user, String inputCode) {
         Objects.requireNonNull(user, "user cannot be null");
         if (inputCode == null || inputCode.isBlank()) {
@@ -197,7 +180,7 @@ public class TrustSafetyService {
     }
 
     /** Result of a report action, including moderation outcome. */
-    public record ReportResult(boolean success, boolean userWasBanned, String errorMessage) {
+    public static record ReportResult(boolean success, boolean userWasBanned, String errorMessage) {
 
         public ReportResult {
             if (success && errorMessage != null) {
