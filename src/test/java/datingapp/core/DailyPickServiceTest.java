@@ -2,10 +2,10 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
@@ -54,8 +54,8 @@ class DailyPickServiceTest {
         userStorage.save(candidate3);
 
         // Get daily pick twice in the same call
-        Optional<DailyService.DailyPick> pick1 = service.getDailyPick(seeker);
-        Optional<DailyService.DailyPick> pick2 = service.getDailyPick(seeker);
+        Optional<DailyPick> pick1 = service.getDailyPick(seeker);
+        Optional<DailyPick> pick2 = service.getDailyPick(seeker);
 
         assertTrue(pick1.isPresent());
         assertTrue(pick2.isPresent());
@@ -80,8 +80,8 @@ class DailyPickServiceTest {
         userStorage.save(candidate3);
 
         // Get daily picks for different users
-        Optional<DailyService.DailyPick> alicePick = service.getDailyPick(alice);
-        Optional<DailyService.DailyPick> bobPick = service.getDailyPick(bob);
+        Optional<DailyPick> alicePick = service.getDailyPick(alice);
+        Optional<DailyPick> bobPick = service.getDailyPick(bob);
 
         assertTrue(alicePick.isPresent());
         assertTrue(bobPick.isPresent());
@@ -103,7 +103,7 @@ class DailyPickServiceTest {
         blockStorage.save(Block.create(seeker.getId(), candidate1.getId()));
 
         // Get daily pick - should not include blocked user
-        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyPick> pick = service.getDailyPick(seeker);
         assertTrue(pick.isPresent());
         assertNotEquals(candidate1.getId(), pick.get().user().getId(), "Blocked user should not appear as daily pick");
     }
@@ -124,7 +124,7 @@ class DailyPickServiceTest {
         likeStorage.save(Like.create(seeker.getId(), candidate1.getId(), Like.Direction.LIKE));
 
         // Get daily pick - should not include already-liked user
-        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyPick> pick = service.getDailyPick(seeker);
         assertTrue(pick.isPresent());
         assertNotEquals(
                 candidate1.getId(), pick.get().user().getId(), "Already swiped user should not appear as daily pick");
@@ -135,7 +135,7 @@ class DailyPickServiceTest {
         User seeker = createActiveUser("Alice", 25);
         userStorage.save(seeker);
 
-        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyPick> pick = service.getDailyPick(seeker);
 
         assertFalse(pick.isPresent(), "Should return empty when no candidates");
     }
@@ -151,7 +151,7 @@ class DailyPickServiceTest {
         // Swipe on the only candidate
         likeStorage.save(Like.create(seeker.getId(), candidate.getId(), Like.Direction.PASS));
 
-        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyPick> pick = service.getDailyPick(seeker);
 
         assertFalse(pick.isPresent(), "Should return empty when all candidates excluded");
     }
@@ -164,7 +164,7 @@ class DailyPickServiceTest {
         userStorage.save(seeker);
         userStorage.save(candidate);
 
-        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyPick> pick = service.getDailyPick(seeker);
 
         assertTrue(pick.isPresent());
         assertNotNull(pick.get().reason());
@@ -179,7 +179,7 @@ class DailyPickServiceTest {
         userStorage.save(seeker);
         userStorage.save(candidate);
 
-        Optional<DailyService.DailyPick> pick = service.getDailyPick(seeker);
+        Optional<DailyPick> pick = service.getDailyPick(seeker);
 
         assertTrue(pick.isPresent());
         assertEquals(LocalDate.now(config.userTimeZone()), pick.get().date());
@@ -211,24 +211,29 @@ class DailyPickServiceTest {
         service.markDailyPickViewed(seeker.getId());
 
         assertTrue(service.hasViewedDailyPick(seeker.getId()));
+        assertEquals(0, service.cleanupOldDailyPickViews(LocalDate.now(config.userTimeZone())));
+        assertEquals(
+                1,
+                service.cleanupOldDailyPickViews(
+                        LocalDate.now(config.userTimeZone()).plusDays(1)));
     }
 
     // Helper methods
 
     private User createActiveUser(String name, int age) {
-        return createActiveUser(name, age, User.Gender.FEMALE);
+        return createActiveUser(name, age, Gender.FEMALE);
     }
 
-    private User createActiveUser(String name, int age, User.Gender gender) {
+    private User createActiveUser(String name, int age, Gender gender) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio for " + name);
         user.setBirthDate(LocalDate.now().minusYears(age));
         user.setGender(gender);
         // Set mutual interest - everyone interested in everyone for simple test matching
-        user.setInterestedIn(EnumSet.of(User.Gender.MALE, User.Gender.FEMALE, User.Gender.OTHER));
+        user.setInterestedIn(EnumSet.of(Gender.MALE, Gender.FEMALE, Gender.OTHER));
         user.setLocation(40.7128, -74.0060); // NYC
         user.addPhotoUrl("http://example.com/" + name + ".jpg");
-        user.setPacePreferences(new Preferences.PacePreferences(
+        user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,
@@ -261,7 +266,7 @@ class DailyPickServiceTest {
 
         @Override
         public List<User> findActive() {
-            return users.stream().filter(u -> u.getState() == User.State.ACTIVE).toList();
+            return users.stream().filter(u -> u.getState() == UserState.ACTIVE).toList();
         }
 
         @Override

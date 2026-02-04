@@ -117,13 +117,26 @@ mvn clean                            # Clean build artifacts
 
 **Formatting:** Palantir Java Format v2.39.0 (4-space indentation). Auto-apply with `mvn spotless:apply` before every commit.
 
+<!--ARCHIVE:40:agent:codex:ui-fxml-unused-->
 **Imports:** No star imports (`import java.util.*`). Import ordering: static first, then third-party, then standard library.
+<!--/ARCHIVE-->
+**Imports:** No star imports (`import java.util.*`). Import ordering: static first, then third-party, then standard library.
+**FXML Controllers:** Use `@SuppressWarnings("unused")` at class level when members/handlers are only referenced from FXML to silence false-positive unused warnings.
+40|2026-02-04 23:32:59|agent:codex|scope:ui-fxml-unused|Suppress false-positive unused warnings for FXML-only members|src/main/java/datingapp/ui/controller/AchievementPopupController.java;src/main/java/datingapp/ui/controller/MatchPopupController.java;src/main/java/datingapp/ui/controller/ProfileController.java;AGENTS.md
 
 **Naming Conventions:**
+<!--ARCHIVE:39:agent:codex:code-style-identifiers-->
 - Classes: PascalCase - `UserService`, `H2UserStorage`, `ProfileHandler`
 - Methods: camelCase - `getUserById()`, `createMatch()`, `isComplete()`
 - Predicates: `is`/`has`/`can` prefix - `isActive()`, `hasDealbreakers()`, `canLike()`
 - Constants: UPPER_SNAKE_CASE - `MAX_DISTANCE_KM`, `DEFAULT_TIMEOUT`
+<!--/ARCHIVE-->
+- Classes: PascalCase - `UserService`, `H2UserStorage`, `ProfileHandler`
+- Methods: camelCase - `getUserById()`, `createMatch()`, `isComplete()`
+- Predicates: `is`/`has`/`can` prefix - `isActive()`, `hasDealbreakers()`, `canLike()`
+- Constants: UPPER_SNAKE_CASE - `MAX_DISTANCE_KM`, `DEFAULT_TIMEOUT`
+- Identifiers: Avoid `_` as a standalone name; Java reserves it (use `event`, `ignored`, etc.).
+39|2026-02-04 23:28:48|agent:codex|scope:code-style-identifiers|Avoid '_' identifiers in Java and use descriptive lambda parameters|AGENTS.md;src/main/java/datingapp/ui/controller/AchievementPopupController.java
 
 **Types:**
 - Use `record` for immutable data (e.g., `UserInteractions.Like`, `UserInteractions.Block`, `UserInteractions.Report`, `MatchQuality`)
@@ -686,11 +699,20 @@ public void handleMenu() {
 
 ## Logging Standards
 
+<!--ARCHIVE:38:agent:codex:logging-guards-->
 **Level Usage:**
 - **DEBUG**: Development diagnostics (disable in prod)
 - **INFO**: User-facing messages, state changes
 - **WARN**: Recoverable issues (missing optional fields)
 - **ERROR**: Unrecoverable errors (shouldn't happen)
+<!--/ARCHIVE-->
+**Level Usage:**
+- **DEBUG**: Development diagnostics (disable in prod)
+- **INFO**: User-facing messages, state changes
+- **WARN**: Recoverable issues (missing optional fields)
+- **ERROR**: Unrecoverable errors (shouldn't happen)
+- Guard log statements with `logger.isXEnabled()` (or helper) before formatting.
+38|2026-02-04 22:51:33|agent:codex|scope:logging-guards|Guard log calls with level checks for PMD|AGENTS.md
 
 **Message Format:**
 - User messages: `"✅ Profile saved!"` (no stack traces)
@@ -851,4 +873,7 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 35|2026-01-27 22:06:57|agent:codex|scope:ui-login-scroll-balance|Reduce login window height and list size to keep actions visible|src/main/resources/fxml/login.fxml;src/main/java/datingapp/ui/DatingApp.java;src/main/java/datingapp/ui/NavigationService.java;AGENTS.md
 36|2026-01-27 22:11:35|agent:codex|scope:ui-login-top-spacing|Trim login header padding to reduce top whitespace|src/main/resources/fxml/login.fxml;AGENTS.md
 37|2026-01-30 18:00:00|agent:opencode|scope:doc-sync|Update AGENTS.md to reflect actual codebase: 133 files, correct package paths (app.cli, core.storage), ServiceRegistry.Builder pattern|AGENTS.md
+38|2026-02-04 22:51:33|agent:codex|scope:logging-guards|Guard log calls with level checks for PMD|src/main/java/datingapp/Main.java;src/main/java/datingapp/app/cli/LikerBrowserHandler.java;src/main/java/datingapp/app/cli/MatchingHandler.java;src/main/java/datingapp/app/cli/MessagingHandler.java;src/main/java/datingapp/app/cli/ProfileHandler.java;src/main/java/datingapp/ui/viewmodel/LoginViewModel.java;src/main/java/datingapp/ui/viewmodel/MatchesViewModel.java;src/main/java/datingapp/ui/viewmodel/MatchingViewModel.java;src/main/java/datingapp/ui/viewmodel/PreferencesViewModel.java;src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java;src/main/java/datingapp/ui/viewmodel/StatsViewModel.java;AGENTS.md
+39|2026-02-04 23:28:48|agent:codex|scope:code-style-identifiers|Avoid '_' identifiers in Java and use descriptive lambda parameters|src/main/java/datingapp/ui/controller/AchievementPopupController.java;AGENTS.md
+40|2026-02-04 23:32:59|agent:codex|scope:ui-fxml-unused|Suppress false-positive unused warnings for FXML-only members|src/main/java/datingapp/ui/controller/AchievementPopupController.java;src/main/java/datingapp/ui/controller/MatchPopupController.java;src/main/java/datingapp/ui/controller/ProfileController.java;AGENTS.md
 ---AGENT-LOG-END---

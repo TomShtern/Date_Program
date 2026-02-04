@@ -2,10 +2,10 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
@@ -59,10 +59,10 @@ class EdgeCaseRegressionTest {
         @DisplayName("Clearing interestedIn does not break getter")
         void clearingInterestedInWorks() {
             User user = new User(UUID.randomUUID(), "Test");
-            user.setInterestedIn(EnumSet.of(User.Gender.MALE));
-            user.setInterestedIn(EnumSet.noneOf(User.Gender.class)); // Clear it
+            user.setInterestedIn(EnumSet.of(Gender.MALE));
+            user.setInterestedIn(EnumSet.noneOf(Gender.class)); // Clear it
 
-            Set<User.Gender> interested = user.getInterestedIn();
+            Set<Gender> interested = user.getInterestedIn();
 
             assertNotNull(interested);
             assertDoesNotThrow(user::getInterestedIn);
@@ -75,13 +75,13 @@ class EdgeCaseRegressionTest {
             User user = new User(UUID.randomUUID(), "Test");
             user.setBio("Bio");
             user.setBirthDate(LocalDate.of(1990, 1, 1));
-            user.setGender(User.Gender.MALE);
-            user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
+            user.setGender(Gender.MALE);
+            user.setInterestedIn(EnumSet.of(Gender.FEMALE));
             // Note: location defaults to 0,0
             user.setMaxDistanceKm(50);
             user.setAgeRange(18, 40);
             user.addPhotoUrl("photo.jpg");
-            user.setPacePreferences(new Preferences.PacePreferences(
+            user.setPacePreferences(new PacePreferences(
                     MessagingFrequency.OFTEN,
                     TimeToFirstDate.FEW_DAYS,
                     CommunicationStyle.TEXT_ONLY,
@@ -126,13 +126,13 @@ class EdgeCaseRegressionTest {
             User user = new User(UUID.randomUUID(), "Teen");
             user.setBio("Bio");
             user.setBirthDate(LocalDate.now().minusYears(17)); // 17 years old
-            user.setGender(User.Gender.MALE);
-            user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
+            user.setGender(Gender.MALE);
+            user.setInterestedIn(EnumSet.of(Gender.FEMALE));
             user.setLocation(32.0, 34.0);
             user.setMaxDistanceKm(50);
             user.setAgeRange(18, 40);
             user.addPhotoUrl("photo.jpg");
-            user.setPacePreferences(new Preferences.PacePreferences(
+            user.setPacePreferences(new PacePreferences(
                     MessagingFrequency.OFTEN,
                     TimeToFirstDate.FEW_DAYS,
                     CommunicationStyle.TEXT_ONLY,
@@ -305,13 +305,13 @@ class EdgeCaseRegressionTest {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Bio");
         user.setBirthDate(LocalDate.of(1990, 1, 1));
-        user.setGender(User.Gender.MALE);
-        user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
+        user.setGender(Gender.MALE);
+        user.setInterestedIn(EnumSet.of(Gender.FEMALE));
         user.setLocation(32.0, 34.0);
         user.setMaxDistanceKm(50);
         user.setAgeRange(18, 60);
         user.addPhotoUrl("photo.jpg");
-        user.setPacePreferences(new Preferences.PacePreferences(
+        user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,
@@ -410,7 +410,9 @@ class EdgeCaseRegressionTest {
     private static datingapp.core.storage.UserStorage createStubUserStorage() {
         return new datingapp.core.storage.UserStorage() {
             @Override
-            public void save(User user) {}
+            public void save(User user) {
+                // no-op for test
+            }
 
             @Override
             public User get(UUID id) {
@@ -428,10 +430,14 @@ class EdgeCaseRegressionTest {
             }
 
             @Override
-            public void delete(UUID id) {}
+            public void delete(UUID id) {
+                // no-op for test
+            }
 
             @Override
-            public void saveProfileNote(User.ProfileNote note) {}
+            public void saveProfileNote(User.ProfileNote note) {
+                // no-op for test
+            }
 
             @Override
             public Optional<User.ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
@@ -458,7 +464,9 @@ class EdgeCaseRegressionTest {
             }
 
             @Override
-            public void save(UserInteractions.Like like) {}
+            public void save(UserInteractions.Like like) {
+                // no-op for test
+            }
 
             @Override
             public boolean exists(UUID from, UUID to) {
@@ -511,7 +519,9 @@ class EdgeCaseRegressionTest {
             }
 
             @Override
-            public void delete(UUID likeId) {}
+            public void delete(UUID likeId) {
+                // no-op for test
+            }
         };
     }
 
@@ -523,7 +533,9 @@ class EdgeCaseRegressionTest {
             }
 
             @Override
-            public void save(UserInteractions.Block block) {}
+            public void save(UserInteractions.Block block) {
+                // no-op for test
+            }
 
             @Override
             public boolean isBlocked(UUID userA, UUID userB) {

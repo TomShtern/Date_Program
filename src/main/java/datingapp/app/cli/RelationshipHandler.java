@@ -24,14 +24,14 @@ public class RelationshipHandler {
     private final SocialStorage socialStorage;
     private final UserStorage userStorage;
     private final AppSession session;
-    private final CliUtilities.InputReader inputReader;
+    private final InputReader inputReader;
 
     public RelationshipHandler(
             RelationshipTransitionService transitionService,
             SocialStorage socialStorage,
             UserStorage userStorage,
             AppSession session,
-            CliUtilities.InputReader inputReader) {
+            InputReader inputReader) {
         this.transitionService = transitionService;
         this.socialStorage = socialStorage;
         this.userStorage = userStorage;

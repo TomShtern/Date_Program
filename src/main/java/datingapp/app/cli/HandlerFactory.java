@@ -11,7 +11,7 @@ import datingapp.core.ValidationService;
 public final class HandlerFactory {
     private final ServiceRegistry services;
     private final AppSession session;
-    private final CliUtilities.InputReader inputReader;
+    private final InputReader inputReader;
 
     // Lazily-created handlers
     private MatchingHandler matchingHandler;
@@ -30,7 +30,7 @@ public final class HandlerFactory {
      * @param session the app session for user context
      * @param inputReader the CLI input reader
      */
-    public HandlerFactory(ServiceRegistry services, AppSession session, CliUtilities.InputReader inputReader) {
+    public HandlerFactory(ServiceRegistry services, AppSession session, InputReader inputReader) {
         this.services = services;
         this.session = session;
         this.inputReader = inputReader;
@@ -44,7 +44,6 @@ public final class HandlerFactory {
             MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
                     services.getCandidateFinder(),
                     services.getMatchingService(),
-                    services.getLikeStorage(),
                     services.getMatchStorage(),
                     services.getBlockStorage(),
                     services.getDailyService(),

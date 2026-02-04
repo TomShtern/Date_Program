@@ -4,23 +4,27 @@ import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
 import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
-import datingapp.core.MatchQualityService.InterestMatcher;
+import datingapp.core.Gender;
+import datingapp.core.PacePreferences;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
-import datingapp.core.Preferences.PacePreferences;
-import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfilePreviewService;
 import datingapp.core.User;
+import datingapp.core.UserState;
 import datingapp.core.ValidationService;
 import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -33,6 +37,8 @@ import org.slf4j.LoggerFactory;
  */
 public class ProfileHandler {
     private static final Logger logger = LoggerFactory.getLogger(ProfileHandler.class);
+    private static final String INDENTED_LINE = "    {}";
+    private static final String INDENTED_BULLET = "    - {}";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final UserStorage userStorage;
@@ -40,7 +46,7 @@ public class ProfileHandler {
     private final AchievementService achievementService;
     private final ValidationService validationService;
     private final AppSession session;
-    private final CliUtilities.InputReader inputReader;
+    private final InputReader inputReader;
 
     private static final String PROMPT_CHOICE = "Your choice: ";
 
@@ -50,7 +56,7 @@ public class ProfileHandler {
             AchievementService achievementService,
             ValidationService validationService,
             AppSession session,
-            CliUtilities.InputReader inputReader) {
+            InputReader inputReader) {
         this.userStorage = userStorage;
         this.profilePreviewService = profilePreviewService;
         this.achievementService = achievementService;
@@ -68,7 +74,7 @@ public class ProfileHandler {
     public void completeProfile() {
         CliUtilities.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
-            logger.info("\n--- Complete Profile for {} ---\n", currentUser.getName());
+            logInfo("\n--- Complete Profile for {} ---\n", currentUser.getName());
 
             promptBio(currentUser);
             promptBirthDate(currentUser);
@@ -82,15 +88,15 @@ public class ProfileHandler {
             promptPacePreferences(currentUser);
 
             // Try to activate if complete
-            if (currentUser.isComplete() && currentUser.getState() == User.State.INCOMPLETE) {
+            if (currentUser.isComplete() && currentUser.getState() == UserState.INCOMPLETE) {
                 currentUser.activate();
-                logger.info("\n🎉 Profile complete! Status changed to ACTIVE.");
+                logInfo("\n🎉 Profile complete! Status changed to ACTIVE.");
             } else if (!currentUser.isComplete()) {
-                logger.info("\n⚠️  Profile still incomplete. Missing required fields.");
+                logInfo("\n⚠️  Profile still incomplete. Missing required fields.");
             }
 
             userStorage.save(currentUser);
-            logger.info("✅ Profile saved!\n");
+            logInfo("✅ Profile saved!\n");
 
             checkAndDisplayNewAchievements(currentUser);
         });
@@ -106,53 +112,53 @@ public class ProfileHandler {
             User currentUser = session.getCurrentUser();
             ProfilePreviewService.ProfilePreview preview = profilePreviewService.generatePreview(currentUser);
 
-            logger.info("\n" + CliConstants.SEPARATOR_LINE);
-            logger.info("      👤 YOUR PROFILE PREVIEW");
-            logger.info(CliConstants.SEPARATOR_LINE);
-            logger.info("");
-            logger.info("  This is how others see you:");
-            logger.info("");
+            logInfo("\n" + CliConstants.SEPARATOR_LINE);
+            logInfo("      👤 YOUR PROFILE PREVIEW");
+            logInfo(CliConstants.SEPARATOR_LINE);
+            logInfo("");
+            logInfo("  This is how others see you:");
+            logInfo("");
 
             // Card display
-            logger.info(CliConstants.BOX_TOP);
+            logInfo(CliConstants.BOX_TOP);
             String verifiedBadge = Boolean.TRUE.equals(currentUser.isVerified()) ? " ✅ Verified" : "";
-            logger.info("│ 💝 {}, {} years old{}", currentUser.getName(), currentUser.getAge(), verifiedBadge);
-            logger.info("│ 📍 Location: {}, {}", currentUser.getLat(), currentUser.getLon());
+            logInfo("│ 💝 {}, {} years old{}", currentUser.getName(), currentUser.getAge(), verifiedBadge);
+            logInfo("│ 📍 Location: {}, {}", currentUser.getLat(), currentUser.getLon());
             String bio = preview.displayBio();
             if (bio.length() > 50) {
                 bio = bio.substring(0, 47) + "...";
             }
-            logger.info(CliConstants.PROFILE_BIO_FORMAT, bio);
+            logInfo(CliConstants.PROFILE_BIO_FORMAT, bio);
             if (preview.displayLookingFor() != null) {
-                logger.info("│ 💭 {}", preview.displayLookingFor());
+                logInfo("│ 💭 {}", preview.displayLookingFor());
             }
-            logger.info(CliConstants.BOX_BOTTOM);
+            logInfo(CliConstants.BOX_BOTTOM);
 
             // Completeness
             ProfilePreviewService.ProfileCompleteness comp = preview.completeness();
-            logger.info("");
-            logger.info("  📊 PROFILE COMPLETENESS: {}%", comp.percentage());
+            logInfo("");
+            logInfo("  📊 PROFILE COMPLETENESS: {}%", comp.percentage());
 
             // Render progress bar when profile has some completeness
             if (comp.percentage() > 0 && logger.isInfoEnabled()) {
                 String progressBar = ProfilePreviewService.renderProgressBar(comp.percentage() / 100.0, 20);
-                logger.info("  {}", progressBar);
+                logInfo("  {}", progressBar);
             }
 
             if (!comp.missingFields().isEmpty()) {
-                logger.info("");
-                logger.info("  ⚠️  Missing fields:");
-                comp.missingFields().forEach(f -> logger.info("    • {}", f));
+                logInfo("");
+                logInfo("  ⚠️  Missing fields:");
+                comp.missingFields().forEach(f -> logInfo("    • {}", f));
             }
 
             // Tips
             if (!preview.improvementTips().isEmpty()) {
-                logger.info("");
-                logger.info("  💡 IMPROVEMENT TIPS:");
-                preview.improvementTips().forEach(tip -> logger.info("    {}", tip));
+                logInfo("");
+                logInfo("  💡 IMPROVEMENT TIPS:");
+                preview.improvementTips().forEach(tip -> logInfo(INDENTED_LINE, tip));
             }
 
-            logger.info("");
+            logInfo("");
             inputReader.readLine("  [Press Enter to return to menu]");
         });
     }
@@ -165,13 +171,21 @@ public class ProfileHandler {
     public void setDealbreakers() {
         CliUtilities.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
-            displayCurrentDealbreakers(currentUser);
-            displayDealbreakerMenu();
+            boolean editing = true;
+            while (editing) {
+                displayCurrentDealbreakers(currentUser);
+                displayDealbreakerMenu();
 
-            String choice = inputReader.readLine(PROMPT_CHOICE);
-            handleDealbreakerChoice(choice, currentUser);
+                String choice = inputReader.readLine(PROMPT_CHOICE).trim();
+                if ("0".equals(choice)) {
+                    logInfo(CliConstants.CANCELLED);
+                    editing = false;
+                    continue;
+                }
 
-            userStorage.save(currentUser);
+                handleDealbreakerChoice(choice, currentUser);
+                userStorage.save(currentUser);
+            }
         });
     }
 
@@ -185,14 +199,32 @@ public class ProfileHandler {
     private void checkAndDisplayNewAchievements(User currentUser) {
         List<UserAchievement> newAchievements = achievementService.checkAndUnlock(currentUser.getId());
         if (!newAchievements.isEmpty()) {
-            logger.info("\n🏆 NEW ACHIEVEMENTS UNLOCKED! 🏆");
+            logInfo("\n🏆 NEW ACHIEVEMENTS UNLOCKED! 🏆");
             for (UserAchievement ua : newAchievements) {
-                logger.info(
+                logInfo(
                         "  ✨ {} - {}",
                         ua.achievement().getDisplayName(),
                         ua.achievement().getDescription());
             }
-            logger.info("");
+            logInfo("");
+        }
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logDebug(String message, Object... args) {
+        if (logger.isDebugEnabled()) {
+            logger.debug(message, args);
+        }
+    }
+
+    private void logTrace(String message, Object... args) {
+        if (logger.isTraceEnabled()) {
+            logger.trace(message, args);
         }
     }
 
@@ -214,7 +246,7 @@ public class ProfileHandler {
             LocalDate birthDate = LocalDate.parse(birthStr, DATE_FORMAT);
             currentUser.setBirthDate(birthDate);
         } catch (DateTimeParseException _) {
-            logger.info("⚠️  Invalid date format, skipping.");
+            logInfo("⚠️  Invalid date format, skipping.");
         }
     }
 
@@ -224,13 +256,13 @@ public class ProfileHandler {
      * @param currentUser The user whose gender is being set
      */
     private void promptGender(User currentUser) {
-        logger.info("\n" + CliConstants.GENDER_OPTIONS);
+        logInfo("\n" + CliConstants.GENDER_OPTIONS);
         String genderChoice = inputReader.readLine("Your gender (1/2/3): ");
-        User.Gender gender =
+        Gender gender =
                 switch (genderChoice) {
-                    case "1" -> User.Gender.MALE;
-                    case "2" -> User.Gender.FEMALE;
-                    case "3" -> User.Gender.OTHER;
+                    case "1" -> Gender.MALE;
+                    case "2" -> Gender.FEMALE;
+                    case "3" -> Gender.OTHER;
                     default -> null;
                 };
         if (gender != null) {
@@ -239,119 +271,138 @@ public class ProfileHandler {
     }
 
     private void promptInterestedIn(User currentUser) {
-        logger.info("\n" + CliConstants.INTERESTED_IN_PROMPT);
+        logInfo("\n" + CliConstants.INTERESTED_IN_PROMPT);
         String interestedStr = inputReader.readLine("Your preferences: ");
-        Set<User.Gender> interestedIn = parseGenderSet(interestedStr);
+        Set<Gender> interestedIn = parseGenderSet(interestedStr);
         if (!interestedIn.isEmpty()) {
             currentUser.setInterestedIn(interestedIn);
         }
     }
 
-    // Quick fix: implementing parseGenderSet helper here as MainUtils is not
-    // created yet
-    private Set<User.Gender> parseGenderSet(String input) {
-        Set<User.Gender> result = java.util.EnumSet.noneOf(User.Gender.class);
-        if (input == null || input.isBlank()) {
-            return result;
-        }
+    private Set<Gender> parseGenderSet(String input) {
+        String normalized = input == null ? "" : input.trim().toUpperCase(Locale.ROOT);
+        Set<Gender> result = new HashSet<>();
 
-        for (String part : input.split(",")) {
-            switch (part.trim()) {
-                case "1" -> result.add(User.Gender.MALE);
-                case "2" -> result.add(User.Gender.FEMALE);
-                case "3" -> result.add(User.Gender.OTHER);
-                default -> {
-                    // Ignore unrecognized input
-                }
+        for (String token : normalized.split("[,\\s]+")) {
+            if (token.isBlank()) {
+                continue;
+            }
+            try {
+                result.add(Gender.valueOf(token));
+            } catch (IllegalArgumentException _) {
+                logInfo("⚠️  Invalid gender: {}", token);
             }
         }
-        return result;
+
+        return result.isEmpty() ? EnumSet.noneOf(Gender.class) : EnumSet.copyOf(result);
     }
 
-    /**
-     * Prompts the user to select their interests from categorized options.
-     *
-     * @param currentUser The user whose interests are being set
-     */
     private void promptInterests(User currentUser) {
-        logger.info("\n" + CliConstants.HEADER_INTERESTS_HOBBIES);
-        Set<Interest> selected = currentUser.getInterests();
-
+        Set<Interest> interestSet = currentUser.getInterests() == null
+                ? EnumSet.noneOf(Interest.class)
+                : EnumSet.copyOf(currentUser.getInterests());
         boolean editing = true;
-        while (editing) {
-            logger.info(
-                    "\nCurrent interests: {}",
-                    selected.isEmpty() ? "(none)" : InterestMatcher.formatSharedInterests(selected));
-            logger.info("  1. Add by category");
-            logger.info("  2. Clear all");
-            logger.info("  0. Done");
 
-            String choice = inputReader.readLine("\nChoice: ");
+        while (editing) {
+            displayInterestMenu(interestSet);
+            String choice = inputReader.readLine("Select: ").trim();
             switch (choice) {
-                case "1" -> {
-                    if (selected.size() >= Interest.MAX_PER_USER) {
-                        logger.info("❌ Limit of {} reached.\n", Interest.MAX_PER_USER);
-                        continue;
-                    }
-                    addInterestByCategory(selected);
+                case "1" -> addInterestByCategory(currentUser, Interest.Category.OUTDOORS, interestSet);
+                case "2" -> addInterestByCategory(currentUser, Interest.Category.ARTS, interestSet);
+                case "3" -> addInterestByCategory(currentUser, Interest.Category.FOOD, interestSet);
+                case "4" -> addInterestByCategory(currentUser, Interest.Category.SPORTS, interestSet);
+                case "5" -> addInterestByCategory(currentUser, Interest.Category.TECH, interestSet);
+                case "6" -> addInterestByCategory(currentUser, Interest.Category.SOCIAL, interestSet);
+                case "7" -> {
+                    interestSet.clear();
+                    currentUser.setInterests(interestSet);
+                    logInfo("✅ Interests cleared.\n");
                 }
-                case "2" -> {
-                    selected.clear();
-                    logger.info("✅ Interests cleared.\n");
-                }
-                case "0" -> {
-                    editing = false;
-                }
-                default -> logger.info(CliConstants.INVALID_SELECTION);
+                case "0" -> editing = false;
+                default -> logInfo(CliConstants.INVALID_SELECTION);
             }
         }
-        currentUser.setInterests(selected);
+
+        currentUser.setInterests(interestSet);
     }
 
-    /**
-     * Prompts the user to add interests from a specific category.
-     *
-     * @param selected The current set of selected interests to modify
-     */
-    private void addInterestByCategory(Set<Interest> selected) {
-        Interest.Category[] categories = Interest.Category.values();
-        for (int i = 0; i < categories.length; i++) {
-            logger.info("  {}. {}", i + 1, categories[i].getDisplayName());
+    private void displayInterestMenu(Set<Interest> interestSet) {
+        logInfo("\n--- Interests ({} / {}) ---", interestSet.size(), Interest.MAX_PER_USER);
+        if (interestSet.isEmpty()) {
+            logInfo("None selected.");
+        } else {
+            interestSet.forEach(interest -> logInfo(" - {}", interest.getDisplayName()));
         }
+        logInfo("\nChoose a category to edit:");
+        logInfo("  1. {}", Interest.Category.OUTDOORS.getDisplayName());
+        logInfo("  2. {}", Interest.Category.ARTS.getDisplayName());
+        logInfo("  3. {}", Interest.Category.FOOD.getDisplayName());
+        logInfo("  4. {}", Interest.Category.SPORTS.getDisplayName());
+        logInfo("  5. {}", Interest.Category.TECH.getDisplayName());
+        logInfo("  6. {}", Interest.Category.SOCIAL.getDisplayName());
+        logInfo("  7. Clear all interests");
+        logInfo("  0. Back\n");
+    }
 
-        String input = inputReader.readLine("\nSelect category (or 0 to cancel): ");
-        try {
-            int catIdx = Integer.parseInt(input) - 1;
-            if (catIdx < 0 || catIdx >= categories.length) {
-                return;
-            }
+    private void addInterestByCategory(User currentUser, Interest.Category category, Set<Interest> interestSet) {
+        List<Interest> options = Interest.byCategory(category);
+        if (options.isEmpty()) {
+            logInfo("\nNo interests available in this category.\n");
+            return;
+        }
+        displayInterestOptions(category, options, interestSet);
 
-            Interest.Category cat = categories[catIdx];
-            List<Interest> options = Interest.byCategory(cat);
+        String input = inputReader
+                .readLine("Select numbers (comma-separated) or 0 to cancel: ")
+                .trim();
+        if (!"0".equals(input)) {
+            applyInterestSelections(interestSet, options, input);
+            currentUser.setInterests(interestSet);
+        }
+    }
 
-            logger.info("\n--- {} ---", cat.getDisplayName());
-            for (int i = 0; i < options.size(); i++) {
-                Interest interest = options.get(i);
-                String marker = selected.contains(interest) ? " [x]" : "";
-                logger.info("  {}. {}{}", i + 1, interest.getDisplayName(), marker);
-            }
+    private void displayInterestOptions(Interest.Category category, List<Interest> options, Set<Interest> interestSet) {
+        logInfo("\n{}:", category.getDisplayName());
+        for (int i = 0; i < options.size(); i++) {
+            Interest interest = options.get(i);
+            String marker = interestSet.contains(interest) ? "✅" : "⬜";
+            logInfo("  {}. {} {}", i + 1, marker, interest.getDisplayName());
+        }
+    }
 
-            String intInput = inputReader.readLine("\nSelect interest (or 0 to cancel): ");
-            int intIdx = Integer.parseInt(intInput) - 1;
-            if (intIdx >= 0 && intIdx < options.size()) {
-                Interest chosen = options.get(intIdx);
-                if (selected.contains(chosen)) {
-                    selected.remove(chosen);
-                    logger.info("✅ Removed {}.\n", chosen.getDisplayName());
-                } else if (selected.size() < Interest.MAX_PER_USER) {
-                    selected.add(chosen);
-                    logger.info("✅ Added {}.\n", chosen.getDisplayName());
-                } else {
-                    logger.info("❌ Limit reached.\n");
+    private void applyInterestSelections(Set<Interest> interestSet, List<Interest> options, String input) {
+        for (String rawToken : input.split("[,\\s]+")) {
+            String token = rawToken.trim();
+            if (!token.isEmpty()) {
+                Integer idx = parseInterestIndex(token, options.size());
+                if (idx != null) {
+                    toggleInterestSelection(interestSet, options.get(idx));
                 }
             }
+        }
+    }
+
+    private Integer parseInterestIndex(String token, int size) {
+        try {
+            int idx = Integer.parseInt(token) - 1;
+            if (idx < 0 || idx >= size) {
+                logInfo("⚠️  Invalid selection: {}", token);
+                return null;
+            }
+            return idx;
         } catch (NumberFormatException _) {
-            logger.info(CliConstants.INVALID_INPUT);
+            logInfo("⚠️  Invalid selection: {}", token);
+            return null;
+        }
+    }
+
+    private void toggleInterestSelection(Set<Interest> interestSet, Interest interest) {
+        if (interestSet.contains(interest)) {
+            interestSet.remove(interest);
+        } else if (interestSet.size() < Interest.MAX_PER_USER) {
+            interestSet.add(interest);
+        } else {
+            logInfo("⚠️  You can select up to {} interests.", Interest.MAX_PER_USER);
         }
     }
 
@@ -368,14 +419,14 @@ public class ProfileHandler {
             double lon = Double.parseDouble(lonStr);
             ValidationService.ValidationResult result = validationService.validateLocation(lat, lon);
             if (!result.valid()) {
-                logger.info("⚠️  Invalid coordinates:");
-                result.errors().forEach(e -> logger.info("    - {}", e));
+                logInfo("⚠️  Invalid coordinates:");
+                result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
             } else {
                 currentUser.setLocation(lat, lon);
             }
         } catch (NumberFormatException e) {
-            logger.debug("Invalid coordinates: {}", e.getMessage());
-            logger.info("⚠️  Invalid coordinates, skipping.");
+            logDebug("Invalid coordinates: {}", e.getMessage());
+            logInfo("⚠️  Invalid coordinates, skipping.");
         }
     }
 
@@ -391,14 +442,14 @@ public class ProfileHandler {
                 int dist = Integer.parseInt(distStr);
                 ValidationService.ValidationResult result = validationService.validateDistance(dist);
                 if (!result.valid()) {
-                    logger.info("⚠️  Invalid distance:");
-                    result.errors().forEach(e -> logger.info("    - {}", e));
-                    logger.info("    Using default (50km)");
+                    logInfo("⚠️  Invalid distance:");
+                    result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
+                    logInfo("    Using default (50km)");
                 } else {
                     currentUser.setMaxDistanceKm(dist);
                 }
             } catch (NumberFormatException e) {
-                logger.trace("Using default distance, input was: {}", e.getMessage());
+                logTrace("Using default distance, input was: {}", e.getMessage());
                 // Keep default - user entered non-numeric or empty input
             }
         }
@@ -410,14 +461,14 @@ public class ProfileHandler {
             int maxAge = maxAgeStr.isBlank() ? 99 : Integer.parseInt(maxAgeStr);
             ValidationService.ValidationResult result = validationService.validateAgeRange(minAge, maxAge);
             if (!result.valid()) {
-                logger.info("⚠️  Invalid age range:");
-                result.errors().forEach(e -> logger.info("    - {}", e));
-                logger.info("    Using defaults (18-99)");
+                logInfo("⚠️  Invalid age range:");
+                result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
+                logInfo("    Using defaults (18-99)");
             } else {
                 currentUser.setAgeRange(minAge, maxAge);
             }
         } catch (NumberFormatException _) {
-            logger.info("⚠️  Invalid age range, using defaults.");
+            logInfo("⚠️  Invalid age range, using defaults.");
         }
     }
 
@@ -435,7 +486,7 @@ public class ProfileHandler {
      * @param currentUser The user whose lifestyle preferences are being set
      */
     private void promptLifestyle(User currentUser) {
-        logger.info("\n" + CliConstants.HEADER_LIFESTYLE + "\n");
+        logInfo("\n" + CliConstants.HEADER_LIFESTYLE + "\n");
 
         String heightStr = inputReader.readLine("Height in cm (e.g., 175, or Enter to skip): ");
         if (!heightStr.isBlank()) {
@@ -443,13 +494,13 @@ public class ProfileHandler {
                 int height = Integer.parseInt(heightStr);
                 ValidationService.ValidationResult result = validationService.validateHeight(height);
                 if (!result.valid()) {
-                    logger.info("⚠️  Invalid height:");
-                    result.errors().forEach(e -> logger.info("    - {}", e));
+                    logInfo("⚠️  Invalid height:");
+                    result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
                 } else {
                     currentUser.setHeightCm(height);
                 }
             } catch (NumberFormatException _) {
-                logger.info("⚠️  Invalid height, skipping.");
+                logInfo("⚠️  Invalid height, skipping.");
             }
         }
 
@@ -481,8 +532,8 @@ public class ProfileHandler {
      * @param currentUser The user whose pace preferences are being set
      */
     private void promptPacePreferences(User currentUser) {
-        logger.info("\n--- PACE PREFERENCES ---\n");
-        logger.info("These help us find people who share your communication style.\n");
+        logInfo("\n--- PACE PREFERENCES ---\n");
+        logInfo("These help us find people who share your communication style.\n");
 
         PacePreferences current = currentUser.getPacePreferences();
 
@@ -512,49 +563,49 @@ public class ProfileHandler {
     // --- Dealbreaker Helpers ---
 
     private void displayCurrentDealbreakers(User currentUser) {
-        logger.info("\n" + CliConstants.SEPARATOR_LINE);
-        logger.info("         SET YOUR DEALBREAKERS");
-        logger.info(CliConstants.SEPARATOR_LINE + "\n");
-        logger.info("Dealbreakers are HARD filters.\n");
+        logInfo("\n" + CliConstants.SEPARATOR_LINE);
+        logInfo("         SET YOUR DEALBREAKERS");
+        logInfo(CliConstants.SEPARATOR_LINE + "\n");
+        logInfo("Dealbreakers are HARD filters.\n");
 
         Dealbreakers current = currentUser.getDealbreakers();
         if (current.hasAnyDealbreaker()) {
-            logger.info("Current dealbreakers:");
+            logInfo("Current dealbreakers:");
             if (current.hasSmokingDealbreaker()) {
-                logger.info("  - Smoking: {}", current.acceptableSmoking());
+                logInfo("  - Smoking: {}", current.acceptableSmoking());
             }
             if (current.hasDrinkingDealbreaker()) {
-                logger.info("  - Drinking: {}", current.acceptableDrinking());
+                logInfo("  - Drinking: {}", current.acceptableDrinking());
             }
             if (current.hasKidsDealbreaker()) {
-                logger.info("  - Kids stance: {}", current.acceptableKidsStance());
+                logInfo("  - Kids stance: {}", current.acceptableKidsStance());
             }
             if (current.hasLookingForDealbreaker()) {
-                logger.info("  - Looking for: {}", current.acceptableLookingFor());
+                logInfo("  - Looking for: {}", current.acceptableLookingFor());
             }
             if (current.hasHeightDealbreaker()) {
-                logger.info("  - Height: {} - {} cm", current.minHeightCm(), current.maxHeightCm());
+                logInfo("  - Height: {} - {} cm", current.minHeightCm(), current.maxHeightCm());
             }
             if (current.hasAgeDealbreaker()) {
-                logger.info("  - Max age diff: {} years", current.maxAgeDifference());
+                logInfo("  - Max age diff: {} years", current.maxAgeDifference());
             }
-            logger.info("");
+            logInfo("");
         } else {
-            logger.info("No dealbreakers set (showing everyone).\n");
+            logInfo("No dealbreakers set (showing everyone).\n");
         }
     }
 
     private void displayDealbreakerMenu() {
-        logger.info(CliConstants.MENU_DIVIDER);
-        logger.info("  1. Set smoking dealbreaker");
-        logger.info("  2. Set drinking dealbreaker");
-        logger.info("  3. Set kids stance dealbreaker");
-        logger.info("  4. Set relationship goal dealbreaker");
-        logger.info("  5. Set height range");
-        logger.info("  6. Set max age difference");
-        logger.info("  7. Clear all dealbreakers");
-        logger.info("  0. Cancel");
-        logger.info(CliConstants.MENU_DIVIDER + "\n");
+        logInfo(CliConstants.MENU_DIVIDER);
+        logInfo("  1. Set smoking dealbreaker");
+        logInfo("  2. Set drinking dealbreaker");
+        logInfo("  3. Set kids stance dealbreaker");
+        logInfo("  4. Set relationship goal dealbreaker");
+        logInfo("  5. Set height range");
+        logInfo("  6. Set max age difference");
+        logInfo("  7. Clear all dealbreakers");
+        logInfo("  0. Cancel");
+        logInfo(CliConstants.MENU_DIVIDER + "\n");
     }
 
     // Note: I am copying the logic from Main.java for dealbreakers
@@ -574,10 +625,10 @@ public class ProfileHandler {
             case "6" -> editAgeDealbreaker(currentUser, current);
             case "7" -> {
                 currentUser.setDealbreakers(Dealbreakers.none());
-                logger.info("✅ All dealbreakers cleared.\n");
+                logInfo("✅ All dealbreakers cleared.\n");
             }
-            case "0" -> logger.info(CliConstants.CANCELLED);
-            default -> logger.info(CliConstants.INVALID_SELECTION);
+            case "0" -> logInfo(CliConstants.CANCELLED);
+            default -> logInfo(CliConstants.INVALID_SELECTION);
         }
     }
 
@@ -588,7 +639,7 @@ public class ProfileHandler {
             builder.acceptSmoking(value);
         }
         currentUser.setDealbreakers(builder.build());
-        logger.info("✅ Smoking dealbreaker updated.\n");
+        logInfo("✅ Smoking dealbreaker updated.\n");
     }
 
     private void editDrinkingDealbreaker(User currentUser, Dealbreakers current) {
@@ -598,7 +649,7 @@ public class ProfileHandler {
             builder.acceptDrinking(value);
         }
         currentUser.setDealbreakers(builder.build());
-        logger.info("✅ Drinking dealbreaker updated.\n");
+        logInfo("✅ Drinking dealbreaker updated.\n");
     }
 
     private void editKidsDealbreaker(User currentUser, Dealbreakers current) {
@@ -609,7 +660,7 @@ public class ProfileHandler {
             builder.acceptKidsStance(value);
         }
         currentUser.setDealbreakers(builder.build());
-        logger.info("✅ Kids stance dealbreaker updated.\n");
+        logInfo("✅ Kids stance dealbreaker updated.\n");
     }
 
     private void editLookingForDealbreaker(User currentUser, Dealbreakers current) {
@@ -620,11 +671,11 @@ public class ProfileHandler {
             builder.acceptLookingFor(value);
         }
         currentUser.setDealbreakers(builder.build());
-        logger.info("✅ Looking for dealbreaker updated.\n");
+        logInfo("✅ Looking for dealbreaker updated.\n");
     }
 
     private void editHeightDealbreaker(User currentUser, Dealbreakers current) {
-        logger.info("\nHeight range (in cm), or Enter to clear:");
+        logInfo("\nHeight range (in cm), or Enter to clear:");
         String minStr = inputReader.readLine("Minimum height (e.g., 160): ");
         String maxStr = inputReader.readLine("Maximum height (e.g., 190): ");
         Dealbreakers.Builder builder = current.toBuilder().clearHeight();
@@ -635,29 +686,29 @@ public class ProfileHandler {
                 builder.heightRange(min, max);
             }
             currentUser.setDealbreakers(builder.build());
-            logger.info("✅ Height dealbreaker updated.\n");
+            logInfo("✅ Height dealbreaker updated.\n");
         } catch (NumberFormatException _) {
-            logger.info(CliConstants.INVALID_INPUT);
+            logInfo(CliConstants.INVALID_INPUT);
         } catch (IllegalArgumentException e) {
-            logger.info("❌ {}\n", e.getMessage());
+            logInfo("❌ {}\n", e.getMessage());
         }
     }
 
     private void editAgeDealbreaker(User currentUser, Dealbreakers current) {
-        logger.info("\nMax age difference (years), or Enter to clear:");
+        logInfo("\nMax age difference (years), or Enter to clear:");
         String input = inputReader.readLine("Max years: ");
         Dealbreakers.Builder builder = current.toBuilder().clearAge();
         if (!input.isBlank()) {
             try {
                 builder.maxAgeDifference(Integer.parseInt(input));
                 currentUser.setDealbreakers(builder.build());
-                logger.info("✅ Age dealbreaker updated.\n");
+                logInfo("✅ Age dealbreaker updated.\n");
             } catch (NumberFormatException _) {
-                logger.info(CliConstants.INVALID_INPUT);
+                logInfo(CliConstants.INVALID_INPUT);
             }
         } else {
             currentUser.setDealbreakers(builder.build());
-            logger.info("✅ Age dealbreaker cleared.\n");
+            logInfo("✅ Age dealbreaker cleared.\n");
         }
     }
 
@@ -665,11 +716,11 @@ public class ProfileHandler {
 
     /** Creates a new user and sets them as the current user. */
     public void createUser() {
-        logger.info("\n--- Create New User ---\n");
+        logInfo("\n--- Create New User ---\n");
 
         String name = inputReader.readLine("Enter your name: ");
         if (name.isBlank()) {
-            logger.info("❌ Name cannot be empty.\n");
+            logInfo("❌ Name cannot be empty.\n");
             return;
         }
 
@@ -677,23 +728,23 @@ public class ProfileHandler {
         userStorage.save(user);
         session.setCurrentUser(user);
 
-        logger.info("\n✅ User created! ID: {}", user.getId());
-        logger.info("   Status: {} (Complete your profile to become ACTIVE)\n", user.getState());
+        logInfo("\n✅ User created! ID: {}", user.getId());
+        logInfo("   Status: {} (Complete your profile to become ACTIVE)\n", user.getState());
     }
 
     /** Displays all users and allows selection of one as the current user. */
     public void selectUser() {
-        logger.info("\n--- Select User ---\n");
+        logInfo("\n--- Select User ---\n");
 
         List<User> users = userStorage.findAll();
         if (users.isEmpty()) {
-            logger.info("No users found. Create one first!\n");
+            logInfo("No users found. Create one first!\n");
             return;
         }
 
         for (int i = 0; i < users.size(); i++) {
             User u = users.get(i);
-            logger.info("  {}. {} ({})", i + 1, u.getName(), u.getState());
+            logInfo("  {}. {} ({})", i + 1, u.getName(), u.getState());
         }
 
         String input = inputReader.readLine("\nSelect user number (or 0 to cancel): ");
@@ -701,14 +752,14 @@ public class ProfileHandler {
             int idx = Integer.parseInt(input) - 1;
             if (idx < 0 || idx >= users.size()) {
                 if (idx != -1) {
-                    logger.info("\n❌ Invalid selection.\n");
+                    logInfo("\n❌ Invalid selection.\n");
                 }
                 return;
             }
             session.setCurrentUser(users.get(idx));
-            logger.info("\n✅ Selected: {}\n", session.getCurrentUser().getName());
+            logInfo("\n✅ Selected: {}\n", session.getCurrentUser().getName());
         } catch (NumberFormatException _) {
-            logger.info("❌ Invalid input.\n");
+            logInfo("❌ Invalid input.\n");
         }
     }
 
@@ -720,36 +771,36 @@ public class ProfileHandler {
             User currentUser = session.getCurrentUser();
             ProfileCompletionService.CompletionResult result = ProfileCompletionService.calculate(currentUser);
 
-            logger.info("\n───────────────────────────────────────");
-            logger.info("      📊 PROFILE COMPLETION SCORE");
-            logger.info("───────────────────────────────────────\n");
+            logInfo("\n───────────────────────────────────────");
+            logInfo("      📊 PROFILE COMPLETION SCORE");
+            logInfo("───────────────────────────────────────\n");
 
-            logger.info("  {} {}% {}", result.getTierEmoji(), result.score(), result.tier());
+            logInfo("  {} {}% {}", result.getTierEmoji(), result.score(), result.tier());
             if (logger.isInfoEnabled()) {
                 String overallBar = ProfileCompletionService.renderProgressBar(result.score(), 25);
-                logger.info("  {}", overallBar);
+                logInfo("  {}", overallBar);
             }
-            logger.info("");
+            logInfo("");
 
             // Category breakdown
             for (ProfileCompletionService.CategoryBreakdown cat : result.breakdown()) {
-                logger.info("  {} - {}%", cat.category(), cat.score());
+                logInfo("  {} - {}%", cat.category(), cat.score());
                 if (logger.isInfoEnabled()) {
                     String categoryBar = ProfileCompletionService.renderProgressBar(cat.score(), 15);
-                    logger.info("    {}", categoryBar);
+                    logInfo(INDENTED_LINE, categoryBar);
                 }
                 if (!cat.missingItems().isEmpty()) {
-                    cat.missingItems().forEach(m -> logger.info("    ⚪ {}", m));
+                    cat.missingItems().forEach(m -> logInfo("    ⚪ {}", m));
                 }
             }
 
             // Next steps
             if (!result.nextSteps().isEmpty()) {
-                logger.info("\n  💡 NEXT STEPS:");
-                result.nextSteps().forEach(s -> logger.info("    {}", s));
+                logInfo("\n  💡 NEXT STEPS:");
+                result.nextSteps().forEach(s -> logInfo(INDENTED_LINE, s));
             }
 
-            logger.info("");
+            logInfo("");
             inputReader.readLine("  [Press Enter to return to menu]");
         });
     }

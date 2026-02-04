@@ -2,22 +2,23 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
-import datingapp.core.Preferences.PacePreferences;
+import datingapp.core.Gender;
+import datingapp.core.PacePreferences;
 import datingapp.core.User;
-import datingapp.core.User.Gender;
+import datingapp.core.UserState;
 import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.collections.transformation.FilteredList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +31,7 @@ public class LoginViewModel {
 
     private final UserStorage userStorage;
     private final ObservableList<User> users = FXCollections.observableArrayList();
-    private final FilteredList<User> filteredUsers;
+    private final ObservableList<User> filteredUsers = FXCollections.observableArrayList();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loginDisabled = new SimpleBooleanProperty(true);
     private final StringProperty filterText = new SimpleStringProperty("");
@@ -42,23 +43,39 @@ public class LoginViewModel {
 
     private User selectedUser;
 
+    /** Track disposed state to prevent operations after cleanup. */
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
+
     public LoginViewModel(UserStorage userStorage) {
         this.userStorage = userStorage;
-        this.filteredUsers = new FilteredList<>(users, user -> true);
         this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
         loadUsers();
+    }
+
+    /**
+     * Disposes resources held by this ViewModel.
+     * Should be called when the ViewModel is no longer needed.
+     */
+    public void dispose() {
+        disposed.set(true);
+        users.clear();
+        filteredUsers.clear();
     }
 
     /**
      * Loads the list of available users from storage.
      */
     private void loadUsers() {
+        if (disposed.get()) {
+            return;
+        }
         loading.set(true);
         users.clear();
         List<User> allUsers = userStorage.findAll();
         users.addAll(allUsers);
+        applyFilter(filterText.get());
         loading.set(false);
-        logger.info("Loaded {} users for login selection.", users.size());
+        logInfo("Loaded {} users for login selection.", users.size());
     }
 
     /**
@@ -72,7 +89,7 @@ public class LoginViewModel {
         return users;
     }
 
-    public FilteredList<User> getFilteredUsers() {
+    public ObservableList<User> getFilteredUsers() {
         return filteredUsers;
     }
 
@@ -120,7 +137,7 @@ public class LoginViewModel {
             return false;
         }
 
-        logger.info(
+        logInfo(
                 "Logging in as user: {} ({}) - state={}, isComplete={}",
                 selectedUser.getName(),
                 selectedUser.getId(),
@@ -128,17 +145,17 @@ public class LoginViewModel {
                 selectedUser.isComplete());
 
         // Attempt to auto-complete incomplete users by filling missing fields
-        if (selectedUser.getState() == User.State.INCOMPLETE) {
+        if (selectedUser.getState() == UserState.INCOMPLETE) {
             autoCompleteUserProfile(selectedUser);
 
             // Try to activate if now complete
-            if (selectedUser.isComplete() && selectedUser.getState() == User.State.INCOMPLETE) {
+            if (selectedUser.isComplete() && selectedUser.getState() == UserState.INCOMPLETE) {
                 try {
                     selectedUser.activate();
                     userStorage.save(selectedUser);
-                    logger.info("Auto-activated user {} after completing profile", selectedUser.getName());
+                    logInfo("Auto-activated user {} after completing profile", selectedUser.getName());
                 } catch (IllegalStateException e) {
-                    logger.warn("Could not auto-activate user {}: {}", selectedUser.getName(), e.getMessage());
+                    logWarn("Could not auto-activate user {}: {}", selectedUser.getName(), e.getMessage());
                 }
             }
         }
@@ -159,21 +176,21 @@ public class LoginViewModel {
         if (user.getBio() == null || user.getBio().isBlank()) {
             user.setBio("New to the app! 👋");
             modified = true;
-            logger.debug("Auto-filled bio for user {}", user.getName());
+            logDebug("Auto-filled bio for user {}", user.getName());
         }
 
         // Photo URL default
         if (user.getPhotoUrls() == null || user.getPhotoUrls().isEmpty()) {
             user.setPhotoUrls(List.of("placeholder://default-avatar"));
             modified = true;
-            logger.debug("Auto-filled photo URL for user {}", user.getName());
+            logDebug("Auto-filled photo URL for user {}", user.getName());
         }
 
         // Location default (Tel Aviv)
         if (user.getLat() == 0 && user.getLon() == 0) {
             user.setLocation(32.0853, 34.7818);
             modified = true;
-            logger.debug("Auto-filled location for user {}", user.getName());
+            logDebug("Auto-filled location for user {}", user.getName());
         }
 
         // Pace preferences default
@@ -185,19 +202,19 @@ public class LoginViewModel {
                     PacePreferences.DepthPreference.DEPENDS_ON_VIBE);
             user.setPacePreferences(pacePrefs);
             modified = true;
-            logger.debug("Auto-filled pace preferences for user {}", user.getName());
+            logDebug("Auto-filled pace preferences for user {}", user.getName());
         }
 
         // Dealbreakers default (none) - marks section as reviewed
         if (user.getDealbreakers() == null) {
             user.setDealbreakers(Dealbreakers.none());
             modified = true;
-            logger.debug("Auto-filled dealbreakers (none) for user {}", user.getName());
+            logDebug("Auto-filled dealbreakers (none) for user {}", user.getName());
         }
 
         if (modified) {
             userStorage.save(user);
-            logger.info("Auto-completed profile fields for user {}", user.getName());
+            logInfo("Auto-completed profile fields for user {}", user.getName());
         }
     }
 
@@ -263,9 +280,9 @@ public class LoginViewModel {
             if (newUser.isComplete()) {
                 newUser.activate();
                 userStorage.save(newUser);
-                logger.info("User {} is complete and activated. State: {}", newUser.getName(), newUser.getState());
+                logInfo("User {} is complete and activated. State: {}", newUser.getName(), newUser.getState());
             } else {
-                logger.warn(
+                logWarn(
                         "User {} created but not complete. State: {} (isComplete={})",
                         newUser.getName(),
                         newUser.getState(),
@@ -275,7 +292,7 @@ public class LoginViewModel {
             // Refresh the user list
             refreshUsers();
 
-            logger.info(
+            logInfo(
                     "Created new user: {} with ID {}, State: {}",
                     newUser.getName(),
                     newUser.getId(),
@@ -283,7 +300,7 @@ public class LoginViewModel {
 
             return newUser;
         } catch (Exception e) {
-            logger.error("Failed to create user: {}", e.getMessage(), e);
+            logError("Failed to create user: {}", e.getMessage(), e);
             errorMessage.set("Failed to create user: " + e.getMessage());
             return null;
         }
@@ -298,30 +315,69 @@ public class LoginViewModel {
         errorMessage.set("");
     }
 
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logDebug(String message, Object... args) {
+        if (logger.isDebugEnabled()) {
+            logger.debug(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
+    }
+
+    private void logError(String message, Object... args) {
+        if (logger.isErrorEnabled()) {
+            logger.error(message, args);
+        }
+    }
+
     private void applyFilter(String text) {
-        String normalized = text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
+        String normalized = normalizeFilter(text);
         if (normalized.isBlank()) {
-            filteredUsers.setPredicate(user -> true);
+            filteredUsers.setAll(users);
             return;
         }
 
-        filteredUsers.setPredicate(user -> {
-            if (user == null) {
+        List<User> matches =
+                users.stream().filter(user -> matchesFilter(user, normalized)).toList();
+        filteredUsers.setAll(matches);
+    }
+
+    private static String normalizeFilter(String text) {
+        return text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean matchesFilter(User user, String normalized) {
+        if (user == null) {
+            return false;
+        }
+
+        String searchable = buildSearchable(user);
+        return containsAllTerms(searchable, normalized);
+    }
+
+    private static String buildSearchable(User user) {
+        String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);
+        String state = user.getState() == null ? "" : user.getState().name().toLowerCase(Locale.ROOT);
+        String ageText = user.getAge() > 0 ? String.valueOf(user.getAge()) : "";
+        String verifiedTag = Boolean.TRUE.equals(user.isVerified()) ? "verified" : "";
+        return String.join(" ", name, state, ageText, verifiedTag);
+    }
+
+    private static boolean containsAllTerms(String searchable, String normalized) {
+        for (String term : normalized.split("\\s+")) {
+            if (!searchable.contains(term)) {
                 return false;
             }
-
-            String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);
-            String state = user.getState() == null ? "" : user.getState().name().toLowerCase(Locale.ROOT);
-            String ageText = user.getAge() > 0 ? String.valueOf(user.getAge()) : "";
-            String verifiedTag = Boolean.TRUE.equals(user.isVerified()) ? "verified" : "";
-
-            String searchable = String.join(" ", name, state, ageText, verifiedTag);
-            for (String term : normalized.split("\\s+")) {
-                if (!searchable.contains(term)) {
-                    return false;
-                }
-            }
-            return true;
-        });
+        }
+        return true;
     }
 }

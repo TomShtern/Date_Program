@@ -2,11 +2,10 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.Preferences.PacePreferences;
-import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
@@ -38,12 +37,12 @@ class PaceCompatibilityTest {
     @Test
     @DisplayName("Perfect match returns 100")
     void perfectMatch_returns100() {
-        PacePreferences p1 = new Preferences.PacePreferences(
+        PacePreferences p1 = new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
                 DepthPreference.DEEP_CHAT);
-        PacePreferences p2 = new Preferences.PacePreferences(
+        PacePreferences p2 = new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
@@ -55,12 +54,12 @@ class PaceCompatibilityTest {
     @Test
     @DisplayName("Extreme opposites return low score")
     void extremeOpposites_returnsLowScore() {
-        PacePreferences p1 = new Preferences.PacePreferences(
+        PacePreferences p1 = new PacePreferences(
                 MessagingFrequency.RARELY,
                 TimeToFirstDate.QUICKLY,
                 CommunicationStyle.TEXT_ONLY,
                 DepthPreference.SMALL_TALK);
-        PacePreferences p2 = new Preferences.PacePreferences(
+        PacePreferences p2 = new PacePreferences(
                 MessagingFrequency.CONSTANTLY,
                 TimeToFirstDate.MONTHS,
                 CommunicationStyle.IN_PERSON_ONLY,
@@ -77,12 +76,12 @@ class PaceCompatibilityTest {
     @Test
     @DisplayName("Communication style wildcard applies wildcard score")
     void communicationStyleWildcard_appliesWildcardScore() {
-        PacePreferences p1 = new Preferences.PacePreferences(
+        PacePreferences p1 = new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.MIX_OF_EVERYTHING,
                 DepthPreference.DEEP_CHAT);
-        PacePreferences p2 = new Preferences.PacePreferences(
+        PacePreferences p2 = new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,
@@ -99,12 +98,12 @@ class PaceCompatibilityTest {
     @Test
     @DisplayName("Depth preference wildcard applies wildcard score")
     void depthPreferenceWildcard_appliesWildcardScore() {
-        PacePreferences p1 = new Preferences.PacePreferences(
+        PacePreferences p1 = new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
                 DepthPreference.DEPENDS_ON_VIBE);
-        PacePreferences p2 = new Preferences.PacePreferences(
+        PacePreferences p2 = new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
@@ -121,7 +120,7 @@ class PaceCompatibilityTest {
     @Test
     @DisplayName("Null preferences return -1")
     void nullPreferences_returnsNegativeOne() {
-        PacePreferences p2 = new Preferences.PacePreferences(
+        PacePreferences p2 = new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
@@ -146,12 +145,12 @@ class PaceCompatibilityTest {
     @Test
     @DisplayName("Adjacency logic works correctly")
     void adjacencyLogic_worksCorrectly() {
-        PacePreferences p1 = new Preferences.PacePreferences(
+        PacePreferences p1 = new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.VOICE_NOTES,
                 DepthPreference.DEEP_CHAT);
-        PacePreferences p2 = new Preferences.PacePreferences(
+        PacePreferences p2 = new PacePreferences(
                 MessagingFrequency.RARELY, // dist 1 -> 15
                 TimeToFirstDate.QUICKLY, // dist 1 -> 15
                 CommunicationStyle.TEXT_ONLY, // dist 1 -> 15
@@ -167,7 +166,9 @@ class PaceCompatibilityTest {
         private final Map<String, ProfileNote> profileNotes = new ConcurrentHashMap<>();
 
         @Override
-        public void save(User user) {}
+        public void save(User user) {
+            // no-op for test
+        }
 
         @Override
         public User get(UUID id) {
@@ -224,7 +225,9 @@ class PaceCompatibilityTest {
         }
 
         @Override
-        public void save(Like like) {}
+        public void save(Like like) {
+            // no-op for test
+        }
 
         @Override
         public boolean exists(UUID from, UUID to) {
@@ -277,6 +280,8 @@ class PaceCompatibilityTest {
         }
 
         @Override
-        public void delete(UUID likeId) {}
+        public void delete(UUID likeId) {
+            // no-op for test
+        }
     }
 }

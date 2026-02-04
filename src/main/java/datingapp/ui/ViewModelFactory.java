@@ -162,13 +162,7 @@ public class ViewModelFactory {
     public MatchingViewModel getMatchingViewModel() {
         if (matchingViewModel == null) {
             matchingViewModel = new MatchingViewModel(
-                    services.getCandidateFinder(),
-                    services.getMatchingService(),
-                    services.getUserStorage(),
-                    services.getLikeStorage(),
-                    services.getBlockStorage(),
-                    services.getUndoService(),
-                    services.getMatchQualityService());
+                    services.getCandidateFinder(), services.getMatchingService(), services.getUndoService());
         }
         return matchingViewModel;
     }

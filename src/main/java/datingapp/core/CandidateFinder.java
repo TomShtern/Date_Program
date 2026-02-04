@@ -190,7 +190,7 @@ public class CandidateFinder {
                     return notSelf;
                 })
                 .filter(candidate -> {
-                    boolean isActive = candidate.getState() == User.State.ACTIVE;
+                    boolean isActive = candidate.getState() == UserState.ACTIVE;
                     if (!isActive) {
                         logger.debug(
                                 "Rejecting {} ({}): NOT ACTIVE (state={})",

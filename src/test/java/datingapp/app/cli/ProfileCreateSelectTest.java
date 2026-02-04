@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import datingapp.core.AppSession;
 import datingapp.core.User;
+import datingapp.core.UserState;
 import datingapp.core.ValidationService;
 import datingapp.core.storage.UserStorage;
 import java.io.StringReader;
@@ -49,7 +50,7 @@ class ProfileCreateSelectTest {
     }
 
     private ProfileHandler createHandler(String input) {
-        CliUtilities.InputReader inputReader = new CliUtilities.InputReader(new Scanner(new StringReader(input)));
+        InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         // ProfilePreviewService and AchievementService can be null for create/select
         // tests
         // since they aren't used by these methods
@@ -71,7 +72,7 @@ class ProfileCreateSelectTest {
             assertEquals(1, userStorage.findAll().size(), "Should have 1 user");
             User created = userStorage.findAll().get(0);
             assertEquals("Alice", created.getName());
-            assertEquals(User.State.INCOMPLETE, created.getState());
+            assertEquals(UserState.INCOMPLETE, created.getState());
             assertEquals(created, userSession.getCurrentUser(), "Should set as current user");
         }
 
@@ -196,7 +197,7 @@ class ProfileCreateSelectTest {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == User.State.ACTIVE)
+                    .filter(u -> u.getState() == UserState.ACTIVE)
                     .toList();
         }
 

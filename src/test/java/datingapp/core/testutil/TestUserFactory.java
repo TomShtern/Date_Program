@@ -1,7 +1,7 @@
 package datingapp.core.testutil;
 
+import datingapp.core.Gender;
 import datingapp.core.User;
-import datingapp.core.User.Gender;
 import java.time.LocalDate;
 import java.util.UUID;
 

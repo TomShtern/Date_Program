@@ -6,7 +6,14 @@ import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Business logic for processing likes, creating matches, and browsing pending
@@ -14,6 +21,8 @@ import java.util.*;
  * framework dependencies.
  */
 public class MatchingService {
+
+    private static final String LIKE_REQUIRED = "like cannot be null";
 
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
@@ -203,7 +212,7 @@ public class MatchingService {
         for (var entry : likeTimes) {
             UUID likerId = entry.getKey();
             User liker = userStorage.get(likerId);
-            if (excluded.contains(likerId) || liker == null || liker.getState() != User.State.ACTIVE) {
+            if (excluded.contains(likerId) || liker == null || liker.getState() != UserState.ACTIVE) {
                 continue;
             }
 
@@ -241,17 +250,17 @@ public class MatchingService {
 
         public static SwipeResult matched(Match m, Like l) {
             Objects.requireNonNull(m, "match cannot be null");
-            Objects.requireNonNull(l, "like cannot be null");
+            Objects.requireNonNull(l, LIKE_REQUIRED);
             return new SwipeResult(true, true, m, l, "It's a match!");
         }
 
         public static SwipeResult liked(Like l) {
-            Objects.requireNonNull(l, "like cannot be null");
+            Objects.requireNonNull(l, LIKE_REQUIRED);
             return new SwipeResult(true, false, null, l, "Liked!");
         }
 
         public static SwipeResult passed(Like l) {
-            Objects.requireNonNull(l, "like cannot be null");
+            Objects.requireNonNull(l, LIKE_REQUIRED);
             return new SwipeResult(true, false, null, l, "Passed.");
         }
 

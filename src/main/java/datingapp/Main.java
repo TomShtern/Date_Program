@@ -1,9 +1,14 @@
 package datingapp;
 
 import datingapp.app.cli.CliConstants;
-import datingapp.app.cli.CliUtilities.InputReader;
 import datingapp.app.cli.HandlerFactory;
-import datingapp.core.*;
+import datingapp.app.cli.InputReader;
+import datingapp.core.AppBootstrap;
+import datingapp.core.AppSession;
+import datingapp.core.DailyService;
+import datingapp.core.ServiceRegistry;
+import datingapp.core.SessionService;
+import datingapp.core.User;
 import java.util.Scanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +37,7 @@ public final class Main {
         try (Scanner scanner = new Scanner(System.in)) {
             initializeApp(scanner);
 
-            logger.info("\n🌹 Welcome to Dating App 🌹\n");
+            logInfo("\n🌹 Welcome to Dating App 🌹\n");
 
             boolean running = true;
             while (running) {
@@ -61,9 +66,9 @@ public final class Main {
                     case "19" -> handlers.relationship().viewPendingRequests();
                     case "0" -> {
                         running = false;
-                        logger.info("\n👋 Goodbye!\n");
+                        logInfo("\n👋 Goodbye!\n");
                     }
-                    default -> logger.info(CliConstants.INVALID_SELECTION);
+                    default -> logInfo(CliConstants.INVALID_SELECTION);
                 }
             }
 
@@ -82,21 +87,27 @@ public final class Main {
         handlers = new HandlerFactory(services, AppSession.getInstance(), inputReader);
     }
 
+    private static void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
     private static void printMenu() {
-        logger.info(CliConstants.SEPARATOR_LINE);
-        logger.info("         DATING APP - PHASE 0.5");
-        logger.info(CliConstants.SEPARATOR_LINE);
+        logInfo(CliConstants.SEPARATOR_LINE);
+        logInfo("         DATING APP - PHASE 0.5");
+        logInfo(CliConstants.SEPARATOR_LINE);
 
         User currentUser = AppSession.getInstance().getCurrentUser();
 
         if (currentUser != null) {
-            logger.info("  Current User: {} ({})", currentUser.getName(), currentUser.getState());
+            logInfo("  Current User: {} ({})", currentUser.getName(), currentUser.getState());
 
             // Show active session info
             SessionService sessionService = services.getSessionService();
             sessionService
                     .getCurrentSession(currentUser.getId())
-                    .ifPresent(session -> logger.info(
+                    .ifPresent(session -> logInfo(
                             "  Session: {} swipes ({} likes, {} passes) | {} elapsed",
                             session.getSwipeCount(),
                             session.getLikeCount(),
@@ -107,41 +118,41 @@ public final class Main {
             DailyService dailyService = services.getDailyService();
             DailyService.DailyStatus dailyStatus = dailyService.getStatus(currentUser.getId());
             if (dailyStatus.hasUnlimitedLikes()) {
-                logger.info("  💝 Daily Likes: unlimited");
+                logInfo("  💝 Daily Likes: unlimited");
             } else {
-                logger.info(
+                logInfo(
                         "  💝 Daily Likes: {}/{} remaining",
                         dailyStatus.likesRemaining(),
                         services.getConfig().dailyLikeLimit());
             }
 
         } else {
-            logger.info("  Current User: [None]");
+            logInfo("  Current User: [None]");
         }
-        logger.info("───────────────────────────────────────");
-        logger.info("  1. Create new user");
-        logger.info("  2. Select existing user");
-        logger.info("  3. Complete my profile");
-        logger.info("  4. Browse candidates");
-        logger.info("  5. View my matches");
-        logger.info("  6. 🚫 Block a user");
-        logger.info("  7. ⚠️  Report a user");
-        logger.info("  8. 🔓 Manage blocked users");
-        logger.info("  9. 🎯 Set dealbreakers");
-        logger.info("  10. 📊 View my statistics");
-        logger.info("  11. 👤 Preview my profile");
-        logger.info("  12. 🏆 View achievements");
-        logger.info("  13. 📝 My profile notes");
-        logger.info("  14. 📊 Profile completion score");
-        logger.info("  15. ✅ Verify my profile");
-        logger.info("  16. 💌 Who liked me");
+        logInfo("───────────────────────────────────────");
+        logInfo("  1. Create new user");
+        logInfo("  2. Select existing user");
+        logInfo("  3. Complete my profile");
+        logInfo("  4. Browse candidates");
+        logInfo("  5. View my matches");
+        logInfo("  6. 🚫 Block a user");
+        logInfo("  7. ⚠️  Report a user");
+        logInfo("  8. 🔓 Manage blocked users");
+        logInfo("  9. 🎯 Set dealbreakers");
+        logInfo("  10. 📊 View my statistics");
+        logInfo("  11. 👤 Preview my profile");
+        logInfo("  12. 🏆 View achievements");
+        logInfo("  13. 📝 My profile notes");
+        logInfo("  14. 📊 Profile completion score");
+        logInfo("  15. ✅ Verify my profile");
+        logInfo("  16. 💌 Who liked me");
         int unreadCount = handlers.messaging().getTotalUnreadCount();
         String unreadStr = unreadCount > 0 ? " (" + unreadCount + " new)" : "";
-        logger.info("  17. 💬 Conversations{}", unreadStr);
-        logger.info("  18. 🔔 Notifications");
-        logger.info("  19. 🤝 Friend Requests");
-        logger.info("  0. Exit");
-        logger.info(CliConstants.SEPARATOR_LINE + "\n");
+        logInfo("  17. 💬 Conversations{}", unreadStr);
+        logInfo("  18. 🔔 Notifications");
+        logInfo("  19. 🤝 Friend Requests");
+        logInfo("  0. Exit");
+        logInfo(CliConstants.SEPARATOR_LINE + "\n");
     }
 
     private static void shutdown() {

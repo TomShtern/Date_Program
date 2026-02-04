@@ -27,7 +27,7 @@ public final class EnumMenu {
      * @return Selected value, or null if skipped/invalid
      */
     public static <E extends Enum<E>> E prompt(
-            CliUtilities.InputReader reader, Class<E> enumClass, String prompt, boolean allowSkip) {
+            InputReader reader, Class<E> enumClass, String prompt, boolean allowSkip) {
 
         E[] values = enumClass.getEnumConstants();
 
@@ -69,8 +69,7 @@ public final class EnumMenu {
      * @return Set of selected values (may be empty if user chooses "0" or enters
      *         invalid input)
      */
-    public static <E extends Enum<E>> Set<E> promptMultiple(
-            CliUtilities.InputReader reader, Class<E> enumClass, String prompt) {
+    public static <E extends Enum<E>> Set<E> promptMultiple(InputReader reader, Class<E> enumClass, String prompt) {
 
         E[] values = enumClass.getEnumConstants();
 
@@ -113,7 +112,7 @@ public final class EnumMenu {
         try {
             var method = value.getClass().getMethod("getDisplayName");
             return (String) method.invoke(value);
-        } catch (ReflectiveOperationException e) {
+        } catch (ReflectiveOperationException _) {
             // Fallback: convert ENUM_NAME to "Enum name"
             String name = value.name().replace("_", " ").toLowerCase(Locale.ROOT);
             return Character.toUpperCase(name.charAt(0)) + name.substring(1);

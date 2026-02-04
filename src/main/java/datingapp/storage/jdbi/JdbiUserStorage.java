@@ -1,11 +1,14 @@
 package datingapp.storage.jdbi;
 
 import datingapp.core.Dealbreakers;
+import datingapp.core.Gender;
+import datingapp.core.PacePreferences;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
-import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.User;
 import datingapp.core.User.ProfileNote;
+import datingapp.core.UserState;
+import datingapp.core.VerificationMethod;
 import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -156,13 +159,13 @@ public interface JdbiUserStorage {
                             MapperHelper.readInstant(rs, "created_at"))
                     .bio(rs.getString("bio"))
                     .birthDate(MapperHelper.readLocalDate(rs, "birth_date"))
-                    .gender(MapperHelper.readEnum(rs, "gender", User.Gender.class))
+                    .gender(MapperHelper.readEnum(rs, "gender", Gender.class))
                     .interestedIn(readGenderSet(rs, "interested_in"))
                     .location(rs.getDouble("lat"), rs.getDouble("lon"))
                     .maxDistanceKm(rs.getInt("max_distance_km"))
                     .ageRange(rs.getInt("min_age"), rs.getInt("max_age"))
                     .photoUrls(readPhotoUrls(rs, "photo_urls"))
-                    .state(MapperHelper.readEnum(rs, "state", User.State.class))
+                    .state(MapperHelper.readEnum(rs, "state", UserState.class))
                     .updatedAt(MapperHelper.readInstant(rs, "updated_at"))
                     .interests(readInterestSet(rs, "interests"))
                     .smoking(MapperHelper.readEnum(rs, "smoking", Lifestyle.Smoking.class))
@@ -174,7 +177,7 @@ public interface JdbiUserStorage {
                     .email(rs.getString("email"))
                     .phone(rs.getString("phone"))
                     .verified(rs.getObject("is_verified", Boolean.class))
-                    .verificationMethod(MapperHelper.readEnum(rs, "verification_method", User.VerificationMethod.class))
+                    .verificationMethod(MapperHelper.readEnum(rs, "verification_method", VerificationMethod.class))
                     .verificationCode(rs.getString("verification_code"))
                     .verificationSentAt(MapperHelper.readInstant(rs, "verification_sent_at"))
                     .verifiedAt(MapperHelper.readInstant(rs, "verified_at"))
@@ -191,16 +194,16 @@ public interface JdbiUserStorage {
         }
 
         /** Reads a comma-separated list of genders into an EnumSet. */
-        private Set<User.Gender> readGenderSet(ResultSet rs, String column) throws SQLException {
+        private Set<Gender> readGenderSet(ResultSet rs, String column) throws SQLException {
             String csv = rs.getString(column);
             if (csv == null || csv.isBlank()) {
-                return EnumSet.noneOf(User.Gender.class);
+                return EnumSet.noneOf(Gender.class);
             }
             return Arrays.stream(csv.split(","))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
-                    .map(User.Gender::valueOf)
-                    .collect(Collectors.toCollection(() -> EnumSet.noneOf(User.Gender.class)));
+                    .map(Gender::valueOf)
+                    .collect(Collectors.toCollection(() -> EnumSet.noneOf(Gender.class)));
         }
 
         /** Reads pipe-delimited photo URLs into a List. */
@@ -224,7 +227,7 @@ public interface JdbiUserStorage {
                 if (!trimmed.isEmpty()) {
                     try {
                         result.add(Interest.valueOf(trimmed));
-                    } catch (IllegalArgumentException e) {
+                    } catch (IllegalArgumentException _) {
                         // Skip invalid interests from data migration - maintains backward
                         // compatibility
                     }

@@ -1,7 +1,7 @@
 package datingapp.ui.controller;
 
 import datingapp.core.User;
-import datingapp.ui.util.UiHelpers;
+import datingapp.ui.util.ConfettiAnimation;
 import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.animation.FadeTransition;
@@ -24,6 +24,7 @@ import org.kordamp.ikonli.javafx.FontIcon;
  * <p>FXML controller reference:
  * {@code fx:controller="datingapp.ui.controller.MatchPopupController"}
  */
+@SuppressWarnings("unused") // FXML-injected members and handlers are referenced from FXML.
 public class MatchPopupController implements Initializable {
 
     @FXML
@@ -44,7 +45,7 @@ public class MatchPopupController implements Initializable {
     @FXML
     private Label matchMessage;
 
-    private UiHelpers.ConfettiAnimation confetti;
+    private ConfettiAnimation confetti;
     private Runnable onMessageCallback;
     private Runnable onContinueCallback;
 
@@ -104,7 +105,7 @@ public class MatchPopupController implements Initializable {
         });
 
         // Start confetti
-        confetti = new UiHelpers.ConfettiAnimation();
+        confetti = new ConfettiAnimation();
         confetti.play(confettiCanvas);
 
         new ParallelTransition(fadeIn, leftFly, rightFly, heartPop).play();

@@ -1,9 +1,16 @@
 package datingapp.ui.controller;
 
-import datingapp.ui.util.UiHelpers;
+import datingapp.ui.util.ConfettiAnimation;
 import java.net.URL;
 import java.util.ResourceBundle;
-import javafx.animation.*;
+import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.ParallelTransition;
+import javafx.animation.PauseTransition;
+import javafx.animation.ScaleTransition;
+import javafx.animation.Timeline;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.canvas.Canvas;
@@ -24,6 +31,7 @@ import org.slf4j.LoggerFactory;
  * FXML controller reference:
  * {@code fx:controller="datingapp.ui.controller.AchievementPopupController"}
  */
+@SuppressWarnings("unused") // FXML-injected members and handlers are referenced from FXML.
 public class AchievementPopupController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(AchievementPopupController.class);
     private static final int AUTO_DISMISS_SECONDS = 5;
@@ -50,7 +58,7 @@ public class AchievementPopupController implements Initializable {
     @FXML
     private Label xpLabel;
 
-    private UiHelpers.ConfettiAnimation confetti;
+    private ConfettiAnimation confetti;
     private Runnable onCloseCallback;
     private boolean autoDismiss = true;
 
@@ -84,7 +92,7 @@ public class AchievementPopupController implements Initializable {
         // Auto-dismiss after delay
         if (autoDismiss) {
             PauseTransition delay = new PauseTransition(Duration.seconds(AUTO_DISMISS_SECONDS));
-            delay.setOnFinished(_ -> close());
+            delay.setOnFinished(event -> close());
             delay.play();
         }
     }
@@ -112,7 +120,7 @@ public class AchievementPopupController implements Initializable {
         iconPop.setToY(1.15);
         iconPop.setDelay(Duration.millis(200));
         iconPop.setInterpolator(Interpolator.EASE_OUT);
-        iconPop.setOnFinished(_ -> {
+        iconPop.setOnFinished(event -> {
             ScaleTransition settle = new ScaleTransition(Duration.millis(200), iconContainer);
             settle.setToX(1);
             settle.setToY(1);
@@ -124,7 +132,7 @@ public class AchievementPopupController implements Initializable {
         addIconGlow();
 
         // Start confetti
-        confetti = new UiHelpers.ConfettiAnimation();
+        confetti = new ConfettiAnimation();
         confetti.play(confettiCanvas);
 
         new ParallelTransition(fadeIn, iconPop).play();
@@ -165,7 +173,7 @@ public class AchievementPopupController implements Initializable {
 
         FadeTransition fadeOut = new FadeTransition(Duration.millis(200), rootPane);
         fadeOut.setToValue(0);
-        fadeOut.setOnFinished(_ -> {
+        fadeOut.setOnFinished(event -> {
             if (rootPane.getParent() instanceof StackPane parent) {
                 parent.getChildren().remove(rootPane);
             }

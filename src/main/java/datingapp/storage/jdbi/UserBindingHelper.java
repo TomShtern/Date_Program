@@ -1,7 +1,7 @@
 package datingapp.storage.jdbi;
 
 import datingapp.core.Dealbreakers;
-import datingapp.core.Preferences.PacePreferences;
+import datingapp.core.PacePreferences;
 import datingapp.core.User;
 import java.time.Instant;
 import java.time.LocalDate;

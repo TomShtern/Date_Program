@@ -1,16 +1,18 @@
 package datingapp.ui.controller;
 
 import datingapp.core.Dealbreakers;
+import datingapp.core.Gender;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
-import datingapp.core.User.Gender;
 import datingapp.ui.NavigationService;
+import datingapp.ui.util.ImageCache;
+import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
-import datingapp.ui.util.UiServices;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
 import java.net.URL;
 import java.util.ResourceBundle;
+import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -40,8 +42,12 @@ import org.slf4j.LoggerFactory;
  * Controller for the Profile Editor screen (profile.fxml).
  * Extends BaseController for automatic subscription cleanup.
  */
+@SuppressWarnings("unused") // FXML-injected members and handlers are referenced from FXML.
 public class ProfileController extends BaseController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(ProfileController.class);
+    private static final String GENDER_OTHER_LABEL = "Other / Non-binary";
+    private static final String DEALBREAKER_HEADER = "Only show people who:";
+    private static final String DARK_PANEL_STYLE = "-fx-background-color: #1e293b;";
 
     @FXML
     private javafx.scene.layout.BorderPane rootPane;
@@ -196,7 +202,11 @@ public class ProfileController extends BaseController implements Initializable {
         wireAuxiliaryActions();
 
         // Bind lifestyle fields to ViewModel
-        bindLifestyleFields();
+        bindHeightField();
+        bindCombo(smokingCombo, viewModel.smokingProperty());
+        bindCombo(drinkingCombo, viewModel.drinkingProperty());
+        bindCombo(wantsKidsCombo, viewModel.wantsKidsProperty());
+        bindCombo(lookingForCombo, viewModel.lookingForProperty());
 
         // Bind search preference fields
         bindSearchPreferenceFields();
@@ -298,7 +308,7 @@ public class ProfileController extends BaseController implements Initializable {
                     return switch (g) {
                         case MALE -> "Male";
                         case FEMALE -> "Female";
-                        case OTHER -> "Other / Non-binary";
+                        case OTHER -> GENDER_OTHER_LABEL;
                     };
                 }
 
@@ -318,7 +328,7 @@ public class ProfileController extends BaseController implements Initializable {
                                 switch (item) {
                                     case MALE -> "Male";
                                     case FEMALE -> "Female";
-                                    case OTHER -> "Other / Non-binary";
+                                    case OTHER -> GENDER_OTHER_LABEL;
                                 });
                     }
                 }
@@ -344,7 +354,7 @@ public class ProfileController extends BaseController implements Initializable {
                     switch (g) {
                         case MALE -> "Men";
                         case FEMALE -> "Women";
-                        case OTHER -> "Other / Non-binary";
+                        case OTHER -> GENDER_OTHER_LABEL;
                     });
 
             boolean isSelected = viewModel.getInterestedInGenders().contains(g);
@@ -426,52 +436,44 @@ public class ProfileController extends BaseController implements Initializable {
     /**
      * Binds lifestyle ComboBoxes to ViewModel properties.
      */
-    private void bindLifestyleFields() {
-        // Height field - bind bidirectionally with conversion
-        if (heightField != null) {
-            addSubscription(viewModel.heightProperty().subscribe(height -> {
-                if (height != null) {
-                    heightField.setText(String.valueOf(height));
-                } else {
-                    heightField.setText("");
-                }
-            }));
-            heightField.textProperty().addListener((_, _, newVal) -> {
-                try {
-                    if (newVal != null && !newVal.isBlank()) {
-                        int h = Integer.parseInt(newVal.trim());
-                        if (h > 0 && h < 300) {
-                            viewModel.heightProperty().set(h);
-                        }
-                    } else {
-                        viewModel.heightProperty().set(null);
-                    }
-                } catch (NumberFormatException e) {
-                    // Ignore invalid height input - field will keep previous value
-                    LoggerFactory.getLogger(ProfileController.class).trace("Invalid height input: {}", e.getMessage());
-                }
-            });
-        }
+    private void bindHeightField() {
+        heightField.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == null || newVal.isBlank()) {
+                viewModel.heightProperty().set(null);
+                return;
+            }
+            try {
+                int height = Integer.parseInt(newVal.trim());
+                viewModel.heightProperty().set(height);
+            } catch (NumberFormatException _) {
+                LoggerFactory.getLogger(ProfileController.class).trace("Invalid height input: {}", newVal);
+            }
+        });
 
-        // Smoking
-        if (smokingCombo != null) {
-            smokingCombo.valueProperty().bindBidirectional(viewModel.smokingProperty());
-        }
+        heightField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            if (Boolean.FALSE.equals(isNowFocused)) {
+                validateHeightRange();
+            }
+        });
+    }
 
-        // Drinking
-        if (drinkingCombo != null) {
-            drinkingCombo.valueProperty().bindBidirectional(viewModel.drinkingProperty());
+    private void validateHeightRange() {
+        String heightText = heightField.getText();
+        try {
+            int height = Integer.parseInt(heightText);
+            if (height < 120 || height > 250) {
+                heightField.setText("");
+                viewModel.heightProperty().set(null);
+                Toast.showWarning("Please enter a height between 120-250 cm");
+            }
+        } catch (NumberFormatException _) {
+            heightField.setText("");
+            viewModel.heightProperty().set(null);
         }
+    }
 
-        // Wants Kids
-        if (wantsKidsCombo != null) {
-            wantsKidsCombo.valueProperty().bindBidirectional(viewModel.wantsKidsProperty());
-        }
-
-        // Looking For
-        if (lookingForCombo != null) {
-            lookingForCombo.valueProperty().bindBidirectional(viewModel.lookingForProperty());
-        }
+    private <T> void bindCombo(ComboBox<T> comboBox, ObjectProperty<T> property) {
+        comboBox.valueProperty().bindBidirectional(property);
     }
 
     /**
@@ -513,7 +515,7 @@ public class ProfileController extends BaseController implements Initializable {
             return;
         }
 
-        Image image = UiServices.ImageCache.getImage(photoUrl, 200, 200);
+        Image image = ImageCache.getImage(photoUrl, 200, 200);
         profileImageView.setImage(image);
         profileImageView.setVisible(true);
         if (avatarPlaceholderIcon != null) {
@@ -617,7 +619,7 @@ public class ProfileController extends BaseController implements Initializable {
         // Create content
         VBox content = new VBox(16);
         content.setPadding(new Insets(20));
-        content.setStyle("-fx-background-color: #1e293b;");
+        content.setStyle(DARK_PANEL_STYLE);
 
         // Group interests by category
         for (Interest.Category category : Interest.Category.values()) {
@@ -648,7 +650,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-        dialog.getDialogPane().setStyle("-fx-background-color: #1e293b;");
+        dialog.getDialogPane().setStyle(DARK_PANEL_STYLE);
         dialog.getDialogPane()
                 .lookupButton(ButtonType.CLOSE)
                 .setStyle("-fx-background-color: #667eea; -fx-text-fill: white;");
@@ -706,11 +708,11 @@ public class ProfileController extends BaseController implements Initializable {
                     viewModel.savePhoto(selectedFile);
                 } else {
                     logger.warn("Failed to load image: {}", selectedFile.getAbsolutePath());
-                    UiServices.Toast.showError("Failed to load image");
+                    Toast.showError("Failed to load image");
                 }
             } catch (Exception e) {
                 logger.error("Error loading profile photo", e);
-                UiServices.Toast.showError("Error loading photo: " + e.getMessage());
+                Toast.showError("Error loading photo: " + e.getMessage());
             }
         }
     }
@@ -734,7 +736,7 @@ public class ProfileController extends BaseController implements Initializable {
         // Create scrollable content
         VBox content = new VBox(16);
         content.setPadding(new Insets(20));
-        content.setStyle("-fx-background-color: #1e293b;");
+        content.setStyle(DARK_PANEL_STYLE);
         content.setPrefWidth(450);
 
         // Track selected values for each category
@@ -748,7 +750,7 @@ public class ProfileController extends BaseController implements Initializable {
         content.getChildren()
                 .add(createDealbreakersSection(
                         "Smoking Preferences",
-                        "Only show people who:",
+                        DEALBREAKER_HEADER,
                         Lifestyle.Smoking.values(),
                         selectedSmoking,
                         Lifestyle.Smoking::getDisplayName));
@@ -757,7 +759,7 @@ public class ProfileController extends BaseController implements Initializable {
         content.getChildren()
                 .add(createDealbreakersSection(
                         "Drinking Preferences",
-                        "Only show people who:",
+                        DEALBREAKER_HEADER,
                         Lifestyle.Drinking.values(),
                         selectedDrinking,
                         Lifestyle.Drinking::getDisplayName));
@@ -766,7 +768,7 @@ public class ProfileController extends BaseController implements Initializable {
         content.getChildren()
                 .add(createDealbreakersSection(
                         "Kids Preferences",
-                        "Only show people who:",
+                        DEALBREAKER_HEADER,
                         Lifestyle.WantsKids.values(),
                         selectedKids,
                         Lifestyle.WantsKids::getDisplayName));
@@ -791,7 +793,7 @@ public class ProfileController extends BaseController implements Initializable {
             selectedKids.clear();
             selectedLookingFor.clear();
             // Rebuild dialog to show cleared state
-            UiServices.Toast.showSuccess("All dealbreakers cleared");
+            Toast.showSuccess("All dealbreakers cleared");
         });
         content.getChildren().add(clearAllBtn);
 
@@ -799,11 +801,11 @@ public class ProfileController extends BaseController implements Initializable {
         javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane(content);
         scrollPane.setFitToWidth(true);
         scrollPane.setPrefHeight(400);
-        scrollPane.setStyle("-fx-background-color: #1e293b;");
+        scrollPane.setStyle(DARK_PANEL_STYLE);
 
         dialog.getDialogPane().setContent(scrollPane);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        dialog.getDialogPane().setStyle("-fx-background-color: #1e293b;");
+        dialog.getDialogPane().setStyle(DARK_PANEL_STYLE);
 
         // Style buttons
         Button okBtn = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);

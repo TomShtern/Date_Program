@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.CandidateFinder.GeoUtils;
-import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
@@ -33,7 +33,9 @@ class CandidateFinderTest {
         // which doesn't touch the storage fields, so we provide minimal stubs
         UserStorage userStorage = new UserStorage() {
             @Override
-            public void save(User user) {}
+            public void save(User user) {
+                // no-op for test
+            }
 
             @Override
             public User get(UUID id) {
@@ -51,10 +53,14 @@ class CandidateFinderTest {
             }
 
             @Override
-            public void delete(UUID id) {}
+            public void delete(UUID id) {
+                // no-op for test
+            }
 
             @Override
-            public void saveProfileNote(User.ProfileNote note) {}
+            public void saveProfileNote(User.ProfileNote note) {
+                // no-op for test
+            }
 
             @Override
             public java.util.Optional<User.ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
@@ -78,7 +84,9 @@ class CandidateFinderTest {
             }
 
             @Override
-            public void save(UserInteractions.Like like) {}
+            public void save(UserInteractions.Like like) {
+                // no-op for test
+            }
 
             @Override
             public boolean exists(UUID from, UUID to) {
@@ -131,7 +139,9 @@ class CandidateFinderTest {
             }
 
             @Override
-            public void delete(UUID likeId) {}
+            public void delete(UUID likeId) {
+                // no-op for test
+            }
         };
         BlockStorage blockStorage = new BlockStorage() {
             @Override
@@ -140,7 +150,9 @@ class CandidateFinderTest {
             }
 
             @Override
-            public void save(UserInteractions.Block block) {}
+            public void save(UserInteractions.Block block) {
+                // no-op for test
+            }
 
             @Override
             public boolean isBlocked(UUID userA, UUID userB) {
@@ -169,7 +181,7 @@ class CandidateFinderTest {
         };
 
         finder = new CandidateFinder(userStorage, likeStorage, blockStorage);
-        seeker = createUser("Seeker", User.Gender.MALE, EnumSet.of(User.Gender.FEMALE), 30, 32.0853, 34.7818);
+        seeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.0853, 34.7818);
     }
 
     @Test
@@ -182,7 +194,7 @@ class CandidateFinderTest {
     @Test
     @DisplayName("Excludes already interacted users")
     void excludesAlreadyInteracted() {
-        User candidate = createUser("Candidate", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.0, 34.0);
+        User candidate = createUser("Candidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
 
         List<User> result = finder.findCandidates(seeker, List.of(candidate), Set.of(candidate.getId()));
         assertTrue(result.isEmpty());
@@ -192,10 +204,9 @@ class CandidateFinderTest {
     @DisplayName("Filters by mutual gender preferences")
     void filtersByMutualGenderPreferences() {
         // Interested in seeker's gender
-        User compatible = createUser("Compatible", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.0, 34.0);
+        User compatible = createUser("Compatible", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
         // NOT interested in seeker's gender
-        User incompatible =
-                createUser("Incompatible", User.Gender.FEMALE, EnumSet.of(User.Gender.FEMALE), 28, 32.0, 34.0);
+        User incompatible = createUser("Incompatible", Gender.FEMALE, EnumSet.of(Gender.FEMALE), 28, 32.0, 34.0);
 
         List<User> result = finder.findCandidates(seeker, List.of(compatible, incompatible), Set.of());
 
@@ -208,11 +219,11 @@ class CandidateFinderTest {
     void filtersByMutualAgePreferences() {
         // Seeker is 30, looking for 25-35
         // Compatible is 28, looking for 25-35 (seeker fits)
-        User compatible = createUser("Compatible", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.0, 34.0);
+        User compatible = createUser("Compatible", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
         compatible.setAgeRange(25, 35);
 
         // TooOld is 28, but only looking for 18-25 (seeker doesn't fit)
-        User tooOld = createUser("TooOld", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.0, 34.0);
+        User tooOld = createUser("TooOld", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
         tooOld.setAgeRange(18, 25);
 
         List<User> result = finder.findCandidates(seeker, List.of(compatible, tooOld), Set.of());
@@ -225,9 +236,9 @@ class CandidateFinderTest {
     @DisplayName("Filters by distance preference")
     void filtersByDistance() {
         // Close candidate - same city
-        User close = createUser("Close", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.1, 34.8);
+        User close = createUser("Close", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.1, 34.8);
         // Far candidate - different city (~60km away)
-        User far = createUser("Far", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 31.7683, 35.2137);
+        User far = createUser("Far", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 31.7683, 35.2137);
 
         seeker.setMaxDistanceKm(30); // Only 30km radius
 
@@ -240,9 +251,9 @@ class CandidateFinderTest {
     @Test
     @DisplayName("Sorts candidates by distance ascending")
     void sortsByDistanceAscending() {
-        User far = createUser("Far", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.5, 35.0);
-        User close = createUser("Close", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.1, 34.8);
-        User medium = createUser("Medium", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.3, 34.9);
+        User far = createUser("Far", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.5, 35.0);
+        User close = createUser("Close", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.1, 34.8);
+        User medium = createUser("Medium", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.3, 34.9);
 
         seeker.setMaxDistanceKm(200);
 
@@ -254,8 +265,7 @@ class CandidateFinderTest {
         assertEquals("Far", result.get(2).getName());
     }
 
-    private User createUser(
-            String name, User.Gender gender, Set<User.Gender> interestedIn, int age, double lat, double lon) {
+    private User createUser(String name, Gender gender, Set<Gender> interestedIn, int age, double lat, double lon) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Bio");
         user.setBirthDate(LocalDate.now().minusYears(age));
@@ -265,7 +275,7 @@ class CandidateFinderTest {
         user.setMaxDistanceKm(100);
         user.setAgeRange(18, 60);
         user.addPhotoUrl("photo.jpg");
-        user.setPacePreferences(new Preferences.PacePreferences(
+        user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,

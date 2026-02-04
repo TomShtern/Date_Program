@@ -6,10 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Report;
@@ -136,7 +136,7 @@ class TrustSafetyServiceTest {
                 trustSafetyService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
 
                 assertEquals(
-                        User.State.ACTIVE,
+                        UserState.ACTIVE,
                         userStorage.get(reportedUser.getId()).getState(),
                         "User should still be ACTIVE after 2 reports");
 
@@ -146,7 +146,7 @@ class TrustSafetyServiceTest {
 
                 assertTrue(result.userWasBanned(), "Third report should trigger ban");
                 assertEquals(
-                        User.State.BANNED,
+                        UserState.BANNED,
                         userStorage.get(reportedUser.getId()).getState(),
                         "User should be BANNED after 3 reports");
             }
@@ -290,7 +290,7 @@ class TrustSafetyServiceTest {
             TrustSafetyService trustSafetyService = new TrustSafetyService(Duration.ofMinutes(15), new Random(123));
 
             User user = createActiveUser("ExpiredVerify");
-            user.startVerification(User.VerificationMethod.EMAIL, "123456");
+            user.startVerification(VerificationMethod.EMAIL, "123456");
 
             // Create a copy with verification sent in the past (expired)
             User expired = copyWithVerificationSentAt(
@@ -309,7 +309,7 @@ class TrustSafetyServiceTest {
             TrustSafetyService trustSafetyService = new TrustSafetyService();
 
             User user = createActiveUser("MismatchVerify");
-            user.startVerification(User.VerificationMethod.PHONE, "123456");
+            user.startVerification(VerificationMethod.PHONE, "123456");
 
             assertFalse(trustSafetyService.verifyCode(user, "000000"));
             assertNotEquals(Boolean.TRUE, user.isVerified());
@@ -324,13 +324,13 @@ class TrustSafetyServiceTest {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test user");
         user.setBirthDate(LocalDate.of(1990, 1, 1));
-        user.setGender(User.Gender.MALE);
-        user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
+        user.setGender(Gender.MALE);
+        user.setInterestedIn(EnumSet.of(Gender.FEMALE));
         user.setLocation(32.0, 34.0);
         user.setMaxDistanceKm(50);
         user.setAgeRange(18, 60);
         user.addPhotoUrl("photo.jpg");
-        user.setPacePreferences(new Preferences.PacePreferences(
+        user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,
@@ -435,7 +435,7 @@ class TrustSafetyServiceTest {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == User.State.ACTIVE)
+                    .filter(u -> u.getState() == UserState.ACTIVE)
                     .toList();
         }
 

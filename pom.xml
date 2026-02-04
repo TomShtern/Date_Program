@@ -223,7 +223,12 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.4</version>
                 <configuration>
-                    <argLine>--enable-preview --enable-native-access=ALL-UNNAMED</argLine>
+                    <!--
+                                            IMPORTANT: JaCoCo's prepare-agent populates the 'argLine' property.
+                                            If we overwrite it, JaCoCo will silently skip report/check (no exec data).
+                                            '@{argLine}' is evaluated at execution time (safe for late-injected props).
+                                        -->
+                    <argLine>@{argLine} --enable-preview --enable-native-access=ALL-UNNAMED</argLine>
                 </configuration>
             </plugin>
 
@@ -384,7 +389,8 @@
                         <configuration>
                             <excludes>
                                 <exclude>datingapp/ui/**/*</exclude>
-                                <exclude>datingapp/cli/**/*</exclude>
+                                <!-- CLI package is datingapp.app.cli (not datingapp.cli) -->
+                                <exclude>datingapp/app/cli/**/*</exclude>
                                 <exclude>datingapp/Main.class</exclude>
                             </excludes>
                             <rules>

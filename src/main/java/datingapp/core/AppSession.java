@@ -13,6 +13,7 @@ import java.util.function.Consumer;
  *
  * <p>Thread-safe for concurrent access using CopyOnWriteArrayList for listeners.
  */
+@SuppressWarnings("java:S6548")
 public final class AppSession {
     private static final AppSession INSTANCE = new AppSession();
 
@@ -39,7 +40,7 @@ public final class AppSession {
     }
 
     public boolean isActive() {
-        return currentUser != null && currentUser.getState() == User.State.ACTIVE;
+        return currentUser != null && currentUser.getState() == UserState.ACTIVE;
     }
 
     public void logout() {

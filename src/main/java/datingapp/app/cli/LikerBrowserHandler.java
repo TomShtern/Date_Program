@@ -16,11 +16,10 @@ public class LikerBrowserHandler {
 
     private final MatchingService matchingService;
     private final AppSession session;
-    private final CliUtilities.InputReader inputReader;
+    private final InputReader inputReader;
 
     /** Creates a new LikerBrowserHandler with the required dependencies. */
-    public LikerBrowserHandler(
-            MatchingService matchingService, AppSession session, CliUtilities.InputReader inputReader) {
+    public LikerBrowserHandler(MatchingService matchingService, AppSession session, InputReader inputReader) {
         this.matchingService = Objects.requireNonNull(matchingService);
         this.session = Objects.requireNonNull(session);
         this.inputReader = Objects.requireNonNull(inputReader);
@@ -36,17 +35,17 @@ public class LikerBrowserHandler {
             List<PendingLiker> likers = matchingService.findPendingLikersWithTimes(currentUser.getId());
 
             if (likers.isEmpty()) {
-                logger.info("\nNo new likes yet.\n");
+                logInfo("\nNo new likes yet.\n");
                 return;
             }
 
-            logger.info("\n--- Who Liked Me ({} pending) ---\n", likers.size());
+            logInfo("\n--- Who Liked Me ({} pending) ---\n", likers.size());
 
             for (PendingLiker liker : likers) {
                 showCard(liker);
-                logger.info("1. Like back");
-                logger.info("2. Pass");
-                logger.info("0. Stop\n");
+                logInfo("1. Like back");
+                logInfo("2. Pass");
+                logInfo("0. Stop\n");
 
                 String choice = inputReader.readLine("Choice: ");
                 switch (choice) {
@@ -55,11 +54,11 @@ public class LikerBrowserHandler {
                     case "0" -> {
                         return;
                     }
-                    default -> logger.info(CliConstants.INVALID_SELECTION);
+                    default -> logInfo(CliConstants.INVALID_SELECTION);
                 }
             }
 
-            logger.info("\nEnd of list.\n");
+            logInfo("\nEnd of list.\n");
         });
     }
 
@@ -67,22 +66,28 @@ public class LikerBrowserHandler {
         User user = pending.user();
         String verifiedBadge = Boolean.TRUE.equals(user.isVerified()) ? " ✅ Verified" : "";
         String likedAgo = formatTimeAgo(pending.likedAt());
-        logger.info(CliConstants.BOX_TOP);
-        logger.info("│ 💝 {}, {} years old{}", user.getName(), user.getAge(), verifiedBadge);
-        logger.info("│ 🕒 Liked you {}", likedAgo);
-        logger.info("│ 📍 Location: {}, {}", user.getLat(), user.getLon());
+        logInfo(CliConstants.BOX_TOP);
+        logInfo("│ 💝 {}, {} years old{}", user.getName(), user.getAge(), verifiedBadge);
+        logInfo("│ 🕒 Liked you {}", likedAgo);
+        logInfo("│ 📍 Location: {}, {}", user.getLat(), user.getLon());
         String bio = user.getBio() == null ? "" : user.getBio();
         if (bio.length() > 50) {
             bio = bio.substring(0, 47) + "...";
         }
-        logger.info(CliConstants.PROFILE_BIO_FORMAT, bio);
-        logger.info(CliConstants.BOX_BOTTOM);
-        logger.info("");
+        logInfo(CliConstants.PROFILE_BIO_FORMAT, bio);
+        logInfo(CliConstants.BOX_BOTTOM);
+        logInfo("");
     }
 
     private void handleSwipe(User currentUser, User other, Like.Direction direction) {
         matchingService.recordLike(Like.create(currentUser.getId(), other.getId(), direction));
-        logger.info("✅ Saved.\n");
+        logInfo("✅ Saved.\n");
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
     }
 
     private String formatTimeAgo(java.time.Instant likedAt) {

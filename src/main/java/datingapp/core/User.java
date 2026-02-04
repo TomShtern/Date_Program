@@ -2,11 +2,15 @@ package datingapp.core;
 
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
-import datingapp.core.Preferences.PacePreferences;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Represents a user in the dating app. Mutable entity - state can change over
@@ -16,38 +20,6 @@ public class User {
 
     /** Configuration for validation thresholds. */
     private static final AppConfig CONFIG = AppConfig.defaults();
-
-    /** Represents the gender options available for users. */
-    public static enum Gender {
-        MALE,
-        FEMALE,
-        OTHER
-    }
-
-    /**
-     * Represents the lifecycle state of a user account. Valid transitions:
-     * INCOMPLETE → ACTIVE ↔
-     * PAUSED → BANNED
-     */
-    public static enum State {
-        INCOMPLETE,
-        ACTIVE,
-        PAUSED,
-        BANNED
-    }
-
-    /**
-     * Represents the verification method used to verify a profile.
-     *
-     * <p>
-     * NOTE: Currently simulated - email/phone not sent externally. Future
-     * enhancement: integrate
-     * real email/SMS service for actual code delivery.
-     */
-    public static enum VerificationMethod {
-        EMAIL,
-        PHONE
-    }
 
     private final UUID id;
     private String name;
@@ -61,7 +33,7 @@ public class User {
     private int minAge;
     private int maxAge;
     private List<String> photoUrls;
-    private State state;
+    private UserState state;
     private final Instant createdAt;
     private Instant updatedAt;
 
@@ -115,7 +87,7 @@ public class User {
         this.maxDistanceKm = 50;
         this.minAge = 18;
         this.maxAge = 99;
-        this.state = State.INCOMPLETE;
+        this.state = UserState.INCOMPLETE;
         this.interests = EnumSet.noneOf(Interest.class);
     }
 
@@ -178,7 +150,7 @@ public class User {
             return this;
         }
 
-        public StorageBuilder state(State state) {
+        public StorageBuilder state(UserState state) {
             user.state = state;
             return this;
         }
@@ -323,7 +295,7 @@ public class User {
         return new ArrayList<>(photoUrls);
     }
 
-    public State getState() {
+    public UserState getState() {
         return state;
     }
 
@@ -619,31 +591,31 @@ public class User {
      * be complete.
      */
     public void activate() {
-        if (state == State.BANNED) {
+        if (state == UserState.BANNED) {
             throw new IllegalStateException("Cannot activate a banned user");
         }
         if (!isComplete()) {
             throw new IllegalStateException("Cannot activate an incomplete profile");
         }
-        this.state = State.ACTIVE;
+        this.state = UserState.ACTIVE;
         touch();
     }
 
     /** Pauses the user. Only valid from ACTIVE state. */
     public void pause() {
-        if (state != State.ACTIVE) {
+        if (state != UserState.ACTIVE) {
             throw new IllegalStateException("Can only pause an active user");
         }
-        this.state = State.PAUSED;
+        this.state = UserState.PAUSED;
         touch();
     }
 
     /** Bans the user. One-way transition. */
     public void ban() {
-        if (state == State.BANNED) {
+        if (state == UserState.BANNED) {
             return; // Already banned
         }
-        this.state = State.BANNED;
+        this.state = UserState.BANNED;
         touch();
     }
 

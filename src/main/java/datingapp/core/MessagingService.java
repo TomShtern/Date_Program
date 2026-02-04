@@ -6,7 +6,11 @@ import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Service for messaging between matched users. Handles authorization, message
@@ -36,13 +40,13 @@ public class MessagingService {
     public SendResult sendMessage(UUID senderId, UUID recipientId, String content) {
         // Validate sender exists and is active
         User sender = userStorage.get(senderId);
-        if (sender == null || sender.getState() != User.State.ACTIVE) {
+        if (sender == null || sender.getState() != UserState.ACTIVE) {
             return SendResult.failure("Sender not found or inactive", SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
         // Validate recipient exists and is active
         User recipient = userStorage.get(recipientId);
-        if (recipient == null || recipient.getState() != User.State.ACTIVE) {
+        if (recipient == null || recipient.getState() != UserState.ACTIVE) {
             return SendResult.failure("Recipient not found or inactive", SendResult.ErrorCode.USER_NOT_FOUND);
         }
 

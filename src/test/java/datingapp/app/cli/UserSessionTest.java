@@ -6,12 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppSession;
-import datingapp.core.Preferences.PacePreferences;
-import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.Gender;
+import datingapp.core.PacePreferences;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.User;
+import datingapp.core.UserState;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.UUID;
@@ -91,7 +93,7 @@ class UserSessionTest {
         void incompleteUserNotActive() {
             User user = new User(UUID.randomUUID(), "Dave");
             // User is INCOMPLETE by default
-            assertEquals(User.State.INCOMPLETE, user.getState());
+            assertEquals(UserState.INCOMPLETE, user.getState());
 
             userSession.setCurrentUser(user);
             assertTrue(userSession.isLoggedIn(), "Should be logged in");
@@ -103,7 +105,7 @@ class UserSessionTest {
         void activeUserIsActive() {
             User user = createCompleteUser("Eve");
             user.activate(); // State becomes ACTIVE
-            assertEquals(User.State.ACTIVE, user.getState());
+            assertEquals(UserState.ACTIVE, user.getState());
 
             userSession.setCurrentUser(user);
             assertTrue(userSession.isLoggedIn(), "Should be logged in");
@@ -116,7 +118,7 @@ class UserSessionTest {
             User user = createCompleteUser("Frank");
             user.activate();
             user.pause(); // State becomes PAUSED
-            assertEquals(User.State.PAUSED, user.getState());
+            assertEquals(UserState.PAUSED, user.getState());
 
             userSession.setCurrentUser(user);
             assertTrue(userSession.isLoggedIn(), "Should be logged in");
@@ -129,7 +131,7 @@ class UserSessionTest {
             User user = createCompleteUser("Grace");
             user.activate();
             user.ban(); // State becomes BANNED
-            assertEquals(User.State.BANNED, user.getState());
+            assertEquals(UserState.BANNED, user.getState());
 
             userSession.setCurrentUser(user);
             assertTrue(userSession.isLoggedIn(), "Should be logged in");
@@ -149,8 +151,8 @@ class UserSessionTest {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio");
         user.setBirthDate(LocalDate.of(1990, 1, 1));
-        user.setGender(User.Gender.MALE);
-        user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
+        user.setGender(Gender.MALE);
+        user.setInterestedIn(EnumSet.of(Gender.FEMALE));
         user.setLocation(32.0, 34.0);
         user.setMaxDistanceKm(50);
         user.setAgeRange(20, 40);

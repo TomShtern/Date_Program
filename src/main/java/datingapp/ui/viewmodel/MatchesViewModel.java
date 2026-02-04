@@ -6,6 +6,7 @@ import datingapp.core.MatchingService;
 import datingapp.core.MatchingService.PendingLiker;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserState;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -34,6 +36,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MatchesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(MatchesViewModel.class);
+    private static final String LIKE_REQUIRED = "like cannot be null";
 
     private final MatchStorage matchStorage;
     private final UserStorage userStorage;
@@ -50,6 +53,9 @@ public class MatchesViewModel {
 
     private User currentUser;
 
+    /** Track disposed state to prevent operations after cleanup. */
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
+
     public MatchesViewModel(
             MatchStorage matchStorage,
             UserStorage userStorage,
@@ -65,10 +71,24 @@ public class MatchesViewModel {
 
     /** Initialize and load matches for current user. */
     public void initialize() {
+        if (disposed.get()) {
+            return;
+        }
         currentUser = AppSession.getInstance().getCurrentUser();
         if (currentUser != null) {
             refreshAll();
         }
+    }
+
+    /**
+     * Disposes resources held by this ViewModel.
+     * Should be called when the ViewModel is no longer needed.
+     */
+    public void dispose() {
+        disposed.set(true);
+        matches.clear();
+        likesReceived.clear();
+        likesSent.clear();
     }
 
     /** Refresh all sections for the current user. */
@@ -88,11 +108,11 @@ public class MatchesViewModel {
             currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
-            logger.warn("No current user, cannot load matches");
+            logWarn("No current user, cannot load matches");
             return;
         }
 
-        logger.info("Loading matches for user: {}", currentUser.getName());
+        logInfo("Loading matches for user: {}", currentUser.getName());
         loading.set(true);
         matches.clear();
 
@@ -110,7 +130,7 @@ public class MatchesViewModel {
 
         matchCount.set(matches.size());
         loading.set(false);
-        logger.info("Loaded {} matches", matches.size());
+        logInfo("Loaded {} matches", matches.size());
     }
 
     private void refreshLikesReceived() {
@@ -118,7 +138,7 @@ public class MatchesViewModel {
             currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
-            logger.warn("No current user, cannot load likes received");
+            logWarn("No current user, cannot load likes received");
             return;
         }
 
@@ -127,24 +147,21 @@ public class MatchesViewModel {
 
         for (PendingLiker pending : pendingLikers) {
             User liker = pending.user();
-            if (liker == null || liker.getState() != User.State.ACTIVE) {
-                continue;
+            if (liker != null && liker.getState() == UserState.ACTIVE) {
+                Like like =
+                        likeStorage.getLike(liker.getId(), currentUser.getId()).orElse(null);
+                if (like != null) {
+                    Instant likedAt = pending.likedAt();
+                    received.add(new LikeCardData(
+                            liker.getId(),
+                            like.id(),
+                            liker.getName(),
+                            liker.getAge(),
+                            summarizeBio(liker),
+                            formatTimeAgo(likedAt),
+                            likedAt));
+                }
             }
-
-            Like like = likeStorage.getLike(liker.getId(), currentUser.getId()).orElse(null);
-            if (like == null) {
-                continue;
-            }
-
-            Instant likedAt = pending.likedAt();
-            received.add(new LikeCardData(
-                    liker.getId(),
-                    like.id(),
-                    liker.getName(),
-                    liker.getAge(),
-                    summarizeBio(liker),
-                    formatTimeAgo(likedAt),
-                    likedAt));
         }
 
         received.sort(likeTimeComparator());
@@ -157,7 +174,7 @@ public class MatchesViewModel {
             currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
-            logger.warn("No current user, cannot load likes sent");
+            logWarn("No current user, cannot load likes sent");
             return;
         }
 
@@ -166,29 +183,24 @@ public class MatchesViewModel {
 
         List<LikeCardData> sent = new ArrayList<>();
         for (UUID otherUserId : likeStorage.getLikedOrPassedUserIds(currentUser.getId())) {
-            if (blocked.contains(otherUserId) || matched.contains(otherUserId)) {
-                continue;
+            if (!blocked.contains(otherUserId) && !matched.contains(otherUserId)) {
+                Like like =
+                        likeStorage.getLike(currentUser.getId(), otherUserId).orElse(null);
+                if (like != null && like.direction() == Like.Direction.LIKE) {
+                    User otherUser = userStorage.get(otherUserId);
+                    if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
+                        Instant likedAt = like.createdAt();
+                        sent.add(new LikeCardData(
+                                otherUser.getId(),
+                                like.id(),
+                                otherUser.getName(),
+                                otherUser.getAge(),
+                                summarizeBio(otherUser),
+                                formatTimeAgo(likedAt),
+                                likedAt));
+                    }
+                }
             }
-
-            Like like = likeStorage.getLike(currentUser.getId(), otherUserId).orElse(null);
-            if (like == null || like.direction() != Like.Direction.LIKE) {
-                continue;
-            }
-
-            User otherUser = userStorage.get(otherUserId);
-            if (otherUser == null || otherUser.getState() != User.State.ACTIVE) {
-                continue;
-            }
-
-            Instant likedAt = like.createdAt();
-            sent.add(new LikeCardData(
-                    otherUser.getId(),
-                    like.id(),
-                    otherUser.getName(),
-                    otherUser.getAge(),
-                    summarizeBio(otherUser),
-                    formatTimeAgo(likedAt),
-                    likedAt));
         }
 
         sent.sort(likeTimeComparator());
@@ -197,12 +209,12 @@ public class MatchesViewModel {
     }
 
     public void likeBack(LikeCardData like) {
-        Objects.requireNonNull(like, "like cannot be null");
+        Objects.requireNonNull(like, LIKE_REQUIRED);
         if (currentUser == null) {
             currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
-            logger.warn("No current user, cannot like back");
+            logWarn("No current user, cannot like back");
             return;
         }
 
@@ -211,12 +223,12 @@ public class MatchesViewModel {
     }
 
     public void passOn(LikeCardData like) {
-        Objects.requireNonNull(like, "like cannot be null");
+        Objects.requireNonNull(like, LIKE_REQUIRED);
         if (currentUser == null) {
             currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
-            logger.warn("No current user, cannot pass");
+            logWarn("No current user, cannot pass");
             return;
         }
 
@@ -226,7 +238,7 @@ public class MatchesViewModel {
     }
 
     public void withdrawLike(LikeCardData like) {
-        Objects.requireNonNull(like, "like cannot be null");
+        Objects.requireNonNull(like, LIKE_REQUIRED);
         if (like.likeId() == null) {
             return;
         }
@@ -235,7 +247,19 @@ public class MatchesViewModel {
             likeStorage.delete(like.likeId());
             refreshLikesSent();
         } catch (Exception e) {
-            logger.warn("Failed to withdraw like {}", like.likeId(), e);
+            logWarn("Failed to withdraw like {}", like.likeId(), e);
+        }
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
         }
     }
 

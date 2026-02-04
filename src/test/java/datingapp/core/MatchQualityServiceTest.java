@@ -4,12 +4,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.MatchQualityService.InterestMatcher;
 import datingapp.core.MatchQualityService.MatchQuality;
+import datingapp.core.PacePreferences.CommunicationStyle;
+import datingapp.core.PacePreferences.DepthPreference;
+import datingapp.core.PacePreferences.MessagingFrequency;
+import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
-import datingapp.core.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
@@ -502,14 +502,14 @@ class MatchQualityServiceTest {
     private User createUser(String name, int age, double lat, double lon) {
         User user = new User(UUID.randomUUID(), name);
         user.setBirthDate(LocalDate.now().minusYears(age));
-        user.setGender(User.Gender.OTHER);
-        user.setInterestedIn(EnumSet.of(User.Gender.OTHER));
+        user.setGender(Gender.OTHER);
+        user.setInterestedIn(EnumSet.of(Gender.OTHER));
         user.setLocation(lat, lon);
         user.setMaxDistanceKm(50);
         user.setAgeRange(18, 60);
         user.addPhotoUrl("http://example.com/photo.jpg");
         user.setBio("Test bio");
-        user.setPacePreferences(new Preferences.PacePreferences(
+        user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,
@@ -552,7 +552,7 @@ class MatchQualityServiceTest {
         @Override
         public java.util.List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == User.State.ACTIVE)
+                    .filter(u -> u.getState() == UserState.ACTIVE)
                     .toList();
         }
 

@@ -2,7 +2,8 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.app.cli.CliUtilities;
+import datingapp.app.cli.InputReader;
+import datingapp.ui.util.ConfettiAnimation;
 import java.lang.reflect.Modifier;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
@@ -10,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Verifies that all nested types in the core package are declared as static.
+ * Verifies that nested types are static and key top-level types are public.
  * Non-static nested types (inner classes) cannot be accessed from outside their
  * package, causing compilation errors like "X is not public in Y; cannot be
  * accessed from outside package".
@@ -28,12 +29,6 @@ class NestedTypeVisibilityTest {
         assertTrue(
                 Modifier.isStatic(User.ProfileNote.class.getModifiers()),
                 "User.ProfileNote must be static to be accessible from other packages");
-        assertTrue(
-                Modifier.isStatic(User.State.class.getModifiers()),
-                "User.State must be static to be accessible from other packages");
-        assertTrue(
-                Modifier.isStatic(User.Gender.class.getModifiers()),
-                "User.Gender must be static to be accessible from other packages");
     }
 
     /**
@@ -69,9 +64,6 @@ class NestedTypeVisibilityTest {
                 Modifier.isStatic(MatchingService.SwipeResult.class.getModifiers()),
                 "MatchingService.SwipeResult must be static");
         assertTrue(
-                Modifier.isStatic(DailyService.DailyPick.class.getModifiers()),
-                "DailyService.DailyPick must be static");
-        assertTrue(
                 Modifier.isStatic(RelationshipTransitionService.TransitionValidationException.class.getModifiers()),
                 "RelationshipTransitionService.TransitionValidationException must be static");
     }
@@ -80,10 +72,14 @@ class NestedTypeVisibilityTest {
      * Specific test for CliUtilities nested types accessed from Main.
      */
     @Test
-    @DisplayName("CliUtilities nested types must be static")
-    void cliUtilitiesNestedTypesMustBeStatic() {
-        assertTrue(
-                Modifier.isStatic(CliUtilities.InputReader.class.getModifiers()),
-                "CliUtilities.InputReader must be static to be accessible from Main");
+    @DisplayName("Top-level types used across packages are public")
+    void topLevelTypesArePublic() {
+        assertTrue(Modifier.isPublic(Gender.class.getModifiers()), "Gender must be public");
+        assertTrue(Modifier.isPublic(UserState.class.getModifiers()), "UserState must be public");
+        assertTrue(Modifier.isPublic(VerificationMethod.class.getModifiers()), "VerificationMethod must be public");
+        assertTrue(Modifier.isPublic(PacePreferences.class.getModifiers()), "PacePreferences must be public");
+        assertTrue(Modifier.isPublic(DailyPick.class.getModifiers()), "DailyPick must be public");
+        assertTrue(Modifier.isPublic(InputReader.class.getModifiers()), "InputReader must be public");
+        assertTrue(Modifier.isPublic(ConfettiAnimation.class.getModifiers()), "ConfettiAnimation must be public");
     }
 }

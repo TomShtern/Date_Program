@@ -60,7 +60,7 @@ class MessagingServiceTest {
         Instant now = Instant.now();
         return User.StorageBuilder.create(id, name, now)
                 .bio("Test bio")
-                .state(User.State.ACTIVE)
+                .state(UserState.ACTIVE)
                 .updatedAt(now)
                 .build();
     }
@@ -699,7 +699,7 @@ class MessagingServiceTest {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == User.State.ACTIVE)
+                    .filter(u -> u.getState() == UserState.ACTIVE)
                     .toList();
         }
 

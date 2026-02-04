@@ -17,13 +17,13 @@ public class StatsHandler {
     private final StatsService statsService;
     private final AchievementService achievementService;
     private final AppSession session;
-    private final CliUtilities.InputReader inputReader;
+    private final InputReader inputReader;
 
     public StatsHandler(
             StatsService statsService,
             AchievementService achievementService,
             AppSession session,
-            CliUtilities.InputReader inputReader) {
+            InputReader inputReader) {
         this.statsService = statsService;
         this.achievementService = achievementService;
         this.session = session;

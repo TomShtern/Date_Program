@@ -3,13 +3,19 @@ package datingapp.core;
 import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
-import datingapp.core.Preferences.PacePreferences;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Service for computing match quality/compatibility. Pure Java - no framework

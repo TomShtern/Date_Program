@@ -1,10 +1,12 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.AppSession;
+import datingapp.core.Gender;
 import datingapp.core.User;
 import datingapp.core.storage.UserStorage;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -35,11 +37,17 @@ public class PreferencesViewModel {
     private final IntegerProperty maxDistance = new SimpleIntegerProperty(50);
     private final ObjectProperty<GenderPreference> interestedIn = new SimpleObjectProperty<>(GenderPreference.EVERYONE);
 
+    /** Track disposed state to prevent operations after cleanup. */
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
+
     public PreferencesViewModel(UserStorage userStorage) {
         this.userStorage = userStorage;
     }
 
     public void initialize() {
+        if (disposed.get()) {
+            return;
+        }
         currentUser = AppSession.getInstance().getCurrentUser();
         if (currentUser != null) {
             loadPreferences();
@@ -52,18 +60,18 @@ public class PreferencesViewModel {
         maxDistance.set(currentUser.getMaxDistanceKm());
 
         // Map Set<Gender> to UI GenderPreference
-        Set<User.Gender> interested = currentUser.getInterestedIn();
-        if (interested.contains(User.Gender.MALE) && interested.contains(User.Gender.FEMALE)) {
+        Set<Gender> interested = currentUser.getInterestedIn();
+        if (interested.contains(Gender.MALE) && interested.contains(Gender.FEMALE)) {
             interestedIn.set(GenderPreference.EVERYONE);
-        } else if (interested.contains(User.Gender.MALE)) {
+        } else if (interested.contains(Gender.MALE)) {
             interestedIn.set(GenderPreference.MEN);
-        } else if (interested.contains(User.Gender.FEMALE)) {
+        } else if (interested.contains(Gender.FEMALE)) {
             interestedIn.set(GenderPreference.WOMEN);
         } else {
             interestedIn.set(GenderPreference.EVERYONE); // Default
         }
 
-        logger.info(
+        logInfo(
                 "Loaded preferences for {}: Age {}-{}, Dist {}km, Interested in {}",
                 currentUser.getName(),
                 minAge.get(),
@@ -73,11 +81,11 @@ public class PreferencesViewModel {
     }
 
     public void savePreferences() {
-        if (currentUser == null) {
+        if (disposed.get() || currentUser == null) {
             return;
         }
 
-        logger.info(
+        logInfo(
                 "Saving preferences: Age {}-{}, Dist {}km, Interested in {}",
                 minAge.get(),
                 maxAge.get(),
@@ -88,32 +96,44 @@ public class PreferencesViewModel {
         currentUser.setMaxDistanceKm(maxDistance.get());
 
         // Map UI GenderPreference to Set<Gender>
-        Set<User.Gender> newInterests = EnumSet.noneOf(User.Gender.class);
+        Set<Gender> newInterests = EnumSet.noneOf(Gender.class);
         GenderPreference preference = interestedIn.get();
         if (preference == null) {
-            logger.warn("Interested-in preference missing; defaulting to EVERYONE");
+            logWarn("Interested-in preference missing; defaulting to EVERYONE");
             preference = GenderPreference.EVERYONE;
         }
 
         switch (preference) {
-            case MEN -> newInterests.add(User.Gender.MALE);
-            case WOMEN -> newInterests.add(User.Gender.FEMALE);
+            case MEN -> newInterests.add(Gender.MALE);
+            case WOMEN -> newInterests.add(Gender.FEMALE);
             case EVERYONE -> {
-                newInterests.add(User.Gender.MALE);
-                newInterests.add(User.Gender.FEMALE);
-                newInterests.add(User.Gender.OTHER);
+                newInterests.add(Gender.MALE);
+                newInterests.add(Gender.FEMALE);
+                newInterests.add(Gender.OTHER);
             }
             default -> {
-                logger.warn("Unknown interested-in preference: {}", preference);
-                newInterests.add(User.Gender.MALE);
-                newInterests.add(User.Gender.FEMALE);
-                newInterests.add(User.Gender.OTHER);
+                logWarn("Unknown interested-in preference: {}", preference);
+                newInterests.add(Gender.MALE);
+                newInterests.add(Gender.FEMALE);
+                newInterests.add(Gender.OTHER);
             }
         }
         currentUser.setInterestedIn(newInterests);
 
         // Persist
         userStorage.save(currentUser);
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
     }
 
     // --- Property Getters ---
@@ -132,5 +152,13 @@ public class PreferencesViewModel {
 
     public ObjectProperty<GenderPreference> interestedInProperty() {
         return interestedIn;
+    }
+
+    /**
+     * Disposes resources held by this ViewModel.
+     * Should be called when the ViewModel is no longer needed.
+     */
+    public void dispose() {
+        disposed.set(true);
     }
 }

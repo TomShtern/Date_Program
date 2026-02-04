@@ -32,10 +32,10 @@ public class MessagingHandler {
             DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
 
     private final ServiceRegistry registry;
-    private final CliUtilities.InputReader input;
+    private final InputReader input;
     private final AppSession session;
 
-    public MessagingHandler(ServiceRegistry registry, CliUtilities.InputReader input, AppSession session) {
+    public MessagingHandler(ServiceRegistry registry, InputReader input, AppSession session) {
         this.registry = Objects.requireNonNull(registry, "registry cannot be null");
         this.input = Objects.requireNonNull(input, "input cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
@@ -45,7 +45,7 @@ public class MessagingHandler {
     public void showConversations() {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) {
-            logger.info(CliConstants.PLEASE_SELECT_USER);
+            logInfo(CliConstants.PLEASE_SELECT_USER);
             return;
         }
 
@@ -73,17 +73,17 @@ public class MessagingHandler {
 
     /** Prints the header for the conversation list. */
     private void printConversationListHeader() {
-        logger.info("\n{}", CliConstants.SEPARATOR_LINE);
-        logger.info("       💬 YOUR CONVERSATIONS");
-        logger.info("{}", CliConstants.SEPARATOR_LINE);
+        logInfo("\n{}", CliConstants.SEPARATOR_LINE);
+        logInfo("       💬 YOUR CONVERSATIONS");
+        logInfo("{}", CliConstants.SEPARATOR_LINE);
     }
 
     /** Prints a message when there are no conversations. */
     private void printEmptyConversations() {
-        logger.info("\n  No conversations yet.");
-        logger.info("  Start by matching with someone and send a message!\n");
-        logger.info("{}", CliConstants.MENU_DIVIDER);
-        logger.info("[B] Back");
+        logInfo("\n  No conversations yet.");
+        logInfo("  Start by matching with someone and send a message!\n");
+        logInfo("{}", CliConstants.MENU_DIVIDER);
+        logInfo("[B] Back");
         input.readLine("> ");
     }
 
@@ -100,11 +100,11 @@ public class MessagingHandler {
         int totalUnread =
                 previews.stream().mapToInt(ConversationPreview::unreadCount).sum();
         if (totalUnread > 0) {
-            logger.info("\nTotal unread: {} message(s)", totalUnread);
+            logInfo("\nTotal unread: {} message(s)", totalUnread);
         }
 
-        logger.info("{}", CliConstants.MENU_DIVIDER);
-        logger.info("[#] Select conversation  [B] Back");
+        logInfo("{}", CliConstants.MENU_DIVIDER);
+        logInfo("[#] Select conversation  [B] Back");
     }
 
     /**
@@ -124,10 +124,10 @@ public class MessagingHandler {
                 showConversation(currentUser, previews.get(idx));
                 return messagingService.getConversations(currentUser.getId());
             } else {
-                logger.info(CliConstants.INVALID_SELECTION);
+                logInfo(CliConstants.INVALID_SELECTION);
             }
         } catch (NumberFormatException _) {
-            logger.info(CliConstants.INVALID_INPUT);
+            logInfo(CliConstants.INVALID_INPUT);
         }
         return previews;
     }
@@ -138,13 +138,13 @@ public class MessagingHandler {
         String unreadStr = preview.unreadCount() > 0 ? " (" + preview.unreadCount() + " new)" : "";
         String timeAgo = formatTimeAgo(preview.conversation().getLastMessageAt());
 
-        logger.info("{}. {}{} · {}", index, name, unreadStr, timeAgo);
+        logInfo("{}. {}{} · {}", index, name, unreadStr, timeAgo);
 
         preview.lastMessage().ifPresent(msg -> {
             String content = truncateMessage(msg.content(), PREVIEW_MAX_LENGTH);
-            logger.info("   \"{}\"", content);
+            logInfo("   \"{}\"", content);
         });
-        logger.info("");
+        logInfo("");
     }
 
     /** Shows a single conversation with messages. */
@@ -215,12 +215,12 @@ public class MessagingHandler {
      * @param canMessage Whether the user can send messages in this conversation
      */
     private void printConversationHeader(String otherUserName, boolean canMessage) {
-        logger.info("\n{}", CliConstants.SEPARATOR_LINE);
-        logger.info("       💬 Conversation with {}", otherUserName);
+        logInfo("\n{}", CliConstants.SEPARATOR_LINE);
+        logInfo("       💬 Conversation with {}", otherUserName);
         if (!canMessage) {
-            logger.info("       ⚠️  Match ended - read only");
+            logInfo("       ⚠️  Match ended - read only");
         }
-        logger.info("{}", CliConstants.SEPARATOR_LINE);
+        logInfo("{}", CliConstants.SEPARATOR_LINE);
     }
 
     /**
@@ -232,7 +232,7 @@ public class MessagingHandler {
      */
     private void printMessages(List<Message> messages, User currentUser, boolean showOlder) {
         if (messages.isEmpty()) {
-            logger.info("\n  No messages yet. Start the conversation!");
+            logInfo("\n  No messages yet. Start the conversation!");
         } else {
             int start = showOlder ? 0 : Math.max(0, messages.size() - MESSAGES_PER_PAGE);
             for (int i = start; i < messages.size(); i++) {
@@ -249,15 +249,15 @@ public class MessagingHandler {
      */
     private void printConversationFooter(boolean canMessage, boolean hasMoreMessages) {
         if (hasMoreMessages) {
-            logger.info("\n  [Type /older to see older messages]");
+            logInfo("\n  [Type /older to see older messages]");
         }
 
-        logger.info("{}", CliConstants.MENU_DIVIDER);
+        logInfo("{}", CliConstants.MENU_DIVIDER);
         if (canMessage) {
-            logger.info("Commands: /back  /older  /block  /unmatch");
-            logger.info("\nType your message:");
+            logInfo("Commands: /back  /older  /block  /unmatch");
+            logInfo("\nType your message:");
         } else {
-            logger.info("[B] Back");
+            logInfo("[B] Back");
         }
     }
 
@@ -283,7 +283,7 @@ public class MessagingHandler {
         }
 
         if (!canMessage) {
-            logger.info("\n⚠️  Cannot send messages - match has ended.");
+            logInfo("\n⚠️  Cannot send messages - match has ended.");
             return ConversationAction.CONTINUE;
         }
 
@@ -307,10 +307,10 @@ public class MessagingHandler {
         SendResult result = messagingService.sendMessage(currentUser.getId(), otherUser.getId(), userInput);
 
         if (result.success()) {
-            logger.info("\n✓ Message sent");
+            logInfo("\n✓ Message sent");
             return ConversationAction.REFRESH;
         } else {
-            logger.info("\n❌ {}", result.errorMessage());
+            logInfo("\n❌ {}", result.errorMessage());
             return ConversationAction.CONTINUE;
         }
     }
@@ -321,8 +321,14 @@ public class MessagingHandler {
         String sender = isFromMe ? "You" : "Them";
         String timestamp = TIME_FORMATTER.format(message.createdAt());
 
-        logger.info("\n   [{}] {}:", timestamp, sender);
-        logger.info("   {}", message.content());
+        logInfo("\n   [{}] {}:", timestamp, sender);
+        logInfo("   {}", message.content());
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
     }
 
     /** Formats a timestamp as relative time (e.g., "5m ago"). */
@@ -379,7 +385,7 @@ public class MessagingHandler {
             }
         }
 
-        logger.info("\n✓ {} has been blocked.", otherUser.getName());
+        logInfo("\n✓ {} has been blocked.", otherUser.getName());
     }
 
     /** Unmatches from another user. */
@@ -392,12 +398,12 @@ public class MessagingHandler {
             if (match.isActive()) {
                 match.unmatch(currentUser.getId());
                 registry.getMatchStorage().update(match);
-                logger.info("\n✓ Unmatched from {}.", otherUser.getName());
+                logInfo("\n✓ Unmatched from {}.", otherUser.getName());
             } else {
-                logger.info("\n⚠️  Match is already ended.");
+                logInfo("\n⚠️  Match is already ended.");
             }
         } else {
-            logger.info("\n⚠️  No match found.");
+            logInfo("\n⚠️  No match found.");
         }
     }
 

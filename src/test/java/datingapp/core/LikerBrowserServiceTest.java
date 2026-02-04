@@ -94,18 +94,18 @@ class LikerBrowserServiceTest {
     }
 
     private static User activeUser(UUID id, String name) {
-        return baseUser(id, name, User.State.ACTIVE);
+        return baseUser(id, name, UserState.ACTIVE);
     }
 
     private static User incompleteUser(UUID id, String name) {
-        return baseUser(id, name, User.State.INCOMPLETE);
+        return baseUser(id, name, UserState.INCOMPLETE);
     }
 
-    private static User baseUser(UUID id, String name, User.State state) {
+    private static User baseUser(UUID id, String name, UserState state) {
         return User.StorageBuilder.create(id, name, Instant.EPOCH)
                 .birthDate(LocalDate.of(1990, 1, 1))
-                .gender(User.Gender.OTHER)
-                .interestedIn(EnumSet.of(User.Gender.OTHER))
+                .gender(Gender.OTHER)
+                .interestedIn(EnumSet.of(Gender.OTHER))
                 .state(state)
                 .updatedAt(Instant.EPOCH)
                 .verified(false)

@@ -8,7 +8,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** Consolidated daily limit and daily pick workflows. */
@@ -155,7 +162,7 @@ public class DailyService {
         for (Set<LocalDate> dates : dailyPickViews.values()) {
             long count = dates.stream().filter(date -> date.isBefore(before)).count();
             dates.removeIf(date -> date.isBefore(before));
-            removed += count;
+            removed += Math.toIntExact(count);
         }
         return removed;
     }
@@ -261,19 +268,6 @@ public class DailyService {
 
         public boolean hasUnlimitedPasses() {
             return passesRemaining < 0;
-        }
-    }
-
-    /** Daily pick payload. */
-    public static record DailyPick(User user, LocalDate date, String reason, boolean alreadySeen) {
-
-        public DailyPick {
-            Objects.requireNonNull(user, "user cannot be null");
-            Objects.requireNonNull(date, "date cannot be null");
-            Objects.requireNonNull(reason, "reason cannot be null");
-            if (reason.isBlank()) {
-                throw new IllegalArgumentException("reason cannot be blank");
-            }
         }
     }
 }

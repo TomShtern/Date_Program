@@ -31,8 +31,8 @@ class ProfilePreviewServiceTest {
         fullUser = new User(UUID.randomUUID(), "Complete Alice");
         fullUser.setBio("Detailed bio with more than 50 characters to pass the tip check. Located in New York.");
         fullUser.setBirthDate(LocalDate.now().minusYears(25));
-        fullUser.setGender(User.Gender.FEMALE);
-        fullUser.setInterestedIn(java.util.Set.of(User.Gender.MALE));
+        fullUser.setGender(Gender.FEMALE);
+        fullUser.setInterestedIn(java.util.Set.of(Gender.MALE));
         fullUser.setMaxDistanceKm(50);
         fullUser.setAgeRange(20, 30);
         fullUser.addPhotoUrl("http://example.com/photo1.jpg");

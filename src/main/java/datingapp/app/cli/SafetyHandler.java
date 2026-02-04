@@ -6,6 +6,8 @@ import datingapp.core.TrustSafetyService;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Report;
+import datingapp.core.UserState;
+import datingapp.core.VerificationMethod;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.UserStorage;
@@ -28,7 +30,7 @@ public class SafetyHandler {
     private final MatchStorage matchStorage;
     private final TrustSafetyService trustSafetyService;
     private final AppSession session;
-    private final CliUtilities.InputReader inputReader;
+    private final InputReader inputReader;
 
     public SafetyHandler(
             UserStorage userStorage,
@@ -36,7 +38,7 @@ public class SafetyHandler {
             MatchStorage matchStorage,
             TrustSafetyService trustSafetyService,
             AppSession session,
-            CliUtilities.InputReader inputReader) {
+            InputReader inputReader) {
         this.userStorage = Objects.requireNonNull(userStorage);
         this.blockStorage = Objects.requireNonNull(blockStorage);
         this.matchStorage = Objects.requireNonNull(matchStorage);
@@ -51,56 +53,35 @@ public class SafetyHandler {
             logger.info(CliConstants.HEADER_BLOCK_USER);
 
             User currentUser = session.getCurrentUser();
-            List<User> allUsers = userStorage.findAll();
-            Set<UUID> alreadyBlocked = blockStorage.getBlockedUserIds(currentUser.getId());
-
-            List<User> blockableUsers = allUsers.stream()
-                    .filter(u -> !u.getId().equals(currentUser.getId()))
-                    .filter(u -> !alreadyBlocked.contains(u.getId()))
-                    .toList();
+            List<User> blockableUsers = getBlockableUsers(currentUser);
 
             if (blockableUsers.isEmpty()) {
                 logger.info("No users to block.\n");
                 return;
             }
-
-            for (int i = 0; i < blockableUsers.size(); i++) {
-                User u = blockableUsers.get(i);
-                logger.info("  {}. {}", i + 1, u.getName());
+            User toBlock = selectUserFromList(blockableUsers, "\nSelect user to block (or 0 to cancel): ", false);
+            if (toBlock == null) {
+                return;
             }
 
-            String input = inputReader.readLine("\nSelect user to block (or 0 to cancel): ");
-            try {
-                int idx = Integer.parseInt(input) - 1;
-                if (idx < 0 || idx >= blockableUsers.size()) {
-                    if (idx != -1) {
-                        logger.info(CliConstants.INVALID_INPUT);
+            String confirm =
+                    inputReader.readLine(CliConstants.BLOCK_PREFIX + toBlock.getName() + CliConstants.CONFIRM_SUFFIX);
+            if ("y".equalsIgnoreCase(confirm)) {
+                Block block = Block.create(currentUser.getId(), toBlock.getId());
+                blockStorage.save(block);
+
+                // If matched, end the match
+                String matchId = Match.generateId(currentUser.getId(), toBlock.getId());
+                matchStorage.get(matchId).ifPresent(match -> {
+                    if (match.isActive()) {
+                        match.block(currentUser.getId());
+                        matchStorage.update(match);
                     }
-                    return;
-                }
+                });
 
-                User toBlock = blockableUsers.get(idx);
-                String confirm = inputReader.readLine(
-                        CliConstants.BLOCK_PREFIX + toBlock.getName() + CliConstants.CONFIRM_SUFFIX);
-                if ("y".equalsIgnoreCase(confirm)) {
-                    Block block = Block.create(currentUser.getId(), toBlock.getId());
-                    blockStorage.save(block);
-
-                    // If matched, end the match
-                    String matchId = Match.generateId(currentUser.getId(), toBlock.getId());
-                    matchStorage.get(matchId).ifPresent(match -> {
-                        if (match.isActive()) {
-                            match.block(currentUser.getId());
-                            matchStorage.update(match);
-                        }
-                    });
-
-                    logger.info("🚫 Blocked {}.\n", toBlock.getName());
-                } else {
-                    logger.info(CliConstants.CANCELLED);
-                }
-            } catch (NumberFormatException _) {
-                logger.info(CliConstants.INVALID_INPUT);
+                logger.info("🚫 Blocked {}.\n", toBlock.getName());
+            } else {
+                logger.info(CliConstants.CANCELLED);
             }
         });
     }
@@ -109,24 +90,21 @@ public class SafetyHandler {
     public void reportUser() {
         CliUtilities.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
-            if (currentUser.getState() != User.State.ACTIVE) {
+            if (currentUser.getState() != UserState.ACTIVE) {
                 logger.info("\n⚠️  You must be ACTIVE to report users.\n");
                 return;
             }
 
             logger.info(CliConstants.HEADER_REPORT_USER);
 
-            List<User> allUsers = userStorage.findAll();
-            List<User> reportableUsers = allUsers.stream()
-                    .filter(u -> !u.getId().equals(currentUser.getId()))
-                    .toList();
+            List<User> reportableUsers = getReportableUsers(currentUser);
 
             if (reportableUsers.isEmpty()) {
                 logger.info("No users to report.\n");
                 return;
             }
 
-            User toReport = selectReportCandidate(reportableUsers);
+            User toReport = selectUserFromList(reportableUsers, "\nSelect user to report (or 0 to cancel): ", true);
             if (toReport == null) {
                 return;
             }
@@ -136,47 +114,14 @@ public class SafetyHandler {
                 return;
             }
 
-            String description = inputReader.readLine("Additional details (optional, max 500 chars): ");
-            if (description.isBlank()) {
-                description = null;
-            }
+            String description =
+                    normalizeReportDescription(inputReader.readLine("Additional details (optional, max 500 chars): "));
 
             TrustSafetyService.ReportResult result =
                     trustSafetyService.report(currentUser.getId(), toReport.getId(), reason, description);
 
-            if (result.success()) {
-                logger.info("\n✅ Report submitted. {} has been blocked.", toReport.getName());
-                if (result.userWasBanned()) {
-                    logger.info("⚠️  This user has been automatically BANNED due to multiple reports.");
-                }
-                logger.info("");
-            } else {
-                logger.info("\n❌ {}\n", result.errorMessage());
-            }
+            handleReportResult(result, toReport);
         });
-    }
-
-    /** Displays reportable users and prompts for selection. */
-    private User selectReportCandidate(List<User> reportableUsers) {
-        for (int i = 0; i < reportableUsers.size(); i++) {
-            User u = reportableUsers.get(i);
-            logger.info("  {}. {} ({})", i + 1, u.getName(), u.getState());
-        }
-
-        String input = inputReader.readLine("\nSelect user to report (or 0 to cancel): ");
-        try {
-            int idx = Integer.parseInt(input) - 1;
-            if (idx < 0 || idx >= reportableUsers.size()) {
-                if (idx != -1) {
-                    logger.info(CliConstants.INVALID_INPUT);
-                }
-                return null;
-            }
-            return reportableUsers.get(idx);
-        } catch (NumberFormatException _) {
-            logger.info("❌ Invalid input.\n");
-            return null;
-        }
     }
 
     /**
@@ -219,42 +164,85 @@ public class SafetyHandler {
             }
 
             logger.info(CliConstants.HEADER_BLOCKED_USERS);
-            for (int i = 0; i < blockedUsers.size(); i++) {
-                User user = blockedUsers.get(i);
-                logger.info("  {}. {} ({})", i + 1, user.getName(), user.getState());
+            User toUnblock = selectUserFromList(blockedUsers, "\nEnter number to unblock (or 0 to go back): ", true);
+            if (toUnblock == null) {
+                return;
             }
 
-            String input = inputReader.readLine("\nEnter number to unblock (or 0 to go back): ");
-            try {
-                int choice = Integer.parseInt(input);
-                if (choice == 0) {
-                    return;
-                }
+            String confirm = inputReader.readLine("Unblock " + toUnblock.getName() + CliConstants.CONFIRM_SUFFIX);
+            if ("y".equalsIgnoreCase(confirm)) {
+                boolean success = trustSafetyService.unblock(currentUser.getId(), toUnblock.getId());
 
-                if (choice < 1 || choice > blockedUsers.size()) {
-                    logger.info(CliConstants.INVALID_INPUT);
-                    return;
-                }
-
-                User toUnblock = blockedUsers.get(choice - 1);
-                String confirm = inputReader.readLine("Unblock " + toUnblock.getName() + CliConstants.CONFIRM_SUFFIX);
-
-                if ("y".equalsIgnoreCase(confirm)) {
-                    boolean success = trustSafetyService.unblock(currentUser.getId(), toUnblock.getId());
-
-                    if (success) {
-                        logger.info("✅ Unblocked {}.\n", toUnblock.getName());
-                    } else {
-                        logger.info("❌ Failed to unblock user.\n");
-                    }
+                if (success) {
+                    logger.info("✅ Unblocked {}.\n", toUnblock.getName());
                 } else {
-                    logger.info(CliConstants.CANCELLED);
+                    logger.info("❌ Failed to unblock user.\n");
                 }
-
-            } catch (NumberFormatException _) {
-                logger.info(CliConstants.INVALID_INPUT);
+            } else {
+                logger.info(CliConstants.CANCELLED);
             }
         });
+    }
+
+    private List<User> getBlockableUsers(User currentUser) {
+        List<User> allUsers = userStorage.findAll();
+        Set<UUID> alreadyBlocked = blockStorage.getBlockedUserIds(currentUser.getId());
+
+        return allUsers.stream()
+                .filter(u -> !u.getId().equals(currentUser.getId()))
+                .filter(u -> !alreadyBlocked.contains(u.getId()))
+                .toList();
+    }
+
+    private List<User> getReportableUsers(User currentUser) {
+        return userStorage.findAll().stream()
+                .filter(u -> !u.getId().equals(currentUser.getId()))
+                .toList();
+    }
+
+    private String normalizeReportDescription(String description) {
+        if (description == null || description.isBlank()) {
+            return null;
+        }
+        return description;
+    }
+
+    private void handleReportResult(TrustSafetyService.ReportResult result, User reportedUser) {
+        if (result.success()) {
+            logger.info("\n✅ Report submitted. {} has been blocked.", reportedUser.getName());
+            if (result.userWasBanned()) {
+                logger.info("⚠️  This user has been automatically BANNED due to multiple reports.");
+            }
+            logger.info("");
+        } else {
+            logger.info("\n❌ {}\n", result.errorMessage());
+        }
+    }
+
+    private User selectUserFromList(List<User> users, String prompt, boolean showState) {
+        for (int i = 0; i < users.size(); i++) {
+            User user = users.get(i);
+            if (showState) {
+                logger.info("  {}. {} ({})", i + 1, user.getName(), user.getState());
+            } else {
+                logger.info("  {}. {}", i + 1, user.getName());
+            }
+        }
+
+        String input = inputReader.readLine(prompt);
+        try {
+            int idx = Integer.parseInt(input) - 1;
+            if (idx < 0 || idx >= users.size()) {
+                if (idx != -1) {
+                    logger.info(CliConstants.INVALID_INPUT);
+                }
+                return null;
+            }
+            return users.get(idx);
+        } catch (NumberFormatException _) {
+            logger.info(CliConstants.INVALID_INPUT);
+            return null;
+        }
     }
 
     // =========================================================================
@@ -280,8 +268,8 @@ public class SafetyHandler {
             switch (choice) {
                 case "0" -> {
                     /* cancelled */ }
-                case "1" -> startVerification(currentUser, User.VerificationMethod.EMAIL);
-                case "2" -> startVerification(currentUser, User.VerificationMethod.PHONE);
+                case "1" -> startVerification(currentUser, VerificationMethod.EMAIL);
+                case "2" -> startVerification(currentUser, VerificationMethod.PHONE);
                 default -> logger.info(CliConstants.INVALID_SELECTION);
             }
         });
@@ -293,8 +281,8 @@ public class SafetyHandler {
      * @param user   The user to verify
      * @param method The verification method (email or phone)
      */
-    private void startVerification(User user, User.VerificationMethod method) {
-        if (method == User.VerificationMethod.EMAIL) {
+    private void startVerification(User user, VerificationMethod method) {
+        if (method == VerificationMethod.EMAIL) {
             String email = inputReader.readLine("Email: ");
             if (email == null || email.isBlank()) {
                 logger.info("❌ Email required.\n");

@@ -2,8 +2,17 @@ package datingapp.core;
 
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.storage.*;
-import java.util.*;
+import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.ReportStorage;
+import datingapp.core.storage.StatsStorage;
+import datingapp.core.storage.UserStorage;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Service for checking and unlocking achievements. Evaluates user activity

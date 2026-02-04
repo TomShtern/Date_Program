@@ -5,6 +5,7 @@ import datingapp.core.User;
 import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.UserState;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
@@ -48,7 +49,7 @@ public final class TestStorages {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == User.State.ACTIVE)
+                    .filter(u -> u.getState() == UserState.ACTIVE)
                     .toList();
         }
 

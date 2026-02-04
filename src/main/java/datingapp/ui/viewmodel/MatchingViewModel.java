@@ -9,12 +9,12 @@ import datingapp.core.MatchQualityService;
 import datingapp.core.MatchingService;
 import datingapp.core.UndoService;
 import datingapp.core.User;
-import datingapp.core.storage.BlockStorage;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.UserStorage;
+import datingapp.core.UserState;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -32,11 +32,7 @@ public class MatchingViewModel {
 
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
-    private final UserStorage userStorage;
-    private final LikeStorage likeStorage;
-    private final BlockStorage blockStorage;
     private final UndoService undoService;
-    private final MatchQualityService matchQualityService;
 
     private final Queue<User> candidateQueue = new LinkedList<>();
     private final ObjectProperty<User> currentCandidate = new SimpleObjectProperty<>();
@@ -48,28 +44,18 @@ public class MatchingViewModel {
     private final ObjectProperty<User> matchedUser = new SimpleObjectProperty<>();
 
     /** Track background thread for cleanup on dispose. */
-    private volatile Thread backgroundThread;
+    private final AtomicReference<Thread> backgroundThread = new AtomicReference<>();
 
-    private volatile boolean disposed = false;
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     private User lastSwipedCandidate;
     private User currentUser;
 
     public MatchingViewModel(
-            CandidateFinder candidateFinder,
-            MatchingService matchingService,
-            UserStorage userStorage,
-            LikeStorage likeStorage,
-            BlockStorage blockStorage,
-            UndoService undoService,
-            MatchQualityService matchQualityService) {
+            CandidateFinder candidateFinder, MatchingService matchingService, UndoService undoService) {
         this.candidateFinder = candidateFinder;
         this.matchingService = matchingService;
-        this.userStorage = userStorage;
-        this.likeStorage = likeStorage;
-        this.blockStorage = blockStorage;
         this.undoService = undoService;
-        this.matchQualityService = matchQualityService;
     }
 
     /**
@@ -94,7 +80,8 @@ public class MatchingViewModel {
         User user = ensureCurrentUser();
         if (user != null) {
             // Load candidates in background to keep UI responsive
-            backgroundThread = Thread.ofVirtual().start(this::refreshCandidates);
+            Thread thread = Thread.ofVirtual().start(this::refreshCandidates);
+            backgroundThread.set(thread);
         }
     }
 
@@ -103,8 +90,8 @@ public class MatchingViewModel {
      * Should be called when the ViewModel is no longer needed.
      */
     public void dispose() {
-        disposed = true;
-        Thread thread = backgroundThread;
+        disposed.set(true);
+        Thread thread = backgroundThread.getAndSet(null);
         if (thread != null && thread.isAlive()) {
             thread.interrupt();
         }
@@ -114,16 +101,16 @@ public class MatchingViewModel {
      * Fetches a new list of candidates for the current user.
      */
     public void refreshCandidates() {
-        if (disposed) {
+        if (disposed.get()) {
             return;
         }
         if (ensureCurrentUser() == null) {
-            logger.warn("Cannot refresh candidates: no current user set");
+            logWarn("Cannot refresh candidates: no current user set");
             return;
         }
 
         javafx.application.Platform.runLater(() -> loading.set(true));
-        logger.info(
+        logInfo(
                 "Refreshing candidates for user: {} (state={}, isComplete={}, gender={}, interestedIn={})",
                 currentUser.getName(),
                 currentUser.getState(),
@@ -132,8 +119,8 @@ public class MatchingViewModel {
                 currentUser.getInterestedIn());
 
         // Check if current user is ACTIVE - otherwise they cannot browse
-        if (currentUser.getState() != User.State.ACTIVE) {
-            logger.warn(
+        if (currentUser.getState() != UserState.ACTIVE) {
+            logWarn(
                     "Current user {} is NOT ACTIVE (state={}). Cannot browse candidates. Profile complete: {}",
                     currentUser.getName(),
                     currentUser.getState(),
@@ -141,7 +128,7 @@ public class MatchingViewModel {
         }
 
         List<User> candidates = candidateFinder.findCandidatesForUser(currentUser);
-        logger.info("Found {} candidates after filtering", candidates.size());
+        logInfo("Found {} candidates after filtering", candidates.size());
 
         javafx.application.Platform.runLater(() -> {
             candidateQueue.clear();
@@ -183,13 +170,13 @@ public class MatchingViewModel {
             return;
         }
 
-        logger.info("User {} {} candidate {}", currentUser.getName(), liked ? "liked" : "passed", candidate.getName());
+        logInfo("User {} {} candidate {}", currentUser.getName(), liked ? "liked" : "passed", candidate.getName());
 
         MatchingService.SwipeResult result = matchingService.processSwipe(currentUser, candidate, liked);
 
         if (!result.success()) {
-            logger.warn("Swipe failed: {}", result.message());
-            // TODO: Notify UI about daily limit
+            logWarn("Swipe failed: {}", result.message());
+            // UI handles daily limit messaging elsewhere; no further action here.
             return;
         }
 
@@ -197,7 +184,7 @@ public class MatchingViewModel {
 
         // Check for a match and notify UI
         if (result.matched()) {
-            logger.info("IT'S A MATCH! {} matched with {}", currentUser.getName(), candidate.getName());
+            logInfo("IT'S A MATCH! {} matched with {}", currentUser.getName(), candidate.getName());
             lastMatch.set(result.match());
             matchedUser.set(candidate);
         }
@@ -211,7 +198,7 @@ public class MatchingViewModel {
         }
 
         if (undoService.canUndo(currentUser.getId())) {
-            logger.info(
+            logInfo(
                     "Undoing swipe on {}",
                     lastSwipedCandidate != null ? lastSwipedCandidate.getName() : "previous candidate");
             UndoService.UndoResult result = undoService.undo(currentUser.getId());
@@ -319,5 +306,17 @@ public class MatchingViewModel {
 
     public ObjectProperty<User> matchedUserProperty() {
         return matchedUser;
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
     }
 }

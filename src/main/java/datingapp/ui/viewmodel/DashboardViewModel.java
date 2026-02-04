@@ -3,14 +3,15 @@ package datingapp.ui.viewmodel;
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
 import datingapp.core.AppSession;
+import datingapp.core.DailyPick;
 import datingapp.core.DailyService;
-import datingapp.core.DailyService.DailyPick;
 import datingapp.core.DailyService.DailyStatus;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
 import datingapp.core.storage.MatchStorage;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -45,6 +46,12 @@ public class DashboardViewModel {
 
     private final ObservableList<String> recentAchievements = FXCollections.observableArrayList();
 
+    /** Track background thread for cleanup on dispose. */
+    private final AtomicReference<Thread> backgroundThread = new AtomicReference<>();
+
+    /** Track disposed state to prevent operations after cleanup. */
+    private volatile boolean disposed = false;
+
     public DashboardViewModel(
             DailyService dailyService, MatchStorage matchStorage, AchievementService achievementService) {
         this.dailyService = dailyService;
@@ -73,10 +80,26 @@ public class DashboardViewModel {
         javafx.application.Platform.runLater(() -> loading.set(true));
 
         // Run data fetching in background to prevent UI freeze
-        Thread.ofVirtual().start(() -> performRefresh(user));
+        Thread thread = Thread.ofVirtual().start(() -> performRefresh(user));
+        backgroundThread.set(thread);
+    }
+
+    /**
+     * Disposes resources held by this ViewModel.
+     * Should be called when the ViewModel is no longer needed.
+     */
+    public void dispose() {
+        disposed = true;
+        Thread thread = backgroundThread.getAndSet(null);
+        if (thread != null && thread.isAlive()) {
+            thread.interrupt();
+        }
     }
 
     private void performRefresh(User user) {
+        if (disposed) {
+            return;
+        }
         logger.info("Performing dashboard refresh for user: {}", user.getName());
 
         // 1. Data that doesn't need DB can be set immediately or just captured

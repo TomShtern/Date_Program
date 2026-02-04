@@ -2,14 +2,15 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
+import datingapp.core.Gender;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfileCompletionService.CompletionResult;
 import datingapp.core.User;
-import datingapp.core.User.Gender;
+import datingapp.core.UserState;
 import datingapp.core.storage.UserStorage;
-import datingapp.ui.util.UiServices;
+import datingapp.ui.util.Toast;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,6 +21,8 @@ import java.time.LocalDate;
 import java.time.Period;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -38,6 +41,7 @@ import org.slf4j.LoggerFactory;
 public class ProfileViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
     private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
+    private static final String NONE_SET_LABEL = "None set";
 
     private final UserStorage userStorage;
 
@@ -69,11 +73,17 @@ public class ProfileViewModel {
 
     // Dealbreakers property
     private final ObjectProperty<Dealbreakers> dealbreakers = new SimpleObjectProperty<>(Dealbreakers.none());
-    private final StringProperty dealbreakersStatus = new SimpleStringProperty("None set");
+    private final StringProperty dealbreakersStatus = new SimpleStringProperty(NONE_SET_LABEL);
 
     // Selected interests (observable set for multi-selection)
     private final ObservableSet<Interest> selectedInterests =
             FXCollections.observableSet(EnumSet.noneOf(Interest.class));
+
+    /** Track disposed state to prevent operations after cleanup. */
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
+
+    /** Track background thread for cleanup on dispose. */
+    private final AtomicReference<Thread> backgroundThread = new AtomicReference<>();
 
     @SuppressWarnings("unused")
     public ProfileViewModel(UserStorage userStorage, ProfileCompletionService unused) {
@@ -82,16 +92,29 @@ public class ProfileViewModel {
     }
 
     /**
+     * Disposes resources held by this ViewModel.
+     * Should be called when the ViewModel is no longer needed.
+     */
+    public void dispose() {
+        disposed.set(true);
+        Thread thread = backgroundThread.getAndSet(null);
+        if (thread != null && thread.isAlive()) {
+            thread.interrupt();
+        }
+        selectedInterests.clear();
+    }
+
+    /**
      * Loads the current user's data into the form properties.
      */
     public void loadCurrentUser() {
         User user = AppSession.getInstance().getCurrentUser();
         if (user == null) {
-            logger.warn("No current user to load");
+            logWarn("No current user to load");
             return;
         }
 
-        logger.info("Loading profile for user: {}", user.getName());
+        logInfo("Loading profile for user: {}", user.getName());
 
         // Basic info
         name.set(user.getName());
@@ -140,7 +163,7 @@ public class ProfileViewModel {
             updateDealbreakersStatus(db);
         } else {
             dealbreakers.set(Dealbreakers.none());
-            dealbreakersStatus.set("None set");
+            dealbreakersStatus.set(NONE_SET_LABEL);
         }
 
         // Primary photo
@@ -152,32 +175,42 @@ public class ProfileViewModel {
 
     private void updateDealbreakersStatus(Dealbreakers db) {
         if (!db.hasAnyDealbreaker()) {
-            dealbreakersStatus.set("None set");
-        } else {
-            int count = 0;
-            if (db.hasSmokingDealbreaker()) {
-                count++;
-            }
-            if (db.hasDrinkingDealbreaker()) {
-                count++;
-            }
-            if (db.hasKidsDealbreaker()) {
-                count++;
-            }
-            if (db.hasLookingForDealbreaker()) {
-                count++;
-            }
-            if (db.hasEducationDealbreaker()) {
-                count++;
-            }
-            if (db.hasHeightDealbreaker()) {
-                count++;
-            }
-            if (db.hasAgeDealbreaker()) {
-                count++;
-            }
-            dealbreakersStatus.set(count + " filter" + (count != 1 ? "s" : "") + " set");
+            dealbreakersStatus.set(NONE_SET_LABEL);
+            return;
         }
+
+        int count = countDealbreakers(db);
+        dealbreakersStatus.set(formatDealbreakersStatus(count));
+    }
+
+    private int countDealbreakers(Dealbreakers db) {
+        int count = 0;
+        if (db.hasSmokingDealbreaker()) {
+            count++;
+        }
+        if (db.hasDrinkingDealbreaker()) {
+            count++;
+        }
+        if (db.hasKidsDealbreaker()) {
+            count++;
+        }
+        if (db.hasLookingForDealbreaker()) {
+            count++;
+        }
+        if (db.hasEducationDealbreaker()) {
+            count++;
+        }
+        if (db.hasHeightDealbreaker()) {
+            count++;
+        }
+        if (db.hasAgeDealbreaker()) {
+            count++;
+        }
+        return count;
+    }
+
+    private static String formatDealbreakersStatus(int count) {
+        return count + " filter" + (count != 1 ? "s" : "") + " set";
     }
 
     private void updateCompletion(User user) {
@@ -186,7 +219,7 @@ public class ProfileViewModel {
             completionStatus.set(result.getDisplayString());
             completionDetails.set(buildCompletionDetails(result));
         } catch (Exception e) {
-            logger.error("Failed to calculate profile completion", e);
+            logError("Failed to calculate profile completion", e);
             completionStatus.set("--");
             completionDetails.set("Unable to calculate completion");
         }
@@ -223,16 +256,28 @@ public class ProfileViewModel {
     public void save() {
         User user = AppSession.getInstance().getCurrentUser();
         if (user == null) {
-            logger.warn("No current user to save");
+            logWarn("No current user to save");
             return;
         }
 
-        logger.info("Saving profile for user: {}", user.getName());
+        logInfo("Saving profile for user: {}", user.getName());
 
-        // Update basic fields
+        applyBasicFields(user);
+        applyLocation(user);
+        applyInterests(user);
+        applyLifestyleFields(user);
+        applySearchPreferences(user);
+        applyDealbreakers(user);
+        persistUser(user);
+        attemptActivation(user);
+        updateSessionAndCompletion(user);
+
+        logInfo("Profile saved successfully");
+    }
+
+    private void applyBasicFields(User user) {
         user.setBio(bio.get());
 
-        // Save gender and interested in
         if (gender.get() != null) {
             user.setGender(gender.get());
         }
@@ -240,26 +285,31 @@ public class ProfileViewModel {
             user.setInterestedIn(EnumSet.copyOf(interestedInGenders));
         }
         applyBirthDate(user);
+    }
 
-        // Parse location if provided
+    private void applyLocation(User user) {
         String loc = location.get();
-        if (loc != null && loc.contains(",")) {
-            try {
-                String[] parts = loc.split(",");
-                if (parts.length == 2) {
-                    user.setLocation(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()));
-                }
-            } catch (NumberFormatException _) {
-                logger.warn("Could not parse location: {}", loc);
-            }
+        if (loc == null || !loc.contains(",")) {
+            return;
         }
 
-        // Save interests
+        try {
+            String[] parts = loc.split(",");
+            if (parts.length == 2) {
+                user.setLocation(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()));
+            }
+        } catch (NumberFormatException _) {
+            logWarn("Could not parse location: {}", loc);
+        }
+    }
+
+    private void applyInterests(User user) {
         if (!selectedInterests.isEmpty()) {
             user.setInterests(EnumSet.copyOf(selectedInterests));
         }
+    }
 
-        // Save lifestyle fields
+    private void applyLifestyleFields(User user) {
         if (height.get() != null) {
             user.setHeightCm(height.get());
         }
@@ -275,8 +325,9 @@ public class ProfileViewModel {
         if (lookingFor.get() != null) {
             user.setLookingFor(lookingFor.get());
         }
+    }
 
-        // Save search preferences
+    private void applySearchPreferences(User user) {
         try {
             int min = Integer.parseInt(minAge.get());
             int max = Integer.parseInt(maxAge.get());
@@ -284,7 +335,7 @@ public class ProfileViewModel {
                 user.setAgeRange(min, max);
             }
         } catch (NumberFormatException _) {
-            logger.warn("Invalid age range values");
+            logWarn("Invalid age range values");
         }
 
         try {
@@ -293,36 +344,54 @@ public class ProfileViewModel {
                 user.setMaxDistanceKm(dist);
             }
         } catch (NumberFormatException _) {
-            logger.warn("Invalid max distance value");
+            logWarn("Invalid max distance value");
         }
+    }
 
-        // Save dealbreakers
+    private void applyDealbreakers(User user) {
         if (dealbreakers.get() != null) {
             user.setDealbreakers(dealbreakers.get());
         }
+    }
 
-        // Save to storage
+    private void persistUser(User user) {
         userStorage.save(user);
+    }
 
-        // Try to activate user if profile is now complete
-        if (user.isComplete() && user.getState() == User.State.INCOMPLETE) {
+    private void attemptActivation(User user) {
+        if (user.isComplete() && user.getState() == UserState.INCOMPLETE) {
             try {
                 user.activate();
                 userStorage.save(user);
-                logger.info("User {} activated after profile completion", user.getName());
-                UiServices.Toast.showSuccess("Profile complete! You're now active!");
+                logInfo("User {} activated after profile completion", user.getName());
+                Toast.showSuccess("Profile complete! You're now active!");
             } catch (IllegalStateException e) {
-                logger.warn("Could not activate user: {}", e.getMessage());
+                logWarn("Could not activate user: {}", e.getMessage());
             }
         }
+    }
 
-        // Update the user in session
+    private void updateSessionAndCompletion(User user) {
         AppSession.getInstance().setCurrentUser(user);
-
-        // Update completion display
         updateCompletion(user);
+    }
 
-        logger.info("Profile saved successfully");
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
+    }
+
+    private void logError(String message, Object... args) {
+        if (logger.isErrorEnabled()) {
+            logger.error(message, args);
+        }
     }
 
     // --- Properties for data binding ---
@@ -478,7 +547,7 @@ public class ProfileViewModel {
                 updateInterestsDisplay();
                 return true;
             } else {
-                UiServices.Toast.showWarning("Maximum " + Interest.MAX_PER_USER + " interests allowed");
+                Toast.showWarning("Maximum " + Interest.MAX_PER_USER + " interests allowed");
                 return false;
             }
         }
@@ -507,18 +576,21 @@ public class ProfileViewModel {
      * @param photoFile the selected photo file
      */
     public void savePhoto(File photoFile) {
+        if (disposed.get()) {
+            return;
+        }
         User user = AppSession.getInstance().getCurrentUser();
         if (user == null) {
-            logger.warn("No current user for photo save");
+            logWarn("No current user for photo save");
             return;
         }
         if (photoFile == null || !photoFile.isFile()) {
-            logger.warn("Invalid photo file selected: {}", photoFile);
-            UiServices.Toast.showError("Invalid photo file selected");
+            logWarn("Invalid photo file selected: {}", photoFile);
+            Toast.showError("Invalid photo file selected");
             return;
         }
 
-        Thread.ofVirtual().name("photo-save").start(() -> {
+        Thread thread = Thread.ofVirtual().name("photo-save").start(() -> {
             try {
                 // 1. Create app data directory for photos
                 Path appData = Paths.get(System.getProperty("user.home"), ".datingapp", "photos");
@@ -540,15 +612,16 @@ public class ProfileViewModel {
                 Platform.runLater(() -> {
                     primaryPhotoUrl.set(photoUrl);
                     updateCompletion(user);
-                    UiServices.Toast.showSuccess("Photo saved!");
-                    logger.info("Profile photo saved: {}", destination);
+                    Toast.showSuccess("Photo saved!");
+                    logInfo("Profile photo saved: {}", destination);
                 });
 
             } catch (IOException e) {
-                logger.error("Failed to save profile photo", e);
-                Platform.runLater(() -> UiServices.Toast.showError("Failed to save photo: " + e.getMessage()));
+                logError("Failed to save profile photo", e);
+                Platform.runLater(() -> Toast.showError("Failed to save photo: " + e.getMessage()));
             }
         });
+        backgroundThread.set(thread);
     }
 
     /**
@@ -566,7 +639,7 @@ public class ProfileViewModel {
         }
         List<String> missing = result.breakdown().stream()
                 .flatMap(breakdown -> breakdown.missingItems().stream())
-                .map(item -> item == null ? "" : item.toString().trim())
+                .map(item -> item == null ? "" : String.valueOf(item).trim())
                 .filter(item -> !item.isEmpty())
                 .distinct()
                 .toList();
@@ -589,14 +662,14 @@ public class ProfileViewModel {
         }
         LocalDate today = LocalDate.now();
         if (selected.isAfter(today)) {
-            logger.warn("Birth date cannot be in the future: {}", selected);
-            UiServices.Toast.showWarning("Birth date cannot be in the future");
+            logWarn("Birth date cannot be in the future: {}", selected);
+            Toast.showWarning("Birth date cannot be in the future");
             return;
         }
         int age = Period.between(selected, today).getYears();
         if (age < 18 || age > 120) {
-            logger.warn("Birth date outside allowed age range: {}", selected);
-            UiServices.Toast.showWarning("Birth date must be for ages 18-120");
+            logWarn("Birth date outside allowed age range: {}", selected);
+            Toast.showWarning("Birth date must be for ages 18-120");
             return;
         }
         user.setBirthDate(selected);

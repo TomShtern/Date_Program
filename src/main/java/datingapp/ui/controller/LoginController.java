@@ -1,8 +1,9 @@
 package datingapp.ui.controller;
 
+import datingapp.core.Gender;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
-import datingapp.core.User.Gender;
+import datingapp.core.UserState;
 import datingapp.ui.NavigationService;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.util.UiServices;
@@ -356,7 +357,7 @@ public class LoginController extends BaseController implements Initializable {
             return first;
         }
 
-        private static String formatState(User.State state) {
+        private static String formatState(UserState state) {
             if (state == null) {
                 return TEXT_UNKNOWN;
             }

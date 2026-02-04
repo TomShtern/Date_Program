@@ -2,7 +2,11 @@ package datingapp.core.storage;
 
 import datingapp.core.UserInteractions.Like;
 import java.time.Instant;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Storage interface for Like entities.

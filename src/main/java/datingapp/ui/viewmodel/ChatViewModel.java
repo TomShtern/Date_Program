@@ -35,17 +35,35 @@ public class ChatViewModel {
 
     private User currentUser;
 
+    /** Track disposed state to prevent operations after cleanup. */
+    private volatile boolean disposed = false;
+
+    /** Keep reference to listener for cleanup. */
+    private final javafx.beans.value.ChangeListener<ConversationPreview> selectionListener;
+
     public ChatViewModel(MessagingService messagingService) {
         this.messagingService = messagingService;
 
         // Listen for selection changes to load messages
-        selectedConversation.addListener((obs, oldVal, newVal) -> {
+        selectionListener = (obs, oldVal, newVal) -> {
             if (newVal != null) {
                 loadMessages(newVal);
             } else {
                 activeMessages.clear();
             }
-        });
+        };
+        selectedConversation.addListener(selectionListener);
+    }
+
+    /**
+     * Disposes resources held by this ViewModel.
+     * Should be called when the ViewModel is no longer needed.
+     */
+    public void dispose() {
+        disposed = true;
+        selectedConversation.removeListener(selectionListener);
+        conversations.clear();
+        activeMessages.clear();
     }
 
     /**
@@ -73,7 +91,7 @@ public class ChatViewModel {
     }
 
     public void refreshConversations() {
-        if (ensureCurrentUser() == null) {
+        if (disposed || ensureCurrentUser() == null) {
             return;
         }
 

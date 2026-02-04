@@ -118,8 +118,8 @@ class AchievementServiceTest {
             // Set up a complete profile
             user.setBio("Complete bio with more than enough text to be valid.");
             user.setBirthDate(LocalDate.now().minusYears(25));
-            user.setGender(User.Gender.FEMALE);
-            user.setInterestedIn(Set.of(User.Gender.MALE));
+            user.setGender(Gender.FEMALE);
+            user.setInterestedIn(Set.of(Gender.MALE));
             user.setLocation(32.0, 34.0);
             user.addPhotoUrl("http://example.com/photo.jpg");
             user.setHeightCm(170);
@@ -263,8 +263,8 @@ class AchievementServiceTest {
     private User createActiveUser(UUID id, String name) {
         User u = new User(id, name);
         u.setBirthDate(LocalDate.now().minusYears(25));
-        u.setGender(User.Gender.MALE);
-        u.setInterestedIn(Set.of(User.Gender.FEMALE));
+        u.setGender(Gender.MALE);
+        u.setInterestedIn(Set.of(Gender.FEMALE));
         u.setMaxDistanceKm(50);
         return u;
     }
@@ -539,7 +539,7 @@ class AchievementServiceTest {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == User.State.ACTIVE)
+                    .filter(u -> u.getState() == UserState.ACTIVE)
                     .toList();
         }
 

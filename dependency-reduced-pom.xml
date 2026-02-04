@@ -92,7 +92,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.5.4</version>
         <configuration>
-          <argLine>--enable-preview --enable-native-access=ALL-UNNAMED</argLine>
+          <argLine>@{argLine} --enable-preview --enable-native-access=ALL-UNNAMED</argLine>
         </configuration>
       </plugin>
       <plugin>
@@ -235,7 +235,7 @@
             <configuration>
               <excludes>
                 <exclude>datingapp/ui/**/*</exclude>
-                <exclude>datingapp/cli/**/*</exclude>
+                <exclude>datingapp/app/cli/**/*</exclude>
                 <exclude>datingapp/Main.class</exclude>
               </excludes>
               <rules>
@@ -268,11 +268,23 @@
           <groupId>org.junit.jupiter</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>junit-jupiter-params</artifactId>
+          <artifactId>junit-jupiter-engine</artifactId>
           <groupId>org.junit.jupiter</groupId>
         </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <version>5.14.2</version>
+      <scope>test</scope>
+      <exclusions>
         <exclusion>
-          <artifactId>junit-jupiter-engine</artifactId>
+          <artifactId>apiguardian-api</artifactId>
+          <groupId>org.apiguardian</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>junit-jupiter-api</artifactId>
           <groupId>org.junit.jupiter</groupId>
         </exclusion>
       </exclusions>

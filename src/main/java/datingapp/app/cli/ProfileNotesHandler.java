@@ -21,9 +21,9 @@ public class ProfileNotesHandler {
 
     private final UserStorage userStorage;
     private final AppSession session;
-    private final CliUtilities.InputReader inputReader;
+    private final InputReader inputReader;
 
-    public ProfileNotesHandler(UserStorage userStorage, AppSession session, CliUtilities.InputReader inputReader) {
+    public ProfileNotesHandler(UserStorage userStorage, AppSession session, InputReader inputReader) {
         this.userStorage = userStorage;
         this.session = session;
         this.inputReader = inputReader;

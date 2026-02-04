@@ -65,16 +65,16 @@ ACTIVE → FRIENDS | UNMATCHED | GRACEFUL_EXIT | BLOCKED
 
 ## Entry Points
 
-| Use Case | Class | Method |
-|----------|-------|--------|
-| Find candidates | `CandidateFinder` | `findCandidates(UUID userId, int limit)` |
-| Record swipe | `MatchingService` | `recordLike(Like like)` |
-| Get user stats | `StatsService` | `getLatestStats(UUID userId)` |
-| Block user | `TrustSafetyService` | `blockUser(UUID blocker, UUID blocked)` |
+| Use Case        | Class                | Method                                   |
+|-----------------|----------------------|------------------------------------------|
+| Find candidates | `CandidateFinder`    | `findCandidates(UUID userId, int limit)` |
+| Record swipe    | `MatchingService`    | `recordLike(Like like)`                  |
+| Get user stats  | `StatsService`       | `getLatestStats(UUID userId)`            |
+| Block user      | `TrustSafetyService` | `blockUser(UUID blocker, UUID blocked)`  |
 
 ## Naming Conventions
 
 - **Services**: `*Service` (business logic coordinators)
 - **Storage interfaces**: `*Storage` (data access contracts)
 - **Records**: Use for immutable value objects
-- **Enums**: Nested within owner class (e.g., `User.Gender`, `Match.State`)
+- **Enums**: Prefer top-level for cross-package use (e.g., `Gender`, `UserState`, `VerificationMethod`)

@@ -10,6 +10,7 @@ import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -39,6 +40,9 @@ public class StatsViewModel {
     private final StringProperty responseRate = new SimpleStringProperty("--");
 
     private User currentUser;
+
+    /** Track disposed state to prevent operations after cleanup. */
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public StatsViewModel(AchievementService achievementService) {
         // Backward compatible constructor for when ViewModelFactory doesn't have all
@@ -79,11 +83,11 @@ public class StatsViewModel {
     }
 
     public void refresh() {
-        if (ensureCurrentUser() == null) {
+        if (disposed.get() || ensureCurrentUser() == null) {
             return;
         }
 
-        logger.info("Refreshing stats for user: {}", currentUser.getName());
+        logInfo("Refreshing stats for user: {}", currentUser.getName());
 
         // Load achievements
         List<UserAchievement> earned = achievementService.getUnlocked(currentUser.getId());
@@ -114,6 +118,12 @@ public class StatsViewModel {
         }
     }
 
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
     // --- Properties ---
     public ObservableList<Achievement> getAchievements() {
         return achievements;
@@ -133,5 +143,14 @@ public class StatsViewModel {
 
     public StringProperty responseRateProperty() {
         return responseRate;
+    }
+
+    /**
+     * Disposes resources held by this ViewModel.
+     * Should be called when the ViewModel is no longer needed.
+     */
+    public void dispose() {
+        disposed.set(true);
+        achievements.clear();
     }
 }
