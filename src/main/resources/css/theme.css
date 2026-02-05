@@ -131,6 +131,12 @@
     -fx-border-color: -fx-primary;
 }
 
+.button-secondary:focused {
+    -fx-border-color: -fx-primary;
+    -fx-border-width: 2;
+    -fx-background-color: rgba(255, 255, 255, 0.03);
+}
+
 .button-danger {
     -fx-background-color: -fx-danger;
 }
@@ -138,6 +144,12 @@
 .button-danger:hover {
     -fx-background-color: derive(-fx-danger, 15%);
     -fx-effect: dropshadow(gaussian, rgba(239, 68, 68, 0.4), 10, 0, 0, 3);
+}
+
+.button-danger:focused {
+    -fx-border-color: white;
+    -fx-border-width: 2;
+    -fx-border-radius: 12;
 }
 
 .button-transparent {
@@ -484,6 +496,12 @@
 .action-button-round:hover {
     -fx-scale-x: 1.1;
     -fx-scale-y: 1.1;
+}
+
+.action-button-round:focused {
+    -fx-border-color: white;
+    -fx-border-width: 3;
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.4), 15, 0, 0, 0);
 }
 
 /* ============================================
@@ -2456,6 +2474,12 @@
     -fx-background-color: rgba(255, 255, 255, 0.15);
 }
 
+.icon-button:focused {
+    -fx-border-color: -fx-primary;
+    -fx-border-width: 2;
+    -fx-background-color: rgba(102, 126, 234, 0.15);
+}
+
 /* Settings toggle button - for preferences/settings screens */
 .settings-toggle {
     -fx-background-color: transparent;
@@ -2477,6 +2501,46 @@
     -fx-background-color: -fx-primary;
     -fx-border-color: -fx-primary;
     -fx-text-fill: white;
+}
+
+.settings-toggle:focused {
+    -fx-border-color: -fx-primary;
+    -fx-border-width: 2;
+}
+
+/* ============================================
+   Confirmation Dialogs
+   ============================================ */
+.confirmation-dialog {
+    -fx-background-color: -fx-surface-dark;
+}
+
+.confirmation-dialog .content {
+    -fx-text-fill: -fx-text-primary;
+}
+
+.confirmation-dialog .header-panel {
+    -fx-background-color: -fx-surface-elevated;
+}
+
+.confirmation-dialog .button-bar .button {
+    -fx-min-width: 80;
+}
+
+/* ============================================
+   Loading States
+   ============================================ */
+.loading-overlay {
+    -fx-background-color: rgba(15, 23, 42, 0.7);
+}
+
+.loading-spinner {
+    -fx-progress-color: -fx-primary;
+}
+
+.loading-spinner .indicator {
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
 }
 
 /* Toggle group container - wrapper for toggle button groups */

@@ -30,7 +30,7 @@ public enum Achievement {
     GUARDIAN("Guardian", "Report a fake profile", "🛡️", Category.SAFETY, 1);
 
     /** Achievement categories for grouping in UI. */
-    public static enum Category {
+    public enum Category {
         MATCHING("Matching Milestones"),
         BEHAVIOR("Swiping Behavior"),
         PROFILE("Profile Excellence"),
@@ -90,7 +90,7 @@ public enum Achievement {
      * Record representing a user's unlocked achievement. Immutable and stored in
      * the database.
      */
-    public static record UserAchievement(UUID id, UUID userId, Achievement achievement, Instant unlockedAt) {
+    public record UserAchievement(UUID id, UUID userId, Achievement achievement, Instant unlockedAt) {
 
         // Compact constructor - validates parameters
         public UserAchievement {

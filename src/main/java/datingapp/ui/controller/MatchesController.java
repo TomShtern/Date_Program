@@ -1,6 +1,7 @@
 package datingapp.ui.controller;
 
 import datingapp.ui.NavigationService;
+import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.MatchesViewModel;
 import datingapp.ui.viewmodel.MatchesViewModel.LikeCardData;
@@ -132,6 +133,8 @@ public class MatchesController extends BaseController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        viewModel.setErrorHandler(Toast::showError);
+
         // Initialize viewmodel
         viewModel.initialize();
 
@@ -423,7 +426,7 @@ public class MatchesController extends BaseController implements Initializable {
                 }
             }
             default -> {
-                logger.warn("Unknown section {}, defaulting to matches list", currentSection);
+                logWarn("Unknown section {}, defaulting to matches list", currentSection);
                 for (MatchCardData match : viewModel.getMatches()) {
                     cards.add(createMatchCard(match));
                 }
@@ -642,7 +645,7 @@ public class MatchesController extends BaseController implements Initializable {
 
     /** Navigate to chat with selected match. */
     private void handleStartChat(MatchCardData match) {
-        logger.info("Starting chat with match: {}", match.userName());
+        logInfo("Starting chat with match: {}", match.userName());
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.CHAT);
     }
 
@@ -653,7 +656,7 @@ public class MatchesController extends BaseController implements Initializable {
 
     @FXML
     private void handleBrowse() {
-        logger.info("Navigating to browse/matching screen");
+        logInfo("Navigating to browse/matching screen");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
     }
 
@@ -696,7 +699,7 @@ public class MatchesController extends BaseController implements Initializable {
                         String.valueOf(viewModel.likesSentCountProperty().get()));
             }
             default -> {
-                logger.warn("Unknown section {}, defaulting to matches header", currentSection);
+                logWarn("Unknown section {}, defaulting to matches header", currentSection);
                 headerTitleLabel.setText("Your Matches");
                 headerIcon.setIconLiteral("mdi2h-heart-multiple");
                 headerIcon.setIconColor(Color.web(COLOR_PINK));
@@ -736,7 +739,7 @@ public class MatchesController extends BaseController implements Initializable {
                 emptyActionButton.setText(START_BROWSING_LABEL);
             }
             default -> {
-                logger.warn("Unknown section {}, defaulting to matches empty state", currentSection);
+                logWarn("Unknown section {}, defaulting to matches empty state", currentSection);
                 emptyStateIcon.setIconLiteral("mdi2h-heart-broken");
                 emptyStateIcon.setIconColor(Color.web("#64748b"));
                 emptyTitleLabel.setText("No matches yet");
@@ -745,6 +748,18 @@ public class MatchesController extends BaseController implements Initializable {
                 emptyHintLabel.setText("Like someone and if they like you back, it's a match!");
                 emptyActionButton.setText(START_BROWSING_LABEL);
             }
+        }
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
         }
     }
 }

@@ -7,8 +7,15 @@ import java.util.UUID;
 /** Container for messaging domain models (message + conversation). */
 public final class Messaging {
 
+    private static final String CONVERSATION_ID_SEPARATOR = "_";
+
     private Messaging() {
         // Utility class
+    }
+
+    /** Formats a deterministic conversation ID for two users. */
+    public static String formatConversationId(UUID a, UUID b) {
+        return Conversation.generateId(a, b);
     }
 
     /**
@@ -17,7 +24,7 @@ public final class Messaging {
      * <p>Messages are validated on construction: content cannot be empty or exceed 1000
      * characters.
      */
-    public static record Message(UUID id, String conversationId, UUID senderId, String content, Instant createdAt) {
+    public record Message(UUID id, String conversationId, UUID senderId, String content, Instant createdAt) {
 
         public static final int MAX_LENGTH = 1000;
 
@@ -138,7 +145,7 @@ public final class Messaging {
                 userB = a;
             }
 
-            String id = userA + "_" + userB;
+            String id = userA + CONVERSATION_ID_SEPARATOR + userB;
             Instant now = Instant.now();
             return new Conversation(id, userA, userB, now, null, null, null, null, null, true, true);
         }
@@ -149,9 +156,9 @@ public final class Messaging {
             String userBString = b.toString();
 
             if (userAString.compareTo(userBString) < 0) {
-                return userAString + "_" + userBString;
+                return userAString + CONVERSATION_ID_SEPARATOR + userBString;
             } else {
-                return userBString + "_" + userAString;
+                return userBString + CONVERSATION_ID_SEPARATOR + userAString;
             }
         }
 

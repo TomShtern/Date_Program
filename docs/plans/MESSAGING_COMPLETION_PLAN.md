@@ -25,15 +25,15 @@ The messaging system is 95% complete and functional. This document captures all 
 
 ### Current State
 
-| Component | Status | Completion |
-|-----------|--------|------------|
-| Core Domain Models | Complete | 100% |
-| Storage Interfaces | Complete | 100% |
-| H2 Storage Implementation | Needs Fix | 95% |
-| MessagingService | Needs Fix | 90% |
-| CLI Handler | Complete | 100% |
-| Unit Tests | Partial | 75% |
-| Integration Tests | Missing | 0% |
+| Component                 | Status    | Completion |
+|---------------------------|-----------|------------|
+| Core Domain Models        | Complete  | 100%       |
+| Storage Interfaces        | Complete  | 100%       |
+| H2 Storage Implementation | Needs Fix | 95%        |
+| MessagingService          | Needs Fix | 90%        |
+| CLI Handler               | Complete  | 100%       |
+| Unit Tests                | Partial   | 75%        |
+| Integration Tests         | Missing   | 0%         |
 
 ### Target State
 
@@ -48,10 +48,10 @@ All components at 100% with full test coverage, architectural compliance, and fe
 > [!CAUTION]
 > The storage layer has ZERO database-level test coverage. This is a significant gap.
 
-| Missing File | Purpose | Priority |
-|--------------|---------|----------|
+| Missing File                     | Purpose                                                 | Priority     |
+|----------------------------------|---------------------------------------------------------|--------------|
 | `H2ConversationStorageTest.java` | Test CRUD operations, cascade delete, query correctness | **CRITICAL** |
-| `H2MessageStorageTest.java` | Test CRUD, pagination, counting methods | **CRITICAL** |
+| `H2MessageStorageTest.java`      | Test CRUD, pagination, counting methods                 | **CRITICAL** |
 
 **Impact:** Database schema issues, query bugs, and data integrity problems will not be caught until runtime.
 
@@ -61,11 +61,11 @@ All components at 100% with full test coverage, architectural compliance, and fe
 
 The design document (`docs/MESSAGING_SYSTEM_DESIGN.md`) specifies features that were not implemented:
 
-| Feature | Design Doc Reference | Current State | Priority |
-|---------|---------------------|---------------|----------|
-| Update `lastActiveAt` on message send | Section 5.1, Line 312 | Not implemented | MEDIUM |
-| Achievement trigger (first message) | Section 5.1, Line 313 | Not implemented | LOW |
-| BlockStorage defensive check | Section 5.1, Line 310 | Relies on Match state only | LOW |
+| Feature                               | Design Doc Reference  | Current State              | Priority |
+|---------------------------------------|-----------------------|----------------------------|----------|
+| Update `lastActiveAt` on message send | Section 5.1, Line 312 | Not implemented            | MEDIUM   |
+| Achievement trigger (first message)   | Section 5.1, Line 313 | Not implemented            | LOW      |
+| BlockStorage defensive check          | Section 5.1, Line 310 | Relies on Match state only | LOW      |
 
 #### 2.2.1 Missing: `lastActiveAt` Update
 
@@ -235,19 +235,19 @@ CREATE TABLE IF NOT EXISTS messages (
 
 ### 4.1 Missing Unit Tests in `MessagingServiceTest.java`
 
-| Method | Test Scenario | Priority |
-|--------|---------------|----------|
-| `markAsRead()` | Updates read timestamp correctly | HIGH |
-| `markAsRead()` | Ignores non-participant user | MEDIUM |
-| `getUnreadCount()` | Returns correct count after messages | HIGH |
-| `getUnreadCount()` | Returns 0 for empty conversation | MEDIUM |
-| `getUnreadCount()` | Returns 0 after marking as read | HIGH |
-| `getTotalUnreadCount()` | Aggregates across conversations | MEDIUM |
-| `getConversations()` | Returns sorted by most recent | HIGH |
-| `getConversations()` | Includes unread counts | MEDIUM |
-| `getConversations()` | Skips deleted users | LOW |
-| `getOrCreateConversation()` | Creates if not exists | MEDIUM |
-| `getOrCreateConversation()` | Returns existing if exists | MEDIUM |
+| Method                      | Test Scenario                        | Priority |
+|-----------------------------|--------------------------------------|----------|
+| `markAsRead()`              | Updates read timestamp correctly     | HIGH     |
+| `markAsRead()`              | Ignores non-participant user         | MEDIUM   |
+| `getUnreadCount()`          | Returns correct count after messages | HIGH     |
+| `getUnreadCount()`          | Returns 0 for empty conversation     | MEDIUM   |
+| `getUnreadCount()`          | Returns 0 after marking as read      | HIGH     |
+| `getTotalUnreadCount()`     | Aggregates across conversations      | MEDIUM   |
+| `getConversations()`        | Returns sorted by most recent        | HIGH     |
+| `getConversations()`        | Includes unread counts               | MEDIUM   |
+| `getConversations()`        | Skips deleted users                  | LOW      |
+| `getOrCreateConversation()` | Creates if not exists                | MEDIUM   |
+| `getOrCreateConversation()` | Returns existing if exists           | MEDIUM   |
 
 ---
 
@@ -255,32 +255,32 @@ CREATE TABLE IF NOT EXISTS messages (
 
 #### 4.2.1 `H2ConversationStorageTest.java`
 
-| Test Case | Description |
-|-----------|-------------|
-| `save_persistsConversation` | Conversation survives save/get cycle |
-| `get_returnsEmptyForNonExistent` | Returns Optional.empty() for unknown ID |
-| `getByUsers_worksRegardlessOfOrder` | Both (a,b) and (b,a) find same conversation |
-| `getConversationsFor_returnsSortedByLastMessage` | Most recent first |
-| `getConversationsFor_returnsEmptyForNewUser` | Empty list for user with no conversations |
-| `updateLastMessageAt_updatesTimestamp` | Timestamp is persisted |
-| `updateReadTimestamp_updatesCorrectUser` | Only target user's timestamp updated |
-| `delete_removesConversation` | Conversation no longer retrievable |
-| `delete_cascadesToMessages` | Messages also deleted (requires FK) |
+| Test Case                                        | Description                                 |
+|--------------------------------------------------|---------------------------------------------|
+| `save_persistsConversation`                      | Conversation survives save/get cycle        |
+| `get_returnsEmptyForNonExistent`                 | Returns Optional.empty() for unknown ID     |
+| `getByUsers_worksRegardlessOfOrder`              | Both (a,b) and (b,a) find same conversation |
+| `getConversationsFor_returnsSortedByLastMessage` | Most recent first                           |
+| `getConversationsFor_returnsEmptyForNewUser`     | Empty list for user with no conversations   |
+| `updateLastMessageAt_updatesTimestamp`           | Timestamp is persisted                      |
+| `updateReadTimestamp_updatesCorrectUser`         | Only target user's timestamp updated        |
+| `delete_removesConversation`                     | Conversation no longer retrievable          |
+| `delete_cascadesToMessages`                      | Messages also deleted (requires FK)         |
 
 #### 4.2.2 `H2MessageStorageTest.java`
 
-| Test Case | Description |
-|-----------|-------------|
-| `save_persistsMessage` | Message survives save/get cycle |
-| `getMessages_returnsInChronologicalOrder` | Oldest first |
-| `getMessages_respectsLimit` | Only returns requested count |
-| `getMessages_respectsOffset` | Skips correct number |
-| `getMessages_returnsEmptyForNoMessages` | Empty list, not null |
-| `getLatestMessage_returnsNewest` | Most recent by createdAt |
-| `getLatestMessage_returnsEmptyForNoMessages` | Optional.empty() |
-| `countMessages_returnsCorrectCount` | Matches actual count |
-| `countMessagesAfter_countsCorrectly` | Only counts after timestamp |
-| `deleteByConversation_removesAllMessages` | All messages for conversation deleted |
+| Test Case                                    | Description                           |
+|----------------------------------------------|---------------------------------------|
+| `save_persistsMessage`                       | Message survives save/get cycle       |
+| `getMessages_returnsInChronologicalOrder`    | Oldest first                          |
+| `getMessages_respectsLimit`                  | Only returns requested count          |
+| `getMessages_respectsOffset`                 | Skips correct number                  |
+| `getMessages_returnsEmptyForNoMessages`      | Empty list, not null                  |
+| `getLatestMessage_returnsNewest`             | Most recent by createdAt              |
+| `getLatestMessage_returnsEmptyForNoMessages` | Optional.empty()                      |
+| `countMessages_returnsCorrectCount`          | Matches actual count                  |
+| `countMessagesAfter_countsCorrectly`         | Only counts after timestamp           |
+| `deleteByConversation_removesAllMessages`    | All messages for conversation deleted |
 
 ---
 
@@ -659,31 +659,31 @@ if (blockStorage.existsBetween(senderId, recipientId)) {
 
 ### Files to Modify
 
-| File | Changes | Priority |
-|------|---------|----------|
-| `MessagingService.java` | Add null checks, use new storage method, add lastActiveAt update | CRITICAL |
-| `H2MessageStorage.java` | Add FK constraint, implement `countMessagesNotFromSender()` | CRITICAL |
-| `MessageStorage.java` | Add `countMessagesNotFromSender()` method | HIGH |
-| `MessagingServiceTest.java` | Add missing test methods, update mock | HIGH |
+| File                        | Changes                                                          | Priority |
+|-----------------------------|------------------------------------------------------------------|----------|
+| `MessagingService.java`     | Add null checks, use new storage method, add lastActiveAt update | CRITICAL |
+| `H2MessageStorage.java`     | Add FK constraint, implement `countMessagesNotFromSender()`      | CRITICAL |
+| `MessageStorage.java`       | Add `countMessagesNotFromSender()` method                        | HIGH     |
+| `MessagingServiceTest.java` | Add missing test methods, update mock                            | HIGH     |
 
 ### Files to Create
 
-| File | Purpose | Priority |
-|------|---------|----------|
+| File                             | Purpose                                    | Priority |
+|----------------------------------|--------------------------------------------|----------|
 | `H2ConversationStorageTest.java` | Integration tests for conversation storage | CRITICAL |
-| `H2MessageStorageTest.java` | Integration tests for message storage | CRITICAL |
+| `H2MessageStorageTest.java`      | Integration tests for message storage      | CRITICAL |
 
 ### Files Unchanged
 
-| File | Reason |
-|------|--------|
-| `Message.java` | Complete |
-| `Conversation.java` | Complete |
-| `ConversationStorage.java` | Complete |
-| `H2ConversationStorage.java` | Complete |
-| `MessagingHandler.java` | Complete |
-| `Main.java` | Complete |
-| `ServiceRegistry.java` | Complete |
+| File                          | Reason   |
+|-------------------------------|----------|
+| `Message.java`                | Complete |
+| `Conversation.java`           | Complete |
+| `ConversationStorage.java`    | Complete |
+| `H2ConversationStorage.java`  | Complete |
+| `MessagingHandler.java`       | Complete |
+| `Main.java`                   | Complete |
+| `ServiceRegistry.java`        | Complete |
 | `ServiceRegistryBuilder.java` | Complete |
 
 ---
@@ -749,12 +749,12 @@ Phase 6 (Optional)
 
 ## Appendix B: Risk Assessment
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| FK constraint fails on existing data | LOW | MEDIUM | Run on fresh DB or add migration |
-| lastActiveAt update breaks tests | MEDIUM | LOW | Update affected mocks |
-| Integration tests flaky | LOW | MEDIUM | Use unique DB per test class |
-| Achievement integration scope creep | MEDIUM | LOW | Mark as optional, defer if needed |
+| Risk                                 | Likelihood | Impact | Mitigation                        |
+|--------------------------------------|------------|--------|-----------------------------------|
+| FK constraint fails on existing data | LOW        | MEDIUM | Run on fresh DB or add migration  |
+| lastActiveAt update breaks tests     | MEDIUM     | LOW    | Update affected mocks             |
+| Integration tests flaky              | LOW        | MEDIUM | Use unique DB per test class      |
+| Achievement integration scope creep  | MEDIUM     | LOW    | Mark as optional, defer if needed |
 
 ---
 

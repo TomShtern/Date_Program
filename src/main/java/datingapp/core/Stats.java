@@ -11,12 +11,17 @@ public final class Stats {
         // Utility class
     }
 
+    /** Creates a builder for assembling user stats snapshots. */
+    public static UserStats.StatsBuilder builder() {
+        return new UserStats.StatsBuilder();
+    }
+
     /**
      * Immutable snapshot of user engagement statistics. Stored periodically for
      * historical trends
      * and faster reads.
      */
-    public static record UserStats(
+    public record UserStats(
             UUID id,
             UUID userId,
             Instant computedAt,
@@ -167,7 +172,7 @@ public final class Stats {
      * a user is
      * "above average" or "below average".
      */
-    public static record PlatformStats(
+    public record PlatformStats(
             UUID id,
             Instant computedAt,
             int totalActiveUsers,

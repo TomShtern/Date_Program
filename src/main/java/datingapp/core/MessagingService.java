@@ -231,7 +231,7 @@ public class MessagingService {
     // === Data Transfer Objects ===
 
     /** Result of sending a message. */
-    public static record SendResult(boolean success, Message message, String errorMessage, ErrorCode errorCode) {
+    public record SendResult(boolean success, Message message, String errorMessage, ErrorCode errorCode) {
 
         public SendResult {
             if (success) {
@@ -246,7 +246,7 @@ public class MessagingService {
         }
 
         /** Error codes for message sending failures. */
-        public static enum ErrorCode {
+        public enum ErrorCode {
             NO_ACTIVE_MATCH,
             USER_NOT_FOUND,
             EMPTY_MESSAGE,
@@ -263,7 +263,7 @@ public class MessagingService {
     }
 
     /** Preview of a conversation for list display. */
-    public static record ConversationPreview(
+    public record ConversationPreview(
             Conversation conversation, User otherUser, Optional<Message> lastMessage, int unreadCount) {
 
         public ConversationPreview {

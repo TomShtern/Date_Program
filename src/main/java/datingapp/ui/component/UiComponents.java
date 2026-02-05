@@ -14,6 +14,7 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
@@ -37,6 +38,23 @@ public final class UiComponents {
 
     private UiComponents() {
         // Utility class
+    }
+
+    /**
+     * Creates a loading overlay with a spinner. The overlay is hidden by default.
+     *
+     * @return a StackPane containing the loading spinner
+     */
+    public static StackPane createLoadingOverlay() {
+        ProgressIndicator spinner = new ProgressIndicator();
+        spinner.setMaxSize(50, 50);
+        spinner.getStyleClass().add("loading-spinner");
+
+        StackPane overlay = new StackPane(spinner);
+        overlay.getStyleClass().add("loading-overlay");
+        overlay.setVisible(false);
+        overlay.setManaged(false);
+        return overlay;
     }
 
     // ========== TYPING INDICATOR ==========

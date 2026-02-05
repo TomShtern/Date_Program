@@ -689,8 +689,7 @@ public class User {
      * <li>Track date plans ("Dinner Thursday @ Olive Garden")
      * </ul>
      */
-    public static record ProfileNote(
-            UUID authorId, UUID subjectId, String content, Instant createdAt, Instant updatedAt) {
+    public record ProfileNote(UUID authorId, UUID subjectId, String content, Instant createdAt, Instant updatedAt) {
 
         /** Maximum length for note content. */
         public static final int MAX_LENGTH = 500;

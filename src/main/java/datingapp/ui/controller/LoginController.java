@@ -5,6 +5,7 @@ import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
 import datingapp.core.UserState;
 import datingapp.ui.NavigationService;
+import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.util.UiServices;
 import datingapp.ui.viewmodel.LoginViewModel;
@@ -146,6 +147,8 @@ public class LoginController extends BaseController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        viewModel.setErrorHandler(Toast::showError);
+
         bindUserList();
         setupUserListInteractions();
         setupFilterField();
@@ -408,7 +411,7 @@ public class LoginController extends BaseController implements Initializable {
     @FXML
     private void handleLogin() {
         if (viewModel.login()) {
-            logger.info(LOG_LOGIN_SUCCESS);
+            logInfo(LOG_LOGIN_SUCCESS);
             NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
         }
     }
@@ -416,7 +419,7 @@ public class LoginController extends BaseController implements Initializable {
     @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleCreateAccount() {
-        logger.info(LOG_OPENING_DIALOG);
+        logInfo(LOG_OPENING_DIALOG);
         showCreateAccountDialog();
     }
 
@@ -588,7 +591,7 @@ public class LoginController extends BaseController implements Initializable {
 
         Optional<User> result = dialog.showAndWait();
         result.ifPresent(user -> {
-            logger.info(LOG_USER_CREATED, user.getName());
+            logInfo(LOG_USER_CREATED, user.getName());
             // Select the newly created user
             userListView.getSelectionModel().select(user);
         });
@@ -619,9 +622,21 @@ public class LoginController extends BaseController implements Initializable {
     private String resolveStylesheet(String path) {
         URL resource = getClass().getResource(path);
         if (resource == null) {
-            logger.warn(LOG_STYLESHEET_NOT_FOUND, path);
+            logWarn(LOG_STYLESHEET_NOT_FOUND, path);
             return null;
         }
         return resource.toExternalForm();
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
     }
 }

@@ -11,7 +11,10 @@ import datingapp.core.User;
 import datingapp.core.storage.MatchStorage;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -46,11 +49,22 @@ public class DashboardViewModel {
 
     private final ObservableList<String> recentAchievements = FXCollections.observableArrayList();
 
+    private ErrorHandler errorHandler;
+    private final AtomicInteger activeLoads = new AtomicInteger(0);
+
     /** Track background thread for cleanup on dispose. */
     private final AtomicReference<Thread> backgroundThread = new AtomicReference<>();
 
-    /** Track disposed state to prevent operations after cleanup. */
-    private volatile boolean disposed = false;
+    /**
+     * Track disposed state to prevent operations after cleanup.
+     *
+     * <p>Uses {@link AtomicBoolean} instead of a volatile flag to make the threading
+     * semantics explicit and consistent with other atomics (e.g. {@link #activeLoads}).
+     * This allows safe, lock-free checks and updates from background threads and
+     * keeps the option open for compound atomic operations if the lifecycle logic
+     * becomes more complex.
+     */
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public DashboardViewModel(
             DailyService dailyService, MatchStorage matchStorage, AchievementService achievementService) {
@@ -72,12 +86,13 @@ public class DashboardViewModel {
     public void refresh() {
         User user = getCurrentUser();
         if (user == null) {
-            logger.warn("Cannot refresh dashboard - no user logged in");
+            logWarn("Cannot refresh dashboard - no user logged in");
+            activeLoads.set(0);
+            setLoadingState(false);
             return;
         }
 
-        // Set loading state
-        javafx.application.Platform.runLater(() -> loading.set(true));
+        beginLoading();
 
         // Run data fetching in background to prevent UI freeze
         Thread thread = Thread.ofVirtual().start(() -> performRefresh(user));
@@ -89,28 +104,39 @@ public class DashboardViewModel {
      * Should be called when the ViewModel is no longer needed.
      */
     public void dispose() {
-        disposed = true;
+        disposed.set(true);
         Thread thread = backgroundThread.getAndSet(null);
         if (thread != null && thread.isAlive()) {
             thread.interrupt();
         }
+        activeLoads.set(0);
+        setLoadingState(false);
+    }
+
+    public void setErrorHandler(ErrorHandler handler) {
+        this.errorHandler = handler;
     }
 
     private void performRefresh(User user) {
-        if (disposed) {
+        if (disposed.get()) {
+            endLoading();
             return;
         }
-        logger.info("Performing dashboard refresh for user: {}", user.getName());
+        logInfo("Performing dashboard refresh for user: {}", user.getName());
 
         // 1. Data that doesn't need DB can be set immediately or just captured
         String name = user.getName();
 
         // 2. Fetch DB data
         String completionText = "--";
+        Exception firstError = null;
         try {
             completionText = ProfileCompletionService.calculate(user).getDisplayString();
         } catch (Exception e) {
-            logger.error("Completion count error", e);
+            logError("Completion count error", e);
+            if (firstError == null) {
+                firstError = e;
+            }
         }
 
         String likesText = "Likes: --/50";
@@ -120,7 +146,10 @@ public class DashboardViewModel {
                     ? "Likes: ∞"
                     : "Likes: " + status.likesUsed() + "/" + (status.likesUsed() + status.likesRemaining());
         } catch (Exception e) {
-            logger.error("Likes reload error", e);
+            logError("Likes reload error", e);
+            if (firstError == null) {
+                firstError = e;
+            }
         }
 
         String matchCount = "--";
@@ -128,7 +157,10 @@ public class DashboardViewModel {
             matchCount = String.valueOf(
                     matchStorage.getActiveMatchesFor(user.getId()).size());
         } catch (Exception e) {
-            logger.error("Match count error", e);
+            logError("Match count error", e);
+            if (firstError == null) {
+                firstError = e;
+            }
         }
 
         String pickName = "No pick available";
@@ -139,14 +171,20 @@ public class DashboardViewModel {
                 pickName = pickedUser.getName() + ", " + pickedUser.getAge();
             }
         } catch (Exception e) {
-            logger.error("Daily pick error", e);
+            logError("Daily pick error", e);
+            if (firstError == null) {
+                firstError = e;
+            }
         }
 
         List<UserAchievement> achievements = List.of();
         try {
             achievements = achievementService.getUnlocked(user.getId());
         } catch (Exception e) {
-            logger.error("Achievements error", e);
+            logError("Achievements error", e);
+            if (firstError == null) {
+                firstError = e;
+            }
         }
 
         // 3. Update UI on FX Thread
@@ -156,7 +194,8 @@ public class DashboardViewModel {
         final String finalPick = pickName;
         final List<UserAchievement> finalAchievements = achievements;
 
-        javafx.application.Platform.runLater(() -> {
+        final Exception finalError = firstError;
+        Platform.runLater(() -> {
             userName.set(name);
             profileCompletion.set(finalCompletion);
             dailyLikesStatus.set(finalLikes);
@@ -171,8 +210,73 @@ public class DashboardViewModel {
                             ua.achievement().getIcon() + " " + ua.achievement().getDisplayName()));
 
             // Loading complete
-            loading.set(false);
+            endLoading();
+
+            if (finalError != null) {
+                notifyError("Some dashboard data failed to load", finalError);
+            }
         });
+    }
+
+    private void notifyError(String userMessage, Exception e) {
+        if (errorHandler == null) {
+            return;
+        }
+        String detail = e.getMessage();
+        String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
+        if (Platform.isFxApplicationThread()) {
+            errorHandler.onError(message);
+        } else {
+            Platform.runLater(() -> errorHandler.onError(message));
+        }
+    }
+
+    private void beginLoading() {
+        if (activeLoads.incrementAndGet() == 1) {
+            setLoadingState(true);
+        }
+    }
+
+    private void endLoading() {
+        int remaining = activeLoads.decrementAndGet();
+        if (remaining <= 0) {
+            activeLoads.set(0);
+            setLoadingState(false);
+        }
+    }
+
+    private void setLoadingState(boolean isLoading) {
+        runOnFx(() -> {
+            if (loading.get() != isLoading) {
+                loading.set(isLoading);
+            }
+        });
+    }
+
+    private void runOnFx(Runnable action) {
+        if (Platform.isFxApplicationThread()) {
+            action.run();
+        } else {
+            Platform.runLater(action);
+        }
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
+    }
+
+    private void logError(String message, Throwable error) {
+        if (logger.isErrorEnabled()) {
+            logger.error(message, error);
+        }
     }
 
     // --- Properties for data binding ---

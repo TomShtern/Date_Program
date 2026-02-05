@@ -21,7 +21,7 @@ public class ValidationService {
      * Result of a validation operation. Contains success status and any error
      * messages.
      */
-    public static record ValidationResult(boolean valid, List<String> errors) {
+    public record ValidationResult(boolean valid, List<String> errors) {
         public ValidationResult {
             errors = errors != null ? List.copyOf(errors) : List.of();
             if (valid && !errors.isEmpty()) {

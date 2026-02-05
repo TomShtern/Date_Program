@@ -43,22 +43,22 @@ public class RelationshipHandler {
     public void viewPendingRequests() {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) {
-            logger.info("\n⚠️ Please log in first.\n");
+            logInfo("\n⚠️ Please log in first.\n");
             return;
         }
         List<FriendRequest> requests = transitionService.getPendingRequestsFor(currentUser.getId());
 
         if (requests.isEmpty()) {
-            logger.info("\nNo pending friend requests.\n");
+            logInfo("\nNo pending friend requests.\n");
             return;
         }
 
-        logger.info("\n--- PENDING FRIEND REQUESTS ---");
+        logInfo("\n--- PENDING FRIEND REQUESTS ---");
         for (int i = 0; i < requests.size(); i++) {
             FriendRequest req = requests.get(i);
             User from = userStorage.get(req.fromUserId());
             String fromName = from != null ? from.getName() : "Unknown User";
-            logger.info("  {}. From: {} (Received: {})", i + 1, fromName, req.createdAt());
+            logInfo("  {}. From: {} (Received: {})", i + 1, fromName, req.createdAt());
         }
 
         String choice = inputReader.readLine("\nEnter request number to respond (or 'b' to go back): ");
@@ -69,7 +69,7 @@ public class RelationshipHandler {
         try {
             int idx = Integer.parseInt(choice) - 1;
             if (idx < 0 || idx >= requests.size()) {
-                logger.info("Invalid selection.");
+                logInfo("Invalid selection.");
                 return;
             }
 
@@ -77,20 +77,20 @@ public class RelationshipHandler {
             User from = userStorage.get(req.fromUserId());
             String fromName = from != null ? from.getName() : "Unknown User";
 
-            logger.info("\nFriend Request from {}", fromName);
+            logInfo("\nFriend Request from {}", fromName);
             String action = inputReader
                     .readLine("Do you want to (A)ccept or (D)ecline? ")
                     .toLowerCase(Locale.ROOT);
 
             if ("a".equals(action)) {
                 transitionService.acceptFriendZone(req.id(), currentUser.getId());
-                logger.info("✅ You are now friends with {}! You can find them in your matches.\n", fromName);
+                logInfo("✅ You are now friends with {}! You can find them in your matches.\n", fromName);
             } else if ("d".equals(action)) {
                 transitionService.declineFriendZone(req.id(), currentUser.getId());
-                logger.info("Declined friend request from {}.\n", fromName);
+                logInfo("Declined friend request from {}.\n", fromName);
             }
         } catch (NumberFormatException | TransitionValidationException e) {
-            logger.info("Error processing request: {}\n", e.getMessage());
+            logInfo("Error processing request: {}\n", e.getMessage());
         }
     }
 
@@ -98,25 +98,31 @@ public class RelationshipHandler {
     public void viewNotifications() {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) {
-            logger.info("\n⚠️ Please log in first.\n");
+            logInfo("\n⚠️ Please log in first.\n");
             return;
         }
         List<Notification> notifications = socialStorage.getNotificationsForUser(currentUser.getId(), false);
 
         if (notifications.isEmpty()) {
-            logger.info("\nNo notifications.\n");
+            logInfo("\nNo notifications.\n");
             return;
         }
 
-        logger.info("\n--- YOUR NOTIFICATIONS ---");
+        logInfo("\n--- YOUR NOTIFICATIONS ---");
         for (Notification n : notifications) {
             String status = n.isRead() ? "  " : "🆕";
-            logger.info("{} [{}] {}: {}", status, n.createdAt(), n.title(), n.message());
+            logInfo("{} [{}] {}: {}", status, n.createdAt(), n.title(), n.message());
             if (!n.isRead()) {
                 socialStorage.markNotificationAsRead(n.id());
             }
         }
-        logger.info("--------------------------\n");
+        logInfo("--------------------------\n");
         inputReader.readLine("Press Enter to continue...");
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
     }
 }

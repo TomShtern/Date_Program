@@ -45,7 +45,7 @@ mvn spotless:apply && mvn verify       # Format + full quality checks
 
 **Phase 2.1** console dating app: **Java 25** + Maven + H2 + JDBI. Features: matching, messaging, relationship transitions, pace compatibility, achievements.
 
-**Stats (2026-02-03):** 92 Java files, 37 test files, ~16K LOC, 60% coverage min.
+**Stats (2026-02-05):** 93 Java files, 37 test files, ~16K LOC, 60% coverage min.
 
 ### Package Structure
 
@@ -55,6 +55,9 @@ mvn spotless:apply && mvn verify       # Format + full quality checks
 | `app/cli/` | CLI handlers + HandlerFactory | Thin layer over services |
 | `storage/` | JDBI SQL interfaces | Implements `core/storage/*` |
 | `ui/` | JavaFX (AtlantaFX theme) | Uses BaseController pattern |
+| `ui/viewmodel/` | MVVM ViewModels + `ErrorHandler` | Owns observable properties |
+| `ui/util/` | `Toast`, `UiServices`, `ImageCache` | Static UI utilities |
+| `ui/component/` | `UiComponents` factory methods | Loading overlays, reusable UI |
 
 ### Bootstrap (Entry Points)
 
@@ -166,6 +169,51 @@ public class MatchingHandler {
 }
 ```
 
+### ViewModel Error Handling (JavaFX)
+```java
+// ErrorHandler.java - functional interface for ViewModel→Controller error communication
+@FunctionalInterface
+public interface ErrorHandler {
+    void onError(String message);
+}
+
+// In ViewModel - add field and setter
+private ErrorHandler errorHandler;
+public void setErrorHandler(ErrorHandler handler) { this.errorHandler = handler; }
+
+// In catch blocks - notify via handler
+private void notifyError(String userMessage, Exception e) {
+    if (errorHandler != null) {
+        Platform.runLater(() -> errorHandler.onError(userMessage + ": " + e.getMessage()));
+    }
+}
+
+// In Controller initialize() - wire up to toast
+viewModel.setErrorHandler(msg -> Toast.showError(msg));
+```
+
+### Navigation Context (View-to-View Data)
+```java
+// Before navigating - set context
+navigationService.setNavigationContext(matchedUserId);
+navigationService.navigateTo(ViewType.CHAT);
+
+// In target controller initialize() - consume context
+Object context = navigationService.consumeNavigationContext();
+if (context instanceof UUID userId) {
+    viewModel.selectConversationWithUser(userId);
+}
+```
+
+### Loading Overlays (BaseController)
+```java
+// In controller initialize()
+StackPane loadingOverlay = UiComponents.createLoadingOverlay();
+registerOverlay(loadingOverlay);  // BaseController tracks for cleanup
+loadingOverlay.visibleProperty().bind(viewModel.loadingProperty());
+loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
+```
+
 ## Testing
 
 ### Use TestStorages (Centralized Mocks)
@@ -274,6 +322,8 @@ public interface JdbiUserStorage extends UserStorage {
 
 ## Recent Updates (2026-02)
 
+- **02-05**: Enhanced UI/UX: ErrorHandler pattern in ViewModels, navigation context, loading overlays, confirmation dialogs
+- **02-04**: CSS accessibility (focus states all button types), 5 new DB indexes, toast error notifications
 - **02-03**: Fixed 25+ nested types to `public static`; added `NestedTypeVisibilityTest`
 - **02-01**: Added `AppBootstrap`, `AppSession`, `HandlerFactory` for unified init
 - **01-31**: Centralized validation in `AppConfig`; reorganized `ServiceRegistry`
@@ -293,4 +343,5 @@ public interface JdbiUserStorage extends UserStorage {
 8|2026-02-01 17:30:00|agent:claude_code|docs-fix|Fixed nested type visibility rules|User.java,CLAUDE.md
 9|2026-02-03 19:50:00|agent:claude_code|docs-update|AppBootstrap/AppSession/HandlerFactory docs|CLAUDE.md
 10|2026-02-03 20:30:00|agent:claude_code|docs-optimize|Added Critical Gotchas, StorageBuilder, TestStorages, EnumSet patterns; condensed Recent Updates|CLAUDE.md
+11|2026-02-05 00:00:00|agent:claude_code|docs-ui-patterns|Added ViewModel ErrorHandler, navigation context, loading overlay patterns; updated package structure|CLAUDE.md
 ---AGENT-LOG-END---

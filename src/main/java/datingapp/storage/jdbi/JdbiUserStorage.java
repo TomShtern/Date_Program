@@ -28,6 +28,8 @@ import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * JDBI DAO interface for User storage operations.
@@ -150,6 +152,8 @@ public interface JdbiUserStorage {
      */
     class Mapper implements RowMapper<User> {
 
+        private static final Logger logger = LoggerFactory.getLogger(Mapper.class);
+
         @Override
         public User map(ResultSet rs, StatementContext ctx) throws SQLException {
             // Core fields (required)
@@ -227,9 +231,10 @@ public interface JdbiUserStorage {
                 if (!trimmed.isEmpty()) {
                     try {
                         result.add(Interest.valueOf(trimmed));
-                    } catch (IllegalArgumentException _) {
-                        // Skip invalid interests from data migration - maintains backward
-                        // compatibility
+                    } catch (IllegalArgumentException e) {
+                        if (logger.isDebugEnabled()) {
+                            logger.debug("Skipping invalid interest value '{}' from database", trimmed, e);
+                        }
                     }
                 }
             }

@@ -12,8 +12,13 @@ public final class Social {
         // Utility class - prevent instantiation
     }
 
+    /** Returns true if a friend request status is terminal. */
+    public static boolean isTerminalStatus(FriendRequest.Status status) {
+        return status == FriendRequest.Status.DECLINED || status == FriendRequest.Status.EXPIRED;
+    }
+
     /** Represents a request to transition a match to the "Friend Zone". */
-    public static record FriendRequest(
+    public record FriendRequest(
             UUID id, UUID fromUserId, UUID toUserId, Instant createdAt, Status status, Instant respondedAt) {
 
         public FriendRequest {
@@ -31,7 +36,7 @@ public final class Social {
         }
 
         /** Status of a friend zone request. */
-        public static enum Status {
+        public enum Status {
             PENDING,
             ACCEPTED,
             DECLINED,
@@ -48,7 +53,7 @@ public final class Social {
     }
 
     /** Represents a system notification for a user. */
-    public static record Notification(
+    public record Notification(
             UUID id,
             UUID userId,
             Type type,
@@ -75,7 +80,7 @@ public final class Social {
         }
 
         /** Types of notifications in the system. */
-        public static enum Type {
+        public enum Type {
             MATCH_FOUND,
             NEW_MESSAGE,
             FRIEND_REQUEST,

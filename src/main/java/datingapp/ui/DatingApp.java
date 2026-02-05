@@ -15,9 +15,7 @@ import org.slf4j.LoggerFactory;
 public class DatingApp extends Application {
     private static final Logger logger = LoggerFactory.getLogger(DatingApp.class);
 
-    private ServiceRegistry serviceRegistry;
     private NavigationService navigationService;
-    private ViewModelFactory viewModelFactory;
 
     @Override
     public void init() throws Exception {
@@ -25,12 +23,12 @@ public class DatingApp extends Application {
 
         // Initialize application with centralized bootstrap
         logger.info("[DEBUG] Initializing application services...");
-        this.serviceRegistry = AppBootstrap.initialize();
+        ServiceRegistry serviceRegistry = AppBootstrap.initialize();
         logger.info("[DEBUG] ServiceRegistry initialized.");
 
         // Initialize UI framework components
         logger.info("[DEBUG] Creating ViewModelFactory...");
-        this.viewModelFactory = new ViewModelFactory(serviceRegistry);
+        ViewModelFactory viewModelFactory = new ViewModelFactory(serviceRegistry);
         logger.info("[DEBUG] ViewModelFactory created.");
 
         logger.info("[DEBUG] Setting up NavigationService...");

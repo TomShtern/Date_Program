@@ -232,7 +232,7 @@ public class MatchingService {
      * Represents a user who liked the current user but hasn't been responded to
      * yet.
      */
-    public static record PendingLiker(User user, Instant likedAt) {
+    public record PendingLiker(User user, Instant likedAt) {
         public PendingLiker {
             Objects.requireNonNull(user, "user cannot be null");
             Objects.requireNonNull(likedAt, "likedAt cannot be null");
@@ -243,7 +243,7 @@ public class MatchingService {
      * Result of a swipe action containing success status, match information, and
      * user-friendly message.
      */
-    public static record SwipeResult(boolean success, boolean matched, Match match, Like like, String message) {
+    public record SwipeResult(boolean success, boolean matched, Match match, Like like, String message) {
         public SwipeResult {
             Objects.requireNonNull(message, "message cannot be null");
         }

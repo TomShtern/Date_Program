@@ -11,6 +11,11 @@ public final class Preferences {
         // Utility class - prevent instantiation
     }
 
+    /** Returns the maximum number of interests a user can select. */
+    public static int maxInterestsPerUser() {
+        return Interest.MAX_PER_USER;
+    }
+
     /**
      * Predefined interests for user profiles. Organized by category for easier
      * selection in CLI.
@@ -24,7 +29,7 @@ public final class Preferences {
      * List&lt;Interest&gt; outdoorInterests = Interest.byCategory(Interest.Category.OUTDOORS);
      * </pre>
      */
-    public static enum Interest {
+    public enum Interest {
         // ===== OUTDOORS =====
         HIKING("Hiking", Category.OUTDOORS),
         CAMPING("Camping", Category.OUTDOORS),
@@ -86,7 +91,7 @@ public final class Preferences {
         public static final int MIN_FOR_COMPLETE = 3;
 
         /** Interest categories for organized display. */
-        public static enum Category {
+        public enum Category {
             OUTDOORS("🏕️ Outdoors"),
             ARTS("🎨 Arts & Culture"),
             FOOD("🍳 Food & Drink"),
@@ -151,7 +156,7 @@ public final class Preferences {
         }
 
         /** Smoking habits. */
-        public static enum Smoking {
+        public enum Smoking {
             NEVER("Never"),
             SOMETIMES("Sometimes"),
             REGULARLY("Regularly");
@@ -168,7 +173,7 @@ public final class Preferences {
         }
 
         /** Drinking habits. */
-        public static enum Drinking {
+        public enum Drinking {
             NEVER("Never"),
             SOCIALLY("Socially"),
             REGULARLY("Regularly");
@@ -185,7 +190,7 @@ public final class Preferences {
         }
 
         /** Stance on having children. */
-        public static enum WantsKids {
+        public enum WantsKids {
             NO("Don't want"),
             OPEN("Open to it"),
             SOMEDAY("Want someday"),
@@ -203,7 +208,7 @@ public final class Preferences {
         }
 
         /** Relationship goals. */
-        public static enum LookingFor {
+        public enum LookingFor {
             CASUAL("Something casual"),
             SHORT_TERM("Short-term dating"),
             LONG_TERM("Long-term relationship"),
@@ -222,7 +227,7 @@ public final class Preferences {
         }
 
         /** Education level. */
-        public static enum Education {
+        public enum Education {
             HIGH_SCHOOL("High school"),
             SOME_COLLEGE("Some college"),
             BACHELORS("Bachelor's degree"),

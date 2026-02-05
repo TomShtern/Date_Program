@@ -1,7 +1,10 @@
 package datingapp.ui.controller;
 
+import datingapp.ui.NavigationService;
 import java.util.ArrayList;
 import java.util.List;
+import javafx.scene.Node;
+import javafx.scene.layout.StackPane;
 import javafx.util.Subscription;
 
 /**
@@ -29,6 +32,7 @@ import javafx.util.Subscription;
 public abstract class BaseController {
 
     private final List<Subscription> subscriptions = new ArrayList<>();
+    private final List<Node> overlays = new ArrayList<>();
 
     /**
      * Registers a subscription for automatic cleanup.
@@ -43,6 +47,22 @@ public abstract class BaseController {
     }
 
     /**
+     * Registers an overlay node on the global root stack for cleanup.
+     *
+     * @param overlay the overlay node to add and track
+     */
+    protected void registerOverlay(Node overlay) {
+        if (overlay == null) {
+            return;
+        }
+        StackPane rootStack = NavigationService.getInstance().getRootStack();
+        if (rootStack != null) {
+            rootStack.getChildren().add(overlay);
+            overlays.add(overlay);
+        }
+    }
+
+    /**
      * Cleans up all registered subscriptions.
      * Should be called when navigating away from this controller's view
      * or when the controller is being disposed.
@@ -50,6 +70,18 @@ public abstract class BaseController {
     public void cleanup() {
         subscriptions.forEach(Subscription::unsubscribe);
         subscriptions.clear();
+
+        StackPane rootStack = NavigationService.getInstance().getRootStack();
+        for (Node overlay : overlays) {
+            if (overlay != null) {
+                overlay.visibleProperty().unbind();
+                overlay.managedProperty().unbind();
+                if (rootStack != null) {
+                    rootStack.getChildren().remove(overlay);
+                }
+            }
+        }
+        overlays.clear();
     }
 
     /**

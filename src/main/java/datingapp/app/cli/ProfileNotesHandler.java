@@ -39,18 +39,18 @@ public class ProfileNotesHandler {
         CliUtilities.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
 
-            logger.info("\n" + CliConstants.MENU_DIVIDER);
-            logger.info("       📝 NOTES ABOUT {}", subjectName.toUpperCase(Locale.ROOT));
-            logger.info(CliConstants.MENU_DIVIDER);
+            logInfo("\n" + CliConstants.MENU_DIVIDER);
+            logInfo("       📝 NOTES ABOUT {}", subjectName.toUpperCase(Locale.ROOT));
+            logInfo(CliConstants.MENU_DIVIDER);
 
             Optional<User.ProfileNote> existingNote = userStorage.getProfileNote(currentUser.getId(), subjectId);
 
             if (existingNote.isPresent()) {
-                logger.info("\nCurrent note:");
-                logger.info("\"{}\"", existingNote.get().content());
-                logger.info("\n  1. Edit note");
-                logger.info("  2. Delete note");
-                logger.info("  0. Back");
+                logInfo("\nCurrent note:");
+                logInfo("\"{}\"", existingNote.get().content());
+                logInfo("\n  1. Edit note");
+                logInfo("  2. Delete note");
+                logInfo("  0. Back");
 
                 String choice = inputReader.readLine("\nChoice: ");
                 switch (choice) {
@@ -60,9 +60,9 @@ public class ProfileNotesHandler {
                         /* back */ }
                 }
             } else {
-                logger.info("\nNo notes yet.");
-                logger.info("  1. Add a note");
-                logger.info("  0. Back");
+                logInfo("\nNo notes yet.");
+                logInfo("  1. Add a note");
+                logInfo("  0. Back");
 
                 String choice = inputReader.readLine("\nChoice: ");
                 if ("1".equals(choice)) {
@@ -80,27 +80,26 @@ public class ProfileNotesHandler {
      * @param subjectName The name of the user the note is about
      */
     private void addNote(UUID authorId, UUID subjectId, String subjectName) {
-        logger.info("\nEnter your note about {} (max {} chars):", subjectName, User.ProfileNote.MAX_LENGTH);
-        logger.info("Examples: \"Met at coffee shop\", \"Loves hiking\", \"Dinner Thursday 7pm\"");
+        logInfo("\nEnter your note about {} (max {} chars):", subjectName, User.ProfileNote.MAX_LENGTH);
+        logInfo("Examples: \"Met at coffee shop\", \"Loves hiking\", \"Dinner Thursday 7pm\"");
         String content = inputReader.readLine("\nNote: ");
 
         if (content.isBlank()) {
-            logger.info("⚠️  Note cannot be empty.");
+            logInfo("⚠️  Note cannot be empty.");
             return;
         }
 
         if (content.length() > User.ProfileNote.MAX_LENGTH) {
-            logger.info(
-                    "⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), User.ProfileNote.MAX_LENGTH);
+            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), User.ProfileNote.MAX_LENGTH);
             return;
         }
 
         try {
             User.ProfileNote note = User.ProfileNote.create(authorId, subjectId, content);
             userStorage.saveProfileNote(note);
-            logger.info("✅ Note saved!\n");
+            logInfo("✅ Note saved!\n");
         } catch (IllegalArgumentException e) {
-            logger.info("❌ {}\n", e.getMessage());
+            logInfo("❌ {}\n", e.getMessage());
         }
     }
 
@@ -110,27 +109,26 @@ public class ProfileNotesHandler {
      * @param existing The existing note to edit
      */
     private void editNote(User.ProfileNote existing) {
-        logger.info("\nCurrent note: \"{}\"\n", existing.content());
-        logger.info("Enter new note (or press Enter to keep current):");
+        logInfo("\nCurrent note: \"{}\"\n", existing.content());
+        logInfo("Enter new note (or press Enter to keep current):");
         String content = inputReader.readLine("Note: ");
 
         if (content.isBlank()) {
-            logger.info("✓ Note unchanged.\n");
+            logInfo("✓ Note unchanged.\n");
             return;
         }
 
         if (content.length() > User.ProfileNote.MAX_LENGTH) {
-            logger.info(
-                    "⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), User.ProfileNote.MAX_LENGTH);
+            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), User.ProfileNote.MAX_LENGTH);
             return;
         }
 
         try {
             User.ProfileNote updated = existing.withContent(content);
             userStorage.saveProfileNote(updated);
-            logger.info("✅ Note updated!\n");
+            logInfo("✅ Note updated!\n");
         } catch (IllegalArgumentException e) {
-            logger.info("❌ {}\n", e.getMessage());
+            logInfo("❌ {}\n", e.getMessage());
         }
     }
 
@@ -145,12 +143,12 @@ public class ProfileNotesHandler {
         String confirm = inputReader.readLine("Delete note about " + subjectName + "? (y/n): ");
         if ("y".equalsIgnoreCase(confirm)) {
             if (userStorage.deleteProfileNote(authorId, subjectId)) {
-                logger.info("✅ Note deleted.\n");
+                logInfo("✅ Note deleted.\n");
             } else {
-                logger.info("⚠️  Note not found.\n");
+                logInfo("⚠️  Note not found.\n");
             }
         } else {
-            logger.info("Cancelled.\n");
+            logInfo("Cancelled.\n");
         }
     }
 
@@ -159,29 +157,29 @@ public class ProfileNotesHandler {
         CliUtilities.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
 
-            logger.info("\n" + CliConstants.MENU_DIVIDER);
-            logger.info("         📝 MY PROFILE NOTES");
-            logger.info(CliConstants.MENU_DIVIDER + "\n");
+            logInfo("\n" + CliConstants.MENU_DIVIDER);
+            logInfo("         📝 MY PROFILE NOTES");
+            logInfo(CliConstants.MENU_DIVIDER + "\n");
 
             List<User.ProfileNote> notes = userStorage.getProfileNotesByAuthor(currentUser.getId());
 
             if (notes.isEmpty()) {
-                logger.info("You haven't added any notes yet.");
-                logger.info("Tip: Add notes when viewing matches to remember details!\n");
+                logInfo("You haven't added any notes yet.");
+                logInfo("Tip: Add notes when viewing matches to remember details!\n");
                 return;
             }
 
-            logger.info("You have {} note(s):\n", notes.size());
+            logInfo("You have {} note(s):\n", notes.size());
 
             for (int i = 0; i < notes.size(); i++) {
                 User.ProfileNote note = notes.get(i);
                 User subject = userStorage.get(note.subjectId());
                 String subjectName = subject != null ? subject.getName() : "(deleted user)";
 
-                logger.info("  {}. {} - \"{}\"", i + 1, subjectName, note.getPreview());
+                logInfo("  {}. {} - \"{}\"", i + 1, subjectName, note.getPreview());
             }
 
-            logger.info("\nEnter number to view/edit, or 0 to go back:");
+            logInfo("\nEnter number to view/edit, or 0 to go back:");
             String input = inputReader.readLine("Choice: ");
 
             try {
@@ -193,7 +191,7 @@ public class ProfileNotesHandler {
                     manageNoteFor(note.subjectId(), subjectName);
                 }
             } catch (NumberFormatException e) {
-                logger.trace("Non-numeric input for note selection: {}", e.getMessage());
+                logTrace("Non-numeric input for note selection: {}", e.getMessage());
                 // Back to menu - user entered non-numeric input
             }
         });
@@ -216,5 +214,17 @@ public class ProfileNotesHandler {
     /** Checks if a note exists for the given subject. */
     public boolean hasNote(UUID authorId, UUID subjectId) {
         return userStorage.getProfileNote(authorId, subjectId).isPresent();
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logTrace(String message, Object... args) {
+        if (logger.isTraceEnabled()) {
+            logger.trace(message, args);
+        }
     }
 }

@@ -3,6 +3,7 @@ package datingapp.ui.controller;
 import datingapp.core.Match;
 import datingapp.core.User;
 import datingapp.ui.NavigationService;
+import datingapp.ui.component.UiComponents;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
@@ -98,8 +99,10 @@ public class MatchingController extends BaseController implements Initializable 
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        // Initialize the ViewModel with current user from UISession
-        viewModel.initialize();
+        StackPane loadingOverlay = UiComponents.createLoadingOverlay();
+        registerOverlay(loadingOverlay);
+        loadingOverlay.visibleProperty().bind(viewModel.loadingProperty());
+        loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
 
         // Bind visibility to hasMoreCandidates
         candidateCard.visibleProperty().bind(viewModel.hasMoreCandidatesProperty());
@@ -128,10 +131,13 @@ public class MatchingController extends BaseController implements Initializable 
         // Handle loading state for skeleton display
         addSubscription(viewModel.loadingProperty().subscribe(this::handleLoadingChange));
 
-        // Apply fade-in animation
-        UiAnimations.fadeIn(rootPane, 800);
+        // Initialize the ViewModel with current user from UISession
+        viewModel.initialize();
 
         updateCandidateUI(viewModel.currentCandidateProperty().get());
+
+        // Apply fade-in animation
+        UiAnimations.fadeIn(rootPane, 800);
 
         // Suppress unused warning for logger
         if (logger.isTraceEnabled()) {
@@ -359,7 +365,7 @@ public class MatchingController extends BaseController implements Initializable 
     /** Super like action - triggered by button or UP key. */
     @FXML
     private void handleSuperLike() {
-        logger.info("Super Like triggered");
+        logInfo("Super Like triggered");
         // Pulse the card for micro-interaction feedback
         UiAnimations.pulseScale(candidateCard);
         // For now, acts like a regular like (super like logic to be added later)
@@ -381,9 +387,9 @@ public class MatchingController extends BaseController implements Initializable 
      * Shows the "IT'S A MATCH!" popup dialog.
      */
     private void showMatchPopup(User matchedUser, Match match) {
-        logger.info("Showing match popup for: {}", matchedUser.getName());
+        logInfo("Showing match popup for: {}", matchedUser.getName());
         if (match != null) {
-            logger.debug("Match id: {}", match.getId());
+            logDebug("Match id: {}", match.getId());
         }
 
         Dialog<ButtonType> dialog = new Dialog<>();
@@ -430,7 +436,11 @@ public class MatchingController extends BaseController implements Initializable 
         dialog.showAndWait().ifPresent(response -> {
             if (Objects.equals(response, sendMessageBtn)) {
                 // Navigate to chat with this match
-                NavigationService.getInstance().navigateTo(NavigationService.ViewType.CHAT);
+                NavigationService navigationService = NavigationService.getInstance();
+                if (matchedUser != null) {
+                    navigationService.setNavigationContext(matchedUser.getId());
+                }
+                navigationService.navigateTo(NavigationService.ViewType.CHAT);
             }
             // Clear the match notification
             viewModel.clearMatchNotification();
@@ -463,30 +473,48 @@ public class MatchingController extends BaseController implements Initializable 
 
     @FXML
     private void handleExpandPreferences() {
-        logger.info("User clicked Expand Preferences - navigating to Profile settings");
+        logInfo("User clicked Expand Preferences - navigating to Profile settings");
         // Navigate to filter/preferences screen
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.PREFERENCES);
     }
 
     @FXML
     private void handleCheckLikes() {
-        logger.info("User clicked Check Likes - navigating to Matches");
+        logInfo("User clicked Check Likes - navigating to Matches");
         // Navigate to Matches screen where they can see who liked them
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHES);
     }
 
     @FXML
     private void handleImproveProfile() {
-        logger.info("User clicked Improve Profile - navigating to Profile");
+        logInfo("User clicked Improve Profile - navigating to Profile");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE);
     }
 
     private String resolveStylesheet(String path) {
         URL resource = getClass().getResource(path);
         if (resource == null) {
-            logger.warn("Stylesheet not found: {}", path);
+            logWarn("Stylesheet not found: {}", path);
             return null;
         }
         return resource.toExternalForm();
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
+    }
+
+    private void logDebug(String message, Object... args) {
+        if (logger.isDebugEnabled()) {
+            logger.debug(message, args);
+        }
     }
 }

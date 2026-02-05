@@ -13,7 +13,7 @@ import java.util.Objects;
 public class ProfilePreviewService {
 
     /** Result of profile completeness calculation. */
-    public static record ProfileCompleteness(int percentage, List<String> filledFields, List<String> missingFields) {
+    public record ProfileCompleteness(int percentage, List<String> filledFields, List<String> missingFields) {
 
         public ProfileCompleteness {
             if (percentage < 0 || percentage > 100) {
@@ -25,7 +25,7 @@ public class ProfilePreviewService {
     }
 
     /** Full profile preview result. */
-    public static record ProfilePreview(
+    public record ProfilePreview(
             User user,
             ProfileCompleteness completeness,
             List<String> improvementTips,

@@ -5,6 +5,8 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 /** Manages H2 database connections and schema initialization. */
@@ -286,6 +288,14 @@ public final class DatabaseManager {
             createSocialSchema(stmt);
             createModerationSchema(stmt);
             createProfileSchema(stmt);
+
+            // Additional indexes for query optimization (kept here for consistency)
+            stmt.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_last_msg ON conversations(last_message_at DESC)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_friend_req_to_user ON friend_requests(to_user_id)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_daily_picks_user ON daily_pick_views(user_id)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_profile_views_viewer ON profile_views(viewer_id)");
 
             // Add missing foreign key constraints
             addMissingForeignKeys(stmt);
@@ -627,8 +637,10 @@ public final class DatabaseManager {
         } catch (SQLException e) {
             // Shutdown errors are expected when database is already closed
             // Log at finest level only for debugging purposes
-            java.util.logging.Logger.getLogger(DatabaseManager.class.getName())
-                    .finest("Database shutdown: " + e.getMessage());
+            Logger logger = Logger.getLogger(DatabaseManager.class.getName());
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.finest("Database shutdown: " + e.getMessage());
+            }
         }
     }
 }

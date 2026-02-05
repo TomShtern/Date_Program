@@ -254,18 +254,14 @@ public record Dealbreakers(
         public static boolean passes(User seeker, User candidate) {
             Dealbreakers db = seeker.getDealbreakers();
 
-            // No dealbreakers set = everyone passes
-            if (!db.hasAnyDealbreaker()) {
-                return true;
-            }
-
-            return passesSmoking(db, candidate)
-                    && passesDrinking(db, candidate)
-                    && passesKids(db, candidate)
-                    && passesLookingFor(db, candidate)
-                    && passesEducation(db, candidate)
-                    && passesHeight(db, candidate)
-                    && passesAgeDifference(db, seeker, candidate);
+            return !db.hasAnyDealbreaker()
+                    || (passesSmoking(db, candidate)
+                            && passesDrinking(db, candidate)
+                            && passesKids(db, candidate)
+                            && passesLookingFor(db, candidate)
+                            && passesEducation(db, candidate)
+                            && passesHeight(db, candidate)
+                            && passesAgeDifference(db, seeker, candidate));
         }
 
         /**

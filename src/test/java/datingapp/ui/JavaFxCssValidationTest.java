@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javafx.application.Platform;
@@ -45,6 +47,9 @@ class JavaFxCssValidationTest {
         }
 
         CountDownLatch latch = new CountDownLatch(1);
+
+        Logger.getLogger("com.sun.javafx.application.PlatformImpl").setLevel(Level.SEVERE);
+        Logger.getLogger("javafx").setLevel(Level.SEVERE);
 
         // Initialize JavaFX toolkit
         try {

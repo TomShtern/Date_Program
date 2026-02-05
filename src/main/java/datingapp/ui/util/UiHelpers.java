@@ -16,6 +16,11 @@ public final class UiHelpers {
         // Utility class
     }
 
+    /** Clears validation styling for a text input control. */
+    public static void clearValidation(TextInputControl control, Label errorLabel) {
+        ValidationHelper.clearValidation(control, errorLabel);
+    }
+
     // ========== RESPONSIVE CONTROLLER INTERFACE ==========
 
     /**

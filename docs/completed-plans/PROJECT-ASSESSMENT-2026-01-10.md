@@ -109,14 +109,14 @@ Logical feature progression building on Phase 1.5 foundation:
 
 ---
 
-## 💡 Nice to Haves (15)
+## 💡 Nice to Haves (15) - NOT NOW. DO-NOT DO IT AT ALL
 
 Enhancement suggestions for future phases:
 
-1. **REST API Layer** - Spring Boot REST endpoints for web/mobile clients
-2. **Web UI** - React/Vue frontend with responsive design
-3. **Mobile App** - React Native or Flutter cross-platform app
-4. **Redis Caching** - Cache hot data (active users, match scores, daily picks)
+1. **REST API Layer** - Spring Boot REST endpoints for web/mobile clients - NOT NOW
+2. **Web UI** - React/Vue frontend with responsive design - NOT NOW
+3. **Mobile App** - React Native or Flutter cross-platform app - NOT NOW
+4. **Redis Caching** - Cache hot data (active users, match scores, daily picks) - NOT NOW
 5. **Elasticsearch Integration** - Advanced full-text search on bios/interests
 6. **S3/Cloud Storage** - Proper photo storage with CDN delivery (AWS S3, Cloudinary)
 7. **WebSocket Support** - Real-time notifications (new matches, messages)
@@ -143,7 +143,7 @@ Enhancement suggestions for future phases:
 ### Code Quality
 - ✅ **Formatting Enforced** - Spotless plugin with Google Java Format (build fails if violated)
 - ⚠️ **Checkstyle Non-Blocking** - Style violations logged but don't fail build
-- ⚠️ **PMD Non-Blocking** - Code quality issues logged but don't fail build
+- ⚠️ **PMD Non-Blocking** - Code quality issues logged but don't fail build - NOT GOOD ENOUGH
 - ❌ **No Coverage Reporting** - JaCoCo not configured
 - ❌ **No Static Analysis** - No SpotBugs, no SonarQube integration
 
@@ -174,7 +174,7 @@ Enhancement suggestions for future phases:
 1. **Documentation Cleanup**
    - Move 4 completed feature docs to `completed-plans/`
    - Update CLAUDE.md with all Phase 1.5 features marked complete
-   - Add "Last Updated: 2026-01-10" timestamps
+   - Add "Last Updated: 2026-01-10" timestamps - ALREADY OUTDATED
 
 2. **Critical Fixes**
    - Implement JDBC transactions for undo flow

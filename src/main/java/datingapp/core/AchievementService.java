@@ -46,7 +46,7 @@ public class AchievementService {
     }
 
     /** Progress towards an achievement. */
-    public static record AchievementProgress(Achievement achievement, int current, int target, boolean unlocked) {
+    public record AchievementProgress(Achievement achievement, int current, int target, boolean unlocked) {
 
         public AchievementProgress {
             Objects.requireNonNull(achievement, "achievement cannot be null");

@@ -10,7 +10,9 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
@@ -28,7 +30,7 @@ public class DailyService {
     private final AppConfig config;
 
     /** In-memory tracking of daily pick views (userId -> set of dates viewed). */
-    private final ConcurrentHashMap<UUID, Set<LocalDate>> dailyPickViews = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<LocalDate>> dailyPickViews = new ConcurrentHashMap<>();
 
     public DailyService(LikeStorage likeStorage, AppConfig config) {
         this(null, likeStorage, null, null, config);
@@ -108,8 +110,7 @@ public class DailyService {
         } else {
             // Fallback for tests/configurations without CandidateFinder
             List<User> allActive = userStorage.findActive();
-            java.util.Set<UUID> alreadyInteracted =
-                    new java.util.HashSet<>(likeStorage.getLikedOrPassedUserIds(seeker.getId()));
+            Set<UUID> alreadyInteracted = new HashSet<>(likeStorage.getLikedOrPassedUserIds(seeker.getId()));
             candidates = allActive.stream()
                     .filter(u -> !u.getId().equals(seeker.getId()))
                     .filter(u -> !blockStorage.isBlocked(seeker.getId(), u.getId()))
@@ -251,7 +252,7 @@ public class DailyService {
     }
 
     /** Status snapshot for daily limits. */
-    public static record DailyStatus(
+    public record DailyStatus(
             int likesUsed, int likesRemaining, int passesUsed, int passesRemaining, LocalDate date, Instant resetsAt) {
 
         public DailyStatus {

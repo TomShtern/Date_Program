@@ -149,7 +149,7 @@ public class PreferencesController extends BaseController implements Initializab
                 case WOMEN -> womenToggle.setSelected(true);
                 case EVERYONE -> everyoneToggle.setSelected(true);
                 default -> {
-                    logger.warn("Unknown gender preference: {}", pref);
+                    logWarn("Unknown gender preference: {}", pref);
                     everyoneToggle.setSelected(true);
                 }
             }
@@ -175,14 +175,14 @@ public class PreferencesController extends BaseController implements Initializab
 
     @FXML
     private void handleSave() {
-        logger.info("Saving preferences...");
+        logInfo("Saving preferences...");
         viewModel.savePreferences();
         NavigationService.getInstance().goBack();
     }
 
     @FXML
     private void handleBack() {
-        logger.info("Canceling preferences changes...");
+        logInfo("Canceling preferences changes...");
         // Just go back without saving
         NavigationService.getInstance().goBack();
     }
@@ -190,11 +190,11 @@ public class PreferencesController extends BaseController implements Initializab
     @FXML
     private void handleThemeToggle() {
         boolean isDarkMode = themeToggle.isSelected();
-        logger.info("Toggling theme to: {}", isDarkMode ? "Dark" : "Light");
+        logInfo("Toggling theme to: {}", isDarkMode ? "Dark" : "Light");
 
         Scene scene = rootPane.getScene();
         if (scene == null) {
-            logger.warn("Scene not available for theme toggle");
+            logWarn("Scene not available for theme toggle");
             return;
         }
 
@@ -220,10 +220,22 @@ public class PreferencesController extends BaseController implements Initializab
     private String resolveStylesheet(String path) {
         URL resource = getClass().getResource(path);
         if (resource == null) {
-            logger.warn("Stylesheet not found: {}", path);
+            logWarn("Stylesheet not found: {}", path);
             return null;
         }
         return resource.toExternalForm();
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
     }
 
     private void wireActionButtons() {

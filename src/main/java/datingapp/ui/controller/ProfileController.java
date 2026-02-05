@@ -8,6 +8,7 @@ import datingapp.ui.NavigationService;
 import datingapp.ui.util.ImageCache;
 import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
+import datingapp.ui.util.UiServices;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
 import java.net.URL;
@@ -169,6 +170,8 @@ public class ProfileController extends BaseController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        viewModel.setErrorHandler(Toast::showError);
+
         // Bind basic form fields to ViewModel properties
         if (nameLabel != null) {
             nameLabel.textProperty().bind(viewModel.nameProperty());
@@ -702,16 +705,16 @@ public class ProfileController extends BaseController implements Initializable {
                         avatarPlaceholderIcon.setVisible(false);
                     }
 
-                    logger.info("Profile photo loaded: {}", selectedFile.getName());
+                    logInfo("Profile photo loaded: {}", selectedFile.getName());
 
                     // Save photo via ViewModel (persists to storage)
                     viewModel.savePhoto(selectedFile);
                 } else {
-                    logger.warn("Failed to load image: {}", selectedFile.getAbsolutePath());
+                    logWarn("Failed to load image: {}", selectedFile.getAbsolutePath());
                     Toast.showError("Failed to load image");
                 }
             } catch (Exception e) {
-                logger.error("Error loading profile photo", e);
+                logError("Error loading profile photo", e);
                 Toast.showError("Error loading photo: " + e.getMessage());
             }
         }
@@ -788,6 +791,13 @@ public class ProfileController extends BaseController implements Initializable {
                 "-fx-background-color: #64748b; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 8 16;");
         clearAllBtn.setOnAction(event -> {
             event.consume();
+            boolean confirmed = UiServices.showConfirmation(
+                    "Clear All Dealbreakers",
+                    "Remove all dealbreaker preferences?",
+                    "This will reset all your dealbreaker filters. You can set them again anytime.");
+            if (!confirmed) {
+                return;
+            }
             selectedSmoking.clear();
             selectedDrinking.clear();
             selectedKids.clear();
@@ -830,7 +840,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         dialog.showAndWait().ifPresent(newDealbreakers -> {
             viewModel.setDealbreakers(newDealbreakers);
-            logger.info("Dealbreakers updated");
+            logInfo("Dealbreakers updated");
         });
     }
 
@@ -885,6 +895,24 @@ public class ProfileController extends BaseController implements Initializable {
         } else {
             chip.setStyle(
                     "-fx-background-color: #334155; -fx-text-fill: #94a3b8; -fx-background-radius: 20; -fx-padding: 6 12;");
+        }
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
+    }
+
+    private void logError(String message, Throwable error) {
+        if (logger.isErrorEnabled()) {
+            logger.error(message, error);
         }
     }
 }

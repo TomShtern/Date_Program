@@ -1,5 +1,6 @@
 package datingapp.ui.util;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import javafx.scene.image.Image;
@@ -23,7 +24,7 @@ public final class ImageCache {
     private static final String DEFAULT_AVATAR_PATH = "/images/default-avatar.png";
 
     /** Thread-safe cache storage. */
-    private static final ConcurrentHashMap<String, Image> CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, Image> CACHE = new ConcurrentHashMap<>();
 
     private ImageCache() {
         // Utility class - no instantiation
@@ -77,13 +78,13 @@ public final class ImageCache {
 
             // Check for load errors
             if (image.isError()) {
-                logger.warn("Failed to load image: {}", path, image.getException());
+                logWarn("Failed to load image: {}", path, image.getException());
                 return getDefaultAvatar(width, height);
             }
 
             return image;
         } catch (Exception e) {
-            logger.warn("Exception loading image: {}", path, e);
+            logWarn("Exception loading image: {}", path, e);
             return getDefaultAvatar(width, height);
         }
     }
@@ -101,7 +102,7 @@ public final class ImageCache {
                     }
                 }
             } catch (Exception e) {
-                logger.warn("Failed to load default avatar", e);
+                logWarn("Failed to load default avatar", e);
             }
             // Fallback: create a simple colored placeholder
             return createPlaceholder(width, height);
@@ -123,7 +124,7 @@ public final class ImageCache {
     private static void evictOldest() {
         CACHE.keySet().stream().findFirst().ifPresent(key -> {
             CACHE.remove(key);
-            logger.debug("Evicted cached image: {}", key);
+            logDebug("Evicted cached image: {}", key);
         });
     }
 
@@ -133,7 +134,7 @@ public final class ImageCache {
      */
     public static void clearCache() {
         CACHE.clear();
-        logger.info("Image cache cleared");
+        logInfo("Image cache cleared");
     }
 
     /**
@@ -165,7 +166,25 @@ public final class ImageCache {
 
         Thread.ofVirtual().name("image-preload").start(() -> {
             getImage(path, width, height);
-            logger.debug("Preloaded image: {}", key);
+            logDebug("Preloaded image: {}", key);
         });
+    }
+
+    private static void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
+    }
+
+    private static void logDebug(String message, Object... args) {
+        if (logger.isDebugEnabled()) {
+            logger.debug(message, args);
+        }
+    }
+
+    private static void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
     }
 }

@@ -21,6 +21,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -50,6 +51,8 @@ public class MatchesViewModel {
     private final IntegerProperty matchCount = new SimpleIntegerProperty(0);
     private final IntegerProperty likesReceivedCount = new SimpleIntegerProperty(0);
     private final IntegerProperty likesSentCount = new SimpleIntegerProperty(0);
+
+    private ErrorHandler errorHandler;
 
     private User currentUser;
 
@@ -89,6 +92,10 @@ public class MatchesViewModel {
         matches.clear();
         likesReceived.clear();
         likesSent.clear();
+    }
+
+    public void setErrorHandler(ErrorHandler handler) {
+        this.errorHandler = handler;
     }
 
     /** Refresh all sections for the current user. */
@@ -248,6 +255,7 @@ public class MatchesViewModel {
             refreshLikesSent();
         } catch (Exception e) {
             logWarn("Failed to withdraw like {}", like.likeId(), e);
+            notifyError("Failed to withdraw like", e);
         }
     }
 
@@ -260,6 +268,19 @@ public class MatchesViewModel {
     private void logWarn(String message, Object... args) {
         if (logger.isWarnEnabled()) {
             logger.warn(message, args);
+        }
+    }
+
+    private void notifyError(String userMessage, Exception e) {
+        if (errorHandler == null) {
+            return;
+        }
+        String detail = e.getMessage();
+        String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
+        if (Platform.isFxApplicationThread()) {
+            errorHandler.onError(message);
+        } else {
+            Platform.runLater(() -> errorHandler.onError(message));
         }
     }
 

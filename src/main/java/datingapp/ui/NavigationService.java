@@ -1,6 +1,7 @@
 package datingapp.ui;
 
 import datingapp.ui.controller.BaseController;
+import datingapp.ui.util.Toast;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -30,7 +31,10 @@ public final class NavigationService {
 
     private Stage primaryStage;
     private BorderPane rootLayout;
+    private StackPane rootStack;
     private ViewModelFactory viewModelFactory;
+
+    private Object navigationContext;
 
     /** Navigation history stack for back navigation. */
     private final Deque<ViewType> navigationHistory = new ArrayDeque<>();
@@ -96,11 +100,15 @@ public final class NavigationService {
         this.primaryStage = stage;
         this.rootLayout = new BorderPane();
 
-        Scene scene = new Scene(rootLayout, 900, 760);
+        this.rootStack = new StackPane(rootLayout);
+
+        Scene scene = new Scene(rootStack, 900, 760);
         // Load CSS theme
         String css =
                 Objects.requireNonNull(getClass().getResource("/css/theme.css")).toExternalForm();
         scene.getStylesheets().add(css);
+
+        Toast.setContainer(rootStack);
 
         primaryStage.setScene(scene);
     }
@@ -133,7 +141,7 @@ public final class NavigationService {
      */
     private void navigateWithTransition(ViewType viewType, TransitionType type, boolean addToHistory) {
         try {
-            logger.info("Navigating to: {} with transition: {}", viewType, type);
+            logInfo("Navigating to: {} with transition: {}", viewType, type);
 
             // Track navigation history (skip for back navigation)
             if (addToHistory) {
@@ -184,7 +192,7 @@ public final class NavigationService {
             }
 
         } catch (IOException e) {
-            logger.error("Failed to navigate to {}: {}", viewType, e.getMessage(), e);
+            logError("Failed to navigate to {}: {}", viewType, e.getMessage(), e);
         }
     }
 
@@ -271,5 +279,31 @@ public final class NavigationService {
 
     public ViewModelFactory getViewModelFactory() {
         return viewModelFactory;
+    }
+
+    public StackPane getRootStack() {
+        return rootStack;
+    }
+
+    public void setNavigationContext(Object context) {
+        this.navigationContext = context;
+    }
+
+    public Object consumeNavigationContext() {
+        Object context = navigationContext;
+        navigationContext = null;
+        return context;
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    private void logError(String message, Object... args) {
+        if (logger.isErrorEnabled()) {
+            logger.error(message, args);
+        }
     }
 }

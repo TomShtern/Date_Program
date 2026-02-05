@@ -37,18 +37,18 @@ public class StatsHandler {
     public void viewStatistics() {
         CliUtilities.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
-            logger.info("\n" + CliConstants.SEPARATOR_LINE);
-            logger.info(CliConstants.HEADER_YOUR_STATISTICS);
-            logger.info(CliConstants.SEPARATOR_LINE + "\n");
+            logInfo("\n" + CliConstants.SEPARATOR_LINE);
+            logInfo(CliConstants.HEADER_YOUR_STATISTICS);
+            logInfo(CliConstants.SEPARATOR_LINE + "\n");
 
             UserStats stats = statsService.getOrComputeStats(currentUser.getId());
             String computedAt = stats.computedAt().toString().substring(0, 16).replace("T", " ");
-            logger.info("  Last updated: {}\n", computedAt);
+            logInfo("  Last updated: {}\n", computedAt);
 
             // Activity section
-            logger.info(CliConstants.STATS_ACTIVITY);
-            logger.info(CliConstants.SECTION_LINE);
-            logger.info(
+            logInfo(CliConstants.STATS_ACTIVITY);
+            logInfo(CliConstants.SECTION_LINE);
+            logInfo(
                     "  Swipes given:     {} ({} likes, {} passes)",
                     stats.totalSwipesGiven(),
                     stats.likesGiven(),
@@ -61,18 +61,18 @@ public class StatsHandler {
                 likeRatioDesc = "(you're selective)";
             }
 
-            logger.info("  Like ratio:       {} {}", stats.getLikeRatioDisplay(), likeRatioDesc);
-            logger.info(
+            logInfo("  Like ratio:       {} {}", stats.getLikeRatioDisplay(), likeRatioDesc);
+            logInfo(
                     "  Swipes received:  {} ({} likes, {} passes)\n",
                     stats.totalSwipesReceived(),
                     stats.likesReceived(),
                     stats.passesReceived());
 
             // Matches section
-            logger.info(CliConstants.STATS_MATCHES);
-            logger.info(CliConstants.SECTION_LINE);
-            logger.info("  Total matches:    {}", stats.totalMatches());
-            logger.info("  Active matches:   {}", stats.activeMatches());
+            logInfo(CliConstants.STATS_MATCHES);
+            logInfo(CliConstants.SECTION_LINE);
+            logInfo("  Total matches:    {}", stats.totalMatches());
+            logInfo("  Active matches:   {}", stats.activeMatches());
 
             String matchRateDesc = "";
             if (stats.matchRate() > 0.2) {
@@ -81,12 +81,12 @@ public class StatsHandler {
                 matchRateDesc = "(below average)";
             }
 
-            logger.info("  Match rate:       {} {}\n", stats.getMatchRateDisplay(), matchRateDesc);
+            logInfo("  Match rate:       {} {}\n", stats.getMatchRateDisplay(), matchRateDesc);
 
             // Scores section
-            logger.info(CliConstants.STATS_SCORES);
-            logger.info(CliConstants.SECTION_LINE);
-            logger.info("  Reciprocity:      {} (of your likes, liked you back)", stats.getReciprocityDisplay());
+            logInfo(CliConstants.STATS_SCORES);
+            logInfo(CliConstants.SECTION_LINE);
+            logInfo("  Reciprocity:      {} (of your likes, liked you back)", stats.getReciprocityDisplay());
 
             String selectivenessDesc = "Average";
             if (stats.selectivenessScore() > 0.6) {
@@ -95,7 +95,7 @@ public class StatsHandler {
                 selectivenessDesc = "Below average (open-minded)";
             }
 
-            logger.info("  Selectiveness:    {}", selectivenessDesc);
+            logInfo("  Selectiveness:    {}", selectivenessDesc);
 
             String attractivenessDesc = "Average";
             if (stats.attractivenessScore() > 0.6) {
@@ -104,17 +104,17 @@ public class StatsHandler {
                 attractivenessDesc = "Below average";
             }
 
-            logger.info("  Attractiveness:   {}\n", attractivenessDesc);
+            logInfo("  Attractiveness:   {}\n", attractivenessDesc);
 
             // Safety section (only show if there's activity)
             if (stats.blocksGiven() > 0
                     || stats.blocksReceived() > 0
                     || stats.reportsGiven() > 0
                     || stats.reportsReceived() > 0) {
-                logger.info(CliConstants.STATS_SAFETY);
-                logger.info(CliConstants.SECTION_LINE);
-                logger.info("  Blocks: {} given | {} received", stats.blocksGiven(), stats.blocksReceived());
-                logger.info("  Reports: {} given | {} received\n", stats.reportsGiven(), stats.reportsReceived());
+                logInfo(CliConstants.STATS_SAFETY);
+                logInfo(CliConstants.SECTION_LINE);
+                logInfo("  Blocks: {} given | {} received", stats.blocksGiven(), stats.blocksReceived());
+                logInfo("  Reports: {} given | {} received\n", stats.reportsGiven(), stats.reportsReceived());
             }
 
             inputReader.readLine("Press Enter to return...");
@@ -130,26 +130,26 @@ public class StatsHandler {
             User currentUser = session.getCurrentUser();
             final List<UserAchievement> unlocked = achievementService.getUnlocked(currentUser.getId());
 
-            logger.info("\n" + CliConstants.SEPARATOR_LINE);
-            logger.info(CliConstants.HEADER_YOUR_ACHIEVEMENTS);
-            logger.info(CliConstants.SEPARATOR_LINE + "\n");
+            logInfo("\n" + CliConstants.SEPARATOR_LINE);
+            logInfo(CliConstants.HEADER_YOUR_ACHIEVEMENTS);
+            logInfo(CliConstants.SEPARATOR_LINE + "\n");
 
             if (unlocked.isEmpty()) {
-                logger.info("  No achievements yet. Keep swiping!\n");
+                logInfo("  No achievements yet. Keep swiping!\n");
             } else {
-                logger.info("  Unlocked: {} / ???\n", unlocked.size());
+                logInfo("  Unlocked: {} / ???\n", unlocked.size());
                 // I don't know total count easily without asking service for all definitions.
 
                 for (UserAchievement ua : unlocked) {
-                    logger.info(
+                    logInfo(
                             "  ✅ {} - {}",
                             ua.achievement().getDisplayName(),
                             ua.achievement().getDescription());
                     // Date formatting?
                     String dateStr = ua.unlockedAt().toString().substring(0, 10);
-                    logger.info("     (Unlocked: {})", dateStr);
+                    logInfo("     (Unlocked: {})", dateStr);
                 }
-                logger.info("");
+                logInfo("");
             }
 
             inputReader.readLine("Press Enter to return...");
@@ -160,14 +160,20 @@ public class StatsHandler {
     private void checkAndDisplayNewAchievements(User currentUser) {
         List<UserAchievement> newAchievements = achievementService.checkAndUnlock(currentUser.getId());
         if (!newAchievements.isEmpty()) {
-            logger.info("\n🏆 NEW ACHIEVEMENTS UNLOCKED! 🏆");
+            logInfo("\n🏆 NEW ACHIEVEMENTS UNLOCKED! 🏆");
             for (UserAchievement ua : newAchievements) {
-                logger.info(
+                logInfo(
                         "  ✨ {} - {}",
                         ua.achievement().getDisplayName(),
                         ua.achievement().getDescription());
             }
-            logger.info("");
+            logInfo("");
+        }
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
         }
     }
 }

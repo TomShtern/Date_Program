@@ -35,7 +35,7 @@ public class MatchQualityService {
      * from one user's
      * perspective (scores may differ slightly between perspectives).
      */
-    public static record MatchQuality(
+    public record MatchQuality(
             String matchId,
             UUID perspectiveUserId, // Whose perspective (for directional metrics)
             UUID otherUserId,
@@ -186,8 +186,7 @@ public class MatchQualityService {
          * @param overlapRatio shared / min(a.size, b.size), range [0.0, 1.0]
          * @param jaccardIndex shared / union, range [0.0, 1.0]
          */
-        public static record MatchResult(
-                Set<Interest> shared, int sharedCount, double overlapRatio, double jaccardIndex) {
+        public record MatchResult(Set<Interest> shared, int sharedCount, double overlapRatio, double jaccardIndex) {
             public MatchResult {
                 Objects.requireNonNull(shared, "shared cannot be null");
                 if (sharedCount < 0) {

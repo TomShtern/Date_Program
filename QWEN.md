@@ -22,10 +22,18 @@ The application has both CLI and UI interfaces, with the UI layer built using Ja
 ## Project Structure
 ```
 datingapp/
+├── app/           Application layer (CLI handlers, UI controllers)
+│   └── cli/       Console UI handlers
 ├── core/          Pure Java business logic (NO framework/database imports)
+│   ├── storage/   Storage interfaces (defined in core, implemented in storage/)
+│   └── Messaging.java  Messaging domain models (Message, Conversation)
+│   └── Preferences.java  User preferences (Interests, Lifestyle choices)
+│   └── Social.java       Social domain models (FriendRequest, Notification)
 ├── storage/       H2 database implementations
-├── cli/           Console UI handlers
-├── ui/            JavaFX UI layer (controllers, viewmodels, views)
+│   ├── jdbi/      JDBI adapter implementations
+│   ├── mapper/    Custom type mappers for JDBI
+│   └── DatabaseManager.java  Database connection and schema management
+└── ui/            JavaFX UI layer (controllers, viewmodels, views)
 └── Main.java      Application entry point
 ```
 
@@ -36,6 +44,9 @@ datingapp/
 4. **Immutability**: Use records for immutable data
 5. **State Machines**: Mutable entities have explicit state transitions
 6. **MVC Pattern**: UI layer follows Model-View-Controller pattern with ViewModels
+7. **Consolidated Storage**: Using JDBI for database access with SQL Object pattern
+8. **Centralized Configuration**: All configurable values in `AppConfig` record
+9. **Service Registry**: Single point of access for all services via `ServiceRegistry`
 
 ## Key Features (Phase 2.1)
 
@@ -48,14 +59,14 @@ datingapp/
 - `SwipeSession` - Mutable entity tracking continuous swiping activity
 - `MatchQuality` - Immutable record containing compatibility score (0-100), star rating (1-5), highlights
 - `Dealbreakers` - Immutable record defining user's filtering preferences
-- `Interest` - Enum of 37 predefined interests across 6 categories
-- `Achievement` - Enum of 11 gamification achievements across 4 categories
+- `Interest` - Enum of 37 predefined interests across 6 categories (OUTDOORS, ARTS & CULTURE, FOOD & DRINK, SPORTS & FITNESS, GAMES & TECH, SOCIAL)
+- `Achievement` - Enum of 11 gamification achievements across 4 categories (Matching Milestones, Behavior, Profile Excellence, Safety & Community)
 - `UserAchievement` - Immutable record linking users to unlocked achievements
 - `ProfileNote` - Immutable record for private notes about other users (max 500 chars)
-- `Conversation` - Mutable entity with deterministic ID (userA_userB where UUIDs are sorted lexicographically), per-user read timestamps
-- `Message` - Immutable record with max 1000 chars, timestamp, sender reference
-- `FriendRequest` - Immutable record for Friend Zone requests with status tracking
-- `Notification` - Immutable record for user notifications with type and metadata
+- `Messaging.Message` - Immutable record with max 1000 chars, timestamp, sender reference
+- `Messaging.Conversation` - Mutable entity with deterministic ID (userA_userB where UUIDs are sorted lexicographically), per-user read timestamps
+- `Social.FriendRequest` - Immutable record for Friend Zone requests with status tracking
+- `Social.Notification` - Immutable record for user notifications with type and metadata
 - `PacePreferences` - Immutable record tracking messaging frequency, time to first date, communication style, and depth preference
 
 ### Core Services
@@ -71,8 +82,8 @@ datingapp/
 - `MatchingService` - Records likes, creates matches on mutual like, integrates with UndoService
 - `ReportService` - Files reports with auto-blocking and configurable auto-ban threshold
 - `UndoService` - Allows users to undo their last swipe within configurable time window (default 30s)
-- `DailyLimitService` - Enforces daily quotas for likes (default 100/day) and passes (unlimited by default)
-- `MatchQualityService` - Calculates 5-factor compatibility scores (distance, age, interests, lifestyle, response time) with configurable weights
+- `DailyService` - Enforces daily quotas for likes (default 100/day) and passes (unlimited by default)
+- `MatchQualityService` - Calculates 5-factor compatibility scores (distance, age, interests, lifestyle, pace) with configurable weights
 - `DealbreakersEvaluator` - One-way filter evaluator applying lifestyle, physical, and age dealbreakers
 - `SessionService` - Manages swipe session lifecycle with timeout detection, velocity tracking
 - `ProfilePreviewService` - Generates profile completeness scores with actionable improvement tips
@@ -84,35 +95,26 @@ datingapp/
 - `ProfileCompletionService` - Comprehensive profile quality scoring
 - `VerificationService` - Profile verification workflow management
 - `MessagingService` - Full-featured messaging system with authorization checks
-- `PaceCompatibilityService` - Calculates compatibility scores (0-100) based on messaging frequency, time to first date, communication style, and depth preferences
 - `RelationshipTransitionService` - Manages relationship lifecycle transitions: Friend Zone requests and Graceful Exit
 
 ### Storage Interfaces (defined in `core/`, implemented in `storage/`)
 - `UserStorage`, `LikeStorage`, `MatchStorage`, `BlockStorage`, `ReportStorage`
 - `SwipeSessionStorage` - Session CRUD with timeout queries and aggregate statistics
-- `UserStatsStorage`, `PlatformStatsStorage` - Metrics persistence
-- `UserAchievementStorage` - Achievement unlock tracking with duplicate prevention
-- `DailyPickStorage` - Tracks daily pick view history per user
-- `ProfileNoteStorage` - Private notes CRUD operations
-- `ProfileViewStorage` - Profile view history tracking
-- `ConversationStorage` - Conversation CRUD with user-based queries and timestamp updates
-- `MessageStorage` - Message CRUD with pagination, counting, and cascade deletion
-- `FriendRequestStorage` - Friend request CRUD with status tracking and user queries
-- `NotificationStorage` - Notification CRUD with user-based queries and read status tracking
+- `StatsStorage` - Consolidated metrics persistence (user and platform stats)
+- `MessagingStorage` - Consolidated messaging persistence (conversations and messages)
+- `SocialStorage` - Consolidated social features persistence (friend requests and notifications)
 
 ### CLI Layer
 - `Main` - Orchestrator with menu loop and dependency wiring (in `datingapp/` package)
-- `UserManagementHandler` - User creation and selection
+- `HandlerFactory` - Factory for creating CLI handlers with proper dependency injection
 - `ProfileHandler` - Profile completion, dealbreakers configuration, profile preview
 - `MatchingHandler` - Candidate browsing, daily pick display, match viewing
 - `SafetyHandler` - Blocking and reporting
 - `StatsHandler` - Statistics and achievement display
 - `ProfileNotesHandler` - Private note-taking for profiles
 - `LikerBrowserHandler` - Browse incoming likes
-- `ProfileVerificationHandler` - Profile verification UI
 - `MessagingHandler` - Conversation list, message view, send/receive UI
 - `RelationshipHandler` - Friend Zone requests, notifications, and relationship transitions UI
-- `UserSession` - Tracks currently logged-in user
 - `InputReader` - I/O abstraction over Scanner
 - `CliConstants` - UI string constants and formatting
 
@@ -187,20 +189,16 @@ The application uses Haversine distance calculation for location-based matching:
 - Distance factor contributes 15% to match quality score (configurable)
 
 ## Match Quality Configuration
-The match quality system calculates compatibility across 5 factors with configurable weights:
+The match quality system calculates compatibility across 6 factors with configurable weights:
 
 - **Distance Score** (15% default): Linear decay from max distance
 - **Age Score** (10% default): Normalized against mutual age preferences
-- **Interest Score** (30% default): Overlap ratio via `InterestMatcher.compare()`
+- **Interest Score** (25% default): Overlap ratio via `InterestMatcher.compare()`
   - Uses `shared / min(setA, setB)` metric rewarding smaller set completeness
   - Returns 0.5 if neither has interests, 0.3 if only one has interests
-- **Lifestyle Score** (30% default): Smoking, drinking, kids, relationship goals
-- **Response Time Score** (15% default): Mutual like speed in tiers from <1hr to >1mo
-
-**Weight Presets:**
-- **Default**: Balanced distribution as above
-- **Proximity**: 35% distance, 10% age, 20% interests, 25% lifestyle, 10% response
-- **Lifestyle**: 10% distance, 10% age, 25% interests, 40% lifestyle, 15% response
+- **Lifestyle Score** (25% default): Smoking, drinking, kids, relationship goals
+- **Pace Score** (15% default): Compatibility based on messaging frequency, time to first date, communication style, and depth preferences
+- **Response Time Score** (10% default): Mutual like speed in tiers from <1hr to >1mo
 
 ## Dealbreakers Configuration
 The dealbreakers system allows users to set filtering preferences across multiple dimensions:
@@ -310,19 +308,22 @@ mvn clean verify package
 - **JaCoCo**: Code coverage (target: 80%+)
 
 ## Dependencies
-- **H2 Database**: 2.2.224 - Embedded database
-- **JUnit Jupiter**: 5.10.2 - Testing framework
-- **SLF4J API**: 2.0.12 - Logging facade
-- **Logback Classic**: 1.5.3 - Logging implementation
-- **Jackson**: Core and Databind - JSON support
-- **JavaFX**: Controls, FXML, Graphics (21.0.2) - UI framework
+- **H2 Database**: 2.4.240 - Embedded database
+- **JDBI**: 3.51.0 - Declarative SQL framework (core and sqlobject)
+- **JUnit Jupiter**: 5.14.2 - Testing framework
+- **SLF4J API**: 2.0.17 - Logging facade
+- **Logback Classic**: 1.5.25 - Logging implementation
+- **Jackson**: Core and Databind (2.21.0) - JSON support
+- **JavaFX**: Controls, FXML, Graphics (25.0.1) - UI framework
+- **AtlantaFX**: 2.1.0 - Modern theme based on GitHub Primer
+- **Ikonli**: Core, JavaFX, MaterialDesign2 pack (12.4.0) - Professional SVG icon library
 
 ## Configuration
-The application uses `AppConfig` with 15+ configurable parameters:
+The application uses `AppConfig` with 40+ configurable parameters:
 
 ### Matching & Discovery
-- `maxDistanceKm` (default: 50) - Maximum candidate search radius
-- `minAgeRange`, `maxAgeRange` (default: 18-100) - Global age boundaries
+- `maxDistanceKm` (default: 500) - Maximum candidate search radius
+- `minAgeRange`, `maxAgeRange` (default: 18-120) - Global age boundaries
 
 ### Daily Limits
 - `dailyLikeLimit` (default: 100) - Max likes per day (-1 = unlimited)
@@ -335,16 +336,46 @@ The application uses `AppConfig` with 15+ configurable parameters:
 ### Session Management
 - `sessionTimeoutMinutes` (default: 5) - Inactivity timeout for sessions
 - `maxSwipesPerSession` (default: 500) - Hard limit per session (anti-bot)
-- `suspiciousSwipeVelocity` (default: 30) - Swipes/min warning threshold
+- `suspiciousSwipeVelocity` (default: 30.0) - Swipes/min warning threshold
 
 ### Safety & Moderation
 - `autoBanThreshold` (default: 3) - Reports needed for auto-ban
 
 ### Match Quality
-- `matchQualityConfig` (default: balanced) - Weight distribution preset
-  - **Default**: 15% distance, 10% age, 30% interests, 30% lifestyle, 15% response
-  - **Proximity**: 35% distance, 10% age, 20% interests, 25% lifestyle, 10% response
-  - **Lifestyle**: 10% distance, 10% age, 25% interests, 40% lifestyle, 15% response
+- `distanceWeight` (default: 0.15) - Weight for distance score
+- `ageWeight` (default: 0.10) - Weight for age score
+- `interestWeight` (default: 0.25) - Weight for interest score
+- `lifestyleWeight` (default: 0.25) - Weight for lifestyle score
+- `paceWeight` (default: 0.15) - Weight for pace score
+- `responseWeight` (default: 0.10) - Weight for response time score
+
+### Algorithm Thresholds
+- `nearbyDistanceKm` (default: 5) - Distance considered "nearby"
+- `closeDistanceKm` (default: 10) - Distance considered "close"
+- `similarAgeDiff` (default: 2) - Age difference considered "similar"
+- `compatibleAgeDiff` (default: 5) - Age difference considered "compatible"
+- `minSharedInterests` (default: 3) - Min shared interests for "many"
+- `paceCompatibilityThreshold` (default: 50) - Min pace score for compatibility
+- `responseTimeExcellentHours` (default: 1) - Response time for "excellent"
+- `responseTimeGreatHours` (default: 24) - Response time for "great"
+- `responseTimeGoodHours` (default: 72) - Response time for "good"
+
+### Achievement Thresholds
+- `achievementMatchTier1` (default: 1) - First match milestone
+- `achievementMatchTier2` (default: 5) - Second match milestone
+- `achievementMatchTier3` (default: 10) - Third match milestone
+- `achievementMatchTier4` (default: 25) - Fourth match milestone
+- `achievementMatchTier5` (default: 50) - Fifth match milestone
+- `minSwipesForBehaviorAchievement` (default: 50) - Min swipes to evaluate behavior
+
+### Validation Bounds
+- `minAge` (default: 18) - Min legal age
+- `maxAge` (default: 120) - Max valid age
+- `minHeightCm` (default: 50) - Min valid height
+- `maxHeightCm` (default: 300) - Max valid height
+- `minDistanceKm` (default: 1) - Min search distance
+- `maxNameLength` (default: 100) - Max name length
+- `minAgeRangeSpan` (default: 5) - Min age range span
 
 ### Additional Configuration Options
 Beyond the basic configuration, the application supports additional settings:
@@ -357,7 +388,7 @@ Beyond the basic configuration, the application supports additional settings:
 
 ## Database Schema
 - Persistent data stored in `./data/dating.mv.db`
-- **Users table**: Stores user profiles with all attributes (location, preferences, interests, etc.)
+- **Users table**: Stores user profiles with all attributes (location, preferences, interests, lifestyle, verification, pace preferences, etc.)
 - **Likes table**: Records user interactions (likes/passes) with timestamps
 - **Matches table**: Stores mutual likes with deterministic IDs
 - **Blocks table**: Bidirectional blocking relationships
@@ -365,12 +396,15 @@ Beyond the basic configuration, the application supports additional settings:
 - **Conversations table**: Messaging conversations between matched users
 - **Messages table**: Individual messages with foreign key to conversations
 - **Swipe sessions table**: Session tracking with timestamps and counters
-- **User achievements table**: Gamification tracking
+- **User stats table**: User statistics snapshots
+- **Platform stats table**: Platform-wide statistics
 - **Daily pick views table**: Tracks which daily picks users have seen
-- **Profile notes table**: Private notes about other users
-- **Profile views table**: Tracks profile viewing history
+- **User achievements table**: Gamification tracking
 - **Friend requests table**: Friend zone request tracking
 - **Notifications table**: User notifications with read status
+- **Profile notes table**: Private notes about other users
+- **Profile views table**: Tracks profile viewing history
+- **Schema version table**: Tracks database schema version for migrations
 
 
 
@@ -412,10 +446,10 @@ Beyond the basic configuration, the application supports additional settings:
 - Collections: `alreadyInteracted`, `blockedUsers`, `sharedIntersects`
 
 ### Storage Pattern
-- **No ORM:** Raw JDBC with `DatabaseManager`
+- **JDBI Framework:** Using JDBI 3 with SQL Object pattern for database access
 - **SQL Patterns:**
   - All tables defined in `DatabaseManager.initSchema()` using `IF NOT EXISTS`
-  - Use `try-with-resources` for all JDBC objects
+  - Use JDBI's SQL Object pattern for type-safe queries
   - Wrap `SQLException` in custom `RuntimeException` (e.g., `StorageException`)
 - **Null Safety:** Use `Optional<T>` for all storage lookups and nullable service returns
 
@@ -708,6 +742,8 @@ public class H2NewStorage implements NewStorage {
 8. Return direct collection references
 9. Use Mockito or external mocking
 10. Update documentation without timestamp
+11. Use raw JDBC directly - always use JDBI
+12. Store services as static variables outside ServiceRegistry
 
 ### ✅ ALWAYS DO THIS
 1. Run `mvn spotless:apply` before committing
@@ -720,6 +756,8 @@ public class H2NewStorage implements NewStorage {
 8. Use factory methods for object creation (`create()`, `of()`, `fromDatabase()`)
 9. Check state before state transitions
 10. Update QWEN.md "Recent Updates" section with changes
+11. Use JDBI SQL Object pattern for database operations
+12. Access all services through ServiceRegistry
 
 ## Final Checklist Before Completion
 Before considering a task complete, verify:
@@ -728,19 +766,19 @@ Before considering a task complete, verify:
 3. Did I add a `@Nested` test class for this feature?
 4. Did I use `Optional` for null safety?
 
-## Current Status (Phase 2.1)
-- **Completed**: Basic matching, daily limits, undo, interests, achievements, messaging, relationship transitions, pace compatibility, daily pick
-- **In Development**: Notifications delivery, advanced UI features, friend zone workflows
-- **Architecture**: Clean, well-tested, extensible
+## Current Status (Phase 4)
+- **Completed**: Basic matching, daily limits, undo, interests, achievements, messaging, relationship transitions, verification, pace preferences, comprehensive stats, social features
+- **In Development**: Advanced UI features, notification delivery mechanisms
+- **Architecture**: Clean, well-tested, extensible with JDBI integration
 
 ## Known Limitations
 - No database transactions (undo deletions not atomic)
-- In-memory undo state (lost on restart)
 - Identity: Currently lacks a password/auth layer (anyone can select any user)
 - No proactive notifications delivery (UI alerts/email)
 - Media: Photo support uses string URLs; no actual image processing yet
 - Location: Geolocation is manual (users enter lat/lon coordinates)
 - JavaFX UI is experimental and not fully integrated
+- JDBI integration: Some complex queries may require custom solutions
 
 
 ## Key Files to Know
@@ -754,15 +792,19 @@ Before considering a task complete, verify:
 - `datingapp.ui.DatingApp` - JavaFX UI application entry point
 - `src/main/resources/logback.xml` - Logging configuration
 
-## Recent Additions (Phase 2.1)
+## Recent Additions (Phase 4)
+- **JDBI Integration**: Migration from raw JDBC to JDBI 3 for type-safe database access
+- **Service Registry Consolidation**: Unified service creation and dependency injection
 - **Messaging System**: Full conversation and message management
 - **Relationship Transitions**: Friend zone requests and graceful exit
-- **Notifications**: User notification system with read status
-- **Pace Compatibility**: 4-dimensional relationship pace matching
-- **UI Layer**: New JavaFX UI architecture with controllers and ViewModels
+- **Social Features**: Friend requests and notification system
+- **Enhanced User Profiles**: Verification system and pace preferences
 - **Interests System**: 37 predefined interests across 6 categories with matching algorithm
 - **Achievement System**: 11 gamification achievements across 4 categories
-- **Daily Pick**: Serendipitous daily discovery feature
+- **Advanced Matching**: Multi-factor compatibility scoring with configurable weights
+- **Comprehensive Stats**: User and platform statistics with snapshot system
+- **Profile Management**: Notes, views, and privacy controls
+- **Safety & Moderation**: Reporting, blocking, and verification systems
 
 This project serves as an excellent example of clean architecture principles applied to a real-world application with comprehensive testing and quality controls.
 

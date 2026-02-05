@@ -2,8 +2,11 @@ package datingapp.ui.controller;
 
 import datingapp.core.AppSession;
 import datingapp.ui.NavigationService;
+import datingapp.ui.component.UiComponents;
+import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.util.UiHelpers;
+import datingapp.ui.util.UiServices;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
 import java.util.Objects;
@@ -14,6 +17,7 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.layout.StackPane;
 import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +81,13 @@ public class DashboardController extends BaseController implements Initializable
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        viewModel.setErrorHandler(Toast::showError);
+
+        StackPane loadingOverlay = UiComponents.createLoadingOverlay();
+        registerOverlay(loadingOverlay);
+        loadingOverlay.visibleProperty().bind(viewModel.loadingProperty());
+        loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
+
         // Use Subscription API for memory-safe listener management
         addSubscription(viewModel.userNameProperty().subscribe(userNameLabel::setText));
         addSubscription(viewModel.dailyLikesStatusProperty().subscribe(statusLabel::setText));
@@ -99,6 +110,9 @@ public class DashboardController extends BaseController implements Initializable
             achievementsListView.setItems(viewModel.getRecentAchievements());
         }
 
+        // Load initial data (will trigger loading skeleton)
+        viewModel.refresh();
+
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
 
@@ -106,9 +120,6 @@ public class DashboardController extends BaseController implements Initializable
         setupResponsiveListener();
 
         wireNavigationButtons();
-
-        // Load initial data (will trigger loading skeleton)
-        viewModel.refresh();
     }
 
     /**
@@ -247,13 +258,9 @@ public class DashboardController extends BaseController implements Initializable
 
     @FXML
     private void handleLogout() {
-        javafx.scene.control.Alert alert =
-                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Logout");
-        alert.setHeaderText("Are you sure you want to logout?");
-        alert.setContentText("You will need to login again to access your account.");
-
-        if (alert.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL) == javafx.scene.control.ButtonType.OK) {
+        boolean confirmed = UiServices.showConfirmation(
+                "Confirm Logout", "Are you sure you want to log out?", "You will need to log in again to continue.");
+        if (confirmed) {
             logger.info("Logging out");
             AppSession.getInstance().logout();
             NavigationService.getInstance().getViewModelFactory().reset();

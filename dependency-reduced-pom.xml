@@ -125,10 +125,28 @@
               <goal>shade</goal>
             </goals>
             <configuration>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>module-info.class</exclude>
+                    <exclude>META-INF/versions/**/module-info.class</exclude>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>META-INF/LICENSE</exclude>
+                    <exclude>META-INF/NOTICE</exclude>
+                    <exclude>META-INF/MANIFEST.MF</exclude>
+                    <exclude>META-INF/substrate/**</exclude>
+                    <exclude>META-INF/native-image/**</exclude>
+                  </excludes>
+                </filter>
+              </filters>
               <transformers>
                 <transformer>
                   <mainClass>datingapp.Main</mainClass>
                 </transformer>
+                <transformer />
               </transformers>
             </configuration>
           </execution>
@@ -205,6 +223,7 @@
             <ruleset>rulesets/java/quickstart.xml</ruleset>
           </rulesets>
           <minimumTokens>100</minimumTokens>
+          <linkXRef>false</linkXRef>
           <failOnViolation>false</failOnViolation>
         </configuration>
       </plugin>

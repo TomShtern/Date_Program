@@ -176,7 +176,7 @@ public class SessionService {
     }
 
     /** Result of a swipe operation in the context of session tracking. */
-    public static record SwipeResult(boolean allowed, SwipeSession session, String warning, String blockedReason) {
+    public record SwipeResult(boolean allowed, SwipeSession session, String warning, String blockedReason) {
         public static SwipeResult success(SwipeSession session, String warning) {
             return new SwipeResult(true, session, warning, null);
         }

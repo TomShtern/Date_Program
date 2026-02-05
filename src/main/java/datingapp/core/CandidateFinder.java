@@ -169,7 +169,7 @@ public class CandidateFinder {
      * Results are sorted by distance (closest first).
      */
     public List<User> findCandidates(User seeker, List<User> allActive, Set<UUID> alreadyInteracted) {
-        logger.debug(
+        logDebug(
                 "Finding candidates for {} (state={}, gender={}, interestedIn={}, age={}, minAge={}, maxAge={})",
                 seeker.getName(),
                 seeker.getState(),
@@ -178,21 +178,21 @@ public class CandidateFinder {
                 seeker.getAge(),
                 seeker.getMinAge(),
                 seeker.getMaxAge());
-        logger.debug("Total active users to filter: {}", allActive.size());
-        logger.debug("Already interacted with: {} users", alreadyInteracted.size());
+        logDebug("Total active users to filter: {}", allActive.size());
+        logDebug("Already interacted with: {} users", alreadyInteracted.size());
 
         List<User> candidates = allActive.stream()
                 .filter(candidate -> {
                     boolean notSelf = !candidate.getId().equals(seeker.getId());
                     if (!notSelf) {
-                        logger.trace("Rejecting {}: IS SELF", candidate.getName());
+                        logTrace("Rejecting {}: IS SELF", candidate.getName());
                     }
                     return notSelf;
                 })
                 .filter(candidate -> {
                     boolean isActive = candidate.getState() == UserState.ACTIVE;
                     if (!isActive) {
-                        logger.debug(
+                        logDebug(
                                 "Rejecting {} ({}): NOT ACTIVE (state={})",
                                 candidate.getName(),
                                 candidate.getId(),
@@ -203,14 +203,14 @@ public class CandidateFinder {
                 .filter(candidate -> {
                     boolean notInteracted = !alreadyInteracted.contains(candidate.getId());
                     if (!notInteracted) {
-                        logger.trace("Rejecting {}: ALREADY INTERACTED", candidate.getName());
+                        logTrace("Rejecting {}: ALREADY INTERACTED", candidate.getName());
                     }
                     return notInteracted;
                 })
                 .filter(candidate -> {
                     boolean genderMatch = hasMatchingGenderPreferences(seeker, candidate);
                     if (!genderMatch) {
-                        logger.debug(
+                        logDebug(
                                 "Rejecting {} ({}): GENDER MISMATCH - seeker({})→interestedIn({}), candidate({})→interestedIn({})",
                                 candidate.getName(),
                                 candidate.getId(),
@@ -224,7 +224,7 @@ public class CandidateFinder {
                 .filter(candidate -> {
                     boolean ageMatch = hasMatchingAgePreferences(seeker, candidate);
                     if (!ageMatch) {
-                        logger.debug(
+                        logDebug(
                                 "Rejecting {} ({}): AGE MISMATCH - seeker(age={}, range={}-{}), candidate(age={}, range={}-{})",
                                 candidate.getName(),
                                 candidate.getId(),
@@ -240,27 +240,29 @@ public class CandidateFinder {
                 .filter(candidate -> {
                     boolean inDistance = isWithinDistance(seeker, candidate);
                     if (!inDistance) {
-                        double dist = distanceTo(seeker, candidate);
-                        logger.debug(
-                                "Rejecting {} ({}): TOO FAR - distance={}km, max={}km",
-                                candidate.getName(),
-                                candidate.getId(),
-                                String.format("%.1f", dist),
-                                seeker.getMaxDistanceKm());
+                        if (logger.isDebugEnabled()) {
+                            double dist = distanceTo(seeker, candidate);
+                            logDebug(
+                                    "Rejecting {} ({}): TOO FAR - distance={}km, max={}km",
+                                    candidate.getName(),
+                                    candidate.getId(),
+                                    String.format("%.1f", dist),
+                                    seeker.getMaxDistanceKm());
+                        }
                     }
                     return inDistance;
                 })
                 .filter(candidate -> {
                     boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate);
                     if (!passesDb) {
-                        logger.debug("Rejecting {} ({}): DEALBREAKER HIT", candidate.getName(), candidate.getId());
+                        logDebug("Rejecting {} ({}): DEALBREAKER HIT", candidate.getName(), candidate.getId());
                     }
                     return passesDb;
                 })
                 .sorted(Comparator.comparingDouble(c -> distanceTo(seeker, c))) // Sort by distance
                 .toList();
 
-        logger.info(
+        logInfo(
                 "CandidateFinder: Found {} candidates for {} (from {} active users)",
                 candidates.size(),
                 seeker.getName(),
@@ -324,14 +326,12 @@ public class CandidateFinder {
     /** Checks if the candidate is within the seeker's max distance preference. */
     private boolean isWithinDistance(User seeker, User candidate) {
         if (!hasLocation(seeker) || !hasLocation(candidate)) {
-            if (logger.isDebugEnabled()) {
-                logger.debug(
-                        "Skipping distance filter for {} ({}): missing location (seekerLatLon={}, candidateLatLon={}).",
-                        candidate.getName(),
-                        candidate.getId(),
-                        formatLatLon(seeker),
-                        formatLatLon(candidate));
-            }
+            logDebug(
+                    "Skipping distance filter for {} ({}): missing location (seekerLatLon={}, candidateLatLon={}).",
+                    candidate.getName(),
+                    candidate.getId(),
+                    formatLatLon(seeker),
+                    formatLatLon(candidate));
             return true;
         }
         double distance = distanceTo(seeker, candidate);
@@ -355,5 +355,23 @@ public class CandidateFinder {
             return "missing";
         }
         return String.format("%.4f, %.4f", user.getLat(), user.getLon());
+    }
+
+    private void logDebug(String message, Object... args) {
+        if (logger.isDebugEnabled()) {
+            logger.debug(message, args);
+        }
+    }
+
+    private void logTrace(String message, Object... args) {
+        if (logger.isTraceEnabled()) {
+            logger.trace(message, args);
+        }
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
     }
 }

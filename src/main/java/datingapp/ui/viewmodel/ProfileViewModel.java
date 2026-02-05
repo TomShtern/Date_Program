@@ -85,6 +85,8 @@ public class ProfileViewModel {
     /** Track background thread for cleanup on dispose. */
     private final AtomicReference<Thread> backgroundThread = new AtomicReference<>();
 
+    private ErrorHandler errorHandler;
+
     @SuppressWarnings("unused")
     public ProfileViewModel(UserStorage userStorage, ProfileCompletionService unused) {
         // ProfileCompletionService has static methods, so we ignore the parameter
@@ -102,6 +104,10 @@ public class ProfileViewModel {
             thread.interrupt();
         }
         selectedInterests.clear();
+    }
+
+    public void setErrorHandler(ErrorHandler handler) {
+        this.errorHandler = handler;
     }
 
     /**
@@ -220,6 +226,7 @@ public class ProfileViewModel {
             completionDetails.set(buildCompletionDetails(result));
         } catch (Exception e) {
             logError("Failed to calculate profile completion", e);
+            notifyError("Failed to calculate profile completion", e);
             completionStatus.set("--");
             completionDetails.set("Unable to calculate completion");
         }
@@ -298,7 +305,7 @@ public class ProfileViewModel {
             if (parts.length == 2) {
                 user.setLocation(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()));
             }
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignored) {
             logWarn("Could not parse location: {}", loc);
         }
     }
@@ -334,7 +341,7 @@ public class ProfileViewModel {
             if (min >= 18 && max <= 120 && min <= max) {
                 user.setAgeRange(min, max);
             }
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignored) {
             logWarn("Invalid age range values");
         }
 
@@ -343,7 +350,7 @@ public class ProfileViewModel {
             if (dist > 0 && dist <= 500) {
                 user.setMaxDistanceKm(dist);
             }
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignored) {
             logWarn("Invalid max distance value");
         }
     }
@@ -391,6 +398,19 @@ public class ProfileViewModel {
     private void logError(String message, Object... args) {
         if (logger.isErrorEnabled()) {
             logger.error(message, args);
+        }
+    }
+
+    private void notifyError(String userMessage, Exception e) {
+        if (errorHandler == null) {
+            return;
+        }
+        String detail = e.getMessage();
+        String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
+        if (Platform.isFxApplicationThread()) {
+            errorHandler.onError(message);
+        } else {
+            Platform.runLater(() -> errorHandler.onError(message));
         }
     }
 
@@ -618,7 +638,7 @@ public class ProfileViewModel {
 
             } catch (IOException e) {
                 logError("Failed to save profile photo", e);
-                Platform.runLater(() -> Toast.showError("Failed to save photo: " + e.getMessage()));
+                notifyError("Failed to save profile photo", e);
             }
         });
         backgroundThread.set(thread);

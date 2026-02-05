@@ -180,7 +180,7 @@ public class TrustSafetyService {
     }
 
     /** Result of a report action, including moderation outcome. */
-    public static record ReportResult(boolean success, boolean userWasBanned, String errorMessage) {
+    public record ReportResult(boolean success, boolean userWasBanned, String errorMessage) {
 
         public ReportResult {
             if (success && errorMessage != null) {

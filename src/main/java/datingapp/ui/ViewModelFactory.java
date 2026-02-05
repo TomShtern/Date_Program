@@ -82,7 +82,7 @@ public class ViewModelFactory {
      * Maps controller classes to their initialized instances with ViewModels.
      */
     public Object createController(Class<?> controllerClass) {
-        logger.debug("Creating controller: {}", controllerClass.getSimpleName());
+        logDebug("Creating controller: {}", controllerClass.getSimpleName());
 
         if (controllerClass == LoginController.class) {
             return new LoginController(getLoginViewModel());
@@ -128,7 +128,7 @@ public class ViewModelFactory {
                 | InvocationTargetException
                 | NoSuchMethodException e) {
             String controllerName = controllerClass.getName();
-            logger.error("Failed to create fallback controller: {}", controllerName, e);
+            logError("Failed to create fallback controller: {}", controllerName, e);
             throw new IllegalStateException("Failed to create fallback controller: " + controllerName, e);
         }
     }
@@ -216,5 +216,17 @@ public class ViewModelFactory {
         matchesViewModel = null;
         statsViewModel = null;
         preferencesViewModel = null;
+    }
+
+    private void logDebug(String message, Object... args) {
+        if (logger.isDebugEnabled()) {
+            logger.debug(message, args);
+        }
+    }
+
+    private void logError(String message, Object... args) {
+        if (logger.isErrorEnabled()) {
+            logger.error(message, args);
+        }
     }
 }

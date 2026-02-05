@@ -14,7 +14,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -47,6 +49,7 @@ public class MatchingViewModel {
     private final AtomicReference<Thread> backgroundThread = new AtomicReference<>();
 
     private final AtomicBoolean disposed = new AtomicBoolean(false);
+    private final AtomicInteger activeLoads = new AtomicInteger(0);
 
     private User lastSwipedCandidate;
     private User currentUser;
@@ -79,9 +82,7 @@ public class MatchingViewModel {
     public void initialize() {
         User user = ensureCurrentUser();
         if (user != null) {
-            // Load candidates in background to keep UI responsive
-            Thread thread = Thread.ofVirtual().start(this::refreshCandidates);
-            backgroundThread.set(thread);
+            refreshCandidates();
         }
     }
 
@@ -95,6 +96,8 @@ public class MatchingViewModel {
         if (thread != null && thread.isAlive()) {
             thread.interrupt();
         }
+        activeLoads.set(0);
+        setLoadingState(false);
     }
 
     /**
@@ -104,39 +107,53 @@ public class MatchingViewModel {
         if (disposed.get()) {
             return;
         }
-        if (ensureCurrentUser() == null) {
+        User user = ensureCurrentUser();
+        if (user == null) {
             logWarn("Cannot refresh candidates: no current user set");
+            activeLoads.set(0);
+            setLoadingState(false);
             return;
         }
 
-        javafx.application.Platform.runLater(() -> loading.set(true));
-        logInfo(
-                "Refreshing candidates for user: {} (state={}, isComplete={}, gender={}, interestedIn={})",
-                currentUser.getName(),
-                currentUser.getState(),
-                currentUser.isComplete(),
-                currentUser.getGender(),
-                currentUser.getInterestedIn());
+        beginLoading();
 
-        // Check if current user is ACTIVE - otherwise they cannot browse
-        if (currentUser.getState() != UserState.ACTIVE) {
-            logWarn(
-                    "Current user {} is NOT ACTIVE (state={}). Cannot browse candidates. Profile complete: {}",
-                    currentUser.getName(),
-                    currentUser.getState(),
-                    currentUser.isComplete());
-        }
+        Thread thread = Thread.ofVirtual().name("candidate-refresh").start(() -> {
+            List<User> candidates = null;
+            try {
+                logInfo(
+                        "Refreshing candidates for user: {} (state={}, isComplete={}, gender={}, interestedIn={})",
+                        user.getName(),
+                        user.getState(),
+                        user.isComplete(),
+                        user.getGender(),
+                        user.getInterestedIn());
 
-        List<User> candidates = candidateFinder.findCandidatesForUser(currentUser);
-        logInfo("Found {} candidates after filtering", candidates.size());
+                // Check if current user is ACTIVE - otherwise they cannot browse
+                if (user.getState() != UserState.ACTIVE) {
+                    logWarn(
+                            "Current user {} is NOT ACTIVE (state={}). Cannot browse candidates. Profile complete: {}",
+                            user.getName(),
+                            user.getState(),
+                            user.isComplete());
+                }
 
-        javafx.application.Platform.runLater(() -> {
-            candidateQueue.clear();
-            candidateQueue.addAll(candidates);
+                candidates = candidateFinder.findCandidatesForUser(user);
+                logInfo("Found {} candidates after filtering", candidates.size());
 
-            loading.set(false);
-            nextCandidate();
+            } catch (Exception e) {
+                logWarn("Failed to refresh candidates", e);
+            }
+            List<User> finalCandidates = candidates;
+            runOnFx(() -> {
+                if (!disposed.get() && finalCandidates != null) {
+                    candidateQueue.clear();
+                    candidateQueue.addAll(finalCandidates);
+                    nextCandidate();
+                }
+                endLoading();
+            });
         });
+        backgroundThread.set(thread);
     }
 
     /**
@@ -145,11 +162,11 @@ public class MatchingViewModel {
      */
     public void nextCandidate() {
         User next = candidateQueue.poll();
-        if (javafx.application.Platform.isFxApplicationThread()) {
+        if (Platform.isFxApplicationThread()) {
             currentCandidate.set(next);
             hasMoreCandidates.set(next != null);
         } else {
-            javafx.application.Platform.runLater(() -> {
+            Platform.runLater(() -> {
                 currentCandidate.set(next);
                 hasMoreCandidates.set(next != null);
             });
@@ -317,6 +334,36 @@ public class MatchingViewModel {
     private void logWarn(String message, Object... args) {
         if (logger.isWarnEnabled()) {
             logger.warn(message, args);
+        }
+    }
+
+    private void beginLoading() {
+        if (activeLoads.incrementAndGet() == 1) {
+            setLoadingState(true);
+        }
+    }
+
+    private void endLoading() {
+        int remaining = activeLoads.decrementAndGet();
+        if (remaining <= 0) {
+            activeLoads.set(0);
+            setLoadingState(false);
+        }
+    }
+
+    private void setLoadingState(boolean isLoading) {
+        runOnFx(() -> {
+            if (loading.get() != isLoading) {
+                loading.set(isLoading);
+            }
+        });
+    }
+
+    private void runOnFx(Runnable action) {
+        if (Platform.isFxApplicationThread()) {
+            action.run();
+        } else {
+            Platform.runLater(action);
         }
     }
 }

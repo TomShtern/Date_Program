@@ -23,11 +23,12 @@ All 581 tests must pass before beginning.
 
 ---
 
-## Task 1: CSS Focus States for All Button Types
+## Task 1: CSS Focus States for All Button Types ✅
 
 **Priority:** High (accessibility)
 **Effort:** 15-20 minutes
 **File:** `src/main/resources/css/theme.css`
+Status: ✅ Done on 2026-02-04
 
 ### Problem
 Only `.button:focused` has a focus style. Secondary, danger, icon, and action buttons lack `:focused` pseudo-class styles, making keyboard navigation invisible.
@@ -79,11 +80,12 @@ Add these CSS rules after their respective `:pressed` states:
 
 ---
 
-## Task 2: Add Missing Database Indexes
+## Task 2: Add Missing Database Indexes ✅
 
 **Priority:** Medium (performance)
 **Effort:** 10-15 minutes
 **File:** `src/main/java/datingapp/storage/DatabaseManager.java`
+Status: ✅ Done on 2026-02-04
 
 ### Problem
 Five indexes are missing for common query patterns. While not critical at small scale, these prevent performance issues as data grows.
@@ -108,7 +110,7 @@ stmt.execute("CREATE INDEX IF NOT EXISTS idx_daily_picks_user ON daily_pick_view
 
 ---
 
-## Task 3: Add Confirmation Dialogs
+## Task 3: Add Confirmation Dialogs ✅
 
 **Priority:** High (UX/data safety)
 **Effort:** 30-45 minutes
@@ -116,6 +118,7 @@ stmt.execute("CREATE INDEX IF NOT EXISTS idx_daily_picks_user ON daily_pick_view
 - `src/main/java/datingapp/ui/util/UiServices.java`
 - `src/main/java/datingapp/ui/controller/DashboardController.java`
 - `src/main/java/datingapp/ui/controller/ProfileController.java`
+Status: ✅ Done on 2026-02-04
 
 ### Problem
 Critical actions (logout, clear dealbreakers) execute immediately without confirmation, risking accidental data loss.
@@ -228,11 +231,12 @@ private void handleClearDealbreakers() {
 
 ---
 
-## Task 4: Add Error Toast Notifications in UI
+## Task 4: Add Error Toast Notifications in UI ✅
 
 **Priority:** High (UX)
 **Effort:** 45-60 minutes
 **Files:** Multiple ViewModel files in `src/main/java/datingapp/ui/viewmodel/`
+Status: ✅ Done on 2026-02-04
 
 ### Problem
 All catch blocks log errors but don't show user feedback. Users see silent failures.
@@ -298,13 +302,14 @@ viewModel.setErrorHandler(message ->
 
 ---
 
-## Task 5: Fix Match Popup → Chat Navigation
+## Task 5: Fix Match Popup → Chat Navigation ✅
 
 **Priority:** Medium (UX)
 **Effort:** 20-30 minutes
 **Files:**
 - `src/main/java/datingapp/ui/controller/MatchingController.java`
 - `src/main/java/datingapp/ui/NavigationService.java`
+Status: ✅ Done on 2026-02-04
 
 ### Problem
 After match popup, "Send Message" navigates to CHAT without setting conversation context. User sees empty chat.
@@ -378,11 +383,12 @@ public void selectConversationWithUser(UUID otherUserId) {
 
 ---
 
-## Task 6: Add Defensive Copy for PacePreferences
+## Task 6: Add Defensive Copy for PacePreferences ✅
 
 **Priority:** Low (code quality)
 **Effort:** 10 minutes
 **File:** `src/main/java/datingapp/core/User.java`
+Status: ✅ Done on 2026-02-04
 
 ### Problem
 `getPacePreferences()` returns direct reference, allowing external mutation.
@@ -407,11 +413,12 @@ If it's a record, this task is already complete. If it's a class, create a copy 
 
 ---
 
-## Task 7: Add Loading Spinners/Skeletons
+## Task 7: Add Loading Spinners/Skeletons ✅
 
 **Priority:** Low (UX polish)
 **Effort:** 45-60 minutes
 **Files:** Multiple controller and FXML files
+Status: ✅ Done on 2026-02-04
 
 ### Problem
 Loading states just dim content with no spinner, unclear if app is working.
@@ -492,11 +499,12 @@ loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
 
 ---
 
-## Task 8: Review and Clean Up stats.fxml ListView
+## Task 8: Review and Clean Up stats.fxml ListView ✅
 
 **Priority:** Low (tech debt)
 **Effort:** 15-20 minutes
 **File:** `src/main/resources/fxml/stats.fxml`
+Status: ✅ Done on 2026-02-04
 
 ### Problem
 Hidden ListView at line ~143 duplicates achievement card functionality.
@@ -546,7 +554,7 @@ mvn javafx:run
 
 ---
 
-## Commit Message Template
+## Commit Message Template - just commit. nothing else. do not change any branch and dont run any other commands, just commit, or dont!
 
 ```
 feat: Add foundational UI/UX and database improvements
@@ -558,9 +566,8 @@ feat: Add foundational UI/UX and database improvements
 - Fix match popup → chat navigation context passing
 - Add loading spinner overlay component
 
-Closes #[issue-number-if-applicable]
 
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.5 AI Agent
 ```
 
 ---

@@ -50,13 +50,13 @@ public class SafetyHandler {
     /** Allows the current user to block another user. */
     public void blockUser() {
         CliUtilities.requireLogin(() -> {
-            logger.info(CliConstants.HEADER_BLOCK_USER);
+            logInfo(CliConstants.HEADER_BLOCK_USER);
 
             User currentUser = session.getCurrentUser();
             List<User> blockableUsers = getBlockableUsers(currentUser);
 
             if (blockableUsers.isEmpty()) {
-                logger.info("No users to block.\n");
+                logInfo("No users to block.\n");
                 return;
             }
             User toBlock = selectUserFromList(blockableUsers, "\nSelect user to block (or 0 to cancel): ", false);
@@ -79,9 +79,9 @@ public class SafetyHandler {
                     }
                 });
 
-                logger.info("🚫 Blocked {}.\n", toBlock.getName());
+                logInfo("🚫 Blocked {}.\n", toBlock.getName());
             } else {
-                logger.info(CliConstants.CANCELLED);
+                logInfo(CliConstants.CANCELLED);
             }
         });
     }
@@ -91,16 +91,16 @@ public class SafetyHandler {
         CliUtilities.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             if (currentUser.getState() != UserState.ACTIVE) {
-                logger.info("\n⚠️  You must be ACTIVE to report users.\n");
+                logInfo("\n⚠️  You must be ACTIVE to report users.\n");
                 return;
             }
 
-            logger.info(CliConstants.HEADER_REPORT_USER);
+            logInfo(CliConstants.HEADER_REPORT_USER);
 
             List<User> reportableUsers = getReportableUsers(currentUser);
 
             if (reportableUsers.isEmpty()) {
-                logger.info("No users to report.\n");
+                logInfo("No users to report.\n");
                 return;
             }
 
@@ -130,22 +130,22 @@ public class SafetyHandler {
      * @return The selected report reason, or null if invalid
      */
     private Report.Reason selectReportReason() {
-        logger.info("\nReason for report:");
+        logInfo("\nReason for report:");
         Report.Reason[] reasons = Report.Reason.values();
         for (int i = 0; i < reasons.length; i++) {
-            logger.info("  {}. {}", i + 1, reasons[i]);
+            logInfo("  {}. {}", i + 1, reasons[i]);
         }
 
         String reasonInput = inputReader.readLine("Select reason: ");
         try {
             int reasonIdx = Integer.parseInt(reasonInput) - 1;
             if (reasonIdx < 0 || reasonIdx >= reasons.length) {
-                logger.info("❌ Invalid reason.\n");
+                logInfo("❌ Invalid reason.\n");
                 return null;
             }
             return reasons[reasonIdx];
         } catch (NumberFormatException _) {
-            logger.info("❌ Invalid input.\n");
+            logInfo("❌ Invalid input.\n");
             return null;
         }
     }
@@ -159,11 +159,11 @@ public class SafetyHandler {
             List<User> blockedUsers = trustSafetyService.getBlockedUsers(currentUser.getId());
 
             if (blockedUsers.isEmpty()) {
-                logger.info("\nYou haven't blocked anyone.\n");
+                logInfo("\nYou haven't blocked anyone.\n");
                 return;
             }
 
-            logger.info(CliConstants.HEADER_BLOCKED_USERS);
+            logInfo(CliConstants.HEADER_BLOCKED_USERS);
             User toUnblock = selectUserFromList(blockedUsers, "\nEnter number to unblock (or 0 to go back): ", true);
             if (toUnblock == null) {
                 return;
@@ -174,12 +174,12 @@ public class SafetyHandler {
                 boolean success = trustSafetyService.unblock(currentUser.getId(), toUnblock.getId());
 
                 if (success) {
-                    logger.info("✅ Unblocked {}.\n", toUnblock.getName());
+                    logInfo("✅ Unblocked {}.\n", toUnblock.getName());
                 } else {
-                    logger.info("❌ Failed to unblock user.\n");
+                    logInfo("❌ Failed to unblock user.\n");
                 }
             } else {
-                logger.info(CliConstants.CANCELLED);
+                logInfo(CliConstants.CANCELLED);
             }
         });
     }
@@ -209,13 +209,13 @@ public class SafetyHandler {
 
     private void handleReportResult(TrustSafetyService.ReportResult result, User reportedUser) {
         if (result.success()) {
-            logger.info("\n✅ Report submitted. {} has been blocked.", reportedUser.getName());
+            logInfo("\n✅ Report submitted. {} has been blocked.", reportedUser.getName());
             if (result.userWasBanned()) {
-                logger.info("⚠️  This user has been automatically BANNED due to multiple reports.");
+                logInfo("⚠️  This user has been automatically BANNED due to multiple reports.");
             }
-            logger.info("");
+            logInfo("");
         } else {
-            logger.info("\n❌ {}\n", result.errorMessage());
+            logInfo("\n❌ {}\n", result.errorMessage());
         }
     }
 
@@ -223,9 +223,9 @@ public class SafetyHandler {
         for (int i = 0; i < users.size(); i++) {
             User user = users.get(i);
             if (showState) {
-                logger.info("  {}. {} ({})", i + 1, user.getName(), user.getState());
+                logInfo("  {}. {} ({})", i + 1, user.getName(), user.getState());
             } else {
-                logger.info("  {}. {}", i + 1, user.getName());
+                logInfo("  {}. {}", i + 1, user.getName());
             }
         }
 
@@ -234,13 +234,13 @@ public class SafetyHandler {
             int idx = Integer.parseInt(input) - 1;
             if (idx < 0 || idx >= users.size()) {
                 if (idx != -1) {
-                    logger.info(CliConstants.INVALID_INPUT);
+                    logInfo(CliConstants.INVALID_INPUT);
                 }
                 return null;
             }
             return users.get(idx);
         } catch (NumberFormatException _) {
-            logger.info(CliConstants.INVALID_INPUT);
+            logInfo(CliConstants.INVALID_INPUT);
             return null;
         }
     }
@@ -255,14 +255,14 @@ public class SafetyHandler {
             User currentUser = session.getCurrentUser();
 
             if (Boolean.TRUE.equals(currentUser.isVerified())) {
-                logger.info("\n✅ Profile already verified ({}).\n", currentUser.getVerifiedAt());
+                logInfo("\n✅ Profile already verified ({}).\n", currentUser.getVerifiedAt());
                 return;
             }
 
-            logger.info("\n--- Profile Verification ---\n");
-            logger.info("1. Verify by email");
-            logger.info("2. Verify by phone");
-            logger.info("0. Back\n");
+            logInfo("\n--- Profile Verification ---\n");
+            logInfo("1. Verify by email");
+            logInfo("2. Verify by phone");
+            logInfo("0. Back\n");
 
             String choice = inputReader.readLine("Choice: ");
             switch (choice) {
@@ -270,7 +270,7 @@ public class SafetyHandler {
                     /* cancelled */ }
                 case "1" -> startVerification(currentUser, VerificationMethod.EMAIL);
                 case "2" -> startVerification(currentUser, VerificationMethod.PHONE);
-                default -> logger.info(CliConstants.INVALID_SELECTION);
+                default -> logInfo(CliConstants.INVALID_SELECTION);
             }
         });
     }
@@ -285,14 +285,14 @@ public class SafetyHandler {
         if (method == VerificationMethod.EMAIL) {
             String email = inputReader.readLine("Email: ");
             if (email == null || email.isBlank()) {
-                logger.info("❌ Email required.\n");
+                logInfo("❌ Email required.\n");
                 return;
             }
             user.setEmail(email.trim());
         } else {
             String phone = inputReader.readLine("Phone: ");
             if (phone == null || phone.isBlank()) {
-                logger.info("❌ Phone required.\n");
+                logInfo("❌ Phone required.\n");
                 return;
             }
             user.setPhone(phone.trim());
@@ -302,20 +302,26 @@ public class SafetyHandler {
         user.startVerification(method, generatedCode);
         userStorage.save(user);
 
-        logger.info("\n[SIMULATED DELIVERY] Your verification code is: {}\n", generatedCode);
+        logInfo("\n[SIMULATED DELIVERY] Your verification code is: {}\n", generatedCode);
 
         String inputCode = inputReader.readLine("Enter the code: ");
         if (!trustSafetyService.verifyCode(user, inputCode)) {
             if (trustSafetyService.isExpired(user.getVerificationSentAt())) {
-                logger.info("❌ Code expired. Please try again.\n");
+                logInfo("❌ Code expired. Please try again.\n");
             } else {
-                logger.info("❌ Incorrect code.\n");
+                logInfo("❌ Incorrect code.\n");
             }
             return;
         }
 
         user.markVerified();
         userStorage.save(user);
-        logger.info("✅ Profile verified!\n");
+        logInfo("✅ Profile verified!\n");
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
     }
 }

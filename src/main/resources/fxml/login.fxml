@@ -20,7 +20,7 @@
     <Region styleClass="login-glow login-glow-left" mouseTransparent="true" StackPane.alignment="TOP_LEFT"/>
     <Region styleClass="login-glow login-glow-right" mouseTransparent="true" StackPane.alignment="BOTTOM_RIGHT"/>
 
-    <VBox alignment="TOP_CENTER" maxWidth="520.0" minHeight="700.0" prefHeight="740.0"
+    <VBox alignment="TOP_CENTER" maxWidth="520.0" minHeight="0.0" prefHeight="-1.0" maxHeight="Infinity"
           spacing="16.0" styleClass="glass-card login-card">
         <padding>
             <Insets bottom="32.0" left="48.0" right="48.0" top="20.0" />
@@ -42,7 +42,7 @@
                 <TextField fx:id="filterField" promptText="Search by name, age, or status"
                            HBox.hgrow="ALWAYS" styleClass="login-search-field"/>
             </HBox>
-            <ListView fx:id="userListView" minHeight="320.0" prefHeight="440.0" maxHeight="480.0"
+            <ListView fx:id="userListView" minHeight="200.0" prefHeight="360.0" maxHeight="Infinity"
                       maxWidth="Infinity"
                       VBox.vgrow="ALWAYS" styleClass="login-user-list" />
             <Label styleClass="login-hint" wrapText="true" maxWidth="420.0"

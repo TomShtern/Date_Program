@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -41,6 +42,8 @@ public class LoginViewModel {
     private final StringProperty newUserAge = new SimpleStringProperty("");
     private final StringProperty errorMessage = new SimpleStringProperty("");
 
+    private ErrorHandler errorHandler;
+
     private User selectedUser;
 
     /** Track disposed state to prevent operations after cleanup. */
@@ -60,6 +63,10 @@ public class LoginViewModel {
         disposed.set(true);
         users.clear();
         filteredUsers.clear();
+    }
+
+    public void setErrorHandler(ErrorHandler handler) {
+        this.errorHandler = handler;
     }
 
     /**
@@ -302,6 +309,7 @@ public class LoginViewModel {
         } catch (Exception e) {
             logError("Failed to create user: {}", e.getMessage(), e);
             errorMessage.set("Failed to create user: " + e.getMessage());
+            notifyError("Failed to create user", e);
             return null;
         }
     }
@@ -336,6 +344,19 @@ public class LoginViewModel {
     private void logError(String message, Object... args) {
         if (logger.isErrorEnabled()) {
             logger.error(message, args);
+        }
+    }
+
+    private void notifyError(String userMessage, Exception e) {
+        if (errorHandler == null) {
+            return;
+        }
+        String detail = e.getMessage();
+        String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
+        if (Platform.isFxApplicationThread()) {
+            errorHandler.onError(message);
+        } else {
+            Platform.runLater(() -> errorHandler.onError(message));
         }
     }
 

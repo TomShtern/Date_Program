@@ -318,7 +318,9 @@ public class ProfileHandler {
                     currentUser.setInterests(interestSet);
                     logInfo("✅ Interests cleared.\n");
                 }
-                case "0" -> editing = false;
+                case "0" -> {
+                    editing = false;
+                }
                 default -> logInfo(CliConstants.INVALID_SELECTION);
             }
         }
@@ -390,7 +392,7 @@ public class ProfileHandler {
                 return null;
             }
             return idx;
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException e) {
             logInfo("⚠️  Invalid selection: {}", token);
             return null;
         }

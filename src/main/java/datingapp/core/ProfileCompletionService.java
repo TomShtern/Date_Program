@@ -14,7 +14,7 @@ public final class ProfileCompletionService {
     /**
      * Result of completion analysis.
      */
-    public static record CompletionResult(
+    public record CompletionResult(
             int score,
             String tier,
             int filledFields,
@@ -49,7 +49,7 @@ public final class ProfileCompletionService {
         }
 
         public String getTierEmoji() {
-            return ProfileCompletionService.tierEmojiForScore(score);
+            return tierEmojiForScore(score);
         }
 
         public String getDisplayString() {
@@ -60,8 +60,7 @@ public final class ProfileCompletionService {
     /**
      * Breakdown of completion by category.
      */
-    public static record CategoryBreakdown(
-            String category, int score, List<String> filledItems, List<String> missingItems) {
+    public record CategoryBreakdown(String category, int score, List<String> filledItems, List<String> missingItems) {
 
         public CategoryBreakdown {
             Objects.requireNonNull(category, "category cannot be null");
