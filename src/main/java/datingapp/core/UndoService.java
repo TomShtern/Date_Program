@@ -3,13 +3,13 @@ package datingapp.core;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.TransactionExecutor;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service for managing undo state and executing undo operations. Tracks the
@@ -17,64 +17,66 @@ import java.util.concurrent.ConcurrentHashMap;
  * with a configurable time window (default 30 seconds).
  *
  * <p>
- * Undo state is stored in-memory per user (not persisted to database). When a
- * user swipes, their
- * undo state is recorded. If they undo within the time window, the Like is
- * deleted and any
- * resulting Match is also deleted.
+ * Undo state is persisted to database via UndoState.Storage, surviving
+ * application restarts.
  *
  * <p>
  * Phase 1 feature: Undo Last Swipe
  *
  * <p>
- * KNOWN LIMITATIONS: - Like and Match deletions are NOT in a transaction. If
- * Match deletion
- * fails after Like deletion, the system may be left in an inconsistent state.
- * For production
- * systems with concurrent writes, wrap deletions in database transactions. -
- * In-memory undo state
- * uses lazy cleanup (expired entries removed on access). Long-running
- * applications with many users
- * may accumulate stale entries. Consider implementing periodic cleanup or using
- * a time-expiring
- * cache library (e.g., Caffeine) for future versions. - For multi-threaded or
- * web deployments,
- * TOCTOU (time-of-check-to-time-of-use) race conditions may occur between
- * expiry checks and user
- * input. Current implementation is acceptable for single-user console
- * application.
+ * TRANSACTION SUPPORT: When a TransactionExecutor is provided, Like and Match deletions
+ * are executed atomically within a database transaction, ensuring data consistency.
+ * If no TransactionExecutor is provided, operations fall back to non-atomic deletes.
  */
 public class UndoService {
 
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
+    private final UndoState.Storage undoStorage;
     private final AppConfig config;
     private final Clock clock;
-
-    // In-memory state per user: userId -> UndoState
-    private final Map<UUID, UndoState> undoStates = new ConcurrentHashMap<>();
+    private TransactionExecutor transactionExecutor;
 
     /**
-     * Constructor for UndoService.
+     * Constructor for UndoService with persistent storage.
+     * Use {@link #setTransactionExecutor} to enable atomic undo operations.
      *
      * @param likeStorage  Storage interface for managing likes
      * @param matchStorage Storage interface for managing matches
+     * @param undoStorage  Storage interface for persisting undo state
      * @param config       Application configuration with undo window setting
      */
-    public UndoService(LikeStorage likeStorage, MatchStorage matchStorage, AppConfig config) {
-        this(likeStorage, matchStorage, config, Clock.systemUTC());
+    public UndoService(
+            LikeStorage likeStorage, MatchStorage matchStorage, UndoState.Storage undoStorage, AppConfig config) {
+        this(likeStorage, matchStorage, undoStorage, config, Clock.systemUTC());
     }
 
-    UndoService(LikeStorage likeStorage, MatchStorage matchStorage, AppConfig config, Clock clock) {
-        this.likeStorage = likeStorage;
-        this.matchStorage = matchStorage;
-        this.config = config;
+    UndoService(
+            LikeStorage likeStorage,
+            MatchStorage matchStorage,
+            UndoState.Storage undoStorage,
+            AppConfig config,
+            Clock clock) {
+        this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
+        this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
+        this.undoStorage = Objects.requireNonNull(undoStorage, "undoStorage cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
         this.clock = Objects.requireNonNull(clock, "clock cannot be null");
     }
 
     /**
+     * Sets the transaction executor for atomic undo operations.
+     * When set, undo operations will be performed atomically within a database transaction.
+     *
+     * @param transactionExecutor The executor for atomic operations
+     */
+    public void setTransactionExecutor(TransactionExecutor transactionExecutor) {
+        this.transactionExecutor = transactionExecutor;
+    }
+
+    /**
      * Records a swipe for potential undo. Called after each like/pass action to
-     * store the undo state.
+     * store the undo state. Persists to database.
      *
      * @param userId       The user who swiped
      * @param like         The like/pass that was recorded
@@ -82,30 +84,31 @@ public class UndoService {
      */
     public void recordSwipe(UUID userId, Like like, Match matchCreated) {
         Instant expiresAt = Instant.now(clock).plusSeconds(config.undoWindowSeconds());
+        String matchId = matchCreated != null ? matchCreated.getId() : null;
 
-        UndoState state = new UndoState(like, matchCreated != null ? matchCreated.getId() : null, expiresAt);
-
-        undoStates.put(userId, state);
+        UndoState state = UndoState.create(userId, like, matchId, expiresAt);
+        undoStorage.save(state);
     }
 
     /**
      * Checks if a user can undo their last swipe. Returns false if no undo state
-     * exists or the window
-     * has expired. Lazy cleanup: removes expired state on access.
+     * exists or the window has expired. Removes expired state on access.
      *
      * @param userId The user to check
      * @return true if undo is available and not expired
      */
     public boolean canUndo(UUID userId) {
-        UndoState state = undoStates.get(userId);
+        Optional<UndoState> optState = undoStorage.findByUserId(userId);
 
-        if (state == null) {
+        if (optState.isEmpty()) {
             return false;
         }
 
+        UndoState state = optState.get();
+
         // Check if window has expired
-        if (Instant.now(clock).isAfter(state.expiresAt)) {
-            undoStates.remove(userId);
+        if (state.isExpired(Instant.now(clock))) {
+            undoStorage.delete(userId);
             return false;
         }
 
@@ -114,63 +117,72 @@ public class UndoService {
 
     /**
      * Gets the seconds remaining for the current undo window. Returns 0 if no undo
-     * available or
-     * expired.
+     * available or expired.
      *
      * @param userId The user to check
      * @return Seconds remaining (0 if expired or no state)
      */
     public int getSecondsRemaining(UUID userId) {
-        UndoState state = undoStates.get(userId);
+        Optional<UndoState> optState = undoStorage.findByUserId(userId);
 
-        if (state == null) {
+        if (optState.isEmpty()) {
             return 0;
         }
 
-        long seconds = Duration.between(Instant.now(clock), state.expiresAt).getSeconds();
+        long seconds =
+                Duration.between(Instant.now(clock), optState.get().expiresAt()).getSeconds();
         return Math.max(0, (int) seconds);
     }
 
     /**
      * Executes an undo operation. Validates that undo is available, then deletes
-     * the Like and any
-     * resulting Match. Clears the undo state so the same action cannot be undone
-     * twice.
+     * the Like and any resulting Match. Clears the undo state so the same action
+     * cannot be undone twice.
+     *
+     * <p>When a TransactionExecutor is configured, deletions are performed atomically.
      *
      * @param userId The user requesting the undo
      * @return UndoResult with success status, message, and side effects
      */
     public UndoResult undo(UUID userId) {
-        UndoState state = undoStates.get(userId);
+        Optional<UndoState> optState = undoStorage.findByUserId(userId);
 
         // Validation: No undo state
-        if (state == null) {
+        if (optState.isEmpty()) {
             return UndoResult.failure("No swipe to undo");
         }
 
+        UndoState state = optState.get();
+
         // Validation: Window expired
-        if (Instant.now(clock).isAfter(state.expiresAt)) {
-            undoStates.remove(userId);
+        if (state.isExpired(Instant.now(clock))) {
+            undoStorage.delete(userId);
             return UndoResult.failure("Undo window expired");
         }
 
-        // Execute undo
-        boolean matchDeleted = false;
-
+        // Execute undo - use transaction if available
         try {
-            // Delete the Like from database
-            likeStorage.delete(state.like.id());
+            boolean matchDeleted = state.matchId() != null;
 
-            // If a match was created, delete it too (cascade)
-            if (state.matchId != null) {
-                matchStorage.delete(state.matchId);
-                matchDeleted = true;
+            if (transactionExecutor != null) {
+                // Atomic delete using transaction
+                boolean success =
+                        transactionExecutor.atomicUndoDelete(state.like().id(), state.matchId());
+                if (!success) {
+                    return UndoResult.failure("Like not found in database");
+                }
+            } else {
+                // Fallback to non-atomic deletes (backward compatibility)
+                likeStorage.delete(state.like().id());
+                if (matchDeleted) {
+                    matchStorage.delete(state.matchId());
+                }
             }
 
             // Clear undo state (no re-undo)
-            undoStates.remove(userId);
+            undoStorage.delete(userId);
 
-            return UndoResult.success(state.like, matchDeleted);
+            return UndoResult.success(state.like(), matchDeleted);
 
         } catch (Exception e) {
             // Return error but don't clear state (user might retry)
@@ -180,37 +192,26 @@ public class UndoService {
 
     /**
      * Manually clears the undo state for a user. Called when starting a new swipe
-     * or on explicit
-     * expiry.
+     * or on explicit expiry.
      *
      * @param userId The user to clear
      */
     public void clearUndo(UUID userId) {
-        undoStates.remove(userId);
+        undoStorage.delete(userId);
     }
 
-    // ===== Inner Classes =====
-
     /**
-     * Represents the undo state for a single swipe action. Immutable - created
-     * once, never modified.
+     * Cleans up expired undo states. Should be called periodically.
+     *
+     * @return Number of expired states removed
      */
-    private static class UndoState {
-        final Like like;
-        final String matchId; // null if no match was created
-        final Instant expiresAt;
-
-        UndoState(Like like, String matchId, Instant expiresAt) {
-            this.like = like;
-            this.matchId = matchId;
-            this.expiresAt = expiresAt;
-        }
+    public int cleanupExpired() {
+        return undoStorage.deleteExpired(Instant.now(clock));
     }
 
     /**
      * Result of an undo operation. Immutable record containing success status,
-     * message, and side
-     * effects.
+     * message, and side effects.
      */
     public record UndoResult(boolean success, String message, Like undoneSwipe, boolean matchDeleted) {
 

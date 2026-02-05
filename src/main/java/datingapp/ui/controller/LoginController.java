@@ -1,5 +1,6 @@
 package datingapp.ui.controller;
 
+import datingapp.core.AppConfig;
 import datingapp.core.Gender;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
@@ -97,8 +98,9 @@ public class LoginController extends BaseController implements Initializable {
     private static final String LABEL_GENDER = "Gender:";
     private static final String LABEL_INTERESTED_IN = "Interested In:";
     private static final String PROMPT_ENTER_NAME = "Enter your name";
-    private static final int AGE_MIN = 18;
-    private static final int AGE_MAX = 100;
+    private static final AppConfig CONFIG = AppConfig.defaults();
+    private static final int AGE_MIN = CONFIG.minAge();
+    private static final int AGE_MAX = CONFIG.maxAge();
     private static final int AGE_DEFAULT = 25;
 
     // Log Messages

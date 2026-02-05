@@ -680,5 +680,10 @@ class StatsServiceTest {
         public int countUnlockedAchievements(UUID userId) {
             return achievements.getOrDefault(userId, Collections.emptyList()).size();
         }
+
+        @Override
+        public int deleteExpiredDailyPickViews(Instant cutoff) {
+            return 0; // Not needed for stats tests
+        }
     }
 }

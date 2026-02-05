@@ -64,6 +64,7 @@ public final class Main {
                     case "17" -> handlers.messaging().showConversations();
                     case "18" -> handlers.relationship().viewNotifications();
                     case "19" -> handlers.relationship().viewPendingRequests();
+                    case "20" -> handlers.matching().viewStandouts();
                     case "0" -> {
                         running = false;
                         logInfo("\n👋 Goodbye!\n");
@@ -151,6 +152,7 @@ public final class Main {
         logInfo("  17. 💬 Conversations{}", unreadStr);
         logInfo("  18. 🔔 Notifications");
         logInfo("  19. 🤝 Friend Requests");
+        logInfo("  20. 🌟 View Standouts");
         logInfo("  0. Exit");
         logInfo(CliConstants.SEPARATOR_LINE + "\n");
     }

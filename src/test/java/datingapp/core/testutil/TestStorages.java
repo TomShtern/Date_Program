@@ -1,6 +1,7 @@
 package datingapp.core.testutil;
 
 import datingapp.core.Match;
+import datingapp.core.Standout;
 import datingapp.core.User;
 import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Block;
@@ -355,6 +356,110 @@ public final class TestStorages {
 
         private String key(UUID from, UUID to) {
             return from.toString() + "->" + to.toString();
+        }
+    }
+
+    /**
+     * In-memory Standout.Storage implementation for testing.
+     */
+    public static class Standouts implements Standout.Storage {
+        private final Map<String, List<Standout>> standoutsByDate = new HashMap<>();
+
+        @Override
+        public void saveStandouts(UUID seekerId, List<Standout> standouts, java.time.LocalDate date) {
+            standoutsByDate.put(key(seekerId, date), new ArrayList<>(standouts));
+        }
+
+        @Override
+        public List<Standout> getStandouts(UUID seekerId, java.time.LocalDate date) {
+            return standoutsByDate.getOrDefault(key(seekerId, date), List.of());
+        }
+
+        @Override
+        public void markInteracted(UUID seekerId, UUID standoutUserId, java.time.LocalDate date) {
+            List<Standout> list = standoutsByDate.get(key(seekerId, date));
+            if (list != null) {
+                for (int i = 0; i < list.size(); i++) {
+                    Standout s = list.get(i);
+                    if (s.standoutUserId().equals(standoutUserId)) {
+                        list.set(i, s.withInteraction(java.time.Instant.now()));
+                        break;
+                    }
+                }
+            }
+        }
+
+        @Override
+        public int cleanup(java.time.LocalDate before) {
+            int removed = 0;
+            var iter = standoutsByDate.entrySet().iterator();
+            while (iter.hasNext()) {
+                var entry = iter.next();
+                java.time.LocalDate date =
+                        java.time.LocalDate.parse(entry.getKey().split("\\|")[1]);
+                if (date.isBefore(before)) {
+                    removed += entry.getValue().size();
+                    iter.remove();
+                }
+            }
+            return removed;
+        }
+
+        private String key(UUID seekerId, java.time.LocalDate date) {
+            return seekerId.toString() + "|" + date.toString();
+        }
+
+        public void clear() {
+            standoutsByDate.clear();
+        }
+    }
+
+    /**
+     * In-memory UndoState.Storage implementation for testing.
+     */
+    public static class Undos implements datingapp.core.UndoState.Storage {
+        private final Map<UUID, datingapp.core.UndoState> undoStates = new HashMap<>();
+
+        @Override
+        public void save(datingapp.core.UndoState state) {
+            undoStates.put(state.userId(), state);
+        }
+
+        @Override
+        public java.util.Optional<datingapp.core.UndoState> findByUserId(UUID userId) {
+            return java.util.Optional.ofNullable(undoStates.get(userId));
+        }
+
+        @Override
+        public boolean delete(UUID userId) {
+            return undoStates.remove(userId) != null;
+        }
+
+        @Override
+        public int deleteExpired(Instant now) {
+            int removed = 0;
+            var iter = undoStates.entrySet().iterator();
+            while (iter.hasNext()) {
+                var entry = iter.next();
+                if (entry.getValue().isExpired(now)) {
+                    iter.remove();
+                    removed++;
+                }
+            }
+            return removed;
+        }
+
+        @Override
+        public java.util.List<datingapp.core.UndoState> findAll() {
+            return new java.util.ArrayList<>(undoStates.values());
+        }
+
+        public void clear() {
+            undoStates.clear();
+        }
+
+        public int size() {
+            return undoStates.size();
         }
     }
 }

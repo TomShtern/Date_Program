@@ -288,6 +288,8 @@ public final class DatabaseManager {
             createSocialSchema(stmt);
             createModerationSchema(stmt);
             createProfileSchema(stmt);
+            createStandoutsSchema(stmt);
+            createUndoStateSchema(stmt);
 
             // Additional indexes for query optimization (kept here for consistency)
             stmt.execute(
@@ -470,6 +472,51 @@ public final class DatabaseManager {
 
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_id ON profile_views(viewed_id)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_profile_views_viewed_at ON profile_views(viewed_at DESC)");
+    }
+
+    /**
+     * Creates standouts table for daily ranked matches.
+     */
+    private void createStandoutsSchema(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS standouts (
+                    id UUID PRIMARY KEY,
+                    seeker_id UUID NOT NULL,
+                    standout_user_id UUID NOT NULL,
+                    featured_date DATE NOT NULL,
+                    rank INT NOT NULL,
+                    score INT NOT NULL,
+                    reason VARCHAR(200) NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    interacted_at TIMESTAMP,
+                    FOREIGN KEY (seeker_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (standout_user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    CONSTRAINT uk_standouts_daily UNIQUE (seeker_id, standout_user_id, featured_date)
+                )
+                """);
+
+        stmt.execute(
+                "CREATE INDEX IF NOT EXISTS idx_standouts_seeker_date ON standouts(seeker_id, featured_date DESC)");
+    }
+
+    /**
+     * Creates undo states table for persisting undo operations across restarts.
+     */
+    private void createUndoStateSchema(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS undo_states (
+                    user_id UUID PRIMARY KEY,
+                    like_id UUID NOT NULL,
+                    who_likes UUID NOT NULL,
+                    who_got_liked UUID NOT NULL,
+                    direction VARCHAR(10) NOT NULL,
+                    like_created_at TIMESTAMP NOT NULL,
+                    match_id VARCHAR(100),
+                    expires_at TIMESTAMP NOT NULL
+                )
+                """);
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_undo_states_expires ON undo_states(expires_at)");
     }
 
     /**

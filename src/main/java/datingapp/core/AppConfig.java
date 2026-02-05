@@ -62,7 +62,9 @@ public record AppConfig(
         double interestWeight, // Weight for interest score (0.25 default)
         double lifestyleWeight, // Weight for lifestyle score (0.25 default)
         double paceWeight, // Weight for pace score (0.15 default)
-        double responseWeight // Weight for response time score (0.10 default)
+        double responseWeight, // Weight for response time score (0.10 default)
+        // Cleanup configuration
+        int cleanupRetentionDays // Days to retain expired data before cleanup (30 default)
         ) {
     public AppConfig {
         Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
@@ -114,6 +116,7 @@ public record AppConfig(
         requireNonNegative("lifestyleWeight", lifestyleWeight);
         requireNonNegative("paceWeight", paceWeight);
         requireNonNegative("responseWeight", responseWeight);
+        requireNonNegative("cleanupRetentionDays", cleanupRetentionDays);
     }
 
     private static void requireNonNegative(String name, int value) {
@@ -175,7 +178,9 @@ public record AppConfig(
                 0.25, // interestWeight
                 0.25, // lifestyleWeight
                 0.15, // paceWeight
-                0.10 // responseWeight
+                0.10, // responseWeight
+                // Cleanup configuration
+                30 // cleanupRetentionDays
                 );
     }
 
@@ -246,6 +251,8 @@ public record AppConfig(
         private double lifestyleWeight = 0.25;
         private double paceWeight = 0.15;
         private double responseWeight = 0.10;
+        // Cleanup configuration
+        private int cleanupRetentionDays = 30;
 
         public Builder autoBanThreshold(int v) {
             this.autoBanThreshold = v;
@@ -457,6 +464,11 @@ public record AppConfig(
             return this;
         }
 
+        public Builder cleanupRetentionDays(int v) {
+            this.cleanupRetentionDays = v;
+            return this;
+        }
+
         public AppConfig build() {
             return new AppConfig(
                     autoBanThreshold,
@@ -500,7 +512,8 @@ public record AppConfig(
                     interestWeight,
                     lifestyleWeight,
                     paceWeight,
-                    responseWeight);
+                    responseWeight,
+                    cleanupRetentionDays);
         }
     }
 }

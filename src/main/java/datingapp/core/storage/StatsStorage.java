@@ -116,4 +116,17 @@ public interface StatsStorage {
 
     /** Counts total achievements unlocked by a user. */
     int countUnlockedAchievements(UUID userId);
+
+    // ═══════════════════════════════════════════════════════════════
+    // Cleanup Operations
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Deletes expired daily pick view records older than the cutoff date.
+     * Used by CleanupService to purge stale tracking data.
+     *
+     * @param cutoff Records older than this instant will be deleted
+     * @return Number of records deleted
+     */
+    int deleteExpiredDailyPickViews(Instant cutoff);
 }

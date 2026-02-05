@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
 import datingapp.core.Gender;
@@ -40,6 +41,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ProfileViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
+    private static final AppConfig CONFIG = AppConfig.defaults();
     private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
     private static final String NONE_SET_LABEL = "None set";
 
@@ -338,10 +340,10 @@ public class ProfileViewModel {
         try {
             int min = Integer.parseInt(minAge.get());
             int max = Integer.parseInt(maxAge.get());
-            if (min >= 18 && max <= 120 && min <= max) {
+            if (min >= CONFIG.minAge() && max <= CONFIG.maxAge() && min <= max) {
                 user.setAgeRange(min, max);
             }
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException e) {
             logWarn("Invalid age range values");
         }
 
@@ -350,7 +352,7 @@ public class ProfileViewModel {
             if (dist > 0 && dist <= 500) {
                 user.setMaxDistanceKm(dist);
             }
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException e) {
             logWarn("Invalid max distance value");
         }
     }
@@ -687,9 +689,9 @@ public class ProfileViewModel {
             return;
         }
         int age = Period.between(selected, today).getYears();
-        if (age < 18 || age > 120) {
+        if (age < CONFIG.minAge() || age > CONFIG.maxAge()) {
             logWarn("Birth date outside allowed age range: {}", selected);
-            Toast.showWarning("Birth date must be for ages 18-120");
+            Toast.showWarning("Birth date must be for ages " + CONFIG.minAge() + "-" + CONFIG.maxAge());
             return;
         }
         user.setBirthDate(selected);

@@ -19,11 +19,12 @@ public final class AppBootstrap {
 
     /**
      * Initializes the application with default configuration.
+     * Loads config from ./config/app-config.json if present, otherwise uses defaults.
      *
      * @return The initialized ServiceRegistry
      */
     public static synchronized ServiceRegistry initialize() {
-        return initialize(AppConfig.defaults());
+        return initialize(ConfigLoader.load());
     }
 
     /**

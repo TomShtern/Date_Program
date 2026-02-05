@@ -108,6 +108,14 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
     }
 
     /**
+     * Permanently deletes expired session records older than the cutoff date.
+     * Used by CleanupService to purge old session data.
+     */
+    @SqlUpdate("DELETE FROM swipe_sessions WHERE started_at < :cutoff")
+    @Override
+    int deleteExpiredSessions(@Bind("cutoff") Instant cutoff);
+
+    /**
      * Row mapper for SwipeSession records - inlined from former SwipeSessionMapper
      * class.
      */

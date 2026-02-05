@@ -245,5 +245,10 @@ class SessionServiceTest {
             }
             return count;
         }
+
+        @Override
+        public int deleteExpiredSessions(Instant cutoff) {
+            return 0; // Not needed for session tests
+        }
     }
 }

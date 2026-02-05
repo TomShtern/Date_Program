@@ -50,6 +50,15 @@ public interface SwipeSessionStorage {
      */
     int endStaleSessions(Duration timeout);
 
+    /**
+     * Permanently deletes expired session records older than the cutoff date.
+     * Used by CleanupService to purge old session data.
+     *
+     * @param cutoff Sessions older than this instant will be deleted
+     * @return Number of sessions deleted
+     */
+    int deleteExpiredSessions(Instant cutoff);
+
     /** Aggregate statistics across all sessions for a user. */
     public record SessionAggregates(
             int totalSessions,

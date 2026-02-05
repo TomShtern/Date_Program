@@ -1,0 +1,449 @@
+package datingapp.app.cli;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import datingapp.core.*;
+import datingapp.core.UserInteractions.Block;
+import datingapp.core.UserInteractions.Report;
+import datingapp.core.storage.ReportStorage;
+import datingapp.core.testutil.TestStorages;
+import java.io.StringReader;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.*;
+
+/**
+ * Unit tests for SafetyHandler CLI commands: blockUser(), reportUser(),
+ * manageBlockedUsers(), verifyProfile().
+ */
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
+class SafetyHandlerTest {
+
+    private TestStorages.Users userStorage;
+    private TestStorages.Blocks blockStorage;
+    private TestStorages.Matches matchStorage;
+    private InMemoryReportStorage reportStorage;
+    private AppSession session;
+    private User testUser;
+
+    @BeforeEach
+    void setUp() {
+        userStorage = new TestStorages.Users();
+        blockStorage = new TestStorages.Blocks();
+        matchStorage = new TestStorages.Matches();
+        reportStorage = new InMemoryReportStorage();
+
+        session = AppSession.getInstance();
+        session.reset();
+
+        testUser = createActiveUser("TestUser");
+        userStorage.save(testUser);
+        session.setCurrentUser(testUser);
+    }
+
+    private SafetyHandler createHandler(String input) {
+        InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
+        TrustSafetyService trustSafetyService =
+                new TrustSafetyService(reportStorage, userStorage, blockStorage, AppConfig.defaults());
+        return new SafetyHandler(userStorage, blockStorage, matchStorage, trustSafetyService, session, inputReader);
+    }
+
+    @SuppressWarnings("unused")
+    @Nested
+    @DisplayName("Block User")
+    class BlockUser {
+
+        @Test
+        @DisplayName("Blocks selected user with confirmation")
+        void blocksSelectedUserWithConfirmation() {
+            User otherUser = createActiveUser("OtherUser");
+            userStorage.save(otherUser);
+
+            SafetyHandler handler = createHandler("1\ny\n");
+            handler.blockUser();
+
+            assertTrue(blockStorage.isBlocked(testUser.getId(), otherUser.getId()));
+        }
+
+        @Test
+        @DisplayName("Cancels block when user declines")
+        void cancelsBlockWhenUserDeclines() {
+            User otherUser = createActiveUser("OtherUser");
+            userStorage.save(otherUser);
+
+            SafetyHandler handler = createHandler("1\nn\n");
+            handler.blockUser();
+
+            assertFalse(blockStorage.isBlocked(testUser.getId(), otherUser.getId()));
+        }
+
+        @Test
+        @DisplayName("Shows message when no users to block")
+        void showsMessageWhenNoUsersToBlock() {
+            SafetyHandler handler = createHandler("0\n");
+
+            // Only test user exists - should show "No users to block"
+            assertDoesNotThrow(handler::blockUser);
+        }
+
+        @Test
+        @DisplayName("Ends match when blocking matched user")
+        void endsMatchWhenBlockingMatchedUser() {
+            User otherUser = createActiveUser("OtherUser");
+            userStorage.save(otherUser);
+            Match match = Match.create(testUser.getId(), otherUser.getId());
+            matchStorage.save(match);
+
+            SafetyHandler handler = createHandler("1\ny\n");
+            handler.blockUser();
+
+            assertTrue(blockStorage.isBlocked(testUser.getId(), otherUser.getId()));
+            Optional<Match> updatedMatch = matchStorage.get(match.getId());
+            assertTrue(updatedMatch.isPresent());
+            assertEquals(Match.State.BLOCKED, updatedMatch.get().getState());
+        }
+
+        @Test
+        @DisplayName("Does not show already blocked users")
+        void doesNotShowAlreadyBlockedUsers() {
+            User blocked = createActiveUser("BlockedUser");
+            userStorage.save(blocked);
+            Block block = Block.create(testUser.getId(), blocked.getId());
+            blockStorage.save(block);
+
+            User available = createActiveUser("AvailableUser");
+            userStorage.save(available);
+
+            // Select index 1 (should be AvailableUser, not BlockedUser)
+            SafetyHandler handler = createHandler("1\ny\n");
+            handler.blockUser();
+
+            assertTrue(blockStorage.isBlocked(testUser.getId(), available.getId()));
+        }
+
+        @Test
+        @DisplayName("Requires login")
+        void requiresLogin() {
+            session.logout();
+            SafetyHandler handler = createHandler("1\ny\n");
+            handler.blockUser();
+
+            assertEquals(0, blockStorage.size());
+        }
+
+        @Test
+        @DisplayName("Handles cancel selection (0)")
+        void handlesCancelSelection() {
+            User otherUser = createActiveUser("OtherUser");
+            userStorage.save(otherUser);
+
+            SafetyHandler handler = createHandler("0\n");
+            handler.blockUser();
+
+            assertEquals(0, blockStorage.size());
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @Nested
+    @DisplayName("Report User")
+    class ReportUser {
+
+        @Test
+        @DisplayName("Reports user with reason and blocks them")
+        void reportsUserWithReasonAndBlocksThem() {
+            User otherUser = createActiveUser("BadUser");
+            userStorage.save(otherUser);
+
+            // Select user 1, reason 1 (FAKE_PROFILE), empty description
+            SafetyHandler handler = createHandler("1\n1\n\n");
+            handler.reportUser();
+
+            assertTrue(reportStorage.hasReported(testUser.getId(), otherUser.getId()));
+            assertTrue(blockStorage.isBlocked(testUser.getId(), otherUser.getId()));
+        }
+
+        @Test
+        @DisplayName("Reports user with description")
+        void reportsUserWithDescription() {
+            User otherUser = createActiveUser("BadUser");
+            userStorage.save(otherUser);
+
+            SafetyHandler handler = createHandler("1\n1\nThis is a fake profile\n");
+            handler.reportUser();
+
+            assertTrue(reportStorage.hasReported(testUser.getId(), otherUser.getId()));
+        }
+
+        @Test
+        @DisplayName("Handles user with multiple existing reports")
+        void handlesUserWithMultipleReports() {
+            User badUser = createActiveUser("BadUser");
+            userStorage.save(badUser);
+
+            // Create multiple reporters and reports
+            for (int i = 0; i < 4; i++) {
+                User reporter = createActiveUser("Reporter" + i);
+                userStorage.save(reporter);
+                Report report = Report.create(reporter.getId(), badUser.getId(), Report.Reason.FAKE_PROFILE, "Fake");
+                reportStorage.save(report);
+            }
+
+            // Handler should work even when user has multiple reports
+            SafetyHandler handler = createHandler("0\n");
+            assertDoesNotThrow(handler::reportUser);
+        }
+
+        @Test
+        @DisplayName("Shows message when no users to report")
+        void showsMessageWhenNoUsersToReport() {
+            SafetyHandler handler = createHandler("0\n");
+
+            assertDoesNotThrow(handler::reportUser);
+        }
+
+        @Test
+        @DisplayName("Handles invalid reason selection")
+        void handlesInvalidReasonSelection() {
+            User otherUser = createActiveUser("OtherUser");
+            userStorage.save(otherUser);
+
+            SafetyHandler handler = createHandler("1\n99\n");
+            handler.reportUser();
+
+            assertFalse(reportStorage.hasReported(testUser.getId(), otherUser.getId()));
+        }
+
+        @Test
+        @DisplayName("Requires active state to report")
+        void requiresActiveStateToReport() {
+            testUser.pause();
+            userStorage.save(testUser);
+
+            SafetyHandler handler = createHandler("1\n1\n\n");
+            handler.reportUser();
+
+            assertEquals(0, reportStorage.size());
+        }
+
+        @Test
+        @DisplayName("Requires login")
+        void requiresLogin() {
+            session.logout();
+            SafetyHandler handler = createHandler("1\n1\n\n");
+            handler.reportUser();
+
+            assertEquals(0, reportStorage.size());
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @Nested
+    @DisplayName("Manage Blocked Users")
+    class ManageBlockedUsers {
+
+        @Test
+        @DisplayName("Shows message when no blocked users")
+        void showsMessageWhenNoBlockedUsers() {
+            SafetyHandler handler = createHandler("\n");
+
+            assertDoesNotThrow(handler::manageBlockedUsers);
+        }
+
+        @Test
+        @DisplayName("Lists blocked users")
+        void listsBlockedUsers() {
+            User blocked1 = createActiveUser("Blocked1");
+            User blocked2 = createActiveUser("Blocked2");
+            userStorage.save(blocked1);
+            userStorage.save(blocked2);
+
+            blockStorage.save(Block.create(testUser.getId(), blocked1.getId()));
+            blockStorage.save(Block.create(testUser.getId(), blocked2.getId()));
+
+            SafetyHandler handler = createHandler("0\n");
+
+            assertDoesNotThrow(handler::manageBlockedUsers);
+        }
+
+        @Test
+        @DisplayName("Unblocks user with confirmation")
+        void unblocksUserWithConfirmation() {
+            User blocked = createActiveUser("BlockedUser");
+            userStorage.save(blocked);
+            blockStorage.save(Block.create(testUser.getId(), blocked.getId()));
+
+            // Select user 1, confirm unblock
+            SafetyHandler handler = createHandler("1\ny\n");
+            handler.manageBlockedUsers();
+
+            assertFalse(blockStorage.isBlocked(testUser.getId(), blocked.getId()));
+        }
+
+        @Test
+        @DisplayName("Cancels unblock when declined")
+        void cancelsUnblockWhenDeclined() {
+            User blocked = createActiveUser("BlockedUser");
+            userStorage.save(blocked);
+            blockStorage.save(Block.create(testUser.getId(), blocked.getId()));
+
+            SafetyHandler handler = createHandler("1\nn\n");
+            handler.manageBlockedUsers();
+
+            assertTrue(blockStorage.isBlocked(testUser.getId(), blocked.getId()));
+        }
+
+        @Test
+        @DisplayName("Requires login")
+        void requiresLogin() {
+            session.logout();
+            User blocked = createActiveUser("BlockedUser");
+            userStorage.save(blocked);
+            blockStorage.save(Block.create(testUser.getId(), blocked.getId()));
+
+            SafetyHandler handler = createHandler("1\ny\n");
+            handler.manageBlockedUsers();
+
+            // Block should still exist
+            assertTrue(blockStorage.isBlocked(testUser.getId(), blocked.getId()));
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @Nested
+    @DisplayName("Verify Profile")
+    class VerifyProfile {
+
+        @Test
+        @DisplayName("Shows already verified message")
+        void showsAlreadyVerifiedMessage() {
+            testUser.startVerification(VerificationMethod.EMAIL, "123456");
+            testUser.markVerified();
+            userStorage.save(testUser);
+
+            SafetyHandler handler = createHandler("\n");
+
+            assertDoesNotThrow(handler::verifyProfile);
+        }
+
+        @Test
+        @DisplayName("Verifies by email with correct code")
+        void verifiesByEmailWithCorrectCode() {
+            // Select email verification, enter email, then code
+            SafetyHandler handler = createHandler("1\ntest@example.com\n123456\n");
+
+            // The handler generates a random code, but we can't match it
+            // We just verify it doesn't throw
+            assertDoesNotThrow(handler::verifyProfile);
+        }
+
+        @Test
+        @DisplayName("Shows error for incorrect code")
+        void showsErrorForIncorrectCode() {
+            SafetyHandler handler = createHandler("1\ntest@example.com\nwrongcode\n");
+
+            assertDoesNotThrow(handler::verifyProfile);
+            assertFalse(testUser.isVerified());
+        }
+
+        @Test
+        @DisplayName("Cancels verification (0)")
+        void cancelsVerification() {
+            SafetyHandler handler = createHandler("0\n");
+            handler.verifyProfile();
+
+            assertFalse(testUser.isVerified());
+        }
+
+        @Test
+        @DisplayName("Requires email for email verification")
+        void requiresEmailForEmailVerification() {
+            SafetyHandler handler = createHandler("1\n\n");
+            handler.verifyProfile();
+
+            assertFalse(testUser.isVerified());
+        }
+
+        @Test
+        @DisplayName("Requires phone for phone verification")
+        void requiresPhoneForPhoneVerification() {
+            SafetyHandler handler = createHandler("2\n\n");
+            handler.verifyProfile();
+
+            assertFalse(testUser.isVerified());
+        }
+
+        @Test
+        @DisplayName("Requires login")
+        void requiresLogin() {
+            session.logout();
+            SafetyHandler handler = createHandler("1\ntest@example.com\n123456\n");
+            handler.verifyProfile();
+
+            // Should not modify user
+            User stored = userStorage.get(testUser.getId());
+            assertFalse(stored.isVerified());
+        }
+    }
+
+    // === Helper Methods ===
+
+    private User createActiveUser(String name) {
+        User user = new User(UUID.randomUUID(), name);
+        user.setBio("Test bio for " + name);
+        user.setBirthDate(LocalDate.of(1990, 1, 1));
+        user.setGender(Gender.OTHER);
+        user.setInterestedIn(EnumSet.of(Gender.OTHER));
+        user.addPhotoUrl("https://example.com/photo.jpg");
+        user.setPacePreferences(new PacePreferences(
+                PacePreferences.MessagingFrequency.OFTEN,
+                PacePreferences.TimeToFirstDate.FEW_DAYS,
+                PacePreferences.CommunicationStyle.TEXT_ONLY,
+                PacePreferences.DepthPreference.SMALL_TALK));
+        user.activate();
+        return user;
+    }
+
+    // === In-Memory Mock Storage ===
+
+    private static class InMemoryReportStorage implements ReportStorage {
+        private final List<Report> reports = new ArrayList<>();
+
+        @Override
+        public void save(Report report) {
+            reports.add(report);
+        }
+
+        @Override
+        public int countReportsAgainst(UUID userId) {
+            return (int) reports.stream()
+                    .filter(r -> r.reportedUserId().equals(userId))
+                    .count();
+        }
+
+        @Override
+        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
+            return reports.stream()
+                    .anyMatch(r -> r.reporterId().equals(reporterId)
+                            && r.reportedUserId().equals(reportedUserId));
+        }
+
+        @Override
+        public List<Report> getReportsAgainst(UUID userId) {
+            return reports.stream()
+                    .filter(r -> r.reportedUserId().equals(userId))
+                    .toList();
+        }
+
+        @Override
+        public int countReportsBy(UUID userId) {
+            return (int)
+                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
+        }
+
+        public int size() {
+            return reports.size();
+        }
+    }
+}

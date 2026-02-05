@@ -390,6 +390,11 @@ class AchievementServiceTest {
         public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
             return false;
         }
+
+        @Override
+        public int deleteExpiredDailyPickViews(Instant cutoff) {
+            return 0; // Not needed for achievement tests
+        }
     }
 
     private static class InMemoryMatchStorage implements MatchStorage {

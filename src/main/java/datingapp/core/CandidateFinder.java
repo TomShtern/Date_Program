@@ -279,10 +279,12 @@ public class CandidateFinder {
      * @return list of candidate users sorted by distance
      */
     public List<User> findCandidatesForUser(User currentUser) {
-        List<User> activeUsers = userStorage.findActive();
-        Set<UUID> excluded = new HashSet<>(likeStorage.getLikedOrPassedUserIds(currentUser.getId()));
-        excluded.addAll(blockStorage.getBlockedUserIds(currentUser.getId()));
-        return findCandidates(currentUser, activeUsers, excluded);
+        try (var ignored = PerformanceMonitor.startTimer("CandidateFinder.findCandidatesForUser")) {
+            List<User> activeUsers = userStorage.findActive();
+            Set<UUID> excluded = new HashSet<>(likeStorage.getLikedOrPassedUserIds(currentUser.getId()));
+            excluded.addAll(blockStorage.getBlockedUserIds(currentUser.getId()));
+            return findCandidates(currentUser, activeUsers, excluded);
+        }
     }
 
     /**

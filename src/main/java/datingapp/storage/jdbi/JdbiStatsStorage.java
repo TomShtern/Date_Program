@@ -222,6 +222,18 @@ public interface JdbiStatsStorage extends StatsStorage {
     int countUnlockedAchievements(@Bind("userId") UUID userId);
 
     // ═══════════════════════════════════════════════════════════════
+    // Cleanup Operations
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Deletes expired daily pick view records older than the cutoff date.
+     * Used by CleanupService to purge stale tracking data.
+     */
+    @SqlUpdate("DELETE FROM daily_pick_views WHERE viewed_at < :cutoff")
+    @Override
+    int deleteExpiredDailyPickViews(@Bind("cutoff") Instant cutoff);
+
+    // ═══════════════════════════════════════════════════════════════
     // Row Mappers
     // ═══════════════════════════════════════════════════════════════
 

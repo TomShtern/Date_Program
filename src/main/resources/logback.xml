@@ -1,11 +1,79 @@
+<!--
+  Logback configuration for the Dating App.
+
+  Environment Variable Control:
+  - Set DATING_APP_LOG_LEVEL=DEBUG for verbose logging
+  - Set DATING_APP_LOG_LEVEL=TRACE for maximum detail
+  - Default is INFO for production
+-->
 <configuration>
+    <!-- Variable for log level, default INFO, override with environment variable -->
+    <variable name="LOG_LEVEL" value="${DATING_APP_LOG_LEVEL:-INFO}" />
+
+    <!-- Console appender for CLI output - simple format -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%msg%n</pattern>
         </encoder>
     </appender>
 
-    <root level="INFO">
+    <!-- Debug console appender - includes timestamp and class -->
+    <appender name="DEBUG_STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- File appender for debugging (optional, writes to logs/app.log) -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/app.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/app.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Package-specific loggers -->
+
+    <!-- Core services - show at DEBUG when enabled -->
+    <logger name="datingapp.core" level="${LOG_LEVEL}" additivity="false">
+        <appender-ref ref="DEBUG_STDOUT" />
+        <appender-ref ref="FILE" />
+    </logger>
+
+    <!-- Storage/JDBI - typically noisier, keep at INFO unless explicitly DEBUG -->
+    <logger name="datingapp.storage" level="INFO" additivity="false">
+        <appender-ref ref="STDOUT" />
+        <appender-ref ref="FILE" />
+    </logger>
+
+    <!-- CLI handlers - simple output -->
+    <logger name="datingapp.app.cli" level="INFO" additivity="false">
+        <appender-ref ref="STDOUT" />
+    </logger>
+
+    <!-- UI components - keep quiet unless debugging -->
+    <logger name="datingapp.ui" level="WARN" additivity="false">
+        <appender-ref ref="DEBUG_STDOUT" />
+    </logger>
+
+    <!-- Performance monitoring - DEBUG level shows slow operations -->
+    <logger name="datingapp.core.PerformanceMonitor" level="${LOG_LEVEL}" additivity="false">
+        <appender-ref ref="DEBUG_STDOUT" />
+        <appender-ref ref="FILE" />
+    </logger>
+
+    <!-- Third-party libraries - keep quiet -->
+    <logger name="org.jdbi" level="WARN" />
+    <logger name="org.h2" level="WARN" />
+    <logger name="com.zaxxer.hikari" level="WARN" />
+    <logger name="javafx" level="WARN" />
+
+    <!-- Root logger - fallback -->
+    <root level="${LOG_LEVEL}">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>

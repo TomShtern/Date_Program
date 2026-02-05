@@ -78,10 +78,11 @@
 
 ### HIGH PRIORITY - Still Valid
 
-1. **No Transaction Support** ❌ UNFIXED
-   - Undo flow deletes Like/Match without atomicity
-   - Risk: Data integrity if system crashes during multi-table delete
-   - Status: Deferred (accept for Phase 2.1)
+1. **Transaction Support** ✅ FIXED (2026-02-05)
+   - Implemented `TransactionExecutor` interface in core/storage/
+   - `JdbiTransactionExecutor` uses JDBI's `inTransaction()` for atomic operations
+   - `UndoService.undo()` now uses `atomicUndoDelete()` for Like+Match deletions
+   - Status: Atomic ACID operations available for critical multi-table workflows
 
 2. **In-Memory Undo State** ❌ UNFIXED
    - Undo history lost on restart
@@ -92,9 +93,10 @@
    - Current: Added significant new features; handlers still mostly untested
    - Status: Low risk (handlers are thin wrapper layer)
 
-4. **No Cleanup Jobs** ❌ UNFIXED
-   - Daily pick views, expired sessions, stale undo state never purged
-   - Status: Acceptable for Phase 2.1, needed before production
+4. **Cleanup Jobs** ✅ FIXED
+   - Implemented `CleanupService` to purge expired daily pick views, sessions, and stale data
+   - Configurable retention period via `AppConfig.cleanupRetentionDays` (default: 30 days)
+   - Wired into `ServiceRegistry` and callable on demand
 
 5. **No Authentication** ❌ UNFIXED - ok for now, no need.
    - Raw UUID-based selection, no password/auth layer
@@ -309,7 +311,7 @@ mvn package:              ✅ SUCCESS (fat JAR created)
 
 ### By Design
 1. **In-Memory Undo** - Survives within session only (30-second window), lost on restart
-2. **No Transactions** - JDBC auto-commit; undo deletes not atomic
+2. **Transaction Support** - ✅ FIXED: `TransactionExecutor` interface with `JdbiTransactionExecutor` implementation
 3. **Simulated Verification** - Email/SMS codes not actually sent
 4. **No Caching** - Repeated DB queries acceptable at current scale
 
@@ -327,12 +329,12 @@ mvn package:              ✅ SUCCESS (fat JAR created)
 ### High Priority
 1. **Implement Standouts Feature** - Top 10 daily matches (design doc exists)
 2. **Add CLI Test Coverage** - Remaining 6 handlers need unit tests
-3. **Implement Database Cleanup Job** - Scheduler for session/pick purging
+3. ~~**Implement Database Cleanup Job**~~ ✅ DONE - `CleanupService` implemented
 4. **Externalize Config** - Load AppConfig from file (JSON/YAML)
 
 ### Medium Priority
 1. **Add REST API Layer** - Spring Boot endpoints for web/mobile
-2. **Implement Real Transaction Support** - H2 JDBC transactions for undo
+2. ~~**Implement Real Transaction Support**~~ ✅ DONE - JDBI `TransactionTemplate` + atomic undo
 3. **Persist Undo History** - New `undo_history` table
 4. **Add Performance Monitoring** - Query timing metrics
 5. **Enhance Logging** - DEBUG/TRACE levels configurability
@@ -402,13 +404,13 @@ mvn package:              ✅ SUCCESS (fat JAR created)
 
 ### What's Blocking Production Deployment
 
-| Blocker                    | Impact   | Effort | Timeline  |
-|----------------------------|----------|--------|-----------|
-| **No Authentication**      | Critical | High   | 1-2 weeks |
-| **No Input Sanitization**  | High     | Medium | 3-5 days  |
-| **No Transaction Support** | Medium   | High   | 1 week    |
-| **No Deployment Guide**    | Medium   | Low    | 1-2 days  |
-| **No Monitoring**          | Low      | High   | 2-3 weeks |
+| Blocker                   | Impact   | Effort | Timeline  |
+|---------------------------|----------|--------|-----------|
+| **No Authentication**     | Critical | High   | 1-2 weeks |
+| **No Input Sanitization** | High     | Medium | 3-5 days  |
+| **Transaction Support**   | ✅ FIXED  | Done   | Completed |
+| **No Deployment Guide**   | Medium   | Low    | 1-2 days  |
+| **No Monitoring**         | Low      | High   | 2-3 weeks |
 
 ### What Would Be Needed
 1. User registration + password hashing

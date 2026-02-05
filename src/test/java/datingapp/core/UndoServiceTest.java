@@ -6,6 +6,7 @@ import datingapp.core.UndoService.UndoResult;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
+import datingapp.core.testutil.TestStorages;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -23,6 +24,7 @@ class UndoServiceTest {
 
     private InMemoryLikeStorage likeStorage;
     private InMemoryMatchStorage matchStorage;
+    private TestStorages.Undos undoStorage;
     private AppConfig config;
     private UndoService undoService;
     private TestClock clock;
@@ -34,9 +36,10 @@ class UndoServiceTest {
     void setUp() {
         likeStorage = new InMemoryLikeStorage();
         matchStorage = new InMemoryMatchStorage();
+        undoStorage = new TestStorages.Undos();
         config = AppConfig.builder().undoWindowSeconds(30).build(); // 30 second undo window
         clock = new TestClock(Instant.parse("2026-01-26T00:00:00Z"));
-        undoService = new UndoService(likeStorage, matchStorage, config, clock);
+        undoService = new UndoService(likeStorage, matchStorage, undoStorage, config, clock);
 
         userId = UUID.randomUUID();
         targetUserId = UUID.randomUUID();
@@ -120,7 +123,9 @@ class UndoServiceTest {
             // Use 1 second undo window for fast test
             AppConfig shortConfig = AppConfig.builder().undoWindowSeconds(1).build();
             TestClock shortClock = new TestClock(clock.instant());
-            UndoService shortUndoService = new UndoService(likeStorage, matchStorage, shortConfig, shortClock);
+            TestStorages.Undos shortUndoStorage = new TestStorages.Undos();
+            UndoService shortUndoService =
+                    new UndoService(likeStorage, matchStorage, shortUndoStorage, shortConfig, shortClock);
 
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             shortUndoService.recordSwipe(userId, like, null);
@@ -268,7 +273,9 @@ class UndoServiceTest {
             // Use 1 second undo window for fast test
             AppConfig shortConfig = AppConfig.builder().undoWindowSeconds(1).build();
             TestClock shortClock = new TestClock(clock.instant());
-            UndoService shortUndoService = new UndoService(likeStorage, matchStorage, shortConfig, shortClock);
+            TestStorages.Undos shortUndoStorage = new TestStorages.Undos();
+            UndoService shortUndoService =
+                    new UndoService(likeStorage, matchStorage, shortUndoStorage, shortConfig, shortClock);
 
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             likeStorage.save(like);

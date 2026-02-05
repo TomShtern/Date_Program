@@ -13,6 +13,8 @@ import datingapp.core.MatchQualityService.MatchQuality;
 import datingapp.core.MatchingService;
 import datingapp.core.RelationshipTransitionService;
 import datingapp.core.RelationshipTransitionService.TransitionValidationException;
+import datingapp.core.Standout;
+import datingapp.core.StandoutsService;
 import datingapp.core.UndoService;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
@@ -49,6 +51,7 @@ public class MatchingHandler {
     private final AchievementService achievementService;
     private final StatsStorage statsStorage;
     private final RelationshipTransitionService transitionService;
+    private final StandoutsService standoutsService;
     private final AppSession session;
     private final InputReader inputReader;
 
@@ -64,6 +67,7 @@ public class MatchingHandler {
         this.achievementService = dependencies.achievementService();
         this.statsStorage = dependencies.statsStorage();
         this.transitionService = dependencies.transitionService();
+        this.standoutsService = dependencies.standoutsService();
         this.session = dependencies.userSession();
         this.inputReader = dependencies.inputReader();
     }
@@ -80,6 +84,7 @@ public class MatchingHandler {
             AchievementService achievementService,
             StatsStorage statsStorage,
             RelationshipTransitionService transitionService,
+            StandoutsService standoutsService,
             AppSession userSession,
             InputReader inputReader) {
 
@@ -95,6 +100,7 @@ public class MatchingHandler {
             Objects.requireNonNull(achievementService);
             Objects.requireNonNull(statsStorage);
             Objects.requireNonNull(transitionService);
+            Objects.requireNonNull(standoutsService);
             Objects.requireNonNull(userSession);
             Objects.requireNonNull(inputReader);
         }
@@ -635,5 +641,99 @@ public class MatchingHandler {
         } else {
             return "✨"; // Some shared interests
         }
+    }
+
+    /**
+     * Displays today's standout profiles - the top 10 high-quality matches.
+     */
+    public void viewStandouts() {
+        CliUtilities.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
+            if (currentUser.getState() != UserState.ACTIVE) {
+                logInfo("\n⚠️  You must be ACTIVE to view standouts. Complete your profile first.\n");
+                return;
+            }
+
+            logInfo("\n🌟 === TODAY'S STANDOUTS === 🌟\n");
+
+            StandoutsService.Result result = standoutsService.getStandouts(currentUser);
+
+            if (result.isEmpty()) {
+                logInfo(result.message() != null ? result.message() : "No standouts available today.");
+                logInfo("\n");
+                return;
+            }
+
+            if (result.fromCache()) {
+                logInfo("(Cached from earlier today - refreshes at midnight)\n");
+            }
+
+            List<Standout> standouts = result.standouts();
+            java.util.Map<UUID, User> users = standoutsService.resolveUsers(standouts);
+
+            logInfo("Your top {} matches from {} candidates:\n", standouts.size(), result.totalCandidates());
+
+            for (Standout s : standouts) {
+                User candidate = users.get(s.standoutUserId());
+
+                if (candidate == null) {
+                    continue;
+                }
+
+                String interacted = s.hasInteracted() ? " ✓" : "";
+                logInfo(
+                        "{}. {} {} (Score: {}%){}",
+                        s.rank(), getStandoutEmoji(s.rank()), candidate.getName(), s.score(), interacted);
+                logInfo("   {} - {}", s.reason(), candidate.getAge() + "yo");
+            }
+
+            logInfo("\n[L] Like a standout  [P] Pass  [B] Back to menu");
+            String input = inputReader.readLine("\nYour choice: ").toUpperCase(Locale.ROOT);
+
+            if ("L".equals(input) || "P".equals(input)) {
+                logInfo("Enter standout number (1-{}):", standouts.size());
+                String numStr = inputReader.readLine("Selection: ");
+                try {
+                    int num = Integer.parseInt(numStr);
+                    if (num >= 1 && num <= standouts.size()) {
+                        Standout selected = standouts.get(num - 1);
+                        User candidate = users.get(selected.standoutUserId());
+                        if (candidate != null) {
+                            boolean isLike = "L".equals(input);
+                            processStandoutInteraction(currentUser, candidate, isLike);
+                        }
+                    } else {
+                        logInfo("Invalid number.\n");
+                    }
+                } catch (NumberFormatException _) {
+                    logInfo("Invalid input.\n");
+                }
+            }
+        });
+    }
+
+    private void processStandoutInteraction(User currentUser, User candidate, boolean isLike) {
+        Like.Direction direction = isLike ? Like.Direction.LIKE : Like.Direction.PASS;
+        Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
+        Optional<Match> matchResult = matchingService.recordLike(like);
+
+        standoutsService.markInteracted(currentUser.getId(), candidate.getId());
+
+        if (matchResult.isPresent()) {
+            logInfo("\n🎉 IT'S A MATCH with {}! 🎉\n", candidate.getName());
+        } else if (isLike) {
+            logInfo("✅ Liked {}!\n", candidate.getName());
+        } else {
+            logInfo("👋 Passed on {}.\\n", candidate.getName());
+        }
+    }
+
+    private String getStandoutEmoji(int rank) {
+        return switch (rank) {
+            case 1 -> "👑";
+            case 2 -> "🥈";
+            case 3 -> "🥉";
+            default -> "⭐";
+        };
     }
 }

@@ -10,6 +10,7 @@ import datingapp.core.storage.StatsStorage;
 import datingapp.core.storage.SwipeSessionStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.storage.DatabaseManager;
+import datingapp.storage.TransactionTemplate;
 import java.util.Objects;
 
 /**
@@ -83,6 +84,17 @@ public class ServiceRegistry {
     private final MessagingService messagingService; // Messaging
     private final RelationshipTransitionService relationshipTransitionService;
 
+    // ─────────────────────────────────────────────
+    // Transaction Support
+    // ─────────────────────────────────────────────
+    private final TransactionTemplate transactionTemplate;
+
+    // ─────────────────────────────────────────────
+    // Maintenance Services
+    // ─────────────────────────────────────────────
+    private final CleanupService cleanupService;
+    private final StandoutsService standoutsService;
+
     /** Package-private constructor - use ServiceRegistry.Builder to create. */
     @SuppressWarnings("java:S107")
     ServiceRegistry(
@@ -107,7 +119,10 @@ public class ServiceRegistry {
             UndoService undoService,
             AchievementService achievementService,
             MessagingService messagingService,
-            RelationshipTransitionService relationshipTransitionService) {
+            RelationshipTransitionService relationshipTransitionService,
+            TransactionTemplate transactionTemplate,
+            CleanupService cleanupService,
+            StandoutsService standoutsService) {
         this.config = Objects.requireNonNull(config);
         this.userStorage = Objects.requireNonNull(userStorage);
         this.likeStorage = Objects.requireNonNull(likeStorage);
@@ -130,6 +145,9 @@ public class ServiceRegistry {
         this.achievementService = Objects.requireNonNull(achievementService);
         this.messagingService = Objects.requireNonNull(messagingService);
         this.relationshipTransitionService = Objects.requireNonNull(relationshipTransitionService);
+        this.transactionTemplate = Objects.requireNonNull(transactionTemplate);
+        this.cleanupService = Objects.requireNonNull(cleanupService);
+        this.standoutsService = Objects.requireNonNull(standoutsService);
     }
 
     // === Configuration ===
@@ -238,6 +256,32 @@ public class ServiceRegistry {
         return relationshipTransitionService;
     }
 
+    // === Transaction Support ===
+
+    /**
+     * Gets the transaction template for atomic database operations.
+     *
+     * @return The transaction template for ACID operations
+     */
+    public TransactionTemplate getTransactionTemplate() {
+        return transactionTemplate;
+    }
+
+    // === Maintenance Services ===
+
+    /**
+     * Gets the cleanup service for purging expired data.
+     *
+     * @return The cleanup service
+     */
+    public CleanupService getCleanupService() {
+        return cleanupService;
+    }
+
+    public StandoutsService getStandoutsService() {
+        return standoutsService;
+    }
+
     /**
      * Builder for creating ServiceRegistry instances with different storage
      * backends.
@@ -301,13 +345,22 @@ public class ServiceRegistry {
             MessagingStorage messagingStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiMessagingStorage.class);
             SocialStorage socialStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiSocialStorage.class);
 
+            // Undo storage for persistent undo state
+            UndoState.Storage undoStorage = new datingapp.storage.jdbi.JdbiUndoStorageAdapter(jdbi);
+
             // ═══════════════════════════════════════════════════════════════
             // Matching Services (inlined from MatchingModule.create)
             // ═══════════════════════════════════════════════════════════════
             CandidateFinder candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage);
             DailyService dailyService =
                     new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config);
-            UndoService undoService = new UndoService(likeStorage, matchStorage, config);
+            UndoService undoService = new UndoService(likeStorage, matchStorage, undoStorage, config);
+
+            // Wire transaction support for atomic undo operations
+            datingapp.storage.jdbi.JdbiTransactionExecutor txExecutor =
+                    new datingapp.storage.jdbi.JdbiTransactionExecutor(jdbi);
+            undoService.setTransactionExecutor(txExecutor);
+
             SessionService sessionService = new SessionService(sessionStorage, config);
             MatchingService matchingService = new MatchingService(
                     likeStorage, matchStorage, userStorage, blockStorage, sessionService, undoService, dailyService);
@@ -337,6 +390,24 @@ public class ServiceRegistry {
                     statsStorage, matchStorage, likeStorage, userStorage, reportStorage, profilePreviewService, config);
 
             // ═══════════════════════════════════════════════════════════════
+            // Transaction Support
+            // ═══════════════════════════════════════════════════════════════
+            TransactionTemplate transactionTemplate = new TransactionTemplate(jdbi);
+
+            // ═══════════════════════════════════════════════════════════════
+            // Maintenance Services
+            // ═══════════════════════════════════════════════════════════════
+            CleanupService cleanupService = new CleanupService(statsStorage, sessionStorage, config);
+
+            // ═══════════════════════════════════════════════════════════════
+            // Standouts Service
+            // ═══════════════════════════════════════════════════════════════
+            Standout.Storage standoutStorage = new datingapp.storage.jdbi.JdbiStandoutStorageAdapter(
+                    jdbi.onDemand(datingapp.storage.jdbi.JdbiStandoutStorage.class));
+            StandoutsService standoutsService =
+                    new StandoutsService(userStorage, standoutStorage, candidateFinder, config);
+
+            // ═══════════════════════════════════════════════════════════════
             // Build ServiceRegistry
             // ═══════════════════════════════════════════════════════════════
             return new ServiceRegistry(
@@ -361,7 +432,10 @@ public class ServiceRegistry {
                     undoService,
                     achievementService,
                     messagingService,
-                    relationshipTransitionService);
+                    relationshipTransitionService,
+                    transactionTemplate,
+                    cleanupService,
+                    standoutsService);
         }
 
         /** Builds a ServiceRegistry with H2 database and default configuration. */

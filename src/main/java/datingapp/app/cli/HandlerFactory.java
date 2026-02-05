@@ -53,6 +53,7 @@ public final class HandlerFactory {
                     services.getAchievementService(),
                     services.getStatsStorage(),
                     services.getRelationshipTransitionService(),
+                    services.getStandoutsService(),
                     session,
                     inputReader);
             matchingHandler = new MatchingHandler(deps);

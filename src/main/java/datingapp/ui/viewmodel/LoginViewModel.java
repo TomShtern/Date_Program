@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
 import datingapp.core.Gender;
@@ -29,6 +30,7 @@ import org.slf4j.LoggerFactory;
  */
 public class LoginViewModel {
     private static final Logger logger = LoggerFactory.getLogger(LoginViewModel.class);
+    private static final AppConfig CONFIG = AppConfig.defaults();
 
     private final UserStorage userStorage;
     private final ObservableList<User> users = FXCollections.observableArrayList();
@@ -237,8 +239,8 @@ public class LoginViewModel {
             return null;
         }
 
-        if (age < 18 || age > 120) {
-            errorMessage.set("Age must be between 18 and 120");
+        if (age < CONFIG.minAge() || age > CONFIG.maxAge()) {
+            errorMessage.set("Age must be between " + CONFIG.minAge() + " and " + CONFIG.maxAge());
             return null;
         }
 
