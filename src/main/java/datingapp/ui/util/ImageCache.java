@@ -1,17 +1,17 @@
 package datingapp.ui.util;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import javafx.scene.image.Image;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Thread-safe LRU-style image cache for avatars and profile photos.
+ * Thread-safe LRU image cache for avatars and profile photos.
  *
- * <p>Uses ConcurrentHashMap for thread safety. Cache keys are composed of
- * path and requested size for efficient lookups.
+ * <p>Uses LinkedHashMap with access-order for true LRU eviction.
+ * Cache keys are composed of path and requested size for efficient lookups.
  */
 public final class ImageCache {
 
@@ -23,8 +23,21 @@ public final class ImageCache {
     /** Path to default avatar resource. */
     private static final String DEFAULT_AVATAR_PATH = "/images/default-avatar.png";
 
-    /** Thread-safe cache storage. */
-    private static final Map<String, Image> CACHE = new ConcurrentHashMap<>();
+    /**
+     * Thread-safe LRU cache using LinkedHashMap with access-order.
+     * Access-order (true) means get() operations move entries to the end,
+     * so oldest/least-recently-used entries are at the beginning.
+     */
+    private static final Map<String, Image> CACHE = Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Image> eldest) {
+            boolean shouldRemove = size() > MAX_CACHE_SIZE;
+            if (shouldRemove) {
+                logDebug("LRU evicted cached image: {}", eldest.getKey());
+            }
+            return shouldRemove;
+        }
+    });
 
     private ImageCache() {
         // Utility class - no instantiation
@@ -56,18 +69,17 @@ public final class ImageCache {
 
         String key = path + "@" + width + "x" + height;
 
-        // computeIfAbsent is atomic with ConcurrentHashMap
-        Image image = CACHE.computeIfAbsent(key, k -> {
-            Objects.requireNonNull(k, "cacheKey");
-            return loadImage(path, width, height);
-        });
-
-        // Simple eviction: remove oldest entry when over size
-        if (CACHE.size() > MAX_CACHE_SIZE) {
-            evictOldest();
+        // Synchronized access for thread safety with LinkedHashMap
+        synchronized (CACHE) {
+            Image image = CACHE.get(key);
+            if (image != null) {
+                return image;
+            }
+            image = loadImage(path, width, height);
+            CACHE.put(key, image);
+            // LRU eviction handled automatically by removeEldestEntry
+            return image;
         }
-
-        return image;
     }
 
     /** Loads an image with error handling. */
@@ -93,20 +105,30 @@ public final class ImageCache {
     private static Image getDefaultAvatar(double width, double height) {
         String key = "default@" + width + "x" + height;
 
-        return CACHE.computeIfAbsent(key, k -> {
-            Objects.requireNonNull(k, "cacheKey");
-            try {
-                try (var stream = ImageCache.class.getResourceAsStream(DEFAULT_AVATAR_PATH)) {
-                    if (stream != null) {
-                        return new Image(stream, width, height, true, true);
-                    }
-                }
-            } catch (Exception e) {
-                logWarn("Failed to load default avatar", e);
+        synchronized (CACHE) {
+            Image cached = CACHE.get(key);
+            if (cached != null) {
+                return cached;
             }
-            // Fallback: create a simple colored placeholder
-            return createPlaceholder(width, height);
-        });
+            Image avatar = loadDefaultAvatarImage(width, height);
+            CACHE.put(key, avatar);
+            return avatar;
+        }
+    }
+
+    /** Loads the default avatar image from resources or creates a placeholder. */
+    private static Image loadDefaultAvatarImage(double width, double height) {
+        try {
+            try (var stream = ImageCache.class.getResourceAsStream(DEFAULT_AVATAR_PATH)) {
+                if (stream != null) {
+                    return new Image(stream, width, height, true, true);
+                }
+            }
+        } catch (Exception e) {
+            logWarn("Failed to load default avatar", e);
+        }
+        // Fallback: create a simple colored placeholder
+        return createPlaceholder(width, height);
     }
 
     /** Creates a simple placeholder image when default avatar is unavailable. */
@@ -118,22 +140,13 @@ public final class ImageCache {
     }
 
     /**
-     * Evicts the oldest entry from the cache. Simple strategy - just remove first
-     * entry found.
-     */
-    private static void evictOldest() {
-        CACHE.keySet().stream().findFirst().ifPresent(key -> {
-            CACHE.remove(key);
-            logDebug("Evicted cached image: {}", key);
-        });
-    }
-
-    /**
      * Clears the entire image cache.
      * Useful when user logs out or memory pressure is detected.
      */
     public static void clearCache() {
-        CACHE.clear();
+        synchronized (CACHE) {
+            CACHE.clear();
+        }
         logInfo("Image cache cleared");
     }
 
@@ -143,7 +156,9 @@ public final class ImageCache {
      * @return number of cached images
      */
     public static int getCacheSize() {
-        return CACHE.size();
+        synchronized (CACHE) {
+            return CACHE.size();
+        }
     }
 
     /**
@@ -160,8 +175,10 @@ public final class ImageCache {
         }
 
         String key = path + "@" + width + "x" + height;
-        if (CACHE.containsKey(key)) {
-            return; // Already cached
+        synchronized (CACHE) {
+            if (CACHE.containsKey(key)) {
+                return; // Already cached
+            }
         }
 
         Thread.ofVirtual().name("image-preload").start(() -> {

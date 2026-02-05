@@ -45,7 +45,7 @@ public interface JdbiStandoutStorage {
     int cleanup(@Bind("before") LocalDate before);
 
     /** Binding helper for Standout record. */
-    class StandoutBindingHelper {
+    public static class StandoutBindingHelper {
         private final Standout standout;
 
         public StandoutBindingHelper(Standout standout) {
@@ -90,7 +90,7 @@ public interface JdbiStandoutStorage {
     }
 
     /** Row mapper for Standout. */
-    class StandoutMapper implements org.jdbi.v3.core.mapper.RowMapper<Standout> {
+    public static class StandoutMapper implements org.jdbi.v3.core.mapper.RowMapper<Standout> {
         @Override
         public Standout map(java.sql.ResultSet rs, org.jdbi.v3.core.statement.StatementContext ctx)
                 throws java.sql.SQLException {

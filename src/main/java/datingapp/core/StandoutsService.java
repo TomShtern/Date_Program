@@ -122,13 +122,13 @@ public class StandoutsService {
         // 6. Activity score (10%)
         double activityScore = calculateActivityScore(candidate);
 
-        // Compute composite score
-        double composite = distanceScore * 0.20
-                + ageScore * 0.15
-                + interestScore * 0.25
-                + lifestyleScore * 0.20
-                + completenessScore * 0.10
-                + activityScore * 0.10;
+        // Compute composite score using configurable weights
+        double composite = distanceScore * config.standoutDistanceWeight()
+                + ageScore * config.standoutAgeWeight()
+                + interestScore * config.standoutInterestWeight()
+                + lifestyleScore * config.standoutLifestyleWeight()
+                + completenessScore * config.standoutCompletenessWeight()
+                + activityScore * config.standoutActivityWeight();
 
         int score = (int) Math.round(composite * 100);
         String reason = generateReason(seeker, candidate, interests, distanceKm, lifestyleScore);
@@ -154,38 +154,55 @@ public class StandoutsService {
     }
 
     private double calculateLifestyleScore(User seeker, User candidate) {
-        int matches = 0;
-        int total = 0;
+        int total = countLifestyleFactors(seeker, candidate);
+        if (total == 0) {
+            return 0.5;
+        }
 
+        int matches = countLifestyleMatches(seeker, candidate);
+        return (double) matches / total;
+    }
+
+    private int countLifestyleFactors(User seeker, User candidate) {
+        int total = 0;
         if (seeker.getSmoking() != null && candidate.getSmoking() != null) {
             total++;
-            if (seeker.getSmoking() == candidate.getSmoking()) {
-                matches++;
-            }
         }
-
         if (seeker.getDrinking() != null && candidate.getDrinking() != null) {
             total++;
-            if (seeker.getDrinking() == candidate.getDrinking()) {
-                matches++;
-            }
         }
-
         if (seeker.getWantsKids() != null && candidate.getWantsKids() != null) {
             total++;
-            if (areKidsCompatible(seeker.getWantsKids(), candidate.getWantsKids())) {
-                matches++;
-            }
         }
-
         if (seeker.getLookingFor() != null && candidate.getLookingFor() != null) {
             total++;
-            if (seeker.getLookingFor() == candidate.getLookingFor()) {
-                matches++;
-            }
         }
+        return total;
+    }
 
-        return total > 0 ? (double) matches / total : 0.5;
+    private int countLifestyleMatches(User seeker, User candidate) {
+        int matches = 0;
+        if (seeker.getSmoking() != null
+                && candidate.getSmoking() != null
+                && seeker.getSmoking() == candidate.getSmoking()) {
+            matches++;
+        }
+        if (seeker.getDrinking() != null
+                && candidate.getDrinking() != null
+                && seeker.getDrinking() == candidate.getDrinking()) {
+            matches++;
+        }
+        if (seeker.getWantsKids() != null
+                && candidate.getWantsKids() != null
+                && areKidsCompatible(seeker.getWantsKids(), candidate.getWantsKids())) {
+            matches++;
+        }
+        if (seeker.getLookingFor() != null
+                && candidate.getLookingFor() != null
+                && seeker.getLookingFor() == candidate.getLookingFor()) {
+            matches++;
+        }
+        return matches;
     }
 
     private boolean areKidsCompatible(Lifestyle.WantsKids a, Lifestyle.WantsKids b) {
@@ -228,13 +245,13 @@ public class StandoutsService {
             User seeker, User candidate, InterestMatcher.MatchResult interests, double distanceKm, double lifestyle) {
         List<String> reasons = new ArrayList<>();
 
-        if (interests.sharedCount() >= 3) {
+        if (interests.sharedCount() >= config.minSharedInterests()) {
             reasons.add("Many shared interests");
         } else if (interests.sharedCount() >= 1) {
             reasons.add("Shared interests");
         }
 
-        if (distanceKm < 5) {
+        if (distanceKm < config.nearbyDistanceKm()) {
             reasons.add("Lives nearby");
         }
 
@@ -279,10 +296,10 @@ public class StandoutsService {
     }
 
     /** Internal scored candidate record. */
-    private record ScoredCandidate(User user, int score, String reason) {}
+    private static record ScoredCandidate(User user, int score, String reason) {}
 
     /** Result record for standouts query. */
-    public record Result(List<Standout> standouts, int totalCandidates, boolean fromCache, String message) {
+    public static record Result(List<Standout> standouts, int totalCandidates, boolean fromCache, String message) {
 
         public boolean isEmpty() {
             return standouts == null || standouts.isEmpty();

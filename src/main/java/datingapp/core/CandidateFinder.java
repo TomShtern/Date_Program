@@ -182,84 +182,14 @@ public class CandidateFinder {
         logDebug("Already interacted with: {} users", alreadyInteracted.size());
 
         List<User> candidates = allActive.stream()
-                .filter(candidate -> {
-                    boolean notSelf = !candidate.getId().equals(seeker.getId());
-                    if (!notSelf) {
-                        logTrace("Rejecting {}: IS SELF", candidate.getName());
-                    }
-                    return notSelf;
-                })
-                .filter(candidate -> {
-                    boolean isActive = candidate.getState() == UserState.ACTIVE;
-                    if (!isActive) {
-                        logDebug(
-                                "Rejecting {} ({}): NOT ACTIVE (state={})",
-                                candidate.getName(),
-                                candidate.getId(),
-                                candidate.getState());
-                    }
-                    return isActive;
-                })
-                .filter(candidate -> {
-                    boolean notInteracted = !alreadyInteracted.contains(candidate.getId());
-                    if (!notInteracted) {
-                        logTrace("Rejecting {}: ALREADY INTERACTED", candidate.getName());
-                    }
-                    return notInteracted;
-                })
-                .filter(candidate -> {
-                    boolean genderMatch = hasMatchingGenderPreferences(seeker, candidate);
-                    if (!genderMatch) {
-                        logDebug(
-                                "Rejecting {} ({}): GENDER MISMATCH - seeker({})→interestedIn({}), candidate({})→interestedIn({})",
-                                candidate.getName(),
-                                candidate.getId(),
-                                seeker.getGender(),
-                                seeker.getInterestedIn(),
-                                candidate.getGender(),
-                                candidate.getInterestedIn());
-                    }
-                    return genderMatch;
-                })
-                .filter(candidate -> {
-                    boolean ageMatch = hasMatchingAgePreferences(seeker, candidate);
-                    if (!ageMatch) {
-                        logDebug(
-                                "Rejecting {} ({}): AGE MISMATCH - seeker(age={}, range={}-{}), candidate(age={}, range={}-{})",
-                                candidate.getName(),
-                                candidate.getId(),
-                                seeker.getAge(),
-                                seeker.getMinAge(),
-                                seeker.getMaxAge(),
-                                candidate.getAge(),
-                                candidate.getMinAge(),
-                                candidate.getMaxAge());
-                    }
-                    return ageMatch;
-                })
-                .filter(candidate -> {
-                    boolean inDistance = isWithinDistance(seeker, candidate);
-                    if (!inDistance) {
-                        if (logger.isDebugEnabled()) {
-                            double dist = distanceTo(seeker, candidate);
-                            logDebug(
-                                    "Rejecting {} ({}): TOO FAR - distance={}km, max={}km",
-                                    candidate.getName(),
-                                    candidate.getId(),
-                                    String.format("%.1f", dist),
-                                    seeker.getMaxDistanceKm());
-                        }
-                    }
-                    return inDistance;
-                })
-                .filter(candidate -> {
-                    boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate);
-                    if (!passesDb) {
-                        logDebug("Rejecting {} ({}): DEALBREAKER HIT", candidate.getName(), candidate.getId());
-                    }
-                    return passesDb;
-                })
-                .sorted(Comparator.comparingDouble(c -> distanceTo(seeker, c))) // Sort by distance
+                .filter(candidate -> isNotSelf(seeker, candidate))
+                .filter(this::isActiveCandidate)
+                .filter(candidate -> notAlreadyInteracted(candidate, alreadyInteracted))
+                .filter(candidate -> matchesGenderPreferences(seeker, candidate))
+                .filter(candidate -> matchesAgePreferences(seeker, candidate))
+                .filter(candidate -> isWithinDistanceWithLogging(seeker, candidate))
+                .filter(candidate -> passesDealbreakers(seeker, candidate))
+                .sorted(Comparator.comparingDouble(c -> distanceTo(seeker, c)))
                 .toList();
 
         logInfo(
@@ -279,12 +209,98 @@ public class CandidateFinder {
      * @return list of candidate users sorted by distance
      */
     public List<User> findCandidatesForUser(User currentUser) {
-        try (var ignored = PerformanceMonitor.startTimer("CandidateFinder.findCandidatesForUser")) {
+        try (PerformanceMonitor.Timer timer = PerformanceMonitor.startTimer("CandidateFinder.findCandidatesForUser")) {
             List<User> activeUsers = userStorage.findActive();
             Set<UUID> excluded = new HashSet<>(likeStorage.getLikedOrPassedUserIds(currentUser.getId()));
             excluded.addAll(blockStorage.getBlockedUserIds(currentUser.getId()));
-            return findCandidates(currentUser, activeUsers, excluded);
+            List<User> candidates = findCandidates(currentUser, activeUsers, excluded);
+            if (logger.isTraceEnabled()) {
+                logger.trace("CandidateFinder.findCandidatesForUser completed in {}ms", timer.elapsedMs());
+            }
+            return candidates;
         }
+    }
+
+    private boolean isNotSelf(User seeker, User candidate) {
+        boolean notSelf = !candidate.getId().equals(seeker.getId());
+        if (!notSelf) {
+            logTrace("Rejecting {}: IS SELF", candidate.getName());
+        }
+        return notSelf;
+    }
+
+    private boolean isActiveCandidate(User candidate) {
+        boolean isActive = candidate.getState() == UserState.ACTIVE;
+        if (!isActive) {
+            logDebug(
+                    "Rejecting {} ({}): NOT ACTIVE (state={})",
+                    candidate.getName(),
+                    candidate.getId(),
+                    candidate.getState());
+        }
+        return isActive;
+    }
+
+    private boolean notAlreadyInteracted(User candidate, Set<UUID> alreadyInteracted) {
+        boolean notInteracted = !alreadyInteracted.contains(candidate.getId());
+        if (!notInteracted) {
+            logTrace("Rejecting {}: ALREADY INTERACTED", candidate.getName());
+        }
+        return notInteracted;
+    }
+
+    private boolean matchesGenderPreferences(User seeker, User candidate) {
+        boolean genderMatch = hasMatchingGenderPreferences(seeker, candidate);
+        if (!genderMatch) {
+            logDebug(
+                    "Rejecting {} ({}): GENDER MISMATCH - seeker({})→interestedIn({}), candidate({})→interestedIn({})",
+                    candidate.getName(),
+                    candidate.getId(),
+                    seeker.getGender(),
+                    seeker.getInterestedIn(),
+                    candidate.getGender(),
+                    candidate.getInterestedIn());
+        }
+        return genderMatch;
+    }
+
+    private boolean matchesAgePreferences(User seeker, User candidate) {
+        boolean ageMatch = hasMatchingAgePreferences(seeker, candidate);
+        if (!ageMatch) {
+            logDebug(
+                    "Rejecting {} ({}): AGE MISMATCH - seeker(age={}, range={}-{}), candidate(age={}, range={}-{})",
+                    candidate.getName(),
+                    candidate.getId(),
+                    seeker.getAge(),
+                    seeker.getMinAge(),
+                    seeker.getMaxAge(),
+                    candidate.getAge(),
+                    candidate.getMinAge(),
+                    candidate.getMaxAge());
+        }
+        return ageMatch;
+    }
+
+    private boolean isWithinDistanceWithLogging(User seeker, User candidate) {
+        boolean inDistance = isWithinDistance(seeker, candidate);
+        if (!inDistance && logger.isDebugEnabled()) {
+            double dist = distanceTo(seeker, candidate);
+            logDebug(
+                    "Rejecting {} ({}): TOO FAR - distance={}km, max={}km",
+                    candidate.getName(),
+                    candidate.getId(),
+                    String.format("%.1f", dist),
+                    seeker.getMaxDistanceKm());
+        }
+        return inDistance;
+    }
+
+    private boolean passesDealbreakers(User seeker, User candidate) {
+        boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate);
+        if (!passesDb) {
+            logDebug("Rejecting {} ({}): DEALBREAKER HIT", candidate.getName(), candidate.getId());
+        }
+        return passesDb;
     }
 
     /**

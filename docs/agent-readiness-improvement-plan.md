@@ -13,21 +13,21 @@ This plan provides a **concrete roadmap to advance from Level 2 to Level 3** age
 
 ### Current State
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| **Level 1** | 6/7 (85.7%) | ⚠️ 1 blocker remaining |
-| **Level 2** | 7/21 (33.3%) | ⚠️ Need 10 more for Level 3 |
+| Metric      | Value        | Status                           |
+|-------------|--------------|----------------------------------|
+| **Level 1** | 6/7 (85.7%)  | ⚠️ 1 blocker remaining            |
+| **Level 2** | 7/21 (33.3%) | ⚠️ Need 10 more for Level 3       |
 | **Level 3** | 6/13 (46.2%) | 🔒 Locked until Level 2 complete |
-| **Overall** | 20/54 (37%) | 📊 Below average readiness |
+| **Overall** | 20/54 (37%)  | 📊 Below average readiness       |
 
 ### Target State
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| **Level 1** | 7/7 (100%) | ✅ Complete |
-| **Level 2** | 17/21 (81%) | ✅ Level 3 unlocked |
-| **Level 3** | Ready to improve | 🚀 Next focus area |
-| **Overall** | 30/54 (56%) | 📈 Above average readiness |
+| Metric      | Value            | Status                     |
+|-------------|------------------|----------------------------|
+| **Level 1** | 7/7 (100%)       | ✅ Complete                 |
+| **Level 2** | 17/21 (81%)      | ✅ Level 3 unlocked         |
+| **Level 3** | Ready to improve | 🚀 Next focus area         |
+| **Overall** | 30/54 (56%)      | 📈 Above average readiness |
 
 ### Impact on AI Agents
 
@@ -86,8 +86,8 @@ Agents need to know what environment variables are required to run the applicati
 # Copy this file to .env and update the values
 
 # Database Configuration
-# The H2 database password (default: changeit)
-DATING_APP_DB_PASSWORD=changeit
+# The H2 database password (default: dev)
+DATING_APP_DB_PASSWORD=dev
 
 # Database Connection
 # Location of the H2 database file (default: ./data/dating)
@@ -1473,12 +1473,12 @@ volumes:
 
 ### Score Progression
 
-| Phase | Level 1 | Level 2 | Level 3 | Overall |
-|-------|---------|---------|---------|---------|
-| **Before** | 6/7 (85.7%) | 7/21 (33.3%) | 6/13 (46.2%) | 20/54 (37%) |
-| **After Phase 1** | 7/7 (100%) ✅ | 15/21 (71.4%) | 6/13 (46.2%) | 28/54 (52%) |
-| **After Phase 2** | 7/7 (100%) ✅ | 17/21 (81.0%) ✅ | Level unlocked | 30/54 (56%) |
-| **After Phase 3** | 7/7 (100%) ✅ | 19/21 (90.5%) ✅ | Improvements | 32+/54 (59%+) |
+| Phase             | Level 1      | Level 2         | Level 3        | Overall       |
+|-------------------|--------------|-----------------|----------------|---------------|
+| **Before**        | 6/7 (85.7%)  | 7/21 (33.3%)    | 6/13 (46.2%)   | 20/54 (37%)   |
+| **After Phase 1** | 7/7 (100%) ✅ | 15/21 (71.4%)   | 6/13 (46.2%)   | 28/54 (52%)   |
+| **After Phase 2** | 7/7 (100%) ✅ | 17/21 (81.0%) ✅ | Level unlocked | 30/54 (56%)   |
+| **After Phase 3** | 7/7 (100%) ✅ | 19/21 (90.5%) ✅ | Improvements   | 32+/54 (59%+) |
 
 ### Criteria Added
 
@@ -1593,7 +1593,7 @@ mvn clean verify
 **1. Environment Template**
 ```bash
 cat .env.example | grep DATING_APP_DB_PASSWORD
-# Should show: DATING_APP_DB_PASSWORD=changeit
+# Should show: DATING_APP_DB_PASSWORD=dev
 ```
 
 **2. Coverage Reports**
@@ -1757,14 +1757,14 @@ ls .git/hooks/
 
 ### Quantitative Metrics
 
-| Metric | Before | Target | Measurement |
-|--------|--------|--------|-------------|
-| Agent Readiness Level | 2 | 3 | Agent readiness report |
-| Level 2 Completion | 33% | 81% | Criteria passed |
-| Overall Readiness | 37% | 56%+ | Total score |
-| CI/CD Build Time | N/A | <5 min | GitHub Actions |
-| Coverage | Unknown | 80%+ | JaCoCo report |
-| Dependabot PRs/week | 0 | 1-3 | GitHub insights |
+| Metric                | Before  | Target | Measurement            |
+|-----------------------|---------|--------|------------------------|
+| Agent Readiness Level | 2       | 3      | Agent readiness report |
+| Level 2 Completion    | 33%     | 81%    | Criteria passed        |
+| Overall Readiness     | 37%     | 56%+   | Total score            |
+| CI/CD Build Time      | N/A     | <5 min | GitHub Actions         |
+| Coverage              | Unknown | 80%+   | JaCoCo report          |
+| Dependabot PRs/week   | 0       | 1-3    | GitHub insights        |
 
 ### Qualitative Metrics
 

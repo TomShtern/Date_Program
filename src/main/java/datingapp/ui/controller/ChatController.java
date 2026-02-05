@@ -3,7 +3,6 @@ package datingapp.ui.controller;
 import datingapp.core.Messaging.Message;
 import datingapp.core.MessagingService.ConversationPreview;
 import datingapp.ui.NavigationService;
-import datingapp.ui.component.UiComponents;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.ChatViewModel;
 import java.net.URL;
@@ -68,11 +67,6 @@ public class ChatController extends BaseController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        StackPane loadingOverlay = UiComponents.createLoadingOverlay();
-        registerOverlay(loadingOverlay);
-        loadingOverlay.visibleProperty().bind(viewModel.loadingProperty());
-        loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
-
         conversationListView.setItems(viewModel.getConversations());
         messageListView.setItems(viewModel.getActiveMessages());
 

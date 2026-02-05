@@ -6,6 +6,7 @@ import datingapp.core.AppSession;
 import datingapp.core.DailyPick;
 import datingapp.core.DailyService;
 import datingapp.core.DailyService.DailyStatus;
+import datingapp.core.MessagingService;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
 import datingapp.core.storage.MatchStorage;
@@ -36,6 +37,7 @@ public class DashboardViewModel {
     private final DailyService dailyService;
     private final MatchStorage matchStorage;
     private final AchievementService achievementService;
+    private final MessagingService messagingService;
 
     // Observable properties for data binding
     private final StringProperty userName = new SimpleStringProperty("Not Logged In");
@@ -67,10 +69,14 @@ public class DashboardViewModel {
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public DashboardViewModel(
-            DailyService dailyService, MatchStorage matchStorage, AchievementService achievementService) {
+            DailyService dailyService,
+            MatchStorage matchStorage,
+            AchievementService achievementService,
+            MessagingService messagingService) {
         this.dailyService = dailyService;
         this.matchStorage = matchStorage;
         this.achievementService = achievementService;
+        this.messagingService = messagingService;
     }
 
     /**
@@ -187,12 +193,25 @@ public class DashboardViewModel {
             }
         }
 
+        int unreadCount = 0;
+        try {
+            if (messagingService != null) {
+                unreadCount = messagingService.getTotalUnreadCount(user.getId());
+            }
+        } catch (Exception e) {
+            logError("Unread messages error", e);
+            if (firstError == null) {
+                firstError = e;
+            }
+        }
+
         // 3. Update UI on FX Thread
         final String finalCompletion = completionText;
         final String finalLikes = likesText;
         final String finalMatches = matchCount;
         final String finalPick = pickName;
         final List<UserAchievement> finalAchievements = achievements;
+        final int finalUnreadCount = unreadCount;
 
         final Exception finalError = firstError;
         Platform.runLater(() -> {
@@ -201,6 +220,8 @@ public class DashboardViewModel {
             dailyLikesStatus.set(finalLikes);
             totalMatches.set(finalMatches);
             dailyPickName.set(finalPick);
+            unreadMessages.set(finalUnreadCount);
+            // notificationCount could aggregate unread + other alerts in future
 
             recentAchievements.clear();
             finalAchievements.stream()

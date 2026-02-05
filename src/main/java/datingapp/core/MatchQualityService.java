@@ -23,7 +23,6 @@ import java.util.UUID;
  */
 public class MatchQualityService {
 
-    private static final int LOW_PACE_COMPATIBILITY_THRESHOLD = 50;
     private static final int WILDCARD_SCORE = 20;
 
     private final UserStorage userStorage;
@@ -35,7 +34,7 @@ public class MatchQualityService {
      * from one user's
      * perspective (scores may differ slightly between perspectives).
      */
-    public record MatchQuality(
+    public static record MatchQuality(
             String matchId,
             UUID perspectiveUserId, // Whose perspective (for directional metrics)
             UUID otherUserId,
@@ -186,7 +185,8 @@ public class MatchQualityService {
          * @param overlapRatio shared / min(a.size, b.size), range [0.0, 1.0]
          * @param jaccardIndex shared / union, range [0.0, 1.0]
          */
-        public record MatchResult(Set<Interest> shared, int sharedCount, double overlapRatio, double jaccardIndex) {
+        public static record MatchResult(
+                Set<Interest> shared, int sharedCount, double overlapRatio, double jaccardIndex) {
             public MatchResult {
                 Objects.requireNonNull(shared, "shared cannot be null");
                 if (sharedCount < 0) {
@@ -305,8 +305,11 @@ public class MatchQualityService {
         User me = userStorage.get(perspectiveUserId);
         User them = userStorage.get(otherUserId);
 
-        if (me == null || them == null) {
-            throw new IllegalArgumentException("User not found");
+        if (me == null) {
+            throw new IllegalArgumentException("User not found: " + perspectiveUserId);
+        }
+        if (them == null) {
+            throw new IllegalArgumentException("User not found: " + otherUserId);
         }
 
         // === Calculate Individual Scores ===
@@ -571,16 +574,16 @@ public class MatchQualityService {
 
         long hours = timeBetween.toHours();
 
-        // Within 1 hour = excellent
-        if (hours < 1) {
+        // Within excellent threshold = excellent
+        if (hours < config.responseTimeExcellentHours()) {
             return 1.0;
         }
-        // Within 24 hours = great
-        if (hours < 24) {
+        // Within great threshold = great
+        if (hours < config.responseTimeGreatHours()) {
             return 0.9;
         }
-        // Within 3 days = good
-        if (hours < 72) {
+        // Within good threshold = good
+        if (hours < config.responseTimeGoodHours()) {
             return 0.7;
         }
         // Within a week = okay
@@ -736,7 +739,7 @@ public class MatchQualityService {
 
     /** Checks if a pace score is considered low compatibility. */
     public boolean isLowPaceCompatibility(int score) {
-        return score >= 0 && score < LOW_PACE_COMPATIBILITY_THRESHOLD;
+        return score >= 0 && score < config.paceCompatibilityThreshold();
     }
 
     /** Gets the warning message for low pace compatibility. */

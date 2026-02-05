@@ -45,7 +45,7 @@ class SafetyHandlerTest {
     private SafetyHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         TrustSafetyService trustSafetyService =
-                new TrustSafetyService(reportStorage, userStorage, blockStorage, AppConfig.defaults());
+                new TrustSafetyService(reportStorage, userStorage, blockStorage, matchStorage, AppConfig.defaults());
         return new SafetyHandler(userStorage, blockStorage, matchStorage, trustSafetyService, session, inputReader);
     }
 

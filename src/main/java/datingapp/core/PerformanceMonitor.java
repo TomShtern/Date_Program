@@ -29,6 +29,7 @@ public final class PerformanceMonitor {
     private static final Logger logger = LoggerFactory.getLogger(PerformanceMonitor.class);
 
     private static final Map<String, OperationMetrics> METRICS = new ConcurrentHashMap<>();
+    private static final int MAX_METRICS_SIZE = 1000;
 
     private PerformanceMonitor() {} // Utility class
 
@@ -49,6 +50,9 @@ public final class PerformanceMonitor {
      * @param durationMs Duration in milliseconds
      */
     public static void record(String operationName, long durationMs) {
+        if (METRICS.size() >= MAX_METRICS_SIZE && !METRICS.containsKey(operationName)) {
+            return; // Prevent unbounded growth
+        }
         METRICS.computeIfAbsent(operationName, OperationMetrics::new).record(durationMs);
     }
 
@@ -169,11 +173,11 @@ public final class PerformanceMonitor {
             return c > 0 ? totalMs.sum() / c : 0;
         }
 
-        public long getMinMs() {
+        public synchronized long getMinMs() {
             return count.sum() > 0 ? minMs : 0;
         }
 
-        public long getMaxMs() {
+        public synchronized long getMaxMs() {
             return count.sum() > 0 ? maxMs : 0;
         }
     }

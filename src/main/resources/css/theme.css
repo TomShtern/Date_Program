@@ -2527,21 +2527,7 @@
     -fx-min-width: 80;
 }
 
-/* ============================================
-   Loading States
-   ============================================ */
-.loading-overlay {
-    -fx-background-color: rgba(15, 23, 42, 0.7);
-}
 
-.loading-spinner {
-    -fx-progress-color: -fx-primary;
-}
-
-.loading-spinner .indicator {
-    -fx-border-color: transparent;
-    -fx-border-width: 0;
-}
 
 /* Toggle group container - wrapper for toggle button groups */
 .toggle-group-container {

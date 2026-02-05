@@ -1,5 +1,7 @@
 package datingapp.core;
 
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -11,11 +13,13 @@ import java.util.function.Consumer;
  * with a single source of truth. Supports both plain access (CLI) and listener-based binding
  * (JavaFX).
  *
- * <p>Thread-safe for concurrent access using CopyOnWriteArrayList for listeners.
+ * <p>Thread-safe: all methods accessing mutable state are synchronized,
+ * and CopyOnWriteArrayList provides safe listener iteration.
  */
 @SuppressWarnings("java:S6548")
 public final class AppSession {
     private static final AppSession INSTANCE = new AppSession();
+    private static final Logger LOGGER = System.getLogger(AppSession.class.getName());
 
     private User currentUser;
     private final List<Consumer<User>> listeners = new CopyOnWriteArrayList<>();
@@ -26,20 +30,20 @@ public final class AppSession {
         return INSTANCE;
     }
 
-    public User getCurrentUser() {
+    public synchronized User getCurrentUser() {
         return currentUser;
     }
 
-    public void setCurrentUser(User user) {
+    public synchronized void setCurrentUser(User user) {
         this.currentUser = user;
         notifyListeners(user);
     }
 
-    public boolean isLoggedIn() {
+    public synchronized boolean isLoggedIn() {
         return currentUser != null;
     }
 
-    public boolean isActive() {
+    public synchronized boolean isActive() {
         return currentUser != null && currentUser.getState() == UserState.ACTIVE;
     }
 
@@ -57,14 +61,20 @@ public final class AppSession {
 
     private void notifyListeners(User user) {
         for (Consumer<User> listener : listeners) {
-            listener.accept(user);
+            try {
+                listener.accept(user);
+            } catch (Exception e) {
+                if (LOGGER.isLoggable(Level.WARNING)) {
+                    LOGGER.log(Level.WARNING, "Listener threw exception: " + e.getMessage());
+                }
+            }
         }
     }
 
     /**
      * Resets the session state. Used primarily for testing.
      */
-    public void reset() {
+    public synchronized void reset() {
         currentUser = null;
         listeners.clear();
     }

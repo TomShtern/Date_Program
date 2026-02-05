@@ -1,7 +1,6 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.testutil.TestStorages;
@@ -150,6 +149,28 @@ class MatchingServiceTest {
             Optional<Match> result = matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
 
             assertTrue(result.isPresent(), "Order should not matter for matching");
+        }
+    }
+
+    @Nested
+    @DisplayName("Process Swipe Guard")
+    class ProcessSwipeGuard {
+
+        @Test
+        @DisplayName("processSwipe throws ISE when services are missing")
+        void processSwipeThrowsWithoutServices() {
+            // 2-arg constructor: dailyService and undoService are null
+            User user = User.StorageBuilder.create(UUID.randomUUID(), "Alice", java.time.Instant.now())
+                    .state(UserState.ACTIVE)
+                    .build();
+            User candidate = User.StorageBuilder.create(UUID.randomUUID(), "Bob", java.time.Instant.now())
+                    .state(UserState.ACTIVE)
+                    .build();
+
+            assertThrows(
+                    IllegalStateException.class,
+                    () -> matchingService.processSwipe(user, candidate, true),
+                    "processSwipe should throw ISE when dailyService/undoService are null");
         }
     }
 }

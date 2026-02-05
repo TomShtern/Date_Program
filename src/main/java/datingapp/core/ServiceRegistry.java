@@ -377,7 +377,7 @@ public class ServiceRegistry {
             // Safety Services (inlined from SafetyModule.create)
             // ═══════════════════════════════════════════════════════════════
             TrustSafetyService trustSafetyService =
-                    new TrustSafetyService(reportStorage, userStorage, blockStorage, config);
+                    new TrustSafetyService(reportStorage, userStorage, blockStorage, matchStorage, config);
             // ValidationService is now a utility class - instances not tracked in registry
 
             // ═══════════════════════════════════════════════════════════════

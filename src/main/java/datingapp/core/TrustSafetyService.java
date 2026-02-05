@@ -3,6 +3,7 @@ package datingapp.core;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Report;
 import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.ReportStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Duration;
@@ -23,24 +24,32 @@ public class TrustSafetyService {
     private final ReportStorage reportStorage;
     private final UserStorage userStorage;
     private final BlockStorage blockStorage;
+    private final MatchStorage matchStorage;
     private final AppConfig config;
     private final Duration verificationTtl;
     private final Random random;
 
-    public TrustSafetyService() {
+    /** Package-private: testing only. Core dependencies are null. */
+    TrustSafetyService() {
         this(DEFAULT_VERIFICATION_TTL, new Random());
     }
 
-    public TrustSafetyService(Duration verificationTtl, Random random) {
-        this(null, null, null, null, verificationTtl, random);
+    /** Package-private: testing only. Core dependencies are null. */
+    TrustSafetyService(Duration verificationTtl, Random random) {
+        this(null, null, null, null, null, verificationTtl, random);
     }
 
     public TrustSafetyService(
-            ReportStorage reportStorage, UserStorage userStorage, BlockStorage blockStorage, AppConfig config) {
+            ReportStorage reportStorage,
+            UserStorage userStorage,
+            BlockStorage blockStorage,
+            MatchStorage matchStorage,
+            AppConfig config) {
         this(
                 Objects.requireNonNull(reportStorage, "reportStorage cannot be null"),
                 Objects.requireNonNull(userStorage, "userStorage cannot be null"),
                 Objects.requireNonNull(blockStorage, "blockStorage cannot be null"),
+                matchStorage, // Optional - may be null for backward compatibility
                 Objects.requireNonNull(config, "config cannot be null"),
                 DEFAULT_VERIFICATION_TTL,
                 new Random());
@@ -50,12 +59,14 @@ public class TrustSafetyService {
             ReportStorage reportStorage,
             UserStorage userStorage,
             BlockStorage blockStorage,
+            MatchStorage matchStorage,
             AppConfig config,
             Duration verificationTtl,
             Random random) {
         this.reportStorage = reportStorage;
         this.userStorage = userStorage;
         this.blockStorage = blockStorage;
+        this.matchStorage = matchStorage;
         this.config = config;
         this.verificationTtl = Objects.requireNonNull(verificationTtl, "verificationTtl cannot be null");
         this.random = Objects.requireNonNull(random, "random cannot be null");
@@ -117,6 +128,7 @@ public class TrustSafetyService {
         if (!blockStorage.isBlocked(reporterId, reportedUserId)) {
             Block block = Block.create(reporterId, reportedUserId);
             blockStorage.save(block);
+            updateMatchStateForBlock(reporterId, reportedUserId);
         }
 
         int reportCount = reportStorage.countReportsAgainst(reportedUserId);
@@ -133,6 +145,78 @@ public class TrustSafetyService {
     private void ensureReportDependencies() {
         if (reportStorage == null || userStorage == null || blockStorage == null || config == null) {
             throw new IllegalStateException("Report dependencies are not configured");
+        }
+    }
+
+    /**
+     * Updates the match state to BLOCKED if a match exists between the two users.
+     * Silently succeeds if matchStorage is not configured or no match exists.
+     */
+    private void updateMatchStateForBlock(UUID blockerId, UUID blockedId) {
+        if (matchStorage == null) {
+            logger.debug("MatchStorage not configured; skipping match state update for block");
+            return;
+        }
+        matchStorage.getByUsers(blockerId, blockedId).ifPresent(match -> {
+            if (match.getState() != Match.State.BLOCKED) {
+                match.block(blockerId);
+                matchStorage.update(match);
+                logger.info("Match {} transitioned to BLOCKED by user {}", match.getId(), blockerId);
+            }
+        });
+    }
+
+    /**
+     * Blocks a user without filing a report. Updates both the block storage and
+     * any existing match state.
+     *
+     * @param blockerId the user initiating the block
+     * @param blockedId the user being blocked
+     * @return result of the block operation
+     */
+    public BlockResult block(UUID blockerId, UUID blockedId) {
+        Objects.requireNonNull(blockerId, "blockerId cannot be null");
+        Objects.requireNonNull(blockedId, "blockedId cannot be null");
+
+        if (blockStorage == null || userStorage == null) {
+            throw new IllegalStateException("Block dependencies are not configured");
+        }
+
+        if (blockerId.equals(blockedId)) {
+            return new BlockResult(false, "Cannot block yourself");
+        }
+
+        User blocker = userStorage.get(blockerId);
+        if (blocker == null || blocker.getState() != UserState.ACTIVE) {
+            return new BlockResult(false, "Blocker must be an active user");
+        }
+
+        User blocked = userStorage.get(blockedId);
+        if (blocked == null) {
+            return new BlockResult(false, "User to block not found");
+        }
+
+        if (blockStorage.isBlocked(blockerId, blockedId)) {
+            return new BlockResult(false, "User is already blocked");
+        }
+
+        Block block = Block.create(blockerId, blockedId);
+        blockStorage.save(block);
+        updateMatchStateForBlock(blockerId, blockedId);
+
+        logger.info("User {} blocked user {}", blockerId, blockedId);
+        return new BlockResult(true, null);
+    }
+
+    /** Result of a block action. */
+    public record BlockResult(boolean success, String errorMessage) {
+        public BlockResult {
+            if (success && errorMessage != null) {
+                throw new IllegalArgumentException("errorMessage must be null on success");
+            }
+            if (!success && (errorMessage == null || errorMessage.isBlank())) {
+                throw new IllegalArgumentException("errorMessage is required on failure");
+            }
         }
     }
 

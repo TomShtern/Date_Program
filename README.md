@@ -28,18 +28,18 @@ A modern dating application built with **Clean Architecture** principles, featur
 
 ## 🛠 Tech Stack
 
-| Category            | Technology               | Version                       |
-|---------------------|--------------------------|-------------------------------|
-| **Language**        | Java                     | 25 (preview features enabled) |
-| **UI Framework**    | JavaFX                   | 25.0.1                        |
-| **UI Theme**        | AtlantaFX (Primer-based) | 2.1.0                         |
-| **Icons**           | Ikonli (Material Design 2) | 12.4.0                      |
-| **Database Access** | JDBI 3 (Declarative SQL) | 3.51.0                        |
-| **Database**        | H2 (embedded)            | 2.4.240                       |
-| **JSON**            | Jackson                  | 2.21.0                        |
-| **Testing**         | JUnit 5                  | 5.14.2                        |
-| **Logging**         | SLF4J + Logback          | 2.0.17 / 1.5.25               |
-| **Build**           | Maven                    | 3.8+                          |
+| Category            | Technology                 | Version                       |
+|---------------------|----------------------------|-------------------------------|
+| **Language**        | Java                       | 25 (preview features enabled) |
+| **UI Framework**    | JavaFX                     | 25.0.1                        |
+| **UI Theme**        | AtlantaFX (Primer-based)   | 2.1.0                         |
+| **Icons**           | Ikonli (Material Design 2) | 12.4.0                        |
+| **Database Access** | JDBI 3 (Declarative SQL)   | 3.51.0                        |
+| **Database**        | H2 (embedded)              | 2.4.240                       |
+| **JSON**            | Jackson                    | 2.21.0                        |
+| **Testing**         | JUnit 5                    | 5.14.2                        |
+| **Logging**         | SLF4J + Logback            | 2.0.17 / 1.5.25               |
+| **Build**           | Maven                      | 3.8+                          |
 
 ## 🚀 Getting Started
 
@@ -122,30 +122,30 @@ datingapp/
 
 Embedded H2 database stored at `./data/dating.mv.db`
 
-| Setting      | Value                                                                  |
-|--------------|------------------------------------------------------------------------|
-| **User**     | `sa`                                                                   |
-| **Password** | Environment variable `DATING_APP_DB_PASSWORD` or default: `changeit`   |
+| Setting      | Value                                                           |
+|--------------|-----------------------------------------------------------------|
+| **User**     | `sa`                                                            |
+| **Password** | Environment variable `DATING_APP_DB_PASSWORD` or default: `dev` |
 
 > **Note:** In production, use the environment variable for password management.
 
 ## 📚 Documentation
 
-| Document                 | Description                                     |
-|--------------------------|-------------------------------------------------|
-| [GEMINI.md](GEMINI.md)   | AI agent operational context & coding standards |
-| [STATUS.md](STATUS.md)   | Implementation status vs Product Requirements   |
-| [docs/](docs/)           | Additional documentation and completed plans    |
+| Document               | Description                                     |
+|------------------------|-------------------------------------------------|
+| [GEMINI.md](GEMINI.md) | AI agent operational context & coding standards |
+| [STATUS.md](STATUS.md) | Implementation status vs Product Requirements   |
+| [docs/](docs/)         | Additional documentation and completed plans    |
 
 ## 📈 Project Statistics
 
-| Metric              | Value               |
-|---------------------|---------------------|
-| **Lines of Code**   | ~16,200             |
-| **Test Cases**      | 576+                |
-| **Core Services**   | 15+                 |
-| **GUI Views**       | 10 FXML screens     |
-| **CLI Handlers**    | 11 command handlers |
+| Metric            | Value               |
+|-------------------|---------------------|
+| **Lines of Code** | ~16,200             |
+| **Test Cases**    | 576+                |
+| **Core Services** | 15+                 |
+| **GUI Views**     | 10 FXML screens     |
+| **CLI Handlers**  | 11 command handlers |
 
 ## 🪟 Windows Setup
 

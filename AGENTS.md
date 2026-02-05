@@ -328,7 +328,12 @@ loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
 - Use `class` for mutable entities with state machines (`User`, `Match`)
 - Use `enum` for fixed sets (`Preferences.Interest`, `Achievement`, `User.Gender`)
 - Use `Optional<T>` for nullable returns from storage
+<!--ARCHIVE:49:agent:github_copilot:scope:nested-types-->
 - **Nested types MUST be `public static`** (compiler requirement for cross-package access)
+<!--/ARCHIVE-->
+- **Nested types MUST be `public static`** (compiler requirement for cross-package access, including nested records like `User.ProfileNote`).
+49|2026-02-06 10:00:00|agent:github_copilot|scope:nested-types|Clarify nested records must be public static|AGENTS.md
+48|2026-02-05 18:30:00|agent:github_copilot|scope:precommit-fixes|Refactor candidate filtering/lifestyle scoring and make nested types explicit for access checks|src/main/java/datingapp/core/CandidateFinder.java;src/main/java/datingapp/core/StandoutsService.java;src/main/java/datingapp/core/MatchQualityService.java;src/main/java/datingapp/core/MatchingService.java;src/main/java/datingapp/core/UserInteractions.java;src/main/java/datingapp/core/Match.java;src/main/java/datingapp/core/Stats.java;src/main/java/datingapp/storage/jdbi/JdbiStandoutStorage.java;src/test/java/datingapp/core/PerformanceMonitorTest.java;AGENTS.md
 
 **State Machines:**
 - `User`: `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`
@@ -588,7 +593,7 @@ public class MatchingHandler {
 - **Location:** `./data/dating.mv.db` (file-based, auto-created on first run)
 - **JDBC URL:** `jdbc:h2:./data/dating`
 - **Username:** `sa`
-- **Password:** `changeit` (hardcoded for development; use env var `DATING_APP_DB_PASSWORD` in production)
+- **Password:** `dev` (hardcoded for development; use env var `DATING_APP_DB_PASSWORD` in production)
 - **Mode:** Embedded (no separate server process)
 - **Auto-Server:** Disabled during tests to prevent locking issues
 
@@ -978,4 +983,6 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 45|2026-02-05 03:54:37|agent:codex|scope:ui-loading-timing|Refine loading overlay timing guidance for FX-thread updates and initialization|src/main/java/datingapp/ui/controller/ChatController.java;src/main/java/datingapp/ui/controller/DashboardController.java;src/main/java/datingapp/ui/controller/MatchingController.java;src/main/java/datingapp/ui/viewmodel/ChatViewModel.java;src/main/java/datingapp/ui/viewmodel/DashboardViewModel.java;src/main/java/datingapp/ui/viewmodel/MatchingViewModel.java;AGENTS.md
 46|2026-02-05 04:02:41|agent:codex|scope:messaging-conversation-id|Clarify conversation ID type for UI/viewmodel usage|src/main/java/datingapp/ui/viewmodel/ChatViewModel.java;AGENTS.md
 47|2026-02-05 13:35:19|agent:codex|scope:project-audit|Add project audit report|PROJECT_AUDIT_2026-02-05_codex.md;AGENTS.md
+48|2026-02-05 18:30:00|agent:github_copilot|scope:precommit-fixes|Refactor candidate filtering/lifestyle scoring and make nested types explicit for access checks|src/main/java/datingapp/core/CandidateFinder.java;src/main/java/datingapp/core/StandoutsService.java;src/main/java/datingapp/core/MatchQualityService.java;src/main/java/datingapp/core/MatchingService.java;src/main/java/datingapp/core/UserInteractions.java;src/main/java/datingapp/core/Match.java;src/main/java/datingapp/core/Stats.java;src/main/java/datingapp/storage/jdbi/JdbiStandoutStorage.java;src/test/java/datingapp/core/PerformanceMonitorTest.java;AGENTS.md
+49|2026-02-06 10:00:00|agent:github_copilot|scope:nested-types|Make User.ProfileNote explicitly public static to fix test visibility|src/main/java/datingapp/core/User.java;AGENTS.md
 ---AGENT-LOG-END---

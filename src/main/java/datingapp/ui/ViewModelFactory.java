@@ -145,7 +145,10 @@ public class ViewModelFactory {
     public DashboardViewModel getDashboardViewModel() {
         if (dashboardViewModel == null) {
             dashboardViewModel = new DashboardViewModel(
-                    services.getDailyService(), services.getMatchStorage(), services.getAchievementService());
+                    services.getDailyService(),
+                    services.getMatchStorage(),
+                    services.getAchievementService(),
+                    services.getMessagingService());
         }
         return dashboardViewModel;
     }

@@ -3,7 +3,6 @@ package datingapp.ui.controller;
 import datingapp.core.Match;
 import datingapp.core.User;
 import datingapp.ui.NavigationService;
-import datingapp.ui.component.UiComponents;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
@@ -99,11 +98,6 @@ public class MatchingController extends BaseController implements Initializable 
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        StackPane loadingOverlay = UiComponents.createLoadingOverlay();
-        registerOverlay(loadingOverlay);
-        loadingOverlay.visibleProperty().bind(viewModel.loadingProperty());
-        loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
-
         // Bind visibility to hasMoreCandidates
         candidateCard.visibleProperty().bind(viewModel.hasMoreCandidatesProperty());
         candidateCard.managedProperty().bind(viewModel.hasMoreCandidatesProperty());
@@ -128,9 +122,6 @@ public class MatchingController extends BaseController implements Initializable 
             }
         }));
 
-        // Handle loading state for skeleton display
-        addSubscription(viewModel.loadingProperty().subscribe(this::handleLoadingChange));
-
         // Initialize the ViewModel with current user from UISession
         viewModel.initialize();
 
@@ -151,25 +142,6 @@ public class MatchingController extends BaseController implements Initializable 
 
         // Setup swipe gestures
         setupSwipeGestures();
-    }
-
-    /**
-     * Handles loading state changes by showing/hiding skeleton visual effect.
-     */
-    private void handleLoadingChange(boolean isLoading) {
-        if (isLoading) {
-            // Show loading state - fade the card
-            if (candidateCard != null) {
-                candidateCard.setOpacity(0.5);
-            }
-        } else {
-            // Data loaded - restore full opacity with fade
-            if (candidateCard != null) {
-                FadeTransition fade = new FadeTransition(Duration.millis(300), candidateCard);
-                fade.setToValue(1.0);
-                fade.play();
-            }
-        }
     }
 
     /** Setup drag-to-swipe gestures on the candidate card. */

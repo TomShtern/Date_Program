@@ -4,7 +4,6 @@ import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.SwipeSessionStorage;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -23,6 +22,9 @@ public class SessionService {
 
     /** Per-user locks to prevent race conditions in swipe recording. */
     private final ConcurrentMap<UUID, Object> userLocks = new ConcurrentHashMap<>();
+
+    /** Maximum entries in userLocks before cleanup. */
+    private static final int MAX_USER_LOCKS = 10_000;
 
     public SessionService(SwipeSessionStorage sessionStorage, AppConfig config) {
         this.sessionStorage = Objects.requireNonNull(sessionStorage, "sessionStorage cannot be null");
@@ -72,7 +74,10 @@ public class SessionService {
      */
     public SwipeResult recordSwipe(UUID userId, Like.Direction direction, boolean matched) {
         // Per-user lock to prevent race condition in read-modify-write
-        Object lock = userLocks.computeIfAbsent(userId, _ -> new Object());
+        if (userLocks.size() > MAX_USER_LOCKS) {
+            userLocks.clear();
+        }
+        Object lock = userLocks.computeIfAbsent(userId, id -> new Object());
         synchronized (lock) {
             SwipeSession session = getOrCreateSession(userId);
 
@@ -151,8 +156,9 @@ public class SessionService {
      * @return list of sessions started today
      */
     public List<SwipeSession> getTodaysSessions(UUID userId) {
-        Instant startOfDay =
-                LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant startOfDay = LocalDate.now(config.userTimeZone())
+                .atStartOfDay(config.userTimeZone())
+                .toInstant();
         return sessionStorage.getSessionsInRange(userId, startOfDay, Instant.now());
     }
 

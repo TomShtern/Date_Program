@@ -14,6 +14,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Business logic for processing likes, creating matches, and browsing pending
@@ -21,6 +23,8 @@ import java.util.UUID;
  * framework dependencies.
  */
 public class MatchingService {
+
+    private static final Logger logger = LoggerFactory.getLogger(MatchingService.class);
 
     private static final String LIKE_REQUIRED = "like cannot be null";
 
@@ -128,9 +132,12 @@ public class MatchingService {
                 }
 
                 return Optional.of(match);
-            } catch (RuntimeException _) {
+            } catch (RuntimeException ex) {
                 // Handle storage conflicts (duplicate key, race condition)
                 // JdbiException extends RuntimeException
+                if (logger.isWarnEnabled()) {
+                    logger.warn("Match save conflict for {}: {}", match.getId(), ex.getMessage());
+                }
                 return matchStorage.get(match.getId());
             }
         }
@@ -153,6 +160,10 @@ public class MatchingService {
      * @return SwipeResult containing success status and match information
      */
     public SwipeResult processSwipe(User currentUser, User candidate, boolean liked) {
+        if (dailyService == null || undoService == null) {
+            throw new IllegalStateException(
+                    "dailyService and undoService required for processSwipe(). Use the 7-arg constructor.");
+        }
         if (liked && !dailyService.canLike(currentUser.getId())) {
             return SwipeResult.dailyLimitReached();
         }
@@ -232,7 +243,7 @@ public class MatchingService {
      * Represents a user who liked the current user but hasn't been responded to
      * yet.
      */
-    public record PendingLiker(User user, Instant likedAt) {
+    public static record PendingLiker(User user, Instant likedAt) {
         public PendingLiker {
             Objects.requireNonNull(user, "user cannot be null");
             Objects.requireNonNull(likedAt, "likedAt cannot be null");
@@ -243,7 +254,7 @@ public class MatchingService {
      * Result of a swipe action containing success status, match information, and
      * user-friendly message.
      */
-    public record SwipeResult(boolean success, boolean matched, Match match, Like like, String message) {
+    public static record SwipeResult(boolean success, boolean matched, Match match, Like like, String message) {
         public SwipeResult {
             Objects.requireNonNull(message, "message cannot be null");
         }

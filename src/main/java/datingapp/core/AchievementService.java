@@ -27,6 +27,7 @@ public class AchievementService {
     private final UserStorage userStorage;
     private final ReportStorage reportStorage;
     private final ProfilePreviewService profilePreviewService;
+    private final AppConfig config;
 
     public AchievementService(
             StatsStorage achievementStorage,
@@ -42,7 +43,7 @@ public class AchievementService {
         this.userStorage = Objects.requireNonNull(userStorage);
         this.reportStorage = Objects.requireNonNull(reportStorage);
         this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
-        Objects.requireNonNull(config); // Validate but don't store (reserved for future use)
+        this.config = Objects.requireNonNull(config);
     }
 
     /** Progress towards an achievement. */
@@ -155,11 +156,11 @@ public class AchievementService {
     private boolean isEarned(UUID userId, User user, Achievement achievement) {
         return switch (achievement) {
             // Matching milestones
-            case FIRST_SPARK -> getMatchCount(userId) >= 1;
-            case SOCIAL_BUTTERFLY -> getMatchCount(userId) >= 5;
-            case POPULAR -> getMatchCount(userId) >= 10;
-            case SUPERSTAR -> getMatchCount(userId) >= 25;
-            case LEGEND -> getMatchCount(userId) >= 50;
+            case FIRST_SPARK -> getMatchCount(userId) >= config.achievementMatchTier1();
+            case SOCIAL_BUTTERFLY -> getMatchCount(userId) >= config.achievementMatchTier2();
+            case POPULAR -> getMatchCount(userId) >= config.achievementMatchTier3();
+            case SUPERSTAR -> getMatchCount(userId) >= config.achievementMatchTier4();
+            case LEGEND -> getMatchCount(userId) >= config.achievementMatchTier5();
 
             // Behavior achievements
             case SELECTIVE -> isSelective(userId);
@@ -183,14 +184,29 @@ public class AchievementService {
     private int[] getProgressValues(UUID userId, User user, Achievement achievement) {
         return switch (achievement) {
             // Matching milestones
-            case FIRST_SPARK -> new int[] {Math.min(1, getMatchCount(userId)), 1};
-            case SOCIAL_BUTTERFLY -> new int[] {Math.min(5, getMatchCount(userId)), 5};
-            case POPULAR -> new int[] {Math.min(10, getMatchCount(userId)), 10};
-            case SUPERSTAR -> new int[] {Math.min(25, getMatchCount(userId)), 25};
-            case LEGEND -> new int[] {Math.min(50, getMatchCount(userId)), 50};
+            case FIRST_SPARK ->
+                new int[] {
+                    Math.min(config.achievementMatchTier1(), getMatchCount(userId)), config.achievementMatchTier1()
+                };
+            case SOCIAL_BUTTERFLY ->
+                new int[] {
+                    Math.min(config.achievementMatchTier2(), getMatchCount(userId)), config.achievementMatchTier2()
+                };
+            case POPULAR ->
+                new int[] {
+                    Math.min(config.achievementMatchTier3(), getMatchCount(userId)), config.achievementMatchTier3()
+                };
+            case SUPERSTAR ->
+                new int[] {
+                    Math.min(config.achievementMatchTier4(), getMatchCount(userId)), config.achievementMatchTier4()
+                };
+            case LEGEND ->
+                new int[] {
+                    Math.min(config.achievementMatchTier5(), getMatchCount(userId)), config.achievementMatchTier5()
+                };
 
-            // Behavior - needs 50+ swipes
-            case SELECTIVE, OPEN_MINDED -> new int[] {getTotalSwipes(userId), 50};
+            // Behavior - needs minimum swipes
+            case SELECTIVE, OPEN_MINDED -> new int[] {getTotalSwipes(userId), config.minSwipesForBehaviorAchievement()};
 
             // Profile achievements
             case COMPLETE_PACKAGE -> new int[] {getProfileCompleteness(user), 100};
@@ -215,7 +231,7 @@ public class AchievementService {
 
     private boolean isSelective(UUID userId) {
         int totalSwipes = getTotalSwipes(userId);
-        if (totalSwipes < 50) {
+        if (totalSwipes < config.minSwipesForBehaviorAchievement()) {
             return false;
         }
         int likes = likeStorage.countByDirection(userId, Like.Direction.LIKE);
@@ -225,7 +241,7 @@ public class AchievementService {
 
     private boolean isOpenMinded(UUID userId) {
         int totalSwipes = getTotalSwipes(userId);
-        if (totalSwipes < 50) {
+        if (totalSwipes < config.minSwipesForBehaviorAchievement()) {
             return false;
         }
         int likes = likeStorage.countByDirection(userId, Like.Direction.LIKE);

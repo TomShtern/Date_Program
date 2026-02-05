@@ -26,7 +26,7 @@ class AppConfigTest {
             assertEquals(3, defaults.autoBanThreshold(), "Default auto-ban threshold should be 3");
             assertEquals(100, defaults.dailyLikeLimit(), "Default daily like limit should be 100");
             assertEquals(1, defaults.dailySuperLikeLimit(), "Default super like limit should be 1");
-            assertEquals(5, defaults.maxInterests(), "Default max interests should be 5");
+            assertEquals(10, defaults.maxInterests(), "Default max interests should be 10");
             assertEquals(2, defaults.maxPhotos(), "Default max photos should be 2");
             assertEquals(500, defaults.maxBioLength(), "Default max bio length should be 500");
             assertEquals(500, defaults.maxReportDescLength(), "Default report desc length should be 500");

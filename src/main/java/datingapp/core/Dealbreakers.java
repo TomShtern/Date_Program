@@ -41,11 +41,12 @@ public record Dealbreakers(
         acceptableLookingFor = acceptableLookingFor == null ? Set.of() : Set.copyOf(acceptableLookingFor);
         acceptableEducation = acceptableEducation == null ? Set.of() : Set.copyOf(acceptableEducation);
 
-        // Validate height range
-        if (minHeightCm != null && minHeightCm < 100) {
+        // Validate height range using configured bounds
+        AppConfig heightConfig = AppConfig.defaults();
+        if (minHeightCm != null && minHeightCm < heightConfig.minHeightCm()) {
             throw new IllegalArgumentException("minHeightCm too low: " + minHeightCm);
         }
-        if (maxHeightCm != null && maxHeightCm > 250) {
+        if (maxHeightCm != null && maxHeightCm > heightConfig.maxHeightCm()) {
             throw new IllegalArgumentException("maxHeightCm too high: " + maxHeightCm);
         }
         if (minHeightCm != null && maxHeightCm != null && minHeightCm > maxHeightCm) {

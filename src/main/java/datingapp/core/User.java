@@ -268,7 +268,7 @@ public class User {
     }
 
     public Set<Gender> getInterestedIn() {
-        return EnumSet.copyOf(interestedIn);
+        return interestedIn.isEmpty() ? EnumSet.noneOf(Gender.class) : EnumSet.copyOf(interestedIn);
     }
 
     public double getLat() {
@@ -347,12 +347,25 @@ public class User {
         return interests.isEmpty() ? EnumSet.noneOf(Interest.class) : EnumSet.copyOf(interests);
     }
 
-    /** Calculates the user's age based on their birth date. */
+    /**
+     * Calculates the user's age based on their birth date using the configured timezone.
+     * Uses the application's configured timezone to avoid off-by-one-day issues.
+     */
     public int getAge() {
+        return getAge(CONFIG.userTimeZone());
+    }
+
+    /**
+     * Calculates the user's age based on their birth date using the specified timezone.
+     *
+     * @param timezone the timezone to use for age calculation
+     * @return the user's age in years, or 0 if birth date is not set
+     */
+    public int getAge(java.time.ZoneId timezone) {
         if (birthDate == null) {
             return 0;
         }
-        return Period.between(birthDate, LocalDate.now()).getYears();
+        return Period.between(birthDate, LocalDate.now(timezone)).getYears();
     }
 
     // Verification getters (Phase 2 feature)
@@ -480,19 +493,19 @@ public class User {
         touch();
     }
 
-    /** Sets photo URLs. Maximum 2 photos allowed. */
+    /** Sets photo URLs. Maximum {@code CONFIG.maxPhotos()} photos allowed. */
     public void setPhotoUrls(List<String> photoUrls) {
-        if (photoUrls != null && photoUrls.size() > 2) {
-            throw new IllegalArgumentException("Maximum 2 photos allowed");
+        if (photoUrls != null && photoUrls.size() > CONFIG.maxPhotos()) {
+            throw new IllegalArgumentException("Maximum " + CONFIG.maxPhotos() + " photos allowed");
         }
         this.photoUrls = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
         touch();
     }
 
-    /** Adds a photo URL. Maximum 2 photos allowed. */
+    /** Adds a photo URL. Maximum {@code CONFIG.maxPhotos()} photos allowed. */
     public void addPhotoUrl(String url) {
-        if (photoUrls.size() >= 2) {
-            throw new IllegalArgumentException("Maximum 2 photos allowed");
+        if (photoUrls.size() >= CONFIG.maxPhotos()) {
+            throw new IllegalArgumentException("Maximum " + CONFIG.maxPhotos() + " photos allowed");
         }
         photoUrls.add(url);
         touch();
@@ -540,16 +553,16 @@ public class User {
     }
 
     /**
-     * Sets the user's interests. Maximum of {@link Interest#MAX_PER_USER} interests
+     * Sets the user's interests. Maximum of {@code CONFIG.maxInterests()} interests
      * allowed.
      *
      * @param interests set of interests (null treated as empty)
-     * @throws IllegalArgumentException if more than MAX_PER_USER interests
+     * @throws IllegalArgumentException if more than maxInterests interests
      */
     public void setInterests(Set<Interest> interests) {
-        if (interests != null && interests.size() > Interest.MAX_PER_USER) {
+        if (interests != null && interests.size() > CONFIG.maxInterests()) {
             throw new IllegalArgumentException(
-                    "Maximum " + Interest.MAX_PER_USER + " interests allowed, got " + interests.size());
+                    "Maximum " + CONFIG.maxInterests() + " interests allowed, got " + interests.size());
         }
         this.interests =
                 (interests == null || interests.isEmpty()) ? EnumSet.noneOf(Interest.class) : EnumSet.copyOf(interests);
@@ -560,14 +573,14 @@ public class User {
      * Adds a single interest to the user's profile.
      *
      * @param interest the interest to add
-     * @throws IllegalArgumentException if adding would exceed MAX_PER_USER
+     * @throws IllegalArgumentException if adding would exceed maxInterests
      */
     public void addInterest(Interest interest) {
         if (interest == null) {
             return;
         }
-        if (interests.size() >= Interest.MAX_PER_USER && !interests.contains(interest)) {
-            throw new IllegalArgumentException("Maximum " + Interest.MAX_PER_USER + " interests allowed");
+        if (interests.size() >= CONFIG.maxInterests() && !interests.contains(interest)) {
+            throw new IllegalArgumentException("Maximum " + CONFIG.maxInterests() + " interests allowed");
         }
         interests.add(interest);
         touch();
@@ -633,7 +646,7 @@ public class User {
                 && interestedIn != null
                 && !interestedIn.isEmpty()
                 && maxDistanceKm > 0
-                && minAge >= 18
+                && minAge >= CONFIG.minAge()
                 && maxAge >= minAge
                 && photoUrls != null
                 && !photoUrls.isEmpty()
@@ -689,7 +702,8 @@ public class User {
      * <li>Track date plans ("Dinner Thursday @ Olive Garden")
      * </ul>
      */
-    public record ProfileNote(UUID authorId, UUID subjectId, String content, Instant createdAt, Instant updatedAt) {
+    public static record ProfileNote(
+            UUID authorId, UUID subjectId, String content, Instant createdAt, Instant updatedAt) {
 
         /** Maximum length for note content. */
         public static final int MAX_LENGTH = 500;

@@ -48,7 +48,7 @@ public final class AppBootstrap {
      * @return The ServiceRegistry
      * @throws IllegalStateException if initialize() has not been called
      */
-    public static ServiceRegistry getServices() {
+    public static synchronized ServiceRegistry getServices() {
         if (!initialized) {
             throw new IllegalStateException("AppBootstrap.initialize() must be called first");
         }

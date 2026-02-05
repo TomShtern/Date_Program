@@ -83,9 +83,6 @@ public class MessagingService {
         // Update conversation's last message timestamp
         messagingStorage.updateConversationLastMessageAt(conversationId, message.createdAt());
 
-        // Update sender's lastActiveAt (Phase 3.1 feature)
-        userStorage.save(sender);
-
         return SendResult.success(message);
     }
 
@@ -99,6 +96,13 @@ public class MessagingService {
      * @return List of messages, ordered oldest first
      */
     public List<Message> getMessages(UUID userId, UUID otherUserId, int limit, int offset) {
+        if (limit < 1 || limit > 100) {
+            return List.of();
+        }
+        if (offset < 0) {
+            return List.of();
+        }
+
         String conversationId = Conversation.generateId(userId, otherUserId);
 
         // Verify user is part of conversation

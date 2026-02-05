@@ -21,7 +21,7 @@ public final class Stats {
      * historical trends
      * and faster reads.
      */
-    public record UserStats(
+    public static record UserStats(
             UUID id,
             UUID userId,
             Instant computedAt,
@@ -172,7 +172,7 @@ public final class Stats {
      * a user is
      * "above average" or "below average".
      */
-    public record PlatformStats(
+    public static record PlatformStats(
             UUID id,
             Instant computedAt,
             int totalActiveUsers,

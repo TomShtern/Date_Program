@@ -581,21 +581,21 @@ public final class DatabaseManager {
         addForeignKeyIfPresent(stmt, "reports", "fk_reports_reporter", "reporter_id", "users", "id");
         addForeignKeyIfPresent(stmt, "reports", "fk_reports_reported", "reported_user_id", "users", "id");
 
-        // conversations - add FKs
-        addForeignKeyIfPresent(stmt, "conversations", "fk_conversations_user_a", "user_a_id", "users", "id");
-        addForeignKeyIfPresent(stmt, "conversations", "fk_conversations_user_b", "user_b_id", "users", "id");
+        // conversations - add FKs (column names match table definition: user_a, user_b)
+        addForeignKeyIfPresent(stmt, "conversations", "fk_conversations_user_a", "user_a", "users", "id");
+        addForeignKeyIfPresent(stmt, "conversations", "fk_conversations_user_b", "user_b", "users", "id");
 
         // messages - add FKs
         addForeignKeyIfPresent(stmt, "messages", "fk_messages_sender", "sender_id", "users", "id");
         addForeignKeyIfPresent(stmt, "messages", "fk_messages_conversation", "conversation_id", "conversations", "id");
 
-        // profile_notes - add FKs
-        addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_author", "author_user_id", "users", "id");
-        addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_subject", "subject_user_id", "users", "id");
+        // profile_notes - add FKs (column names match table definition: author_id, subject_id)
+        addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_author", "author_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_subject", "subject_id", "users", "id");
 
-        // profile_views - add FKs
+        // profile_views - add FKs (column names match table definition: viewer_id, viewed_id)
         addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewer", "viewer_id", "users", "id");
-        addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewed", "viewed_user_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewed", "viewed_id", "users", "id");
     }
 
     private void addForeignKeyIfPresent(
@@ -627,9 +627,19 @@ public final class DatabaseManager {
         }
     }
 
+    /**
+     * Checks if the SQLException indicates a missing table (H2 error code 42102).
+     * More specific than substring matching to avoid masking real errors.
+     */
     private static boolean isMissingTable(SQLException e) {
-        String message = e.getMessage();
-        return message != null && message.contains("not found");
+        // H2 uses SQL state 42S02 for "table not found"
+        String sqlState = e.getSQLState();
+        if ("42S02".equals(sqlState)) {
+            return true;
+        }
+        // Fallback: H2 error code 42102 for base table/view not found
+        int errorCode = e.getErrorCode();
+        return errorCode == 42102;
     }
 
     private static String requireIdentifier(String value, String label) {

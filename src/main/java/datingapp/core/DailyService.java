@@ -32,6 +32,9 @@ public class DailyService {
     /** In-memory tracking of daily pick views (userId -> set of dates viewed). */
     private final Map<UUID, Set<LocalDate>> dailyPickViews = new ConcurrentHashMap<>();
 
+    /** Maximum users tracked in dailyPickViews before automatic cleanup. */
+    private static final int MAX_DAILY_PICK_USERS = 10_000;
+
     public DailyService(LikeStorage likeStorage, AppConfig config) {
         this(null, likeStorage, null, null, config);
     }
@@ -152,8 +155,11 @@ public class DailyService {
 
     /** Internal: Mark daily pick as viewed for a specific date. */
     private void markDailyPickViewed(UUID userId, LocalDate date) {
+        if (dailyPickViews.size() > MAX_DAILY_PICK_USERS) {
+            cleanupOldDailyPickViews(date);
+        }
         dailyPickViews
-                .computeIfAbsent(userId, _ -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
+                .computeIfAbsent(userId, id -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
                 .add(date);
     }
 

@@ -64,7 +64,14 @@ public record AppConfig(
         double paceWeight, // Weight for pace score (0.15 default)
         double responseWeight, // Weight for response time score (0.10 default)
         // Cleanup configuration
-        int cleanupRetentionDays // Days to retain expired data before cleanup (30 default)
+        int cleanupRetentionDays, // Days to retain expired data before cleanup (30 default)
+        // Standout scoring weights (separate from match quality for different use case)
+        double standoutDistanceWeight, // Weight for distance in standouts (0.20 default)
+        double standoutAgeWeight, // Weight for age in standouts (0.15 default)
+        double standoutInterestWeight, // Weight for interests in standouts (0.25 default)
+        double standoutLifestyleWeight, // Weight for lifestyle in standouts (0.20 default)
+        double standoutCompletenessWeight, // Weight for profile completeness (0.10 default)
+        double standoutActivityWeight // Weight for activity recency (0.10 default)
         ) {
     public AppConfig {
         Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
@@ -117,6 +124,12 @@ public record AppConfig(
         requireNonNegative("paceWeight", paceWeight);
         requireNonNegative("responseWeight", responseWeight);
         requireNonNegative("cleanupRetentionDays", cleanupRetentionDays);
+        requireNonNegative("standoutDistanceWeight", standoutDistanceWeight);
+        requireNonNegative("standoutAgeWeight", standoutAgeWeight);
+        requireNonNegative("standoutInterestWeight", standoutInterestWeight);
+        requireNonNegative("standoutLifestyleWeight", standoutLifestyleWeight);
+        requireNonNegative("standoutCompletenessWeight", standoutCompletenessWeight);
+        requireNonNegative("standoutActivityWeight", standoutActivityWeight);
     }
 
     private static void requireNonNegative(String name, int value) {
@@ -139,7 +152,7 @@ public record AppConfig(
                 1, // dailySuperLikeLimit
                 -1, // dailyPassLimit (-1 = unlimited)
                 ZoneId.systemDefault(), // userTimeZone
-                5, // maxInterests
+                10, // maxInterests
                 2, // maxPhotos
                 500, // maxBioLength
                 500, // maxReportDescLength
@@ -180,7 +193,14 @@ public record AppConfig(
                 0.15, // paceWeight
                 0.10, // responseWeight
                 // Cleanup configuration
-                30 // cleanupRetentionDays
+                30, // cleanupRetentionDays
+                // Standout scoring weights
+                0.20, // standoutDistanceWeight
+                0.15, // standoutAgeWeight
+                0.25, // standoutInterestWeight
+                0.20, // standoutLifestyleWeight
+                0.10, // standoutCompletenessWeight
+                0.10 // standoutActivityWeight
                 );
     }
 
@@ -211,7 +231,7 @@ public record AppConfig(
         private int dailySuperLikeLimit = 1;
         private int dailyPassLimit = -1;
         private ZoneId userTimeZone = ZoneId.systemDefault();
-        private int maxInterests = 5;
+        private int maxInterests = 10;
         private int maxPhotos = 2;
         private int maxBioLength = 500;
         private int maxReportDescLength = 500;
@@ -253,6 +273,13 @@ public record AppConfig(
         private double responseWeight = 0.10;
         // Cleanup configuration
         private int cleanupRetentionDays = 30;
+        // Standout scoring weights
+        private double standoutDistanceWeight = 0.20;
+        private double standoutAgeWeight = 0.15;
+        private double standoutInterestWeight = 0.25;
+        private double standoutLifestyleWeight = 0.20;
+        private double standoutCompletenessWeight = 0.10;
+        private double standoutActivityWeight = 0.10;
 
         public Builder autoBanThreshold(int v) {
             this.autoBanThreshold = v;
@@ -469,6 +496,36 @@ public record AppConfig(
             return this;
         }
 
+        public Builder standoutDistanceWeight(double v) {
+            this.standoutDistanceWeight = v;
+            return this;
+        }
+
+        public Builder standoutAgeWeight(double v) {
+            this.standoutAgeWeight = v;
+            return this;
+        }
+
+        public Builder standoutInterestWeight(double v) {
+            this.standoutInterestWeight = v;
+            return this;
+        }
+
+        public Builder standoutLifestyleWeight(double v) {
+            this.standoutLifestyleWeight = v;
+            return this;
+        }
+
+        public Builder standoutCompletenessWeight(double v) {
+            this.standoutCompletenessWeight = v;
+            return this;
+        }
+
+        public Builder standoutActivityWeight(double v) {
+            this.standoutActivityWeight = v;
+            return this;
+        }
+
         public AppConfig build() {
             return new AppConfig(
                     autoBanThreshold,
@@ -513,7 +570,13 @@ public record AppConfig(
                     lifestyleWeight,
                     paceWeight,
                     responseWeight,
-                    cleanupRetentionDays);
+                    cleanupRetentionDays,
+                    standoutDistanceWeight,
+                    standoutAgeWeight,
+                    standoutInterestWeight,
+                    standoutLifestyleWeight,
+                    standoutCompletenessWeight,
+                    standoutActivityWeight);
         }
     }
 }

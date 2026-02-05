@@ -9,6 +9,7 @@ import datingapp.core.storage.SocialStorage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,9 +32,9 @@ public class RelationshipTransitionService {
 
     public RelationshipTransitionService(
             MatchStorage matchStorage, SocialStorage socialStorage, MessagingStorage messagingStorage) {
-        this.matchStorage = matchStorage;
-        this.socialStorage = socialStorage;
-        this.messagingStorage = messagingStorage;
+        this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
+        this.socialStorage = Objects.requireNonNull(socialStorage, "socialStorage cannot be null");
+        this.messagingStorage = Objects.requireNonNull(messagingStorage, "messagingStorage cannot be null");
     }
 
     /**

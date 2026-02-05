@@ -23,20 +23,20 @@ class DealbreakersTest {
     class ValidationTests {
 
         @Test
-        @DisplayName("minHeightCm cannot be below 100")
+        @DisplayName("minHeightCm cannot be below config minimum (50)")
         void minHeightTooLow() {
             var exception = assertThrows(
                     IllegalArgumentException.class,
-                    () -> new Dealbreakers(null, null, null, null, null, 99, null, null));
+                    () -> new Dealbreakers(null, null, null, null, null, 49, null, null));
             assertNotNull(exception.getMessage());
         }
 
         @Test
-        @DisplayName("maxHeightCm cannot be above 250")
+        @DisplayName("maxHeightCm cannot be above config maximum (300)")
         void maxHeightTooHigh() {
             var exception = assertThrows(
                     IllegalArgumentException.class,
-                    () -> new Dealbreakers(null, null, null, null, null, null, 251, null));
+                    () -> new Dealbreakers(null, null, null, null, null, null, 301, null));
             assertNotNull(exception.getMessage());
         }
 

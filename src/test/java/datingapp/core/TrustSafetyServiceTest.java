@@ -72,7 +72,7 @@ class TrustSafetyServiceTest {
             blockStorage = new InMemoryBlockStorage();
 
             AppConfig config = AppConfig.builder().autoBanThreshold(3).build();
-            trustSafetyService = new TrustSafetyService(reportStorage, userStorage, blockStorage, config);
+            trustSafetyService = new TrustSafetyService(reportStorage, userStorage, blockStorage, null, config);
 
             // Create test users
             activeReporter = createActiveUser("Reporter");
@@ -156,7 +156,7 @@ class TrustSafetyServiceTest {
             void customThresholdWorks() {
                 AppConfig customConfig = AppConfig.builder().autoBanThreshold(2).build();
                 TrustSafetyService customService =
-                        new TrustSafetyService(reportStorage, userStorage, blockStorage, customConfig);
+                        new TrustSafetyService(reportStorage, userStorage, blockStorage, null, customConfig);
 
                 User reporter2 = createActiveUser("Reporter2");
                 userStorage.save(reporter2);

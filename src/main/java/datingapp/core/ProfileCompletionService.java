@@ -9,6 +9,8 @@ import java.util.Objects;
  */
 public final class ProfileCompletionService {
 
+    private static final AppConfig CONFIG = AppConfig.defaults();
+
     private ProfileCompletionService() {}
 
     /**
@@ -305,7 +307,9 @@ public final class ProfileCompletionService {
         }
 
         totalPoints += 5;
-        if (user.getMinAge() >= 18 && user.getMaxAge() <= 120 && user.getMinAge() <= user.getMaxAge()) {
+        if (user.getMinAge() >= CONFIG.minAge()
+                && user.getMaxAge() <= CONFIG.maxAge()
+                && user.getMinAge() <= user.getMaxAge()) {
             earnedPoints += 5;
             prefsFilled.add("Age preferences");
         } else {

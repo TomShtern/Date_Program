@@ -214,6 +214,19 @@ class MessagingServiceTest {
             List<Message> messages = messagingService.getMessages(userA, userB, 10, 0);
             assertTrue(messages.isEmpty());
         }
+
+        @Test
+        @DisplayName("should return empty list for zero limit")
+        void returnsEmptyForZeroLimit() {
+            Match match = Match.create(userA, userB);
+            matchStorage.save(match);
+
+            messagingService.sendMessage(userA, userB, "Hello");
+
+            List<Message> msgs = messagingService.getMessages(userA, userB, 0, 0);
+            assertNotNull(msgs);
+            assertTrue(msgs.isEmpty(), "Zero limit should return empty list");
+        }
     }
 
     @SuppressWarnings("unused") // JUnit 5 discovers via reflection

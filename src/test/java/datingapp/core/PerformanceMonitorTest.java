@@ -85,9 +85,9 @@ class PerformanceMonitorTest {
 
         @Test
         @DisplayName("Should auto-record when timer closes")
-        void autoRecordsOnClose() throws Exception {
+        void autoRecordsOnClose() {
             try (PerformanceMonitor.Timer timer = PerformanceMonitor.startTimer("auto.test")) {
-                Thread.sleep(10); // Small delay to ensure measurable time
+                assertTrue(timer.elapsedMs() >= 0);
             }
 
             PerformanceMonitor.OperationMetrics metrics = PerformanceMonitor.getMetrics("auto.test");
@@ -98,9 +98,8 @@ class PerformanceMonitorTest {
 
         @Test
         @DisplayName("Should report elapsed time without closing")
-        void reportsElapsedTime() throws Exception {
+        void reportsElapsedTime() {
             PerformanceMonitor.Timer timer = PerformanceMonitor.startTimer("elapsed.test");
-            Thread.sleep(10);
             long elapsed = timer.elapsedMs();
 
             assertTrue(elapsed >= 0);
@@ -156,21 +155,41 @@ class PerformanceMonitorTest {
         @Test
         @DisplayName("logMetrics should not throw when empty")
         void logMetricsEmptyNoThrow() {
-            assertDoesNotThrow(() -> PerformanceMonitor.logMetrics());
+            assertDoesNotThrow(PerformanceMonitor::logMetrics);
         }
 
         @Test
         @DisplayName("logMetrics should not throw with data")
         void logMetricsWithDataNoThrow() {
             PerformanceMonitor.record("log.test", 100);
-            assertDoesNotThrow(() -> PerformanceMonitor.logMetrics());
+            assertDoesNotThrow(PerformanceMonitor::logMetrics);
         }
 
         @Test
         @DisplayName("logMetricsDebug should not throw")
         void logMetricsDebugNoThrow() {
             PerformanceMonitor.record("debug.test", 100);
-            assertDoesNotThrow(() -> PerformanceMonitor.logMetricsDebug());
+            assertDoesNotThrow(PerformanceMonitor::logMetricsDebug);
+        }
+    }
+
+    @Nested
+    @DisplayName("Bounded Metrics Map")
+    class BoundedMetricsTests {
+
+        @Test
+        @DisplayName("should not grow beyond MAX_METRICS_SIZE")
+        void metricsMapIsBounded() {
+            // Record 1100 unique operations (MAX is 1000)
+            for (int i = 0; i < 1100; i++) {
+                PerformanceMonitor.record("op-" + i, 10);
+            }
+            // Early operations should be recorded
+            PerformanceMonitor.OperationMetrics early = PerformanceMonitor.getMetrics("op-0");
+            assertNotNull(early, "Early operations should be recorded");
+            // Operations beyond the 1000 limit should be silently dropped
+            PerformanceMonitor.OperationMetrics late = PerformanceMonitor.getMetrics("op-1099");
+            assertNull(late, "Operations beyond MAX_METRICS_SIZE should not be recorded");
         }
     }
 }

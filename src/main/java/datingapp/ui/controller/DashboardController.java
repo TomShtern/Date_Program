@@ -2,7 +2,6 @@ package datingapp.ui.controller;
 
 import datingapp.core.AppSession;
 import datingapp.ui.NavigationService;
-import datingapp.ui.component.UiComponents;
 import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.util.UiHelpers;
@@ -11,14 +10,11 @@ import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
 import java.util.Objects;
 import java.util.ResourceBundle;
-import javafx.animation.FadeTransition;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
-import javafx.scene.layout.StackPane;
-import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,20 +79,12 @@ public class DashboardController extends BaseController implements Initializable
     public void initialize(URL location, ResourceBundle resources) {
         viewModel.setErrorHandler(Toast::showError);
 
-        StackPane loadingOverlay = UiComponents.createLoadingOverlay();
-        registerOverlay(loadingOverlay);
-        loadingOverlay.visibleProperty().bind(viewModel.loadingProperty());
-        loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
-
         // Use Subscription API for memory-safe listener management
         addSubscription(viewModel.userNameProperty().subscribe(userNameLabel::setText));
         addSubscription(viewModel.dailyLikesStatusProperty().subscribe(statusLabel::setText));
         addSubscription(viewModel.dailyPickNameProperty().subscribe(dailyPickLabel::setText));
         addSubscription(viewModel.totalMatchesProperty().subscribe(totalMatchesLabel::setText));
         addSubscription(viewModel.profileCompletionProperty().subscribe(completionLabel::setText));
-
-        // Handle loading state changes for skeleton display
-        addSubscription(viewModel.loadingProperty().subscribe(this::handleLoadingChange));
 
         // Set initial values
         userNameLabel.setText(viewModel.userNameProperty().get());
@@ -120,34 +108,6 @@ public class DashboardController extends BaseController implements Initializable
         setupResponsiveListener();
 
         wireNavigationButtons();
-    }
-
-    /**
-     * Handles loading state changes by showing/hiding skeleton loaders.
-     */
-    private void handleLoadingChange(boolean isLoading) {
-        if (isLoading) {
-            // Show skeleton for daily pick label while loading
-            if (dailyPickLabel != null) {
-                dailyPickLabel.setText("Loading...");
-                dailyPickLabel.setOpacity(0.5);
-            }
-            if (achievementsListView != null) {
-                achievementsListView.setOpacity(0.5);
-            }
-        } else {
-            // Data loaded - restore full opacity with fade
-            if (dailyPickLabel != null) {
-                FadeTransition fade = new FadeTransition(Duration.millis(300), dailyPickLabel);
-                fade.setToValue(1.0);
-                fade.play();
-            }
-            if (achievementsListView != null) {
-                FadeTransition fade = new FadeTransition(Duration.millis(300), achievementsListView);
-                fade.setToValue(1.0);
-                fade.play();
-            }
-        }
     }
 
     /** Adds a window width listener to trigger compact mode at 900px threshold. */
