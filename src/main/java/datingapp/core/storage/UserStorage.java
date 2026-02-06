@@ -3,7 +3,9 @@ package datingapp.core.storage;
 import datingapp.core.User;
 import datingapp.core.User.ProfileNote;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -28,6 +30,27 @@ public interface UserStorage {
 
     /** Finds all users regardless of state. */
     List<User> findAll();
+
+    /**
+     * Finds multiple users by their IDs in a single batch query.
+     * Returns a map of user ID to User. Missing IDs are not included in the map.
+     *
+     * @param ids the user IDs to look up
+     * @return map of found users keyed by their ID
+     */
+    default Map<UUID, User> findByIds(Set<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, User> result = new java.util.HashMap<>();
+        for (UUID id : ids) {
+            User user = get(id);
+            if (user != null) {
+                result.put(id, user);
+            }
+        }
+        return result;
+    }
 
     /**
      * Deletes a user and all their associated data. When combined with CASCADE DELETE on

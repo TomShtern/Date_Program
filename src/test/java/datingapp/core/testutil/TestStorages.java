@@ -324,7 +324,7 @@ public final class TestStorages {
             return (int) likes.values().stream()
                     .filter(l -> l.whoLikes().equals(userId)
                             && l.direction() == Like.Direction.LIKE
-                            && l.createdAt().isAfter(startOfDay))
+                            && !l.createdAt().isBefore(startOfDay))
                     .count();
         }
 
@@ -333,7 +333,7 @@ public final class TestStorages {
             return (int) likes.values().stream()
                     .filter(l -> l.whoLikes().equals(userId)
                             && l.direction() == Like.Direction.PASS
-                            && l.createdAt().isAfter(startOfDay))
+                            && !l.createdAt().isBefore(startOfDay))
                     .count();
         }
 

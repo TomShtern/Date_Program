@@ -18,11 +18,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
-import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -58,9 +57,6 @@ public class MatchesViewModel {
 
     private User currentUser;
 
-    /** Track disposed state to prevent operations after cleanup. */
-    private final AtomicBoolean disposed = new AtomicBoolean(false);
-
     public MatchesViewModel(
             MatchStorage matchStorage,
             UserStorage userStorage,
@@ -78,9 +74,6 @@ public class MatchesViewModel {
 
     /** Initialize and load matches for current user. */
     public void initialize() {
-        if (disposed.get()) {
-            return;
-        }
         currentUser = AppSession.getInstance().getCurrentUser();
         if (currentUser != null) {
             refreshAll();
@@ -92,7 +85,6 @@ public class MatchesViewModel {
      * Should be called when the ViewModel is no longer needed.
      */
     public void dispose() {
-        disposed.set(true);
         matches.clear();
         likesReceived.clear();
         likesSent.clear();
@@ -104,119 +96,123 @@ public class MatchesViewModel {
 
     /** Refresh all sections for the current user. */
     public void refreshAll() {
-        refreshMatches();
-        refreshLikesReceived();
-        refreshLikesSent();
-    }
-
-    /** Refresh the matches list. */
-    public void refresh() {
-        refreshAll();
-    }
-
-    private void refreshMatches() {
         if (currentUser == null) {
             currentUser = AppSession.getInstance().getCurrentUser();
         }
         if (currentUser == null) {
-            logWarn("No current user, cannot load matches");
+            logWarn("No current user, cannot refresh matches");
             return;
         }
 
-        logInfo("Loading matches for user: {}", currentUser.getName());
         loading.set(true);
-        matches.clear();
+        try {
+            // Fetch data using batch loading
+            List<MatchCardData> matchCardDataList = fetchMatchesFromStorage(currentUser.getId());
+            List<LikeCardData> received = fetchReceivedLikesFromStorage(currentUser.getId());
+            List<LikeCardData> sent = fetchSentLikesFromStorage(currentUser.getId());
 
-        List<Match> activeMatches = matchStorage.getActiveMatchesFor(currentUser.getId());
+            // Update observable lists
+            matches.setAll(matchCardDataList);
+            matchCount.set(matches.size());
 
+            likesReceived.setAll(received);
+            likesReceivedCount.set(likesReceived.size());
+
+            likesSent.setAll(sent);
+            likesSentCount.set(likesSent.size());
+
+            if (logger.isInfoEnabled()) {
+                logger.info("Refreshed all matches and likes for {}", currentUser.getName());
+            }
+        } catch (Exception e) {
+            logWarn("Failed to refresh matches: {}", e.getMessage(), e);
+            notifyError("Failed to refresh matches", e);
+        } finally {
+            loading.set(false);
+        }
+    }
+
+    private List<MatchCardData> fetchMatchesFromStorage(UUID userId) {
+        List<Match> activeMatches = matchStorage.getActiveMatchesFor(userId);
+        List<UUID> otherUserIds =
+                activeMatches.stream().map(m -> m.getOtherUser(userId)).toList();
+        Map<UUID, User> otherUsers = userStorage.findByIds(new HashSet<>(otherUserIds));
+
+        List<MatchCardData> cardData = new ArrayList<>();
         for (Match match : activeMatches) {
-            UUID otherUserId = match.getOtherUser(currentUser.getId());
-            User otherUser = userStorage.get(otherUserId);
+            UUID otherUserId = match.getOtherUser(userId);
+            User otherUser = otherUsers.get(otherUserId);
             if (otherUser != null) {
-                String timeAgo = formatTimeAgo(match.getCreatedAt());
-                matches.add(new MatchCardData(
-                        match.getId(), otherUser.getId(), otherUser.getName(), timeAgo, match.getCreatedAt()));
+                cardData.add(new MatchCardData(
+                        match.getId(),
+                        otherUser.getId(),
+                        otherUser.getName(),
+                        formatTimeAgo(match.getCreatedAt()),
+                        match.getCreatedAt()));
             }
         }
-
-        matchCount.set(matches.size());
-        loading.set(false);
-        logInfo("Loaded {} matches", matches.size());
+        return cardData;
     }
 
-    private void refreshLikesReceived() {
-        if (currentUser == null) {
-            currentUser = AppSession.getInstance().getCurrentUser();
-        }
-        if (currentUser == null) {
-            logWarn("No current user, cannot load likes received");
-            return;
-        }
-
+    private List<LikeCardData> fetchReceivedLikesFromStorage(UUID userId) {
         List<LikeCardData> received = new ArrayList<>();
-        List<PendingLiker> pendingLikers = matchingService.findPendingLikersWithTimes(currentUser.getId());
+        List<PendingLiker> pendingLikers = matchingService.findPendingLikersWithTimes(userId);
 
         for (PendingLiker pending : pendingLikers) {
             User liker = pending.user();
             if (liker != null && liker.getState() == UserState.ACTIVE) {
-                Like like =
-                        likeStorage.getLike(liker.getId(), currentUser.getId()).orElse(null);
+                Like like = likeStorage.getLike(liker.getId(), userId).orElse(null);
                 if (like != null) {
-                    Instant likedAt = pending.likedAt();
                     received.add(new LikeCardData(
                             liker.getId(),
                             like.id(),
                             liker.getName(),
                             liker.getAge(),
                             summarizeBio(liker),
-                            formatTimeAgo(likedAt),
-                            likedAt));
+                            formatTimeAgo(pending.likedAt()),
+                            pending.likedAt()));
                 }
             }
         }
-
         received.sort(likeTimeComparator());
-        likesReceived.setAll(received);
-        likesReceivedCount.set(likesReceived.size());
+        return received;
     }
 
-    private void refreshLikesSent() {
-        if (currentUser == null) {
-            currentUser = AppSession.getInstance().getCurrentUser();
-        }
-        if (currentUser == null) {
-            logWarn("No current user, cannot load likes sent");
-            return;
-        }
+    private List<LikeCardData> fetchSentLikesFromStorage(UUID userId) {
+        Set<UUID> blocked = blockStorage.getBlockedUserIds(userId);
+        Set<UUID> matched = getMatchedUserIds(userId);
+        Set<UUID> allLikedOrPassedIds = likeStorage.getLikedOrPassedUserIds(userId);
 
-        Set<UUID> blocked = blockStorage.getBlockedUserIds(currentUser.getId());
-        Set<UUID> matched = getMatchedUserIds(currentUser.getId());
+        List<UUID> candidateIds = allLikedOrPassedIds.stream()
+                .filter(id -> !blocked.contains(id) && !matched.contains(id))
+                .toList();
 
+        Map<UUID, User> potentialUsers = userStorage.findByIds(new HashSet<>(candidateIds));
         List<LikeCardData> sent = new ArrayList<>();
-        for (UUID otherUserId : likeStorage.getLikedOrPassedUserIds(currentUser.getId())) {
-            if (!blocked.contains(otherUserId) && !matched.contains(otherUserId)) {
-                Like like =
-                        likeStorage.getLike(currentUser.getId(), otherUserId).orElse(null);
-                if (like != null && like.direction() == Like.Direction.LIKE) {
-                    User otherUser = userStorage.get(otherUserId);
-                    if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
-                        Instant likedAt = like.createdAt();
-                        sent.add(new LikeCardData(
-                                otherUser.getId(),
-                                like.id(),
-                                otherUser.getName(),
-                                otherUser.getAge(),
-                                summarizeBio(otherUser),
-                                formatTimeAgo(likedAt),
-                                likedAt));
-                    }
+
+        for (UUID otherUserId : candidateIds) {
+            Like like = likeStorage.getLike(userId, otherUserId).orElse(null);
+            if (like != null && like.direction() == Like.Direction.LIKE) {
+                User otherUser = potentialUsers.get(otherUserId);
+                if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
+                    sent.add(new LikeCardData(
+                            otherUser.getId(),
+                            like.id(),
+                            otherUser.getName(),
+                            otherUser.getAge(),
+                            summarizeBio(otherUser),
+                            formatTimeAgo(like.createdAt()),
+                            like.createdAt()));
                 }
             }
         }
-
         sent.sort(likeTimeComparator());
-        likesSent.setAll(sent);
-        likesSentCount.set(likesSent.size());
+        return sent;
+    }
+
+    /** Refresh the matches list. */
+    public void refresh() {
+        refreshAll();
     }
 
     public void likeBack(LikeCardData like) {
@@ -228,13 +224,21 @@ public class MatchesViewModel {
             logWarn("No current user, cannot like back");
             return;
         }
-        if (!dailyService.canLike(currentUser.getId())) {
-            notifyError("Daily like limit reached", new IllegalStateException("Daily limit reached"));
-            return;
-        }
 
-        matchingService.recordLike(Like.create(currentUser.getId(), like.userId(), Like.Direction.LIKE));
-        refreshAll();
+        loading.set(true);
+        try {
+            if (!dailyService.canLike(currentUser.getId())) {
+                notifyError("Daily like limit reached", new IllegalStateException("Daily limit reached"));
+                return;
+            }
+
+            matchingService.recordLike(Like.create(currentUser.getId(), like.userId(), Like.Direction.LIKE));
+            refreshAll();
+        } catch (Exception e) {
+            logWarn("Failed to like back: {}", e.getMessage(), e);
+            notifyError("Failed to like back", e);
+            loading.set(false);
+        }
     }
 
     public void passOn(LikeCardData like) {
@@ -247,9 +251,15 @@ public class MatchesViewModel {
             return;
         }
 
-        matchingService.recordLike(Like.create(currentUser.getId(), like.userId(), Like.Direction.PASS));
-        refreshLikesReceived();
-        refreshMatches();
+        loading.set(true);
+        try {
+            matchingService.recordLike(Like.create(currentUser.getId(), like.userId(), Like.Direction.PASS));
+            refreshAll();
+        } catch (Exception e) {
+            logWarn("Failed to pass: {}", e.getMessage(), e);
+            notifyError("Failed to pass", e);
+            loading.set(false);
+        }
     }
 
     public void withdrawLike(LikeCardData like) {
@@ -258,18 +268,14 @@ public class MatchesViewModel {
             return;
         }
 
+        loading.set(true);
         try {
             likeStorage.delete(like.likeId());
-            refreshLikesSent();
+            refreshAll();
         } catch (Exception e) {
             logWarn("Failed to withdraw like {}", like.likeId(), e);
             notifyError("Failed to withdraw like", e);
-        }
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
+            loading.set(false);
         }
     }
 
@@ -285,11 +291,7 @@ public class MatchesViewModel {
         }
         String detail = e.getMessage();
         String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
-        if (Platform.isFxApplicationThread()) {
-            errorHandler.onError(message);
-        } else {
-            Platform.runLater(() -> errorHandler.onError(message));
-        }
+        errorHandler.onError(message);
     }
 
     /** Format a timestamp as "X days ago" or similar. */

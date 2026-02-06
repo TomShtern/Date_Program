@@ -7,6 +7,7 @@ import datingapp.core.storage.MatchStorage;
 import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,18 +55,41 @@ public interface JdbiMatchStorage extends MatchStorage {
 
     @SqlQuery("""
             SELECT * FROM matches
-            WHERE (user_a = :userId OR user_b = :userId)
-            AND state = 'ACTIVE'
+            WHERE user_a = :userId AND state = 'ACTIVE'
             """)
-    @Override
-    List<Match> getActiveMatchesFor(@Bind("userId") UUID userId);
+    List<Match> getActiveMatchesForUserA(@Bind("userId") UUID userId);
 
     @SqlQuery("""
             SELECT * FROM matches
-            WHERE user_a = :userId OR user_b = :userId
+            WHERE user_b = :userId AND state = 'ACTIVE'
             """)
+    List<Match> getActiveMatchesForUserB(@Bind("userId") UUID userId);
+
     @Override
-    List<Match> getAllMatchesFor(@Bind("userId") UUID userId);
+    default List<Match> getActiveMatchesFor(UUID userId) {
+        List<Match> fromA = getActiveMatchesForUserA(userId);
+        List<Match> fromB = getActiveMatchesForUserB(userId);
+        List<Match> combined = new ArrayList<>(fromA.size() + fromB.size());
+        combined.addAll(fromA);
+        combined.addAll(fromB);
+        return combined;
+    }
+
+    @SqlQuery("SELECT * FROM matches WHERE user_a = :userId")
+    List<Match> getAllMatchesForUserA(@Bind("userId") UUID userId);
+
+    @SqlQuery("SELECT * FROM matches WHERE user_b = :userId")
+    List<Match> getAllMatchesForUserB(@Bind("userId") UUID userId);
+
+    @Override
+    default List<Match> getAllMatchesFor(UUID userId) {
+        List<Match> fromA = getAllMatchesForUserA(userId);
+        List<Match> fromB = getAllMatchesForUserB(userId);
+        List<Match> combined = new ArrayList<>(fromA.size() + fromB.size());
+        combined.addAll(fromA);
+        combined.addAll(fromB);
+        return combined;
+    }
 
     @SqlUpdate("DELETE FROM matches WHERE id = :matchId")
     @Override

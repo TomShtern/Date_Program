@@ -1,6 +1,7 @@
 package datingapp.core;
 
 import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.DailyPickViewStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.MessagingStorage;
@@ -38,6 +39,7 @@ public class ServiceRegistry {
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
     private final BlockStorage blockStorage;
+    private final DailyPickViewStorage dailyPickViewStorage;
     private final SwipeSessionStorage sessionStorage;
 
     // ─────────────────────────────────────────────
@@ -103,6 +105,7 @@ public class ServiceRegistry {
             LikeStorage likeStorage,
             MatchStorage matchStorage,
             BlockStorage blockStorage,
+            DailyPickViewStorage dailyPickViewStorage,
             ReportStorage reportStorage,
             SwipeSessionStorage sessionStorage,
             StatsStorage statsStorage,
@@ -128,6 +131,7 @@ public class ServiceRegistry {
         this.likeStorage = Objects.requireNonNull(likeStorage);
         this.matchStorage = Objects.requireNonNull(matchStorage);
         this.blockStorage = Objects.requireNonNull(blockStorage);
+        this.dailyPickViewStorage = Objects.requireNonNull(dailyPickViewStorage);
         this.reportStorage = Objects.requireNonNull(reportStorage);
         this.sessionStorage = Objects.requireNonNull(sessionStorage);
         this.statsStorage = Objects.requireNonNull(statsStorage);
@@ -176,6 +180,10 @@ public class ServiceRegistry {
 
     public SwipeSessionStorage getSessionStorage() {
         return sessionStorage;
+    }
+
+    public DailyPickViewStorage getDailyPickViewStorage() {
+        return dailyPickViewStorage;
     }
 
     // === Trust & Safety Storage ===
@@ -339,6 +347,8 @@ public class ServiceRegistry {
             LikeStorage likeStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiLikeStorage.class);
             MatchStorage matchStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiMatchStorage.class);
             BlockStorage blockStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiBlockStorage.class);
+            DailyPickViewStorage dailyPickViewStorage =
+                    jdbi.onDemand(datingapp.storage.jdbi.JdbiDailyPickViewStorage.class);
             ReportStorage reportStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiReportStorage.class);
             SwipeSessionStorage sessionStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiSwipeSessionStorage.class);
             StatsStorage statsStorage = jdbi.onDemand(datingapp.storage.jdbi.JdbiStatsStorage.class);
@@ -352,8 +362,8 @@ public class ServiceRegistry {
             // Matching Services (inlined from MatchingModule.create)
             // ═══════════════════════════════════════════════════════════════
             CandidateFinder candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, config);
-            DailyService dailyService =
-                    new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config);
+            DailyService dailyService = new DailyService(
+                    userStorage, likeStorage, blockStorage, dailyPickViewStorage, candidateFinder, config);
             UndoService undoService = new UndoService(likeStorage, matchStorage, undoStorage, config);
 
             // Wire transaction support for atomic undo operations
@@ -423,6 +433,7 @@ public class ServiceRegistry {
                     likeStorage,
                     matchStorage,
                     blockStorage,
+                    dailyPickViewStorage,
                     reportStorage,
                     sessionStorage,
                     statsStorage,

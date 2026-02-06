@@ -10,7 +10,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -290,14 +289,8 @@ public class StandoutsService {
 
     /** Resolve standout user IDs to User objects. */
     public Map<UUID, User> resolveUsers(List<Standout> standouts) {
-        Map<UUID, User> users = new HashMap<>();
-        for (Standout standout : standouts) {
-            User user = userStorage.get(standout.standoutUserId());
-            if (user != null) {
-                users.put(standout.standoutUserId(), user);
-            }
-        }
-        return users;
+        List<UUID> ids = standouts.stream().map(Standout::standoutUserId).toList();
+        return userStorage.findByIds(new HashSet<>(ids));
     }
 
     /** Internal scored candidate record. */

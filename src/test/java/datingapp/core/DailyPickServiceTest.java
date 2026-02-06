@@ -10,6 +10,7 @@ import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.BlockStorage;
+import datingapp.core.storage.DailyPickViewStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Clock;
@@ -28,6 +29,7 @@ class DailyPickServiceTest {
     private InMemoryUserStorage userStorage;
     private InMemoryLikeStorage likeStorage;
     private InMemoryBlockStorage blockStorage;
+    private InMemoryDailyPickViewStorage dailyPickViewStorage;
     private CandidateFinder candidateFinder;
     private AppConfig config;
 
@@ -36,10 +38,12 @@ class DailyPickServiceTest {
         userStorage = new InMemoryUserStorage();
         likeStorage = new InMemoryLikeStorage();
         blockStorage = new InMemoryBlockStorage();
+        dailyPickViewStorage = new InMemoryDailyPickViewStorage();
         config = AppConfig.defaults();
 
         candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, AppConfig.defaults());
-        service = new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config);
+        service =
+                new DailyService(userStorage, likeStorage, blockStorage, dailyPickViewStorage, candidateFinder, config);
     }
 
     @Test
@@ -225,8 +229,8 @@ class DailyPickServiceTest {
         LocalDate oldDate = LocalDate.now(config.userTimeZone()).minusDays(10);
         ZoneId zone = config.userTimeZone();
         Clock oldClock = Clock.fixed(oldDate.atStartOfDay(zone).toInstant(), zone);
-        DailyService oldService =
-                new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config, oldClock);
+        DailyService oldService = new DailyService(
+                userStorage, likeStorage, blockStorage, dailyPickViewStorage, candidateFinder, config, oldClock);
 
         User seeker = createActiveUser("Alice", 25);
         userStorage.save(seeker);
@@ -448,6 +452,31 @@ class DailyPickServiceTest {
                     .filter(l -> l.direction() == Like.Direction.PASS)
                     .filter(l -> l.createdAt().isAfter(startOfDay))
                     .count();
+        }
+    }
+
+    private static class InMemoryDailyPickViewStorage implements DailyPickViewStorage {
+        private final Map<UUID, Set<LocalDate>> views = new HashMap<>();
+
+        @Override
+        public void markAsViewed(UUID userId, LocalDate date) {
+            views.computeIfAbsent(userId, k -> new HashSet<>()).add(date);
+        }
+
+        @Override
+        public boolean isViewed(UUID userId, LocalDate date) {
+            return views.getOrDefault(userId, Set.of()).contains(date);
+        }
+
+        @Override
+        public int deleteOlderThan(LocalDate before) {
+            int removed = 0;
+            for (Set<LocalDate> dates : views.values()) {
+                int sizeBefore = dates.size();
+                dates.removeIf(d -> d.isBefore(before));
+                removed += (sizeBefore - dates.size());
+            }
+            return removed;
         }
     }
 

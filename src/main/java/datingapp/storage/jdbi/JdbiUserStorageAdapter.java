@@ -3,8 +3,12 @@ package datingapp.storage.jdbi;
 import datingapp.core.User;
 import datingapp.core.User.ProfileNote;
 import datingapp.core.storage.UserStorage;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;
 
@@ -38,6 +42,27 @@ public class JdbiUserStorageAdapter implements UserStorage {
     @Override
     public List<User> findAll() {
         return jdbi.withExtension(JdbiUserStorage.class, JdbiUserStorage::findAll);
+    }
+
+    @Override
+    public Map<UUID, User> findByIds(Set<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        // JDBI handles collection binding with <userIds> syntax
+        return jdbi.withHandle(handle -> {
+            List<User> users = handle.createQuery(
+                            "SELECT " + JdbiUserStorage.ALL_COLUMNS + " FROM users WHERE id IN (<userIds>)")
+                    .bindList("userIds", new ArrayList<>(ids))
+                    .map(new JdbiUserStorage.Mapper())
+                    .list();
+
+            Map<UUID, User> result = new HashMap<>();
+            for (User user : users) {
+                result.put(user.getId(), user);
+            }
+            return result;
+        });
     }
 
     @Override

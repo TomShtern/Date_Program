@@ -5,16 +5,21 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility methods for JDBI row mappers.
  * Provides null-safe reading and type conversion from ResultSet.
  */
 public final class MapperHelper {
+
+    private static final Logger logger = LoggerFactory.getLogger(MapperHelper.class);
 
     private MapperHelper() {} // Utility class
 
@@ -57,11 +62,22 @@ public final class MapperHelper {
 
     /**
      * Reads an enum from a VARCHAR column.
-     * Returns null if column is NULL.
+     * Returns null if column is NULL or if the value is invalid.
      */
     public static <E extends Enum<E>> E readEnum(ResultSet rs, String column, Class<E> enumType) throws SQLException {
         String value = rs.getString(column);
-        return value == null ? null : Enum.valueOf(enumType, value);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Enum.valueOf(enumType, value);
+        } catch (IllegalArgumentException e) {
+            if (logger.isDebugEnabled()) {
+                logger.debug(
+                        "Skipping invalid {} value '{}' in column '{}'", enumType.getSimpleName(), value, column, e);
+            }
+            return null;
+        }
     }
 
     /**
@@ -84,14 +100,17 @@ public final class MapperHelper {
 
     /**
      * Reads a comma-separated string as a List.
-     * Returns empty list if column is NULL or empty.
+     * Returns empty mutable ArrayList if column is NULL or empty.
      */
     public static List<String> readCsvAsList(ResultSet rs, String column) throws SQLException {
         String csv = rs.getString(column);
         if (csv == null || csv.isBlank()) {
-            return Collections.emptyList();
+            return new ArrayList<>();
         }
-        return Arrays.asList(csv.split(","));
+        return Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     /**

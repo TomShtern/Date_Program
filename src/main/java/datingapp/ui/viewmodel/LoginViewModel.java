@@ -79,12 +79,25 @@ public class LoginViewModel {
             return;
         }
         loading.set(true);
-        users.clear();
-        List<User> allUsers = userStorage.findAll();
-        users.addAll(allUsers);
-        applyFilter(filterText.get());
-        loading.set(false);
-        logInfo("Loaded {} users for login selection.", users.size());
+        Thread.ofVirtual().start(() -> {
+            try {
+                List<User> allUsers = userStorage.findAll();
+                if (disposed.get()) {
+                    return;
+                }
+                Platform.runLater(() -> {
+                    users.clear();
+                    users.addAll(allUsers);
+                    applyFilter(filterText.get());
+                    loading.set(false);
+                    logInfo("Loaded {} users for login selection.", users.size());
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> loading.set(false));
+                logError("Failed to load users for login: {}", e.getMessage(), e);
+                notifyError("Failed to load users", e);
+            }
+        });
     }
 
     /**

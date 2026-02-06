@@ -12,15 +12,13 @@ import datingapp.core.VerificationMethod;
 import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
@@ -150,7 +148,7 @@ public interface JdbiUserStorage {
      * Row mapper for User entity - inlined from former UserMapper class.
      * Maps database rows to User objects using the StorageBuilder pattern.
      */
-    class Mapper implements RowMapper<User> {
+    public static class Mapper implements RowMapper<User> {
 
         private static final Logger logger = LoggerFactory.getLogger(Mapper.class);
 
@@ -210,20 +208,29 @@ public interface JdbiUserStorage {
             if (csv == null || csv.isBlank()) {
                 return EnumSet.noneOf(Gender.class);
             }
-            return Arrays.stream(csv.split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .map(Gender::valueOf)
-                    .collect(Collectors.toCollection(() -> EnumSet.noneOf(Gender.class)));
+            Set<Gender> result = EnumSet.noneOf(Gender.class);
+            for (String s : csv.split(",")) {
+                String trimmed = s.trim();
+                if (!trimmed.isEmpty()) {
+                    try {
+                        result.add(Gender.valueOf(trimmed));
+                    } catch (IllegalArgumentException e) {
+                        if (logger.isDebugEnabled()) {
+                            logger.debug("Skipping invalid Gender value '{}' from database", trimmed, e);
+                        }
+                    }
+                }
+            }
+            return result;
         }
 
         /** Reads pipe-delimited photo URLs into a List. */
         private List<String> readPhotoUrls(ResultSet rs, String column) throws SQLException {
             String csv = rs.getString(column);
             if (csv == null || csv.isBlank()) {
-                return Collections.emptyList();
+                return new ArrayList<>();
             }
-            return Arrays.asList(csv.split("\\|"));
+            return new ArrayList<>(Arrays.asList(csv.split("\\|")));
         }
 
         /** Reads a comma-separated list of interests into an EnumSet. */
@@ -293,13 +300,26 @@ public interface JdbiUserStorage {
                 throws SQLException {
             String csv = rs.getString(column);
             if (csv == null || csv.isBlank()) {
-                return new HashSet<>();
+                return EnumSet.noneOf(enumClass);
             }
-            return Arrays.stream(csv.split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .map(s -> Enum.valueOf(enumClass, s))
-                    .collect(Collectors.toSet());
+            Set<E> result = EnumSet.noneOf(enumClass);
+            for (String s : csv.split(",")) {
+                String trimmed = s.trim();
+                if (!trimmed.isEmpty()) {
+                    try {
+                        result.add(Enum.valueOf(enumClass, trimmed));
+                    } catch (IllegalArgumentException e) {
+                        if (logger.isDebugEnabled()) {
+                            logger.debug(
+                                    "Skipping invalid {} value '{}' from database",
+                                    enumClass.getSimpleName(),
+                                    trimmed,
+                                    e);
+                        }
+                    }
+                }
+            }
+            return result;
         }
     }
 
@@ -307,7 +327,7 @@ public interface JdbiUserStorage {
      * Row mapper for ProfileNote entity.
      * Maps database rows to ProfileNote objects.
      */
-    class ProfileNoteMapper implements RowMapper<ProfileNote> {
+    public static class ProfileNoteMapper implements RowMapper<ProfileNote> {
 
         @Override
         public ProfileNote map(ResultSet rs, StatementContext ctx) throws SQLException {

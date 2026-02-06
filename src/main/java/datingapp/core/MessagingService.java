@@ -7,7 +7,9 @@ import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -122,11 +124,15 @@ public class MessagingService {
      */
     public List<ConversationPreview> getConversations(UUID userId) {
         List<Conversation> conversations = messagingStorage.getConversationsFor(userId);
-        List<ConversationPreview> previews = new ArrayList<>();
 
+        List<UUID> otherUserIds =
+                conversations.stream().map(c -> c.getOtherUser(userId)).toList();
+        Map<UUID, User> otherUsers = userStorage.findByIds(new HashSet<>(otherUserIds));
+
+        List<ConversationPreview> previews = new ArrayList<>();
         for (Conversation convo : conversations) {
             UUID otherUserId = convo.getOtherUser(userId);
-            User otherUser = userStorage.get(otherUserId);
+            User otherUser = otherUsers.get(otherUserId);
 
             // Skip if other user doesn't exist
             if (otherUser == null) {
@@ -134,7 +140,7 @@ public class MessagingService {
             }
 
             Optional<Message> lastMessage = messagingStorage.getLatestMessage(convo.getId());
-            int unreadCount = getUnreadCount(userId, convo.getId());
+            int unreadCount = calculateUnreadCount(userId, convo);
 
             previews.add(new ConversationPreview(convo, otherUser, lastMessage, unreadCount));
         }
@@ -171,6 +177,14 @@ public class MessagingService {
         }
 
         Conversation convo = convoOpt.get();
+        return calculateUnreadCount(userId, convo);
+    }
+
+    /**
+     * Calculate unread count using an already-loaded conversation object.
+     * Avoids redudant lookups when mapping.
+     */
+    private int calculateUnreadCount(UUID userId, Conversation convo) {
         if (!convo.involves(userId)) {
             return 0;
         }
@@ -178,11 +192,11 @@ public class MessagingService {
         Instant lastReadAt = convo.getLastReadAt(userId);
         if (lastReadAt == null) {
             // Never read - count all messages not from this user
-            return countMessagesNotFromUser(conversationId, userId);
+            return countMessagesNotFromUser(convo.getId(), userId);
         }
 
         // Count messages after last read, excluding user's own messages
-        return messagingStorage.countMessagesAfterNotFrom(conversationId, lastReadAt, userId);
+        return messagingStorage.countMessagesAfterNotFrom(convo.getId(), lastReadAt, userId);
     }
 
     /**
@@ -195,7 +209,9 @@ public class MessagingService {
         List<Conversation> conversations = messagingStorage.getConversationsFor(userId);
         int total = 0;
         for (Conversation convo : conversations) {
-            total += getUnreadCount(userId, convo.getId());
+            // Use calculateUnreadCount directly with already-loaded conversation
+            // to avoid redundant getConversation() calls in getUnreadCount()
+            total += calculateUnreadCount(userId, convo);
         }
         return total;
     }

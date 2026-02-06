@@ -11,7 +11,9 @@ import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
@@ -38,6 +40,7 @@ public class StatsViewModel {
     private final IntegerProperty totalLikesReceived = new SimpleIntegerProperty(0);
     private final IntegerProperty totalMatches = new SimpleIntegerProperty(0);
     private final StringProperty responseRate = new SimpleStringProperty("--");
+    private final BooleanProperty loading = new SimpleBooleanProperty(false);
 
     private User currentUser;
 
@@ -87,46 +90,72 @@ public class StatsViewModel {
             return;
         }
 
-        logInfo("Refreshing stats for user: {}", currentUser.getName());
+        loading.set(true);
+        Thread.ofVirtual().start(() -> {
+            try {
+                List<Achievement> achievementList = fetchAchievements(currentUser.getId());
+                StatsData stats = fetchStats(currentUser.getId());
 
-        // Load achievements
-        List<UserAchievement> earned = achievementService.getUnlocked(currentUser.getId());
-        achievements.clear();
-        for (UserAchievement ua : earned) {
-            achievements.add(ua.achievement());
-        }
+                javafx.application.Platform.runLater(() -> {
+                    if (disposed.get()) {
+                        return;
+                    }
+                    achievements.setAll(achievementList);
+                    totalLikesGiven.set(stats.likesGiven());
+                    totalLikesReceived.set(stats.likesReceived());
+                    totalMatches.set(stats.matchesCount());
+                    responseRate.set(stats.rateText());
+                    loading.set(false);
+                    if (logger.isInfoEnabled()) {
+                        logger.info("Refreshed stats for user: {}", currentUser.getName());
+                    }
+                });
+            } catch (Exception e) {
+                javafx.application.Platform.runLater(() -> loading.set(false));
+                if (logger.isWarnEnabled()) {
+                    logger.warn("Failed to refresh stats: {}", e.getMessage(), e);
+                }
+            }
+        });
+    }
 
-        // Load stats from storage if available
+    private List<Achievement> fetchAchievements(java.util.UUID userId) {
+        List<UserAchievement> earned = achievementService.getUnlocked(userId);
+        return earned.stream().map(UserAchievement::achievement).toList();
+    }
+
+    private StatsData fetchStats(java.util.UUID userId) {
+        int likesGiven = 0;
+        int likesReceived = 0;
+        int matchesCount = 0;
+        String rateText = "--";
+
         if (likeStorage != null) {
-            int likesGiven = likeStorage.countByDirection(currentUser.getId(), Like.Direction.LIKE);
-            int likesReceived = likeStorage.countReceivedByDirection(currentUser.getId(), Like.Direction.LIKE);
-            totalLikesGiven.set(likesGiven);
-            totalLikesReceived.set(likesReceived);
+            likesGiven = likeStorage.countByDirection(userId, Like.Direction.LIKE);
+            likesReceived = likeStorage.countReceivedByDirection(userId, Like.Direction.LIKE);
 
-            // Calculate response rate (matches / likes received)
             if (matchStorage != null) {
-                List<Match> matches = matchStorage.getActiveMatchesFor(currentUser.getId());
-                totalMatches.set(matches.size());
+                List<Match> matches = matchStorage.getActiveMatchesFor(userId);
+                matchesCount = matches.size();
 
                 if (likesReceived > 0) {
-                    double rate = (double) matches.size() / likesReceived * 100;
-                    responseRate.set(String.format("%.0f%%", Math.min(rate, 100)));
-                } else {
-                    responseRate.set("--");
+                    double rate = (double) matchesCount / likesReceived * 100;
+                    rateText = String.format("%.0f%%", Math.min(rate, 100));
                 }
             }
         }
+        return new StatsData(likesGiven, likesReceived, matchesCount, rateText);
     }
 
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
+    private record StatsData(int likesGiven, int likesReceived, int matchesCount, String rateText) {}
 
     // --- Properties ---
     public ObservableList<Achievement> getAchievements() {
         return achievements;
+    }
+
+    public BooleanProperty loadingProperty() {
+        return loading;
     }
 
     public IntegerProperty totalLikesGivenProperty() {

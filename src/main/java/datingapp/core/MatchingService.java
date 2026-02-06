@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -239,11 +240,21 @@ public class MatchingService {
 
         var likeTimes = likeStorage.getLikeTimesForUsersWhoLiked(currentUserId);
 
+        // Batch-load all potential likers in one query
+        Set<UUID> likerIds = new HashSet<>();
+        for (var entry : likeTimes) {
+            UUID likerId = entry.getKey();
+            if (!excluded.contains(likerId)) {
+                likerIds.add(likerId);
+            }
+        }
+        Map<UUID, User> likerUsers = userStorage.findByIds(likerIds);
+
         List<PendingLiker> result = new ArrayList<>();
         for (var entry : likeTimes) {
             UUID likerId = entry.getKey();
-            User liker = userStorage.get(likerId);
-            if (excluded.contains(likerId) || liker == null || liker.getState() != UserState.ACTIVE) {
+            User liker = likerUsers.get(likerId);
+            if (liker == null || liker.getState() != UserState.ACTIVE) {
                 continue;
             }
 

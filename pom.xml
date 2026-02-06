@@ -136,6 +136,13 @@
             <artifactId>jackson-datatype-jsr310</artifactId>
             <version>2.21.0</version>
         </dependency>
+
+        <!-- HikariCP: Connection Pooling -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>6.2.1</version>
+        </dependency>
     </dependencies>
 
     <build>
