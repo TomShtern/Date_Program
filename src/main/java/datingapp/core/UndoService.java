@@ -223,7 +223,7 @@ public class UndoService {
          * @return Success UndoResult
          */
         public static UndoResult success(Like like, boolean matchDeleted) {
-            return new UndoResult(true, "", like, matchDeleted);
+            return new UndoResult(true, null, like, matchDeleted);
         }
 
         /**
@@ -239,6 +239,9 @@ public class UndoService {
         public UndoResult {
             if (success) {
                 Objects.requireNonNull(undoneSwipe, "undoneSwipe cannot be null on success");
+                if (message != null && !message.isBlank()) {
+                    throw new IllegalArgumentException("message must be null or blank on success");
+                }
             } else {
                 if (message == null || message.isBlank()) {
                     throw new IllegalArgumentException("message is required on failure");

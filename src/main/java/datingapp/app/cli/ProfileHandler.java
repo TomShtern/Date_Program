@@ -121,7 +121,7 @@ public class ProfileHandler {
 
             // Card display
             logInfo(CliConstants.BOX_TOP);
-            String verifiedBadge = Boolean.TRUE.equals(currentUser.isVerified()) ? " ✅ Verified" : "";
+            String verifiedBadge = currentUser.isVerified() ? " ✅ Verified" : "";
             logInfo("│ 💝 {}, {} years old{}", currentUser.getName(), currentUser.getAge(), verifiedBadge);
             logInfo("│ 📍 Location: {}, {}", currentUser.getLat(), currentUser.getLon());
             String bio = preview.displayBio();

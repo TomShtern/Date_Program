@@ -351,7 +351,7 @@ public class ServiceRegistry {
             // ═══════════════════════════════════════════════════════════════
             // Matching Services (inlined from MatchingModule.create)
             // ═══════════════════════════════════════════════════════════════
-            CandidateFinder candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage);
+            CandidateFinder candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, config);
             DailyService dailyService =
                     new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config);
             UndoService undoService = new UndoService(likeStorage, matchStorage, undoStorage, config);
@@ -362,8 +362,15 @@ public class ServiceRegistry {
             undoService.setTransactionExecutor(txExecutor);
 
             SessionService sessionService = new SessionService(sessionStorage, config);
-            MatchingService matchingService = new MatchingService(
-                    likeStorage, matchStorage, userStorage, blockStorage, sessionService, undoService, dailyService);
+            MatchingService matchingService = MatchingService.builder()
+                    .likeStorage(likeStorage)
+                    .matchStorage(matchStorage)
+                    .userStorage(userStorage)
+                    .blockStorage(blockStorage)
+                    .sessionService(sessionService)
+                    .undoService(undoService)
+                    .dailyService(dailyService)
+                    .build();
             MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
 
             // ═══════════════════════════════════════════════════════════════

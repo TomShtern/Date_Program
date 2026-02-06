@@ -205,6 +205,31 @@ class MatchQualityServiceTest {
 
             assertEquals(0.3, quality.interestScore());
         }
+
+        @Test
+        @DisplayName("Missing location yields neutral distance score")
+        void missingLocationGivesNeutralDistanceScore() {
+            User alice = new User(UUID.randomUUID(), "Alice");
+            alice.setBirthDate(LocalDate.now().minusYears(25));
+            alice.setGender(Gender.OTHER);
+            alice.setInterestedIn(EnumSet.of(Gender.OTHER));
+
+            User bob = new User(UUID.randomUUID(), "Bob");
+            bob.setBirthDate(LocalDate.now().minusYears(26));
+            bob.setGender(Gender.OTHER);
+            bob.setInterestedIn(EnumSet.of(Gender.OTHER));
+
+            userStorage.save(alice);
+            userStorage.save(bob);
+
+            Match match = Match.create(alice.getId(), bob.getId());
+            addMutualLikes(alice.getId(), bob.getId());
+
+            MatchQuality quality = service.computeQuality(match, alice.getId());
+
+            assertEquals(0.5, quality.distanceScore());
+            assertEquals(-1, quality.distanceKm());
+        }
     }
 
     @Nested

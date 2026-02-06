@@ -36,40 +36,7 @@ public class MatchingService {
     private UndoService undoService; // Optional
     private DailyService dailyService; // Optional
 
-    /** Basic constructor for minimal usage. */
-    public MatchingService(LikeStorage likeStorage, MatchStorage matchStorage) {
-        this.likeStorage = Objects.requireNonNull(likeStorage);
-        this.matchStorage = Objects.requireNonNull(matchStorage);
-        this.userStorage = null;
-        this.blockStorage = null;
-    }
-
-    /** Full constructor with all dependencies for liker browsing functionality. */
-    public MatchingService(
-            LikeStorage likeStorage, MatchStorage matchStorage, UserStorage userStorage, BlockStorage blockStorage) {
-        this.likeStorage = Objects.requireNonNull(likeStorage);
-        this.matchStorage = Objects.requireNonNull(matchStorage);
-        this.userStorage = userStorage;
-        this.blockStorage = blockStorage;
-    }
-
-    /** Enhanced constructor with session tracking (Phase 0.5b). */
-    public MatchingService(
-            LikeStorage likeStorage,
-            MatchStorage matchStorage,
-            UserStorage userStorage,
-            BlockStorage blockStorage,
-            SessionService sessionService) {
-        this.likeStorage = Objects.requireNonNull(likeStorage);
-        this.matchStorage = Objects.requireNonNull(matchStorage);
-        this.userStorage = userStorage;
-        this.blockStorage = blockStorage;
-        this.sessionService = sessionService;
-        this.undoService = null;
-        this.dailyService = null;
-    }
-
-    /** Enhanced constructor with swipe processing capabilities. */
+    /** Constructor with all dependencies (optional dependencies may be null). */
     public MatchingService(
             LikeStorage likeStorage,
             MatchStorage matchStorage,
@@ -78,13 +45,67 @@ public class MatchingService {
             SessionService sessionService,
             UndoService undoService,
             DailyService dailyService) {
-        this.likeStorage = Objects.requireNonNull(likeStorage);
-        this.matchStorage = Objects.requireNonNull(matchStorage);
+        this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
+        this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
         this.userStorage = userStorage;
         this.blockStorage = blockStorage;
         this.sessionService = sessionService;
-        this.undoService = Objects.requireNonNull(undoService, "undoService cannot be null");
-        this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
+        this.undoService = undoService;
+        this.dailyService = dailyService;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private LikeStorage likeStorage;
+        private MatchStorage matchStorage;
+        private UserStorage userStorage;
+        private BlockStorage blockStorage;
+        private SessionService sessionService;
+        private UndoService undoService;
+        private DailyService dailyService;
+
+        public Builder likeStorage(LikeStorage storage) {
+            this.likeStorage = storage;
+            return this;
+        }
+
+        public Builder matchStorage(MatchStorage storage) {
+            this.matchStorage = storage;
+            return this;
+        }
+
+        public Builder userStorage(UserStorage storage) {
+            this.userStorage = storage;
+            return this;
+        }
+
+        public Builder blockStorage(BlockStorage storage) {
+            this.blockStorage = storage;
+            return this;
+        }
+
+        public Builder sessionService(SessionService service) {
+            this.sessionService = service;
+            return this;
+        }
+
+        public Builder undoService(UndoService service) {
+            this.undoService = service;
+            return this;
+        }
+
+        public Builder dailyService(DailyService service) {
+            this.dailyService = service;
+            return this;
+        }
+
+        public MatchingService build() {
+            return new MatchingService(
+                    likeStorage, matchStorage, userStorage, blockStorage, sessionService, undoService, dailyService);
+        }
     }
 
     /**
@@ -96,17 +117,10 @@ public class MatchingService {
      * @return The created Match if mutual like exists, empty otherwise
      */
     public Optional<Match> recordLike(Like like) {
+        Objects.requireNonNull(like, LIKE_REQUIRED);
         // Check if already exists
         if (likeStorage.exists(like.whoLikes(), like.whoGotLiked())) {
             return Optional.empty(); // Already recorded
-        }
-
-        // Record in session if tracking is enabled (Phase 0.5b)
-        if (sessionService != null) {
-            // Record the swipe for session tracking (result ignored - we don't block likes)
-            sessionService.recordSwipe(
-                    like.whoLikes(), like.direction(), false // We don't know if it's a match yet
-                    );
         }
 
         // Save the like
@@ -114,8 +128,13 @@ public class MatchingService {
 
         // If it's a PASS, no match possible
         if (like.direction() == Like.Direction.PASS) {
+            if (sessionService != null) {
+                sessionService.recordSwipe(like.whoLikes(), like.direction(), false);
+            }
             return Optional.empty();
         }
+
+        Optional<Match> matchResult = Optional.empty();
 
         // Check for mutual LIKE
         if (likeStorage.mutualLikeExists(like.whoLikes(), like.whoGotLiked())) {
@@ -126,23 +145,23 @@ public class MatchingService {
                 // Save using upsert semantics (MERGE) - idempotent operation
                 matchStorage.save(match);
 
-                // Update session with match count (Phase 0.5b)
-                if (sessionService != null) {
-                    sessionService.recordMatch(like.whoLikes());
-                }
-
-                return Optional.of(match);
+                matchResult = Optional.of(match);
             } catch (RuntimeException ex) {
                 // Handle storage conflicts (duplicate key, race condition)
                 // JdbiException extends RuntimeException
                 if (logger.isWarnEnabled()) {
                     logger.warn("Match save conflict for {}: {}", match.getId(), ex.getMessage());
                 }
-                return matchStorage.get(match.getId());
+                matchResult =
+                        matchStorage.get(match.getId()).filter(existing -> existing.getState() == Match.State.ACTIVE);
             }
         }
 
-        return Optional.empty();
+        if (sessionService != null) {
+            sessionService.recordSwipe(like.whoLikes(), like.direction(), matchResult.isPresent());
+        }
+
+        return matchResult;
     }
 
     /** Get the session service (for UI access to session info). */
@@ -161,9 +180,10 @@ public class MatchingService {
      */
     public SwipeResult processSwipe(User currentUser, User candidate, boolean liked) {
         if (dailyService == null || undoService == null) {
-            throw new IllegalStateException(
-                    "dailyService and undoService required for processSwipe(). Use the 7-arg constructor.");
+            return SwipeResult.configError("dailyService and undoService required for processSwipe");
         }
+        Objects.requireNonNull(currentUser, "currentUser cannot be null");
+        Objects.requireNonNull(candidate, "candidate cannot be null");
         if (liked && !dailyService.canLike(currentUser.getId())) {
             return SwipeResult.dailyLimitReached();
         }
@@ -277,6 +297,11 @@ public class MatchingService {
 
         public static SwipeResult dailyLimitReached() {
             return new SwipeResult(false, false, null, null, "Daily like limit reached.");
+        }
+
+        public static SwipeResult configError(String reason) {
+            Objects.requireNonNull(reason, "reason cannot be null");
+            return new SwipeResult(false, false, null, null, reason);
         }
     }
 }

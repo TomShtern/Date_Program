@@ -3,6 +3,7 @@ package datingapp.app.cli;
 import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.ValidationService;
+import java.util.Objects;
 
 /**
  * Factory for creating CLI handlers with consistent dependency injection.
@@ -31,9 +32,9 @@ public final class HandlerFactory {
      * @param inputReader the CLI input reader
      */
     public HandlerFactory(ServiceRegistry services, AppSession session, InputReader inputReader) {
-        this.services = services;
-        this.session = session;
-        this.inputReader = inputReader;
+        this.services = Objects.requireNonNull(services, "services cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.inputReader = Objects.requireNonNull(inputReader, "inputReader cannot be null");
     }
 
     /**
@@ -70,7 +71,7 @@ public final class HandlerFactory {
                     services.getUserStorage(),
                     services.getProfilePreviewService(),
                     services.getAchievementService(),
-                    new ValidationService(),
+                    new ValidationService(services.getConfig()),
                     session,
                     inputReader);
         }

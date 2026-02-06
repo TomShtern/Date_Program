@@ -62,6 +62,10 @@ public class UserBindingHelper {
         return user.getLon();
     }
 
+    public boolean getHasLocationSet() {
+        return user.hasLocationSet();
+    }
+
     public int getMaxDistanceKm() {
         return user.getMaxDistanceKm();
     }

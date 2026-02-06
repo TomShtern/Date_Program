@@ -470,7 +470,15 @@ public void setBio(String bio) {
 
 **Daily Pick Exclusions:** Use `LikeStorage.getLikedOrPassedUserIds()` to avoid resurfacing users already liked or passed.
 
+<!--ARCHIVE:50:agent:codex:scope:candidate-distance-->
 **Candidate Distance:** If either user lacks a location (0,0), skip distance filtering and sort unknown distances last to avoid empty queues.
+<!--/ARCHIVE-->
+<!--ARCHIVE:51:agent:codex:scope:candidate-distance-->
+**Candidate Distance:** If either user lacks a location (`hasLocationSet` is false), skip distance filtering and sort unknown distances last to avoid empty queues.
+50|2026-02-06 19:25:00|agent:codex|scope:candidate-distance|Clarify location-set distance rule|AGENTS.md
+<!--/ARCHIVE-->
+**Candidate Distance:** If either user lacks a location (`hasLocationSet` is false), skip distance filtering and sort unknown distances last to avoid empty queues.
+51|2026-02-06 19:27:00|agent:codex|scope:candidate-distance|Confirm location-set rule placement for docsync|AGENTS.md
 
 ## Handler Dependencies Pattern (CLI)
 
@@ -985,4 +993,6 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 47|2026-02-05 13:35:19|agent:codex|scope:project-audit|Add project audit report|PROJECT_AUDIT_2026-02-05_codex.md;AGENTS.md
 48|2026-02-05 18:30:00|agent:github_copilot|scope:precommit-fixes|Refactor candidate filtering/lifestyle scoring and make nested types explicit for access checks|src/main/java/datingapp/core/CandidateFinder.java;src/main/java/datingapp/core/StandoutsService.java;src/main/java/datingapp/core/MatchQualityService.java;src/main/java/datingapp/core/MatchingService.java;src/main/java/datingapp/core/UserInteractions.java;src/main/java/datingapp/core/Match.java;src/main/java/datingapp/core/Stats.java;src/main/java/datingapp/storage/jdbi/JdbiStandoutStorage.java;src/test/java/datingapp/core/PerformanceMonitorTest.java;AGENTS.md
 49|2026-02-06 10:00:00|agent:github_copilot|scope:nested-types|Make User.ProfileNote explicitly public static to fix test visibility|src/main/java/datingapp/core/User.java;AGENTS.md
+50|2026-02-06 19:25:00|agent:codex|scope:candidate-distance|Clarify location-set distance rule|AGENTS.md
+51|2026-02-06 19:27:00|agent:codex|scope:candidate-distance|Confirm location-set rule placement for docsync|AGENTS.md
 ---AGENT-LOG-END---

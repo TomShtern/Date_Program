@@ -210,7 +210,7 @@ public class MessagingService {
     public boolean canMessage(UUID userA, UUID userB) {
         String matchId = Match.generateId(userA, userB);
         Optional<Match> matchOpt = matchStorage.get(matchId);
-        return matchOpt.isPresent() && matchOpt.get().isActive();
+        return matchOpt.isPresent() && matchOpt.get().canMessage();
     }
 
     /**

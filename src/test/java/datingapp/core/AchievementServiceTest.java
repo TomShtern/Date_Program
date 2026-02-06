@@ -256,6 +256,30 @@ class AchievementServiceTest {
             assertTrue(firstSpark.unlocked());
             assertEquals(100, firstSpark.getProgressPercent());
         }
+
+        @Test
+        @DisplayName("Inactive matches still count toward match milestones")
+        void inactiveMatchesStillCount() {
+            Match active = Match.create(userId, UUID.randomUUID());
+            matchStorage.save(active);
+
+            Match unmatched1 = Match.create(userId, UUID.randomUUID());
+            unmatched1.unmatch(userId);
+            matchStorage.save(unmatched1);
+
+            Match unmatched2 = Match.create(userId, UUID.randomUUID());
+            unmatched2.unmatch(userId);
+            matchStorage.save(unmatched2);
+
+            List<AchievementService.AchievementProgress> progress = service.getProgress(userId);
+
+            AchievementService.AchievementProgress firstSpark = progress.stream()
+                    .filter(p -> p.achievement() == Achievement.FIRST_SPARK)
+                    .findFirst()
+                    .orElseThrow();
+
+            assertEquals(3, firstSpark.current());
+        }
     }
 
     // === Helper Methods ===

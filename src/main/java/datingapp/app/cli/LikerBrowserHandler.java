@@ -64,7 +64,7 @@ public class LikerBrowserHandler {
 
     private void showCard(PendingLiker pending) {
         User user = pending.user();
-        String verifiedBadge = Boolean.TRUE.equals(user.isVerified()) ? " ✅ Verified" : "";
+        String verifiedBadge = user.isVerified() ? " ✅ Verified" : "";
         String likedAgo = formatTimeAgo(pending.likedAt());
         logInfo(CliConstants.BOX_TOP);
         logInfo("│ 💝 {}, {} years old{}", user.getName(), user.getAge(), verifiedBadge);

@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 /**
  * Service for managing swipe sessions. Handles session lifecycle (create, update, end) and anti-bot
@@ -20,15 +18,18 @@ public class SessionService {
     private final SwipeSessionStorage sessionStorage;
     private final AppConfig config;
 
-    /** Per-user locks to prevent race conditions in swipe recording. */
-    private final ConcurrentMap<UUID, Object> userLocks = new ConcurrentHashMap<>();
+    /** Fixed lock stripes to prevent race conditions in swipe recording. */
+    private static final int LOCK_STRIPE_COUNT = 256;
 
-    /** Maximum entries in userLocks before cleanup. */
-    private static final int MAX_USER_LOCKS = 10_000;
+    private final Object[] lockStripes;
 
     public SessionService(SwipeSessionStorage sessionStorage, AppConfig config) {
         this.sessionStorage = Objects.requireNonNull(sessionStorage, "sessionStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.lockStripes = new Object[LOCK_STRIPE_COUNT];
+        for (int i = 0; i < LOCK_STRIPE_COUNT; i++) {
+            lockStripes[i] = new Object();
+        }
     }
 
     /**
@@ -74,10 +75,7 @@ public class SessionService {
      */
     public SwipeResult recordSwipe(UUID userId, Like.Direction direction, boolean matched) {
         // Per-user lock to prevent race condition in read-modify-write
-        if (userLocks.size() > MAX_USER_LOCKS) {
-            userLocks.clear();
-        }
-        Object lock = userLocks.computeIfAbsent(userId, id -> new Object());
+        Object lock = lockStripes[Math.floorMod(userId.hashCode(), LOCK_STRIPE_COUNT)];
         synchronized (lock) {
             SwipeSession session = getOrCreateSession(userId);
 

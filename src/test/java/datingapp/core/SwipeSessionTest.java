@@ -296,6 +296,39 @@ class SwipeSessionTest {
 
             assertEquals(0, session.getDurationSeconds());
         }
+
+        @Test
+        @DisplayName("Swipes per minute scales with session duration")
+        void swipesPerMinuteScalesWithDuration() {
+            Instant now = Instant.now();
+            SwipeSession shortSession = new SwipeSession(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    now.minusSeconds(10),
+                    now,
+                    null,
+                    SwipeSession.State.ACTIVE,
+                    5,
+                    3,
+                    2,
+                    0);
+
+            assertEquals(30.0, shortSession.getSwipesPerMinute(), 0.1);
+
+            SwipeSession oneMinuteSession = new SwipeSession(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    now.minusSeconds(60),
+                    now,
+                    null,
+                    SwipeSession.State.ACTIVE,
+                    60,
+                    30,
+                    30,
+                    0);
+
+            assertEquals(60.0, oneMinuteSession.getSwipesPerMinute(), 0.1);
+        }
     }
 
     @Nested

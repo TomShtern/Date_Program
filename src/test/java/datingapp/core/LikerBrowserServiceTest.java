@@ -59,7 +59,12 @@ class LikerBrowserServiceTest {
         userStorage.put(activeUser(matchedId, "Matched"));
         userStorage.put(incompleteUser(inactiveId, "Inactive"));
 
-        MatchingService service = new MatchingService(likeStorage, matchStorage, userStorage, blockStorage);
+        MatchingService service = MatchingService.builder()
+                .likeStorage(likeStorage)
+                .matchStorage(matchStorage)
+                .userStorage(userStorage)
+                .blockStorage(blockStorage)
+                .build();
 
         List<User> pending = service.findPendingLikers(currentUserId);
 
@@ -83,8 +88,12 @@ class LikerBrowserServiceTest {
         userStorage.put(activeUser(olderLikerId, "Older"));
         userStorage.put(activeUser(newerLikerId, "Newer"));
 
-        MatchingService service =
-                new MatchingService(likeStorage, new InMemoryMatchStorage(), userStorage, new InMemoryBlockStorage());
+        MatchingService service = MatchingService.builder()
+                .likeStorage(likeStorage)
+                .matchStorage(new InMemoryMatchStorage())
+                .userStorage(userStorage)
+                .blockStorage(new InMemoryBlockStorage())
+                .build();
 
         List<PendingLiker> pending = service.findPendingLikersWithTimes(currentUserId);
 

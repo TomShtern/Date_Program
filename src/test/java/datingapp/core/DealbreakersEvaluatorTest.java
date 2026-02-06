@@ -233,13 +233,13 @@ class DealbreakersEvaluatorTest {
         }
 
         @Test
-        @DisplayName("Passes when candidate height is null (not entered)")
-        void passesNullHeight() {
+        @DisplayName("Fails when candidate height is null (not entered)")
+        void failsNullHeight() {
             seeker.setDealbreakers(Dealbreakers.builder().heightRange(170, 190).build());
 
             // candidate height not set
 
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }
 
@@ -362,12 +362,12 @@ class DealbreakersEvaluatorTest {
         }
 
         @Test
-        @DisplayName("Passes when candidate has null height with height dealbreaker")
-        void passesNullHeight() {
+        @DisplayName("Fails when candidate has null height with height dealbreaker")
+        void failsNullHeight() {
             seeker.setDealbreakers(Dealbreakers.builder().minHeight(160).build());
 
             // height is null by default and should not be a blocker
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
         }
     }
 

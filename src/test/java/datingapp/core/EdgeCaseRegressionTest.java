@@ -179,8 +179,8 @@ class EdgeCaseRegressionTest {
         @DisplayName("Empty active users list returns empty candidates")
         void emptyActiveUsersReturnsEmpty() {
             // Create minimal stubs for storage dependencies (not used by findCandidates)
-            CandidateFinder finder =
-                    new CandidateFinder(createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage());
+            CandidateFinder finder = new CandidateFinder(
+                    createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage(), AppConfig.defaults());
             User seeker = createCompleteActiveUser("Seeker");
 
             var candidates = finder.findCandidates(seeker, List.of(), Set.of());
@@ -192,8 +192,8 @@ class EdgeCaseRegressionTest {
         @DisplayName("Seeker with null interestedIn returns no candidates")
         void seekerWithNullInterestedIn() {
             // Create minimal stubs for storage dependencies (not used by findCandidates)
-            CandidateFinder finder =
-                    new CandidateFinder(createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage());
+            CandidateFinder finder = new CandidateFinder(
+                    createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage(), AppConfig.defaults());
             User seeker = createCompleteActiveUser("Seeker");
             seeker.setInterestedIn(null);
 
@@ -208,8 +208,8 @@ class EdgeCaseRegressionTest {
         @DisplayName("Banned users are filtered out")
         void candidateFinderFiltersBannedUsers() {
             // Create minimal stubs for storage dependencies (not used by findCandidates)
-            CandidateFinder finder =
-                    new CandidateFinder(createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage());
+            CandidateFinder finder = new CandidateFinder(
+                    createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage(), AppConfig.defaults());
 
             User seeker = createCompleteActiveUser("Seeker");
             User bannedUser = createCompleteActiveUser("Banned");
@@ -277,7 +277,10 @@ class EdgeCaseRegressionTest {
                 }
             };
 
-            MatchingService service = new MatchingService(likeStorage, raceConditionStorage);
+            MatchingService service = MatchingService.builder()
+                    .likeStorage(likeStorage)
+                    .matchStorage(raceConditionStorage)
+                    .build();
 
             UUID a = UUID.randomUUID();
             UUID b = UUID.randomUUID();

@@ -5,7 +5,9 @@ import datingapp.core.Preferences.Lifestyle;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -29,6 +31,7 @@ public class User {
     private Set<Gender> interestedIn;
     private double lat;
     private double lon;
+    private boolean hasLocationSet;
     private int maxDistanceKm;
     private int minAge;
     private int maxAge;
@@ -131,6 +134,11 @@ public class User {
         public StorageBuilder location(double lat, double lon) {
             user.lat = lat;
             user.lon = lon;
+            return this;
+        }
+
+        public StorageBuilder hasLocationSet(boolean hasLocationSet) {
+            user.hasLocationSet = hasLocationSet;
             return this;
         }
 
@@ -279,6 +287,10 @@ public class User {
         return lon;
     }
 
+    public boolean hasLocationSet() {
+        return hasLocationSet;
+    }
+
     public int getMaxDistanceKm() {
         return maxDistanceKm;
     }
@@ -292,7 +304,7 @@ public class User {
     }
 
     public List<String> getPhotoUrls() {
-        return new ArrayList<>(photoUrls);
+        return Collections.unmodifiableList(photoUrls);
     }
 
     public UserState getState() {
@@ -352,7 +364,7 @@ public class User {
      * Uses the application's configured timezone to avoid off-by-one-day issues.
      */
     public int getAge() {
-        return getAge(CONFIG.userTimeZone());
+        return getAge(ZoneOffset.UTC);
     }
 
     /**
@@ -369,7 +381,7 @@ public class User {
     }
 
     // Verification getters (Phase 2 feature)
-    public Boolean isVerified() {
+    public boolean isVerified() {
         return isVerified;
     }
 
@@ -464,6 +476,7 @@ public class User {
     public void setLocation(double lat, double lon) {
         this.lat = lat;
         this.lon = lon;
+        this.hasLocationSet = true;
         touch();
     }
 

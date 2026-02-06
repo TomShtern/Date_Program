@@ -88,6 +88,7 @@ class PerformanceMonitorTest {
         void autoRecordsOnClose() {
             try (PerformanceMonitor.Timer timer = PerformanceMonitor.startTimer("auto.test")) {
                 assertTrue(timer.elapsedMs() >= 0);
+                timer.markSuccess();
             }
 
             PerformanceMonitor.OperationMetrics metrics = PerformanceMonitor.getMetrics("auto.test");
@@ -103,6 +104,7 @@ class PerformanceMonitorTest {
             long elapsed = timer.elapsedMs();
 
             assertTrue(elapsed >= 0);
+            timer.markSuccess();
             timer.close();
         }
     }

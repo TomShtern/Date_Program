@@ -108,16 +108,25 @@ public final class PerformanceMonitor {
     public static class Timer implements AutoCloseable {
         private final String operationName;
         private final Instant startTime;
+        private boolean success;
 
         Timer(String operationName, Instant startTime) {
             this.operationName = operationName;
             this.startTime = startTime;
         }
 
+        public void markSuccess() {
+            this.success = true;
+        }
+
         @Override
         public void close() {
             Duration duration = Duration.between(startTime, Instant.now());
-            record(operationName, duration.toMillis());
+            if (success) {
+                record(operationName, duration.toMillis());
+            } else {
+                record(operationName + ".error", duration.toMillis());
+            }
 
             // Log slow operations (>100ms) at DEBUG level
             if (logger.isDebugEnabled() && duration.toMillis() > 100) {

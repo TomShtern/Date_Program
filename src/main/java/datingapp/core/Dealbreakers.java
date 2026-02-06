@@ -3,6 +3,7 @@ package datingapp.core;
 import datingapp.core.Preferences.Lifestyle;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -253,6 +254,11 @@ public record Dealbreakers(
          * @return true if candidate passes all dealbreakers, false if any fails
          */
         public static boolean passes(User seeker, User candidate) {
+            return passes(seeker, candidate, AppConfig.defaults());
+        }
+
+        public static boolean passes(User seeker, User candidate, AppConfig config) {
+            Objects.requireNonNull(config, "config cannot be null");
             Dealbreakers db = seeker.getDealbreakers();
 
             return !db.hasAnyDealbreaker()
@@ -333,7 +339,7 @@ public record Dealbreakers(
             }
             Integer candidateHeight = candidate.getHeightCm();
             if (candidateHeight == null) {
-                return true;
+                return false;
             }
             Integer minHeight = db.minHeightCm();
             if (minHeight != null && candidateHeight < minHeight) {

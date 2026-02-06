@@ -103,6 +103,7 @@ public class CandidateFinder {
     private final UserStorage userStorage;
     private final LikeStorage likeStorage;
     private final BlockStorage blockStorage;
+    private final AppConfig config;
 
     /**
      * Constructs a CandidateFinder with the required storage dependencies.
@@ -112,10 +113,12 @@ public class CandidateFinder {
      * @param blockStorage the block storage implementation
      * @throws NullPointerException if any parameter is null
      */
-    public CandidateFinder(UserStorage userStorage, LikeStorage likeStorage, BlockStorage blockStorage) {
+    public CandidateFinder(
+            UserStorage userStorage, LikeStorage likeStorage, BlockStorage blockStorage, AppConfig config) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
         this.blockStorage = Objects.requireNonNull(blockStorage, "blockStorage cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
     }
 
     /** Geographic utility functions. Pure Java - no external dependencies. */
@@ -169,12 +172,13 @@ public class CandidateFinder {
      * Results are sorted by distance (closest first).
      */
     public List<User> findCandidates(User seeker, List<User> allActive, Set<UUID> alreadyInteracted) {
+        Set<Gender> seekerInterestedIn = seeker.getInterestedIn();
         logDebug(
                 "Finding candidates for {} (state={}, gender={}, interestedIn={}, age={}, minAge={}, maxAge={})",
                 seeker.getName(),
                 seeker.getState(),
                 seeker.getGender(),
-                seeker.getInterestedIn(),
+                seekerInterestedIn,
                 seeker.getAge(),
                 seeker.getMinAge(),
                 seeker.getMaxAge());
@@ -185,7 +189,7 @@ public class CandidateFinder {
                 .filter(candidate -> isNotSelf(seeker, candidate))
                 .filter(this::isActiveCandidate)
                 .filter(candidate -> notAlreadyInteracted(candidate, alreadyInteracted))
-                .filter(candidate -> matchesGenderPreferences(seeker, candidate))
+                .filter(candidate -> matchesGenderPreferences(seeker, candidate, seekerInterestedIn))
                 .filter(candidate -> matchesAgePreferences(seeker, candidate))
                 .filter(candidate -> isWithinDistanceWithLogging(seeker, candidate))
                 .filter(candidate -> passesDealbreakers(seeker, candidate))
@@ -217,6 +221,7 @@ public class CandidateFinder {
             if (logger.isTraceEnabled()) {
                 logger.trace("CandidateFinder.findCandidatesForUser completed in {}ms", timer.elapsedMs());
             }
+            timer.markSuccess();
             return candidates;
         }
     }
@@ -249,15 +254,15 @@ public class CandidateFinder {
         return notInteracted;
     }
 
-    private boolean matchesGenderPreferences(User seeker, User candidate) {
-        boolean genderMatch = hasMatchingGenderPreferences(seeker, candidate);
+    private boolean matchesGenderPreferences(User seeker, User candidate, Set<Gender> seekerInterestedIn) {
+        boolean genderMatch = hasMatchingGenderPreferences(seeker, candidate, seekerInterestedIn);
         if (!genderMatch) {
             logDebug(
                     "Rejecting {} ({}): GENDER MISMATCH - seeker({})→interestedIn({}), candidate({})→interestedIn({})",
                     candidate.getName(),
                     candidate.getId(),
                     seeker.getGender(),
-                    seeker.getInterestedIn(),
+                    seekerInterestedIn,
                     candidate.getGender(),
                     candidate.getInterestedIn());
         }
@@ -296,7 +301,7 @@ public class CandidateFinder {
     }
 
     private boolean passesDealbreakers(User seeker, User candidate) {
-        boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate);
+        boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate, config);
         if (!passesDb) {
             logDebug("Rejecting {} ({}): DEALBREAKER HIT", candidate.getName(), candidate.getId());
         }
@@ -308,15 +313,15 @@ public class CandidateFinder {
      * candidate's gender -
      * Candidate is interested in seeker's gender.
      */
-    private boolean hasMatchingGenderPreferences(User seeker, User candidate) {
+    private boolean hasMatchingGenderPreferences(User seeker, User candidate, Set<Gender> seekerInterestedIn) {
         if (seeker.getGender() == null || candidate.getGender() == null) {
             return false;
         }
-        if (seeker.getInterestedIn() == null || candidate.getInterestedIn() == null) {
+        if (seekerInterestedIn == null || candidate.getInterestedIn() == null) {
             return false;
         }
 
-        boolean seekerInterestedInCandidate = seeker.getInterestedIn().contains(candidate.getGender());
+        boolean seekerInterestedInCandidate = seekerInterestedIn.contains(candidate.getGender());
         boolean candidateInterestedInSeeker = candidate.getInterestedIn().contains(seeker.getGender());
 
         return seekerInterestedInCandidate && candidateInterestedInSeeker;
@@ -365,7 +370,7 @@ public class CandidateFinder {
     }
 
     private boolean hasLocation(User user) {
-        return user.getLat() != 0.0 || user.getLon() != 0.0;
+        return user.hasLocationSet();
     }
 
     private String formatLatLon(User user) {

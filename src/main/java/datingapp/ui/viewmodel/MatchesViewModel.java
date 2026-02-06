@@ -1,6 +1,7 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.AppSession;
+import datingapp.core.DailyService;
 import datingapp.core.Match;
 import datingapp.core.MatchingService;
 import datingapp.core.MatchingService.PendingLiker;
@@ -44,6 +45,7 @@ public class MatchesViewModel {
     private final LikeStorage likeStorage;
     private final BlockStorage blockStorage;
     private final MatchingService matchingService;
+    private final DailyService dailyService;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesReceived = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesSent = FXCollections.observableArrayList();
@@ -64,12 +66,14 @@ public class MatchesViewModel {
             UserStorage userStorage,
             LikeStorage likeStorage,
             BlockStorage blockStorage,
-            MatchingService matchingService) {
+            MatchingService matchingService,
+            DailyService dailyService) {
         this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
         this.blockStorage = Objects.requireNonNull(blockStorage, "blockStorage cannot be null");
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
+        this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
     }
 
     /** Initialize and load matches for current user. */
@@ -222,6 +226,10 @@ public class MatchesViewModel {
         }
         if (currentUser == null) {
             logWarn("No current user, cannot like back");
+            return;
+        }
+        if (!dailyService.canLike(currentUser.getId())) {
+            notifyError("Daily like limit reached", new IllegalStateException("Daily limit reached"));
             return;
         }
 

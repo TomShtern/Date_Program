@@ -79,8 +79,8 @@ public class MatchQualityService {
                 throw new IllegalArgumentException("compatibilityScore must be 0-100, got: " + compatibilityScore);
             }
 
-            if (distanceKm < 0) {
-                throw new IllegalArgumentException("distanceKm cannot be negative");
+            if (distanceKm < -1) {
+                throw new IllegalArgumentException("distanceKm cannot be less than -1");
             }
             if (ageDifference < 0) {
                 throw new IllegalArgumentException("ageDifference cannot be negative");
@@ -315,10 +315,13 @@ public class MatchQualityService {
         // === Calculate Individual Scores ===
 
         // Distance Score
-        double distanceKm = GeoUtils.distanceKm(
-                me.getLat(), me.getLon(),
-                them.getLat(), them.getLon());
-        double distanceScore = calculateDistanceScore(distanceKm, me.getMaxDistanceKm());
+        double distanceKm;
+        if (me.hasLocationSet() && them.hasLocationSet()) {
+            distanceKm = GeoUtils.distanceKm(me.getLat(), me.getLon(), them.getLat(), them.getLon());
+        } else {
+            distanceKm = -1;
+        }
+        double distanceScore = distanceKm >= 0 ? calculateDistanceScore(distanceKm, me.getMaxDistanceKm()) : 0.5;
 
         // Age Score
         int ageDiff = Math.abs(me.getAge() - them.getAge());
@@ -587,11 +590,11 @@ public class MatchQualityService {
             return 0.7;
         }
         // Within a week = okay
-        if (hours < 168) {
+        if (hours < config.responseTimeWeekHours()) {
             return 0.5;
         }
         // Within a month = low
-        if (hours < 720) {
+        if (hours < config.responseTimeMonthHours()) {
             return 0.3;
         }
         // Longer = very low
@@ -611,9 +614,9 @@ public class MatchQualityService {
         List<String> highlights = new ArrayList<>();
 
         // Distance highlight
-        if (distanceKm < 5) {
+        if (distanceKm >= 0 && distanceKm < 5) {
             highlights.add(String.format("Lives nearby (%.1f km away)", distanceKm));
-        } else if (distanceKm < 15) {
+        } else if (distanceKm >= 0 && distanceKm < 15) {
             highlights.add(String.format("%.0f km away", distanceKm));
         }
 

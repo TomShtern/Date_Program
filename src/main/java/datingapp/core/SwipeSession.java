@@ -171,10 +171,10 @@ public class SwipeSession {
     /** Get swipes per minute velocity. */
     public double getSwipesPerMinute() {
         long seconds = getDurationSeconds();
-        if (seconds < 60) {
-            return swipeCount; // Less than a minute, return raw count
+        if (seconds == 0) {
+            return swipeCount;
         }
-        return swipeCount / (seconds / 60.0);
+        return swipeCount * 60.0 / seconds;
     }
 
     /** Get like ratio for this session. */

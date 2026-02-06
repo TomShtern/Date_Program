@@ -103,6 +103,7 @@ public final class DatabaseManager {
                         interested_in VARCHAR(100),
                         lat DOUBLE,
                         lon DOUBLE,
+                        has_location_set BOOLEAN DEFAULT FALSE,
                         max_distance_km INT DEFAULT 50,
                         min_age INT DEFAULT 18,
                         max_age INT DEFAULT 99,
@@ -662,6 +663,7 @@ public final class DatabaseManager {
         stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS looking_for VARCHAR(20)");
         stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS education VARCHAR(20)");
         stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS height_cm INT");
+        stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS has_location_set BOOLEAN DEFAULT FALSE");
         stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_smoking VARCHAR(100)");
         stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_drinking VARCHAR(100)");
         stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS db_wants_kids VARCHAR(100)");

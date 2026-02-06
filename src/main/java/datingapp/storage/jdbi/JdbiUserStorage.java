@@ -45,7 +45,7 @@ public interface JdbiUserStorage {
     /** All columns in the users table (for SELECT queries). */
     String ALL_COLUMNS = """
                         id, name, bio, birth_date, gender, interested_in, lat, lon,
-                        max_distance_km, min_age, max_age, photo_urls, state, created_at,
+                        has_location_set, max_distance_km, min_age, max_age, photo_urls, state, created_at,
                         updated_at, smoking, drinking, wants_kids, looking_for, education,
                         height_cm, db_smoking, db_drinking, db_wants_kids, db_looking_for,
                         db_education, db_min_height_cm, db_max_height_cm, db_max_age_diff,
@@ -62,7 +62,7 @@ public interface JdbiUserStorage {
     @SqlUpdate("""
                         MERGE INTO users (
                             id, name, bio, birth_date, gender, interested_in, lat, lon,
-                            max_distance_km, min_age, max_age, photo_urls, state, created_at,
+                            has_location_set, max_distance_km, min_age, max_age, photo_urls, state, created_at,
                             updated_at, smoking, drinking, wants_kids, looking_for, education,
                             height_cm, db_smoking, db_drinking, db_wants_kids, db_looking_for,
                             db_education, db_min_height_cm, db_max_height_cm, db_max_age_diff,
@@ -72,7 +72,7 @@ public interface JdbiUserStorage {
                             pace_communication_style, pace_depth_preference
                         ) KEY (id) VALUES (
                             :id, :name, :bio, :birthDate, :gender, :interestedInCsv,
-                            :lat, :lon, :maxDistanceKm, :minAge, :maxAge, :photoUrlsCsv,
+                            :lat, :lon, :hasLocationSet, :maxDistanceKm, :minAge, :maxAge, :photoUrlsCsv,
                             :state, :createdAt, :updatedAt,
                             :smoking, :drinking, :wantsKids, :lookingFor,
                             :education, :heightCm,
@@ -157,6 +157,12 @@ public interface JdbiUserStorage {
         @Override
         public User map(ResultSet rs, StatementContext ctx) throws SQLException {
             // Core fields (required)
+            Double lat = MapperHelper.readDouble(rs, "lat");
+            Double lon = MapperHelper.readDouble(rs, "lon");
+            Boolean hasLocationFlag = rs.getObject("has_location_set", Boolean.class);
+            boolean hasLocationSet =
+                    Boolean.TRUE.equals(hasLocationFlag) || (lat != null && lon != null && (lat != 0.0 || lon != 0.0));
+
             User user = User.StorageBuilder.create(
                             MapperHelper.readUuid(rs, "id"),
                             rs.getString("name"),
@@ -165,7 +171,8 @@ public interface JdbiUserStorage {
                     .birthDate(MapperHelper.readLocalDate(rs, "birth_date"))
                     .gender(MapperHelper.readEnum(rs, "gender", Gender.class))
                     .interestedIn(readGenderSet(rs, "interested_in"))
-                    .location(rs.getDouble("lat"), rs.getDouble("lon"))
+                    .location(lat != null ? lat : 0.0, lon != null ? lon : 0.0)
+                    .hasLocationSet(hasLocationSet)
                     .maxDistanceKm(rs.getInt("max_distance_km"))
                     .ageRange(rs.getInt("min_age"), rs.getInt("max_age"))
                     .photoUrls(readPhotoUrls(rs, "photo_urls"))

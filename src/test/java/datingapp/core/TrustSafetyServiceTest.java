@@ -2,7 +2,6 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -312,7 +311,7 @@ class TrustSafetyServiceTest {
             user.startVerification(VerificationMethod.PHONE, "123456");
 
             assertFalse(trustSafetyService.verifyCode(user, "000000"));
-            assertNotEquals(Boolean.TRUE, user.isVerified());
+            assertFalse(user.isVerified());
         }
     }
 

@@ -45,26 +45,26 @@ public final class Main {
                 String choice = inputReader.readLine("Choose an option: ");
 
                 switch (choice) {
-                    case "1" -> handlers.profile().createUser();
-                    case "2" -> handlers.profile().selectUser();
-                    case "3" -> handlers.profile().completeProfile();
-                    case "4" -> handlers.matching().browseCandidates();
-                    case "5" -> handlers.matching().viewMatches();
-                    case "6" -> handlers.safety().blockUser();
-                    case "7" -> handlers.safety().reportUser();
-                    case "8" -> handlers.safety().manageBlockedUsers();
-                    case "9" -> handlers.profile().setDealbreakers();
-                    case "10" -> handlers.stats().viewStatistics();
-                    case "11" -> handlers.profile().previewProfile();
-                    case "12" -> handlers.stats().viewAchievements();
-                    case "13" -> handlers.profileNotes().viewAllNotes();
-                    case "14" -> handlers.profile().viewProfileScore();
-                    case "15" -> handlers.safety().verifyProfile();
-                    case "16" -> handlers.likerBrowser().browseWhoLikedMe();
-                    case "17" -> handlers.messaging().showConversations();
-                    case "18" -> handlers.relationship().viewNotifications();
-                    case "19" -> handlers.relationship().viewPendingRequests();
-                    case "20" -> handlers.matching().viewStandouts();
+                    case "1" -> safeExecute(() -> handlers.profile().createUser());
+                    case "2" -> safeExecute(() -> handlers.profile().selectUser());
+                    case "3" -> safeExecute(() -> handlers.profile().completeProfile());
+                    case "4" -> safeExecute(() -> handlers.matching().browseCandidates());
+                    case "5" -> safeExecute(() -> handlers.matching().viewMatches());
+                    case "6" -> safeExecute(() -> handlers.safety().blockUser());
+                    case "7" -> safeExecute(() -> handlers.safety().reportUser());
+                    case "8" -> safeExecute(() -> handlers.safety().manageBlockedUsers());
+                    case "9" -> safeExecute(() -> handlers.profile().setDealbreakers());
+                    case "10" -> safeExecute(() -> handlers.stats().viewStatistics());
+                    case "11" -> safeExecute(() -> handlers.profile().previewProfile());
+                    case "12" -> safeExecute(() -> handlers.stats().viewAchievements());
+                    case "13" -> safeExecute(() -> handlers.profileNotes().viewAllNotes());
+                    case "14" -> safeExecute(() -> handlers.profile().viewProfileScore());
+                    case "15" -> safeExecute(() -> handlers.safety().verifyProfile());
+                    case "16" -> safeExecute(() -> handlers.likerBrowser().browseWhoLikedMe());
+                    case "17" -> safeExecute(() -> handlers.messaging().showConversations());
+                    case "18" -> safeExecute(() -> handlers.relationship().viewNotifications());
+                    case "19" -> safeExecute(() -> handlers.relationship().viewPendingRequests());
+                    case "20" -> safeExecute(() -> handlers.matching().viewStandouts());
                     case "0" -> {
                         running = false;
                         logInfo("\n👋 Goodbye!\n");
@@ -91,6 +91,17 @@ public final class Main {
     private static void logInfo(String message, Object... args) {
         if (logger.isInfoEnabled()) {
             logger.info(message, args);
+        }
+    }
+
+    private static void safeExecute(Runnable action) {
+        try {
+            action.run();
+        } catch (Exception e) {
+            logInfo("\n❌ An error occurred: {}\n", e.getMessage());
+            if (logger.isDebugEnabled()) {
+                logger.debug("Handler error details", e);
+            }
         }
     }
 

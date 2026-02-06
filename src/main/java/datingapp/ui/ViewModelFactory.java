@@ -177,7 +177,8 @@ public class ViewModelFactory {
                     services.getUserStorage(),
                     services.getLikeStorage(),
                     services.getBlockStorage(),
-                    services.getMatchingService());
+                    services.getMatchingService(),
+                    services.getDailyService());
         }
         return matchesViewModel;
     }

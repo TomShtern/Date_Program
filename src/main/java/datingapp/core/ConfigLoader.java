@@ -123,6 +123,8 @@ public final class ConfigLoader {
             applyInt(root, "responseTimeExcellentHours", builder::responseTimeExcellentHours);
             applyInt(root, "responseTimeGreatHours", builder::responseTimeGreatHours);
             applyInt(root, "responseTimeGoodHours", builder::responseTimeGoodHours);
+            applyInt(root, "responseTimeWeekHours", builder::responseTimeWeekHours);
+            applyInt(root, "responseTimeMonthHours", builder::responseTimeMonthHours);
 
             // Achievement tiers
             applyInt(root, "achievementMatchTier1", builder::achievementMatchTier1);

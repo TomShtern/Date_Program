@@ -244,6 +244,16 @@ class MessagingServiceTest {
         }
 
         @Test
+        @DisplayName("should return true for friends match")
+        void trueForFriendsMatch() {
+            Match match = Match.create(userA, userB);
+            match.transitionToFriends(userA);
+            matchStorage.save(match);
+
+            assertTrue(messagingService.canMessage(userA, userB));
+        }
+
+        @Test
         @DisplayName("should return false for no match")
         void falseForNoMatch() {
             assertFalse(messagingService.canMessage(userA, userB));

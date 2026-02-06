@@ -4,6 +4,7 @@ import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -28,15 +29,18 @@ public class DailyService {
     private final BlockStorage blockStorage;
     private final CandidateFinder candidateFinder;
     private final AppConfig config;
+    private final Clock clock;
 
     /** In-memory tracking of daily pick views (userId -> set of dates viewed). */
     private final Map<UUID, Set<LocalDate>> dailyPickViews = new ConcurrentHashMap<>();
+
+    private final Map<String, UUID> cachedDailyPicks = new ConcurrentHashMap<>();
 
     /** Maximum users tracked in dailyPickViews before automatic cleanup. */
     private static final int MAX_DAILY_PICK_USERS = 10_000;
 
     public DailyService(LikeStorage likeStorage, AppConfig config) {
-        this(null, likeStorage, null, null, config);
+        this(null, likeStorage, null, null, config, null);
     }
 
     public DailyService(
@@ -45,11 +49,22 @@ public class DailyService {
             BlockStorage blockStorage,
             CandidateFinder candidateFinder,
             AppConfig config) {
+        this(userStorage, likeStorage, blockStorage, candidateFinder, config, null);
+    }
+
+    public DailyService(
+            UserStorage userStorage,
+            LikeStorage likeStorage,
+            BlockStorage blockStorage,
+            CandidateFinder candidateFinder,
+            AppConfig config,
+            Clock clock) {
         this.userStorage = userStorage;
         this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
         this.blockStorage = blockStorage;
         this.candidateFinder = candidateFinder;
         this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.clock = clock != null ? clock : Clock.system(config.userTimeZone());
     }
 
     /** Whether the user can perform a like action today. */
@@ -70,7 +85,7 @@ public class DailyService {
     public DailyStatus getStatus(UUID userId) {
         Instant startOfDay = getStartOfToday();
         Instant resetTime = getResetTime();
-        LocalDate today = LocalDate.now(config.userTimeZone());
+        LocalDate today = getToday();
 
         int likesUsed = likeStorage.countLikesToday(userId, startOfDay);
         int passesUsed = likeStorage.countPassesToday(userId, startOfDay);
@@ -83,7 +98,7 @@ public class DailyService {
 
     /** Time remaining until next daily reset (midnight local time). */
     public Duration getTimeUntilReset() {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant resetTime = getResetTime();
         return Duration.between(now, resetTime);
     }
@@ -125,11 +140,27 @@ public class DailyService {
             return Optional.empty();
         }
 
+        String cacheKey = seeker.getId() + "_" + today;
+        UUID cachedPickId = cachedDailyPicks.get(cacheKey);
+        User picked = null;
+        if (cachedPickId != null) {
+            picked = candidates.stream()
+                    .filter(candidate -> candidate.getId().equals(cachedPickId))
+                    .findFirst()
+                    .orElse(null);
+        }
+
         // Deterministic random selection based on date + user ID
         long seed = today.toEpochDay() + seeker.getId().hashCode();
-        Random random = new Random(seed);
-        User picked = candidates.get(random.nextInt(candidates.size()));
-        String reason = generateReason(seeker, picked, random);
+        Random pickRandom = new Random(seed);
+        if (picked == null) {
+            picked = candidates.get(pickRandom.nextInt(candidates.size()));
+            cachedDailyPicks.put(cacheKey, picked.getId());
+        }
+        long reasonSeed =
+                seed ^ picked.getId().getMostSignificantBits() ^ picked.getId().getLeastSignificantBits();
+        Random reasonRandom = new Random(reasonSeed);
+        String reason = generateReason(seeker, picked, reasonRandom);
         boolean alreadySeen = hasViewedDailyPick(seeker.getId(), today);
 
         return Optional.of(new DailyPick(picked, today, reason, alreadySeen));
@@ -156,7 +187,7 @@ public class DailyService {
     /** Internal: Mark daily pick as viewed for a specific date. */
     private void markDailyPickViewed(UUID userId, LocalDate date) {
         if (dailyPickViews.size() > MAX_DAILY_PICK_USERS) {
-            cleanupOldDailyPickViews(date);
+            cleanupOldDailyPickViews(date.minusDays(7));
         }
         dailyPickViews
                 .computeIfAbsent(userId, id -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
@@ -171,6 +202,8 @@ public class DailyService {
             dates.removeIf(date -> date.isBefore(before));
             removed += Math.toIntExact(count);
         }
+        String todaySuffix = "_" + LocalDate.now(clock);
+        cachedDailyPicks.entrySet().removeIf(entry -> !entry.getKey().endsWith(todaySuffix));
         return removed;
     }
 
@@ -183,11 +216,13 @@ public class DailyService {
     private String generateReason(User seeker, User picked, Random random) {
         List<String> reasons = new ArrayList<>();
 
-        double distance = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), picked.getLat(), picked.getLon());
-        if (distance < config.nearbyDistanceKm()) {
-            reasons.add("Lives nearby!");
-        } else if (distance < config.closeDistanceKm()) {
-            reasons.add("Close enough for coffee!");
+        if (seeker.hasLocationSet() && picked.hasLocationSet()) {
+            double distance = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), picked.getLat(), picked.getLon());
+            if (distance < config.nearbyDistanceKm()) {
+                reasons.add("Lives nearby!");
+            } else if (distance < config.closeDistanceKm()) {
+                reasons.add("Close enough for coffee!");
+            }
         }
 
         int ageDiff = Math.abs(seeker.getAge() - picked.getAge());
@@ -222,11 +257,13 @@ public class DailyService {
             reasons.add("Some shared interests");
         }
 
-        reasons.add("Our algorithm thinks you might click!");
-        reasons.add("Something different today!");
-        reasons.add("Expand your horizons!");
-        reasons.add("Why not give them a chance?");
-        reasons.add("Could be a pleasant surprise!");
+        if (reasons.isEmpty()) {
+            reasons.add("Our algorithm thinks you might click!");
+            reasons.add("Something different today!");
+            reasons.add("Expand your horizons!");
+            reasons.add("Why not give them a chance?");
+            reasons.add("Could be a pleasant surprise!");
+        }
 
         return reasons.get(random.nextInt(reasons.size()));
     }
@@ -240,17 +277,17 @@ public class DailyService {
     }
 
     private Instant getStartOfToday() {
-        ZoneId zone = config.userTimeZone();
-        return LocalDate.now(zone).atStartOfDay(zone).toInstant();
+        ZoneId zone = clock.getZone();
+        return LocalDate.now(clock).atStartOfDay(zone).toInstant();
     }
 
     private Instant getResetTime() {
-        ZoneId zone = config.userTimeZone();
-        return LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant();
+        ZoneId zone = clock.getZone();
+        return LocalDate.now(clock).plusDays(1).atStartOfDay(zone).toInstant();
     }
 
     private LocalDate getToday() {
-        return LocalDate.now(config.userTimeZone());
+        return LocalDate.now(clock);
     }
 
     private static <T> boolean sameNonNull(T left, T right) {

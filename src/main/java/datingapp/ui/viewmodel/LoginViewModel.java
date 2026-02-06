@@ -282,13 +282,9 @@ public class LoginViewModel {
             // Set default dealbreakers (none) - marks section as reviewed for profile completion
             newUser.setDealbreakers(Dealbreakers.none());
 
-            // Save to storage
-            userStorage.save(newUser);
-
             // Now attempt to activate the user since profile is complete
             if (newUser.isComplete()) {
                 newUser.activate();
-                userStorage.save(newUser);
                 logInfo("User {} is complete and activated. State: {}", newUser.getName(), newUser.getState());
             } else {
                 logWarn(
@@ -297,6 +293,7 @@ public class LoginViewModel {
                         newUser.getState(),
                         newUser.isComplete());
             }
+            userStorage.save(newUser);
 
             // Refresh the user list
             refreshUsers();
@@ -391,7 +388,7 @@ public class LoginViewModel {
         String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);
         String state = user.getState() == null ? "" : user.getState().name().toLowerCase(Locale.ROOT);
         String ageText = user.getAge() > 0 ? String.valueOf(user.getAge()) : "";
-        String verifiedTag = Boolean.TRUE.equals(user.isVerified()) ? "verified" : "";
+        String verifiedTag = user.isVerified() ? "verified" : "";
         return String.join(" ", name, state, ageText, verifiedTag);
     }
 

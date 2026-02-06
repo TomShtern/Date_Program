@@ -2,6 +2,7 @@ package datingapp.core;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Centralized validation service for user input. Provides consistent validation
@@ -15,7 +16,15 @@ import java.util.List;
 public class ValidationService {
 
     /** Shared configuration for validation thresholds. */
-    private static final AppConfig CONFIG = AppConfig.defaults();
+    private final AppConfig config;
+
+    public ValidationService() {
+        this(AppConfig.defaults());
+    }
+
+    public ValidationService(AppConfig config) {
+        this.config = Objects.requireNonNull(config, "config cannot be null");
+    }
 
     /**
      * Result of a validation operation. Contains success status and any error
@@ -55,8 +64,8 @@ public class ValidationService {
         if (name == null || name.isBlank()) {
             return ValidationResult.failure("Name cannot be empty");
         }
-        if (name.length() > CONFIG.maxNameLength()) {
-            return ValidationResult.failure("Name too long (max " + CONFIG.maxNameLength() + " chars)");
+        if (name.length() > config.maxNameLength()) {
+            return ValidationResult.failure("Name too long (max " + config.maxNameLength() + " chars)");
         }
         return ValidationResult.success();
     }
@@ -68,10 +77,10 @@ public class ValidationService {
      * @return validation result
      */
     public ValidationResult validateAge(int age) {
-        if (age < CONFIG.minAge()) {
-            return ValidationResult.failure("Must be " + CONFIG.minAge() + " or older");
+        if (age < config.minAge()) {
+            return ValidationResult.failure("Must be " + config.minAge() + " or older");
         }
-        if (age > CONFIG.maxAge()) {
+        if (age > config.maxAge()) {
             return ValidationResult.failure("Invalid age");
         }
         return ValidationResult.success();
@@ -84,11 +93,11 @@ public class ValidationService {
      * @return validation result
      */
     public ValidationResult validateHeight(int heightCm) {
-        if (heightCm < CONFIG.minHeightCm()) {
-            return ValidationResult.failure("Height too short (min " + CONFIG.minHeightCm() + "cm)");
+        if (heightCm < config.minHeightCm()) {
+            return ValidationResult.failure("Height too short (min " + config.minHeightCm() + "cm)");
         }
-        if (heightCm > CONFIG.maxHeightCm()) {
-            return ValidationResult.failure("Height too tall (max " + CONFIG.maxHeightCm() + "cm)");
+        if (heightCm > config.maxHeightCm()) {
+            return ValidationResult.failure("Height too tall (max " + config.maxHeightCm() + "cm)");
         }
         return ValidationResult.success();
     }
@@ -100,11 +109,11 @@ public class ValidationService {
      * @return validation result
      */
     public ValidationResult validateDistance(int distanceKm) {
-        if (distanceKm < CONFIG.minDistanceKm()) {
-            return ValidationResult.failure("Distance must be at least " + CONFIG.minDistanceKm() + "km");
+        if (distanceKm < config.minDistanceKm()) {
+            return ValidationResult.failure("Distance must be at least " + config.minDistanceKm() + "km");
         }
-        if (distanceKm > CONFIG.maxDistanceKm()) {
-            return ValidationResult.failure("Distance too far (max " + CONFIG.maxDistanceKm() + "km)");
+        if (distanceKm > config.maxDistanceKm()) {
+            return ValidationResult.failure("Distance too far (max " + config.maxDistanceKm() + "km)");
         }
         return ValidationResult.success();
     }
@@ -119,8 +128,8 @@ public class ValidationService {
         if (bio == null) {
             return ValidationResult.success();
         }
-        if (bio.length() > CONFIG.maxBioLength()) {
-            return ValidationResult.failure("Bio too long (max " + CONFIG.maxBioLength() + " chars)");
+        if (bio.length() > config.maxBioLength()) {
+            return ValidationResult.failure("Bio too long (max " + config.maxBioLength() + " chars)");
         }
         return ValidationResult.success();
     }
@@ -135,17 +144,17 @@ public class ValidationService {
     public ValidationResult validateAgeRange(int min, int max) {
         List<String> errors = new ArrayList<>();
 
-        if (min < CONFIG.minAge()) {
-            errors.add("Minimum age must be " + CONFIG.minAge() + "+");
+        if (min < config.minAge()) {
+            errors.add("Minimum age must be " + config.minAge() + "+");
         }
-        if (max > CONFIG.maxAge()) {
+        if (max > config.maxAge()) {
             errors.add("Maximum age invalid");
         }
         if (min > max) {
             errors.add("Min age cannot exceed max age");
         }
-        if (max - min < CONFIG.minAgeRangeSpan()) {
-            errors.add("Age range too narrow (min " + CONFIG.minAgeRangeSpan() + " years)");
+        if (max - min < config.minAgeRangeSpan()) {
+            errors.add("Age range too narrow (min " + config.minAgeRangeSpan() + " years)");
         }
 
         return errors.isEmpty() ? ValidationResult.success() : ValidationResult.failure(errors);

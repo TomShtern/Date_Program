@@ -11,9 +11,9 @@ import datingapp.storage.DatabaseManager;
  * <p>Thread-safe singleton pattern ensures only one initialization occurs.
  */
 public final class AppBootstrap {
-    private static ServiceRegistry services;
+    private static volatile ServiceRegistry services;
     private static DatabaseManager dbManager;
-    private static boolean initialized = false;
+    private static volatile boolean initialized = false;
 
     private AppBootstrap() {}
 
@@ -48,11 +48,12 @@ public final class AppBootstrap {
      * @return The ServiceRegistry
      * @throws IllegalStateException if initialize() has not been called
      */
-    public static synchronized ServiceRegistry getServices() {
-        if (!initialized) {
+    public static ServiceRegistry getServices() {
+        ServiceRegistry current = services;
+        if (!initialized || current == null) {
             throw new IllegalStateException("AppBootstrap.initialize() must be called first");
         }
-        return services;
+        return current;
     }
 
     /**

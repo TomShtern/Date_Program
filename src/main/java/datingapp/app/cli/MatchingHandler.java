@@ -1,5 +1,6 @@
 package datingapp.app.cli;
 
+import datingapp.core.Achievement;
 import datingapp.core.AchievementService;
 import datingapp.core.AppSession;
 import datingapp.core.CandidateFinder;
@@ -152,7 +153,7 @@ public class MatchingHandler {
                 candidate.getLat(), candidate.getLon());
 
         logInfo(CliConstants.BOX_TOP);
-        boolean verified = Boolean.TRUE.equals(candidate.isVerified());
+        boolean verified = candidate.isVerified();
         logInfo(
                 "│ 💝 {}{}{}, {} years old",
                 candidate.getName(),
@@ -234,7 +235,7 @@ public class MatchingHandler {
 
                 if (otherUser != null && logger.isInfoEnabled()) {
                     MatchQuality quality = matchQualityService.computeQuality(match, currentUser.getId());
-                    String verifiedBadge = Boolean.TRUE.equals(otherUser.isVerified()) ? " ✅ Verified" : "";
+                    String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
                     logInfo(
                             "  {}. {} {}{}, {}         {} {}%",
                             i + 1,
@@ -300,8 +301,13 @@ public class MatchingHandler {
         if (otherUser.getBio() != null) {
             logInfo("  📝 {}", otherUser.getBio());
         }
-        String distanceStr = String.format("%.1f", quality.distanceKm());
-        logInfo("  📍 {} km away", distanceStr);
+        double distanceKm = quality.distanceKm();
+        if (distanceKm < 0) {
+            logInfo("  📍 Distance unknown");
+        } else {
+            String distanceStr = String.format("%.1f", distanceKm);
+            logInfo("  📍 {} km away", distanceStr);
+        }
 
         logInfo("\n" + CliConstants.SECTION_LINE);
         logInfo("  COMPATIBILITY: {}%  {}", quality.compatibilityScore(), quality.getStarDisplay());
@@ -589,27 +595,17 @@ public class MatchingHandler {
     }
 
     private void checkAndDisplayNewAchievements(User currentUser) {
-        // The nested UserAchievement type is package-private; avoid directly
-        // referencing it to prevent access issues. Use a generic List and
-        // reflection to read the public Achievement data.
-        Object raw = achievementService.checkAndUnlock(currentUser.getId());
-        if (!(raw instanceof List<?> newAchievements) || newAchievements.isEmpty()) {
+        List<Achievement.UserAchievement> newAchievements = achievementService.checkAndUnlock(currentUser.getId());
+        if (newAchievements.isEmpty()) {
             return;
         }
 
         logInfo("\n🏆 NEW ACHIEVEMENTS UNLOCKED! 🏆");
-        for (Object ua : newAchievements) {
-            try {
-                java.lang.reflect.Method achievementMethod = ua.getClass().getMethod("achievement");
-                Object achievement = achievementMethod.invoke(ua);
-                java.lang.reflect.Method nameMethod = achievement.getClass().getMethod("getDisplayName");
-                java.lang.reflect.Method descMethod = achievement.getClass().getMethod("getDescription");
-                Object name = nameMethod.invoke(achievement);
-                Object desc = descMethod.invoke(achievement);
-                logInfo("  ✨ {} - {}", String.valueOf(name), String.valueOf(desc));
-            } catch (ReflectiveOperationException e) {
-                logWarn("Could not display achievement details", e);
-            }
+        for (Achievement.UserAchievement ua : newAchievements) {
+            logInfo(
+                    "  ✨ {} - {}",
+                    ua.achievement().getDisplayName(),
+                    ua.achievement().getDescription());
         }
         logInfo("");
     }
@@ -713,6 +709,10 @@ public class MatchingHandler {
     }
 
     private void processStandoutInteraction(User currentUser, User candidate, boolean isLike) {
+        if (isLike && !dailyService.canLike(currentUser.getId())) {
+            showDailyLimitReached(currentUser);
+            return;
+        }
         Like.Direction direction = isLike ? Like.Direction.LIKE : Like.Direction.PASS;
         Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
         Optional<Match> matchResult = matchingService.recordLike(like);

@@ -26,7 +26,10 @@ class MatchingServiceTest {
 
         likeStorage = new TestStorages.Likes();
         matchStorage = new TestStorages.Matches();
-        matchingService = new MatchingService(likeStorage, matchStorage);
+        matchingService = MatchingService.builder()
+                .likeStorage(likeStorage)
+                .matchStorage(matchStorage)
+                .build();
     }
 
     @Nested
@@ -157,9 +160,9 @@ class MatchingServiceTest {
     class ProcessSwipeGuard {
 
         @Test
-        @DisplayName("processSwipe throws ISE when services are missing")
-        void processSwipeThrowsWithoutServices() {
-            // 2-arg constructor: dailyService and undoService are null
+        @DisplayName("processSwipe returns config error when services are missing")
+        void processSwipeReturnsConfigErrorWithoutServices() {
+            // Builder without dailyService/undoService
             User user = User.StorageBuilder.create(UUID.randomUUID(), "Alice", java.time.Instant.now())
                     .state(UserState.ACTIVE)
                     .build();
@@ -167,10 +170,11 @@ class MatchingServiceTest {
                     .state(UserState.ACTIVE)
                     .build();
 
-            assertThrows(
-                    IllegalStateException.class,
-                    () -> matchingService.processSwipe(user, candidate, true),
-                    "processSwipe should throw ISE when dailyService/undoService are null");
+            MatchingService.SwipeResult result = matchingService.processSwipe(user, candidate, true);
+
+            assertFalse(result.success(), "processSwipe should fail when dailyService/undoService are null");
+            assertEquals(
+                    "dailyService and undoService required for processSwipe", result.message(), "Unexpected message");
         }
     }
 }

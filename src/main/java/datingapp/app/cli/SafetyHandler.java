@@ -254,7 +254,7 @@ public class SafetyHandler {
         CliUtilities.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
 
-            if (Boolean.TRUE.equals(currentUser.isVerified())) {
+            if (currentUser.isVerified()) {
                 logInfo("\n✅ Profile already verified ({}).\n", currentUser.getVerifiedAt());
                 return;
             }

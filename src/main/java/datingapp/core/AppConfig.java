@@ -40,6 +40,8 @@ public record AppConfig(
         int responseTimeExcellentHours, // Response time for "excellent" (1)
         int responseTimeGreatHours, // Response time for "great" (24)
         int responseTimeGoodHours, // Response time for "good" (72)
+        int responseTimeWeekHours, // Response time threshold for "okay" (168)
+        int responseTimeMonthHours, // Response time threshold for "low" (720)
         int achievementMatchTier1, // First match milestone (1)
         int achievementMatchTier2, // Second match milestone (5)
         int achievementMatchTier3, // Third match milestone (10)
@@ -103,6 +105,8 @@ public record AppConfig(
         requireNonNegative("responseTimeExcellentHours", responseTimeExcellentHours);
         requireNonNegative("responseTimeGreatHours", responseTimeGreatHours);
         requireNonNegative("responseTimeGoodHours", responseTimeGoodHours);
+        requireNonNegative("responseTimeWeekHours", responseTimeWeekHours);
+        requireNonNegative("responseTimeMonthHours", responseTimeMonthHours);
         requireNonNegative("achievementMatchTier1", achievementMatchTier1);
         requireNonNegative("achievementMatchTier2", achievementMatchTier2);
         requireNonNegative("achievementMatchTier3", achievementMatchTier3);
@@ -130,6 +134,11 @@ public record AppConfig(
         requireNonNegative("standoutLifestyleWeight", standoutLifestyleWeight);
         requireNonNegative("standoutCompletenessWeight", standoutCompletenessWeight);
         requireNonNegative("standoutActivityWeight", standoutActivityWeight);
+
+        double weightSum = distanceWeight + ageWeight + interestWeight + lifestyleWeight + paceWeight + responseWeight;
+        if (Math.abs(weightSum - 1.0) > 0.01) {
+            throw new IllegalArgumentException("Config weights must sum to 1.0, got: " + weightSum);
+        }
     }
 
     private static void requireNonNegative(String name, int value) {
@@ -170,6 +179,8 @@ public record AppConfig(
                 1, // responseTimeExcellentHours
                 24, // responseTimeGreatHours
                 72, // responseTimeGoodHours
+                168, // responseTimeWeekHours
+                720, // responseTimeMonthHours
                 1, // achievementMatchTier1
                 5, // achievementMatchTier2
                 10, // achievementMatchTier3
@@ -249,6 +260,8 @@ public record AppConfig(
         private int responseTimeExcellentHours = 1;
         private int responseTimeGreatHours = 24;
         private int responseTimeGoodHours = 72;
+        private int responseTimeWeekHours = 168;
+        private int responseTimeMonthHours = 720;
         private int achievementMatchTier1 = 1;
         private int achievementMatchTier2 = 5;
         private int achievementMatchTier3 = 10;
@@ -388,6 +401,16 @@ public record AppConfig(
 
         public Builder responseTimeGoodHours(int v) {
             this.responseTimeGoodHours = v;
+            return this;
+        }
+
+        public Builder responseTimeWeekHours(int v) {
+            this.responseTimeWeekHours = v;
+            return this;
+        }
+
+        public Builder responseTimeMonthHours(int v) {
+            this.responseTimeMonthHours = v;
             return this;
         }
 
@@ -550,6 +573,8 @@ public record AppConfig(
                     responseTimeExcellentHours,
                     responseTimeGreatHours,
                     responseTimeGoodHours,
+                    responseTimeWeekHours,
+                    responseTimeMonthHours,
                     achievementMatchTier1,
                     achievementMatchTier2,
                     achievementMatchTier3,

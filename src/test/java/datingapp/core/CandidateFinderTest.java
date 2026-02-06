@@ -180,7 +180,7 @@ class CandidateFinderTest {
             }
         };
 
-        finder = new CandidateFinder(userStorage, likeStorage, blockStorage);
+        finder = new CandidateFinder(userStorage, likeStorage, blockStorage, AppConfig.defaults());
         seeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.0853, 34.7818);
     }
 
@@ -263,6 +263,19 @@ class CandidateFinderTest {
         assertEquals("Close", result.get(0).getName());
         assertEquals("Medium", result.get(1).getName());
         assertEquals("Far", result.get(2).getName());
+    }
+
+    @Test
+    @DisplayName("Treats (0,0) as a valid location when explicitly set")
+    void treatsZeroZeroAsValidLocationWhenSet() {
+        User zeroSeeker = createUser("ZeroSeeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 0.0, 0.0);
+        zeroSeeker.setMaxDistanceKm(1);
+
+        User farCandidate = createUser("FarAway", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 10.0, 10.0);
+
+        List<User> result = finder.findCandidates(zeroSeeker, List.of(farCandidate), Set.of());
+
+        assertTrue(result.isEmpty(), "Distance filtering should apply when (0,0) is explicitly set");
     }
 
     private User createUser(String name, Gender gender, Set<Gender> interestedIn, int age, double lat, double lon) {

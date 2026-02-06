@@ -308,7 +308,7 @@ public class LoginController extends BaseController implements Initializable {
                 nameLabel.setText(user.getName() + ", " + user.getAge());
 
                 StringBuilder sb = new StringBuilder(formatState(user.getState()));
-                if (Boolean.TRUE.equals(user.isVerified())) {
+                if (user.isVerified()) {
                     sb.append(TEXT_VERIFIED);
                 }
                 detailsLabel.setText(sb.toString());

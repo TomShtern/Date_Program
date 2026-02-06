@@ -12,7 +12,9 @@ import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +38,7 @@ class DailyPickServiceTest {
         blockStorage = new InMemoryBlockStorage();
         config = AppConfig.defaults();
 
-        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage);
+        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, AppConfig.defaults());
         service = new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config);
     }
 
@@ -216,6 +218,50 @@ class DailyPickServiceTest {
                 1,
                 service.cleanupOldDailyPickViews(
                         LocalDate.now(config.userTimeZone()).plusDays(1)));
+    }
+
+    @Test
+    void cleanupOldDailyPickViews_removesOldEntries() {
+        LocalDate oldDate = LocalDate.now(config.userTimeZone()).minusDays(10);
+        ZoneId zone = config.userTimeZone();
+        Clock oldClock = Clock.fixed(oldDate.atStartOfDay(zone).toInstant(), zone);
+        DailyService oldService =
+                new DailyService(userStorage, likeStorage, blockStorage, candidateFinder, config, oldClock);
+
+        User seeker = createActiveUser("Alice", 25);
+        userStorage.save(seeker);
+
+        oldService.markDailyPickViewed(seeker.getId());
+
+        int removed = oldService.cleanupOldDailyPickViews(oldDate.plusDays(7));
+        assertEquals(1, removed);
+        assertFalse(oldService.hasViewedDailyPick(seeker.getId()));
+    }
+
+    @Test
+    void getDailyPick_cachedPickSurvivesCandidateListChanges() {
+        User seeker = createActiveUser("Seeker", 25);
+        User candidate1 = createActiveUser("Candidate1", 26);
+        User candidate2 = createActiveUser("Candidate2", 27);
+        User candidate3 = createActiveUser("Candidate3", 28);
+
+        userStorage.save(seeker);
+        userStorage.save(candidate1);
+        userStorage.save(candidate2);
+        userStorage.save(candidate3);
+
+        DailyPick firstPick = service.getDailyPick(seeker).orElseThrow();
+        UUID pickedId = firstPick.user().getId();
+
+        if (!candidate1.getId().equals(pickedId)) {
+            userStorage.delete(candidate1.getId());
+        } else {
+            userStorage.delete(candidate2.getId());
+        }
+
+        DailyPick secondPick = service.getDailyPick(seeker).orElseThrow();
+
+        assertEquals(pickedId, secondPick.user().getId());
     }
 
     // Helper methods

@@ -42,7 +42,12 @@ class LikerBrowserHandlerTest {
 
     private LikerBrowserHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        MatchingService matchingService = new MatchingService(likeStorage, matchStorage, userStorage, blockStorage);
+        MatchingService matchingService = MatchingService.builder()
+                .likeStorage(likeStorage)
+                .matchStorage(matchStorage)
+                .userStorage(userStorage)
+                .blockStorage(blockStorage)
+                .build();
         return new LikerBrowserHandler(matchingService, session, inputReader);
     }
 

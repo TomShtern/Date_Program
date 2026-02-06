@@ -37,7 +37,7 @@ class StandoutsServiceTest {
         TestStorages.Likes likeStorage = new TestStorages.Likes();
         TestStorages.Blocks blockStorage = new TestStorages.Blocks();
         standoutStorage = new TestStandoutStorage();
-        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage);
+        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, AppConfig.defaults());
         service = new StandoutsService(userStorage, standoutStorage, candidateFinder, AppConfig.defaults());
     }
 

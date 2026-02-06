@@ -80,7 +80,8 @@ public class AchievementService {
             if (unlocked) {
                 return "✓ Unlocked";
             }
-            return current + "/" + target;
+            int displayCurrent = Math.min(current, target);
+            return displayCurrent + "/" + target;
         }
     }
 
@@ -182,28 +183,14 @@ public class AchievementService {
      * @return int[2] where [0] = current, [1] = target
      */
     private int[] getProgressValues(UUID userId, User user, Achievement achievement) {
+        int matchCount = getMatchCount(userId);
         return switch (achievement) {
             // Matching milestones
-            case FIRST_SPARK ->
-                new int[] {
-                    Math.min(config.achievementMatchTier1(), getMatchCount(userId)), config.achievementMatchTier1()
-                };
-            case SOCIAL_BUTTERFLY ->
-                new int[] {
-                    Math.min(config.achievementMatchTier2(), getMatchCount(userId)), config.achievementMatchTier2()
-                };
-            case POPULAR ->
-                new int[] {
-                    Math.min(config.achievementMatchTier3(), getMatchCount(userId)), config.achievementMatchTier3()
-                };
-            case SUPERSTAR ->
-                new int[] {
-                    Math.min(config.achievementMatchTier4(), getMatchCount(userId)), config.achievementMatchTier4()
-                };
-            case LEGEND ->
-                new int[] {
-                    Math.min(config.achievementMatchTier5(), getMatchCount(userId)), config.achievementMatchTier5()
-                };
+            case FIRST_SPARK -> new int[] {matchCount, config.achievementMatchTier1()};
+            case SOCIAL_BUTTERFLY -> new int[] {matchCount, config.achievementMatchTier2()};
+            case POPULAR -> new int[] {matchCount, config.achievementMatchTier3()};
+            case SUPERSTAR -> new int[] {matchCount, config.achievementMatchTier4()};
+            case LEGEND -> new int[] {matchCount, config.achievementMatchTier5()};
 
             // Behavior - needs minimum swipes
             case SELECTIVE, OPEN_MINDED -> new int[] {getTotalSwipes(userId), config.minSwipesForBehaviorAchievement()};
@@ -221,7 +208,7 @@ public class AchievementService {
     // === Helper Methods ===
 
     private int getMatchCount(UUID userId) {
-        return matchStorage.getActiveMatchesFor(userId).size();
+        return matchStorage.getAllMatchesFor(userId).size();
     }
 
     private int getTotalSwipes(UUID userId) {

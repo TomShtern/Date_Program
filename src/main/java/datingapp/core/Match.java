@@ -26,7 +26,12 @@ public class Match {
         BLOCKED // One user blocked the other
     }
 
-    /** Reasons why a relationship/match was archived or ended. */
+    /**
+     * Reasons why a relationship/match was archived or ended.
+     *
+     * <p>Note: Some reasons overlap with terminal {@link State} values. We keep both for
+     * analytics/history without changing the state machine.
+     */
     public static enum ArchiveReason {
         FRIEND_ZONE,
         GRACEFUL_EXIT,

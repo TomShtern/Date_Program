@@ -3,6 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
@@ -101,6 +102,38 @@ class AppConfigTest {
             AppConfig config2 = AppConfig.builder().autoBanThreshold(10).build();
 
             assertNotEquals(config1, config2, "Different configs should not be equal");
+        }
+    }
+
+    @Nested
+    @DisplayName("Weight Validation")
+    class WeightValidation {
+
+        @Test
+        @DisplayName("Defaults have weights that sum to 1.0")
+        void defaultsSumToOne() {
+            AppConfig config = AppConfig.defaults();
+            double total = config.distanceWeight()
+                    + config.ageWeight()
+                    + config.interestWeight()
+                    + config.lifestyleWeight()
+                    + config.paceWeight()
+                    + config.responseWeight();
+
+            assertEquals(1.0, total, 0.001);
+        }
+
+        @Test
+        @DisplayName("Invalid weight sum throws")
+        void invalidWeightSumThrows() {
+            assertThrows(IllegalArgumentException.class, () -> AppConfig.builder()
+                    .distanceWeight(0.5)
+                    .ageWeight(0.5)
+                    .interestWeight(0.5)
+                    .lifestyleWeight(0.0)
+                    .paceWeight(0.0)
+                    .responseWeight(0.0)
+                    .build());
         }
     }
 }

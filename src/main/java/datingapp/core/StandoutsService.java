@@ -97,10 +97,15 @@ public class StandoutsService {
     /** Score a candidate for standout ranking. */
     private ScoredCandidate scoreCandidate(User seeker, User candidate) {
         // 1. Distance score (20%)
-        double distanceKm =
-                GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), candidate.getLat(), candidate.getLon());
-        double distanceScore =
-                seeker.getMaxDistanceKm() > 0 ? Math.max(0, 1.0 - (distanceKm / seeker.getMaxDistanceKm())) : 0.5;
+        double distanceKm;
+        if (seeker.hasLocationSet() && candidate.hasLocationSet()) {
+            distanceKm = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), candidate.getLat(), candidate.getLon());
+        } else {
+            distanceKm = -1;
+        }
+        double distanceScore = distanceKm >= 0 && seeker.getMaxDistanceKm() > 0
+                ? Math.max(0, 1.0 - (distanceKm / seeker.getMaxDistanceKm()))
+                : 0.5;
 
         // 2. Age score (15%)
         int ageDiff = Math.abs(seeker.getAge() - candidate.getAge());
@@ -251,7 +256,7 @@ public class StandoutsService {
             reasons.add("Shared interests");
         }
 
-        if (distanceKm < config.nearbyDistanceKm()) {
+        if (distanceKm >= 0 && distanceKm < config.nearbyDistanceKm()) {
             reasons.add("Lives nearby");
         }
 
