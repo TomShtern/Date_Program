@@ -43,7 +43,10 @@ public interface JdbiReportStorage extends ReportStorage {
     @Override
     boolean hasReported(@Bind("reporterId") UUID reporterId, @Bind("reportedUserId") UUID reportedUserId);
 
-    @SqlQuery("SELECT * FROM reports WHERE reported_user_id = :userId ORDER BY created_at DESC")
+    @SqlQuery("""
+            SELECT id, reporter_id, reported_user_id, reason, description, created_at
+            FROM reports WHERE reported_user_id = :userId ORDER BY created_at DESC
+            """)
     @Override
     List<Report> getReportsAgainst(@Bind("userId") UUID userId);
 

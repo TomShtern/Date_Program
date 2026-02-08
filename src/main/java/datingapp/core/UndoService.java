@@ -24,9 +24,12 @@ import java.util.UUID;
  * Phase 1 feature: Undo Last Swipe
  *
  * <p>
- * TRANSACTION SUPPORT: When a TransactionExecutor is provided, Like and Match deletions
- * are executed atomically within a database transaction, ensuring data consistency.
- * If no TransactionExecutor is provided, operations fall back to non-atomic deletes.
+ * TRANSACTION SUPPORT: When a TransactionExecutor is provided, Like and Match
+ * deletions
+ * are executed atomically within a database transaction, ensuring data
+ * consistency.
+ * If no TransactionExecutor is provided, operations fall back to non-atomic
+ * deletes.
  */
 public class UndoService {
 
@@ -35,7 +38,7 @@ public class UndoService {
     private final UndoState.Storage undoStorage;
     private final AppConfig config;
     private final Clock clock;
-    private TransactionExecutor transactionExecutor;
+    private volatile TransactionExecutor transactionExecutor;
 
     /**
      * Constructor for UndoService with persistent storage.
@@ -66,7 +69,8 @@ public class UndoService {
 
     /**
      * Sets the transaction executor for atomic undo operations.
-     * When set, undo operations will be performed atomically within a database transaction.
+     * When set, undo operations will be performed atomically within a database
+     * transaction.
      *
      * @param transactionExecutor The executor for atomic operations
      */
@@ -139,7 +143,8 @@ public class UndoService {
      * the Like and any resulting Match. Clears the undo state so the same action
      * cannot be undone twice.
      *
-     * <p>When a TransactionExecutor is configured, deletions are performed atomically.
+     * <p>
+     * When a TransactionExecutor is configured, deletions are performed atomically.
      *
      * @param userId The user requesting the undo
      * @return UndoResult with success status, message, and side effects
@@ -149,7 +154,7 @@ public class UndoService {
 
         // Validation: No undo state
         if (optState.isEmpty()) {
-            return UndoResult.failure(ErrorMessages.NO_SWIPE_TO_UNDO);
+            return UndoResult.failure("No swipe to undo");
         }
 
         UndoState state = optState.get();
@@ -157,7 +162,7 @@ public class UndoService {
         // Validation: Window expired
         if (state.isExpired(Instant.now(clock))) {
             undoStorage.delete(userId);
-            return UndoResult.failure(ErrorMessages.UNDO_WINDOW_EXPIRED);
+            return UndoResult.failure("Undo window expired");
         }
 
         // Execute undo - use transaction if available
@@ -169,7 +174,7 @@ public class UndoService {
                 boolean success =
                         transactionExecutor.atomicUndoDelete(state.like().id(), state.matchId());
                 if (!success) {
-                    return UndoResult.failure(ErrorMessages.LIKE_NOT_FOUND);
+                    return UndoResult.failure("Like not found in database");
                 }
             } else {
                 // Fallback to non-atomic deletes (backward compatibility)
@@ -186,7 +191,7 @@ public class UndoService {
 
         } catch (Exception e) {
             // Return error but don't clear state (user might retry)
-            return UndoResult.failure(ErrorMessages.UNDO_FAILED.formatted(e.getMessage()));
+            return UndoResult.failure("Failed to undo: %s".formatted(e.getMessage()));
         }
     }
 

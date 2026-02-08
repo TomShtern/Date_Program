@@ -10,6 +10,8 @@ import java.sql.*;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 class MapperHelperTest {
@@ -1013,6 +1015,7 @@ class MapperHelperTest {
     }
 
     @Test
+    @DisplayName("readCsvAsList returns correct values with trimming")
     void testReadCsvAsList() throws SQLException {
         MockResultSet rs = new MockResultSet();
         rs.setValue("A, B, , C ");
@@ -1020,12 +1023,12 @@ class MapperHelperTest {
         List<String> result = MapperHelper.readCsvAsList(rs, "col");
         assertEquals(List.of("A", "B", "C"), result);
 
-        // Verify mutability
-        result.add("D");
-        assertTrue(result.contains("D"));
+        // Verify immutability (NS-002)
+        assertThrows(UnsupportedOperationException.class, () -> result.add("D"));
     }
 
     @Test
+    @DisplayName("readCsvAsList returns empty immutable list for blank input")
     void testReadCsvAsListEmpty() throws SQLException {
         MockResultSet rs = new MockResultSet();
         rs.setValue("  ");
@@ -1033,8 +1036,42 @@ class MapperHelperTest {
         List<String> result = MapperHelper.readCsvAsList(rs, "col");
         assertTrue(result.isEmpty());
 
-        // Verify mutability
-        result.add("A");
-        assertEquals(1, result.size());
+        // Verify immutability (NS-002)
+        assertThrows(UnsupportedOperationException.class, () -> result.add("A"));
+    }
+
+    @Test
+    @DisplayName("readCsvAsList returns empty immutable list for null input")
+    void testReadCsvAsListNull() throws SQLException {
+        MockResultSet rs = new MockResultSet();
+        rs.setValue(null);
+
+        List<String> result = MapperHelper.readCsvAsList(rs, "col");
+        assertTrue(result.isEmpty());
+        assertThrows(UnsupportedOperationException.class, () -> result.add("A"));
+    }
+
+    @Nested
+    @DisplayName("readEnum validation")
+    class ReadEnumValidation {
+
+        @Test
+        @DisplayName("throws NullPointerException for null enumType")
+        void throwsOnNullEnumType() {
+            MockResultSet rs = new MockResultSet();
+            rs.setValue("VAL1");
+
+            assertThrows(NullPointerException.class, () -> MapperHelper.readEnum(rs, "col", null));
+        }
+
+        @Test
+        @DisplayName("returns null for invalid enum value (logs warning)")
+        void returnsNullForInvalidValue() throws SQLException {
+            MockResultSet rs = new MockResultSet();
+            rs.setValue("NONEXISTENT");
+
+            TestEnum result = MapperHelper.readEnum(rs, "col", TestEnum.class);
+            assertNull(result, "Invalid enum values should return null");
+        }
     }
 }

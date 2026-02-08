@@ -118,7 +118,8 @@ public class DailyService {
         LocalDate today = getToday();
 
         // Use CandidateFinder to get filtered candidates
-        // This filters by: self, active state, blocks, already-interacted, mutual gender,
+        // This filters by: self, active state, blocks, already-interacted, mutual
+        // gender,
         // mutual age, distance, dealbreakers
         List<User> candidates;
         if (candidateFinder != null) {
@@ -138,23 +139,33 @@ public class DailyService {
             return Optional.empty();
         }
 
-        String cacheKey = seeker.getId() + "_" + today;
-        UUID cachedPickId = cachedDailyPicks.get(cacheKey);
-        User picked = null;
-        if (cachedPickId != null) {
-            picked = candidates.stream()
-                    .filter(candidate -> candidate.getId().equals(cachedPickId))
-                    .findFirst()
-                    .orElse(null);
-        }
-
-        // Deterministic random selection based on date + user ID
+        // Deterministic random selection based on date + user ID (TS-006: atomic cache
+        // update)
         long seed = today.toEpochDay() + seeker.getId().hashCode();
         Random pickRandom = new Random(seed);
+
+        String cacheKey = seeker.getId() + "_" + today;
+
+        // Use computeIfAbsent for atomic check-and-populate (eliminates race condition)
+        UUID pickedId = cachedDailyPicks.computeIfAbsent(
+                cacheKey,
+                _ -> candidates.get(pickRandom.nextInt(candidates.size())).getId());
+
+        // Find the cached user in current candidates (may have been filtered out since
+        // caching)
+        User picked = candidates.stream()
+                .filter(candidate -> candidate.getId().equals(pickedId))
+                .findFirst()
+                .orElse(null);
+
         if (picked == null) {
+            // Cached pick no longer in candidate list (e.g., user was blocked since
+            // caching)
+            cachedDailyPicks.remove(cacheKey);
             picked = candidates.get(pickRandom.nextInt(candidates.size()));
             cachedDailyPicks.put(cacheKey, picked.getId());
         }
+
         long reasonSeed =
                 seed ^ picked.getId().getMostSignificantBits() ^ picked.getId().getLeastSignificantBits();
         Random reasonRandom = new Random(reasonSeed);

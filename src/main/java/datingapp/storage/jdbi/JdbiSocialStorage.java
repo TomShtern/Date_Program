@@ -180,7 +180,7 @@ public interface JdbiSocialStorage extends SocialStorage {
             var toUserId = MapperHelper.readUuid(rs, "to_user_id");
             var createdAt = MapperHelper.readInstant(rs, "created_at");
             var status = MapperHelper.readEnum(rs, "status", Status.class);
-            var respondedAt = MapperHelper.readInstantNullable(rs, "responded_at");
+            var respondedAt = MapperHelper.readInstant(rs, "responded_at");
 
             return new FriendRequest(id, fromUserId, toUserId, createdAt, status, respondedAt);
         }

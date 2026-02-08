@@ -9,11 +9,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Unified session management for both CLI and JavaFX interfaces.
  *
- * <p>This singleton replaces the separate CliUtilities.UserSession and ViewModelFactory.UISession
- * with a single source of truth. Supports both plain access (CLI) and listener-based binding
+ * <p>
+ * This singleton replaces the separate CliUtilities.UserSession and
+ * ViewModelFactory.UISession
+ * with a single source of truth. Supports both plain access (CLI) and
+ * listener-based binding
  * (JavaFX).
  *
- * <p>Thread-safe: all methods accessing mutable state are synchronized,
+ * <p>
+ * Thread-safe: all methods accessing mutable state are synchronized,
  * and CopyOnWriteArrayList provides safe listener iteration.
  */
 @SuppressWarnings("java:S6548")
@@ -67,7 +71,8 @@ public final class AppSession {
                 listener.accept(user);
             } catch (Exception e) {
                 if (LOGGER.isWarnEnabled()) {
-                    LOGGER.warn("Listener threw exception: {}", e.getMessage());
+                    // Log full exception with stack trace for debugging (EH-002 fix)
+                    LOGGER.warn("Session listener threw exception", e);
                 }
             }
         }

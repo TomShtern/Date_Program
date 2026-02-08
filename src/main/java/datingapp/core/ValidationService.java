@@ -15,6 +15,17 @@ import java.util.Objects;
  */
 public class ValidationService {
 
+    // Error message constants (inlined from ErrorMessages.java)
+    private static final String NAME_EMPTY = "Name cannot be empty";
+    private static final String NAME_TOO_LONG = "Name too long (max %d chars)";
+    private static final String AGE_TOO_YOUNG = "Must be %d or older";
+    private static final String AGE_INVALID = "Invalid age";
+    private static final String HEIGHT_TOO_SHORT = "Height too short (min %dcm)";
+    private static final String HEIGHT_TOO_TALL = "Height too tall (max %dcm)";
+    private static final String DISTANCE_TOO_SHORT = "Distance must be at least %dkm";
+    private static final String DISTANCE_TOO_FAR = "Distance too far (max %dkm)";
+    private static final String BIO_TOO_LONG = "Bio too long (max %d chars)";
+
     /** Shared configuration for validation thresholds. */
     private final AppConfig config;
 
@@ -62,10 +73,10 @@ public class ValidationService {
      */
     public ValidationResult validateName(String name) {
         if (name == null || name.isBlank()) {
-            return ValidationResult.failure(ErrorMessages.NAME_EMPTY);
+            return ValidationResult.failure(NAME_EMPTY);
         }
         if (name.length() > config.maxNameLength()) {
-            return ValidationResult.failure(ErrorMessages.NAME_TOO_LONG.formatted(config.maxNameLength()));
+            return ValidationResult.failure(NAME_TOO_LONG.formatted(config.maxNameLength()));
         }
         return ValidationResult.success();
     }
@@ -78,10 +89,10 @@ public class ValidationService {
      */
     public ValidationResult validateAge(int age) {
         if (age < config.minAge()) {
-            return ValidationResult.failure(ErrorMessages.AGE_TOO_YOUNG.formatted(config.minAge()));
+            return ValidationResult.failure(AGE_TOO_YOUNG.formatted(config.minAge()));
         }
         if (age > config.maxAge()) {
-            return ValidationResult.failure(ErrorMessages.AGE_INVALID);
+            return ValidationResult.failure(AGE_INVALID);
         }
         return ValidationResult.success();
     }
@@ -94,10 +105,10 @@ public class ValidationService {
      */
     public ValidationResult validateHeight(int heightCm) {
         if (heightCm < config.minHeightCm()) {
-            return ValidationResult.failure(ErrorMessages.HEIGHT_TOO_SHORT.formatted(config.minHeightCm()));
+            return ValidationResult.failure(HEIGHT_TOO_SHORT.formatted(config.minHeightCm()));
         }
         if (heightCm > config.maxHeightCm()) {
-            return ValidationResult.failure(ErrorMessages.HEIGHT_TOO_TALL.formatted(config.maxHeightCm()));
+            return ValidationResult.failure(HEIGHT_TOO_TALL.formatted(config.maxHeightCm()));
         }
         return ValidationResult.success();
     }
@@ -110,10 +121,10 @@ public class ValidationService {
      */
     public ValidationResult validateDistance(int distanceKm) {
         if (distanceKm < config.minDistanceKm()) {
-            return ValidationResult.failure(ErrorMessages.DISTANCE_TOO_SHORT.formatted(config.minDistanceKm()));
+            return ValidationResult.failure(DISTANCE_TOO_SHORT.formatted(config.minDistanceKm()));
         }
         if (distanceKm > config.maxDistanceKm()) {
-            return ValidationResult.failure(ErrorMessages.DISTANCE_TOO_FAR.formatted(config.maxDistanceKm()));
+            return ValidationResult.failure(DISTANCE_TOO_FAR.formatted(config.maxDistanceKm()));
         }
         return ValidationResult.success();
     }
@@ -129,7 +140,7 @@ public class ValidationService {
             return ValidationResult.success();
         }
         if (bio.length() > config.maxBioLength()) {
-            return ValidationResult.failure(ErrorMessages.BIO_TOO_LONG.formatted(config.maxBioLength()));
+            return ValidationResult.failure(BIO_TOO_LONG.formatted(config.maxBioLength()));
         }
         return ValidationResult.success();
     }

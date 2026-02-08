@@ -48,7 +48,10 @@ public interface JdbiBlockStorage extends BlockStorage {
     @Override
     Set<UUID> getBlockedUserIds(@Bind("userId") UUID userId);
 
-    @SqlQuery("SELECT * FROM blocks WHERE blocker_id = :blockerId")
+    @SqlQuery("""
+            SELECT id, blocker_id, blocked_id, created_at
+            FROM blocks WHERE blocker_id = :blockerId
+            """)
     @Override
     List<Block> findByBlocker(@Bind("blockerId") UUID blockerId);
 

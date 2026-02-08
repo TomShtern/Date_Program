@@ -5,11 +5,10 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +44,9 @@ public final class MapperHelper {
     /**
      * Reads an Instant from a TIMESTAMP column.
      * Returns null if column is NULL.
+     *
+     * <p>Precision: Uses {@code Timestamp.toInstant()} which preserves nanosecond
+     * precision from the JDBC driver.</p>
      */
     public static Instant readInstant(ResultSet rs, String column) throws SQLException {
         Timestamp ts = rs.getTimestamp(column);
@@ -63,8 +65,11 @@ public final class MapperHelper {
     /**
      * Reads an enum from a VARCHAR column.
      * Returns null if column is NULL or if the value is invalid.
+     *
+     * @throws NullPointerException if enumType is null
      */
     public static <E extends Enum<E>> E readEnum(ResultSet rs, String column, Class<E> enumType) throws SQLException {
+        Objects.requireNonNull(enumType, "enumType cannot be null");
         String value = rs.getString(column);
         if (value == null) {
             return null;
@@ -72,9 +77,8 @@ public final class MapperHelper {
         try {
             return Enum.valueOf(enumType, value);
         } catch (IllegalArgumentException e) {
-            if (logger.isDebugEnabled()) {
-                logger.debug(
-                        "Skipping invalid {} value '{}' in column '{}'", enumType.getSimpleName(), value, column, e);
+            if (logger.isWarnEnabled()) {
+                logger.warn("Skipping invalid {} value '{}' in column '{}'", enumType.getSimpleName(), value, column);
             }
             return null;
         }
@@ -99,33 +103,17 @@ public final class MapperHelper {
     }
 
     /**
-     * Reads a comma-separated string as a List.
-     * Returns empty mutable ArrayList if column is NULL or empty.
+     * Reads a comma-separated string as an unmodifiable List.
+     * Returns empty list if column is NULL or blank.
      */
     public static List<String> readCsvAsList(ResultSet rs, String column) throws SQLException {
         String csv = rs.getString(column);
         if (csv == null || csv.isBlank()) {
-            return new ArrayList<>();
+            return List.of();
         }
         return Arrays.stream(csv.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
-                .collect(Collectors.toCollection(ArrayList::new));
-    }
-
-    /**
-     * Alias for readInstant() - reads nullable Instant from TIMESTAMP column.
-     * Returns null if column is NULL.
-     */
-    public static Instant readInstantNullable(ResultSet rs, String column) throws SQLException {
-        return readInstant(rs, column);
-    }
-
-    /**
-     * Alias for readInstant() - reads optional Instant from TIMESTAMP column.
-     * Returns null if column is NULL.
-     */
-    public static Instant readInstantOptional(ResultSet rs, String column) throws SQLException {
-        return readInstant(rs, column);
+                .toList();
     }
 }

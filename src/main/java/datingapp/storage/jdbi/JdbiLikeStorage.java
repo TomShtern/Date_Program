@@ -27,7 +27,8 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 public interface JdbiLikeStorage extends LikeStorage {
 
     @SqlQuery("""
-      SELECT * FROM likes
+      SELECT id, who_likes, who_got_liked, direction, created_at
+      FROM likes
       WHERE who_likes = :fromUserId AND who_got_liked = :toUserId
       """)
     @Override

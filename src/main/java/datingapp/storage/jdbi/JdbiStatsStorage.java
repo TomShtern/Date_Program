@@ -89,11 +89,10 @@ public interface JdbiStatsStorage extends StatsStorage {
                 s.blocks_given, s.blocks_received, s.reports_given, s.reports_received,
                 s.reciprocity_score, s.selectiveness_score, s.attractiveness_score
             FROM user_stats s
-            INNER JOIN (
-                SELECT user_id, MAX(computed_at) as max_date
-                FROM user_stats
-                GROUP BY user_id
-            ) latest ON s.user_id = latest.user_id AND s.computed_at = latest.max_date
+            WHERE NOT EXISTS (
+                SELECT 1 FROM user_stats s2
+                WHERE s2.user_id = s.user_id AND s2.computed_at > s.computed_at
+            )
             """)
     @RegisterRowMapper(UserStatsMapper.class)
     @Override

@@ -14,17 +14,17 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Configuration precedence (highest to lowest):
  * <ol>
- *   <li>Environment variables (DATING_APP_* prefix)</li>
- *   <li>JSON config file (./config/app-config.json)</li>
- *   <li>Built-in defaults (AppConfig.defaults())</li>
+ * <li>Environment variables (DATING_APP_* prefix)</li>
+ * <li>JSON config file (./config/app-config.json)</li>
+ * <li>Built-in defaults (AppConfig.defaults())</li>
  * </ol>
  *
  * <p>Example JSON:
  * <pre>{@code
  * {
- *   "dailyLikeLimit": 50,
- *   "autoBanThreshold": 5,
- *   "maxDistanceKm": 100
+ * "dailyLikeLimit": 50,
+ * "autoBanThreshold": 5,
+ * "maxDistanceKm": 100
  * }
  * }</pre>
  *
@@ -66,7 +66,8 @@ public final class ConfigLoader {
                 applyJsonConfig(builder, json);
                 logInfo("Loaded configuration from: {}", configPath);
             } catch (IOException ex) {
-                logWarn("Failed to load config file {}: {}", configPath, ex.getMessage());
+                // EH-005 fix: Include stack trace for debugging
+                logWarn("Failed to load config file {}", configPath, ex);
             }
         } else {
             logInfo("Config file not found at {}, using defaults", configPath);
@@ -163,7 +164,8 @@ public final class ConfigLoader {
                 builder.userTimeZone(ZoneId.of(tz));
             }
         } catch (IOException ex) {
-            logWarn("Failed to parse JSON config: {}", ex.getMessage());
+            // EH-006 fix: Include stack trace for debugging
+            logWarn("Failed to parse JSON config", ex);
         }
     }
 
@@ -187,7 +189,8 @@ public final class ConfigLoader {
             try {
                 builder.userTimeZone(ZoneId.of(tz));
             } catch (Exception ex) {
-                logWarn("Invalid timezone in env var: {}", tz);
+                // EH-007 fix: Include env var name in warning
+                logWarn("Invalid timezone in env var {}{}: {}", ENV_PREFIX, "USER_TIME_ZONE", tz);
             }
         }
     }

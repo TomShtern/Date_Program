@@ -20,8 +20,8 @@ public final class DatabaseManager {
     private static final Pattern SQL_IDENTIFIER = Pattern.compile("[A-Za-z]\\w*");
 
     private static DatabaseManager instance;
-    private HikariDataSource dataSource;
-    private boolean initialized = false;
+    private volatile HikariDataSource dataSource;
+    private volatile boolean initialized = false;
 
     private static final String TABLE_USERS = "users";
     private static final String COL_ID = "id";
@@ -45,7 +45,7 @@ public final class DatabaseManager {
         return instance;
     }
 
-    private void initializePool() {
+    private synchronized void initializePool() {
         if (dataSource != null) {
             return;
         }
@@ -358,20 +358,28 @@ public final class DatabaseManager {
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_daily_picks_user ON daily_pick_views(user_id)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_profile_views_viewer ON profile_views(viewer_id)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_friend_req_to_status ON friend_requests(to_user_id, status)");
     }
 
     private boolean isVersionApplied(Statement stmt, int version) throws SQLException {
         try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = " + version)) {
             return rs.next() && rs.getInt(1) > 0;
-        } catch (SQLException _) {
-            // Table might not exist during very first migration
-            return false;
+        } catch (SQLException e) {
+            if (isMissingTable(e)) {
+                // Table doesn't exist during very first migration — expected
+                return false;
+            }
+            throw e; // Rethrow real SQL errors
         }
     }
 
     /**
      * Creates messaging-related tables (conversations, messages).
      * Consolidated from H2ConversationStorage and H2MessageStorage.
+     *
+     * <p>Note: Conversations and messages are retained after match ends (soft delete model).
+     * CleanupService can be extended to purge old conversations beyond retention period.
      */
     private void createMessagingSchema(Statement stmt) throws SQLException {
         // Conversations table

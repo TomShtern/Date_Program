@@ -21,6 +21,13 @@ import java.util.UUID;
  */
 public class MessagingService {
 
+    // Error message constants (inlined from ErrorMessages.java)
+    private static final String SENDER_NOT_FOUND = "Sender not found or inactive";
+    private static final String RECIPIENT_NOT_FOUND = "Recipient not found or inactive";
+    private static final String NO_ACTIVE_MATCH = "Cannot message: no active match";
+    private static final String EMPTY_MESSAGE = "Message cannot be empty";
+    private static final String MESSAGE_TOO_LONG = "Message too long (max %d characters)";
+
     private static final AppConfig CONFIG = AppConfig.defaults();
 
     private final MessagingStorage messagingStorage;
@@ -45,13 +52,13 @@ public class MessagingService {
         // Validate sender exists and is active
         User sender = userStorage.get(senderId);
         if (sender == null || sender.getState() != UserState.ACTIVE) {
-            return SendResult.failure(ErrorMessages.SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
+            return SendResult.failure(SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
         // Validate recipient exists and is active
         User recipient = userStorage.get(recipientId);
         if (recipient == null || recipient.getState() != UserState.ACTIVE) {
-            return SendResult.failure(ErrorMessages.RECIPIENT_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
+            return SendResult.failure(RECIPIENT_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
         // Verify active match exists
@@ -59,18 +66,17 @@ public class MessagingService {
         Optional<Match> matchOpt = matchStorage.get(matchId);
 
         if (matchOpt.isEmpty() || !matchOpt.get().canMessage()) {
-            return SendResult.failure(ErrorMessages.NO_ACTIVE_MATCH, SendResult.ErrorCode.NO_ACTIVE_MATCH);
+            return SendResult.failure(NO_ACTIVE_MATCH, SendResult.ErrorCode.NO_ACTIVE_MATCH);
         }
 
         // Validate content
         if (content == null || content.isBlank()) {
-            return SendResult.failure(ErrorMessages.EMPTY_MESSAGE, SendResult.ErrorCode.EMPTY_MESSAGE);
+            return SendResult.failure(EMPTY_MESSAGE, SendResult.ErrorCode.EMPTY_MESSAGE);
         }
         content = content.trim();
         if (content.length() > Message.MAX_LENGTH) {
             return SendResult.failure(
-                    ErrorMessages.MESSAGE_TOO_LONG.formatted(Message.MAX_LENGTH),
-                    SendResult.ErrorCode.MESSAGE_TOO_LONG);
+                    MESSAGE_TOO_LONG.formatted(Message.MAX_LENGTH), SendResult.ErrorCode.MESSAGE_TOO_LONG);
         }
 
         // Get or create conversation

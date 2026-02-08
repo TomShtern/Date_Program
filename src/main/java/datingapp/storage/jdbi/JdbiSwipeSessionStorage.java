@@ -127,7 +127,7 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
             UUID userId = MapperHelper.readUuid(rs, "user_id");
             var startedAt = MapperHelper.readInstant(rs, "started_at");
             var lastActivityAt = MapperHelper.readInstant(rs, "last_activity_at");
-            var endedAt = MapperHelper.readInstantOptional(rs, "ended_at");
+            var endedAt = MapperHelper.readInstant(rs, "ended_at");
             SwipeSession.State state = SwipeSession.State.valueOf(rs.getString("state"));
             int swipeCount = rs.getInt("swipe_count");
             int likeCount = rs.getInt("like_count");

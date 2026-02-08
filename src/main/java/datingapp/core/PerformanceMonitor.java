@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.LongAdder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,14 +11,18 @@ import org.slf4j.LoggerFactory;
  * Simple performance monitoring utility for tracking operation timings.
  * Thread-safe and designed for minimal overhead.
  *
- * <p>Usage:
+ * <p>
+ * Usage:
+ *
  * <pre>
  * try (var timer = PerformanceMonitor.startTimer("CandidateFinder.findCandidates")) {
  *     // ... operation
  * }
  * </pre>
  *
- * <p>METRICS can be queried and logged periodically:
+ * <p>
+ * METRICS can be queried and logged periodically:
+ *
  * <pre>
  * PerformanceMonitor.logMetrics();
  * PerformanceMonitor.reset();
@@ -34,9 +37,11 @@ public final class PerformanceMonitor {
     private PerformanceMonitor() {} // Utility class
 
     /**
-     * Starts a timer for an operation. Use with try-with-resources for automatic completion.
+     * Starts a timer for an operation. Use with try-with-resources for automatic
+     * completion.
      *
-     * @param operationName Name of the operation (e.g., "CandidateFinder.findCandidates")
+     * @param operationName Name of the operation (e.g.,
+     *                      "CandidateFinder.findCandidates")
      * @return A Timer that records duration when closed
      */
     public static Timer startTimer(String operationName) {
@@ -47,7 +52,7 @@ public final class PerformanceMonitor {
      * Records a completed operation.
      *
      * @param operationName Name of the operation
-     * @param durationMs Duration in milliseconds
+     * @param durationMs    Duration in milliseconds
      */
     public static void record(String operationName, long durationMs) {
         if (METRICS.size() >= MAX_METRICS_SIZE && !METRICS.containsKey(operationName)) {
@@ -103,7 +108,8 @@ public final class PerformanceMonitor {
     }
 
     /**
-     * Timer for a single operation. Implements AutoCloseable for try-with-resources.
+     * Timer for a single operation. Implements AutoCloseable for
+     * try-with-resources.
      */
     public static class Timer implements AutoCloseable {
         private final String operationName;
@@ -146,11 +152,12 @@ public final class PerformanceMonitor {
 
     /**
      * Aggregated METRICS for a single operation type.
+     * All access is synchronized for thread safety (TS-008 simplification).
      */
     public static class OperationMetrics {
         private final String name;
-        private final LongAdder count = new LongAdder();
-        private final LongAdder totalMs = new LongAdder();
+        private long count;
+        private long totalMs;
         private long minMs = Long.MAX_VALUE;
         private long maxMs = Long.MIN_VALUE;
 
@@ -159,35 +166,34 @@ public final class PerformanceMonitor {
         }
 
         synchronized void record(long durationMs) {
-            count.increment();
-            totalMs.add(durationMs);
+            count++;
+            totalMs += durationMs;
             minMs = Math.min(minMs, durationMs);
             maxMs = Math.max(maxMs, durationMs);
         }
 
-        public String getName() {
+        public synchronized String getName() {
             return name;
         }
 
-        public long getCount() {
-            return count.sum();
+        public synchronized long getCount() {
+            return count;
         }
 
-        public long getTotalMs() {
-            return totalMs.sum();
+        public synchronized long getTotalMs() {
+            return totalMs;
         }
 
-        public long getAverageMs() {
-            long c = count.sum();
-            return c > 0 ? totalMs.sum() / c : 0;
+        public synchronized long getAverageMs() {
+            return count > 0 ? totalMs / count : 0;
         }
 
         public synchronized long getMinMs() {
-            return count.sum() > 0 ? minMs : 0;
+            return count > 0 ? minMs : 0;
         }
 
         public synchronized long getMaxMs() {
-            return count.sum() > 0 ? maxMs : 0;
+            return count > 0 ? maxMs : 0;
         }
     }
 }

@@ -8,7 +8,6 @@ import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,6 +26,8 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 @RegisterRowMapper(JdbiMatchStorage.Mapper.class)
 public interface JdbiMatchStorage extends MatchStorage {
 
+    String MATCH_COLUMNS = "id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at";
+
     @SqlUpdate("""
             MERGE INTO matches (id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at)
             KEY (id)
@@ -42,7 +43,10 @@ public interface JdbiMatchStorage extends MatchStorage {
     @Override
     void update(@BindBean Match match);
 
-    @SqlQuery("SELECT * FROM matches WHERE id = :matchId AND deleted_at IS NULL")
+    @SqlQuery("""
+            SELECT id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
+            FROM matches WHERE id = :matchId AND deleted_at IS NULL
+            """)
     @Override
     Optional<Match> get(@Bind("matchId") String matchId);
 
@@ -55,42 +59,28 @@ public interface JdbiMatchStorage extends MatchStorage {
     boolean exists(@Bind("matchId") String matchId);
 
     @SqlQuery("""
-            SELECT * FROM matches
+            SELECT id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
+            FROM matches
             WHERE user_a = :userId AND state = 'ACTIVE' AND deleted_at IS NULL
-            """)
-    List<Match> getActiveMatchesForUserA(@Bind("userId") UUID userId);
-
-    @SqlQuery("""
-            SELECT * FROM matches
+            UNION ALL
+            SELECT id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
+            FROM matches
             WHERE user_b = :userId AND state = 'ACTIVE' AND deleted_at IS NULL
             """)
-    List<Match> getActiveMatchesForUserB(@Bind("userId") UUID userId);
-
     @Override
-    default List<Match> getActiveMatchesFor(UUID userId) {
-        List<Match> fromA = getActiveMatchesForUserA(userId);
-        List<Match> fromB = getActiveMatchesForUserB(userId);
-        List<Match> combined = new ArrayList<>(fromA.size() + fromB.size());
-        combined.addAll(fromA);
-        combined.addAll(fromB);
-        return combined;
-    }
+    List<Match> getActiveMatchesFor(@Bind("userId") UUID userId);
 
-    @SqlQuery("SELECT * FROM matches WHERE user_a = :userId AND deleted_at IS NULL")
-    List<Match> getAllMatchesForUserA(@Bind("userId") UUID userId);
-
-    @SqlQuery("SELECT * FROM matches WHERE user_b = :userId AND deleted_at IS NULL")
-    List<Match> getAllMatchesForUserB(@Bind("userId") UUID userId);
-
+    @SqlQuery("""
+            SELECT id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
+            FROM matches
+            WHERE user_a = :userId AND deleted_at IS NULL
+            UNION ALL
+            SELECT id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
+            FROM matches
+            WHERE user_b = :userId AND deleted_at IS NULL
+            """)
     @Override
-    default List<Match> getAllMatchesFor(UUID userId) {
-        List<Match> fromA = getAllMatchesForUserA(userId);
-        List<Match> fromB = getAllMatchesForUserB(userId);
-        List<Match> combined = new ArrayList<>(fromA.size() + fromB.size());
-        combined.addAll(fromA);
-        combined.addAll(fromB);
-        return combined;
-    }
+    List<Match> getAllMatchesFor(@Bind("userId") UUID userId);
 
     @SqlUpdate("DELETE FROM matches WHERE id = :matchId")
     @Override

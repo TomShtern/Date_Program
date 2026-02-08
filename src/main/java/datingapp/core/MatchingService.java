@@ -153,8 +153,17 @@ public class MatchingService {
                 if (logger.isWarnEnabled()) {
                     logger.warn("Match save conflict for {}: {}", match.getId(), ex.getMessage());
                 }
-                matchResult =
-                        matchStorage.get(match.getId()).filter(existing -> existing.getState() == Match.State.ACTIVE);
+                // Guard fallback query (EH-004 fix)
+                try {
+                    matchResult = matchStorage
+                            .get(match.getId())
+                            .filter(existing -> existing.getState() == Match.State.ACTIVE);
+                } catch (RuntimeException fallbackEx) {
+                    if (logger.isErrorEnabled()) {
+                        logger.error("Fallback match lookup also failed for {}", match.getId(), fallbackEx);
+                    }
+                    // matchResult remains empty — safe to continue
+                }
             }
         }
 
@@ -175,8 +184,8 @@ public class MatchingService {
      * Checks daily limits, records the interaction, and returns the result.
      *
      * @param currentUser The user performing the swipe
-     * @param candidate The candidate being swiped on
-     * @param liked True if liking, false if passing
+     * @param candidate   The candidate being swiped on
+     * @param liked       True if liking, false if passing
      * @return SwipeResult containing success status and match information
      */
     public SwipeResult processSwipe(User currentUser, User candidate, boolean liked) {
