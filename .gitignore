@@ -9,7 +9,6 @@
 *log*.txt
 *_output.txt
 *_run.txt
-checkstyle_full_output.txt
 
 # Package files
 *.jar
@@ -44,10 +43,6 @@ buildNumber.properties
 settings-security.xml
 .m2/repository/
 
-# Generated sources (covered by target/ but included for completeness)
-generated-sources/
-generated-test-sources/
-
 # IDE / editor files
 .idea/
 *.iml
@@ -61,8 +56,6 @@ generated-test-sources/
 .classpath.generated
 .factorypath
 out/
-.vscode/settings.json
-.vscode/eclipse-settings.prefs
 
 # IDEA Diagnostics folder
 IDEA_Diagnostics/
@@ -113,12 +106,14 @@ $RECYCLE.BIN/
 *.sqlite
 *.db
 
-# Code coverage & analysis
+# Code coverage & analysis reports
 coverage/
 jacoco/
 .sonar/
 .sonarlint/
 site/
+*.sarif
+*.sarif.json
 
 # Temporary & backup files
 *.swp
@@ -127,10 +122,6 @@ site/
 *.bak
 *.tmp
 *.orig
-
-# Workspace-specific build/test outputs
-compile_output.txt
-test_output.txt
 
 # Claude Artifacts
 cUserstom7sAppDataLocalTempclaude-*

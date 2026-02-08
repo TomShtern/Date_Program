@@ -4,6 +4,7 @@ import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
 import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
+import datingapp.core.EnumSetUtil;
 import datingapp.core.Gender;
 import datingapp.core.PacePreferences;
 import datingapp.core.PacePreferences.CommunicationStyle;
@@ -21,7 +22,6 @@ import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -294,13 +294,11 @@ public class ProfileHandler {
             }
         }
 
-        return result.isEmpty() ? EnumSet.noneOf(Gender.class) : EnumSet.copyOf(result);
+        return EnumSetUtil.safeCopy(result, Gender.class);
     }
 
     private void promptInterests(User currentUser) {
-        Set<Interest> interestSet = currentUser.getInterests() == null
-                ? EnumSet.noneOf(Interest.class)
-                : EnumSet.copyOf(currentUser.getInterests());
+        Set<Interest> interestSet = EnumSetUtil.safeCopy(currentUser.getInterests(), Interest.class);
         boolean editing = true;
 
         while (editing) {

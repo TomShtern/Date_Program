@@ -15,7 +15,7 @@ import java.util.UUID;
  * always the
  * lexicographically smaller UUID.
  */
-public class Match {
+public class Match implements SoftDeletable {
 
     /** Represents the current state of a match. */
     public static enum State {
@@ -47,6 +47,7 @@ public class Match {
     private Instant endedAt; // When match was ended (nullable)
     private UUID endedBy; // Who ended it (nullable)
     private ArchiveReason endReason; // Why it ended (nullable) - nested enum in Match
+    private Instant deletedAt; // Soft-delete timestamp (nullable)
 
     /** Full constructor for reconstitution from storage. */
     public Match(
@@ -113,7 +114,7 @@ public class Match {
         }
 
         String id = userA + "_" + userB;
-        return new Match(id, userA, userB, Instant.now(), State.ACTIVE, null, null, null);
+        return new Match(id, userA, userB, AppClock.now(), State.ACTIVE, null, null, null);
     }
 
     /** Generates the deterministic match ID for two user UUIDs. */
@@ -144,7 +145,7 @@ public class Match {
             throw new IllegalArgumentException("User is not part of this match");
         }
         this.state = State.UNMATCHED;
-        this.endedAt = Instant.now();
+        this.endedAt = AppClock.now();
         this.endedBy = userId;
         this.endReason = ArchiveReason.UNMATCH;
     }
@@ -156,7 +157,7 @@ public class Match {
         }
         // Can block even if not active (defensive)
         this.state = State.BLOCKED;
-        this.endedAt = Instant.now();
+        this.endedAt = AppClock.now();
         this.endedBy = userId;
         this.endReason = ArchiveReason.BLOCK;
     }
@@ -183,7 +184,7 @@ public class Match {
             throw new IllegalArgumentException("User is not part of this match");
         }
         this.state = State.GRACEFUL_EXIT;
-        this.endedAt = Instant.now();
+        this.endedAt = AppClock.now();
         this.endedBy = initiatorId;
         this.endReason = ArchiveReason.GRACEFUL_EXIT;
     }
@@ -255,6 +256,23 @@ public class Match {
 
     public ArchiveReason getEndReason() {
         return endReason;
+    }
+
+    // SoftDeletable implementation
+
+    @Override
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    @Override
+    public void markDeleted(Instant deletedAt) {
+        this.deletedAt = Objects.requireNonNull(deletedAt, "deletedAt cannot be null");
+    }
+
+    /** Sets the deleted-at timestamp; used when reconstructing from storage. */
+    public void setDeletedAt(Instant deletedAt) {
+        this.deletedAt = deletedAt;
     }
 
     @Override

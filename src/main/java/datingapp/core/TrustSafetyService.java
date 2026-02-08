@@ -80,7 +80,7 @@ public class TrustSafetyService {
 
     /** Returns true if the verification code has expired. */
     public boolean isExpired(Instant sentAt) {
-        return sentAt == null || sentAt.plus(verificationTtl).isBefore(Instant.now());
+        return sentAt == null || sentAt.plus(verificationTtl).isBefore(AppClock.now());
     }
 
     /**
@@ -161,7 +161,9 @@ public class TrustSafetyService {
             if (match.getState() != Match.State.BLOCKED) {
                 match.block(blockerId);
                 matchStorage.update(match);
-                logger.info("Match {} transitioned to BLOCKED by user {}", match.getId(), blockerId);
+                if (logger.isInfoEnabled()) {
+                    logger.info("Match {} transitioned to BLOCKED by user {}", match.getId(), blockerId);
+                }
             }
         });
     }

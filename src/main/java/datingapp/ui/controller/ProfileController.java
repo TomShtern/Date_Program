@@ -440,7 +440,7 @@ public class ProfileController extends BaseController implements Initializable {
      * Binds lifestyle ComboBoxes to ViewModel properties.
      */
     private void bindHeightField() {
-        heightField.textProperty().addListener((obs, oldVal, newVal) -> {
+        addSubscription(heightField.textProperty().subscribe(newVal -> {
             if (newVal == null || newVal.isBlank()) {
                 viewModel.heightProperty().set(null);
                 return;
@@ -448,26 +448,29 @@ public class ProfileController extends BaseController implements Initializable {
             try {
                 int height = Integer.parseInt(newVal.trim());
                 viewModel.heightProperty().set(height);
-            } catch (NumberFormatException _) {
-                LoggerFactory.getLogger(ProfileController.class).trace("Invalid height input: {}", newVal);
+            } catch (NumberFormatException ignored) {
+                // Non-numeric input ignored; user is still typing
             }
-        });
+        }));
 
-        heightField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
-            if (Boolean.FALSE.equals(isNowFocused)) {
+        addSubscription(heightField.focusedProperty().subscribe(focused -> {
+            if (Boolean.FALSE.equals(focused)) {
                 validateHeightRange();
             }
-        });
+        }));
     }
 
     private void validateHeightRange() {
         String heightText = heightField.getText();
         try {
             int height = Integer.parseInt(heightText);
-            if (height < 120 || height > 250) {
+            // Use centralized config bounds for validation
+            int minHeight = datingapp.core.AppConfig.defaults().minHeightCm();
+            int maxHeight = datingapp.core.AppConfig.defaults().maxHeightCm();
+            if (height < minHeight || height > maxHeight) {
                 heightField.setText("");
                 viewModel.heightProperty().set(null);
-                Toast.showWarning("Please enter a height between 120-250 cm");
+                Toast.showWarning("Please enter a height between " + minHeight + "-" + maxHeight + " cm");
             }
         } catch (NumberFormatException _) {
             heightField.setText("");
@@ -592,8 +595,9 @@ public class ProfileController extends BaseController implements Initializable {
     @FXML
     @SuppressWarnings("unused")
     private void handleSave() {
-        cleanup(); // Clean up subscriptions before navigating away
+        // Save FIRST while bindings are still active, then cleanup
         viewModel.save();
+        cleanup();
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
@@ -742,12 +746,15 @@ public class ProfileController extends BaseController implements Initializable {
         content.setStyle(DARK_PANEL_STYLE);
         content.setPrefWidth(450);
 
-        // Track selected values for each category
-        java.util.Set<Lifestyle.Smoking> selectedSmoking = new java.util.HashSet<>(current.acceptableSmoking());
-        java.util.Set<Lifestyle.Drinking> selectedDrinking = new java.util.HashSet<>(current.acceptableDrinking());
-        java.util.Set<Lifestyle.WantsKids> selectedKids = new java.util.HashSet<>(current.acceptableKidsStance());
-        java.util.Set<Lifestyle.LookingFor> selectedLookingFor =
-                new java.util.HashSet<>(current.acceptableLookingFor());
+        // Track selected values for each category using EnumSet for performance
+        java.util.EnumSet<Lifestyle.Smoking> selectedSmoking =
+                datingapp.core.EnumSetUtil.safeCopy(current.acceptableSmoking(), Lifestyle.Smoking.class);
+        java.util.EnumSet<Lifestyle.Drinking> selectedDrinking =
+                datingapp.core.EnumSetUtil.safeCopy(current.acceptableDrinking(), Lifestyle.Drinking.class);
+        java.util.EnumSet<Lifestyle.WantsKids> selectedKids =
+                datingapp.core.EnumSetUtil.safeCopy(current.acceptableKidsStance(), Lifestyle.WantsKids.class);
+        java.util.EnumSet<Lifestyle.LookingFor> selectedLookingFor =
+                datingapp.core.EnumSetUtil.safeCopy(current.acceptableLookingFor(), Lifestyle.LookingFor.class);
 
         // --- Smoking Section ---
         content.getChildren()

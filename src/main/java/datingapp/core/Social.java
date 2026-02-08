@@ -44,7 +44,7 @@ public final class Social {
         }
 
         public static FriendRequest create(UUID fromUserId, UUID toUserId) {
-            return new FriendRequest(UUID.randomUUID(), fromUserId, toUserId, Instant.now(), Status.PENDING, null);
+            return new FriendRequest(UUID.randomUUID(), fromUserId, toUserId, AppClock.now(), Status.PENDING, null);
         }
 
         public boolean isPending() {
@@ -90,7 +90,7 @@ public final class Social {
 
         public static Notification create(
                 UUID userId, Type type, String title, String message, Map<String, String> data) {
-            return new Notification(UUID.randomUUID(), userId, type, title, message, Instant.now(), false, data);
+            return new Notification(UUID.randomUUID(), userId, type, title, message, AppClock.now(), false, data);
         }
     }
 }

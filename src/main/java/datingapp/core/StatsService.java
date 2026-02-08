@@ -9,7 +9,6 @@ import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.ReportStorage;
 import datingapp.core.storage.StatsStorage;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -118,7 +117,7 @@ public class StatsService {
 
         if (existing.isPresent()) {
             // Check if stale (older than 24 hours)
-            Duration age = Duration.between(existing.get().computedAt(), Instant.now());
+            Duration age = Duration.between(existing.get().computedAt(), AppClock.now());
             if (age.toHours() < 24) {
                 return existing.get();
             }

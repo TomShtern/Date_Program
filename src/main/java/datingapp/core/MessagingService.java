@@ -21,6 +21,8 @@ import java.util.UUID;
  */
 public class MessagingService {
 
+    private static final AppConfig CONFIG = AppConfig.defaults();
+
     private final MessagingStorage messagingStorage;
     private final MatchStorage matchStorage;
     private final UserStorage userStorage;
@@ -43,13 +45,13 @@ public class MessagingService {
         // Validate sender exists and is active
         User sender = userStorage.get(senderId);
         if (sender == null || sender.getState() != UserState.ACTIVE) {
-            return SendResult.failure("Sender not found or inactive", SendResult.ErrorCode.USER_NOT_FOUND);
+            return SendResult.failure(ErrorMessages.SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
         // Validate recipient exists and is active
         User recipient = userStorage.get(recipientId);
         if (recipient == null || recipient.getState() != UserState.ACTIVE) {
-            return SendResult.failure("Recipient not found or inactive", SendResult.ErrorCode.USER_NOT_FOUND);
+            return SendResult.failure(ErrorMessages.RECIPIENT_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
         // Verify active match exists
@@ -57,17 +59,17 @@ public class MessagingService {
         Optional<Match> matchOpt = matchStorage.get(matchId);
 
         if (matchOpt.isEmpty() || !matchOpt.get().canMessage()) {
-            return SendResult.failure("Cannot message: no active match", SendResult.ErrorCode.NO_ACTIVE_MATCH);
+            return SendResult.failure(ErrorMessages.NO_ACTIVE_MATCH, SendResult.ErrorCode.NO_ACTIVE_MATCH);
         }
 
         // Validate content
         if (content == null || content.isBlank()) {
-            return SendResult.failure("Message cannot be empty", SendResult.ErrorCode.EMPTY_MESSAGE);
+            return SendResult.failure(ErrorMessages.EMPTY_MESSAGE, SendResult.ErrorCode.EMPTY_MESSAGE);
         }
         content = content.trim();
         if (content.length() > Message.MAX_LENGTH) {
             return SendResult.failure(
-                    "Message too long (max " + Message.MAX_LENGTH + " characters)",
+                    ErrorMessages.MESSAGE_TOO_LONG.formatted(Message.MAX_LENGTH),
                     SendResult.ErrorCode.MESSAGE_TOO_LONG);
         }
 
@@ -98,7 +100,7 @@ public class MessagingService {
      * @return List of messages, ordered oldest first
      */
     public List<Message> getMessages(UUID userId, UUID otherUserId, int limit, int offset) {
-        if (limit < 1 || limit > 100) {
+        if (limit < 1 || limit > CONFIG.messageMaxPageSize()) {
             return List.of();
         }
         if (offset < 0) {
@@ -160,7 +162,7 @@ public class MessagingService {
             return;
         }
 
-        messagingStorage.updateConversationReadTimestamp(conversationId, userId, Instant.now());
+        messagingStorage.updateConversationReadTimestamp(conversationId, userId, AppClock.now());
     }
 
     /**

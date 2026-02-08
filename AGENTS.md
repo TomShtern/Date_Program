@@ -19,7 +19,7 @@
 **Platform:** Windows 11 (10.0, amd64)
 **Shell:** PowerShell 7.5.4
 **IDE:** VS Code Insiders
-**Java:** OpenJDK 25.0.1 (Eclipse Adoptium Temurin) with `--enable-preview`
+**Java:** OpenJDK 25.0.2 (Eclipse Adoptium Temurin) with `--enable-preview`
 **Maven:** Apache Maven 3.9.12
 **JavaFX:** 25.0.1
 **UI Theme:** AtlantaFX 2.1.0 (GitHub Primer-based modern theme)
@@ -65,10 +65,8 @@ These tools are installed on the development machine and can be leveraged:
 ```bash
 # Build & Run
 mvn compile                          # Compile source
-mvn exec:java                        # Run CLI app (may have input buffering)
+mvn compile && mvn exec:exec         # Compile + Run CLI (forked JVM with --enable-preview)
 mvn javafx:run                       # Run JavaFX GUI app
-mvn package                          # Build fat JAR (creates target/dating-app-1.0.0-shaded.jar)
-java -jar target/dating-app-1.0.0-shaded.jar  # Run from JAR (RECOMMENDED - better terminal support)
 
 # Testing
 mvn test                             # All tests
@@ -92,7 +90,7 @@ mvn clean                            # Clean build artifacts
 **First time working on this codebase?**
 1. Run `mvn verify` to ensure everything builds and tests pass
 2. Explore `src/main/java/datingapp/core/` for domain models
-3. Use `mvn javafx:run` to launch the GUI, or `mvn exec:java` for CLI
+3. Use `mvn javafx:run` to launch the GUI, or `mvn compile && mvn exec:exec` for CLI
 4. Run `mvn spotless:apply` before any commit
 
 **Key things to know:**
@@ -111,8 +109,8 @@ mvn clean                            # Clean build artifacts
 - Pure Java business logic - **ZERO** framework/database imports allowed
 - Domain models: `User`, `Match`, `Messaging`, `UserInteractions`, `Achievement`, `Preferences`, `Dealbreakers`, `Social`, `Stats`, `SwipeSession`, `PacePreferences`, `DailyPick`
 - Standalone enums: `Gender`, `UserState`, `VerificationMethod`
-- Services (14 total): `MatchingService`, `MessagingService`, `CandidateFinder`, `MatchQualityService`, `DailyService`, `AchievementService`, `TrustSafetyService`, `StatsService`, `ProfilePreviewService`, `ProfileCompletionService`, `SessionService`, `UndoService`, `RelationshipTransitionService`, `ValidationService`
-- Storage interfaces (9 total): `core/storage/{UserStorage,MatchStorage,LikeStorage,BlockStorage,MessagingStorage,SocialStorage,StatsStorage,ReportStorage,SwipeSessionStorage}.java`
+- Services (17 total): `MatchingService`, `MessagingService`, `CandidateFinder`, `MatchQualityService`, `DailyService`, `AchievementService`, `TrustSafetyService`, `StatsService`, `ProfilePreviewService`, `ProfileCompletionService`, `SessionService`, `UndoService`, `RelationshipTransitionService`, `ValidationService`, `CleanupService`, `PurgeService`, `StandoutsService`
+- Storage interfaces (11 total): `core/storage/{UserStorage,MatchStorage,LikeStorage,BlockStorage,MessagingStorage,SocialStorage,StatsStorage,ReportStorage,SwipeSessionStorage,DailyPickViewStorage,TransactionExecutor}.java`
 - Bootstrap: `AppBootstrap` (singleton init), `AppSession` (unified session), `ServiceRegistry` (DI container)
 - Configuration: `AppConfig` (40+ immutable parameters)
 
@@ -139,7 +137,7 @@ mvn clean                            # Clean build artifacts
 - UI Utilities: `Toast` (notifications), `UiComponents` (loading overlays), `ImageCache`, `UiAnimations`, `UiHelpers`, `UiServices`, `ConfettiAnimation`
 
 **Critical Rules:**
-- Storage interfaces defined in `core/storage/`, implemented in `storage/jdbi/`
+- Storage interfaces (11) defined in `core/storage/`, implemented in `storage/jdbi/`
 - Core services depend only on interfaces, never implementations
 - Constructor injection only - all dependencies via constructors
 - Initialize once via `AppBootstrap.initialize()` → returns fully wired `ServiceRegistry`
@@ -311,7 +309,7 @@ loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
 
 ## Code Style
 
-**Formatting:** Palantir Java Format v2.39.0 (4-space indentation). Auto-apply with `mvn spotless:apply` before every commit.
+**Formatting:** Palantir Java Format v2.84.0 (4-space indentation). Auto-apply with `mvn spotless:apply` before every commit.
 
 **Imports:** No star imports (`import java.util.*`). Import ordering: static first, then third-party, then standard library.
 **FXML Controllers:** Use `@SuppressWarnings("unused")` at class level when members/handlers are only referenced from FXML to silence false-positive unused warnings.
@@ -513,8 +511,8 @@ public class MatchingHandler {
 **Core Domain** (`src/main/java/datingapp/core/`)
 - Domain models (12 total): `User.java`, `Match.java`, `Messaging.java`, `Social.java`, `Stats.java`, `UserInteractions.java`, `Preferences.java`, `Dealbreakers.java`, `Achievement.java`, `SwipeSession.java`, `PacePreferences.java`, `DailyPick.java`
 - Standalone enums: `Gender.java`, `UserState.java`, `VerificationMethod.java`
-- Storage interfaces (9 total): `storage/{UserStorage,MatchStorage,LikeStorage,BlockStorage,MessagingStorage,SocialStorage,StatsStorage,ReportStorage,SwipeSessionStorage}.java`
-- Services (14 total): `MatchingService.java`, `MessagingService.java`, `CandidateFinder.java`, `MatchQualityService.java`, `DailyService.java`, `AchievementService.java`, `TrustSafetyService.java`, `StatsService.java`, `ProfilePreviewService.java`, `ProfileCompletionService.java`, `SessionService.java`, `UndoService.java`, `RelationshipTransitionService.java`, `ValidationService.java`
+- Storage interfaces (11 total): `storage/{UserStorage,MatchStorage,LikeStorage,BlockStorage,MessagingStorage,SocialStorage,StatsStorage,ReportStorage,SwipeSessionStorage,DailyPickViewStorage,TransactionExecutor}.java`
+- Services (17 total): `MatchingService.java`, `MessagingService.java`, `CandidateFinder.java`, `MatchQualityService.java`, `DailyService.java`, `AchievementService.java`, `TrustSafetyService.java`, `StatsService.java`, `ProfilePreviewService.java`, `ProfileCompletionService.java`, `SessionService.java`, `UndoService.java`, `RelationshipTransitionService.java`, `ValidationService.java`, `CleanupService.java`, `PurgeService.java`, `StandoutsService.java`
 - Bootstrap: `AppBootstrap.java`, `AppSession.java`, `ServiceRegistry.java`
 - Configuration: `AppConfig.java`
 
@@ -930,11 +928,12 @@ Before committing changes, verify:
 - Use feature flags for incomplete features
 - Add TODO comments for future improvements
 
-**Last Updated:** 2026-02-05
-**Phase:** 2.2 (file-consolidation complete: 139 Java files)
+**Last Updated:** 2026-02-08
+**Phase:** 2.2 (JDBI storage + JavaFX MVVM complete)
 **Repository:** https://github.com/TomShtern/Date_Program.git
-**Total Java Files:** 139 in `src/` (102 main + 37 test files)
-**Lines of Code:** ~27K total, ~16K production code
+**Total Java Files:** 182 in `src/` (126 main + 56 test files)
+**Lines of Code:** ~46K total (~34K code, ~5K comments)
+**Tests:** 820 (all passing)
 **Test Coverage:** 60% minimum (JaCoCo enforced, excludes ui/ and cli/)
 
 
@@ -995,4 +994,5 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 49|2026-02-06 10:00:00|agent:github_copilot|scope:nested-types|Make User.ProfileNote explicitly public static to fix test visibility|src/main/java/datingapp/core/User.java;AGENTS.md
 50|2026-02-06 19:25:00|agent:codex|scope:candidate-distance|Clarify location-set distance rule|AGENTS.md
 51|2026-02-06 19:27:00|agent:codex|scope:candidate-distance|Confirm location-set rule placement for docsync|AGENTS.md
+52|2026-02-08 11:15:00|agent:claude_code|scope:config-audit|Fixed stale build commands (exec:java→exec:exec, removed shade refs), updated stats (182 files, 820 tests), corrected service count (17), storage count (11), Palantir version (2.84.0)|AGENTS.md
 ---AGENT-LOG-END---

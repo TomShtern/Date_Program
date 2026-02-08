@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.Gender;
 import datingapp.core.User;
@@ -20,6 +21,7 @@ import org.slf4j.LoggerFactory;
  */
 public class PreferencesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(PreferencesViewModel.class);
+    private static final AppConfig CONFIG = AppConfig.defaults();
 
     private final UserStorage userStorage;
     private User currentUser;
@@ -92,8 +94,19 @@ public class PreferencesViewModel {
                 maxDistance.get(),
                 interestedIn.get());
 
-        currentUser.setAgeRange(minAge.get(), maxAge.get());
-        currentUser.setMaxDistanceKm(maxDistance.get());
+        // M-17: Validate input ranges before saving using centralized config bounds
+        int minAgeVal = Math.clamp(minAge.get(), CONFIG.minAge(), CONFIG.maxAge());
+        int maxAgeVal = Math.clamp(maxAge.get(), CONFIG.minAge(), CONFIG.maxAge());
+        if (minAgeVal > maxAgeVal) {
+            logWarn("Invalid age range: {}>{}, swapping values", minAgeVal, maxAgeVal);
+            int temp = minAgeVal;
+            minAgeVal = maxAgeVal;
+            maxAgeVal = temp;
+        }
+        int maxDistVal = Math.clamp(maxDistance.get(), 1, CONFIG.maxDistanceKm());
+
+        currentUser.setAgeRange(minAgeVal, maxAgeVal);
+        currentUser.setMaxDistanceKm(maxDistVal);
 
         // Map UI GenderPreference to Set<Gender>
         Set<Gender> newInterests = EnumSet.noneOf(Gender.class);

@@ -10,15 +10,21 @@
     <packaging>jar</packaging>
 
     <name>Dating App</name>
-    <description>Console-based dating application - Phase 0</description>
+    <description>Dating application with JavaFX GUI and CLI</description>
 
     <properties>
-        <maven.compiler.release>25</maven.compiler.release>
-
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <h2.version>2.4.240</h2.version>
         <junit.version>5.14.2</junit.version>
         <jdbi.version>3.51.0</jdbi.version>
+        <jackson.version>2.21.0</jackson.version>
+        <javafx.version>25.0.2</javafx.version>
+        <ikonli.version>12.4.0</ikonli.version>
+        <slf4j.version>2.0.17</slf4j.version>
+        <logback.version>1.5.28</logback.version>
+        <atlantafx.version>2.1.0</atlantafx.version>
+        <javalin.version>6.7.0</javalin.version>
+        <hikaricp.version>6.3.0</hikaricp.version>
     </properties>
 
     <dependencies>
@@ -59,175 +65,94 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>2.0.17</version>
+            <version>${slf4j.version}</version>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.5.25</version>
+            <version>${logback.version}</version>
         </dependency>
 
-        <!-- JSON support -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-            <version>2.21.0</version>
-        </dependency>
+        <!-- JSON support (jackson-core is transitive via jackson-databind) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.21.0</version>
+            <version>${jackson.version}</version>
         </dependency>
 
         <!-- JavaFX -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>25.0.1</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
-            <version>25.0.1</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>
-            <version>25.0.1</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-base</artifactId>
-            <version>25.0.1</version>
+            <version>${javafx.version}</version>
         </dependency>
 
         <!-- AtlantaFX: Modern theme based on GitHub Primer -->
         <dependency>
             <groupId>io.github.mkpaz</groupId>
             <artifactId>atlantafx-base</artifactId>
-            <version>2.1.0</version>
+            <version>${atlantafx.version}</version>
         </dependency>
 
         <!-- Ikonli: Professional SVG icon library -->
         <dependency>
             <groupId>org.kordamp.ikonli</groupId>
             <artifactId>ikonli-core</artifactId>
-            <version>12.4.0</version>
+            <version>${ikonli.version}</version>
         </dependency>
         <dependency>
             <groupId>org.kordamp.ikonli</groupId>
             <artifactId>ikonli-javafx</artifactId>
-            <version>12.4.0</version>
+            <version>${ikonli.version}</version>
         </dependency>
         <dependency>
             <groupId>org.kordamp.ikonli</groupId>
             <artifactId>ikonli-materialdesign2-pack</artifactId>
-            <version>12.4.0</version>
+            <version>${ikonli.version}</version>
         </dependency>
 
         <!-- Javalin: Lightweight REST API -->
         <dependency>
             <groupId>io.javalin</groupId>
             <artifactId>javalin</artifactId>
-            <version>6.6.0</version>
+            <version>${javalin.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>2.21.0</version>
+            <version>${jackson.version}</version>
         </dependency>
 
         <!-- HikariCP: Connection Pooling -->
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>6.2.1</version>
+            <version>${hikaricp.version}</version>
         </dependency>
     </dependencies>
 
     <build>
-        <!-- m2e lifecycle mapping: tells Eclipse to ignore certain plugins during incremental
-        builds -->
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>org.eclipse.m2e</groupId>
-                    <artifactId>lifecycle-mapping</artifactId>
-                    <version>1.0.0</version>
-                    <configuration>
-                        <lifecycleMappingMetadata>
-                            <pluginExecutions>
-                                <!-- Checkstyle: ignore during incremental builds -->
-                                <pluginExecution>
-                                    <pluginExecutionFilter>
-                                        <groupId>org.apache.maven.plugins</groupId>
-                                        <artifactId>maven-checkstyle-plugin</artifactId>
-                                        <versionRange>[3.0,)</versionRange>
-                                        <goals>
-                                            <goal>check</goal>
-                                        </goals>
-                                    </pluginExecutionFilter>
-                                    <action>
-                                        <ignore />
-                                    </action>
-                                </pluginExecution>
-                                <!-- PMD: ignore during incremental builds -->
-                                <pluginExecution>
-                                    <pluginExecutionFilter>
-                                        <groupId>org.apache.maven.plugins</groupId>
-                                        <artifactId>maven-pmd-plugin</artifactId>
-                                        <versionRange>[3.0,)</versionRange>
-                                        <goals>
-                                            <goal>check</goal>
-                                        </goals>
-                                    </pluginExecutionFilter>
-                                    <action>
-                                        <ignore />
-                                    </action>
-                                </pluginExecution>
-                                <!-- JaCoCo: ignore during incremental builds -->
-                                <pluginExecution>
-                                    <pluginExecutionFilter>
-                                        <groupId>org.jacoco</groupId>
-                                        <artifactId>jacoco-maven-plugin</artifactId>
-                                        <versionRange>[0.8,)</versionRange>
-                                        <goals>
-                                            <goal>prepare-agent</goal>
-                                            <goal>report</goal>
-                                            <goal>check</goal>
-                                        </goals>
-                                    </pluginExecutionFilter>
-                                    <action>
-                                        <ignore />
-                                    </action>
-                                </pluginExecution>
-                                <!-- Spotless: ignore during incremental builds -->
-                                <pluginExecution>
-                                    <pluginExecutionFilter>
-                                        <groupId>com.diffplug.spotless</groupId>
-                                        <artifactId>spotless-maven-plugin</artifactId>
-                                        <versionRange>[2.0,)</versionRange>
-                                        <goals>
-                                            <goal>check</goal>
-                                            <goal>apply</goal>
-                                        </goals>
-                                    </pluginExecutionFilter>
-                                    <action>
-                                        <ignore />
-                                    </action>
-                                </pluginExecution>
-                            </pluginExecutions>
-                        </lifecycleMappingMetadata>
-                    </configuration>
-                </plugin>
-            </plugins>
-        </pluginManagement>
         <plugins>
             <!-- Compiler Plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.1</version>
+                <version>3.15.0</version>
                 <configuration>
                     <release>25</release>
                     <compilerArgs>
@@ -243,21 +168,35 @@
                 <version>3.5.4</version>
                 <configuration>
                     <!--
-                                            IMPORTANT: JaCoCo's prepare-agent populates the 'argLine' property.
-                                            If we overwrite it, JaCoCo will silently skip report/check (no exec data).
-                                            '@{argLine}' is evaluated at execution time (safe for late-injected props).
-                                        -->
-                    <argLine>@{argLine} --enable-preview --enable-native-access=ALL-UNNAMED</argLine>
+                        IMPORTANT: JaCoCo's prepare-agent populates the 'argLine' property.
+                        If we overwrite it, JaCoCo will silently skip report/check (no exec data).
+                        '@{argLine}' is evaluated at execution time (safe for late-injected props).
+                    -->
+                    <argLine>
+                        @{argLine} --enable-preview --enable-native-access=ALL-UNNAMED
+                        -Djava.util.logging.config.file=${project.basedir}/src/test/resources/logging-test.properties</argLine>
+                    <!--
+                        useModulePath: puts JARs with module-info.class (e.g. JavaFX)
+                        on the module path. Our code stays on the classpath (unnamed module).
+                    -->
+                    <useModulePath>true</useModulePath>
                 </configuration>
             </plugin>
 
-            <!-- Exec plugin for running CLI -->
+            <!-- Exec plugin for running CLI (dev/debug only, forked JVM) -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.6.3</version>
                 <configuration>
-                    <mainClass>datingapp.Main</mainClass>
+                    <executable>${java.home}/bin/java</executable>
+                    <arguments>
+                        <argument>--enable-preview</argument>
+                        <argument>--enable-native-access=ALL-UNNAMED</argument>
+                        <argument>-classpath</argument>
+                        <classpath />
+                        <argument>datingapp.Main</argument>
+                    </arguments>
                 </configuration>
             </plugin>
 
@@ -270,58 +209,16 @@
                     <mainClass>datingapp.ui.DatingApp</mainClass>
                     <options>
                         <option>--enable-preview</option>
-                        <option>--enable-native-access=ALL-UNNAMED</option>
+                        <option>--enable-native-access=javafx.graphics,ALL-UNNAMED</option>
                     </options>
                 </configuration>
-            </plugin>
-
-            <!-- Shade plugin for fat JAR -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.1</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <filters>
-                                <filter>
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>module-info.class</exclude>
-                                        <exclude>META-INF/versions/**/module-info.class</exclude>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                        <exclude>META-INF/LICENSE</exclude>
-                                        <exclude>META-INF/NOTICE</exclude>
-                                        <exclude>META-INF/MANIFEST.MF</exclude>
-                                        <exclude>META-INF/substrate/**</exclude>
-                                        <exclude>META-INF/native-image/**</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
-                            <transformers>
-                                <transformer
-                                    implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>datingapp.Main</mainClass>
-                                </transformer>
-                                <transformer
-                                    implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-                            </transformers>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
 
             <!-- Spotless plugin: Palantir Java Format (4 spaces) -->
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>3.1.0</version>
+                <version>3.2.1</version>
                 <configuration>
                     <java>
                         <includes>
@@ -329,7 +226,7 @@
                             <include>src/test/java/**/*.java</include>
                         </includes>
                         <palantirJavaFormat>
-                            <version>2.84.0</version>
+                            <version>2.85.0</version>
                         </palantirJavaFormat>
                         <removeUnusedImports />
                         <trimTrailingWhitespace />
@@ -355,8 +252,8 @@
                 <configuration>
                     <configLocation>checkstyle.xml</configLocation>
                     <consoleOutput>true</consoleOutput>
-                    <failsOnError>false</failsOnError>
-                    <failOnViolation>false</failOnViolation>
+                    <failsOnError>true</failsOnError>
+                    <failOnViolation>true</failOnViolation>
                 </configuration>
                 <executions>
                     <execution>
@@ -371,7 +268,7 @@
                     <dependency>
                         <groupId>com.puppycrawl.tools</groupId>
                         <artifactId>checkstyle</artifactId>
-                        <version>13.0.0</version>
+                        <version>13.2.0</version>
                     </dependency>
                 </dependencies>
             </plugin>
@@ -383,11 +280,11 @@
                 <version>3.28.0</version>
                 <configuration>
                     <rulesets>
-                        <ruleset>rulesets/java/quickstart.xml</ruleset>
+                        <ruleset>pmd-rules.xml</ruleset>
                     </rulesets>
                     <minimumTokens>100</minimumTokens>
                     <linkXRef>false</linkXRef>
-                    <failOnViolation>false</failOnViolation>
+                    <failOnViolation>true</failOnViolation>
                 </configuration>
                 <executions>
                     <execution>
@@ -449,5 +346,35 @@
                 </executions>
             </plugin>
         </plugins>
+
+        <pluginManagement>
+            <plugins>
+                <!-- M2E lifecycle mapping: tell Eclipse/VS Code how to handle plugin executions -->
+                <plugin>
+                    <groupId>org.eclipse.m2e</groupId>
+                    <artifactId>lifecycle-mapping</artifactId>
+                    <version>1.0.0</version>
+                    <configuration>
+                        <lifecycleMappingMetadata>
+                            <pluginExecutions>
+                                <pluginExecution>
+                                    <pluginExecutionFilter>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-checkstyle-plugin</artifactId>
+                                        <versionRange>[3.0,)</versionRange>
+                                        <goals>
+                                            <goal>check</goal>
+                                        </goals>
+                                    </pluginExecutionFilter>
+                                    <action>
+                                        <ignore />
+                                    </action>
+                                </pluginExecution>
+                            </pluginExecutions>
+                        </lifecycleMappingMetadata>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
     </build>
 </project>

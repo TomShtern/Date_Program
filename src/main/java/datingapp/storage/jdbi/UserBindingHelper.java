@@ -225,6 +225,12 @@ public class UserBindingHelper {
                 : null;
     }
 
+    // ===== Soft Delete =====
+
+    public Instant getDeletedAt() {
+        return user.getDeletedAt();
+    }
+
     // ===== Helper Methods =====
 
     private String serializeEnumSet(java.util.Set<? extends Enum<?>> values) {

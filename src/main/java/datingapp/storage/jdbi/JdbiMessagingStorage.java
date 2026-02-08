@@ -1,5 +1,6 @@
 package datingapp.storage.jdbi;
 
+import datingapp.core.AppClock;
 import datingapp.core.Match;
 import datingapp.core.Messaging.Conversation;
 import datingapp.core.Messaging.Message;
@@ -89,7 +90,7 @@ public interface JdbiMessagingStorage extends MessagingStorage {
 
     @Override
     default void archiveConversation(String conversationId, Match.ArchiveReason reason) {
-        archiveConversationInternal(conversationId, Instant.now(), reason);
+        archiveConversationInternal(conversationId, AppClock.now(), reason);
     }
 
     @SqlUpdate(

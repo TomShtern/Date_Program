@@ -616,12 +616,6 @@ public class MatchingHandler {
         }
     }
 
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
-        }
-    }
-
     /**
      * Returns an emoji badge based on the number of shared interests. More matches
      * = more exciting

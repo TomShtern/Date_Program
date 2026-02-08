@@ -45,7 +45,7 @@ public class CleanupService {
      * @return CleanupResult with counts of deleted records
      */
     public CleanupResult runCleanup() {
-        Instant cutoffDate = Instant.now().minus(config.cleanupRetentionDays(), ChronoUnit.DAYS);
+        Instant cutoffDate = AppClock.now().minus(config.cleanupRetentionDays(), ChronoUnit.DAYS);
 
         int dailyPicksDeleted = statsStorage.deleteExpiredDailyPickViews(cutoffDate);
         int sessionsDeleted = sessionStorage.deleteExpiredSessions(cutoffDate);

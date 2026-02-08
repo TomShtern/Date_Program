@@ -1,5 +1,6 @@
 package datingapp.app.cli;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.Match;
 import datingapp.core.Messaging.Conversation;
@@ -337,7 +338,7 @@ public class MessagingHandler {
             return "never";
         }
 
-        Duration duration = Duration.between(timestamp, Instant.now());
+        Duration duration = Duration.between(timestamp, AppClock.now());
 
         if (duration.toMinutes() < 60) {
             return duration.toMinutes() + "m ago";

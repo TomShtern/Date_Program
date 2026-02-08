@@ -85,7 +85,7 @@ public class SwipeSession {
 
     /** Factory for creating a new session. */
     public static SwipeSession create(UUID userId) {
-        return new SwipeSession(UUID.randomUUID(), userId, Instant.now());
+        return new SwipeSession(UUID.randomUUID(), userId, AppClock.now());
     }
 
     /**
@@ -101,7 +101,7 @@ public class SwipeSession {
         }
 
         this.swipeCount++;
-        this.lastActivityAt = Instant.now();
+        this.lastActivityAt = AppClock.now();
 
         if (direction == Like.Direction.LIKE) {
             this.likeCount++;
@@ -129,7 +129,7 @@ public class SwipeSession {
             return; // Already ended
         }
         this.state = State.COMPLETED;
-        this.endedAt = Instant.now();
+        this.endedAt = AppClock.now();
     }
 
     /**
@@ -142,7 +142,7 @@ public class SwipeSession {
         if (state == State.COMPLETED) {
             return false; // Already ended
         }
-        Duration inactivity = Duration.between(lastActivityAt, Instant.now());
+        Duration inactivity = Duration.between(lastActivityAt, AppClock.now());
         return inactivity.compareTo(timeout) >= 0;
     }
 
@@ -150,7 +150,7 @@ public class SwipeSession {
 
     /** Get session duration in seconds. */
     public long getDurationSeconds() {
-        Instant end = endedAt != null ? endedAt : Instant.now();
+        Instant end = endedAt != null ? endedAt : AppClock.now();
         long seconds = Duration.between(startedAt, end).toSeconds();
         return Math.max(0, seconds);
     }

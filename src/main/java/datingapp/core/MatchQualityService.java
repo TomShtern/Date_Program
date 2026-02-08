@@ -215,8 +215,8 @@ public class MatchQualityService {
          */
         public static MatchResult compare(Set<Interest> a, Set<Interest> b) {
             // Handle null/empty cases
-            Set<Interest> setA = (a == null || a.isEmpty()) ? EnumSet.noneOf(Interest.class) : EnumSet.copyOf(a);
-            Set<Interest> setB = (b == null || b.isEmpty()) ? EnumSet.noneOf(Interest.class) : EnumSet.copyOf(b);
+            Set<Interest> setA = EnumSetUtil.safeCopy(a, Interest.class);
+            Set<Interest> setB = EnumSetUtil.safeCopy(b, Interest.class);
 
             // Empty set case
             if (setA.isEmpty() || setB.isEmpty()) {
@@ -362,7 +362,7 @@ public class MatchQualityService {
                 match.getId(),
                 perspectiveUserId,
                 otherUserId,
-                Instant.now(),
+                AppClock.now(),
                 distanceScore,
                 ageScore,
                 interestScore,

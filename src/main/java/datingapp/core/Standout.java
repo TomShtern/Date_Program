@@ -40,7 +40,7 @@ public record Standout(
     public static Standout create(
             UUID seekerId, UUID standoutUserId, LocalDate date, int rank, int score, String reason) {
         return new Standout(
-                UUID.randomUUID(), seekerId, standoutUserId, date, rank, score, reason, Instant.now(), null);
+                UUID.randomUUID(), seekerId, standoutUserId, date, rank, score, reason, AppClock.now(), null);
     }
 
     /** Factory for loading from database. */

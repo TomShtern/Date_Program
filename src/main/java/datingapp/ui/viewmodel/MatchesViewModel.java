@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.DailyService;
 import datingapp.core.Match;
@@ -105,30 +106,81 @@ public class MatchesViewModel {
         }
 
         loading.set(true);
-        try {
-            // Fetch data using batch loading
-            List<MatchCardData> matchCardDataList = fetchMatchesFromStorage(currentUser.getId());
-            List<LikeCardData> received = fetchReceivedLikesFromStorage(currentUser.getId());
-            List<LikeCardData> sent = fetchSentLikesFromStorage(currentUser.getId());
+        UUID userId = currentUser.getId();
+        String userName = currentUser.getName();
 
-            // Update observable lists
-            matches.setAll(matchCardDataList);
-            matchCount.set(matches.size());
+        // Check if FX toolkit is available (will be false in unit tests)
+        boolean fxAvailable = isFxToolkitAvailable();
 
-            likesReceived.setAll(received);
-            likesReceivedCount.set(likesReceived.size());
+        if (fxAvailable) {
+            // Execute blocking storage calls on virtual thread to avoid FX thread blocking
+            // (H-12)
+            Thread.ofVirtual().name("matches-refresh").start(() -> {
+                try {
+                    List<MatchCardData> matchCardDataList = fetchMatchesFromStorage(userId);
+                    List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
+                    List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
 
-            likesSent.setAll(sent);
-            likesSentCount.set(likesSent.size());
-
-            if (logger.isInfoEnabled()) {
-                logger.info("Refreshed all matches and likes for {}", currentUser.getName());
+                    javafx.application.Platform.runLater(() -> {
+                        updateObservableLists(matchCardDataList, received, sent, userName);
+                        loading.set(false);
+                    });
+                } catch (Exception e) {
+                    javafx.application.Platform.runLater(() -> {
+                        logWarn("Failed to refresh matches: {}", e.getMessage(), e);
+                        notifyError("Failed to refresh matches", e);
+                        loading.set(false);
+                    });
+                }
+            });
+        } else {
+            // Synchronous execution for tests (no FX toolkit available)
+            try {
+                List<MatchCardData> matchCardDataList = fetchMatchesFromStorage(userId);
+                List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
+                List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
+                updateObservableLists(matchCardDataList, received, sent, userName);
+            } catch (Exception e) {
+                logWarn("Failed to refresh matches: {}", e.getMessage(), e);
+                notifyError("Failed to refresh matches", e);
+            } finally {
+                loading.set(false);
             }
-        } catch (Exception e) {
-            logWarn("Failed to refresh matches: {}", e.getMessage(), e);
-            notifyError("Failed to refresh matches", e);
-        } finally {
-            loading.set(false);
+        }
+    }
+
+    /**
+     * Check if the JavaFX toolkit is available. Returns false in unit test
+     * environments.
+     */
+    private boolean isFxToolkitAvailable() {
+        try {
+            return javafx.application.Platform.isFxApplicationThread()
+                    || com.sun.javafx.application.PlatformImpl.isFxApplicationThread();
+        } catch (IllegalStateException | NoClassDefFoundError _) {
+            return false;
+        }
+    }
+
+    /**
+     * Updates the observable lists with fetched data.
+     */
+    private void updateObservableLists(
+            List<MatchCardData> matchCardDataList,
+            List<LikeCardData> received,
+            List<LikeCardData> sent,
+            String userName) {
+        matches.setAll(matchCardDataList);
+        matchCount.set(matches.size());
+
+        likesReceived.setAll(received);
+        likesReceivedCount.set(likesReceived.size());
+
+        likesSent.setAll(sent);
+        likesSentCount.set(likesSent.size());
+
+        if (logger.isInfoEnabled()) {
+            logger.info("Refreshed all matches and likes for {}", userName);
         }
     }
 
@@ -299,7 +351,7 @@ public class MatchesViewModel {
         if (matchedAt == null) {
             return "Unknown";
         }
-        Instant now = Instant.now();
+        Instant now = AppClock.now();
         long days = ChronoUnit.DAYS.between(matchedAt, now);
 
         if (days == 0) {

@@ -1,5 +1,6 @@
 package datingapp.app.cli;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.MatchingService;
 import datingapp.core.MatchingService.PendingLiker;
@@ -95,7 +96,7 @@ public class LikerBrowserHandler {
             return "(unknown)";
         }
 
-        java.time.Duration duration = java.time.Duration.between(likedAt, java.time.Instant.now());
+        java.time.Duration duration = java.time.Duration.between(likedAt, AppClock.now());
         if (duration.isNegative()) {
             duration = java.time.Duration.ZERO;
         }

@@ -41,7 +41,7 @@ public final class UserInteractions {
 
         /** Creates a new Like with auto-generated ID and current timestamp. */
         public static Like create(UUID whoLikes, UUID whoGotLiked, Direction direction) {
-            return new Like(UUID.randomUUID(), whoLikes, whoGotLiked, direction, Instant.now());
+            return new Like(UUID.randomUUID(), whoLikes, whoGotLiked, direction, AppClock.now());
         }
     }
 
@@ -72,7 +72,7 @@ public final class UserInteractions {
             Objects.requireNonNull(blockerId, "blockerId cannot be null");
             Objects.requireNonNull(blockedId, "blockedId cannot be null");
 
-            return new Block(UUID.randomUUID(), blockerId, blockedId, Instant.now());
+            return new Block(UUID.randomUUID(), blockerId, blockedId, AppClock.now());
         }
     }
 
@@ -113,7 +113,7 @@ public final class UserInteractions {
 
         /** Creates a new Report with generated ID and current timestamp. */
         public static Report create(UUID reporterId, UUID reportedUserId, Reason reason, String description) {
-            return new Report(UUID.randomUUID(), reporterId, reportedUserId, reason, description, Instant.now());
+            return new Report(UUID.randomUUID(), reporterId, reportedUserId, reason, description, AppClock.now());
         }
     }
 }

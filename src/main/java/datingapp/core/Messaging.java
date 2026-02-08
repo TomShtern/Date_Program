@@ -53,7 +53,7 @@ public final class Messaging {
          * @return A new Message instance
          */
         public static Message create(String conversationId, UUID senderId, String content) {
-            return new Message(UUID.randomUUID(), conversationId, senderId, content, Instant.now());
+            return new Message(UUID.randomUUID(), conversationId, senderId, content, AppClock.now());
         }
     }
 
@@ -146,7 +146,7 @@ public final class Messaging {
             }
 
             String id = userA + CONVERSATION_ID_SEPARATOR + userB;
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             return new Conversation(id, userA, userB, now, null, null, null, null, null, true, true);
         }
 
@@ -268,7 +268,7 @@ public final class Messaging {
          * @param reason The reason for archiving
          */
         public void archive(Match.ArchiveReason reason) {
-            this.archivedAt = Instant.now();
+            this.archivedAt = AppClock.now();
             this.archiveReason = reason;
         }
 

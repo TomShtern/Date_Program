@@ -3,6 +3,7 @@ package datingapp.ui.controller;
 import datingapp.ui.NavigationService;
 import java.util.ArrayList;
 import java.util.List;
+import javafx.animation.Animation;
 import javafx.scene.Node;
 import javafx.scene.layout.StackPane;
 import javafx.util.Subscription;
@@ -33,6 +34,7 @@ public abstract class BaseController {
 
     private final List<Subscription> subscriptions = new ArrayList<>();
     private final List<Node> overlays = new ArrayList<>();
+    private final List<Animation> animations = new ArrayList<>();
 
     /**
      * Registers a subscription for automatic cleanup.
@@ -63,11 +65,27 @@ public abstract class BaseController {
     }
 
     /**
+     * Tracks an animation for automatic cleanup when the controller is disposed.
+     * Use this for INDEFINITE animations that would otherwise leak CPU and memory.
+     *
+     * @param animation the animation to track (may be null)
+     */
+    protected void trackAnimation(Animation animation) {
+        if (animation != null) {
+            animations.add(animation);
+        }
+    }
+
+    /**
      * Cleans up all registered subscriptions.
      * Should be called when navigating away from this controller's view
      * or when the controller is being disposed.
      */
     public void cleanup() {
+        // Stop all tracked animations to prevent CPU waste and memory leaks
+        animations.forEach(Animation::stop);
+        animations.clear();
+
         subscriptions.forEach(Subscription::unsubscribe);
         subscriptions.clear();
 

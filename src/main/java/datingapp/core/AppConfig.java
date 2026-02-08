@@ -73,7 +73,15 @@ public record AppConfig(
         double standoutInterestWeight, // Weight for interests in standouts (0.25 default)
         double standoutLifestyleWeight, // Weight for lifestyle in standouts (0.20 default)
         double standoutCompletenessWeight, // Weight for profile completeness (0.10 default)
-        double standoutActivityWeight // Weight for activity recency (0.10 default)
+        double standoutActivityWeight, // Weight for activity recency (0.10 default)
+        // Achievement thresholds (centralized from AchievementService)
+        double selectiveThreshold, // Like ratio below which behavior is "selective" (0.20)
+        double openMindedThreshold, // Like ratio above which behavior is "open-minded" (0.60)
+        int bioAchievementLength, // Min bio length for detailed writer achievement (100)
+        int lifestyleFieldTarget, // Lifestyle fields needed for guru achievement (5)
+        // Pagination & data retention
+        int messageMaxPageSize, // Max messages per page query (100)
+        int softDeleteRetentionDays // Days before purging soft-deleted rows (90)
         ) {
     public AppConfig {
         Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
@@ -134,6 +142,12 @@ public record AppConfig(
         requireNonNegative("standoutLifestyleWeight", standoutLifestyleWeight);
         requireNonNegative("standoutCompletenessWeight", standoutCompletenessWeight);
         requireNonNegative("standoutActivityWeight", standoutActivityWeight);
+        requireNonNegative("selectiveThreshold", selectiveThreshold);
+        requireNonNegative("openMindedThreshold", openMindedThreshold);
+        requireNonNegative("bioAchievementLength", bioAchievementLength);
+        requireNonNegative("lifestyleFieldTarget", lifestyleFieldTarget);
+        requireNonNegative("messageMaxPageSize", messageMaxPageSize);
+        requireNonNegative("softDeleteRetentionDays", softDeleteRetentionDays);
 
         double weightSum = distanceWeight + ageWeight + interestWeight + lifestyleWeight + paceWeight + responseWeight;
         if (Math.abs(weightSum - 1.0) > 0.01) {
@@ -211,7 +225,15 @@ public record AppConfig(
                 0.25, // standoutInterestWeight
                 0.20, // standoutLifestyleWeight
                 0.10, // standoutCompletenessWeight
-                0.10 // standoutActivityWeight
+                0.10, // standoutActivityWeight
+                // Achievement thresholds
+                0.20, // selectiveThreshold
+                0.60, // openMindedThreshold
+                100, // bioAchievementLength
+                5, // lifestyleFieldTarget
+                // Pagination & data retention
+                100, // messageMaxPageSize
+                90 // softDeleteRetentionDays
                 );
     }
 
@@ -293,6 +315,14 @@ public record AppConfig(
         private double standoutLifestyleWeight = 0.20;
         private double standoutCompletenessWeight = 0.10;
         private double standoutActivityWeight = 0.10;
+        // Achievement thresholds
+        private double selectiveThreshold = 0.20;
+        private double openMindedThreshold = 0.60;
+        private int bioAchievementLength = 100;
+        private int lifestyleFieldTarget = 5;
+        // Pagination & data retention
+        private int messageMaxPageSize = 100;
+        private int softDeleteRetentionDays = 90;
 
         public Builder autoBanThreshold(int v) {
             this.autoBanThreshold = v;
@@ -549,6 +579,36 @@ public record AppConfig(
             return this;
         }
 
+        public Builder selectiveThreshold(double v) {
+            this.selectiveThreshold = v;
+            return this;
+        }
+
+        public Builder openMindedThreshold(double v) {
+            this.openMindedThreshold = v;
+            return this;
+        }
+
+        public Builder bioAchievementLength(int v) {
+            this.bioAchievementLength = v;
+            return this;
+        }
+
+        public Builder lifestyleFieldTarget(int v) {
+            this.lifestyleFieldTarget = v;
+            return this;
+        }
+
+        public Builder messageMaxPageSize(int v) {
+            this.messageMaxPageSize = v;
+            return this;
+        }
+
+        public Builder softDeleteRetentionDays(int v) {
+            this.softDeleteRetentionDays = v;
+            return this;
+        }
+
         public AppConfig build() {
             return new AppConfig(
                     autoBanThreshold,
@@ -601,7 +661,13 @@ public record AppConfig(
                     standoutInterestWeight,
                     standoutLifestyleWeight,
                     standoutCompletenessWeight,
-                    standoutActivityWeight);
+                    standoutActivityWeight,
+                    selectiveThreshold,
+                    openMindedThreshold,
+                    bioAchievementLength,
+                    lifestyleFieldTarget,
+                    messageMaxPageSize,
+                    softDeleteRetentionDays);
         }
     }
 }

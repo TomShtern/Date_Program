@@ -40,7 +40,7 @@ public final class PerformanceMonitor {
      * @return A Timer that records duration when closed
      */
     public static Timer startTimer(String operationName) {
-        return new Timer(operationName, Instant.now());
+        return new Timer(operationName, AppClock.now());
     }
 
     /**
@@ -121,7 +121,7 @@ public final class PerformanceMonitor {
 
         @Override
         public void close() {
-            Duration duration = Duration.between(startTime, Instant.now());
+            Duration duration = Duration.between(startTime, AppClock.now());
             if (success) {
                 record(operationName, duration.toMillis());
             } else {
@@ -140,7 +140,7 @@ public final class PerformanceMonitor {
          * @return Elapsed milliseconds
          */
         public long elapsedMs() {
-            return Duration.between(startTime, Instant.now()).toMillis();
+            return Duration.between(startTime, AppClock.now()).toMillis();
         }
     }
 

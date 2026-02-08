@@ -34,7 +34,8 @@ public final class NavigationService {
     private StackPane rootStack;
     private ViewModelFactory viewModelFactory;
 
-    private Object navigationContext;
+    private final java.util.concurrent.atomic.AtomicReference<Object> navigationContext =
+            new java.util.concurrent.atomic.AtomicReference<>();
 
     /** Navigation history stack for back navigation. */
     private final Deque<ViewType> navigationHistory = new ArrayDeque<>();
@@ -118,6 +119,11 @@ public final class NavigationService {
      * ViewModels. Uses no animation (instant switch).
      */
     public void navigateTo(ViewType viewType) {
+        // UI-03: Warn if navigation context was set but never consumed (debugging aid)
+        Object unconsumed = navigationContext.get();
+        if (unconsumed != null && logger.isDebugEnabled()) {
+            logger.debug("Navigation context {} was not consumed before navigating to {}", unconsumed, viewType);
+        }
         navigateWithTransition(viewType, TransitionType.NONE);
     }
 
@@ -286,13 +292,11 @@ public final class NavigationService {
     }
 
     public void setNavigationContext(Object context) {
-        this.navigationContext = context;
+        this.navigationContext.set(context);
     }
 
     public Object consumeNavigationContext() {
-        Object context = navigationContext;
-        navigationContext = null;
-        return context;
+        return navigationContext.getAndSet(null);
     }
 
     private void logInfo(String message, Object... args) {

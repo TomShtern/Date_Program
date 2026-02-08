@@ -3,6 +3,7 @@ package datingapp.storage.jdbi;
 import datingapp.core.User;
 import datingapp.core.User.ProfileNote;
 import datingapp.core.storage.UserStorage;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -51,8 +52,8 @@ public class JdbiUserStorageAdapter implements UserStorage {
         }
         // JDBI handles collection binding with <userIds> syntax
         return jdbi.withHandle(handle -> {
-            List<User> users = handle.createQuery(
-                            "SELECT " + JdbiUserStorage.ALL_COLUMNS + " FROM users WHERE id IN (<userIds>)")
+            List<User> users = handle.createQuery("SELECT " + JdbiUserStorage.ALL_COLUMNS
+                            + " FROM users WHERE id IN (<userIds>) AND deleted_at IS NULL")
                     .bindList("userIds", new ArrayList<>(ids))
                     .map(new JdbiUserStorage.Mapper())
                     .list();
@@ -68,6 +69,11 @@ public class JdbiUserStorageAdapter implements UserStorage {
     @Override
     public void delete(UUID id) {
         jdbi.useExtension(JdbiUserStorage.class, dao -> dao.delete(id));
+    }
+
+    @Override
+    public int purgeDeletedBefore(Instant threshold) {
+        return jdbi.withExtension(JdbiUserStorage.class, dao -> dao.purgeDeletedBefore(threshold));
     }
 
     @Override

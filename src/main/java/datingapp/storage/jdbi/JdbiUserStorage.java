@@ -50,7 +50,7 @@ public interface JdbiUserStorage {
                         interests, email, phone, is_verified, verification_method,
                         verification_code, verification_sent_at, verified_at,
                         pace_messaging_frequency, pace_time_to_first_date,
-                        pace_communication_style, pace_depth_preference""";
+                        pace_communication_style, pace_depth_preference, deleted_at""";
 
     /**
      * Saves a user (insert or update via MERGE).
@@ -67,7 +67,7 @@ public interface JdbiUserStorage {
                             interests, email, phone, is_verified, verification_method,
                             verification_code, verification_sent_at, verified_at,
                             pace_messaging_frequency, pace_time_to_first_date,
-                            pace_communication_style, pace_depth_preference
+                            pace_communication_style, pace_depth_preference, deleted_at
                         ) KEY (id) VALUES (
                             :id, :name, :bio, :birthDate, :gender, :interestedInCsv,
                             :lat, :lon, :hasLocationSet, :maxDistanceKm, :minAge, :maxAge, :photoUrlsCsv,
@@ -80,7 +80,7 @@ public interface JdbiUserStorage {
                             :interestsCsv, :email, :phone, :verified, :verificationMethod,
                             :verificationCode, :verificationSentAt, :verifiedAt,
                             :paceMessagingFrequency, :paceTimeToFirstDate,
-                            :paceCommunicationStyle, :paceDepthPreference
+                            :paceCommunicationStyle, :paceDepthPreference, :deletedAt
                         )
                         """)
     void save(@BindBean UserBindingHelper helper);
@@ -88,19 +88,19 @@ public interface JdbiUserStorage {
     /**
      * Gets a user by ID.
      */
-    @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE id = :id")
+    @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE id = :id AND deleted_at IS NULL")
     User get(@Bind("id") UUID id);
 
     /**
      * Finds all active users.
      */
-    @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE state = 'ACTIVE'")
+    @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE state = 'ACTIVE' AND deleted_at IS NULL")
     List<User> findActive();
 
     /**
      * Finds all users regardless of state.
      */
-    @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users")
+    @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE deleted_at IS NULL")
     List<User> findAll();
 
     /**
@@ -109,6 +109,10 @@ public interface JdbiUserStorage {
      */
     @SqlUpdate("DELETE FROM users WHERE id = :id")
     void delete(@Bind("id") UUID id);
+
+    /** Permanently removes soft-deleted users older than the given threshold. */
+    @SqlUpdate("DELETE FROM users WHERE deleted_at IS NOT NULL AND deleted_at < :threshold")
+    int purgeDeletedBefore(@Bind("threshold") java.time.Instant threshold);
 
     // ===== ProfileNote Methods =====
 
@@ -191,6 +195,7 @@ public interface JdbiUserStorage {
                     .verificationSentAt(MapperHelper.readInstant(rs, "verification_sent_at"))
                     .verifiedAt(MapperHelper.readInstant(rs, "verified_at"))
                     .pacePreferences(readPacePreferences(rs))
+                    .deletedAt(MapperHelper.readInstant(rs, "deleted_at"))
                     .build();
 
             // Set dealbreakers if any are present

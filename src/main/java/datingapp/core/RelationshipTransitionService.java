@@ -6,7 +6,6 @@ import datingapp.core.Social.Notification;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.SocialStorage;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -110,7 +109,7 @@ public class RelationshipTransitionService {
                 request.toUserId(),
                 request.createdAt(),
                 FriendRequest.Status.ACCEPTED,
-                Instant.now());
+                AppClock.now());
         socialStorage.updateFriendRequest(updated);
 
         // 3. Send Notification
@@ -147,7 +146,7 @@ public class RelationshipTransitionService {
                 request.toUserId(),
                 request.createdAt(),
                 FriendRequest.Status.DECLINED,
-                Instant.now());
+                AppClock.now());
         socialStorage.updateFriendRequest(updated);
     }
 

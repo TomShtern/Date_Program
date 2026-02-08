@@ -39,7 +39,8 @@ public class ViewModelFactory {
 
     /**
      * JavaFX-compatible wrapper for AppSession.
-     * Provides an ObjectProperty that synchronizes with the global AppSession singleton.
+     * Provides an ObjectProperty that synchronizes with the global AppSession
+     * singleton.
      */
     private final ObjectProperty<User> currentUserProperty = new SimpleObjectProperty<>();
 
@@ -210,16 +211,43 @@ public class ViewModelFactory {
 
     /**
      * Resets all cached ViewModels. Useful when logging out.
+     * Disposes each ViewModel before clearing to prevent memory leaks (UI-04).
      */
     public void reset() {
-        loginViewModel = null;
-        dashboardViewModel = null;
-        profileViewModel = null;
-        matchingViewModel = null;
-        chatViewModel = null;
-        matchesViewModel = null;
-        statsViewModel = null;
-        preferencesViewModel = null;
+        // Dispose ViewModels that have dispose() method before nulling references
+        if (loginViewModel != null) {
+            loginViewModel.dispose();
+            loginViewModel = null;
+        }
+        if (dashboardViewModel != null) {
+            dashboardViewModel.dispose();
+            dashboardViewModel = null;
+        }
+        if (profileViewModel != null) {
+            profileViewModel.dispose();
+            profileViewModel = null;
+        }
+        if (matchingViewModel != null) {
+            matchingViewModel.dispose();
+            matchingViewModel = null;
+        }
+        if (matchesViewModel != null) {
+            matchesViewModel.dispose();
+            matchesViewModel = null;
+        }
+        if (chatViewModel != null) {
+            chatViewModel.dispose();
+            chatViewModel = null;
+        }
+        if (statsViewModel != null) {
+            statsViewModel.dispose();
+            statsViewModel = null;
+        }
+        if (preferencesViewModel != null) {
+            preferencesViewModel.dispose();
+            preferencesViewModel = null;
+        }
+        logDebug("All ViewModels disposed and reset");
     }
 
     private void logDebug(String message, Object... args) {

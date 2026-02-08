@@ -1,5 +1,6 @@
 package datingapp.storage.jdbi;
 
+import datingapp.core.AppClock;
 import datingapp.core.SwipeSession;
 import datingapp.core.storage.SwipeSessionStorage;
 import datingapp.storage.mapper.MapperHelper;
@@ -102,7 +103,7 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
      */
     @Override
     default int endStaleSessions(Duration timeout) {
-        Instant now = Instant.now();
+        Instant now = AppClock.now();
         Instant cutoff = now.minus(timeout);
         return endStaleSessions(now, cutoff);
     }

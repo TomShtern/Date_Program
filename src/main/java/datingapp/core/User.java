@@ -5,7 +5,6 @@ import datingapp.core.Preferences.Lifestyle;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -18,7 +17,7 @@ import java.util.UUID;
  * Represents a user in the dating app. Mutable entity - state can change over
  * time.
  */
-public class User {
+public class User implements SoftDeletable {
 
     /** Configuration for validation thresholds. */
     private static final AppConfig CONFIG = AppConfig.defaults();
@@ -65,12 +64,15 @@ public class User {
 
     private PacePreferences pacePreferences;
 
+    // Soft-delete support
+    private Instant deletedAt;
+
     /**
      * Creates a new incomplete user with just an ID and name. Timestamps are set to
      * current time.
      */
     public User(UUID id, String name) {
-        this(id, name, Instant.now());
+        this(id, name, AppClock.now());
     }
 
     /**
@@ -127,7 +129,7 @@ public class User {
         }
 
         public StorageBuilder interestedIn(Set<Gender> interestedIn) {
-            user.interestedIn = interestedIn != null ? EnumSet.copyOf(interestedIn) : EnumSet.noneOf(Gender.class);
+            user.interestedIn = EnumSetUtil.safeCopy(interestedIn, Gender.class);
             return this;
         }
 
@@ -169,7 +171,7 @@ public class User {
         }
 
         public StorageBuilder interests(Set<Interest> interests) {
-            user.interests = interests != null ? EnumSet.copyOf(interests) : EnumSet.noneOf(Interest.class);
+            user.interests = EnumSetUtil.safeCopy(interests, Interest.class);
             return this;
         }
 
@@ -243,6 +245,11 @@ public class User {
             return this;
         }
 
+        public StorageBuilder deletedAt(Instant deletedAt) {
+            user.deletedAt = deletedAt;
+            return this;
+        }
+
         /** Builds and returns the User instance. */
         public User build() {
             return user;
@@ -276,7 +283,7 @@ public class User {
     }
 
     public Set<Gender> getInterestedIn() {
-        return interestedIn.isEmpty() ? EnumSet.noneOf(Gender.class) : EnumSet.copyOf(interestedIn);
+        return EnumSetUtil.safeCopy(interestedIn, Gender.class);
     }
 
     public double getLat() {
@@ -356,19 +363,23 @@ public class User {
      * @return set of interests (never null, may be empty)
      */
     public Set<Interest> getInterests() {
-        return interests.isEmpty() ? EnumSet.noneOf(Interest.class) : EnumSet.copyOf(interests);
+        return EnumSetUtil.safeCopy(interests, Interest.class);
     }
 
     /**
-     * Calculates the user's age based on their birth date using the configured timezone.
-     * Uses the application's configured timezone to avoid off-by-one-day issues.
+     * Calculates the user's age based on their birth date using the system default
+     * timezone.
+     * Uses system default timezone to match local date perception and avoid
+     * off-by-one issues
+     * when the birthday occurs at midnight across timezones.
      */
     public int getAge() {
-        return getAge(ZoneOffset.UTC);
+        return getAge(java.time.ZoneId.systemDefault());
     }
 
     /**
-     * Calculates the user's age based on their birth date using the specified timezone.
+     * Calculates the user's age based on their birth date using the specified
+     * timezone.
      *
      * @param timezone the timezone to use for age calculation
      * @return the user's age in years, or 0 if birth date is not set
@@ -440,13 +451,13 @@ public class User {
     public void startVerification(VerificationMethod method, String verificationCode) {
         this.verificationMethod = Objects.requireNonNull(method, "method cannot be null");
         this.verificationCode = Objects.requireNonNull(verificationCode, "verificationCode cannot be null");
-        this.verificationSentAt = Instant.now();
+        this.verificationSentAt = AppClock.now();
         touch();
     }
 
     public void markVerified() {
         this.isVerified = true;
-        this.verifiedAt = Instant.now();
+        this.verifiedAt = AppClock.now();
         this.verificationCode = null;
         this.verificationSentAt = null;
         touch();
@@ -469,7 +480,7 @@ public class User {
     }
 
     public void setInterestedIn(Set<Gender> interestedIn) {
-        this.interestedIn = interestedIn != null ? EnumSet.copyOf(interestedIn) : EnumSet.noneOf(Gender.class);
+        this.interestedIn = EnumSetUtil.safeCopy(interestedIn, Gender.class);
         touch();
     }
 
@@ -577,8 +588,7 @@ public class User {
             throw new IllegalArgumentException(
                     "Maximum " + CONFIG.maxInterests() + " interests allowed, got " + interests.size());
         }
-        this.interests =
-                (interests == null || interests.isEmpty()) ? EnumSet.noneOf(Interest.class) : EnumSet.copyOf(interests);
+        this.interests = EnumSetUtil.safeCopy(interests, Interest.class);
         touch();
     }
 
@@ -672,7 +682,7 @@ public class User {
     }
 
     private void touch() {
-        this.updatedAt = Instant.now();
+        this.updatedAt = AppClock.now();
     }
 
     @Override
@@ -695,6 +705,20 @@ public class User {
     @Override
     public String toString() {
         return "User{id=" + id + ", name='" + name + "', state=" + state + "}";
+    }
+
+    // ================================
+    // SoftDeletable implementation
+    // ================================
+
+    @Override
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    @Override
+    public void markDeleted(Instant deletedAt) {
+        this.deletedAt = Objects.requireNonNull(deletedAt, "deletedAt cannot be null");
     }
 
     // ================================
@@ -768,7 +792,7 @@ public class User {
                 throw new IllegalArgumentException("Cannot create a note about yourself");
             }
 
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             return new ProfileNote(authorId, subjectId, content, now, now);
         }
 
@@ -786,7 +810,7 @@ public class User {
                 throw new IllegalArgumentException(
                         "Note content exceeds maximum length of " + MAX_LENGTH + " characters");
             }
-            return new ProfileNote(authorId, subjectId, newContent, createdAt, Instant.now());
+            return new ProfileNote(authorId, subjectId, newContent, createdAt, AppClock.now());
         }
 
         /**

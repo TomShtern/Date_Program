@@ -7,9 +7,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Manages H2 database connections and schema initialization. */
 public final class DatabaseManager {
@@ -128,7 +128,10 @@ public final class DatabaseManager {
 
     private void migrateV1InitialSchema(Statement stmt) throws SQLException {
         createSchemaVersionTable(stmt);
+
         if (isVersionApplied(stmt, 1)) {
+            // Existing database — add any new columns for backward compatibility
+            migrateSchemaColumns(stmt);
             return;
         }
 
@@ -204,26 +207,25 @@ public final class DatabaseManager {
                 + "pace_messaging_frequency VARCHAR(30), "
                 + "pace_time_to_first_date VARCHAR(30), "
                 + "pace_communication_style VARCHAR(30), "
-                + "pace_depth_preference VARCHAR(30)"
+                + "pace_depth_preference VARCHAR(30), "
+                + "deleted_at TIMESTAMP"
                 + ")");
-
-        // Add columns for existing databases (Phase 0.5b migration)
-        migrateSchemaColumns(stmt);
     }
 
     private void createLikesTable(Statement stmt) throws SQLException {
         stmt.execute("""
-                CREATE TABLE IF NOT EXISTS likes (
-                    id UUID PRIMARY KEY,
-                    who_likes UUID NOT NULL,
-                    who_got_liked UUID NOT NULL,
-                    direction VARCHAR(10) NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
-                    CONSTRAINT fk_likes_who_likes FOREIGN KEY (who_likes) REFERENCES users(id) ON DELETE CASCADE,
-                    CONSTRAINT fk_likes_who_got_liked FOREIGN KEY (who_got_liked) REFERENCES users(id) ON DELETE CASCADE,
-                    CONSTRAINT uk_likes UNIQUE (who_likes, who_got_liked)
-                )
-                """);
+                        CREATE TABLE IF NOT EXISTS likes (
+                            id UUID PRIMARY KEY,
+                            who_likes UUID NOT NULL,
+                            who_got_liked UUID NOT NULL,
+                            direction VARCHAR(10) NOT NULL,
+                            created_at TIMESTAMP NOT NULL,
+                            deleted_at TIMESTAMP,
+                            CONSTRAINT fk_likes_who_likes FOREIGN KEY (who_likes) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_likes_who_got_liked FOREIGN KEY (who_got_liked) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT uk_likes UNIQUE (who_likes, who_got_liked)
+                        )
+                        """);
     }
 
     private void createMatchesTable(Statement stmt) throws SQLException {
@@ -237,6 +239,7 @@ public final class DatabaseManager {
                     ended_at TIMESTAMP,
                     ended_by UUID,
                     end_reason VARCHAR(30),
+                    deleted_at TIMESTAMP,
                     CONSTRAINT fk_matches_user_a FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
                     CONSTRAINT fk_matches_user_b FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE,
                     CONSTRAINT uk_matches UNIQUE (user_a, user_b)
@@ -385,6 +388,7 @@ public final class DatabaseManager {
                     archive_reason VARCHAR(20),
                     visible_to_user_a BOOLEAN DEFAULT TRUE,
                     visible_to_user_b BOOLEAN DEFAULT TRUE,
+                    deleted_at TIMESTAMP,
                     CONSTRAINT unq_conversation_users UNIQUE (user_a, user_b),
                     FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE
@@ -402,6 +406,7 @@ public final class DatabaseManager {
                     sender_id UUID NOT NULL,
                     content VARCHAR(1000) NOT NULL,
                     created_at TIMESTAMP NOT NULL,
+                    deleted_at TIMESTAMP,
                     FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
                 )
@@ -463,6 +468,7 @@ public final class DatabaseManager {
                     blocker_id UUID NOT NULL,
                     blocked_id UUID NOT NULL,
                     created_at TIMESTAMP NOT NULL,
+                    deleted_at TIMESTAMP,
                     UNIQUE (blocker_id, blocked_id),
                     FOREIGN KEY (blocker_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE
@@ -481,6 +487,7 @@ public final class DatabaseManager {
                     reason VARCHAR(50) NOT NULL,
                     description VARCHAR(500),
                     created_at TIMESTAMP NOT NULL,
+                    deleted_at TIMESTAMP,
                     UNIQUE (reporter_id, reported_user_id),
                     FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (reported_user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -642,11 +649,13 @@ public final class DatabaseManager {
         addForeignKeyIfPresent(stmt, "messages", "fk_messages_sender", "sender_id", "users", "id");
         addForeignKeyIfPresent(stmt, "messages", "fk_messages_conversation", "conversation_id", "conversations", "id");
 
-        // profile_notes - add FKs (column names match table definition: author_id, subject_id)
+        // profile_notes - add FKs (column names match table definition: author_id,
+        // subject_id)
         addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_author", "author_id", "users", "id");
         addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_subject", "subject_id", "users", "id");
 
-        // profile_views - add FKs (column names match table definition: viewer_id, viewed_id)
+        // profile_views - add FKs (column names match table definition: viewer_id,
+        // viewed_id)
         addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewer", "viewer_id", "users", "id");
         addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewed", "viewed_id", "users", "id");
     }
@@ -678,10 +687,12 @@ public final class DatabaseManager {
                 throw e;
             }
             // Table doesn't exist yet — constraint will be added when table is created
-            Logger logger = Logger.getLogger(DatabaseManager.class.getName());
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Skipping FK constraint '" + constraint + "' on '" + table
-                        + "' — table not found (will be created later)");
+            Logger logger = LoggerFactory.getLogger(DatabaseManager.class);
+            if (logger.isDebugEnabled()) {
+                logger.debug(
+                        "Skipping FK constraint '{}' on '{}' — table not found (will be created later)",
+                        constraint,
+                        table);
             }
         }
     }
@@ -744,6 +755,14 @@ public final class DatabaseManager {
         stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS pace_time_to_first_date VARCHAR(30)");
         stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS pace_communication_style VARCHAR(30)");
         stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS pace_depth_preference VARCHAR(30)");
+        // Soft delete support (Phase 2.2)
+        stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
+        stmt.execute("ALTER TABLE matches ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
+        stmt.execute("ALTER TABLE likes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
+        stmt.execute("ALTER TABLE blocks ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
+        stmt.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
+        stmt.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
+        stmt.execute("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
     }
 
     /** Shuts down the database gracefully. */

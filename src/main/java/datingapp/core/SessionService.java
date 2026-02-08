@@ -157,7 +157,7 @@ public class SessionService {
         Instant startOfDay = LocalDate.now(config.userTimeZone())
                 .atStartOfDay(config.userTimeZone())
                 .toInstant();
-        return sessionStorage.getSessionsInRange(userId, startOfDay, Instant.now());
+        return sessionStorage.getSessionsInRange(userId, startOfDay, AppClock.now());
     }
 
     /**

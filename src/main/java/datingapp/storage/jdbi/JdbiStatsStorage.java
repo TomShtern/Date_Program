@@ -2,6 +2,7 @@ package datingapp.storage.jdbi;
 
 import datingapp.core.Achievement;
 import datingapp.core.Achievement.UserAchievement;
+import datingapp.core.AppClock;
 import datingapp.core.Stats.PlatformStats;
 import datingapp.core.Stats.UserStats;
 import datingapp.core.storage.StatsStorage;
@@ -153,7 +154,7 @@ public interface JdbiStatsStorage extends StatsStorage {
         if (viewerId.equals(viewedId)) {
             return; // Don't record self-views
         }
-        insertView(viewerId, viewedId, Instant.now());
+        insertView(viewerId, viewedId, AppClock.now());
     }
 
     @SqlQuery("SELECT COUNT(*) FROM profile_views WHERE viewed_id = :userId")

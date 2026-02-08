@@ -15,9 +15,6 @@ You are operating in an environment where ast-grep is installed. For any code se
 - **fd** (`fd`) `v10.3.0`
   - **Context:** File system traversal.
   - **Capabilities:** User-friendly, fast alternative to `find`.
-- **fzf** (`fzf`) `v0.67.0`
-  - **Context:** Interactive filtering.
-  - **Capabilities:** General-purpose command-line fuzzy finder.
 - **tokei** (`tokei`) `v12.1.2` - SUPER IMPORTANT AND USEFUL!
   - **Context:** Codebase Statistics.
   - **Capabilities:** Rapidly counts lines of code (LOC), comments, and blanks across all languages.
@@ -53,7 +50,7 @@ You are operating in an environment where ast-grep is installed. For any code se
 # Dating App - AI Agent Instructions
 
 **Platform:** Windows 11 | PowerShell | VS Code Insiders | Java 25 | JavaFX 25.0.1
-**Stats:** 93 main + 37 test Java files | ~43K LOC | 60% coverage min | 17 core services
+**Stats:** 126 main + 56 test Java files | ~46K lines (~34K code) | 60% coverage min | 820 tests | 17 core services
 
 ## ⚠️ Critical Gotchas (Compilation Failures)
 
@@ -74,7 +71,7 @@ You are operating in an environment where ast-grep is installed. For any code se
 **Clean Architecture with MVVM for JavaFX UI:**
 ```
 core/              Pure Java business logic - ZERO framework/database imports
-core/storage/      9 storage interfaces (UserStorage, LikeStorage, MatchStorage...)
+core/storage/      11 storage interfaces (UserStorage, MatchStorage, LikeStorage...)
 storage/jdbi/      JDBI implementations with @SqlQuery/@SqlUpdate annotations
 storage/mapper/    MapperHelper utilities for null-safe ResultSet reading
 app/cli/           CLI handlers + HandlerFactory (lazy handler creation)
@@ -209,13 +206,11 @@ boolean confirmed = UiHelpers.showConfirmation(
 ## Build & Test Commands
 
 ```bash
-mvn compile && mvn exec:java              # Compile + Run CLI
+mvn compile && mvn exec:exec              # Compile + Run CLI (forked JVM with --enable-preview)
 mvn javafx:run                            # Run JavaFX GUI
-mvn test                                  # All tests
+mvn test                                  # All tests (820+)
 mvn test -Dtest=MatchingServiceTest#mutualLikesCreateMatch  # Single method
 mvn spotless:apply && mvn verify          # Format + full quality checks (REQUIRED before commit)
-mvn package                               # Fat JAR → target/dating-app-1.0.0-shaded.jar
-java -jar target/dating-app-1.0.0-shaded.jar  # Run from JAR (RECOMMENDED - better terminal)
 ```
 
 ## Testing Patterns

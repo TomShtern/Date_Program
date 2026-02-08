@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Dating App PMD Rules"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+        https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        Custom PMD ruleset for the Dating App project.
+        Extends the quickstart ruleset but excludes rules that conflict
+        with our explicit coding standards (see AGENTS.md).
+    </description>
+
+    <!-- Include the standard quickstart rules -->
+    <rule ref="rulesets/java/quickstart.xml">
+        <!--
+            UnnecessaryModifier: Flags 'static' on nested records/enums.
+            Our coding standard REQUIRES explicit 'public static' on all
+            nested types for clarity and cross-package access (CLAUDE.md
+            Critical Gotchas #1). Records and enums are implicitly static,
+            but we prefer the explicit modifier.
+        -->
+        <exclude name="UnnecessaryModifier" />
+
+        <!--
+            LooseCoupling: Flags direct use of EnumSet instead of Set.
+            Our coding standard explicitly uses EnumSet for enum collections
+            (defensive copy patterns, performance). See CLAUDE.md EnumSet
+            Defensive Patterns section.
+        -->
+        <exclude name="LooseCoupling" />
+
+        <!--
+            AvoidUsingVolatile: Flags volatile fields.
+            Our singleton patterns (AppBootstrap, AppClock, DatabaseManager)
+            use volatile for correct double-checked locking. These are
+            textbook-correct uses of volatile.
+        -->
+        <exclude name="AvoidUsingVolatile" />
+    </rule>
+</ruleset>

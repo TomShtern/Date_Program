@@ -197,8 +197,8 @@ public class AchievementService {
 
             // Profile achievements
             case COMPLETE_PACKAGE -> new int[] {getProfileCompleteness(user), 100};
-            case STORYTELLER -> new int[] {getBioLength(user), 100};
-            case LIFESTYLE_GURU -> new int[] {getLifestyleFieldCount(user), 5};
+            case STORYTELLER -> new int[] {getBioLength(user), config.bioAchievementLength()};
+            case LIFESTYLE_GURU -> new int[] {getLifestyleFieldCount(user), config.lifestyleFieldTarget()};
 
             // Safety
             case GUARDIAN -> new int[] {getReportsGiven(userId), 1};
@@ -223,7 +223,7 @@ public class AchievementService {
         }
         int likes = likeStorage.countByDirection(userId, Like.Direction.LIKE);
         double likeRatio = (double) likes / totalSwipes;
-        return likeRatio < 0.20;
+        return likeRatio < config.selectiveThreshold();
     }
 
     private boolean isOpenMinded(UUID userId) {
@@ -233,7 +233,7 @@ public class AchievementService {
         }
         int likes = likeStorage.countByDirection(userId, Like.Direction.LIKE);
         double likeRatio = (double) likes / totalSwipes;
-        return likeRatio > 0.60;
+        return likeRatio > config.openMindedThreshold();
     }
 
     private boolean isProfileComplete(User user) {
@@ -246,7 +246,7 @@ public class AchievementService {
     }
 
     private boolean hasBioOver100Chars(User user) {
-        return getBioLength(user) > 100;
+        return getBioLength(user) > config.bioAchievementLength();
     }
 
     private int getBioLength(User user) {
@@ -254,7 +254,7 @@ public class AchievementService {
     }
 
     private boolean hasAllLifestyleFields(User user) {
-        return getLifestyleFieldCount(user) >= 5;
+        return getLifestyleFieldCount(user) >= config.lifestyleFieldTarget();
     }
 
     private int getLifestyleFieldCount(User user) {

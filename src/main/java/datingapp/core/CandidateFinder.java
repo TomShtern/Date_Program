@@ -196,11 +196,18 @@ public class CandidateFinder {
                 .sorted(Comparator.comparingDouble(c -> distanceTo(seeker, c)))
                 .toList();
 
-        logInfo(
-                "CandidateFinder: Found {} candidates for {} (from {} active users)",
-                candidates.size(),
-                seeker.getName(),
-                allActive.size());
+        if (candidates.isEmpty()) {
+            logDebug(
+                    "CandidateFinder: Found 0 candidates for {} (from {} active users)",
+                    seeker.getName(),
+                    allActive.size());
+        } else {
+            logInfo(
+                    "CandidateFinder: Found {} candidates for {} (from {} active users)",
+                    candidates.size(),
+                    seeker.getName(),
+                    allActive.size());
+        }
 
         return candidates;
     }

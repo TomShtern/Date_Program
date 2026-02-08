@@ -7,6 +7,7 @@ import datingapp.core.storage.MatchStorage;
 import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -27,9 +28,9 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 public interface JdbiMatchStorage extends MatchStorage {
 
     @SqlUpdate("""
-            MERGE INTO matches (id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason)
+            MERGE INTO matches (id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at)
             KEY (id)
-            VALUES (:id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason)
+            VALUES (:id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason, :deletedAt)
             """)
     @Override
     void save(@BindBean Match match);
@@ -41,13 +42,13 @@ public interface JdbiMatchStorage extends MatchStorage {
     @Override
     void update(@BindBean Match match);
 
-    @SqlQuery("SELECT * FROM matches WHERE id = :matchId")
+    @SqlQuery("SELECT * FROM matches WHERE id = :matchId AND deleted_at IS NULL")
     @Override
     Optional<Match> get(@Bind("matchId") String matchId);
 
     @SqlQuery("""
             SELECT EXISTS (
-                SELECT 1 FROM matches WHERE id = :matchId
+                SELECT 1 FROM matches WHERE id = :matchId AND deleted_at IS NULL
             )
             """)
     @Override
@@ -55,13 +56,13 @@ public interface JdbiMatchStorage extends MatchStorage {
 
     @SqlQuery("""
             SELECT * FROM matches
-            WHERE user_a = :userId AND state = 'ACTIVE'
+            WHERE user_a = :userId AND state = 'ACTIVE' AND deleted_at IS NULL
             """)
     List<Match> getActiveMatchesForUserA(@Bind("userId") UUID userId);
 
     @SqlQuery("""
             SELECT * FROM matches
-            WHERE user_b = :userId AND state = 'ACTIVE'
+            WHERE user_b = :userId AND state = 'ACTIVE' AND deleted_at IS NULL
             """)
     List<Match> getActiveMatchesForUserB(@Bind("userId") UUID userId);
 
@@ -75,10 +76,10 @@ public interface JdbiMatchStorage extends MatchStorage {
         return combined;
     }
 
-    @SqlQuery("SELECT * FROM matches WHERE user_a = :userId")
+    @SqlQuery("SELECT * FROM matches WHERE user_a = :userId AND deleted_at IS NULL")
     List<Match> getAllMatchesForUserA(@Bind("userId") UUID userId);
 
-    @SqlQuery("SELECT * FROM matches WHERE user_b = :userId")
+    @SqlQuery("SELECT * FROM matches WHERE user_b = :userId AND deleted_at IS NULL")
     List<Match> getAllMatchesForUserB(@Bind("userId") UUID userId);
 
     @Override
@@ -95,6 +96,11 @@ public interface JdbiMatchStorage extends MatchStorage {
     @Override
     void delete(@Bind("matchId") String matchId);
 
+    /** Permanently removes soft-deleted matches older than the given threshold. */
+    @SqlUpdate("DELETE FROM matches WHERE deleted_at IS NOT NULL AND deleted_at < :threshold")
+    @Override
+    int purgeDeletedBefore(@Bind("threshold") Instant threshold);
+
     /** Row mapper for Match records - inlined from former MatchMapper class. */
     class Mapper implements RowMapper<Match> {
         @Override
@@ -107,8 +113,11 @@ public interface JdbiMatchStorage extends MatchStorage {
             var endedAt = MapperHelper.readInstant(rs, "ended_at");
             var endedBy = MapperHelper.readUuid(rs, "ended_by");
             var endReason = MapperHelper.readEnum(rs, "end_reason", ArchiveReason.class);
+            var deletedAt = MapperHelper.readInstant(rs, "deleted_at");
 
-            return new Match(id, userA, userB, createdAt, state, endedAt, endedBy, endReason);
+            Match match = new Match(id, userA, userB, createdAt, state, endedAt, endedBy, endReason);
+            match.setDeletedAt(deletedAt);
+            return match;
         }
     }
 }

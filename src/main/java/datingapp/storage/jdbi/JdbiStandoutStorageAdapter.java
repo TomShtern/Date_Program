@@ -1,7 +1,7 @@
 package datingapp.storage.jdbi;
 
+import datingapp.core.AppClock;
 import datingapp.core.Standout;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -29,7 +29,7 @@ public class JdbiStandoutStorageAdapter implements Standout.Storage {
 
     @Override
     public void markInteracted(UUID seekerId, UUID standoutUserId, LocalDate date) {
-        jdbi.markInteracted(seekerId, standoutUserId, date, Instant.now());
+        jdbi.markInteracted(seekerId, standoutUserId, date, AppClock.now());
     }
 
     @Override

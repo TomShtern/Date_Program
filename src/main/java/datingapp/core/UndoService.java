@@ -149,7 +149,7 @@ public class UndoService {
 
         // Validation: No undo state
         if (optState.isEmpty()) {
-            return UndoResult.failure("No swipe to undo");
+            return UndoResult.failure(ErrorMessages.NO_SWIPE_TO_UNDO);
         }
 
         UndoState state = optState.get();
@@ -157,7 +157,7 @@ public class UndoService {
         // Validation: Window expired
         if (state.isExpired(Instant.now(clock))) {
             undoStorage.delete(userId);
-            return UndoResult.failure("Undo window expired");
+            return UndoResult.failure(ErrorMessages.UNDO_WINDOW_EXPIRED);
         }
 
         // Execute undo - use transaction if available
@@ -169,7 +169,7 @@ public class UndoService {
                 boolean success =
                         transactionExecutor.atomicUndoDelete(state.like().id(), state.matchId());
                 if (!success) {
-                    return UndoResult.failure("Like not found in database");
+                    return UndoResult.failure(ErrorMessages.LIKE_NOT_FOUND);
                 }
             } else {
                 // Fallback to non-atomic deletes (backward compatibility)
@@ -186,7 +186,7 @@ public class UndoService {
 
         } catch (Exception e) {
             // Return error but don't clear state (user might retry)
-            return UndoResult.failure("Failed to undo: " + e.getMessage());
+            return UndoResult.failure(ErrorMessages.UNDO_FAILED.formatted(e.getMessage()));
         }
     }
 

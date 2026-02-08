@@ -1,5 +1,6 @@
 package datingapp.storage.jdbi;
 
+import datingapp.core.AppClock;
 import datingapp.core.storage.DailyPickViewStorage;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,7 +18,7 @@ public interface JdbiDailyPickViewStorage extends DailyPickViewStorage {
 
     @Override
     default void markAsViewed(UUID userId, LocalDate date) {
-        saveView(userId, date, Instant.now());
+        saveView(userId, date, AppClock.now());
     }
 
     @Override

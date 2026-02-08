@@ -1,10 +1,10 @@
 package datingapp.core;
 
-import java.lang.System.Logger;
-import java.lang.System.Logger.Level;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Unified session management for both CLI and JavaFX interfaces.
@@ -19,7 +19,7 @@ import java.util.function.Consumer;
 @SuppressWarnings("java:S6548")
 public final class AppSession {
     private static final AppSession INSTANCE = new AppSession();
-    private static final Logger LOGGER = System.getLogger(AppSession.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(AppSession.class);
 
     private User currentUser;
     private final List<Consumer<User>> listeners = new CopyOnWriteArrayList<>();
@@ -66,8 +66,8 @@ public final class AppSession {
             try {
                 listener.accept(user);
             } catch (Exception e) {
-                if (LOGGER.isLoggable(Level.WARNING)) {
-                    LOGGER.log(Level.WARNING, "Listener threw exception: " + e.getMessage());
+                if (LOGGER.isWarnEnabled()) {
+                    LOGGER.warn("Listener threw exception: {}", e.getMessage());
                 }
             }
         }

@@ -8,7 +8,6 @@ import datingapp.ui.util.UiHelpers;
 import datingapp.ui.util.UiServices;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
-import java.util.Objects;
 import java.util.ResourceBundle;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -113,26 +112,19 @@ public class DashboardController extends BaseController implements Initializable
     /** Adds a window width listener to trigger compact mode at 900px threshold. */
     private void setupResponsiveListener() {
         // Wait for scene to be available
-        rootPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            Objects.requireNonNull(obs, "sceneProperty listener source cannot be null");
-            if (Objects.equals(oldScene, newScene)) {
-                return;
-            }
+        addSubscription(rootPane.sceneProperty().subscribe(newScene -> {
             if (newScene != null && newScene.getWindow() != null) {
                 javafx.stage.Stage stage = (javafx.stage.Stage) newScene.getWindow();
                 // Apply initial state
                 setCompactMode(stage.getWidth() < 900);
                 // Listen for resize
-                stage.widthProperty().addListener((o, oldW, newW) -> {
-                    if (o == null) {
-                        return;
-                    }
-                    if (Double.compare(oldW.doubleValue(), newW.doubleValue()) != 0) {
+                addSubscription(stage.widthProperty().subscribe(newW -> {
+                    if (newW != null) {
                         setCompactMode(newW.doubleValue() < 900);
                     }
-                });
+                }));
             }
-        });
+        }));
     }
 
     private void wireNavigationButtons() {

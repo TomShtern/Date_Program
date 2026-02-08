@@ -60,6 +60,17 @@ public interface UserStorage {
      */
     void delete(UUID id);
 
+    /**
+     * Permanently removes all soft-deleted users whose {@code deleted_at} is before the
+     * given threshold. This is a hard delete for GDPR compliance and storage reclamation.
+     *
+     * @param threshold rows with {@code deleted_at < threshold} are purged
+     * @return number of rows purged
+     */
+    default int purgeDeletedBefore(java.time.Instant threshold) {
+        return 0;
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // Profile Notes (from ProfileNoteStorage)
     // ═══════════════════════════════════════════════════════════════

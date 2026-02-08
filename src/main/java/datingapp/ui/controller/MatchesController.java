@@ -1,5 +1,6 @@
 package datingapp.ui.controller;
 
+import datingapp.core.AppClock;
 import datingapp.ui.NavigationService;
 import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
@@ -9,7 +10,6 @@ import datingapp.ui.viewmodel.MatchesViewModel.MatchCardData;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Random;
 import java.util.ResourceBundle;
 import javafx.animation.FadeTransition;
@@ -172,19 +172,15 @@ public class MatchesController extends BaseController implements Initializable {
         currentSection = (Section) defaultTab.getUserData();
         updateHeader();
 
-        sectionGroup.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
-            if (obs == null || Objects.equals(oldToggle, newToggle)) {
-                return;
-            }
+        addSubscription(sectionGroup.selectedToggleProperty().subscribe(newToggle -> {
             if (newToggle == null) {
                 matchesTabButton.setSelected(true);
                 return;
             }
-
             currentSection = (Section) newToggle.getUserData();
             updateHeader();
             populateCards();
-        });
+        }));
     }
 
     private ToggleButton resolveDefaultTab() {
@@ -255,6 +251,7 @@ public class MatchesController extends BaseController implements Initializable {
         }));
         spawnTimeline.setCycleCount(javafx.animation.Animation.INDEFINITE);
         spawnTimeline.play();
+        trackAnimation(spawnTimeline);
 
         // Spawn initial batch
         for (int i = 0; i < 5; i++) {
@@ -267,9 +264,16 @@ public class MatchesController extends BaseController implements Initializable {
         }
     }
 
+    /** Maximum number of heart particles to prevent unbounded growth. */
+    private static final int MAX_FLOATING_HEARTS = 20;
+
     /** Spawn a single floating heart particle. */
     private void spawnFloatingHeart() {
         if (particleLayer == null) {
+            return;
+        }
+        // Cap particle count to prevent unbounded growth (M-15)
+        if (particleLayer.getChildren().size() >= MAX_FLOATING_HEARTS) {
             return;
         }
 
@@ -347,6 +351,7 @@ public class MatchesController extends BaseController implements Initializable {
         glowPulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
         glowPulse.setAutoReverse(true);
         glowPulse.play();
+        trackAnimation(glowPulse);
 
         // Scale breathing
         ScaleTransition breathe = new ScaleTransition(Duration.millis(1800), emptyStateIcon);
@@ -358,6 +363,7 @@ public class MatchesController extends BaseController implements Initializable {
         breathe.setAutoReverse(true);
         breathe.setInterpolator(Interpolator.EASE_BOTH);
         breathe.play();
+        trackAnimation(breathe);
     }
 
     /** Animate the empty state container with gentle float. */
@@ -369,6 +375,7 @@ public class MatchesController extends BaseController implements Initializable {
         floatAnim.setAutoReverse(true);
         floatAnim.setInterpolator(Interpolator.EASE_BOTH);
         floatAnim.play();
+        trackAnimation(floatAnim);
     }
 
     /** Populate the FlowPane with the current section's cards. */
@@ -474,9 +481,8 @@ public class MatchesController extends BaseController implements Initializable {
         card.setPadding(new Insets(28, 20, 28, 20));
 
         // Check if this is a new match (less than 24 hours old)
-        boolean isNewMatch = java.time.Duration.between(match.matchedAt(), java.time.Instant.now())
-                        .toHours()
-                < 24;
+        boolean isNewMatch =
+                java.time.Duration.between(match.matchedAt(), AppClock.now()).toHours() < 24;
 
         // "New" badge for recent matches
         if (isNewMatch) {
@@ -503,11 +509,10 @@ public class MatchesController extends BaseController implements Initializable {
         avatarIcon.setIconColor(Color.web("#10b981"));
         avatarIcon.getStyleClass().add("match-avatar-icon");
 
-        // Status indicator dot (random for demo purposes)
+        // TODO: Replace with real presence status when user presence tracking is implemented
         Region statusDot = new Region();
         statusDot.getStyleClass().add("status-dot");
-        String[] statuses = {"status-online", "status-away", "status-offline"};
-        statusDot.getStyleClass().add(statuses[RANDOM.nextInt(statuses.length)]);
+        statusDot.getStyleClass().add("status-offline");
         StackPane.setAlignment(statusDot, Pos.BOTTOM_RIGHT);
         statusDot.setTranslateX(4);
         statusDot.setTranslateY(4);
@@ -646,7 +651,10 @@ public class MatchesController extends BaseController implements Initializable {
     /** Navigate to chat with selected match. */
     private void handleStartChat(MatchCardData match) {
         logInfo("Starting chat with match: {}", match.userName());
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.CHAT);
+        // Set navigation context so ChatController knows which user to chat with
+        NavigationService nav = NavigationService.getInstance();
+        nav.setNavigationContext(match.userId());
+        nav.navigateTo(NavigationService.ViewType.CHAT);
     }
 
     @FXML
@@ -761,5 +769,19 @@ public class MatchesController extends BaseController implements Initializable {
         if (logger.isWarnEnabled()) {
             logger.warn(message, args);
         }
+    }
+
+    /**
+     * Cleans up resources when navigating away from this controller.
+     * Stops all INDEFINITE animations to prevent memory leaks and CPU waste.
+     */
+    @Override
+    public void cleanup() {
+        // Clear particle layer if it exists
+        if (particleLayer != null) {
+            particleLayer.getChildren().clear();
+        }
+        // super.cleanup() stops all tracked animations and subscriptions
+        super.cleanup();
     }
 }

@@ -1,6 +1,7 @@
 package datingapp.core.storage;
 
 import datingapp.core.Match;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,4 +41,15 @@ public interface MatchStorage {
      * @param matchId the ID of the match to delete
      */
     void delete(String matchId);
+
+    /**
+     * Permanently removes all soft-deleted matches whose {@code deleted_at} is before the
+     * given threshold. This is a hard delete for storage reclamation.
+     *
+     * @param threshold rows with {@code deleted_at < threshold} are purged
+     * @return number of rows purged
+     */
+    default int purgeDeletedBefore(Instant threshold) {
+        return 0;
+    }
 }

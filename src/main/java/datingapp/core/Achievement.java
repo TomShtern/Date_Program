@@ -102,7 +102,7 @@ public enum Achievement {
 
         /** Factory method to create a new achievement unlock. */
         public static UserAchievement create(UUID userId, Achievement achievement) {
-            return new UserAchievement(UUID.randomUUID(), userId, achievement, Instant.now());
+            return new UserAchievement(UUID.randomUUID(), userId, achievement, AppClock.now());
         }
 
         /** Factory method for loading from storage. */

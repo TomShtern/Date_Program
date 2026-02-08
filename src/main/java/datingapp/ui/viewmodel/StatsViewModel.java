@@ -47,6 +47,13 @@ public class StatsViewModel {
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
+    /** Error handler for ViewModel→Controller error communication (M-22). */
+    private ErrorHandler errorHandler;
+
+    public void setErrorHandler(ErrorHandler handler) {
+        this.errorHandler = handler;
+    }
+
     public StatsViewModel(AchievementService achievementService) {
         // Backward compatible constructor for when ViewModelFactory doesn't have all
         // services
@@ -111,7 +118,10 @@ public class StatsViewModel {
                     }
                 });
             } catch (Exception e) {
-                javafx.application.Platform.runLater(() -> loading.set(false));
+                javafx.application.Platform.runLater(() -> {
+                    loading.set(false);
+                    notifyError("Failed to refresh stats", e);
+                });
                 if (logger.isWarnEnabled()) {
                     logger.warn("Failed to refresh stats: {}", e.getMessage(), e);
                 }
@@ -130,20 +140,32 @@ public class StatsViewModel {
         int matchesCount = 0;
         String rateText = "--";
 
-        if (likeStorage != null) {
-            likesGiven = likeStorage.countByDirection(userId, Like.Direction.LIKE);
-            likesReceived = likeStorage.countReceivedByDirection(userId, Like.Direction.LIKE);
-
-            if (matchStorage != null) {
-                List<Match> matches = matchStorage.getActiveMatchesFor(userId);
-                matchesCount = matches.size();
-
-                if (likesReceived > 0) {
-                    double rate = (double) matchesCount / likesReceived * 100;
-                    rateText = String.format("%.0f%%", Math.min(rate, 100));
-                }
+        // M-22: Log when storage is unavailable instead of silent degradation
+        if (likeStorage == null) {
+            if (logger.isWarnEnabled()) {
+                logger.warn("LikeStorage is null - stats will show default values");
             }
+            return new StatsData(likesGiven, likesReceived, matchesCount, rateText);
         }
+
+        likesGiven = likeStorage.countByDirection(userId, Like.Direction.LIKE);
+        likesReceived = likeStorage.countReceivedByDirection(userId, Like.Direction.LIKE);
+
+        if (matchStorage == null) {
+            if (logger.isWarnEnabled()) {
+                logger.warn("MatchStorage is null - match count and rate will show default values");
+            }
+            return new StatsData(likesGiven, likesReceived, matchesCount, rateText);
+        }
+
+        List<Match> matches = matchStorage.getActiveMatchesFor(userId);
+        matchesCount = matches.size();
+
+        if (likesReceived > 0) {
+            double rate = (double) matchesCount / likesReceived * 100;
+            rateText = String.format("%.0f%%", Math.min(rate, 100));
+        }
+
         return new StatsData(likesGiven, likesReceived, matchesCount, rateText);
     }
 
@@ -172,6 +194,19 @@ public class StatsViewModel {
 
     public StringProperty responseRateProperty() {
         return responseRate;
+    }
+
+    private void notifyError(String userMessage, Exception e) {
+        if (errorHandler == null) {
+            return;
+        }
+        String detail = e.getMessage();
+        String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
+        if (javafx.application.Platform.isFxApplicationThread()) {
+            errorHandler.onError(message);
+        } else {
+            javafx.application.Platform.runLater(() -> errorHandler.onError(message));
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package datingapp.ui.controller;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.Gender;
 import datingapp.core.ProfileCompletionService;
@@ -376,7 +377,7 @@ public class LoginController extends BaseController implements Initializable {
                 return TEXT_ACTIVE_RECENTLY;
             }
 
-            java.time.Duration duration = java.time.Duration.between(updatedAt, Instant.now());
+            java.time.Duration duration = java.time.Duration.between(updatedAt, AppClock.now());
             if (duration.isNegative()) {
                 duration = java.time.Duration.ZERO;
             }

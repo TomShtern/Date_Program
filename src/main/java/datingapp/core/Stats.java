@@ -101,7 +101,7 @@ public final class Stats {
             return new UserStats(
                     UUID.randomUUID(),
                     userId,
-                    Instant.now(),
+                    AppClock.now(),
                     builder.totalSwipesGiven,
                     builder.likesGiven,
                     builder.passesGiven,
@@ -205,7 +205,7 @@ public final class Stats {
                 double avgLikeRatio) {
             return new PlatformStats(
                     UUID.randomUUID(),
-                    Instant.now(),
+                    AppClock.now(),
                     totalActiveUsers,
                     avgLikesReceived,
                     avgLikesGiven,
@@ -215,7 +215,7 @@ public final class Stats {
 
         /** Empty platform stats for new platforms with no users. */
         public static PlatformStats empty() {
-            return new PlatformStats(UUID.randomUUID(), Instant.now(), 0, 0.0, 0.0, 0.0, 0.5);
+            return new PlatformStats(UUID.randomUUID(), AppClock.now(), 0, 0.0, 0.0, 0.0, 0.5);
         }
     }
 }

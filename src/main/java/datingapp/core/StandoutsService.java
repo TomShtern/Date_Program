@@ -6,7 +6,6 @@ import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.storage.UserStorage;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -224,7 +223,7 @@ public class StandoutsService {
         if (candidate.getUpdatedAt() == null) {
             return 0.5;
         }
-        Duration sinceUpdate = Duration.between(candidate.getUpdatedAt(), Instant.now());
+        Duration sinceUpdate = Duration.between(candidate.getUpdatedAt(), AppClock.now());
         long hours = sinceUpdate.toHours();
 
         if (hours < 1) {

@@ -9,6 +9,14 @@ import datingapp.core.DailyService;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.SessionService;
 import datingapp.core.User;
+import java.io.PrintStream;
+import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
+import java.lang.foreign.SymbolLookup;
+import java.lang.foreign.ValueLayout;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Scanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +27,39 @@ import org.slf4j.LoggerFactory;
  * delegate logic to specialized handlers.
  */
 public final class Main {
+
+    // Must run BEFORE logger init so Logback captures the UTF-8 streams
+    static {
+        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+            try {
+                // Direct Win32 API call via FFM — sets code page in THIS process's console
+                var kernel32 = SymbolLookup.libraryLookup("kernel32", Arena.global());
+                var sig = FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT);
+                var linker = Linker.nativeLinker();
+                linker.downcallHandle(kernel32.find("SetConsoleOutputCP").orElseThrow(), sig)
+                        .invoke(65001);
+                linker.downcallHandle(kernel32.find("SetConsoleCP").orElseThrow(), sig)
+                        .invoke(65001);
+            } catch (
+                    Throwable
+                            ignored) { // NOPMD AvoidCatchingThrowable - MethodHandle.invoke() declares throws Throwable
+                // FFM unavailable — try subprocess fallback
+                try {
+                    new ProcessBuilder("cmd", "/c", "chcp 65001 >nul")
+                            .inheritIO()
+                            .start()
+                            .waitFor();
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt(); // Restore interrupt flag
+                } catch (Exception alsoIgnored) {
+                    // Best-effort: console codepage not critical for app functionality
+                    assert true; // PMD: non-empty catch block
+                }
+            }
+        }
+        System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
+        System.setErr(new PrintStream(System.err, true, StandardCharsets.UTF_8));
+    }
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 

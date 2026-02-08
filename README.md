@@ -59,15 +59,8 @@ mvn javafx:run
 
 #### CLI Mode
 
-**Option 1:** Via Maven (may have input buffering)
 ```bash
-mvn compile exec:java
-```
-
-**Option 2:** Via shaded JAR (better terminal support)
-```bash
-mvn package
-java --enable-preview -jar target/dating-app-1.0.0-shaded.jar
+mvn compile && mvn exec:exec
 ```
 
 ## 🧪 Testing
@@ -78,15 +71,15 @@ Run the full test suite:
 mvn clean test
 ```
 
-**576+ tests** covering core domain, services, and storage layers.
+**820 tests** covering core domain, services, and storage layers.
 
 ## � Code Quality
 
 | Tool           | Purpose                                | Enforcement          |
 |----------------|----------------------------------------|----------------------|
 | **Spotless**   | Code formatting (Palantir Java Format) | Blocking on `verify` |
-| **Checkstyle** | Style validation                       | Non-blocking         |
-| **PMD**        | Bug & code smell detection             | Non-blocking         |
+| **Checkstyle** | Style validation                       | Blocking on `verify` |
+| **PMD**        | Bug & code smell detection             | Blocking on `verify` |
 | **JaCoCo**     | Test coverage (60% min on `core/`)     | Blocking on `verify` |
 
 ### Commands
@@ -139,13 +132,14 @@ Embedded H2 database stored at `./data/dating.mv.db`
 
 ## 📈 Project Statistics
 
-| Metric            | Value               |
-|-------------------|---------------------|
-| **Lines of Code** | ~16,200             |
-| **Test Cases**    | 576+                |
-| **Core Services** | 15+                 |
-| **GUI Views**     | 10 FXML screens     |
-| **CLI Handlers**  | 11 command handlers |
+| Metric            | Value                            |
+|-------------------|----------------------------------|
+| **Java Files**    | 182 (126 main + 56 test)         |
+| **Lines of Code** | ~46K total (~34K code)           |
+| **Test Cases**    | 820                              |
+| **Core Services** | 17 (+ CandidateFinder utility)   |
+| **GUI Views**     | 10 FXML screens                  |
+| **CLI Handlers**  | 8 command handlers               |
 
 ## 🪟 Windows Setup
 
@@ -170,4 +164,5 @@ chcp 65001
 # Append-only. Do not edit past entries. If SEQ conflict after 3 tries append ":CONFLICT".
 example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples regen|src/ui/*
 1|2026-01-30 20:45:00|agent:antigravity|docs|Complete README rewrite: updated title, tech stack, architecture, test count (99→576), formatting tool (Google→Palantir), added GUI docs, removed stale Recent Changes|README.md
+2|2026-02-08 11:15:00|agent:claude_code|docs|Fixed stale CLI commands (removed shade/fat JAR), updated stats (182 files, 820 tests, 8 handlers), Checkstyle+PMD now blocking|README.md
 ---AGENT-LOG-END---

@@ -120,7 +120,7 @@ public class MatchingViewModel {
         Thread thread = Thread.ofVirtual().name("candidate-refresh").start(() -> {
             List<User> candidates = null;
             try {
-                logInfo(
+                logDebug(
                         "Refreshing candidates for user: {} (state={}, isComplete={}, gender={}, interestedIn={})",
                         user.getName(),
                         user.getState(),
@@ -135,10 +135,11 @@ public class MatchingViewModel {
                             user.getName(),
                             user.getState(),
                             user.isComplete());
+                    candidates = List.of();
+                } else {
+                    candidates = candidateFinder.findCandidatesForUser(user);
                 }
-
-                candidates = candidateFinder.findCandidatesForUser(user);
-                logInfo("Found {} candidates after filtering", candidates.size());
+                logDebug("Found {} candidates after filtering", candidates.size());
 
             } catch (Exception e) {
                 logWarn("Failed to refresh candidates", e);
@@ -323,6 +324,12 @@ public class MatchingViewModel {
 
     public ObjectProperty<User> matchedUserProperty() {
         return matchedUser;
+    }
+
+    private void logDebug(String message, Object... args) {
+        if (logger.isDebugEnabled()) {
+            logger.debug(message, args);
+        }
     }
 
     private void logInfo(String message, Object... args) {
