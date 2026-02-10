@@ -29,9 +29,9 @@ class AppClockTest {
         @Test
         @DisplayName("now() returns current system time (within tolerance)")
         void nowReturnsCurrentTime() {
-            Instant before = Instant.now();
+            Instant before = AppClock.clock().instant();
             Instant result = AppClock.now();
-            Instant after = Instant.now();
+            Instant after = AppClock.clock().instant();
 
             assertFalse(result.isBefore(before.minus(1, ChronoUnit.SECONDS)));
             assertFalse(result.isAfter(after.plus(1, ChronoUnit.SECONDS)));
@@ -41,7 +41,7 @@ class AppClockTest {
         @DisplayName("today() returns current date")
         void todayReturnsCurrentDate() {
             LocalDate result = AppClock.today();
-            LocalDate expected = LocalDate.now(Clock.systemUTC());
+            LocalDate expected = LocalDate.now(AppClock.clock());
             assertEquals(expected, result);
         }
 
@@ -50,7 +50,7 @@ class AppClockTest {
         void todayWithZoneReturnsCorrectDate() {
             ZoneId tokyo = ZoneId.of("Asia/Tokyo");
             LocalDate result = AppClock.today(tokyo);
-            LocalDate expected = LocalDate.now(tokyo);
+            LocalDate expected = LocalDate.now(AppClock.clock().withZone(tokyo));
             assertEquals(expected, result);
         }
     }

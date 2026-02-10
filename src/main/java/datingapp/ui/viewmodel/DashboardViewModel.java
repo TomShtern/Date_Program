@@ -9,7 +9,7 @@ import datingapp.core.DailyService.DailyStatus;
 import datingapp.core.MessagingService;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.User;
-import datingapp.core.storage.MatchStorage;
+import datingapp.ui.viewmodel.data.UiMatchDataAccess;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,9 +35,10 @@ public class DashboardViewModel {
     private static final Logger logger = LoggerFactory.getLogger(DashboardViewModel.class);
 
     private final DailyService dailyService;
-    private final MatchStorage matchStorage;
+    private final UiMatchDataAccess matchData;
     private final AchievementService achievementService;
     private final MessagingService messagingService;
+    private final ProfileCompletionService profileCompletionService;
 
     // Observable properties for data binding
     private final StringProperty userName = new SimpleStringProperty("Not Logged In");
@@ -70,13 +71,15 @@ public class DashboardViewModel {
 
     public DashboardViewModel(
             DailyService dailyService,
-            MatchStorage matchStorage,
+            UiMatchDataAccess matchData,
             AchievementService achievementService,
-            MessagingService messagingService) {
+            MessagingService messagingService,
+            ProfileCompletionService profileCompletionService) {
         this.dailyService = dailyService;
-        this.matchStorage = matchStorage;
+        this.matchData = matchData;
         this.achievementService = achievementService;
         this.messagingService = messagingService;
+        this.profileCompletionService = profileCompletionService;
     }
 
     /**
@@ -137,7 +140,7 @@ public class DashboardViewModel {
         String completionText = "--";
         Exception firstError = null;
         try {
-            completionText = ProfileCompletionService.calculate(user).getDisplayString();
+            completionText = profileCompletionService.calculate(user).getDisplayString();
         } catch (Exception e) {
             logError("Completion count error", e);
             if (firstError == null) {
@@ -160,8 +163,8 @@ public class DashboardViewModel {
 
         String matchCount = "--";
         try {
-            matchCount = String.valueOf(
-                    matchStorage.getActiveMatchesFor(user.getId()).size());
+            matchCount =
+                    String.valueOf(matchData.getActiveMatchesFor(user.getId()).size());
         } catch (Exception e) {
             logError("Match count error", e);
             if (firstError == null) {

@@ -3,7 +3,7 @@ package datingapp.app.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import datingapp.core.AppBootstrap;
+import datingapp.app.AppBootstrap;
 import datingapp.core.ServiceRegistry;
 import io.javalin.Javalin;
 import io.javalin.json.JavalinJackson;
@@ -128,8 +128,20 @@ public class RestApiServer {
             ctx.json(new ErrorResponse("CONFLICT", e.getMessage()));
         });
 
+        app.exception(java.util.NoSuchElementException.class, (e, ctx) -> {
+            ctx.status(404);
+            ctx.json(new ErrorResponse("NOT_FOUND", e.getMessage()));
+        });
+
+        app.exception(com.fasterxml.jackson.core.JacksonException.class, (e, ctx) -> {
+            ctx.status(400);
+            ctx.json(new ErrorResponse("BAD_REQUEST", "Invalid request body format"));
+        });
+
         app.exception(Exception.class, (e, ctx) -> {
-            logger.error("Unhandled exception", e);
+            if (logger.isErrorEnabled()) {
+                logger.error("Unhandled exception on {} {}", ctx.method(), ctx.path(), e);
+            }
             ctx.status(500);
             ctx.json(new ErrorResponse("INTERNAL_ERROR", "An unexpected error occurred"));
         });

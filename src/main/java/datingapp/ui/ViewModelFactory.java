@@ -19,6 +19,10 @@ import datingapp.ui.viewmodel.MatchingViewModel;
 import datingapp.ui.viewmodel.PreferencesViewModel;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import datingapp.ui.viewmodel.StatsViewModel;
+import datingapp.ui.viewmodel.data.StorageUiMatchDataAccess;
+import datingapp.ui.viewmodel.data.StorageUiUserStore;
+import datingapp.ui.viewmodel.data.UiMatchDataAccess;
+import datingapp.ui.viewmodel.data.UiUserStore;
 import java.lang.reflect.InvocationTargetException;
 import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
@@ -86,7 +90,7 @@ public class ViewModelFactory {
         logDebug("Creating controller: {}", controllerClass.getSimpleName());
 
         if (controllerClass == LoginController.class) {
-            return new LoginController(getLoginViewModel());
+            return new LoginController(getLoginViewModel(), services.getProfileCompletionService());
         }
 
         if (controllerClass == DashboardController.class) {
@@ -136,34 +140,33 @@ public class ViewModelFactory {
 
     // --- ViewModel Accessors (lazy initialization) ---
 
-    public LoginViewModel getLoginViewModel() {
+    public synchronized LoginViewModel getLoginViewModel() {
         if (loginViewModel == null) {
-            loginViewModel = new LoginViewModel(services.getUserStorage());
+            loginViewModel = new LoginViewModel(createUiUserStore());
         }
         return loginViewModel;
     }
 
-    public DashboardViewModel getDashboardViewModel() {
+    public synchronized DashboardViewModel getDashboardViewModel() {
         if (dashboardViewModel == null) {
             dashboardViewModel = new DashboardViewModel(
                     services.getDailyService(),
-                    services.getMatchStorage(),
+                    createUiMatchDataAccess(),
                     services.getAchievementService(),
-                    services.getMessagingService());
+                    services.getMessagingService(),
+                    services.getProfileCompletionService());
         }
         return dashboardViewModel;
     }
 
-    public ProfileViewModel getProfileViewModel() {
+    public synchronized ProfileViewModel getProfileViewModel() {
         if (profileViewModel == null) {
-            // ProfileViewModel takes (User.Storage, ProfileCompletionService)
-            // ProfileCompletionService methods are static, so we pass null
-            profileViewModel = new ProfileViewModel(services.getUserStorage(), null);
+            profileViewModel = new ProfileViewModel(createUiUserStore(), services.getProfileCompletionService());
         }
         return profileViewModel;
     }
 
-    public MatchingViewModel getMatchingViewModel() {
+    public synchronized MatchingViewModel getMatchingViewModel() {
         if (matchingViewModel == null) {
             matchingViewModel = new MatchingViewModel(
                     services.getCandidateFinder(), services.getMatchingService(), services.getUndoService());
@@ -171,20 +174,18 @@ public class ViewModelFactory {
         return matchingViewModel;
     }
 
-    public MatchesViewModel getMatchesViewModel() {
+    public synchronized MatchesViewModel getMatchesViewModel() {
         if (matchesViewModel == null) {
             matchesViewModel = new MatchesViewModel(
-                    services.getMatchStorage(),
-                    services.getUserStorage(),
-                    services.getLikeStorage(),
-                    services.getBlockStorage(),
+                    createUiMatchDataAccess(),
+                    createUiUserStore(),
                     services.getMatchingService(),
                     services.getDailyService());
         }
         return matchesViewModel;
     }
 
-    public ChatViewModel getChatViewModel() {
+    public synchronized ChatViewModel getChatViewModel() {
         if (chatViewModel == null) {
             // ChatViewModel takes only MessagingService
             chatViewModel = new ChatViewModel(services.getMessagingService());
@@ -192,19 +193,16 @@ public class ViewModelFactory {
         return chatViewModel;
     }
 
-    public StatsViewModel getStatsViewModel() {
+    public synchronized StatsViewModel getStatsViewModel() {
         if (statsViewModel == null) {
-            // StatsViewModel with AchievementService, LikeStorage, and MatchStorage for
-            // real stats
-            statsViewModel = new StatsViewModel(
-                    services.getAchievementService(), services.getLikeStorage(), services.getMatchStorage());
+            statsViewModel = new StatsViewModel(services.getAchievementService(), services.getStatsService());
         }
         return statsViewModel;
     }
 
-    public PreferencesViewModel getPreferencesViewModel() {
+    public synchronized PreferencesViewModel getPreferencesViewModel() {
         if (preferencesViewModel == null) {
-            preferencesViewModel = new PreferencesViewModel(services.getUserStorage());
+            preferencesViewModel = new PreferencesViewModel(createUiUserStore());
         }
         return preferencesViewModel;
     }
@@ -213,7 +211,7 @@ public class ViewModelFactory {
      * Resets all cached ViewModels. Useful when logging out.
      * Disposes each ViewModel before clearing to prevent memory leaks (UI-04).
      */
-    public void reset() {
+    public synchronized void reset() {
         // Dispose ViewModels that have dispose() method before nulling references
         if (loginViewModel != null) {
             loginViewModel.dispose();
@@ -248,6 +246,15 @@ public class ViewModelFactory {
             preferencesViewModel = null;
         }
         logDebug("All ViewModels disposed and reset");
+    }
+
+    private UiUserStore createUiUserStore() {
+        return new StorageUiUserStore(services.getUserStorage());
+    }
+
+    private UiMatchDataAccess createUiMatchDataAccess() {
+        return new StorageUiMatchDataAccess(
+                services.getMatchStorage(), services.getLikeStorage(), services.getBlockStorage());
     }
 
     private void logDebug(String message, Object... args) {

@@ -12,9 +12,12 @@ import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.constants.ScoringConstants;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
-import java.time.LocalDate;
+import datingapp.core.testutil.TestClock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
@@ -28,12 +31,19 @@ class MatchQualityServiceTest {
     private MatchQualityService service;
     private TestUserStorage userStorage;
     private TestLikeStorage likeStorage;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
+        TestClock.setFixed(FIXED_INSTANT);
         userStorage = new TestUserStorage();
         likeStorage = new TestLikeStorage();
         service = new MatchQualityService(userStorage, likeStorage, AppConfig.defaults());
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
     }
 
     @Nested
@@ -203,21 +213,21 @@ class MatchQualityServiceTest {
 
             MatchQuality quality = service.computeQuality(match, alice.getId());
 
-            assertEquals(0.3, quality.interestScore());
+            assertEquals(ScoringConstants.MatchQuality.INTEREST_MISSING_SCORE, quality.interestScore());
         }
 
         @Test
         @DisplayName("Missing location yields neutral distance score")
         void missingLocationGivesNeutralDistanceScore() {
             User alice = new User(UUID.randomUUID(), "Alice");
-            alice.setBirthDate(LocalDate.now().minusYears(25));
-            alice.setGender(Gender.OTHER);
-            alice.setInterestedIn(EnumSet.of(Gender.OTHER));
+            alice.setBirthDate(AppClock.today().minusYears(25));
+            alice.setGender(User.Gender.OTHER);
+            alice.setInterestedIn(EnumSet.of(User.Gender.OTHER));
 
             User bob = new User(UUID.randomUUID(), "Bob");
-            bob.setBirthDate(LocalDate.now().minusYears(26));
-            bob.setGender(Gender.OTHER);
-            bob.setInterestedIn(EnumSet.of(Gender.OTHER));
+            bob.setBirthDate(AppClock.today().minusYears(26));
+            bob.setGender(User.Gender.OTHER);
+            bob.setInterestedIn(EnumSet.of(User.Gender.OTHER));
 
             userStorage.save(alice);
             userStorage.save(bob);
@@ -227,7 +237,7 @@ class MatchQualityServiceTest {
 
             MatchQuality quality = service.computeQuality(match, alice.getId());
 
-            assertEquals(0.5, quality.distanceScore());
+            assertEquals(ScoringConstants.MatchQuality.NEUTRAL_SCORE, quality.distanceScore());
             assertEquals(-1, quality.distanceKm());
         }
     }
@@ -289,6 +299,36 @@ class MatchQualityServiceTest {
             MatchQuality quality = service.computeQuality(match, alice.getId());
 
             assertTrue(quality.highlights().stream().anyMatch(h -> h.contains("Similar age")));
+        }
+
+        @Test
+        @DisplayName("Highlights are capped at max count")
+        void highlightsAreCapped() {
+            User alice = createUser("Alice", 25, 32.0, 34.0);
+            User bob = createUser("Bob", 26, 32.0, 34.0);
+            alice.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL));
+            bob.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL));
+            alice.setSmoking(Lifestyle.Smoking.NEVER);
+            bob.setSmoking(Lifestyle.Smoking.NEVER);
+            alice.setDrinking(Lifestyle.Drinking.SOCIALLY);
+            bob.setDrinking(Lifestyle.Drinking.SOCIALLY);
+
+            userStorage.save(alice);
+            userStorage.save(bob);
+
+            Match match = Match.create(alice.getId(), bob.getId());
+
+            Instant firstLikeAt = AppClock.now().minus(Duration.ofHours(2));
+            Instant secondLikeAt = AppClock.now().minus(Duration.ofHours(1));
+            likeStorage.save(new Like(UUID.randomUUID(), alice.getId(), bob.getId(), Like.Direction.LIKE, firstLikeAt));
+            likeStorage.save(
+                    new Like(UUID.randomUUID(), bob.getId(), alice.getId(), Like.Direction.LIKE, secondLikeAt));
+
+            MatchQuality quality = service.computeQuality(match, alice.getId());
+
+            assertEquals(
+                    ScoringConstants.MatchQuality.HIGHLIGHT_MAX_COUNT,
+                    quality.highlights().size());
         }
     }
 
@@ -526,9 +566,9 @@ class MatchQualityServiceTest {
 
     private User createUser(String name, int age, double lat, double lon) {
         User user = new User(UUID.randomUUID(), name);
-        user.setBirthDate(LocalDate.now().minusYears(age));
-        user.setGender(Gender.OTHER);
-        user.setInterestedIn(EnumSet.of(Gender.OTHER));
+        user.setBirthDate(AppClock.today().minusYears(age));
+        user.setGender(User.Gender.OTHER);
+        user.setInterestedIn(EnumSet.of(User.Gender.OTHER));
         user.setLocation(lat, lon);
         user.setMaxDistanceKm(50);
         user.setAgeRange(18, 60);
@@ -577,7 +617,7 @@ class MatchQualityServiceTest {
         @Override
         public java.util.List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == UserState.ACTIVE)
+                    .filter(u -> u.getState() == User.UserState.ACTIVE)
                     .toList();
         }
 

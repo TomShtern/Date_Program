@@ -1,0 +1,176 @@
+[
+  {
+    "file": "src/main/java/datingapp/app/cli/MatchingHandler.java",
+    "loc": 608,
+    "complexity": 81,
+    "imports": 32
+  },
+  {
+    "file": "src/main/java/datingapp/app/cli/MessagingHandler.java",
+    "loc": 303,
+    "complexity": 41,
+    "imports": 22
+  },
+  {
+    "file": "src/main/java/datingapp/app/cli/ProfileHandler.java",
+    "loc": 642,
+    "complexity": 105,
+    "imports": 29
+  },
+  {
+    "file": "src/main/java/datingapp/core/AchievementService.java",
+    "loc": 204,
+    "complexity": 42,
+    "imports": 13
+  },
+  {
+    "file": "src/main/java/datingapp/core/AppConfig.java",
+    "loc": 561,
+    "complexity": 8,
+    "imports": 3
+  },
+  {
+    "file": "src/main/java/datingapp/core/DailyService.java",
+    "loc": 244,
+    "complexity": 24,
+    "imports": 20
+  },
+  {
+    "file": "src/main/java/datingapp/core/Dealbreakers.java",
+    "loc": 343,
+    "complexity": 38,
+    "imports": 5
+  },
+  {
+    "file": "src/main/java/datingapp/core/MatchQualityService.java",
+    "loc": 513,
+    "complexity": 80,
+    "imports": 16
+  },
+  {
+    "file": "src/main/java/datingapp/core/ProfileCompletionService.java",
+    "loc": 323,
+    "complexity": 39,
+    "imports": 3
+  },
+  {
+    "file": "src/main/java/datingapp/core/User.java",
+    "loc": 571,
+    "complexity": 30,
+    "imports": 12
+  },
+  {
+    "file": "src/main/java/datingapp/storage/DatabaseManager.java",
+    "loc": 605,
+    "complexity": 19,
+    "imports": 10
+  },
+  {
+    "file": "src/main/java/datingapp/storage/jdbi/JdbiSocialStorage.java",
+    "loc": 170,
+    "complexity": 5,
+    "imports": 24
+  },
+  {
+    "file": "src/main/java/datingapp/storage/jdbi/JdbiStatsStorage.java",
+    "loc": 235,
+    "complexity": 2,
+    "imports": 20
+  },
+  {
+    "file": "src/main/java/datingapp/storage/jdbi/JdbiUserStorage.java",
+    "loc": 267,
+    "complexity": 19,
+    "imports": 28
+  },
+  {
+    "file": "src/main/java/datingapp/ui/ViewModelFactory.java",
+    "loc": 195,
+    "complexity": 28,
+    "imports": 25
+  },
+  {
+    "file": "src/main/java/datingapp/ui/component/UiComponents.java",
+    "loc": 224,
+    "complexity": 9,
+    "imports": 29
+  },
+  {
+    "file": "src/main/java/datingapp/ui/controller/AchievementPopupController.java",
+    "loc": 159,
+    "complexity": 6,
+    "imports": 22
+  },
+  {
+    "file": "src/main/java/datingapp/ui/controller/ChatController.java",
+    "loc": 214,
+    "complexity": 10,
+    "imports": 24
+  },
+  {
+    "file": "src/main/java/datingapp/ui/controller/LoginController.java",
+    "loc": 525,
+    "complexity": 39,
+    "imports": 47
+  },
+  {
+    "file": "src/main/java/datingapp/ui/controller/MatchesController.java",
+    "loc": 623,
+    "complexity": 42,
+    "imports": 44
+  },
+  {
+    "file": "src/main/java/datingapp/ui/controller/MatchingController.java",
+    "loc": 367,
+    "complexity": 29,
+    "imports": 31
+  },
+  {
+    "file": "src/main/java/datingapp/ui/controller/ProfileController.java",
+    "loc": 667,
+    "complexity": 76,
+    "imports": 38
+  },
+  {
+    "file": "src/main/java/datingapp/ui/viewmodel/ChatViewModel.java",
+    "loc": 262,
+    "complexity": 28,
+    "imports": 23
+  },
+  {
+    "file": "src/main/java/datingapp/ui/viewmodel/DashboardViewModel.java",
+    "loc": 262,
+    "complexity": 29,
+    "imports": 26
+  },
+  {
+    "file": "src/main/java/datingapp/ui/viewmodel/LoginViewModel.java",
+    "loc": 301,
+    "complexity": 36,
+    "imports": 23
+  },
+  {
+    "file": "src/main/java/datingapp/ui/viewmodel/MatchesViewModel.java",
+    "loc": 378,
+    "complexity": 41,
+    "imports": 31
+  },
+  {
+    "file": "src/main/java/datingapp/ui/viewmodel/MatchingViewModel.java",
+    "loc": 267,
+    "complexity": 31,
+    "imports": 22
+  },
+  {
+    "file": "src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java",
+    "loc": 522,
+    "complexity": 61,
+    "imports": 33
+  },
+  {
+    "file": "src/main/java/datingapp/ui/viewmodel/StatsViewModel.java",
+    "loc": 165,
+    "complexity": 16,
+    "imports": 21
+  }
+]

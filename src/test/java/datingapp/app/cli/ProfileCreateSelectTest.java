@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import datingapp.core.AppSession;
 import datingapp.core.User;
-import datingapp.core.UserState;
+import datingapp.core.User.UserState;
 import datingapp.core.ValidationService;
 import datingapp.core.storage.UserStorage;
 import java.io.StringReader;
@@ -51,7 +51,7 @@ class ProfileCreateSelectTest {
 
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        // ProfilePreviewService and AchievementService can be null for create/select
+        // ProfileCompletionService and AchievementService can be null for create/select
         // tests
         // since they aren't used by these methods
         return new ProfileHandler(userStorage, null, null, new ValidationService(), userSession, inputReader);

@@ -6,11 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.MatchQualityService.MatchQuality;
+import datingapp.core.testutil.TestClock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,6 +28,18 @@ class MatchQualityTest {
     private static final String MATCH_ID = "test-match-id";
     private static final UUID USER_A = UUID.randomUUID();
     private static final UUID USER_B = UUID.randomUUID();
+    private static final List<String> EMPTY_LIST = List.of();
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+
+    @BeforeEach
+    void setUpClock() {
+        TestClock.setFixed(FIXED_INSTANT);
+    }
+
+    @AfterEach
+    void resetClock() {
+        TestClock.reset();
+    }
 
     @Nested
     @DisplayName("Validation")
@@ -37,7 +52,7 @@ class MatchQualityTest {
                     MATCH_ID,
                     USER_A,
                     USER_B,
-                    Instant.now(),
+                    AppClock.now(),
                     0.8,
                     0.9,
                     0.5,
@@ -60,13 +75,14 @@ class MatchQualityTest {
         @Test
         @DisplayName("Throws on null matchId")
         void throwsOnNullMatchId() {
+            Instant now = AppClock.now();
             assertThrows(
                     NullPointerException.class,
                     () -> new MatchQuality(
                             null,
                             USER_A,
                             USER_B,
-                            Instant.now(),
+                            now,
                             0.8,
                             0.9,
                             0.5,
@@ -75,24 +91,25 @@ class MatchQualityTest {
                             0.5,
                             10.5,
                             5,
-                            List.of(),
-                            List.of(),
+                            EMPTY_LIST,
+                            EMPTY_LIST,
                             Duration.ZERO,
                             "Good Sync",
                             75,
-                            List.of()));
+                            EMPTY_LIST));
         }
 
         @Test
         @DisplayName("Throws if score above 1.0")
         void throwsIfScoreAboveOne() {
+            Instant now = AppClock.now();
             assertThrows(
                     IllegalArgumentException.class,
                     () -> new MatchQuality(
                             MATCH_ID,
                             USER_A,
                             USER_B,
-                            Instant.now(),
+                            now,
                             1.5,
                             0.9,
                             0.5,
@@ -101,24 +118,25 @@ class MatchQualityTest {
                             0.5,
                             10.5,
                             5,
-                            List.of(),
-                            List.of(),
+                            EMPTY_LIST,
+                            EMPTY_LIST,
                             Duration.ZERO,
                             "Good Sync",
                             75,
-                            List.of()));
+                            EMPTY_LIST));
         }
 
         @Test
         @DisplayName("Throws if score below 0.0")
         void throwsIfScoreBelowZero() {
+            Instant now = AppClock.now();
             assertThrows(
                     IllegalArgumentException.class,
                     () -> new MatchQuality(
                             MATCH_ID,
                             USER_A,
                             USER_B,
-                            Instant.now(),
+                            now,
                             -0.1,
                             0.9,
                             0.5,
@@ -127,24 +145,25 @@ class MatchQualityTest {
                             0.5,
                             10.5,
                             5,
-                            List.of(),
-                            List.of(),
+                            EMPTY_LIST,
+                            EMPTY_LIST,
                             Duration.ZERO,
                             "Good Sync",
                             75,
-                            List.of()));
+                            EMPTY_LIST));
         }
 
         @Test
         @DisplayName("Throws if compatibility above 100")
         void throwsIfCompatibilityAbove100() {
+            Instant now = AppClock.now();
             assertThrows(
                     IllegalArgumentException.class,
                     () -> new MatchQuality(
                             MATCH_ID,
                             USER_A,
                             USER_B,
-                            Instant.now(),
+                            now,
                             0.8,
                             0.9,
                             0.5,
@@ -153,12 +172,12 @@ class MatchQualityTest {
                             0.5,
                             10.5,
                             5,
-                            List.of(),
-                            List.of(),
+                            EMPTY_LIST,
+                            EMPTY_LIST,
                             Duration.ZERO,
                             "Good Sync",
                             101,
-                            List.of() // > 100
+                            EMPTY_LIST // > 100
                             ));
         }
 
@@ -169,7 +188,7 @@ class MatchQualityTest {
                     MATCH_ID,
                     USER_A,
                     USER_B,
-                    Instant.now(),
+                    AppClock.now(),
                     0.8,
                     0.9,
                     0.5,
@@ -262,7 +281,7 @@ class MatchQualityTest {
                     MATCH_ID,
                     USER_A,
                     USER_B,
-                    Instant.now(),
+                    AppClock.now(),
                     0.8,
                     0.9,
                     0.5,
@@ -289,7 +308,7 @@ class MatchQualityTest {
                     MATCH_ID,
                     USER_A,
                     USER_B,
-                    Instant.now(),
+                    AppClock.now(),
                     0.8,
                     0.9,
                     0.5,
@@ -322,7 +341,7 @@ class MatchQualityTest {
                 MATCH_ID,
                 USER_A,
                 USER_B,
-                Instant.now(),
+                AppClock.now(),
                 0.8,
                 0.9,
                 0.5,
@@ -331,11 +350,11 @@ class MatchQualityTest {
                 0.5,
                 10.5,
                 5,
-                List.of(),
-                List.of(),
+                EMPTY_LIST,
+                EMPTY_LIST,
                 Duration.ZERO,
                 "Good Sync",
                 score,
-                List.of());
+                EMPTY_LIST);
     }
 }

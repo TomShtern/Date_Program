@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
+import datingapp.core.testutil.TestClock;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -17,9 +18,11 @@ class DailyLimitServiceTest {
     private AppConfig config;
     private DailyService service;
     private UUID userId;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
+        TestClock.setFixed(FIXED_INSTANT);
         likeStorage = new InMemoryLikeStorage();
         config = AppConfig.builder()
                 .dailyLikeLimit(3)
@@ -28,6 +31,11 @@ class DailyLimitServiceTest {
                 .build();
         service = new DailyService(likeStorage, config);
         userId = UUID.randomUUID();
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
     }
 
     @Nested
@@ -45,7 +53,7 @@ class DailyLimitServiceTest {
         @DisplayName("User at limit cannot like")
         void canLike_atLimit_returnsFalse() {
             // Add 3 likes today (at limit)
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             for (int i = 0; i < 3; i++) {
                 Like like = new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now);
                 likeStorage.save(like);
@@ -57,7 +65,7 @@ class DailyLimitServiceTest {
         @Test
         @DisplayName("User with 1 remaining like can like")
         void canLike_oneRemaining_returnsTrue() {
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             for (int i = 0; i < 2; i++) {
                 Like like = new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now);
                 likeStorage.save(like);
@@ -76,7 +84,7 @@ class DailyLimitServiceTest {
             DailyService unlimitedService = new DailyService(likeStorage, unlimitedConfig);
 
             // Add many likes
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             for (int i = 0; i < 100; i++) {
                 Like like = new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now);
                 likeStorage.save(like);
@@ -97,7 +105,7 @@ class DailyLimitServiceTest {
             assertTrue(service.canPass(userId));
 
             // Even with many passes recorded
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             for (int i = 0; i < 100; i++) {
                 Like pass = new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now);
                 likeStorage.save(pass);
@@ -117,7 +125,7 @@ class DailyLimitServiceTest {
             DailyService limitedPassService = new DailyService(likeStorage, limitedPassConfig);
 
             // Add 2 passes today (at limit)
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             for (int i = 0; i < 2; i++) {
                 Like pass = new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now);
                 likeStorage.save(pass);
@@ -134,7 +142,7 @@ class DailyLimitServiceTest {
         @Test
         @DisplayName("Status shows correct counts")
         void getStatus_returnsCorrectCounts() {
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             // 2 likes, 1 pass
             likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
             likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
@@ -167,7 +175,7 @@ class DailyLimitServiceTest {
         @DisplayName("Status returns correct date")
         void getStatus_returnsCorrectDate() {
             DailyService.DailyStatus status = service.getStatus(userId);
-            assertEquals(LocalDate.now(ZoneOffset.UTC), status.date());
+            assertEquals(AppClock.today(ZoneOffset.UTC), status.date());
         }
     }
 
@@ -218,7 +226,7 @@ class DailyLimitServiceTest {
         @Test
         @DisplayName("Passes don't count against like limit")
         void passes_dontCountAgainstLikes() {
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             // 3 passes
             for (int i = 0; i < 3; i++) {
                 likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now));
@@ -238,7 +246,7 @@ class DailyLimitServiceTest {
                     .build();
             DailyService limitedPassService = new DailyService(likeStorage, limitedPassConfig);
 
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             // 5 likes
             for (int i = 0; i < 5; i++) {
                 likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));

@@ -261,12 +261,6 @@ public class ChatController extends BaseController implements Initializable {
 
     @SuppressWarnings("unused")
     @FXML
-    private void handleBack() {
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
-    }
-
-    @SuppressWarnings("unused")
-    @FXML
     private void handleBrowseMatches() {
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
     }

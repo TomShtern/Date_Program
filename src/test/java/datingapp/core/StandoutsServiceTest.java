@@ -2,7 +2,9 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -12,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -29,25 +32,36 @@ class StandoutsServiceTest {
     private TestStorages.Users userStorage;
     private TestStandoutStorage standoutStorage;
     private CandidateFinder candidateFinder;
+    private ProfileCompletionService profileCompletionService;
     private StandoutsService service;
+    private AppConfig config;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
+        TestClock.setFixed(FIXED_INSTANT);
+        config = AppConfig.defaults();
         userStorage = new TestStorages.Users();
         TestStorages.Likes likeStorage = new TestStorages.Likes();
         TestStorages.Blocks blockStorage = new TestStorages.Blocks();
         standoutStorage = new TestStandoutStorage();
-        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, AppConfig.defaults());
-        service = new StandoutsService(userStorage, standoutStorage, candidateFinder, AppConfig.defaults());
+        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, config);
+        profileCompletionService = new ProfileCompletionService(config);
+        service = new StandoutsService(userStorage, standoutStorage, candidateFinder, profileCompletionService, config);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
     }
 
     /** Creates a fully complete user that can be activated. */
     private User createCompleteActiveUser(String name) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio for " + name);
-        user.setBirthDate(LocalDate.now().minusYears(25)); // 25 years old
-        user.setGender(Gender.OTHER);
-        user.setInterestedIn(EnumSet.allOf(Gender.class));
+        user.setBirthDate(AppClock.today().minusYears(25)); // 25 years old
+        user.setGender(User.Gender.OTHER);
+        user.setInterestedIn(EnumSet.allOf(User.Gender.class));
         user.setLocation(32.0853, 34.7818); // Tel Aviv
         user.setMaxDistanceKm(50);
         user.setAgeRange(18, 99);
@@ -62,10 +76,10 @@ class StandoutsServiceTest {
     }
 
     /** Creates a user with specific gender preferences for matching tests. */
-    private User createUserWithGender(String name, Gender myGender, Gender interestedIn) {
+    private User createUserWithGender(String name, User.Gender myGender, User.Gender interestedIn) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio for " + name);
-        user.setBirthDate(LocalDate.now().minusYears(25));
+        user.setBirthDate(AppClock.today().minusYears(25));
         user.setGender(myGender);
         user.setInterestedIn(EnumSet.of(interestedIn));
         user.setLocation(32.0853, 34.7818);
@@ -90,7 +104,8 @@ class StandoutsServiceTest {
         void requiresUserStorage() {
             assertThrows(
                     NullPointerException.class,
-                    () -> new StandoutsService(null, standoutStorage, candidateFinder, AppConfig.defaults()));
+                    () -> new StandoutsService(
+                            null, standoutStorage, candidateFinder, profileCompletionService, config));
         }
 
         @Test
@@ -98,7 +113,7 @@ class StandoutsServiceTest {
         void requiresStandoutStorage() {
             assertThrows(
                     NullPointerException.class,
-                    () -> new StandoutsService(userStorage, null, candidateFinder, AppConfig.defaults()));
+                    () -> new StandoutsService(userStorage, null, candidateFinder, profileCompletionService, config));
         }
 
         @Test
@@ -106,7 +121,15 @@ class StandoutsServiceTest {
         void requiresCandidateFinder() {
             assertThrows(
                     NullPointerException.class,
-                    () -> new StandoutsService(userStorage, standoutStorage, null, AppConfig.defaults()));
+                    () -> new StandoutsService(userStorage, standoutStorage, null, profileCompletionService, config));
+        }
+
+        @Test
+        @DisplayName("Should require non-null profileCompletionService")
+        void requiresProfileCompletionService() {
+            assertThrows(
+                    NullPointerException.class,
+                    () -> new StandoutsService(userStorage, standoutStorage, candidateFinder, null, config));
         }
 
         @Test
@@ -114,7 +137,8 @@ class StandoutsServiceTest {
         void requiresConfig() {
             assertThrows(
                     NullPointerException.class,
-                    () -> new StandoutsService(userStorage, standoutStorage, candidateFinder, null));
+                    () -> new StandoutsService(
+                            userStorage, standoutStorage, candidateFinder, profileCompletionService, null));
         }
     }
 
@@ -142,7 +166,7 @@ class StandoutsServiceTest {
             userStorage.save(seeker);
 
             // Pre-cache some standouts
-            LocalDate today = LocalDate.now();
+            LocalDate today = AppClock.today();
             Standout cached = Standout.create(seeker.getId(), UUID.randomUUID(), today, 1, 90, "Test");
             standoutStorage.cachedStandouts.put(seeker.getId() + "_" + today, List.of(cached));
 
@@ -155,9 +179,9 @@ class StandoutsServiceTest {
         @Test
         @DisplayName("Should generate standouts when not cached")
         void generatesWhenNotCached() {
-            User seeker = createUserWithGender("Seeker", Gender.FEMALE, Gender.MALE);
-            User candidate1 = createUserWithGender("Bob", Gender.MALE, Gender.FEMALE);
-            User candidate2 = createUserWithGender("Charlie", Gender.MALE, Gender.FEMALE);
+            User seeker = createUserWithGender("Seeker", User.Gender.FEMALE, User.Gender.MALE);
+            User candidate1 = createUserWithGender("Bob", User.Gender.MALE, User.Gender.FEMALE);
+            User candidate2 = createUserWithGender("Charlie", User.Gender.MALE, User.Gender.FEMALE);
 
             userStorage.save(seeker);
             userStorage.save(candidate1);
@@ -172,12 +196,12 @@ class StandoutsServiceTest {
         @Test
         @DisplayName("Should limit to 10 standouts")
         void limitsToTen() {
-            User seeker = createUserWithGender("Seeker", Gender.FEMALE, Gender.MALE);
+            User seeker = createUserWithGender("Seeker", User.Gender.FEMALE, User.Gender.MALE);
             userStorage.save(seeker);
 
             // Create 15 candidates
             for (int i = 0; i < 15; i++) {
-                User candidate = createUserWithGender("Candidate" + i, Gender.MALE, Gender.FEMALE);
+                User candidate = createUserWithGender("Candidate" + i, User.Gender.MALE, User.Gender.FEMALE);
                 userStorage.save(candidate);
             }
 
@@ -216,8 +240,8 @@ class StandoutsServiceTest {
             userStorage.save(user2);
 
             List<Standout> standouts = List.of(
-                    Standout.create(UUID.randomUUID(), user1.getId(), LocalDate.now(), 1, 90, "Test1"),
-                    Standout.create(UUID.randomUUID(), user2.getId(), LocalDate.now(), 2, 85, "Test2"));
+                    Standout.create(UUID.randomUUID(), user1.getId(), AppClock.today(), 1, 90, "Test1"),
+                    Standout.create(UUID.randomUUID(), user2.getId(), AppClock.today(), 2, 85, "Test2"));
 
             var resolved = service.resolveUsers(standouts);
 
@@ -234,8 +258,8 @@ class StandoutsServiceTest {
 
             UUID missingId = UUID.randomUUID();
             List<Standout> standouts = List.of(
-                    Standout.create(UUID.randomUUID(), user1.getId(), LocalDate.now(), 1, 90, "Test1"),
-                    Standout.create(UUID.randomUUID(), missingId, LocalDate.now(), 2, 85, "Test2"));
+                    Standout.create(UUID.randomUUID(), user1.getId(), AppClock.today(), 1, 90, "Test1"),
+                    Standout.create(UUID.randomUUID(), missingId, AppClock.today(), 2, 85, "Test2"));
 
             var resolved = service.resolveUsers(standouts);
 
@@ -263,7 +287,7 @@ class StandoutsServiceTest {
         @DisplayName("of() should create result with standouts")
         void ofCreatesWithStandouts() {
             List<Standout> standouts =
-                    List.of(Standout.create(UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), 1, 90, "Test"));
+                    List.of(Standout.create(UUID.randomUUID(), UUID.randomUUID(), AppClock.today(), 1, 90, "Test"));
 
             StandoutsService.Result result = StandoutsService.Result.of(standouts, 5, true);
 

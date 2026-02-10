@@ -69,7 +69,7 @@ public final class HandlerFactory {
         if (profileHandler == null) {
             profileHandler = new ProfileHandler(
                     services.getUserStorage(),
-                    services.getProfilePreviewService(),
+                    services.getProfileCompletionService(),
                     services.getAchievementService(),
                     new ValidationService(services.getConfig()),
                     session,
@@ -130,7 +130,12 @@ public final class HandlerFactory {
      */
     public MessagingHandler messaging() {
         if (messagingHandler == null) {
-            messagingHandler = new MessagingHandler(services, inputReader, session);
+            messagingHandler = new MessagingHandler(
+                    services.getMessagingService(),
+                    services.getMatchStorage(),
+                    services.getBlockStorage(),
+                    inputReader,
+                    session);
         }
         return messagingHandler;
     }

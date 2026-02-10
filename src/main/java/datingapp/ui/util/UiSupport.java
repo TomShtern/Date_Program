@@ -1,19 +1,27 @@
 package datingapp.ui.util;
 
+import java.net.URL;
+import java.util.Optional;
 import java.util.regex.Pattern;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.image.Image;
 
-/**
- * Consolidated UI helper utilities for the JavaFX application.
- * Contains: ResponsiveController (interface), ValidationHelper
- */
-public final class UiHelpers {
+/** Consolidated UI helper utilities for JavaFX controllers. */
+public final class UiSupport {
 
-    private UiHelpers() {
+    private UiSupport() {
         // Utility class
+    }
+
+    /** Returns a cached avatar image or a default placeholder. */
+    public static Image getAvatar(String path, double size) {
+        return ImageCache.getAvatar(path, size);
     }
 
     /** Clears validation styling for a text input control. */
@@ -21,19 +29,42 @@ public final class UiHelpers {
         ValidationHelper.clearValidation(control, errorLabel);
     }
 
+    /**
+     * Shows a confirmation dialog and returns true if user confirms.
+     *
+     * @param title Dialog title
+     * @param header Header text (can be null)
+     * @param content Detailed message
+     * @return true if user clicked OK, false otherwise
+     */
+    public static boolean showConfirmation(String title, String header, String content) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(header);
+        alert.setContentText(content);
+
+        DialogPane dialogPane = alert.getDialogPane();
+        URL stylesheet = UiSupport.class.getResource("/css/theme.css");
+        if (stylesheet != null) {
+            dialogPane.getStylesheets().add(stylesheet.toExternalForm());
+        }
+        dialogPane.getStyleClass().add("confirmation-dialog");
+
+        Optional<ButtonType> result = alert.showAndWait();
+        return result.isPresent() && result.get() == ButtonType.OK;
+    }
+
     // ========== RESPONSIVE CONTROLLER INTERFACE ==========
 
     /**
      * Interface for controllers that support responsive layout changes.
-     * Implement this in controllers that need to adapt their UI based on window
-     * size.
+     * Implement this in controllers that need to adapt their UI based on window size.
      */
     public interface ResponsiveController {
 
         /**
          * Called when the window enters compact mode (width < 900px).
-         * Controllers should hide non-essential UI elements and use single-column
-         * layouts.
+         * Controllers should hide non-essential UI elements and use single-column layouts.
          *
          * @param compact true to enable compact mode, false for normal mode
          */
@@ -69,7 +100,7 @@ public final class UiHelpers {
         /**
          * Validates that a text field is not empty.
          *
-         * @param field      The text field to validate
+         * @param field The text field to validate
          * @param errorLabel Optional label to show error message
          * @return true if valid, false otherwise
          */
@@ -85,7 +116,7 @@ public final class UiHelpers {
         /**
          * Validates that a text field contains a valid email address.
          *
-         * @param field      The text field to validate
+         * @param field The text field to validate
          * @param errorLabel Optional label to show error message
          * @return true if valid, false otherwise
          */
@@ -102,9 +133,9 @@ public final class UiHelpers {
         /**
          * Validates that a text field meets a minimum length requirement.
          *
-         * @param field      The text field to validate
+         * @param field The text field to validate
          * @param errorLabel Optional label to show error message
-         * @param min        Minimum required length
+         * @param min Minimum required length
          * @return true if valid, false otherwise
          */
         public static boolean validateMinLength(TextField field, Label errorLabel, int min) {
@@ -119,9 +150,9 @@ public final class UiHelpers {
         /**
          * Validates that a text area meets a minimum length requirement.
          *
-         * @param area       The text area to validate
+         * @param area The text area to validate
          * @param errorLabel Optional label to show error message
-         * @param min        Minimum required length
+         * @param min Minimum required length
          * @return true if valid, false otherwise
          */
         public static boolean validateTextAreaMinLength(TextArea area, Label errorLabel, int min) {
@@ -166,7 +197,7 @@ public final class UiHelpers {
         /**
          * Clears all validation styling from a text input control.
          *
-         * @param control    The text input control
+         * @param control The text input control
          * @param errorLabel Optional error label to hide
          */
         public static void clearValidation(TextInputControl control, Label errorLabel) {

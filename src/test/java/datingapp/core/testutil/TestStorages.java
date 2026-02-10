@@ -1,12 +1,13 @@
 package datingapp.core.testutil;
 
+import datingapp.core.AppClock;
 import datingapp.core.Match;
 import datingapp.core.Standout;
 import datingapp.core.User;
 import datingapp.core.User.ProfileNote;
+import datingapp.core.User.UserState;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserState;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
@@ -382,7 +383,7 @@ public final class TestStorages {
                 for (int i = 0; i < list.size(); i++) {
                     Standout s = list.get(i);
                     if (s.standoutUserId().equals(standoutUserId)) {
-                        list.set(i, s.withInteraction(java.time.Instant.now()));
+                        list.set(i, s.withInteraction(AppClock.now()));
                         break;
                     }
                 }

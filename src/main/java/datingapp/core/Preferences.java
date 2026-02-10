@@ -87,7 +87,7 @@ public final class Preferences {
          */
         public static final int MAX_PER_USER = 10;
 
-        /** Minimum interests for "interests complete" in ProfilePreviewService. */
+        /** Minimum interests for "interests complete" in ProfileCompletionService. */
         public static final int MIN_FOR_COMPLETE = 3;
 
         /** Interest categories for organized display. */

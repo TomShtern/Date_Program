@@ -155,12 +155,12 @@ class DailyServiceTest {
             User candidate2 = TestUserFactory.createActiveUser("Candidate2");
 
             // Ensure mutual interest
-            seeker.setGender(Gender.MALE);
-            seeker.setInterestedIn(Set.of(Gender.FEMALE));
-            candidate1.setGender(Gender.FEMALE);
-            candidate1.setInterestedIn(Set.of(Gender.MALE));
-            candidate2.setGender(Gender.FEMALE);
-            candidate2.setInterestedIn(Set.of(Gender.MALE));
+            seeker.setGender(User.Gender.MALE);
+            seeker.setInterestedIn(Set.of(User.Gender.FEMALE));
+            candidate1.setGender(User.Gender.FEMALE);
+            candidate1.setInterestedIn(Set.of(User.Gender.MALE));
+            candidate2.setGender(User.Gender.FEMALE);
+            candidate2.setInterestedIn(Set.of(User.Gender.MALE));
 
             userStorage.save(seeker);
             userStorage.save(candidate1);
@@ -179,13 +179,13 @@ class DailyServiceTest {
         @DisplayName("getDailyPick is deterministic for same user/date")
         void getDailyPick_deterministic() {
             User seeker = TestUserFactory.createActiveUser("Seeker");
-            seeker.setGender(Gender.MALE);
-            seeker.setInterestedIn(Set.of(Gender.FEMALE));
+            seeker.setGender(User.Gender.MALE);
+            seeker.setInterestedIn(Set.of(User.Gender.FEMALE));
 
             for (int i = 0; i < 10; i++) {
                 User candidate = TestUserFactory.createActiveUser("Candidate" + i);
-                candidate.setGender(Gender.FEMALE);
-                candidate.setInterestedIn(Set.of(Gender.MALE));
+                candidate.setGender(User.Gender.FEMALE);
+                candidate.setInterestedIn(Set.of(User.Gender.MALE));
                 userStorage.save(candidate);
             }
             userStorage.save(seeker);
@@ -213,7 +213,7 @@ class DailyServiceTest {
         @Test
         @DisplayName("cleanupOldDailyPickViews removes old entries")
         void cleanupOldDailyPickViews() {
-            LocalDate today = LocalDate.now(fixedClock);
+            LocalDate today = AppClock.today(ZoneId.of("UTC"));
             service.cleanupOldDailyPickViews(today);
             // Verify it doesn't crash and returns 0 for mock
             assertEquals(0, service.cleanupOldDailyPickViews(today));
@@ -241,14 +241,13 @@ class DailyServiceTest {
         @DisplayName("DailyStatus edge cases")
         void dailyStatus_edgeCases() {
             DailyService.DailyStatus status =
-                    new DailyService.DailyStatus(0, 5, 0, 10, LocalDate.now(fixedClock), Instant.now(fixedClock));
+                    new DailyService.DailyStatus(0, 5, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now());
             assertFalse(status.hasUnlimitedLikes());
             assertFalse(status.hasUnlimitedPasses());
 
             assertThrows(
                     IllegalArgumentException.class,
-                    () -> new DailyService.DailyStatus(
-                            -1, 5, 0, 10, LocalDate.now(fixedClock), Instant.now(fixedClock)));
+                    () -> new DailyService.DailyStatus(-1, 5, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now()));
         }
     }
 

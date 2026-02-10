@@ -9,10 +9,13 @@ import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
+import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,6 +32,18 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("Edge Case Regression Tests")
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class EdgeCaseRegressionTest {
+
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+
+    @BeforeEach
+    void setUpClock() {
+        TestClock.setFixed(FIXED_INSTANT);
+    }
+
+    @AfterEach
+    void resetClock() {
+        TestClock.reset();
+    }
 
     // ============================================================
     // USER DATA INTEGRITY
@@ -59,10 +74,10 @@ class EdgeCaseRegressionTest {
         @DisplayName("Clearing interestedIn does not break getter")
         void clearingInterestedInWorks() {
             User user = new User(UUID.randomUUID(), "Test");
-            user.setInterestedIn(EnumSet.of(Gender.MALE));
-            user.setInterestedIn(EnumSet.noneOf(Gender.class)); // Clear it
+            user.setInterestedIn(EnumSet.of(User.Gender.MALE));
+            user.setInterestedIn(EnumSet.noneOf(User.Gender.class)); // Clear it
 
-            Set<Gender> interested = user.getInterestedIn();
+            Set<User.Gender> interested = user.getInterestedIn();
 
             assertNotNull(interested);
             assertDoesNotThrow(user::getInterestedIn);
@@ -75,8 +90,8 @@ class EdgeCaseRegressionTest {
             User user = new User(UUID.randomUUID(), "Test");
             user.setBio("Bio");
             user.setBirthDate(LocalDate.of(1990, 1, 1));
-            user.setGender(Gender.MALE);
-            user.setInterestedIn(EnumSet.of(Gender.FEMALE));
+            user.setGender(User.Gender.MALE);
+            user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
             // Note: location defaults to 0,0
             user.setMaxDistanceKm(50);
             user.setAgeRange(18, 40);
@@ -106,7 +121,7 @@ class EdgeCaseRegressionTest {
         @DisplayName("User born today has age 0")
         void userBornTodayHasAgeZero() {
             User user = new User(UUID.randomUUID(), "Baby");
-            user.setBirthDate(LocalDate.now());
+            user.setBirthDate(AppClock.today());
 
             assertEquals(0, user.getAge(), "User born today should be 0 years old");
         }
@@ -115,7 +130,7 @@ class EdgeCaseRegressionTest {
         @DisplayName("User turning 18 today is exactly 18")
         void userTurning18Today() {
             User user = new User(UUID.randomUUID(), "Teen");
-            user.setBirthDate(LocalDate.now().minusYears(18));
+            user.setBirthDate(AppClock.today().minusYears(18));
 
             assertEquals(18, user.getAge(), "User exactly 18 years");
         }
@@ -125,9 +140,9 @@ class EdgeCaseRegressionTest {
         void minorCanHaveCompleteProfile() {
             User user = new User(UUID.randomUUID(), "Teen");
             user.setBio("Bio");
-            user.setBirthDate(LocalDate.now().minusYears(17)); // 17 years old
-            user.setGender(Gender.MALE);
-            user.setInterestedIn(EnumSet.of(Gender.FEMALE));
+            user.setBirthDate(AppClock.today().minusYears(17)); // 17 years old
+            user.setGender(User.Gender.MALE);
+            user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
             user.setLocation(32.0, 34.0);
             user.setMaxDistanceKm(50);
             user.setAgeRange(18, 40);
@@ -308,8 +323,8 @@ class EdgeCaseRegressionTest {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Bio");
         user.setBirthDate(LocalDate.of(1990, 1, 1));
-        user.setGender(Gender.MALE);
-        user.setInterestedIn(EnumSet.of(Gender.FEMALE));
+        user.setGender(User.Gender.MALE);
+        user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
         user.setLocation(32.0, 34.0);
         user.setMaxDistanceKm(50);
         user.setAgeRange(18, 60);

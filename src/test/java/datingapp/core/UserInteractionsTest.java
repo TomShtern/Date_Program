@@ -9,9 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.Report;
+import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -27,6 +30,18 @@ import org.junit.jupiter.api.Timeout;
 @SuppressWarnings("unused") // Test class with @Nested
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class UserInteractionsTest {
+
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+
+    @BeforeEach
+    void setUpClock() {
+        TestClock.setFixed(FIXED_INSTANT);
+    }
+
+    @AfterEach
+    void resetClock() {
+        TestClock.reset();
+    }
 
     // ==================== LIKE TESTS ====================
 
@@ -142,7 +157,7 @@ class UserInteractionsTest {
         void nullIdThrows() {
             UUID user1 = UUID.randomUUID();
             UUID user2 = UUID.randomUUID();
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
 
             NullPointerException ex = assertThrows(
                     NullPointerException.class, () -> new Like(null, user1, user2, Like.Direction.LIKE, now));
@@ -167,7 +182,7 @@ class UserInteractionsTest {
             UUID id = UUID.randomUUID();
             UUID u1 = UUID.randomUUID();
             UUID u2 = UUID.randomUUID();
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
 
             Like like1 = new Like(id, u1, u2, Like.Direction.LIKE, now);
             Like like2 = new Like(id, u1, u2, Like.Direction.LIKE, now);
@@ -246,7 +261,7 @@ class UserInteractionsTest {
         void nullIdThrows() {
             UUID user1 = UUID.randomUUID();
             UUID user2 = UUID.randomUUID();
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
 
             NullPointerException ex =
                     assertThrows(NullPointerException.class, () -> new Block(null, user1, user2, now));
@@ -270,7 +285,7 @@ class UserInteractionsTest {
             UUID id = UUID.randomUUID();
             UUID u1 = UUID.randomUUID();
             UUID u2 = UUID.randomUUID();
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
 
             Block b1 = new Block(id, u1, u2, now);
             Block b2 = new Block(id, u1, u2, now);
@@ -382,7 +397,7 @@ class UserInteractionsTest {
         void nullIdThrows() {
             UUID u1 = UUID.randomUUID();
             UUID u2 = UUID.randomUUID();
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
 
             NullPointerException ex = assertThrows(
                     NullPointerException.class, () -> new Report(null, u1, u2, Report.Reason.SPAM, "desc", now));
@@ -407,7 +422,7 @@ class UserInteractionsTest {
             UUID id = UUID.randomUUID();
             UUID u1 = UUID.randomUUID();
             UUID u2 = UUID.randomUUID();
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
 
             Report r1 = new Report(id, u1, u2, Report.Reason.SPAM, "desc", now);
             Report r2 = new Report(id, u1, u2, Report.Reason.SPAM, "desc", now);

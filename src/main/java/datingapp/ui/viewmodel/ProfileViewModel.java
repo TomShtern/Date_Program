@@ -1,17 +1,18 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
-import datingapp.core.Gender;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.ProfileCompletionService;
 import datingapp.core.ProfileCompletionService.CompletionResult;
 import datingapp.core.User;
-import datingapp.core.UserState;
-import datingapp.core.storage.UserStorage;
+import datingapp.core.User.Gender;
+import datingapp.core.User.UserState;
 import datingapp.ui.util.Toast;
+import datingapp.ui.viewmodel.data.UiUserStore;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 import java.time.Period;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Platform;
@@ -45,7 +47,8 @@ public class ProfileViewModel {
     private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
     private static final String NONE_SET_LABEL = "None set";
 
-    private final UserStorage userStorage;
+    private final UiUserStore userStore;
+    private final ProfileCompletionService profileCompletionService;
 
     // Observable properties for form binding - Basic Info
     private final StringProperty name = new SimpleStringProperty("");
@@ -89,10 +92,10 @@ public class ProfileViewModel {
 
     private ErrorHandler errorHandler;
 
-    @SuppressWarnings("unused")
-    public ProfileViewModel(UserStorage userStorage, ProfileCompletionService unused) {
-        // ProfileCompletionService has static methods, so we ignore the parameter
-        this.userStorage = userStorage;
+    public ProfileViewModel(UiUserStore userStore, ProfileCompletionService profileCompletionService) {
+        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
+        this.profileCompletionService =
+                Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
     }
 
     /**
@@ -223,7 +226,7 @@ public class ProfileViewModel {
 
     private void updateCompletion(User user) {
         try {
-            CompletionResult result = ProfileCompletionService.calculate(user);
+            CompletionResult result = profileCompletionService.calculate(user);
             completionStatus.set(result.getDisplayString());
             completionDetails.set(buildCompletionDetails(result));
         } catch (Exception e) {
@@ -277,11 +280,21 @@ public class ProfileViewModel {
         applyLifestyleFields(user);
         applySearchPreferences(user);
         applyDealbreakers(user);
-        persistUser(user);
-        attemptActivation(user);
-        updateSessionAndCompletion(user);
 
-        logInfo("Profile saved successfully");
+        Thread thread = Thread.ofVirtual().name("profile-save").start(() -> {
+            try {
+                persistUser(user);
+                attemptActivation(user);
+                Platform.runLater(() -> {
+                    updateSessionAndCompletion(user);
+                    logInfo("Profile saved successfully");
+                });
+            } catch (Exception e) {
+                logError("Failed to save profile: {}", e.getMessage(), e);
+                notifyError("Failed to save profile", e);
+            }
+        });
+        backgroundThread.set(thread);
     }
 
     private void applyBasicFields(User user) {
@@ -364,14 +377,14 @@ public class ProfileViewModel {
     }
 
     private void persistUser(User user) {
-        userStorage.save(user);
+        userStore.save(user);
     }
 
     private void attemptActivation(User user) {
         if (user.isComplete() && user.getState() == UserState.INCOMPLETE) {
             try {
                 user.activate();
-                userStorage.save(user);
+                userStore.save(user);
                 logInfo("User {} activated after profile completion", user.getName());
                 Toast.showSuccess("Profile complete! You're now active!");
             } catch (IllegalStateException e) {
@@ -628,7 +641,7 @@ public class ProfileViewModel {
                 // 4. Update user record with photo URL (use file:// URI)
                 String photoUrl = destination.toUri().toString();
                 user.setPhotoUrls(List.of(photoUrl));
-                userStorage.save(user);
+                userStore.save(user);
 
                 // 5. Update UI on FX thread
                 Platform.runLater(() -> {
@@ -682,7 +695,7 @@ public class ProfileViewModel {
         if (selected == null) {
             return;
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = AppClock.today();
         if (selected.isAfter(today)) {
             logWarn("Birth date cannot be in the future: {}", selected);
             Toast.showWarning("Birth date cannot be in the future");

@@ -2,6 +2,7 @@ package datingapp.app.cli;
 
 import java.util.EnumSet;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,9 +25,9 @@ public final class EnumMenu {
      * @param enumClass The enum class
      * @param prompt    The prompt to display
      * @param allowSkip If true, adds "0=Skip" option
-     * @return Selected value, or null if skipped/invalid
+     * @return Selected value, or empty if skipped/invalid
      */
-    public static <E extends Enum<E>> E prompt(
+    public static <E extends Enum<E>> Optional<E> prompt(
             InputReader reader, Class<E> enumClass, String prompt, boolean allowSkip) {
 
         E[] values = enumClass.getEnumConstants();
@@ -45,17 +46,17 @@ public final class EnumMenu {
         try {
             int choice = Integer.parseInt(input.trim());
             if (choice == 0 && allowSkip) {
-                return null;
+                return Optional.empty();
             }
             if (choice >= 1 && choice <= values.length) {
-                return values[choice - 1];
+                return Optional.of(values[choice - 1]);
             }
         } catch (NumberFormatException ignored) {
             logger.debug("Invalid numeric selection", ignored);
         }
 
         logger.info("⚠️ Invalid selection, skipping.");
-        return null;
+        return Optional.empty();
     }
 
     /**

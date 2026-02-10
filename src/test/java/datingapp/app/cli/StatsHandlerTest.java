@@ -8,7 +8,7 @@ import datingapp.core.AchievementService;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.Match;
-import datingapp.core.ProfilePreviewService;
+import datingapp.core.ProfileCompletionService;
 import datingapp.core.Stats.UserStats;
 import datingapp.core.StatsService;
 import datingapp.core.User;
@@ -55,14 +55,14 @@ class StatsHandlerTest {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         StatsService statsService =
                 new StatsService(likeStorage, matchStorage, blockStorage, reportStorage, statsStorage);
-        ProfilePreviewService profilePreviewService = new ProfilePreviewService();
+        ProfileCompletionService profileCompletionService = new ProfileCompletionService(AppConfig.defaults());
         AchievementService achievementService = new AchievementService(
                 statsStorage,
                 matchStorage,
                 likeStorage,
                 userStorage,
                 reportStorage,
-                profilePreviewService,
+                profileCompletionService,
                 AppConfig.defaults());
         return new StatsHandler(statsService, achievementService, session, inputReader);
     }
@@ -183,8 +183,8 @@ class StatsHandlerTest {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio for " + name);
         user.setBirthDate(java.time.LocalDate.of(1990, 1, 1));
-        user.setGender(datingapp.core.Gender.OTHER);
-        user.setInterestedIn(EnumSet.of(datingapp.core.Gender.OTHER));
+        user.setGender(User.Gender.OTHER);
+        user.setInterestedIn(EnumSet.of(User.Gender.OTHER));
         user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new datingapp.core.PacePreferences(
                 datingapp.core.PacePreferences.MessagingFrequency.OFTEN,

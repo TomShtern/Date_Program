@@ -3,10 +3,13 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,16 +23,22 @@ class MatchingServiceTest {
     private TestStorages.Likes likeStorage;
     private TestStorages.Matches matchStorage;
     private MatchingService matchingService;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
-
+        TestClock.setFixed(FIXED_INSTANT);
         likeStorage = new TestStorages.Likes();
         matchStorage = new TestStorages.Matches();
         matchingService = MatchingService.builder()
                 .likeStorage(likeStorage)
                 .matchStorage(matchStorage)
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
     }
 
     @Nested
@@ -163,11 +172,11 @@ class MatchingServiceTest {
         @DisplayName("processSwipe returns config error when services are missing")
         void processSwipeReturnsConfigErrorWithoutServices() {
             // Builder without dailyService/undoService
-            User user = User.StorageBuilder.create(UUID.randomUUID(), "Alice", java.time.Instant.now())
-                    .state(UserState.ACTIVE)
+            User user = User.StorageBuilder.create(UUID.randomUUID(), "Alice", AppClock.now())
+                    .state(User.UserState.ACTIVE)
                     .build();
-            User candidate = User.StorageBuilder.create(UUID.randomUUID(), "Bob", java.time.Instant.now())
-                    .state(UserState.ACTIVE)
+            User candidate = User.StorageBuilder.create(UUID.randomUUID(), "Bob", AppClock.now())
+                    .state(User.UserState.ACTIVE)
                     .build();
 
             MatchingService.SwipeResult result = matchingService.processSwipe(user, candidate, true);

@@ -3,6 +3,7 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.*;
+import datingapp.core.User.Gender;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.time.LocalDate;

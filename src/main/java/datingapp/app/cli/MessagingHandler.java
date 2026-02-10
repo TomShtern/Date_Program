@@ -2,15 +2,16 @@ package datingapp.app.cli;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppSession;
+import datingapp.core.LoggingSupport;
 import datingapp.core.Match;
 import datingapp.core.Messaging.Conversation;
 import datingapp.core.Messaging.Message;
 import datingapp.core.MessagingService;
 import datingapp.core.MessagingService.ConversationPreview;
 import datingapp.core.MessagingService.SendResult;
-import datingapp.core.ServiceRegistry;
 import datingapp.core.User;
 import datingapp.core.UserInteractions.Block;
+import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.MatchStorage;
 import java.time.Duration;
 import java.time.Instant;
@@ -24,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Handler for messaging functionality in the CLI. */
-public class MessagingHandler {
+public class MessagingHandler implements LoggingSupport {
 
     private static final Logger logger = LoggerFactory.getLogger(MessagingHandler.class);
     private static final int MESSAGES_PER_PAGE = 20;
@@ -32,25 +33,38 @@ public class MessagingHandler {
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
 
-    private final ServiceRegistry registry;
+    private final MessagingService messagingService;
+    private final MatchStorage matchStorage;
+    private final BlockStorage blockStorage;
     private final InputReader input;
     private final AppSession session;
 
-    public MessagingHandler(ServiceRegistry registry, InputReader input, AppSession session) {
-        this.registry = Objects.requireNonNull(registry, "registry cannot be null");
+    public MessagingHandler(
+            MessagingService messagingService,
+            MatchStorage matchStorage,
+            BlockStorage blockStorage,
+            InputReader input,
+            AppSession session) {
+        this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
+        this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
+        this.blockStorage = Objects.requireNonNull(blockStorage, "blockStorage cannot be null");
         this.input = Objects.requireNonNull(input, "input cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
+    }
+
+    @Override
+    public Logger logger() {
+        return logger;
     }
 
     /** Shows the conversation list and handles navigation. */
     public void showConversations() {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) {
-            logInfo(CliConstants.PLEASE_SELECT_USER);
+            logInfo(CliSupport.PLEASE_SELECT_USER);
             return;
         }
 
-        MessagingService messagingService = registry.getMessagingService();
         List<ConversationPreview> previews = messagingService.getConversations(currentUser.getId());
 
         while (true) {
@@ -68,22 +82,22 @@ public class MessagingHandler {
                 return;
             }
 
-            previews = handleConversationSelection(choice, previews, currentUser, messagingService);
+            previews = handleConversationSelection(choice, previews, currentUser);
         }
     }
 
     /** Prints the header for the conversation list. */
     private void printConversationListHeader() {
-        logInfo("\n{}", CliConstants.SEPARATOR_LINE);
+        logInfo("\n{}", CliSupport.SEPARATOR_LINE);
         logInfo("       💬 YOUR CONVERSATIONS");
-        logInfo("{}", CliConstants.SEPARATOR_LINE);
+        logInfo("{}", CliSupport.SEPARATOR_LINE);
     }
 
     /** Prints a message when there are no conversations. */
     private void printEmptyConversations() {
         logInfo("\n  No conversations yet.");
         logInfo("  Start by matching with someone and send a message!\n");
-        logInfo("{}", CliConstants.MENU_DIVIDER);
+        logInfo("{}", CliSupport.MENU_DIVIDER);
         logInfo("[B] Back");
         input.readLine("> ");
     }
@@ -104,7 +118,7 @@ public class MessagingHandler {
             logInfo("\nTotal unread: {} message(s)", totalUnread);
         }
 
-        logInfo("{}", CliConstants.MENU_DIVIDER);
+        logInfo("{}", CliSupport.MENU_DIVIDER);
         logInfo("[#] Select conversation  [B] Back");
     }
 
@@ -114,21 +128,20 @@ public class MessagingHandler {
      * @param choice The user's input choice
      * @param previews The current list of conversation previews
      * @param currentUser The current user
-     * @param messagingService The messaging service
      * @return Updated list of conversation previews
      */
     private List<ConversationPreview> handleConversationSelection(
-            String choice, List<ConversationPreview> previews, User currentUser, MessagingService messagingService) {
+            String choice, List<ConversationPreview> previews, User currentUser) {
         try {
             int idx = Integer.parseInt(choice) - 1;
             if (idx >= 0 && idx < previews.size()) {
                 showConversation(currentUser, previews.get(idx));
                 return messagingService.getConversations(currentUser.getId());
             } else {
-                logInfo(CliConstants.INVALID_SELECTION);
+                logInfo(CliSupport.INVALID_SELECTION);
             }
         } catch (NumberFormatException _) {
-            logInfo(CliConstants.INVALID_INPUT);
+            logInfo(CliSupport.INVALID_INPUT);
         }
         return previews;
     }
@@ -150,8 +163,6 @@ public class MessagingHandler {
 
     /** Shows a single conversation with messages. */
     private void showConversation(User currentUser, ConversationPreview preview) {
-        MessagingService messagingService = registry.getMessagingService();
-        MatchStorage matchStorage = registry.getMatchStorage();
         Conversation conversation = preview.conversation();
         User otherUser = preview.otherUser();
 
@@ -178,8 +189,7 @@ public class MessagingHandler {
                 continue;
             }
 
-            ConversationAction action =
-                    processConversationInput(userInput, canMessage, currentUser, otherUser, messagingService);
+            ConversationAction action = processConversationInput(userInput, canMessage, currentUser, otherUser);
             switch (action) {
                 case EXIT -> {
                     return;
@@ -216,12 +226,12 @@ public class MessagingHandler {
      * @param canMessage Whether the user can send messages in this conversation
      */
     private void printConversationHeader(String otherUserName, boolean canMessage) {
-        logInfo("\n{}", CliConstants.SEPARATOR_LINE);
+        logInfo("\n{}", CliSupport.SEPARATOR_LINE);
         logInfo("       💬 Conversation with {}", otherUserName);
         if (!canMessage) {
             logInfo("       ⚠️  Match ended - read only");
         }
-        logInfo("{}", CliConstants.SEPARATOR_LINE);
+        logInfo("{}", CliSupport.SEPARATOR_LINE);
     }
 
     /**
@@ -253,7 +263,7 @@ public class MessagingHandler {
             logInfo("\n  [Type /older to see older messages]");
         }
 
-        logInfo("{}", CliConstants.MENU_DIVIDER);
+        logInfo("{}", CliSupport.MENU_DIVIDER);
         if (canMessage) {
             logInfo("Commands: /back  /older  /block  /unmatch");
             logInfo("\nType your message:");
@@ -269,11 +279,10 @@ public class MessagingHandler {
      * @param canMessage Whether the user can send messages
      * @param currentUser The current user
      * @param otherUser The other user in the conversation
-     * @param messagingService The messaging service
      * @return The action to take based on the input
      */
     private ConversationAction processConversationInput(
-            String userInput, boolean canMessage, User currentUser, User otherUser, MessagingService messagingService) {
+            String userInput, boolean canMessage, User currentUser, User otherUser) {
 
         if ("/back".equalsIgnoreCase(userInput) || "b".equalsIgnoreCase(userInput)) {
             return ConversationAction.EXIT;
@@ -326,12 +335,6 @@ public class MessagingHandler {
         logInfo("   {}", message.content());
     }
 
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
     /** Formats a timestamp as relative time (e.g., "5m ago"). */
     private String formatTimeAgo(Instant timestamp) {
         if (timestamp == null) {
@@ -374,15 +377,15 @@ public class MessagingHandler {
     /** Blocks another user. */
     private void blockUser(User currentUser, User otherUser) {
         Block block = Block.create(currentUser.getId(), otherUser.getId());
-        registry.getBlockStorage().save(block);
+        blockStorage.save(block);
 
         String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-        Optional<Match> matchOpt = registry.getMatchStorage().get(matchId);
+        Optional<Match> matchOpt = matchStorage.get(matchId);
         if (matchOpt.isPresent()) {
             Match match = matchOpt.get();
             if (match.isActive()) {
                 match.block(currentUser.getId());
-                registry.getMatchStorage().update(match);
+                matchStorage.update(match);
             }
         }
 
@@ -392,13 +395,13 @@ public class MessagingHandler {
     /** Unmatches from another user. */
     private void unmatchUser(User currentUser, User otherUser) {
         String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-        Optional<Match> matchOpt = registry.getMatchStorage().get(matchId);
+        Optional<Match> matchOpt = matchStorage.get(matchId);
 
         if (matchOpt.isPresent()) {
             Match match = matchOpt.get();
             if (match.isActive()) {
                 match.unmatch(currentUser.getId());
-                registry.getMatchStorage().update(match);
+                matchStorage.update(match);
                 logInfo("\n✓ Unmatched from {}.", otherUser.getName());
             } else {
                 logInfo("\n⚠️  Match is already ended.");
@@ -418,6 +421,6 @@ public class MessagingHandler {
         if (currentUser == null) {
             return 0;
         }
-        return registry.getMessagingService().getTotalUnreadCount(currentUser.getId());
+        return messagingService.getTotalUnreadCount(currentUser.getId());
     }
 }

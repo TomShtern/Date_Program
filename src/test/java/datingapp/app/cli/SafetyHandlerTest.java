@@ -3,6 +3,8 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.*;
+import datingapp.core.User.Gender;
+import datingapp.core.User.VerificationMethod;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Report;
 import datingapp.core.storage.ReportStorage;

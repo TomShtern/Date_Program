@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.*;
 import datingapp.core.Messaging.Conversation;
+import datingapp.core.User.Gender;
 import datingapp.core.storage.*;
 import datingapp.storage.DatabaseManager;
+import datingapp.storage.StorageFactory;
 import java.io.StringReader;
 import java.time.LocalDate;
 import java.util.*;
@@ -32,7 +34,7 @@ class MessagingHandlerTest {
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:messagingtest_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
         DatabaseManager.resetInstance();
         dbManager = DatabaseManager.getInstance();
-        registry = ServiceRegistry.Builder.buildH2(dbManager, AppConfig.defaults());
+        registry = StorageFactory.buildH2(dbManager, AppConfig.defaults());
     }
 
     @AfterAll
@@ -56,7 +58,12 @@ class MessagingHandlerTest {
 
     private MessagingHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        return new MessagingHandler(registry, inputReader, session);
+        return new MessagingHandler(
+                registry.getMessagingService(),
+                registry.getMatchStorage(),
+                registry.getBlockStorage(),
+                inputReader,
+                session);
     }
 
     @SuppressWarnings("unused")

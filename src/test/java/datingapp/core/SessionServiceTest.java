@@ -9,12 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.SwipeSessionStorage;
+import datingapp.core.testutil.TestClock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -29,10 +31,11 @@ class SessionServiceTest {
     private AppConfig config;
     private SessionService service;
     private UUID userId;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
-
+        TestClock.setFixed(FIXED_INSTANT);
         storage = new InMemorySwipeSessionStorage();
         config = AppConfig.builder()
                 .sessionTimeoutMinutes(5)
@@ -41,6 +44,11 @@ class SessionServiceTest {
                 .build();
         service = new SessionService(storage, config);
         userId = UUID.randomUUID();
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
     }
 
     @Nested
@@ -76,8 +84,8 @@ class SessionServiceTest {
             SwipeSession oldSession = new SwipeSession(
                     initial.getId(),
                     userId,
-                    Instant.now().minus(Duration.ofMinutes(10)),
-                    Instant.now().minus(Duration.ofMinutes(10)),
+                    AppClock.now().minus(Duration.ofMinutes(10)),
+                    AppClock.now().minus(Duration.ofMinutes(10)),
                     null,
                     SwipeSession.State.ACTIVE,
                     5,
@@ -122,7 +130,21 @@ class SessionServiceTest {
             SessionService.SwipeResult result = service.recordSwipe(userId, Like.Direction.LIKE, false);
 
             assertFalse(result.allowed());
-            assertNotNull(result.blockedReason());
+            assertEquals("Session swipe limit reached. Take a break!", result.blockedReason());
+        }
+
+        @Test
+        @DisplayName("Warns when swipe velocity is suspicious")
+        void warnsOnSuspiciousVelocity() {
+            SessionService.SwipeResult result = null;
+            for (int i = 0; i < 31; i++) {
+                result = service.recordSwipe(userId, Like.Direction.LIKE, false);
+            }
+
+            assertNotNull(result);
+            assertTrue(result.allowed());
+            assertTrue(result.hasWarning());
+            assertNotNull(result.warning());
         }
     }
 

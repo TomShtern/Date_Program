@@ -181,13 +181,6 @@ public class PreferencesController extends BaseController implements Initializab
     }
 
     @FXML
-    private void handleBack() {
-        logInfo("Canceling preferences changes...");
-        // Just go back without saving
-        NavigationService.getInstance().goBack();
-    }
-
-    @FXML
     private void handleThemeToggle() {
         boolean isDarkMode = themeToggle.isSelected();
         logInfo("Toggling theme to: {}", isDarkMode ? "Dark" : "Light");

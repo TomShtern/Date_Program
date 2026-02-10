@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import datingapp.core.*;
 import datingapp.core.Social.FriendRequest;
 import datingapp.core.Social.Notification;
+import datingapp.core.User.Gender;
 import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.SocialStorage;
 import datingapp.core.testutil.TestStorages;

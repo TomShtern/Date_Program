@@ -17,10 +17,38 @@ import java.util.UUID;
  * Represents a user in the dating app. Mutable entity - state can change over
  * time.
  */
-public class User implements SoftDeletable {
+public class User {
 
-    /** Configuration for validation thresholds. */
-    private static final AppConfig CONFIG = AppConfig.defaults();
+    // ================================
+    // Nested Enums (formerly standalone files)
+    // ================================
+
+    /** Gender options available for users. */
+    public static enum Gender {
+        MALE,
+        FEMALE,
+        OTHER
+    }
+
+    /**
+     * Lifecycle state of a user account.
+     * Valid transitions: INCOMPLETE → ACTIVE ↔ PAUSED → BANNED
+     */
+    public static enum UserState {
+        INCOMPLETE,
+        ACTIVE,
+        PAUSED,
+        BANNED
+    }
+
+    /**
+     * Verification method used to verify a profile.
+     * NOTE: Currently simulated - email/phone not sent externally.
+     */
+    public static enum VerificationMethod {
+        EMAIL,
+        PHONE
+    }
 
     private final UUID id;
     private String name;
@@ -388,7 +416,7 @@ public class User implements SoftDeletable {
         if (birthDate == null) {
             return 0;
         }
-        return Period.between(birthDate, LocalDate.now(timezone)).getYears();
+        return Period.between(birthDate, AppClock.today(timezone)).getYears();
     }
 
     // Verification getters (Phase 2 feature)
@@ -492,22 +520,16 @@ public class User implements SoftDeletable {
     }
 
     public void setMaxDistanceKm(int maxDistanceKm) {
-        if (maxDistanceKm < CONFIG.minDistanceKm()) {
-            throw new IllegalArgumentException("maxDistanceKm must be at least " + CONFIG.minDistanceKm());
-        }
-        if (maxDistanceKm > CONFIG.maxDistanceKm()) {
-            throw new IllegalArgumentException("maxDistanceKm cannot exceed " + CONFIG.maxDistanceKm());
+        if (maxDistanceKm <= 0) {
+            throw new IllegalArgumentException("maxDistanceKm must be positive");
         }
         this.maxDistanceKm = maxDistanceKm;
         touch();
     }
 
     public void setAgeRange(int minAge, int maxAge) {
-        if (minAge < CONFIG.minAge()) {
-            throw new IllegalArgumentException("minAge must be at least " + CONFIG.minAge());
-        }
-        if (maxAge > CONFIG.maxAge()) {
-            throw new IllegalArgumentException("maxAge cannot exceed " + CONFIG.maxAge());
+        if (minAge <= 0) {
+            throw new IllegalArgumentException("minAge must be positive");
         }
         if (maxAge < minAge) {
             throw new IllegalArgumentException("maxAge cannot be less than minAge");
@@ -517,20 +539,14 @@ public class User implements SoftDeletable {
         touch();
     }
 
-    /** Sets photo URLs. Maximum {@code CONFIG.maxPhotos()} photos allowed. */
+    /** Sets photo URLs with null-safe copy. */
     public void setPhotoUrls(List<String> photoUrls) {
-        if (photoUrls != null && photoUrls.size() > CONFIG.maxPhotos()) {
-            throw new IllegalArgumentException("Maximum " + CONFIG.maxPhotos() + " photos allowed");
-        }
         this.photoUrls = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
         touch();
     }
 
-    /** Adds a photo URL. Maximum {@code CONFIG.maxPhotos()} photos allowed. */
+    /** Adds a photo URL. */
     public void addPhotoUrl(String url) {
-        if (photoUrls.size() >= CONFIG.maxPhotos()) {
-            throw new IllegalArgumentException("Maximum " + CONFIG.maxPhotos() + " photos allowed");
-        }
         photoUrls.add(url);
         touch();
     }
@@ -563,9 +579,8 @@ public class User implements SoftDeletable {
     }
 
     public void setHeightCm(Integer heightCm) {
-        if (heightCm != null && (heightCm < CONFIG.minHeightCm() || heightCm > CONFIG.maxHeightCm())) {
-            throw new IllegalArgumentException(
-                    "Height must be " + CONFIG.minHeightCm() + "-" + CONFIG.maxHeightCm() + "cm");
+        if (heightCm != null && heightCm <= 0) {
+            throw new IllegalArgumentException("Height must be positive");
         }
         this.heightCm = heightCm;
         touch();
@@ -577,18 +592,12 @@ public class User implements SoftDeletable {
     }
 
     /**
-     * Sets the user's interests. Maximum of {@code CONFIG.maxInterests()} interests
-     * allowed.
+     * Sets the user's interests.
      *
      * @param interests set of interests (null treated as empty)
-     * @throws IllegalArgumentException if more than maxInterests interests
      */
     public void setInterests(Set<Interest> interests) {
-        if (interests != null && interests.size() > CONFIG.maxInterests()) {
-            throw new IllegalArgumentException(
-                    "Maximum " + CONFIG.maxInterests() + " interests allowed, got " + interests.size());
-        }
-        this.interests = EnumSetUtil.safeCopy(interests, Interest.class);
+        this.interests = interests != null ? EnumSet.copyOf(interests) : EnumSet.noneOf(Interest.class);
         touch();
     }
 
@@ -596,14 +605,10 @@ public class User implements SoftDeletable {
      * Adds a single interest to the user's profile.
      *
      * @param interest the interest to add
-     * @throws IllegalArgumentException if adding would exceed maxInterests
      */
     public void addInterest(Interest interest) {
         if (interest == null) {
             return;
-        }
-        if (interests.size() >= CONFIG.maxInterests() && !interests.contains(interest)) {
-            throw new IllegalArgumentException("Maximum " + CONFIG.maxInterests() + " interests allowed");
         }
         interests.add(interest);
         touch();
@@ -669,7 +674,7 @@ public class User implements SoftDeletable {
                 && interestedIn != null
                 && !interestedIn.isEmpty()
                 && maxDistanceKm > 0
-                && minAge >= CONFIG.minAge()
+                && minAge > 0
                 && maxAge >= minAge
                 && photoUrls != null
                 && !photoUrls.isEmpty()
@@ -708,17 +713,22 @@ public class User implements SoftDeletable {
     }
 
     // ================================
-    // SoftDeletable implementation
+    // Soft-delete support
     // ================================
 
-    @Override
+    /** Returns the deletion timestamp, or {@code null} if not deleted. */
     public Instant getDeletedAt() {
         return deletedAt;
     }
 
-    @Override
+    /** Marks this entity as soft-deleted at the given instant. */
     public void markDeleted(Instant deletedAt) {
         this.deletedAt = Objects.requireNonNull(deletedAt, "deletedAt cannot be null");
+    }
+
+    /** Returns {@code true} if this user has been soft-deleted. */
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 
     // ================================

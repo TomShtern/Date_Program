@@ -26,7 +26,7 @@ public class AchievementService {
     private final LikeStorage likeStorage;
     private final UserStorage userStorage;
     private final ReportStorage reportStorage;
-    private final ProfilePreviewService profilePreviewService;
+    private final ProfileCompletionService profileCompletionService;
     private final AppConfig config;
 
     public AchievementService(
@@ -35,14 +35,14 @@ public class AchievementService {
             LikeStorage likeStorage,
             UserStorage userStorage,
             ReportStorage reportStorage,
-            ProfilePreviewService profilePreviewService,
+            ProfileCompletionService profileCompletionService,
             AppConfig config) {
         this.achievementStorage = Objects.requireNonNull(achievementStorage);
         this.matchStorage = Objects.requireNonNull(matchStorage);
         this.likeStorage = Objects.requireNonNull(likeStorage);
         this.userStorage = Objects.requireNonNull(userStorage);
         this.reportStorage = Objects.requireNonNull(reportStorage);
-        this.profilePreviewService = Objects.requireNonNull(profilePreviewService);
+        this.profileCompletionService = Objects.requireNonNull(profileCompletionService);
         this.config = Objects.requireNonNull(config);
     }
 
@@ -241,7 +241,8 @@ public class AchievementService {
     }
 
     private int getProfileCompleteness(User user) {
-        ProfilePreviewService.ProfileCompleteness completeness = profilePreviewService.calculateCompleteness(user);
+        ProfileCompletionService.ProfileCompleteness completeness =
+                profileCompletionService.calculateCompleteness(user);
         return completeness.percentage();
     }
 

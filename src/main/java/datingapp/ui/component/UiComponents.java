@@ -1,5 +1,6 @@
 package datingapp.ui.component;
 
+import datingapp.ui.constants.AnimationConstants;
 import java.util.function.Supplier;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
@@ -65,29 +66,25 @@ public final class UiComponents {
      */
     public static final class TypingIndicator extends HBox {
 
-        private static final int DOT_COUNT = 3;
-        private static final double DOT_RADIUS = 4;
-        private static final Duration BOUNCE_DURATION = Duration.millis(400);
-
         /** Creates a new typing indicator with 3 bouncing dots. */
         public TypingIndicator() {
-            setSpacing(4);
+            setSpacing(AnimationConstants.TYPING_DOT_SPACING);
             setAlignment(Pos.CENTER);
             getStyleClass().add("typing-indicator");
 
-            for (int i = 0; i < DOT_COUNT; i++) {
-                Circle dot = new Circle(DOT_RADIUS);
+            for (int i = 0; i < AnimationConstants.TYPING_DOT_COUNT; i++) {
+                Circle dot = new Circle(AnimationConstants.TYPING_DOT_RADIUS);
                 dot.setFill(Color.web("#94a3b8"));
                 dot.getStyleClass().add("typing-dot");
                 getChildren().add(dot);
 
                 // Staggered bounce animation
-                TranslateTransition bounce = new TranslateTransition(BOUNCE_DURATION, dot);
+                TranslateTransition bounce = new TranslateTransition(AnimationConstants.TYPING_BOUNCE_DURATION, dot);
                 bounce.setFromY(0);
-                bounce.setToY(-6);
+                bounce.setToY(-AnimationConstants.TYPING_BOUNCE_DISTANCE);
                 bounce.setAutoReverse(true);
                 bounce.setCycleCount(Animation.INDEFINITE);
-                bounce.setDelay(Duration.millis(i * 150L));
+                bounce.setDelay(AnimationConstants.TYPING_BOUNCE_DELAY_STEP.multiply(i));
                 Platform.runLater(bounce::play);
             }
 
@@ -177,7 +174,9 @@ public final class UiComponents {
         public void animateTo(double value) {
             Timeline animation = new Timeline(
                     new KeyFrame(Duration.ZERO, new KeyValue(progress, progress.get())),
-                    new KeyFrame(Duration.millis(800), new KeyValue(progress, value, Interpolator.EASE_BOTH)));
+                    new KeyFrame(
+                            AnimationConstants.PROGRESS_RING_ANIMATION_DURATION,
+                            new KeyValue(progress, value, Interpolator.EASE_BOTH)));
             animation.play();
         }
 
@@ -226,9 +225,9 @@ public final class UiComponents {
 
             // Animate gradient position
             double[] animationProgress = {0};
-            shimmerAnimation = new Timeline(new KeyFrame(Duration.millis(50), e -> {
+            shimmerAnimation = new Timeline(new KeyFrame(AnimationConstants.SKELETON_SHIMMER_FRAME, e -> {
                 e.consume();
-                animationProgress[0] += 0.033;
+                animationProgress[0] += AnimationConstants.SKELETON_SHIMMER_STEP;
                 if (animationProgress[0] > 1) {
                     animationProgress[0] = 0;
                 }
@@ -243,8 +242,8 @@ public final class UiComponents {
         }
 
         private static void updateGradient(Rectangle skeleton, double position) {
-            double startX = -0.5 + position * 2;
-            double endX = startX + 0.5;
+            double startX = AnimationConstants.SKELETON_GRADIENT_START + position * 2;
+            double endX = startX + AnimationConstants.SKELETON_GRADIENT_WIDTH;
 
             LinearGradient gradient = new LinearGradient(
                     startX,

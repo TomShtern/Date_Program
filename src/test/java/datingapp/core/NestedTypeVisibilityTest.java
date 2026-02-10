@@ -74,9 +74,11 @@ class NestedTypeVisibilityTest {
     @Test
     @DisplayName("Top-level types used across packages are public")
     void topLevelTypesArePublic() {
-        assertTrue(Modifier.isPublic(Gender.class.getModifiers()), "Gender must be public");
-        assertTrue(Modifier.isPublic(UserState.class.getModifiers()), "UserState must be public");
-        assertTrue(Modifier.isPublic(VerificationMethod.class.getModifiers()), "VerificationMethod must be public");
+        assertTrue(Modifier.isPublic(User.Gender.class.getModifiers()), "User.Gender must be public");
+        assertTrue(Modifier.isPublic(User.UserState.class.getModifiers()), "User.UserState must be public");
+        assertTrue(
+                Modifier.isPublic(User.VerificationMethod.class.getModifiers()),
+                "User.VerificationMethod must be public");
         assertTrue(Modifier.isPublic(PacePreferences.class.getModifiers()), "PacePreferences must be public");
         assertTrue(Modifier.isPublic(DailyPick.class.getModifiers()), "DailyPick must be public");
         assertTrue(Modifier.isPublic(InputReader.class.getModifiers()), "InputReader must be public");

@@ -69,7 +69,7 @@ class EnumSetUtilTest {
         @Test
         @DisplayName("returns empty set for null input")
         void returnsEmptyForNull() {
-            EnumSet<Gender> result = EnumSetUtil.safeCopy((Set<Gender>) null, Gender.class);
+            EnumSet<User.Gender> result = EnumSetUtil.safeCopy((Set<User.Gender>) null, User.Gender.class);
             assertNotNull(result);
             assertTrue(result.isEmpty());
         }
@@ -77,7 +77,7 @@ class EnumSetUtilTest {
         @Test
         @DisplayName("returns empty set for empty set")
         void returnsEmptyForEmptySet() {
-            EnumSet<Gender> result = EnumSetUtil.safeCopy(Set.of(), Gender.class);
+            EnumSet<User.Gender> result = EnumSetUtil.safeCopy(Set.of(), User.Gender.class);
             assertNotNull(result);
             assertTrue(result.isEmpty());
         }
@@ -85,18 +85,18 @@ class EnumSetUtilTest {
         @Test
         @DisplayName("copies elements from non-empty set")
         void copiesNonEmptySet() {
-            Set<Gender> input = Set.of(Gender.MALE, Gender.FEMALE);
-            EnumSet<Gender> result = EnumSetUtil.safeCopy(input, Gender.class);
+            Set<User.Gender> input = Set.of(User.Gender.MALE, User.Gender.FEMALE);
+            EnumSet<User.Gender> result = EnumSetUtil.safeCopy(input, User.Gender.class);
             assertEquals(2, result.size());
-            assertTrue(result.contains(Gender.MALE));
-            assertTrue(result.contains(Gender.FEMALE));
+            assertTrue(result.contains(User.Gender.MALE));
+            assertTrue(result.contains(User.Gender.FEMALE));
         }
 
         @Test
         @DisplayName("copies from EnumSet input")
         void copiesEnumSetInput() {
-            EnumSet<Gender> input = EnumSet.of(Gender.MALE);
-            EnumSet<Gender> result = EnumSetUtil.safeCopy(input, Gender.class);
+            EnumSet<User.Gender> input = EnumSet.of(User.Gender.MALE);
+            EnumSet<User.Gender> result = EnumSetUtil.safeCopy(input, User.Gender.class);
             assertEquals(input, result);
             assertNotSame(input, result);
         }

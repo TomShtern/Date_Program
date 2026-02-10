@@ -85,6 +85,29 @@ rm ./data/dating.mv.db               # Reset database (delete all data)
 mvn clean                            # Clean build artifacts
 ```
 
+### Build Command Discipline
+
+**NEVER run expensive commands (`mvn verify`, `mvn test`, `mvn compile`, `docker build`, `npm run build`) multiple times to extract different pieces of information.** Each `mvn verify` repeats the full pipeline (compile → test → jacoco → jar → spotless → pmd → jacoco:check), taking 30-90s per invocation.
+
+**Pattern: capture once → query N times:**
+```powershell
+# CORRECT: single run, multiple filters
+$out = mvn verify 2>&1 | Out-String
+$out | Select-String "BUILD (SUCCESS|FAILURE)" | Select-Object -Last 1
+$out | Select-String "Tests run:" | Select-Object -Last 1
+$out | Select-String "ERROR|WARNING.*violation"
+```
+
+**Anti-pattern: N parallel runs with different filters:**
+```powershell
+# WRONG: three identical builds, tripled wall-clock time
+mvn verify 2>&1 | Select-String "BUILD (SUCCESS|FAILURE)"
+mvn verify 2>&1 | Select-String "Tests run:"
+mvn verify 2>&1 | Select-String "ERROR|WARNING"
+```
+
+**General rule:** If you need multiple views of the same command's output, run it once into a variable (`$out`), then query the variable. This applies to all long-running commands, not just Maven.
+
 ## Quick Start for New Agents
 
 **First time working on this codebase?**
@@ -309,7 +332,7 @@ loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
 
 ## Code Style
 
-**Formatting:** Palantir Java Format v2.84.0 (4-space indentation). Auto-apply with `mvn spotless:apply` before every commit.
+**Formatting:** Palantir Java Format v2.85.0 (4-space indentation). Auto-apply with `mvn spotless:apply` before every commit.
 
 **Imports:** No star imports (`import java.util.*`). Import ordering: static first, then third-party, then standard library.
 **FXML Controllers:** Use `@SuppressWarnings("unused")` at class level when members/handlers are only referenced from FXML to silence false-positive unused warnings.
@@ -434,12 +457,36 @@ User user = User.StorageBuilder.create(id, name, createdAt)
     .build();
 ```
 
+<!--ARCHIVE:53:agent:codex:scope:logging-support-->
 **Factory Methods** (creating new entities):
 ```java
 public static Message create(String conversationId, UUID senderId, String content) {
     return new Message(UUID.randomUUID(), conversationId, senderId, content, Instant.now());
 }
 ```
+<!--/ARCHIVE-->
+**Factory Methods** (creating new entities):
+```java
+public static Message create(String conversationId, UUID senderId, String content) {
+    return new Message(UUID.randomUUID(), conversationId, senderId, content, Instant.now());
+}
+```
+
+**LoggingSupport Pattern** (guarded logging helpers):
+```java
+public interface LoggingSupport {
+    Logger logger();
+
+    default void logInfo(String message, Object... args) {
+        Logger log = logger();
+        if (log != null && log.isInfoEnabled()) {
+            log.info(message, args);
+        }
+    }
+}
+```
+Use `LoggingSupport` default methods or static helpers for guarded logging in core and static contexts.
+53|2026-02-08 12:45:00|agent:codex|scope:logging-support|Add LoggingSupport pattern for guarded logging helpers|src/main/java/datingapp/core/LoggingSupport.java;src/main/java/datingapp/core/CandidateFinder.java;src/main/java/datingapp/Main.java;AGENTS.md
 
 **EnumSet Defensive Patterns**:
 ```java
@@ -690,7 +737,12 @@ public void handleMenu() {
 - Surface missing completion details in profile headers to guide users to 100%
 - Display age ranges with explicit separators to avoid concatenated labels
 - Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
+<!--ARCHIVE:55:agent:github_copilot:scope:ui-matching-queue-->
 - Include default branches in UI switches to satisfy Checkstyle
+<!--/ARCHIVE-->
+- Include default branches in UI switches to satisfy Checkstyle
+- In `MatchingViewModel`, use a thread-safe candidate queue (e.g., `ConcurrentLinkedQueue`) or ensure all queue access occurs on the FX thread.
+55|2026-02-09 18:40:00|agent:github_copilot|scope:ui-matching-queue|Document thread-safe candidate queue requirement for MatchingViewModel|AGENTS.md
 <!--ARCHIVE:45:agent:codex:ui-loading-timing-->
 - Keep loading overlays responsive by toggling loading state on the FX thread before background work and clearing it in finally
 <!--/ARCHIVE-->
@@ -995,4 +1047,7 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 50|2026-02-06 19:25:00|agent:codex|scope:candidate-distance|Clarify location-set distance rule|AGENTS.md
 51|2026-02-06 19:27:00|agent:codex|scope:candidate-distance|Confirm location-set rule placement for docsync|AGENTS.md
 52|2026-02-08 11:15:00|agent:claude_code|scope:config-audit|Fixed stale build commands (exec:java→exec:exec, removed shade refs), updated stats (182 files, 820 tests), corrected service count (17), storage count (11), Palantir version (2.84.0)|AGENTS.md
+53|2026-02-08 12:45:00|agent:codex|scope:logging-support|Add LoggingSupport pattern for guarded logging helpers|src/main/java/datingapp/core/LoggingSupport.java;src/main/java/datingapp/core/CandidateFinder.java;src/main/java/datingapp/Main.java;AGENTS.md
+54|2026-02-08 18:00:00|agent:claude_code|scope:build-discipline|Added Build Command Discipline section: capture expensive commands once, query N times|CLAUDE.md;AGENTS.md
+55|2026-02-09 18:40:00|agent:github_copilot|scope:ui-matching-queue|Use thread-safe candidate queue in MatchingViewModel|src/main/java/datingapp/ui/viewmodel/MatchingViewModel.java;AGENTS.md
 ---AGENT-LOG-END---

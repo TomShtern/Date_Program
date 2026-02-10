@@ -1,11 +1,12 @@
 package datingapp;
 
-import datingapp.app.cli.CliConstants;
+import datingapp.app.AppBootstrap;
+import datingapp.app.cli.CliSupport;
 import datingapp.app.cli.HandlerFactory;
 import datingapp.app.cli.InputReader;
-import datingapp.core.AppBootstrap;
 import datingapp.core.AppSession;
 import datingapp.core.DailyService;
+import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.SessionService;
 import datingapp.core.User;
@@ -110,7 +111,7 @@ public final class Main {
                         running = false;
                         logInfo("\n👋 Goodbye!\n");
                     }
-                    default -> logInfo(CliConstants.INVALID_SELECTION);
+                    default -> logInfo(CliSupport.INVALID_SELECTION);
                 }
             }
 
@@ -130,26 +131,22 @@ public final class Main {
     }
 
     private static void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
+        LoggingSupport.logInfo(logger, message, args);
     }
 
     private static void safeExecute(Runnable action) {
         try {
             action.run();
         } catch (Exception e) {
-            logInfo("\n❌ An error occurred: {}\n", e.getMessage());
-            if (logger.isDebugEnabled()) {
-                logger.debug("Handler error details", e);
-            }
+            LoggingSupport.logWarn(logger, "\n❌ An error occurred: {}\n", e.getMessage());
+            LoggingSupport.logDebug(logger, "Handler error details", e);
         }
     }
 
     private static void printMenu() {
-        logInfo(CliConstants.SEPARATOR_LINE);
+        logInfo(CliSupport.SEPARATOR_LINE);
         logInfo("         DATING APP - PHASE 0.5");
-        logInfo(CliConstants.SEPARATOR_LINE);
+        logInfo(CliSupport.SEPARATOR_LINE);
 
         User currentUser = AppSession.getInstance().getCurrentUser();
 
@@ -206,7 +203,7 @@ public final class Main {
         logInfo("  19. 🤝 Friend Requests");
         logInfo("  20. 🌟 View Standouts");
         logInfo("  0. Exit");
-        logInfo(CliConstants.SEPARATOR_LINE + "\n");
+        logInfo(CliSupport.SEPARATOR_LINE + "\n");
     }
 
     private static void shutdown() {

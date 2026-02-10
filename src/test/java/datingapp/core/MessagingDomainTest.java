@@ -9,9 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Messaging.Conversation;
 import datingapp.core.Messaging.Message;
+import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,18 @@ import org.junit.jupiter.api.Timeout;
 @SuppressWarnings("unused") // Test class with @Nested
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MessagingDomainTest {
+
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+
+    @BeforeEach
+    void setUpClock() {
+        TestClock.setFixed(FIXED_INSTANT);
+    }
+
+    @AfterEach
+    void resetClock() {
+        TestClock.reset();
+    }
 
     // ==================== MESSAGE TESTS ====================
 
@@ -117,7 +132,7 @@ class MessagingDomainTest {
             @DisplayName("should reject null conversationId")
             void rejectNullConversationId() {
                 UUID id = UUID.randomUUID();
-                Instant createdAt = Instant.now();
+                Instant createdAt = AppClock.now();
                 assertThrows(NullPointerException.class, () -> new Message(id, null, SENDER_ID, "Hello", createdAt));
             }
 
@@ -125,7 +140,7 @@ class MessagingDomainTest {
             @DisplayName("should reject null senderId")
             void rejectNullSenderId() {
                 UUID id = UUID.randomUUID();
-                Instant createdAt = Instant.now();
+                Instant createdAt = AppClock.now();
                 assertThrows(
                         NullPointerException.class, () -> new Message(id, CONVERSATION_ID, null, "Hello", createdAt));
             }
@@ -133,7 +148,7 @@ class MessagingDomainTest {
             @Test
             @DisplayName("should reject null id")
             void rejectNullId() {
-                Instant createdAt = Instant.now();
+                Instant createdAt = AppClock.now();
                 assertThrows(
                         NullPointerException.class,
                         () -> new Message(null, CONVERSATION_ID, SENDER_ID, "Hello", createdAt));
@@ -269,7 +284,7 @@ class MessagingDomainTest {
                 Conversation convo = Conversation.create(UUID.randomUUID(), UUID.randomUUID());
                 assertNull(convo.getLastMessageAt());
 
-                Instant now = Instant.now();
+                Instant now = AppClock.now();
                 convo.updateLastMessageAt(now);
 
                 assertEquals(now, convo.getLastMessageAt());
@@ -283,7 +298,7 @@ class MessagingDomainTest {
                 Conversation convo = Conversation.create(a, b);
                 assertNull(convo.getLastReadAt(a));
 
-                Instant now = Instant.now();
+                Instant now = AppClock.now();
                 convo.updateReadTimestamp(a, now);
 
                 assertEquals(now, convo.getLastReadAt(a));
@@ -297,7 +312,7 @@ class MessagingDomainTest {
                 UUID b = UUID.randomUUID();
                 Conversation convo = Conversation.create(a, b);
 
-                Instant now = Instant.now();
+                Instant now = AppClock.now();
                 convo.updateReadTimestamp(b, now);
 
                 assertEquals(now, convo.getLastReadAt(b));
@@ -311,7 +326,7 @@ class MessagingDomainTest {
                 UUID b = UUID.randomUUID();
                 UUID c = UUID.randomUUID();
                 Conversation convo = Conversation.create(a, b);
-                Instant now = Instant.now();
+                Instant now = AppClock.now();
 
                 assertThrows(IllegalArgumentException.class, () -> convo.updateReadTimestamp(c, now));
             }

@@ -15,6 +15,7 @@ import datingapp.core.UserInteractions.Report;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.ReportStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.testutil.TestClock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -29,6 +30,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,6 +49,18 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("TrustSafetyService")
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class TrustSafetyServiceTest {
+
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+
+    @BeforeEach
+    void setUpClock() {
+        TestClock.setFixed(FIXED_INSTANT);
+    }
+
+    @AfterEach
+    void resetClock() {
+        TestClock.reset();
+    }
 
     // ============================================================
     // REPORT FUNCTIONALITY TESTS
@@ -135,7 +149,7 @@ class TrustSafetyServiceTest {
                 trustSafetyService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
 
                 assertEquals(
-                        UserState.ACTIVE,
+                        User.UserState.ACTIVE,
                         userStorage.get(reportedUser.getId()).getState(),
                         "User should still be ACTIVE after 2 reports");
 
@@ -145,7 +159,7 @@ class TrustSafetyServiceTest {
 
                 assertTrue(result.userWasBanned(), "Third report should trigger ban");
                 assertEquals(
-                        UserState.BANNED,
+                        User.UserState.BANNED,
                         userStorage.get(reportedUser.getId()).getState(),
                         "User should be BANNED after 3 reports");
             }
@@ -289,14 +303,14 @@ class TrustSafetyServiceTest {
             TrustSafetyService trustSafetyService = new TrustSafetyService(Duration.ofMinutes(15), new Random(123));
 
             User user = createActiveUser("ExpiredVerify");
-            user.startVerification(VerificationMethod.EMAIL, "123456");
+            user.startVerification(User.VerificationMethod.EMAIL, "123456");
 
             // Create a copy with verification sent in the past (expired)
             User expired = copyWithVerificationSentAt(
                     user,
                     user.getVerificationSentAt() != null
                             ? user.getVerificationSentAt().minus(Duration.ofMinutes(16))
-                            : Instant.now().minus(Duration.ofMinutes(16)));
+                            : AppClock.now().minus(Duration.ofMinutes(16)));
 
             assertFalse(trustSafetyService.verifyCode(expired, "123456"));
             assertTrue(trustSafetyService.isExpired(expired.getVerificationSentAt()));
@@ -308,7 +322,7 @@ class TrustSafetyServiceTest {
             TrustSafetyService trustSafetyService = new TrustSafetyService();
 
             User user = createActiveUser("MismatchVerify");
-            user.startVerification(VerificationMethod.PHONE, "123456");
+            user.startVerification(User.VerificationMethod.PHONE, "123456");
 
             assertFalse(trustSafetyService.verifyCode(user, "000000"));
             assertFalse(user.isVerified());
@@ -323,8 +337,8 @@ class TrustSafetyServiceTest {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test user");
         user.setBirthDate(LocalDate.of(1990, 1, 1));
-        user.setGender(Gender.MALE);
-        user.setInterestedIn(EnumSet.of(Gender.FEMALE));
+        user.setGender(User.Gender.MALE);
+        user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
         user.setLocation(32.0, 34.0);
         user.setMaxDistanceKm(50);
         user.setAgeRange(18, 60);
@@ -434,7 +448,7 @@ class TrustSafetyServiceTest {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == UserState.ACTIVE)
+                    .filter(u -> u.getState() == User.UserState.ACTIVE)
                     .toList();
         }
 

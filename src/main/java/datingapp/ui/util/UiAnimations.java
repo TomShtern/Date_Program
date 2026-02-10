@@ -1,5 +1,6 @@
 package datingapp.ui.util;
 
+import datingapp.ui.constants.AnimationConstants;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
@@ -51,11 +52,11 @@ public final class UiAnimations {
      * Adds a subtle pulse effect on hover.
      */
     public static void addPulseOnHover(Node node) {
-        ScaleTransition st = new ScaleTransition(Duration.millis(200), node);
+        ScaleTransition st = new ScaleTransition(AnimationConstants.HOVER_PULSE_DURATION, node);
         st.setFromX(1.0);
         st.setFromY(1.0);
-        st.setToX(1.05);
-        st.setToY(1.05);
+        st.setToX(AnimationConstants.HOVER_PULSE_SCALE);
+        st.setToY(AnimationConstants.HOVER_PULSE_SCALE);
 
         node.setOnMouseEntered(e -> {
             e.consume();
@@ -74,11 +75,11 @@ public final class UiAnimations {
      * Per JavaFX Skill Cheatsheet Section 14.
      */
     public static void pulseScale(Node node) {
-        ScaleTransition scale = new ScaleTransition(Duration.millis(100), node);
-        scale.setToX(1.15);
-        scale.setToY(1.15);
+        ScaleTransition scale = new ScaleTransition(AnimationConstants.BUTTON_PULSE_DURATION, node);
+        scale.setToX(AnimationConstants.BUTTON_PULSE_SCALE);
+        scale.setToY(AnimationConstants.BUTTON_PULSE_SCALE);
         scale.setAutoReverse(true);
-        scale.setCycleCount(2);
+        scale.setCycleCount(AnimationConstants.BUTTON_PULSE_CYCLES);
         scale.play();
     }
 
@@ -91,22 +92,22 @@ public final class UiAnimations {
     public static void addPulsingGlow(Node node, Color glowColor) {
         DropShadow glow = new DropShadow();
         glow.setColor(glowColor);
-        glow.setRadius(15);
-        glow.setSpread(0.3);
+        glow.setRadius(AnimationConstants.GLOW_RADIUS_MIN);
+        glow.setSpread(AnimationConstants.GLOW_SPREAD_INITIAL);
 
         Timeline timeline = new Timeline(
                 new KeyFrame(
-                        Duration.ZERO,
-                        new KeyValue(glow.radiusProperty(), 15),
-                        new KeyValue(glow.spreadProperty(), 0.2)),
+                        AnimationConstants.GLOW_START_TIME,
+                        new KeyValue(glow.radiusProperty(), AnimationConstants.GLOW_RADIUS_MIN),
+                        new KeyValue(glow.spreadProperty(), AnimationConstants.GLOW_SPREAD_MIN)),
                 new KeyFrame(
-                        Duration.millis(1000),
-                        new KeyValue(glow.radiusProperty(), 25),
-                        new KeyValue(glow.spreadProperty(), 0.4)),
+                        AnimationConstants.GLOW_MID_TIME,
+                        new KeyValue(glow.radiusProperty(), AnimationConstants.GLOW_RADIUS_MAX),
+                        new KeyValue(glow.spreadProperty(), AnimationConstants.GLOW_SPREAD_MAX)),
                 new KeyFrame(
-                        Duration.millis(2000),
-                        new KeyValue(glow.radiusProperty(), 15),
-                        new KeyValue(glow.spreadProperty(), 0.2)));
+                        AnimationConstants.GLOW_END_TIME,
+                        new KeyValue(glow.radiusProperty(), AnimationConstants.GLOW_RADIUS_MIN),
+                        new KeyValue(glow.spreadProperty(), AnimationConstants.GLOW_SPREAD_MIN)));
         timeline.setCycleCount(Animation.INDEFINITE);
 
         node.setEffect(glow);
@@ -148,13 +149,13 @@ public final class UiAnimations {
      * @return The ScaleTransition (not yet played)
      */
     public static ScaleTransition createPulse(Node node) {
-        ScaleTransition pulse = new ScaleTransition(Duration.millis(150), node);
+        ScaleTransition pulse = new ScaleTransition(AnimationConstants.ICON_PULSE_DURATION, node);
         pulse.setFromX(1.0);
         pulse.setFromY(1.0);
-        pulse.setToX(1.1);
-        pulse.setToY(1.1);
+        pulse.setToX(AnimationConstants.ICON_PULSE_SCALE);
+        pulse.setToY(AnimationConstants.ICON_PULSE_SCALE);
         pulse.setAutoReverse(true);
-        pulse.setCycleCount(2);
+        pulse.setCycleCount(AnimationConstants.ICON_PULSE_CYCLES);
         return pulse;
     }
 
@@ -164,10 +165,10 @@ public final class UiAnimations {
      * @param node The node to shake
      */
     public static void playShake(Node node) {
-        TranslateTransition shake = new TranslateTransition(Duration.millis(50), node);
-        shake.setFromX(-10);
-        shake.setToX(10);
-        shake.setCycleCount(6);
+        TranslateTransition shake = new TranslateTransition(AnimationConstants.SHAKE_DURATION, node);
+        shake.setFromX(-AnimationConstants.SHAKE_DISTANCE);
+        shake.setToX(AnimationConstants.SHAKE_DISTANCE);
+        shake.setCycleCount(AnimationConstants.SHAKE_CYCLES);
         shake.setAutoReverse(true);
         shake.setOnFinished(e -> {
             e.consume();
@@ -185,7 +186,7 @@ public final class UiAnimations {
         node.setScaleX(0);
         node.setScaleY(0);
 
-        ScaleTransition scale = new ScaleTransition(Duration.millis(400), node);
+        ScaleTransition scale = new ScaleTransition(AnimationConstants.BOUNCE_IN_DURATION, node);
         scale.setFromX(0);
         scale.setFromY(0);
         scale.setToX(1);
@@ -193,13 +194,13 @@ public final class UiAnimations {
         scale.setInterpolator(Interpolator.EASE_OUT);
 
         // Overshoot effect
-        ScaleTransition overshoot = new ScaleTransition(Duration.millis(100), node);
+        ScaleTransition overshoot = new ScaleTransition(AnimationConstants.BOUNCE_OVERSHOOT_DURATION, node);
         overshoot.setFromX(1);
         overshoot.setFromY(1);
-        overshoot.setToX(1.05);
-        overshoot.setToY(1.05);
+        overshoot.setToX(AnimationConstants.BOUNCE_OVERSHOOT_SCALE);
+        overshoot.setToY(AnimationConstants.BOUNCE_OVERSHOOT_SCALE);
         overshoot.setAutoReverse(true);
-        overshoot.setCycleCount(2);
+        overshoot.setCycleCount(AnimationConstants.BOUNCE_OVERSHOOT_CYCLES);
 
         scale.setOnFinished(e -> {
             e.consume();
@@ -249,7 +250,7 @@ public final class UiAnimations {
                 double offsetX = (e.getSceneX() - centerX) / centerX * intensity;
                 double offsetY = (e.getSceneY() - centerY) / centerY * intensity;
 
-                TranslateTransition move = new TranslateTransition(Duration.millis(100), node);
+                TranslateTransition move = new TranslateTransition(AnimationConstants.PARALLAX_MOVE_DURATION, node);
                 move.setToX(offsetX);
                 move.setToY(offsetY);
                 move.play();

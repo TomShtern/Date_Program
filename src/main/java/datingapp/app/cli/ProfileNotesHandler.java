@@ -1,6 +1,7 @@
 package datingapp.app.cli;
 
 import datingapp.core.AppSession;
+import datingapp.core.LoggingSupport;
 import datingapp.core.User;
 import datingapp.core.storage.UserStorage;
 import java.util.List;
@@ -15,7 +16,7 @@ import org.slf4j.LoggerFactory;
  * delete personal notes
  * about other profiles.
  */
-public class ProfileNotesHandler {
+public class ProfileNotesHandler implements LoggingSupport {
 
     private static final Logger logger = LoggerFactory.getLogger(ProfileNotesHandler.class);
 
@@ -29,6 +30,11 @@ public class ProfileNotesHandler {
         this.inputReader = inputReader;
     }
 
+    @Override
+    public Logger logger() {
+        return logger;
+    }
+
     /**
      * Shows the note management menu for a specific user.
      *
@@ -36,12 +42,12 @@ public class ProfileNotesHandler {
      * @param subjectName the name of the user (for display)
      */
     public void manageNoteFor(UUID subjectId, String subjectName) {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
 
-            logInfo("\n" + CliConstants.MENU_DIVIDER);
+            logInfo("\n" + CliSupport.MENU_DIVIDER);
             logInfo("       📝 NOTES ABOUT {}", subjectName.toUpperCase(Locale.ROOT));
-            logInfo(CliConstants.MENU_DIVIDER);
+            logInfo(CliSupport.MENU_DIVIDER);
 
             Optional<User.ProfileNote> existingNote = userStorage.getProfileNote(currentUser.getId(), subjectId);
 
@@ -154,12 +160,12 @@ public class ProfileNotesHandler {
 
     /** Views all notes the current user has created. */
     public void viewAllNotes() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
 
-            logInfo("\n" + CliConstants.MENU_DIVIDER);
+            logInfo("\n" + CliSupport.MENU_DIVIDER);
             logInfo("         📝 MY PROFILE NOTES");
-            logInfo(CliConstants.MENU_DIVIDER + "\n");
+            logInfo(CliSupport.MENU_DIVIDER + "\n");
 
             List<User.ProfileNote> notes = userStorage.getProfileNotesByAuthor(currentUser.getId());
 
@@ -214,17 +220,5 @@ public class ProfileNotesHandler {
     /** Checks if a note exists for the given subject. */
     public boolean hasNote(UUID authorId, UUID subjectId) {
         return userStorage.getProfileNote(authorId, subjectId).isPresent();
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logTrace(String message, Object... args) {
-        if (logger.isTraceEnabled()) {
-            logger.trace(message, args);
-        }
     }
 }

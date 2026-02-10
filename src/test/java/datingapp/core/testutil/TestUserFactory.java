@@ -1,7 +1,8 @@
 package datingapp.core.testutil;
 
-import datingapp.core.Gender;
+import datingapp.core.AppClock;
 import datingapp.core.User;
+import datingapp.core.User.Gender;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -33,10 +34,10 @@ public final class TestUserFactory {
      * @return a new active user
      */
     public static User createActiveUser(UUID id, String name) {
-        return User.StorageBuilder.create(id, name, java.time.Instant.now())
-                .state(datingapp.core.UserState.ACTIVE)
+        return User.StorageBuilder.create(id, name, AppClock.now())
+                .state(User.UserState.ACTIVE)
                 .bio("Test bio")
-                .birthDate(java.time.LocalDate.now().minusYears(25))
+                .birthDate(AppClock.today().minusYears(25))
                 .gender(Gender.MALE)
                 .interestedIn(java.util.Set.of(Gender.FEMALE))
                 .photoUrls(java.util.List.of("http://example.com/photo.jpg"))

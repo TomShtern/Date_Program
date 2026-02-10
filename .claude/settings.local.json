@@ -54,8 +54,13 @@
       "Bash(code-insiders:*)",
       "Bash(Select-String -Pattern \"java|redhat|vscjava\")",
       "Bash(Sort-Object)",
-      "Bash(1 -Dmaven.compiler.failOnWarning=false -X)"
+      "Bash(1 -Dmaven.compiler.failOnWarning=false -X)",
+      "Bash(coderabbit:*)",
+      "Bash(coderabbit auth status:*)",
+      "WebFetch(domain:mvnrepository.com)",
+      "WebFetch(domain:central.sonatype.com)"
     ]
   },
-  "outputStyle": "Explanatory"
+  "outputStyle": "Explanatory",
+  "prefersReducedMotion": false
 }

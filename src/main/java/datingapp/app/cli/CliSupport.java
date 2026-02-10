@@ -1,11 +1,22 @@
 package datingapp.app.cli;
 
+import datingapp.core.AppSession;
+import java.util.Locale;
+import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
- * Constants for CLI display elements including separators, box characters, and
- * messages.
+ * Shared CLI constants and utility methods.
+ * Merged from CliConstants + CliUtilities (R-010).
  */
-public final class CliConstants {
-    private CliConstants() {} // Prevent instantiation
+public final class CliSupport {
+
+    private CliSupport() {} // Utility class
+
+    private static final Logger logger = LoggerFactory.getLogger(CliSupport.class);
+
+    // ═══ Display Constants ═══
 
     public static final String SEPARATOR_LINE = "═══════════════════════════════════════";
     public static final String SECTION_LINE = "  ───────────────────────────────────";
@@ -56,4 +67,42 @@ public final class CliConstants {
     public static final String STATS_MATCHES = "  💕 MATCHES";
     public static final String STATS_SCORES = "  🎯 YOUR SCORES";
     public static final String STATS_SAFETY = "  ⚠️  SAFETY";
+
+    // ═══ Utility Methods ═══
+
+    /**
+     * Validates user input against a set of valid choices (case-insensitive).
+     *
+     * @param input        The user input to validate
+     * @param validChoices Array of valid choices (e.g., "l", "p", "v", "b")
+     * @return Optional containing normalized lowercase input if valid, empty otherwise
+     */
+    public static Optional<String> validateChoice(String input, String... validChoices) {
+        if (input == null || input.isBlank()) {
+            return Optional.empty();
+        }
+        String normalized = input.trim().toLowerCase(Locale.ROOT);
+        for (String valid : validChoices) {
+            if (normalized.equals(valid.toLowerCase(Locale.ROOT))) {
+                return Optional.of(normalized);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Executes the action only if a user is logged in to AppSession.
+     * Logs "Please select a user first" if not logged in.
+     *
+     * @param action The action to execute if logged in
+     * @return true if action was executed, false if not logged in
+     */
+    public static boolean requireLogin(Runnable action) {
+        if (!AppSession.getInstance().isLoggedIn()) {
+            logger.info(PLEASE_SELECT_USER);
+            return false;
+        }
+        action.run();
+        return true;
+    }
 }

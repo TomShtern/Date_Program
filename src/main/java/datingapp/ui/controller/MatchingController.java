@@ -439,11 +439,6 @@ public class MatchingController extends BaseController implements Initializable 
     }
 
     @FXML
-    private void handleBack() {
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
-    }
-
-    @FXML
     private void handleExpandPreferences() {
         logInfo("User clicked Expand Preferences - navigating to Profile settings");
         // Navigate to filter/preferences screen

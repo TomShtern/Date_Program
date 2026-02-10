@@ -3,7 +3,6 @@ package datingapp.core;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.storage.SwipeSessionStorage;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -12,6 +11,10 @@ import java.util.UUID;
 /**
  * Service for managing swipe sessions. Handles session lifecycle (create, update, end) and anti-bot
  * detection.
+ *
+ * <p>Thread safety: Uses striped locking ({@code lockStripes}) to guard concurrent swipe recording
+ * for the same user. Each user ID hashes to a fixed lock stripe, allowing parallel operations on
+ * different users while serializing operations on the same user.
  */
 public class SessionService {
 
@@ -154,7 +157,7 @@ public class SessionService {
      * @return list of sessions started today
      */
     public List<SwipeSession> getTodaysSessions(UUID userId) {
-        Instant startOfDay = LocalDate.now(config.userTimeZone())
+        Instant startOfDay = AppClock.today(config.userTimeZone())
                 .atStartOfDay(config.userTimeZone())
                 .toInstant();
         return sessionStorage.getSessionsInRange(userId, startOfDay, AppClock.now());

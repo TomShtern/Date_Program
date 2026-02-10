@@ -21,6 +21,7 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +80,7 @@ public class ChatViewModel {
     /**
      * Gets the current user from UISession if not set.
      */
+    @Nullable
     private User ensureCurrentUser() {
         if (currentUser == null) {
             currentUser = AppSession.getInstance().getCurrentUser();
@@ -276,6 +278,7 @@ public class ChatViewModel {
     /**
      * Get the current user's ID for message styling.
      */
+    @Nullable
     public UUID getCurrentUserId() {
         return currentUser != null ? currentUser.getId() : null;
     }

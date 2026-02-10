@@ -1,13 +1,14 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
-import datingapp.core.Gender;
 import datingapp.core.PacePreferences;
 import datingapp.core.User;
-import datingapp.core.UserState;
-import datingapp.core.storage.UserStorage;
+import datingapp.core.User.Gender;
+import datingapp.core.User.UserState;
+import datingapp.ui.viewmodel.data.UiUserStore;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
@@ -21,6 +22,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +34,7 @@ public class LoginViewModel {
     private static final Logger logger = LoggerFactory.getLogger(LoginViewModel.class);
     private static final AppConfig CONFIG = AppConfig.defaults();
 
-    private final UserStorage userStorage;
+    private final UiUserStore userStore;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final ObservableList<User> filteredUsers = FXCollections.observableArrayList();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
@@ -51,8 +53,8 @@ public class LoginViewModel {
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
-    public LoginViewModel(UserStorage userStorage) {
-        this.userStorage = userStorage;
+    public LoginViewModel(UiUserStore userStore) {
+        this.userStore = userStore;
         this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
         loadUsers();
     }
@@ -81,7 +83,7 @@ public class LoginViewModel {
         loading.set(true);
         Thread.ofVirtual().start(() -> {
             try {
-                List<User> allUsers = userStorage.findAll();
+                List<User> allUsers = userStore.findAll();
                 if (disposed.get()) {
                     return;
                 }
@@ -144,6 +146,7 @@ public class LoginViewModel {
         this.loginDisabled.set(user == null);
     }
 
+    @Nullable
     public User getSelectedUser() {
         return selectedUser;
     }
@@ -174,7 +177,7 @@ public class LoginViewModel {
             if (selectedUser.isComplete() && selectedUser.getState() == UserState.INCOMPLETE) {
                 try {
                     selectedUser.activate();
-                    userStorage.save(selectedUser);
+                    userStore.save(selectedUser);
                     logInfo("Auto-activated user {} after completing profile", selectedUser.getName());
                 } catch (IllegalStateException e) {
                     logWarn("Could not auto-activate user {}: {}", selectedUser.getName(), e.getMessage());
@@ -235,7 +238,7 @@ public class LoginViewModel {
         }
 
         if (modified) {
-            userStorage.save(user);
+            userStore.save(user);
             logInfo("Auto-completed profile fields for user {}", user.getName());
         }
     }
@@ -244,6 +247,7 @@ public class LoginViewModel {
      * Creates a new user account with complete profile data to enable activation.
      * Returns the created user, or null if creation failed.
      */
+    @Nullable
     public User createUser(String name, int age, Gender gender, Gender interestedIn) {
         errorMessage.set("");
 
@@ -259,7 +263,7 @@ public class LoginViewModel {
 
         try {
             // Calculate birth date from age
-            LocalDate birthDate = LocalDate.now().minusYears(age);
+            LocalDate birthDate = AppClock.today().minusYears(age);
 
             // Create a new user with minimal constructor, then set all required fields
             User newUser = new User(UUID.randomUUID(), name.trim());
@@ -306,7 +310,7 @@ public class LoginViewModel {
                         newUser.getState(),
                         newUser.isComplete());
             }
-            userStorage.save(newUser);
+            userStore.save(newUser);
 
             // Refresh the user list
             refreshUsers();

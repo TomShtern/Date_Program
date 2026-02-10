@@ -7,6 +7,7 @@ import datingapp.core.CandidateFinder;
 import datingapp.core.CandidateFinder.GeoUtils;
 import datingapp.core.DailyPick;
 import datingapp.core.DailyService;
+import datingapp.core.LoggingSupport;
 import datingapp.core.Match;
 import datingapp.core.MatchQualityService;
 import datingapp.core.MatchQualityService.InterestMatcher;
@@ -18,9 +19,9 @@ import datingapp.core.Standout;
 import datingapp.core.StandoutsService;
 import datingapp.core.UndoService;
 import datingapp.core.User;
+import datingapp.core.User.UserState;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserState;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.StatsStorage;
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * discovery, daily picks, and
  * match quality display.
  */
-public class MatchingHandler {
+public class MatchingHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(MatchingHandler.class);
 
     private final CandidateFinder candidateFinderService;
@@ -71,6 +72,11 @@ public class MatchingHandler {
         this.standoutsService = dependencies.standoutsService();
         this.session = dependencies.userSession();
         this.inputReader = dependencies.inputReader();
+    }
+
+    @Override
+    public Logger logger() {
+        return logger;
     }
 
     public record Dependencies(
@@ -113,7 +119,7 @@ public class MatchingHandler {
      * picks, candidate filtering, and user interactions (like/pass).
      */
     public void browseCandidates() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             if (currentUser.getState() != UserState.ACTIVE) {
                 logInfo("\n⚠️  You must be ACTIVE to browse candidates. Complete your profile first.\n");
@@ -126,7 +132,7 @@ public class MatchingHandler {
                 showDailyPick(dailyPick.get(), currentUser);
             }
 
-            logInfo("\n" + CliConstants.HEADER_BROWSE_CANDIDATES + "\n");
+            logInfo("\n" + CliSupport.HEADER_BROWSE_CANDIDATES + "\n");
 
             List<User> candidates = candidateFinderService.findCandidatesForUser(currentUser);
 
@@ -152,7 +158,7 @@ public class MatchingHandler {
                 currentUser.getLat(), currentUser.getLon(),
                 candidate.getLat(), candidate.getLon());
 
-        logInfo(CliConstants.BOX_TOP);
+        logInfo(CliSupport.BOX_TOP);
         boolean verified = candidate.isVerified();
         logInfo(
                 "│ 💝 {}{}{}, {} years old",
@@ -163,17 +169,17 @@ public class MatchingHandler {
         if (logger.isInfoEnabled()) {
             logInfo("│ 📍 {} km away", String.format("%.1f", distance));
         }
-        logInfo(CliConstants.PROFILE_BIO_FORMAT, candidate.getBio() != null ? candidate.getBio() : "(no bio)");
+        logInfo(CliSupport.PROFILE_BIO_FORMAT, candidate.getBio() != null ? candidate.getBio() : "(no bio)");
 
         logSharedInterests(currentUser, candidate);
 
-        logInfo(CliConstants.BOX_BOTTOM);
+        logInfo(CliSupport.BOX_BOTTOM);
 
         // Validate input and re-prompt until valid choice is entered
         String action = null;
         while (action == null) {
-            String input = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_QUIT);
-            Optional<String> validated = CliUtilities.validateChoice(input, "l", "p", "q");
+            String input = inputReader.readLine(CliSupport.PROMPT_LIKE_PASS_QUIT);
+            Optional<String> validated = CliSupport.validateChoice(input, "l", "p", "q");
             if (validated.isEmpty()) {
                 logInfo("❌ Invalid choice. Please enter L (like), P (pass), or Q (quit).");
             } else {
@@ -182,7 +188,7 @@ public class MatchingHandler {
         }
 
         if ("q".equals(action)) {
-            logInfo(CliConstants.MSG_STOPPING_BROWSE);
+            logInfo(CliSupport.MSG_STOPPING_BROWSE);
             return false;
         }
 
@@ -213,11 +219,11 @@ public class MatchingHandler {
      * unmatch, or block matches.
      */
     public void viewMatches() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
-            logInfo("\n" + CliConstants.SEPARATOR_LINE);
+            logInfo("\n" + CliSupport.SEPARATOR_LINE);
             logInfo("         YOUR MATCHES");
-            logInfo(CliConstants.SEPARATOR_LINE + "\n");
+            logInfo(CliSupport.SEPARATOR_LINE + "\n");
 
             List<Match> matches = matchStorage.getActiveMatchesFor(currentUser.getId());
 
@@ -249,8 +255,8 @@ public class MatchingHandler {
                 }
             }
 
-            logInfo(CliConstants.MENU_DIVIDER_WITH_NEWLINES);
-            logInfo("  " + CliConstants.PROMPT_VIEW_UNMATCH_BLOCK);
+            logInfo(CliSupport.MENU_DIVIDER_WITH_NEWLINES);
+            logInfo("  " + CliSupport.PROMPT_VIEW_UNMATCH_BLOCK);
             String action = inputReader.readLine("\nYour choice: ").toLowerCase(Locale.ROOT);
 
             switch (action) {
@@ -269,7 +275,7 @@ public class MatchingHandler {
         try {
             int idx = Integer.parseInt(input) - 1;
             if (idx < 0 || idx >= matches.size()) {
-                logInfo(CliConstants.INVALID_SELECTION);
+                logInfo(CliSupport.INVALID_SELECTION);
                 return;
             }
 
@@ -280,22 +286,22 @@ public class MatchingHandler {
 
             displayMatchQuality(otherUser, quality);
 
-            logInfo(CliConstants.MENU_DIVIDER_WITH_NEWLINES);
+            logInfo(CliSupport.MENU_DIVIDER_WITH_NEWLINES);
             logInfo("  (U)nmatch | (B)lock | (F)riend Zone | (G)raceful Exit | back");
             String action = inputReader.readLine("  Your choice: ").toLowerCase(Locale.ROOT);
 
             handleMatchDetailAction(action, match, otherUser, otherUserId, currentUser);
 
         } catch (NumberFormatException _) {
-            logInfo(CliConstants.INVALID_INPUT);
+            logInfo(CliSupport.INVALID_INPUT);
         }
     }
 
     private void displayMatchQuality(User otherUser, MatchQuality quality) {
         String nameUpper = otherUser.getName().toUpperCase(Locale.ROOT);
-        logInfo("\n" + CliConstants.SEPARATOR_LINE);
+        logInfo("\n" + CliSupport.SEPARATOR_LINE);
         logInfo("         MATCH WITH {}", nameUpper);
-        logInfo(CliConstants.SEPARATOR_LINE + "\n");
+        logInfo(CliSupport.SEPARATOR_LINE + "\n");
 
         logInfo("  👤 {}, {}", otherUser.getName(), otherUser.getAge());
         if (otherUser.getBio() != null) {
@@ -309,10 +315,10 @@ public class MatchingHandler {
             logInfo("  📍 {} km away", distanceStr);
         }
 
-        logInfo("\n" + CliConstants.SECTION_LINE);
+        logInfo("\n" + CliSupport.SECTION_LINE);
         logInfo("  COMPATIBILITY: {}%  {}", quality.compatibilityScore(), quality.getStarDisplay());
         logInfo("  {}", quality.getCompatibilityLabel());
-        logInfo(CliConstants.SECTION_LINE);
+        logInfo(CliSupport.SECTION_LINE);
 
         if (!quality.highlights().isEmpty()) {
             logInfo("\n  ✨ WHY YOU MATCHED");
@@ -342,7 +348,7 @@ public class MatchingHandler {
         String responseBar = MatchQualityService.renderProgressBar(quality.responseScore(), 12);
 
         logInfo("\n  📊 SCORE BREAKDOWN");
-        logInfo(CliConstants.SECTION_LINE);
+        logInfo(CliSupport.SECTION_LINE);
         logInfo("  Distance:      {} {}%", distanceBar, (int) (quality.distanceScore() * 100));
         logInfo("  Age match:     {} {}%", ageBar, (int) (quality.ageScore() * 100));
         logInfo("  Interests:     {} {}%", interestBar, (int) (quality.interestScore() * 100));
@@ -380,8 +386,8 @@ public class MatchingHandler {
                 }
             }
             case "b" -> {
-                String confirm = inputReader.readLine(
-                        CliConstants.BLOCK_PREFIX + otherUser.getName() + CliConstants.CONFIRM_SUFFIX);
+                String confirm =
+                        inputReader.readLine(CliSupport.BLOCK_PREFIX + otherUser.getName() + CliSupport.CONFIRM_SUFFIX);
                 if ("y".equalsIgnoreCase(confirm)) {
                     Block block = Block.create(currentUser.getId(), otherUserId);
                     blockStorage.save(block);
@@ -420,7 +426,7 @@ public class MatchingHandler {
         try {
             int idx = Integer.parseInt(input) - 1;
             if (idx < 0 || idx >= matches.size()) {
-                logInfo(CliConstants.INVALID_SELECTION);
+                logInfo(CliSupport.INVALID_SELECTION);
                 return;
             }
 
@@ -434,10 +440,10 @@ public class MatchingHandler {
                 matchStorage.update(match);
                 logInfo("✅ Unmatched with {}.\n", otherUser.getName());
             } else {
-                logInfo(CliConstants.CANCELLED);
+                logInfo(CliSupport.CANCELLED);
             }
         } catch (NumberFormatException _) {
-            logInfo(CliConstants.INVALID_INPUT);
+            logInfo(CliSupport.INVALID_INPUT);
         }
     }
 
@@ -446,7 +452,7 @@ public class MatchingHandler {
         try {
             int idx = Integer.parseInt(input) - 1;
             if (idx < 0 || idx >= matches.size()) {
-                logInfo(CliConstants.INVALID_SELECTION);
+                logInfo(CliSupport.INVALID_SELECTION);
                 return;
             }
 
@@ -455,7 +461,7 @@ public class MatchingHandler {
             User otherUser = userStorage.get(otherUserId);
 
             String confirm = inputReader.readLine(
-                    CliConstants.BLOCK_PREFIX + otherUser.getName() + "? This will end your match. (y/n): ");
+                    CliSupport.BLOCK_PREFIX + otherUser.getName() + "? This will end your match. (y/n): ");
             if ("y".equalsIgnoreCase(confirm)) {
                 Block block = Block.create(currentUser.getId(), otherUserId);
                 blockStorage.save(block);
@@ -463,10 +469,10 @@ public class MatchingHandler {
                 matchStorage.update(match);
                 logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
             } else {
-                logInfo(CliConstants.CANCELLED);
+                logInfo(CliSupport.CANCELLED);
             }
         } catch (NumberFormatException _) {
-            logInfo(CliConstants.INVALID_INPUT);
+            logInfo(CliSupport.INVALID_INPUT);
         }
     }
 
@@ -481,9 +487,9 @@ public class MatchingHandler {
         DailyService.DailyStatus status = dailyService.getStatus(currentUser.getId());
         String timeUntilReset = DailyService.formatDuration(dailyService.getTimeUntilReset());
 
-        logInfo("\n" + CliConstants.SEPARATOR_LINE);
+        logInfo("\n" + CliSupport.SEPARATOR_LINE);
         logInfo("         💔 DAILY LIMIT REACHED");
-        logInfo(CliConstants.SEPARATOR_LINE);
+        logInfo(CliSupport.SEPARATOR_LINE);
         logInfo("");
         logInfo("   You've used all {} likes for today!", status.likesUsed());
         logInfo("");
@@ -495,13 +501,13 @@ public class MatchingHandler {
         logInfo("   • Check your matches!");
         logInfo("");
         inputReader.readLine("   [Press Enter to return to menu]");
-        logInfo(CliConstants.SEPARATOR_LINE + "\n");
+        logInfo(CliSupport.SEPARATOR_LINE + "\n");
     }
 
     private void showDailyPick(DailyPick pick, User currentUser) {
-        logInfo("\n" + CliConstants.SEPARATOR_LINE);
+        logInfo("\n" + CliSupport.SEPARATOR_LINE);
         logInfo("       🎲 YOUR DAILY PICK 🎲");
-        logInfo(CliConstants.SEPARATOR_LINE);
+        logInfo(CliSupport.SEPARATOR_LINE);
         logInfo("");
         logInfo("  ✨ {}", pick.reason());
         logInfo("");
@@ -511,12 +517,12 @@ public class MatchingHandler {
                 currentUser.getLat(), currentUser.getLon(),
                 candidate.getLat(), candidate.getLon());
 
-        logInfo(CliConstants.BOX_TOP);
+        logInfo(CliSupport.BOX_TOP);
         logInfo("│ 🎁 {}, {} years old", candidate.getName(), candidate.getAge());
         if (logger.isInfoEnabled()) {
             logInfo("│ 📍 {} km away", String.format("%.1f", distance));
         }
-        logInfo(CliConstants.PROFILE_BIO_FORMAT, candidate.getBio() != null ? candidate.getBio() : "(no bio)");
+        logInfo(CliSupport.PROFILE_BIO_FORMAT, candidate.getBio() != null ? candidate.getBio() : "(no bio)");
 
         InterestMatcher.MatchResult matchResult =
                 InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
@@ -525,7 +531,7 @@ public class MatchingHandler {
             logInfo("│ ✨ You both like: {}", sharedInterests);
         }
 
-        logInfo(CliConstants.BOX_BOTTOM);
+        logInfo(CliSupport.BOX_BOTTOM);
         logInfo("");
         logInfo("  This pick resets tomorrow at midnight!");
         logInfo("");
@@ -533,8 +539,8 @@ public class MatchingHandler {
         // Validate input and re-prompt until valid choice is entered
         String action = null;
         while (action == null) {
-            String input = inputReader.readLine(CliConstants.PROMPT_LIKE_PASS_SKIP);
-            Optional<String> validated = CliUtilities.validateChoice(input, "l", "p", "s");
+            String input = inputReader.readLine(CliSupport.PROMPT_LIKE_PASS_SKIP);
+            Optional<String> validated = CliSupport.validateChoice(input, "l", "p", "s");
             if (validated.isEmpty()) {
                 logInfo("❌ Invalid choice. Please enter L (like), P (pass), or S (skip).");
             } else {
@@ -610,12 +616,6 @@ public class MatchingHandler {
         logInfo("");
     }
 
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
     /**
      * Returns an emoji badge based on the number of shared interests. More matches
      * = more exciting
@@ -637,7 +637,7 @@ public class MatchingHandler {
      * Displays today's standout profiles - the top 10 high-quality matches.
      */
     public void viewStandouts() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             if (currentUser.getState() != UserState.ACTIVE) {
                 logInfo("\n⚠️  You must be ACTIVE to view standouts. Complete your profile first.\n");

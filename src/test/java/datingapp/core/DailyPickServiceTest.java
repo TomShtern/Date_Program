@@ -13,11 +13,14 @@ import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.DailyPickViewStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.testutil.TestClock;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -32,18 +35,25 @@ class DailyPickServiceTest {
     private InMemoryDailyPickViewStorage dailyPickViewStorage;
     private CandidateFinder candidateFinder;
     private AppConfig config;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
+        TestClock.setFixed(FIXED_INSTANT);
         userStorage = new InMemoryUserStorage();
         likeStorage = new InMemoryLikeStorage();
         blockStorage = new InMemoryBlockStorage();
         dailyPickViewStorage = new InMemoryDailyPickViewStorage();
         config = AppConfig.defaults();
 
-        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, AppConfig.defaults());
+        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, config);
         service =
                 new DailyService(userStorage, likeStorage, blockStorage, dailyPickViewStorage, candidateFinder, config);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
     }
 
     @Test
@@ -188,7 +198,7 @@ class DailyPickServiceTest {
         Optional<DailyPick> pick = service.getDailyPick(seeker);
 
         assertTrue(pick.isPresent());
-        assertEquals(LocalDate.now(config.userTimeZone()), pick.get().date());
+        assertEquals(AppClock.today(config.userTimeZone()), pick.get().date());
     }
 
     @Test
@@ -217,16 +227,16 @@ class DailyPickServiceTest {
         service.markDailyPickViewed(seeker.getId());
 
         assertTrue(service.hasViewedDailyPick(seeker.getId()));
-        assertEquals(0, service.cleanupOldDailyPickViews(LocalDate.now(config.userTimeZone())));
+        assertEquals(0, service.cleanupOldDailyPickViews(AppClock.today(config.userTimeZone())));
         assertEquals(
                 1,
                 service.cleanupOldDailyPickViews(
-                        LocalDate.now(config.userTimeZone()).plusDays(1)));
+                        AppClock.today(config.userTimeZone()).plusDays(1)));
     }
 
     @Test
     void cleanupOldDailyPickViews_removesOldEntries() {
-        LocalDate oldDate = LocalDate.now(config.userTimeZone()).minusDays(10);
+        LocalDate oldDate = AppClock.today(config.userTimeZone()).minusDays(10);
         ZoneId zone = config.userTimeZone();
         Clock oldClock = Clock.fixed(oldDate.atStartOfDay(zone).toInstant(), zone);
         DailyService oldService = new DailyService(
@@ -271,16 +281,16 @@ class DailyPickServiceTest {
     // Helper methods
 
     private User createActiveUser(String name, int age) {
-        return createActiveUser(name, age, Gender.FEMALE);
+        return createActiveUser(name, age, User.Gender.FEMALE);
     }
 
-    private User createActiveUser(String name, int age, Gender gender) {
+    private User createActiveUser(String name, int age, User.Gender gender) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio for " + name);
-        user.setBirthDate(LocalDate.now().minusYears(age));
+        user.setBirthDate(AppClock.today().minusYears(age));
         user.setGender(gender);
         // Set mutual interest - everyone interested in everyone for simple test matching
-        user.setInterestedIn(EnumSet.of(Gender.MALE, Gender.FEMALE, Gender.OTHER));
+        user.setInterestedIn(EnumSet.of(User.Gender.MALE, User.Gender.FEMALE, User.Gender.OTHER));
         user.setLocation(40.7128, -74.0060); // NYC
         user.addPhotoUrl("http://example.com/" + name + ".jpg");
         user.setPacePreferences(new PacePreferences(
@@ -316,7 +326,9 @@ class DailyPickServiceTest {
 
         @Override
         public List<User> findActive() {
-            return users.stream().filter(u -> u.getState() == UserState.ACTIVE).toList();
+            return users.stream()
+                    .filter(u -> u.getState() == User.UserState.ACTIVE)
+                    .toList();
         }
 
         @Override

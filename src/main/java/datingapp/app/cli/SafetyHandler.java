@@ -1,13 +1,14 @@
 package datingapp.app.cli;
 
 import datingapp.core.AppSession;
+import datingapp.core.LoggingSupport;
 import datingapp.core.Match;
 import datingapp.core.TrustSafetyService;
 import datingapp.core.User;
+import datingapp.core.User.UserState;
+import datingapp.core.User.VerificationMethod;
 import datingapp.core.UserInteractions.Block;
 import datingapp.core.UserInteractions.Report;
-import datingapp.core.UserState;
-import datingapp.core.VerificationMethod;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.UserStorage;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +24,7 @@ import org.slf4j.LoggerFactory;
  * Handles user blocking, reporting, and profile verification operations in the
  * CLI.
  */
-public class SafetyHandler {
+public class SafetyHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(SafetyHandler.class);
 
     private final UserStorage userStorage;
@@ -47,10 +49,15 @@ public class SafetyHandler {
         this.inputReader = Objects.requireNonNull(inputReader);
     }
 
+    @Override
+    public Logger logger() {
+        return logger;
+    }
+
     /** Allows the current user to block another user. */
     public void blockUser() {
-        CliUtilities.requireLogin(() -> {
-            logInfo(CliConstants.HEADER_BLOCK_USER);
+        CliSupport.requireLogin(() -> {
+            logInfo(CliSupport.HEADER_BLOCK_USER);
 
             User currentUser = session.getCurrentUser();
             List<User> blockableUsers = getBlockableUsers(currentUser);
@@ -65,7 +72,7 @@ public class SafetyHandler {
             }
 
             String confirm =
-                    inputReader.readLine(CliConstants.BLOCK_PREFIX + toBlock.getName() + CliConstants.CONFIRM_SUFFIX);
+                    inputReader.readLine(CliSupport.BLOCK_PREFIX + toBlock.getName() + CliSupport.CONFIRM_SUFFIX);
             if ("y".equalsIgnoreCase(confirm)) {
                 Block block = Block.create(currentUser.getId(), toBlock.getId());
                 blockStorage.save(block);
@@ -81,21 +88,21 @@ public class SafetyHandler {
 
                 logInfo("🚫 Blocked {}.\n", toBlock.getName());
             } else {
-                logInfo(CliConstants.CANCELLED);
+                logInfo(CliSupport.CANCELLED);
             }
         });
     }
 
     /** Allows the current user to report another user for violations. */
     public void reportUser() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             if (currentUser.getState() != UserState.ACTIVE) {
                 logInfo("\n⚠️  You must be ACTIVE to report users.\n");
                 return;
             }
 
-            logInfo(CliConstants.HEADER_REPORT_USER);
+            logInfo(CliSupport.HEADER_REPORT_USER);
 
             List<User> reportableUsers = getReportableUsers(currentUser);
 
@@ -129,6 +136,7 @@ public class SafetyHandler {
      *
      * @return The selected report reason, or null if invalid
      */
+    @Nullable
     private Report.Reason selectReportReason() {
         logInfo("\nReason for report:");
         Report.Reason[] reasons = Report.Reason.values();
@@ -154,7 +162,7 @@ public class SafetyHandler {
      * Displays blocked users and allows the current user to unblock them.
      */
     public void manageBlockedUsers() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             List<User> blockedUsers = trustSafetyService.getBlockedUsers(currentUser.getId());
 
@@ -163,13 +171,13 @@ public class SafetyHandler {
                 return;
             }
 
-            logInfo(CliConstants.HEADER_BLOCKED_USERS);
+            logInfo(CliSupport.HEADER_BLOCKED_USERS);
             User toUnblock = selectUserFromList(blockedUsers, "\nEnter number to unblock (or 0 to go back): ", true);
             if (toUnblock == null) {
                 return;
             }
 
-            String confirm = inputReader.readLine("Unblock " + toUnblock.getName() + CliConstants.CONFIRM_SUFFIX);
+            String confirm = inputReader.readLine("Unblock " + toUnblock.getName() + CliSupport.CONFIRM_SUFFIX);
             if ("y".equalsIgnoreCase(confirm)) {
                 boolean success = trustSafetyService.unblock(currentUser.getId(), toUnblock.getId());
 
@@ -179,7 +187,7 @@ public class SafetyHandler {
                     logInfo("❌ Failed to unblock user.\n");
                 }
             } else {
-                logInfo(CliConstants.CANCELLED);
+                logInfo(CliSupport.CANCELLED);
             }
         });
     }
@@ -200,6 +208,7 @@ public class SafetyHandler {
                 .toList();
     }
 
+    @Nullable
     private String normalizeReportDescription(String description) {
         if (description == null || description.isBlank()) {
             return null;
@@ -219,6 +228,7 @@ public class SafetyHandler {
         }
     }
 
+    @Nullable
     private User selectUserFromList(List<User> users, String prompt, boolean showState) {
         for (int i = 0; i < users.size(); i++) {
             User user = users.get(i);
@@ -234,13 +244,13 @@ public class SafetyHandler {
             int idx = Integer.parseInt(input) - 1;
             if (idx < 0 || idx >= users.size()) {
                 if (idx != -1) {
-                    logInfo(CliConstants.INVALID_INPUT);
+                    logInfo(CliSupport.INVALID_INPUT);
                 }
                 return null;
             }
             return users.get(idx);
         } catch (NumberFormatException _) {
-            logInfo(CliConstants.INVALID_INPUT);
+            logInfo(CliSupport.INVALID_INPUT);
             return null;
         }
     }
@@ -251,7 +261,7 @@ public class SafetyHandler {
 
     /** Starts the profile verification flow for the current user. */
     public void verifyProfile() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
 
             if (currentUser.isVerified()) {
@@ -270,7 +280,7 @@ public class SafetyHandler {
                     /* cancelled */ }
                 case "1" -> startVerification(currentUser, VerificationMethod.EMAIL);
                 case "2" -> startVerification(currentUser, VerificationMethod.PHONE);
-                default -> logInfo(CliConstants.INVALID_SELECTION);
+                default -> logInfo(CliSupport.INVALID_SELECTION);
             }
         });
     }
@@ -317,11 +327,5 @@ public class SafetyHandler {
         user.markVerified();
         userStorage.save(user);
         logInfo("✅ Profile verified!\n");
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
     }
 }

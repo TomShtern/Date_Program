@@ -7,12 +7,10 @@ import datingapp.core.Match;
 import datingapp.core.MatchingService;
 import datingapp.core.MatchingService.PendingLiker;
 import datingapp.core.User;
+import datingapp.core.User.UserState;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserState;
-import datingapp.core.storage.BlockStorage;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.UserStorage;
+import datingapp.ui.viewmodel.data.UiMatchDataAccess;
+import datingapp.ui.viewmodel.data.UiUserStore;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -40,10 +38,8 @@ public class MatchesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(MatchesViewModel.class);
     private static final String LIKE_REQUIRED = "like cannot be null";
 
-    private final MatchStorage matchStorage;
-    private final UserStorage userStorage;
-    private final LikeStorage likeStorage;
-    private final BlockStorage blockStorage;
+    private final UiMatchDataAccess matchData;
+    private final UiUserStore userStore;
     private final MatchingService matchingService;
     private final DailyService dailyService;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
@@ -59,16 +55,12 @@ public class MatchesViewModel {
     private User currentUser;
 
     public MatchesViewModel(
-            MatchStorage matchStorage,
-            UserStorage userStorage,
-            LikeStorage likeStorage,
-            BlockStorage blockStorage,
+            UiMatchDataAccess matchData,
+            UiUserStore userStore,
             MatchingService matchingService,
             DailyService dailyService) {
-        this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
-        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
-        this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
-        this.blockStorage = Objects.requireNonNull(blockStorage, "blockStorage cannot be null");
+        this.matchData = Objects.requireNonNull(matchData, "matchData cannot be null");
+        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
         this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
     }
@@ -185,10 +177,10 @@ public class MatchesViewModel {
     }
 
     private List<MatchCardData> fetchMatchesFromStorage(UUID userId) {
-        List<Match> activeMatches = matchStorage.getActiveMatchesFor(userId);
+        List<Match> activeMatches = matchData.getActiveMatchesFor(userId);
         List<UUID> otherUserIds =
                 activeMatches.stream().map(m -> m.getOtherUser(userId)).toList();
-        Map<UUID, User> otherUsers = userStorage.findByIds(new HashSet<>(otherUserIds));
+        Map<UUID, User> otherUsers = userStore.findByIds(new HashSet<>(otherUserIds));
 
         List<MatchCardData> cardData = new ArrayList<>();
         for (Match match : activeMatches) {
@@ -213,7 +205,7 @@ public class MatchesViewModel {
         for (PendingLiker pending : pendingLikers) {
             User liker = pending.user();
             if (liker != null && liker.getState() == UserState.ACTIVE) {
-                Like like = likeStorage.getLike(liker.getId(), userId).orElse(null);
+                Like like = matchData.getLike(liker.getId(), userId).orElse(null);
                 if (like != null) {
                     received.add(new LikeCardData(
                             liker.getId(),
@@ -231,19 +223,19 @@ public class MatchesViewModel {
     }
 
     private List<LikeCardData> fetchSentLikesFromStorage(UUID userId) {
-        Set<UUID> blocked = blockStorage.getBlockedUserIds(userId);
+        Set<UUID> blocked = matchData.getBlockedUserIds(userId);
         Set<UUID> matched = getMatchedUserIds(userId);
-        Set<UUID> allLikedOrPassedIds = likeStorage.getLikedOrPassedUserIds(userId);
+        Set<UUID> allLikedOrPassedIds = matchData.getLikedOrPassedUserIds(userId);
 
         List<UUID> candidateIds = allLikedOrPassedIds.stream()
                 .filter(id -> !blocked.contains(id) && !matched.contains(id))
                 .toList();
 
-        Map<UUID, User> potentialUsers = userStorage.findByIds(new HashSet<>(candidateIds));
+        Map<UUID, User> potentialUsers = userStore.findByIds(new HashSet<>(candidateIds));
         List<LikeCardData> sent = new ArrayList<>();
 
         for (UUID otherUserId : candidateIds) {
-            Like like = likeStorage.getLike(userId, otherUserId).orElse(null);
+            Like like = matchData.getLike(userId, otherUserId).orElse(null);
             if (like != null && like.direction() == Like.Direction.LIKE) {
                 User otherUser = potentialUsers.get(otherUserId);
                 if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
@@ -278,18 +270,41 @@ public class MatchesViewModel {
         }
 
         loading.set(true);
-        try {
-            if (!dailyService.canLike(currentUser.getId())) {
-                notifyError("Daily like limit reached", new IllegalStateException("Daily limit reached"));
-                return;
-            }
+        UUID userId = currentUser.getId();
 
-            matchingService.recordLike(Like.create(currentUser.getId(), like.userId(), Like.Direction.LIKE));
-            refreshAll();
-        } catch (Exception e) {
-            logWarn("Failed to like back: {}", e.getMessage(), e);
-            notifyError("Failed to like back", e);
-            loading.set(false);
+        if (isFxToolkitAvailable()) {
+            Thread.ofVirtual().name("matches-like-back").start(() -> {
+                try {
+                    if (!dailyService.canLike(userId)) {
+                        javafx.application.Platform.runLater(() -> {
+                            notifyError("Daily like limit reached", new IllegalStateException("Daily limit reached"));
+                            loading.set(false);
+                        });
+                        return;
+                    }
+                    matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.LIKE));
+                    javafx.application.Platform.runLater(this::refreshAll);
+                } catch (Exception e) {
+                    javafx.application.Platform.runLater(() -> {
+                        logWarn("Failed to like back: {}", e.getMessage(), e);
+                        notifyError("Failed to like back", e);
+                        loading.set(false);
+                    });
+                }
+            });
+        } else {
+            try {
+                if (!dailyService.canLike(userId)) {
+                    notifyError("Daily like limit reached", new IllegalStateException("Daily limit reached"));
+                    return;
+                }
+                matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.LIKE));
+                refreshAll();
+            } catch (Exception e) {
+                logWarn("Failed to like back: {}", e.getMessage(), e);
+                notifyError("Failed to like back", e);
+                loading.set(false);
+            }
         }
     }
 
@@ -304,13 +319,30 @@ public class MatchesViewModel {
         }
 
         loading.set(true);
-        try {
-            matchingService.recordLike(Like.create(currentUser.getId(), like.userId(), Like.Direction.PASS));
-            refreshAll();
-        } catch (Exception e) {
-            logWarn("Failed to pass: {}", e.getMessage(), e);
-            notifyError("Failed to pass", e);
-            loading.set(false);
+        UUID userId = currentUser.getId();
+
+        if (isFxToolkitAvailable()) {
+            Thread.ofVirtual().name("matches-pass-on").start(() -> {
+                try {
+                    matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.PASS));
+                    javafx.application.Platform.runLater(this::refreshAll);
+                } catch (Exception e) {
+                    javafx.application.Platform.runLater(() -> {
+                        logWarn("Failed to pass: {}", e.getMessage(), e);
+                        notifyError("Failed to pass", e);
+                        loading.set(false);
+                    });
+                }
+            });
+        } else {
+            try {
+                matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.PASS));
+                refreshAll();
+            } catch (Exception e) {
+                logWarn("Failed to pass: {}", e.getMessage(), e);
+                notifyError("Failed to pass", e);
+                loading.set(false);
+            }
         }
     }
 
@@ -321,13 +353,29 @@ public class MatchesViewModel {
         }
 
         loading.set(true);
-        try {
-            likeStorage.delete(like.likeId());
-            refreshAll();
-        } catch (Exception e) {
-            logWarn("Failed to withdraw like {}", like.likeId(), e);
-            notifyError("Failed to withdraw like", e);
-            loading.set(false);
+
+        if (isFxToolkitAvailable()) {
+            Thread.ofVirtual().name("matches-withdraw").start(() -> {
+                try {
+                    matchData.deleteLike(like.likeId());
+                    javafx.application.Platform.runLater(this::refreshAll);
+                } catch (Exception e) {
+                    javafx.application.Platform.runLater(() -> {
+                        logWarn("Failed to withdraw like {}", like.likeId(), e);
+                        notifyError("Failed to withdraw like", e);
+                        loading.set(false);
+                    });
+                }
+            });
+        } else {
+            try {
+                matchData.deleteLike(like.likeId());
+                refreshAll();
+            } catch (Exception e) {
+                logWarn("Failed to withdraw like {}", like.likeId(), e);
+                notifyError("Failed to withdraw like", e);
+                loading.set(false);
+            }
         }
     }
 
@@ -389,7 +437,7 @@ public class MatchesViewModel {
 
     private Set<UUID> getMatchedUserIds(UUID userId) {
         Set<UUID> matched = new HashSet<>();
-        for (Match match : matchStorage.getAllMatchesFor(userId)) {
+        for (Match match : matchData.getAllMatchesFor(userId)) {
             matched.add(match.getOtherUser(userId));
         }
         return matched;

@@ -5,11 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.Preferences.Lifestyle;
-import java.time.LocalDate;
+import datingapp.core.testutil.TestClock;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,21 +24,28 @@ class DealbreakersEvaluatorTest {
 
     private User seeker;
     private User candidate;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
+        TestClock.setFixed(FIXED_INSTANT);
 
         // Create seeker (30 years old)
         seeker = new User(UUID.randomUUID(), "Seeker");
-        seeker.setBirthDate(LocalDate.now().minusYears(30));
-        seeker.setGender(Gender.FEMALE);
-        seeker.setInterestedIn(EnumSet.of(Gender.MALE));
+        seeker.setBirthDate(AppClock.today().minusYears(30));
+        seeker.setGender(User.Gender.FEMALE);
+        seeker.setInterestedIn(EnumSet.of(User.Gender.MALE));
 
         // Create candidate (28 years old)
         candidate = new User(UUID.randomUUID(), "Candidate");
-        candidate.setBirthDate(LocalDate.now().minusYears(28));
-        candidate.setGender(Gender.MALE);
-        candidate.setInterestedIn(EnumSet.of(Gender.FEMALE));
+        candidate.setBirthDate(AppClock.today().minusYears(28));
+        candidate.setGender(User.Gender.MALE);
+        candidate.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
     }
 
     @Nested

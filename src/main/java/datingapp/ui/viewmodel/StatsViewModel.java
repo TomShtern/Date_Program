@@ -4,12 +4,11 @@ import datingapp.core.Achievement;
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AchievementService;
 import datingapp.core.AppSession;
-import datingapp.core.Match;
+import datingapp.core.Stats.UserStats;
+import datingapp.core.StatsService;
 import datingapp.core.User;
-import datingapp.core.UserInteractions.Like;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
@@ -30,8 +29,7 @@ public class StatsViewModel {
     private static final Logger logger = LoggerFactory.getLogger(StatsViewModel.class);
 
     private final AchievementService achievementService;
-    private final LikeStorage likeStorage;
-    private final MatchStorage matchStorage;
+    private final StatsService statsService;
 
     private final ObservableList<Achievement> achievements = FXCollections.observableArrayList();
 
@@ -54,18 +52,9 @@ public class StatsViewModel {
         this.errorHandler = handler;
     }
 
-    public StatsViewModel(AchievementService achievementService) {
-        // Backward compatible constructor for when ViewModelFactory doesn't have all
-        // services
-        this.achievementService = achievementService;
-        this.likeStorage = null;
-        this.matchStorage = null;
-    }
-
-    public StatsViewModel(AchievementService achievementService, LikeStorage likeStorage, MatchStorage matchStorage) {
-        this.achievementService = achievementService;
-        this.likeStorage = likeStorage;
-        this.matchStorage = matchStorage;
+    public StatsViewModel(AchievementService achievementService, StatsService statsService) {
+        this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
+        this.statsService = Objects.requireNonNull(statsService, "statsService cannot be null");
     }
 
     /**
@@ -135,32 +124,13 @@ public class StatsViewModel {
     }
 
     private StatsData fetchStats(java.util.UUID userId) {
-        int likesGiven = 0;
-        int likesReceived = 0;
-        int matchesCount = 0;
+        UserStats stats = statsService.getOrComputeStats(userId);
+
+        int likesGiven = stats.likesGiven();
+        int likesReceived = stats.likesReceived();
+        int matchesCount = stats.activeMatches();
+
         String rateText = "--";
-
-        // M-22: Log when storage is unavailable instead of silent degradation
-        if (likeStorage == null) {
-            if (logger.isWarnEnabled()) {
-                logger.warn("LikeStorage is null - stats will show default values");
-            }
-            return new StatsData(likesGiven, likesReceived, matchesCount, rateText);
-        }
-
-        likesGiven = likeStorage.countByDirection(userId, Like.Direction.LIKE);
-        likesReceived = likeStorage.countReceivedByDirection(userId, Like.Direction.LIKE);
-
-        if (matchStorage == null) {
-            if (logger.isWarnEnabled()) {
-                logger.warn("MatchStorage is null - match count and rate will show default values");
-            }
-            return new StatsData(likesGiven, likesReceived, matchesCount, rateText);
-        }
-
-        List<Match> matches = matchStorage.getActiveMatchesFor(userId);
-        matchesCount = matches.size();
-
         if (likesReceived > 0) {
             double rate = (double) matchesCount / likesReceived * 100;
             rateText = String.format("%.0f%%", Math.min(rate, 100));

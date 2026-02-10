@@ -2,10 +2,11 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.Gender;
 import datingapp.core.User;
-import datingapp.core.storage.UserStorage;
+import datingapp.core.User.Gender;
+import datingapp.ui.viewmodel.data.UiUserStore;
 import java.util.EnumSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.beans.property.IntegerProperty;
@@ -23,7 +24,7 @@ public class PreferencesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(PreferencesViewModel.class);
     private static final AppConfig CONFIG = AppConfig.defaults();
 
-    private final UserStorage userStorage;
+    private final UiUserStore userStore;
     private User currentUser;
 
     // UI-specific enum for single-selection preference
@@ -42,8 +43,8 @@ public class PreferencesViewModel {
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
-    public PreferencesViewModel(UserStorage userStorage) {
-        this.userStorage = userStorage;
+    public PreferencesViewModel(UiUserStore userStore) {
+        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
     }
 
     public void initialize() {
@@ -134,7 +135,7 @@ public class PreferencesViewModel {
         currentUser.setInterestedIn(newInterests);
 
         // Persist
-        userStorage.save(currentUser);
+        userStore.save(currentUser);
     }
 
     private void logInfo(String message, Object... args) {

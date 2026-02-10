@@ -1,7 +1,8 @@
-package datingapp.core;
+package datingapp.app;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import datingapp.core.AppConfig;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -66,7 +67,6 @@ public final class ConfigLoader {
                 applyJsonConfig(builder, json);
                 logInfo("Loaded configuration from: {}", configPath);
             } catch (IOException ex) {
-                // EH-005 fix: Include stack trace for debugging
                 logWarn("Failed to load config file {}", configPath, ex);
             }
         } else {
@@ -164,7 +164,6 @@ public final class ConfigLoader {
                 builder.userTimeZone(ZoneId.of(tz));
             }
         } catch (IOException ex) {
-            // EH-006 fix: Include stack trace for debugging
             logWarn("Failed to parse JSON config", ex);
         }
     }
@@ -189,7 +188,6 @@ public final class ConfigLoader {
             try {
                 builder.userTimeZone(ZoneId.of(tz));
             } catch (Exception ex) {
-                // EH-007 fix: Include env var name in warning
                 logWarn("Invalid timezone in env var {}{}: {}", ENV_PREFIX, "USER_TIME_ZONE", tz);
             }
         }

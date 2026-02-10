@@ -9,10 +9,10 @@ import datingapp.core.MatchQualityService;
 import datingapp.core.MatchingService;
 import datingapp.core.UndoService;
 import datingapp.core.User;
-import datingapp.core.UserState;
-import java.util.LinkedList;
+import datingapp.core.User.UserState;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,7 +36,7 @@ public class MatchingViewModel {
     private final MatchingService matchingService;
     private final UndoService undoService;
 
-    private final Queue<User> candidateQueue = new LinkedList<>();
+    private final Queue<User> candidateQueue = new ConcurrentLinkedQueue<>();
     private final ObjectProperty<User> currentCandidate = new SimpleObjectProperty<>();
     private final BooleanProperty hasMoreCandidates = new SimpleBooleanProperty(false);
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
@@ -159,19 +159,15 @@ public class MatchingViewModel {
 
     /**
      * Loads the next candidate from the queue.
-     * MUST be called on FX Thread or use Platform.runLater.
+     * All queue access is dispatched to the FX thread to avoid races
+     * with {@link #refreshCandidates()} which clears/refills the queue on FX.
      */
     public void nextCandidate() {
-        User next = candidateQueue.poll();
-        if (Platform.isFxApplicationThread()) {
+        runOnFx(() -> {
+            User next = candidateQueue.poll();
             currentCandidate.set(next);
             hasMoreCandidates.set(next != null);
-        } else {
-            Platform.runLater(() -> {
-                currentCandidate.set(next);
-                hasMoreCandidates.set(next != null);
-            });
-        }
+        });
     }
 
     public void like() {

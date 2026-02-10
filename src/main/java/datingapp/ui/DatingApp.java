@@ -1,6 +1,6 @@
 package datingapp.ui;
 
-import datingapp.core.AppBootstrap;
+import datingapp.app.AppBootstrap;
 import datingapp.core.ServiceRegistry;
 import javafx.application.Application;
 import javafx.stage.Stage;

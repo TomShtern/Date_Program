@@ -96,7 +96,7 @@ import org.slf4j.LoggerFactory;
  * @see MatchQualityService.InterestMatcher
  * @see GeoUtils
  */
-public class CandidateFinder {
+public class CandidateFinder implements LoggingSupport {
 
     private static final Logger logger = LoggerFactory.getLogger(CandidateFinder.class);
 
@@ -172,7 +172,7 @@ public class CandidateFinder {
      * Results are sorted by distance (closest first).
      */
     public List<User> findCandidates(User seeker, List<User> allActive, Set<UUID> alreadyInteracted) {
-        Set<Gender> seekerInterestedIn = seeker.getInterestedIn();
+        Set<User.Gender> seekerInterestedIn = seeker.getInterestedIn();
         logDebug(
                 "Finding candidates for {} (state={}, gender={}, interestedIn={}, age={}, minAge={}, maxAge={})",
                 seeker.getName(),
@@ -242,7 +242,7 @@ public class CandidateFinder {
     }
 
     private boolean isActiveCandidate(User candidate) {
-        boolean isActive = candidate.getState() == UserState.ACTIVE;
+        boolean isActive = candidate.getState() == User.UserState.ACTIVE;
         if (!isActive) {
             logDebug(
                     "Rejecting {} ({}): NOT ACTIVE (state={})",
@@ -261,7 +261,7 @@ public class CandidateFinder {
         return notInteracted;
     }
 
-    private boolean matchesGenderPreferences(User seeker, User candidate, Set<Gender> seekerInterestedIn) {
+    private boolean matchesGenderPreferences(User seeker, User candidate, Set<User.Gender> seekerInterestedIn) {
         boolean genderMatch = hasMatchingGenderPreferences(seeker, candidate, seekerInterestedIn);
         if (!genderMatch) {
             logDebug(
@@ -320,7 +320,7 @@ public class CandidateFinder {
      * candidate's gender -
      * Candidate is interested in seeker's gender.
      */
-    private boolean hasMatchingGenderPreferences(User seeker, User candidate, Set<Gender> seekerInterestedIn) {
+    private boolean hasMatchingGenderPreferences(User seeker, User candidate, Set<User.Gender> seekerInterestedIn) {
         if (seeker.getGender() == null || candidate.getGender() == null) {
             return false;
         }
@@ -387,21 +387,8 @@ public class CandidateFinder {
         return String.format("%.4f, %.4f", user.getLat(), user.getLon());
     }
 
-    private void logDebug(String message, Object... args) {
-        if (logger.isDebugEnabled()) {
-            logger.debug(message, args);
-        }
-    }
-
-    private void logTrace(String message, Object... args) {
-        if (logger.isTraceEnabled()) {
-            logger.trace(message, args);
-        }
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
+    @Override
+    public Logger logger() {
+        return logger;
     }
 }

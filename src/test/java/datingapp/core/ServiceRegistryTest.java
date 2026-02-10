@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import datingapp.storage.DatabaseManager;
+import datingapp.storage.StorageFactory;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
@@ -34,7 +35,7 @@ class ServiceRegistryTest {
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:test_service_registry_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
         DatabaseManager.resetInstance();
         dbManager = DatabaseManager.getInstance();
-        registry = ServiceRegistry.Builder.buildH2(dbManager, AppConfig.defaults());
+        registry = StorageFactory.buildH2(dbManager, AppConfig.defaults());
     }
 
     @AfterAll
@@ -58,7 +59,7 @@ class ServiceRegistryTest {
             AppConfig customConfig = AppConfig.builder().dailyLikeLimit(50).build();
             // Note: Using same dbManager since we can't easily create isolated instances
             // Config customization is the key thing being tested
-            ServiceRegistry customRegistry = ServiceRegistry.Builder.buildH2(dbManager, customConfig);
+            ServiceRegistry customRegistry = StorageFactory.buildH2(dbManager, customConfig);
 
             assertSame(customConfig, customRegistry.getConfig());
         }
@@ -66,7 +67,7 @@ class ServiceRegistryTest {
         @Test
         @DisplayName("Uses default config when not specified")
         void usesDefaultConfig() {
-            ServiceRegistry defaultRegistry = ServiceRegistry.Builder.buildH2(dbManager);
+            ServiceRegistry defaultRegistry = StorageFactory.buildH2(dbManager);
 
             assertNotNull(defaultRegistry.getConfig());
         }
@@ -172,9 +173,9 @@ class ServiceRegistryTest {
         }
 
         @Test
-        @DisplayName("getProfilePreviewService returns non-null")
-        void getProfilePreviewService() {
-            assertNotNull(registry.getProfilePreviewService());
+        @DisplayName("getProfileCompletionService returns non-null")
+        void getProfileCompletionService() {
+            assertNotNull(registry.getProfileCompletionService());
         }
 
         @Test

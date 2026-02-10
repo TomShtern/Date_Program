@@ -7,9 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,18 @@ import org.junit.jupiter.api.Timeout;
  */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MatchStateTest {
+
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+
+    @BeforeEach
+    void setUpClock() {
+        TestClock.setFixed(FIXED_INSTANT);
+    }
+
+    @AfterEach
+    void resetClock() {
+        TestClock.reset();
+    }
 
     @Nested
     @DisplayName("Match State Transitions")
@@ -222,8 +237,8 @@ class MatchStateTest {
             UUID a = UUID.fromString("00000000-0000-0000-0000-000000000001");
             UUID b = UUID.fromString("00000000-0000-0000-0000-000000000002");
             String id = a + "_" + b;
-            Instant createdAt = Instant.now().minusSeconds(3600);
-            Instant endedAt = Instant.now();
+            Instant createdAt = AppClock.now().minusSeconds(3600);
+            Instant endedAt = AppClock.now();
 
             Match match =
                     new Match(id, a, b, createdAt, Match.State.UNMATCHED, endedAt, a, Match.ArchiveReason.UNMATCH);
@@ -245,7 +260,7 @@ class MatchStateTest {
             String id = b + "_" + a; // Wrong order (a > b lexicographically)
 
             // a is larger, so passing (a, b) as (userA, userB) should fail
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             IllegalArgumentException ex = assertThrows(
                     IllegalArgumentException.class,
                     () -> new Match(id, a, b, now, Match.State.ACTIVE, null, null, null),

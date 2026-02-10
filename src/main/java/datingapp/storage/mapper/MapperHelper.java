@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +27,7 @@ public final class MapperHelper {
      * Reads a UUID from a ResultSet column.
      * Returns null if column is NULL.
      */
+    @Nullable
     public static UUID readUuid(ResultSet rs, String column) throws SQLException {
         Object obj = rs.getObject(column);
         if (obj == null) {
@@ -48,6 +50,7 @@ public final class MapperHelper {
      * <p>Precision: Uses {@code Timestamp.toInstant()} which preserves nanosecond
      * precision from the JDBC driver.</p>
      */
+    @Nullable
     public static Instant readInstant(ResultSet rs, String column) throws SQLException {
         Timestamp ts = rs.getTimestamp(column);
         return ts == null ? null : ts.toInstant();
@@ -57,6 +60,7 @@ public final class MapperHelper {
      * Reads a LocalDate from a DATE column.
      * Returns null if column is NULL.
      */
+    @Nullable
     public static LocalDate readLocalDate(ResultSet rs, String column) throws SQLException {
         java.sql.Date date = rs.getDate(column);
         return date == null ? null : date.toLocalDate();
@@ -68,6 +72,7 @@ public final class MapperHelper {
      *
      * @throws NullPointerException if enumType is null
      */
+    @Nullable
     public static <E extends Enum<E>> E readEnum(ResultSet rs, String column, Class<E> enumType) throws SQLException {
         Objects.requireNonNull(enumType, "enumType cannot be null");
         String value = rs.getString(column);
@@ -88,6 +93,7 @@ public final class MapperHelper {
      * Reads an integer from a column, handling NULL.
      * Returns null if column is NULL (use wasNull() pattern).
      */
+    @Nullable
     public static Integer readInteger(ResultSet rs, String column) throws SQLException {
         int value = rs.getInt(column);
         return rs.wasNull() ? null : value;
@@ -97,6 +103,7 @@ public final class MapperHelper {
      * Reads a double from a column, handling NULL.
      * Returns null if column is NULL (use wasNull() pattern).
      */
+    @Nullable
     public static Double readDouble(ResultSet rs, String column) throws SQLException {
         double value = rs.getDouble(column);
         return rs.wasNull() ? null : value;

@@ -3,13 +3,15 @@ package datingapp.ui;
 import datingapp.ui.controller.BaseController;
 import datingapp.ui.util.Toast;
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.ParallelTransition;
 import javafx.animation.TranslateTransition;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -27,7 +29,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class NavigationService {
     private static final Logger logger = LoggerFactory.getLogger(NavigationService.class);
-    private static NavigationService instance;
+
+    private static final class Holder {
+        private static final NavigationService INSTANCE = new NavigationService();
+    }
 
     private Stage primaryStage;
     private BorderPane rootLayout;
@@ -38,7 +43,7 @@ public final class NavigationService {
             new java.util.concurrent.atomic.AtomicReference<>();
 
     /** Navigation history stack for back navigation. */
-    private final Deque<ViewType> navigationHistory = new ArrayDeque<>();
+    private final Deque<ViewType> navigationHistory = new ConcurrentLinkedDeque<>();
 
     /** Current controller for cleanup when navigating away. */
     private Object currentController;
@@ -82,11 +87,8 @@ public final class NavigationService {
 
     private NavigationService() {}
 
-    public static synchronized NavigationService getInstance() {
-        if (instance == null) {
-            instance = new NavigationService();
-        }
-        return instance;
+    public static NavigationService getInstance() {
+        return Holder.INSTANCE;
     }
 
     public void setViewModelFactory(ViewModelFactory viewModelFactory) {
@@ -146,59 +148,86 @@ public final class NavigationService {
      * @param addToHistory Whether to add this navigation to the history stack
      */
     private void navigateWithTransition(ViewType viewType, TransitionType type, boolean addToHistory) {
+        runOnFx(() -> navigateInternal(viewType, type, addToHistory));
+    }
+
+    private boolean navigateInternal(ViewType viewType, TransitionType type, boolean addToHistory) {
+        if (rootLayout == null) {
+            logError("NavigationService not initialized; cannot navigate to {}", viewType);
+            Toast.showError("Navigation not ready yet.");
+            return false;
+        }
+        if (viewModelFactory == null) {
+            logError("ViewModelFactory is null; cannot navigate to {}", viewType);
+            Toast.showError("Navigation unavailable. Please restart the app.");
+            return false;
+        }
+
+        logInfo("Navigating to: {} with transition: {}", viewType, type);
+
+        java.net.URL fxmlUrl = getClass().getResource(viewType.getFxmlPath());
+        if (fxmlUrl == null) {
+            logError("FXML resource not found for view: {}", viewType);
+            Toast.showError("Unable to load screen: " + viewType);
+            return false;
+        }
+
+        FXMLLoader loader = new FXMLLoader(fxmlUrl);
+        loader.setControllerFactory(viewModelFactory::createController);
+
+        Parent newView;
         try {
-            logInfo("Navigating to: {} with transition: {}", viewType, type);
-
-            // Track navigation history (skip for back navigation)
-            if (addToHistory) {
-                // Avoid duplicate consecutive entries
-                if (navigationHistory.isEmpty() || navigationHistory.peek() != viewType) {
-                    navigationHistory.push(viewType);
-
-                    // Limit history size to prevent memory leaks
-                    while (navigationHistory.size() > MAX_HISTORY_SIZE) {
-                        navigationHistory.removeLast();
-                    }
-                }
-            }
-
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(viewType.getFxmlPath()));
-            loader.setControllerFactory(viewModelFactory::createController);
-
-            // Cleanup old controller before loading new one
-            if (currentController instanceof BaseController bc) {
-                bc.cleanup();
-            }
-
-            Parent newView = loader.load();
-
-            // Store new controller for future cleanup
-            currentController = loader.getController();
-
-            if (type == TransitionType.NONE) {
-                rootLayout.setCenter(newView);
-                return;
-            }
-
-            Parent oldView = (Parent) rootLayout.getCenter();
-            if (oldView == null) {
-                rootLayout.setCenter(newView);
-                return;
-            }
-
-            // Create transition container
-            StackPane transitionPane = new StackPane(oldView, newView);
-            rootLayout.setCenter(transitionPane);
-
-            switch (type) {
-                case FADE -> playFadeTransition(oldView, newView);
-                case SLIDE_LEFT -> playSlideTransition(oldView, newView, true);
-                case SLIDE_RIGHT -> playSlideTransition(oldView, newView, false);
-                default -> rootLayout.setCenter(newView);
-            }
-
-        } catch (IOException e) {
+            newView = loader.load();
+        } catch (IOException | RuntimeException e) {
             logError("Failed to navigate to {}: {}", viewType, e.getMessage(), e);
+            Toast.showError("Failed to load screen. Please try again.");
+            return false;
+        }
+
+        // Cleanup old controller before switching
+        if (currentController instanceof BaseController bc) {
+            bc.cleanup();
+        }
+
+        // Store new controller for future cleanup
+        currentController = loader.getController();
+
+        if (addToHistory) {
+            recordNavigation(viewType);
+        }
+
+        if (type == TransitionType.NONE) {
+            rootLayout.setCenter(newView);
+            return true;
+        }
+
+        Parent oldView = (Parent) rootLayout.getCenter();
+        if (oldView == null) {
+            rootLayout.setCenter(newView);
+            return true;
+        }
+
+        // Create transition container
+        StackPane transitionPane = new StackPane(oldView, newView);
+        rootLayout.setCenter(transitionPane);
+
+        switch (type) {
+            case FADE -> playFadeTransition(oldView, newView);
+            case SLIDE_LEFT -> playSlideTransition(oldView, newView, true);
+            case SLIDE_RIGHT -> playSlideTransition(oldView, newView, false);
+            default -> rootLayout.setCenter(newView);
+        }
+
+        return true;
+    }
+
+    private void recordNavigation(ViewType viewType) {
+        if (navigationHistory.isEmpty() || navigationHistory.peek() != viewType) {
+            navigationHistory.push(viewType);
+
+            while (navigationHistory.size() > MAX_HISTORY_SIZE) {
+                navigationHistory.removeLast();
+            }
         }
     }
 
@@ -251,16 +280,26 @@ public final class NavigationService {
      * If no history exists, defaults to DASHBOARD.
      */
     public void goBack() {
-        // Pop current view from history
-        if (!navigationHistory.isEmpty()) {
+        runOnFx(this::doGoBack);
+    }
+
+    private void doGoBack() {
+        ViewType previousView = resolvePreviousView();
+        boolean navigated = navigateInternal(previousView, TransitionType.SLIDE_RIGHT, false);
+        if (navigated && !navigationHistory.isEmpty()) {
             navigationHistory.pop();
         }
+    }
 
-        // Navigate to previous view or default to DASHBOARD
-        ViewType previousView = navigationHistory.isEmpty() ? ViewType.DASHBOARD : navigationHistory.peek();
-
-        // Navigate without adding to history (we're going back, not forward)
-        navigateWithTransition(previousView, TransitionType.SLIDE_RIGHT, false);
+    private ViewType resolvePreviousView() {
+        if (navigationHistory.size() < 2) {
+            return ViewType.DASHBOARD;
+        }
+        Iterator<ViewType> iterator = navigationHistory.iterator();
+        if (iterator.hasNext()) {
+            iterator.next();
+        }
+        return iterator.hasNext() ? iterator.next() : ViewType.DASHBOARD;
     }
 
     /**
@@ -297,6 +336,14 @@ public final class NavigationService {
 
     public Object consumeNavigationContext() {
         return navigationContext.getAndSet(null);
+    }
+
+    private void runOnFx(Runnable action) {
+        if (Platform.isFxApplicationThread()) {
+            action.run();
+        } else {
+            Platform.runLater(action);
+        }
     }
 
     private void logInfo(String message, Object... args) {

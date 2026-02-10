@@ -2,16 +2,31 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 @Timeout(5)
-@DisplayName("SoftDeletable")
+@DisplayName("Soft-delete behavior")
 class SoftDeletableTest {
+
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+
+    @BeforeEach
+    void setUpClock() {
+        TestClock.setFixed(FIXED_INSTANT);
+    }
+
+    @AfterEach
+    void resetClock() {
+        TestClock.reset();
+    }
 
     @Nested
     @DisplayName("User soft-delete")
@@ -49,7 +64,7 @@ class SoftDeletableTest {
         @DisplayName("StorageBuilder preserves deletedAt")
         void storageBuilderPreservesDeletedAt() {
             Instant deleted = Instant.parse("2026-01-15T12:00:00Z");
-            User user = User.StorageBuilder.create(UUID.randomUUID(), "Dave", Instant.now())
+            User user = User.StorageBuilder.create(UUID.randomUUID(), "Dave", AppClock.now())
                     .deletedAt(deleted)
                     .build();
 
@@ -60,7 +75,7 @@ class SoftDeletableTest {
         @Test
         @DisplayName("StorageBuilder null deletedAt means not deleted")
         void storageBuilderNullDeletedAt() {
-            User user = User.StorageBuilder.create(UUID.randomUUID(), "Eve", Instant.now())
+            User user = User.StorageBuilder.create(UUID.randomUUID(), "Eve", AppClock.now())
                     .deletedAt(null)
                     .build();
 
@@ -133,48 +148,6 @@ class SoftDeletableTest {
 
             assertEquals(ts, match.getDeletedAt());
             assertTrue(match.isDeleted());
-        }
-    }
-
-    @Nested
-    @DisplayName("SoftDeletable interface default method")
-    @SuppressWarnings("unused")
-    class DefaultMethod {
-
-        @Test
-        @DisplayName("isDeleted returns false when getDeletedAt is null")
-        void isDeletedFalseWhenNull() {
-            SoftDeletable entity = new SoftDeletable() {
-                @Override
-                public Instant getDeletedAt() {
-                    return null;
-                }
-
-                @Override
-                public void markDeleted(Instant deletedAt) {
-                    // no-op for testing
-                }
-            };
-
-            assertFalse(entity.isDeleted());
-        }
-
-        @Test
-        @DisplayName("isDeleted returns true when getDeletedAt is non-null")
-        void isDeletedTrueWhenNonNull() {
-            SoftDeletable entity = new SoftDeletable() {
-                @Override
-                public Instant getDeletedAt() {
-                    return Instant.now();
-                }
-
-                @Override
-                public void markDeleted(Instant deletedAt) {
-                    // no-op for testing
-                }
-            };
-
-            assertTrue(entity.isDeleted());
         }
     }
 }

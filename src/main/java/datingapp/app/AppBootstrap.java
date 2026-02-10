@@ -1,17 +1,18 @@
-package datingapp.core;
+package datingapp.app;
 
+import datingapp.core.AppConfig;
+import datingapp.core.AppSession;
+import datingapp.core.ServiceRegistry;
 import datingapp.storage.DatabaseManager;
+import datingapp.storage.StorageFactory;
 
 /**
  * Centralized application initialization for both CLI and JavaFX entry points.
  *
- * <p>
- * Eliminates duplicated initialization code between Main.java and
- * DatingApp.java by providing a
- * single initialization method that sets up the database and service registry.
+ * <p>Eliminates duplicated initialization code between Main.java and DatingApp.java
+ * by providing a single initialization method that sets up the database and service registry.
  *
- * <p>
- * Thread-safe singleton pattern ensures only one initialization occurs.
+ * <p>Thread-safe singleton pattern ensures only one initialization occurs.
  */
 public final class AppBootstrap {
     private static volatile ServiceRegistry services;
@@ -22,8 +23,7 @@ public final class AppBootstrap {
 
     /**
      * Initializes the application with default configuration.
-     * Loads config from ./config/app-config.json if present, otherwise uses
-     * defaults.
+     * Loads config from ./config/app-config.json if present, otherwise uses defaults.
      *
      * @return The initialized ServiceRegistry
      */
@@ -40,7 +40,7 @@ public final class AppBootstrap {
     public static synchronized ServiceRegistry initialize(AppConfig config) {
         if (!initialized) {
             dbManager = DatabaseManager.getInstance();
-            services = ServiceRegistry.Builder.buildH2(dbManager, config);
+            services = StorageFactory.buildH2(dbManager, config);
             initialized = true;
         }
         return services;

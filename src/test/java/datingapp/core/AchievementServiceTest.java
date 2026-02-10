@@ -9,8 +9,8 @@ import datingapp.core.User.ProfileNote;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.UserInteractions.Report;
 import datingapp.core.storage.*;
+import datingapp.core.testutil.TestClock;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -26,19 +26,21 @@ class AchievementServiceTest {
     private InMemoryLikeStorage likeStorage;
     private InMemoryUserStorage userStorage;
     private InMemoryReportStorage reportStorage;
-    private ProfilePreviewService profilePreviewService;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+    private ProfileCompletionService profileCompletionService;
     private AchievementService service;
     private UUID userId;
     private User user;
 
     @BeforeEach
     void setUp() {
+        TestClock.setFixed(FIXED_INSTANT);
         achievementStorage = new InMemoryStatsStorage();
         matchStorage = new InMemoryMatchStorage();
         likeStorage = new InMemoryLikeStorage();
         userStorage = new InMemoryUserStorage();
         reportStorage = new InMemoryReportStorage();
-        profilePreviewService = new ProfilePreviewService();
+        profileCompletionService = new ProfileCompletionService(AppConfig.defaults());
 
         service = new AchievementService(
                 achievementStorage,
@@ -46,12 +48,17 @@ class AchievementServiceTest {
                 likeStorage,
                 userStorage,
                 reportStorage,
-                profilePreviewService,
+                profileCompletionService,
                 AppConfig.defaults());
 
         userId = UUID.randomUUID();
         user = createActiveUser(userId, "Test User");
         userStorage.save(user);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
     }
 
     @Nested
@@ -63,7 +70,7 @@ class AchievementServiceTest {
         void checkAndUnlock_firstMatch_unlocksFirstSpark() {
             // Add 1 match
             addMatches(userId, 1);
-
+            user.setBirthDate(AppClock.today().minusYears(25));
             List<UserAchievement> unlocked = service.checkAndUnlock(userId);
 
             assertTrue(hasAchievement(unlocked, Achievement.FIRST_SPARK));
@@ -117,9 +124,9 @@ class AchievementServiceTest {
         void checkAndUnlock_completeProfile_unlocksCompletePackage() {
             // Set up a complete profile
             user.setBio("Complete bio with more than enough text to be valid.");
-            user.setBirthDate(LocalDate.now().minusYears(25));
-            user.setGender(Gender.FEMALE);
-            user.setInterestedIn(Set.of(Gender.MALE));
+            user.setBirthDate(AppClock.today().minusYears(25));
+            user.setGender(User.Gender.FEMALE);
+            user.setInterestedIn(Set.of(User.Gender.MALE));
             user.setLocation(32.0, 34.0);
             user.addPhotoUrl("http://example.com/photo.jpg");
             user.setHeightCm(170);
@@ -286,9 +293,9 @@ class AchievementServiceTest {
 
     private User createActiveUser(UUID id, String name) {
         User u = new User(id, name);
-        u.setBirthDate(LocalDate.now().minusYears(25));
-        u.setGender(Gender.MALE);
-        u.setInterestedIn(Set.of(Gender.FEMALE));
+        u.setBirthDate(AppClock.today().minusYears(25));
+        u.setGender(User.Gender.MALE);
+        u.setInterestedIn(Set.of(User.Gender.FEMALE));
         u.setMaxDistanceKm(50);
         return u;
     }
@@ -467,7 +474,7 @@ class AchievementServiceTest {
 
         void addLike(UUID userId, Like.Direction direction) {
             likes.computeIfAbsent(userId, k -> new ArrayList<>())
-                    .add(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), direction, Instant.now()));
+                    .add(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), direction, AppClock.now()));
         }
 
         @Override
@@ -568,7 +575,7 @@ class AchievementServiceTest {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == UserState.ACTIVE)
+                    .filter(u -> u.getState() == User.UserState.ACTIVE)
                     .toList();
         }
 

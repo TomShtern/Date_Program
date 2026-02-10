@@ -109,6 +109,18 @@ class UndoServiceTest {
         }
 
         @Test
+        @DisplayName("Returns true at exact expiry boundary")
+        void returnsTrueAtExpiryBoundary() {
+            Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
+            undoService.recordSwipe(userId, like, null);
+
+            clock.advanceSeconds(config.undoWindowSeconds());
+
+            assertTrue(undoService.canUndo(userId));
+            assertEquals(0, undoService.getSecondsRemaining(userId));
+        }
+
+        @Test
         @DisplayName("Returns false for different user")
         void returnsFalseForDifferentUser() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);

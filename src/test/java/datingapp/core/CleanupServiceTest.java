@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.storage.StatsStorage;
 import datingapp.core.storage.SwipeSessionStorage;
+import datingapp.core.testutil.TestClock;
 import java.time.Instant;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,12 +24,21 @@ class CleanupServiceTest {
     private TestStatsStorage statsStorage;
     private TestSessionStorage sessionStorage;
     private CleanupService service;
+    private AppConfig config;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
+        TestClock.setFixed(FIXED_INSTANT);
+        config = AppConfig.defaults();
         statsStorage = new TestStatsStorage();
         sessionStorage = new TestSessionStorage();
-        service = new CleanupService(statsStorage, sessionStorage, AppConfig.defaults());
+        service = new CleanupService(statsStorage, sessionStorage, config);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
     }
 
     @Nested
@@ -37,15 +48,13 @@ class CleanupServiceTest {
         @Test
         @DisplayName("Should require non-null statsStorage")
         void requiresStatsStorage() {
-            assertThrows(
-                    NullPointerException.class, () -> new CleanupService(null, sessionStorage, AppConfig.defaults()));
+            assertThrows(NullPointerException.class, () -> new CleanupService(null, sessionStorage, config));
         }
 
         @Test
         @DisplayName("Should require non-null sessionStorage")
         void requiresSessionStorage() {
-            assertThrows(
-                    NullPointerException.class, () -> new CleanupService(statsStorage, null, AppConfig.defaults()));
+            assertThrows(NullPointerException.class, () -> new CleanupService(statsStorage, null, config));
         }
 
         @Test
@@ -93,7 +102,7 @@ class CleanupServiceTest {
             assertNotNull(statsStorage.receivedCutoff);
             assertNotNull(sessionStorage.receivedCutoff);
             // Cutoff should be in the past
-            assertTrue(statsStorage.receivedCutoff.isBefore(Instant.now()));
+            assertTrue(statsStorage.receivedCutoff.isBefore(AppClock.now()));
         }
     }
 

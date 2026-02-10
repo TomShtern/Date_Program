@@ -2,6 +2,7 @@ package datingapp.app.cli;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppSession;
+import datingapp.core.LoggingSupport;
 import datingapp.core.MatchingService;
 import datingapp.core.MatchingService.PendingLiker;
 import datingapp.core.User;
@@ -12,7 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Handler for browsing users who have liked the current user's profile. */
-public class LikerBrowserHandler {
+public class LikerBrowserHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(LikerBrowserHandler.class);
 
     private final MatchingService matchingService;
@@ -26,12 +27,17 @@ public class LikerBrowserHandler {
         this.inputReader = Objects.requireNonNull(inputReader);
     }
 
+    @Override
+    public Logger logger() {
+        return logger;
+    }
+
     /**
      * Displays a list of users who have liked the current user and allows
      * interaction.
      */
     public void browseWhoLikedMe() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             List<PendingLiker> likers = matchingService.findPendingLikersWithTimes(currentUser.getId());
 
@@ -55,7 +61,7 @@ public class LikerBrowserHandler {
                     case "0" -> {
                         return;
                     }
-                    default -> logInfo(CliConstants.INVALID_SELECTION);
+                    default -> logInfo(CliSupport.INVALID_SELECTION);
                 }
             }
 
@@ -67,7 +73,7 @@ public class LikerBrowserHandler {
         User user = pending.user();
         String verifiedBadge = user.isVerified() ? " ✅ Verified" : "";
         String likedAgo = formatTimeAgo(pending.likedAt());
-        logInfo(CliConstants.BOX_TOP);
+        logInfo(CliSupport.BOX_TOP);
         logInfo("│ 💝 {}, {} years old{}", user.getName(), user.getAge(), verifiedBadge);
         logInfo("│ 🕒 Liked you {}", likedAgo);
         logInfo("│ 📍 Location: {}, {}", user.getLat(), user.getLon());
@@ -75,20 +81,14 @@ public class LikerBrowserHandler {
         if (bio.length() > 50) {
             bio = bio.substring(0, 47) + "...";
         }
-        logInfo(CliConstants.PROFILE_BIO_FORMAT, bio);
-        logInfo(CliConstants.BOX_BOTTOM);
+        logInfo(CliSupport.PROFILE_BIO_FORMAT, bio);
+        logInfo(CliSupport.BOX_BOTTOM);
         logInfo("");
     }
 
     private void handleSwipe(User currentUser, User other, Like.Direction direction) {
         matchingService.recordLike(Like.create(currentUser.getId(), other.getId(), direction));
         logInfo("✅ Saved.\n");
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
     }
 
     private String formatTimeAgo(java.time.Instant likedAt) {

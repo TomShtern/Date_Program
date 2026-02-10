@@ -5,7 +5,7 @@ import datingapp.core.AchievementService;
 import datingapp.core.AppSession;
 import datingapp.core.Dealbreakers;
 import datingapp.core.EnumSetUtil;
-import datingapp.core.Gender;
+import datingapp.core.LoggingSupport;
 import datingapp.core.PacePreferences;
 import datingapp.core.PacePreferences.CommunicationStyle;
 import datingapp.core.PacePreferences.DepthPreference;
@@ -14,9 +14,9 @@ import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
 import datingapp.core.ProfileCompletionService;
-import datingapp.core.ProfilePreviewService;
 import datingapp.core.User;
-import datingapp.core.UserState;
+import datingapp.core.User.Gender;
+import datingapp.core.User.UserState;
 import datingapp.core.ValidationService;
 import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,14 +36,14 @@ import org.slf4j.LoggerFactory;
  * preview, and dealbreaker
  * settings.
  */
-public class ProfileHandler {
+public class ProfileHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(ProfileHandler.class);
     private static final String INDENTED_LINE = "    {}";
     private static final String INDENTED_BULLET = "    - {}";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final UserStorage userStorage;
-    private final ProfilePreviewService profilePreviewService;
+    private final ProfileCompletionService profileCompletionService;
     private final AchievementService achievementService;
     private final ValidationService validationService;
     private final AppSession session;
@@ -52,18 +53,23 @@ public class ProfileHandler {
 
     public ProfileHandler(
             UserStorage userStorage,
-            ProfilePreviewService profilePreviewService,
+            ProfileCompletionService profileCompletionService,
             AchievementService achievementService,
             ValidationService validationService,
             AppSession session,
             InputReader inputReader) {
         this.userStorage = userStorage;
-        this.profilePreviewService = profilePreviewService;
+        this.profileCompletionService = profileCompletionService;
         this.achievementService = achievementService;
         this.validationService =
                 java.util.Objects.requireNonNull(validationService, "validationService cannot be null");
         this.session = session;
         this.inputReader = inputReader;
+    }
+
+    @Override
+    public Logger logger() {
+        return logger;
     }
 
     /**
@@ -72,7 +78,7 @@ public class ProfileHandler {
      * to activate the profile if complete.
      */
     public void completeProfile() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             logInfo("\n--- Complete Profile for {} ---\n", currentUser.getName());
 
@@ -108,19 +114,19 @@ public class ProfileHandler {
      * percentage and improvement tips.
      */
     public void previewProfile() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
-            ProfilePreviewService.ProfilePreview preview = profilePreviewService.generatePreview(currentUser);
+            ProfileCompletionService.ProfilePreview preview = profileCompletionService.generatePreview(currentUser);
 
-            logInfo("\n" + CliConstants.SEPARATOR_LINE);
+            logInfo("\n" + CliSupport.SEPARATOR_LINE);
             logInfo("      👤 YOUR PROFILE PREVIEW");
-            logInfo(CliConstants.SEPARATOR_LINE);
+            logInfo(CliSupport.SEPARATOR_LINE);
             logInfo("");
             logInfo("  This is how others see you:");
             logInfo("");
 
             // Card display
-            logInfo(CliConstants.BOX_TOP);
+            logInfo(CliSupport.BOX_TOP);
             String verifiedBadge = currentUser.isVerified() ? " ✅ Verified" : "";
             logInfo("│ 💝 {}, {} years old{}", currentUser.getName(), currentUser.getAge(), verifiedBadge);
             logInfo("│ 📍 Location: {}, {}", currentUser.getLat(), currentUser.getLon());
@@ -128,20 +134,20 @@ public class ProfileHandler {
             if (bio.length() > 50) {
                 bio = bio.substring(0, 47) + "...";
             }
-            logInfo(CliConstants.PROFILE_BIO_FORMAT, bio);
+            logInfo(CliSupport.PROFILE_BIO_FORMAT, bio);
             if (preview.displayLookingFor() != null) {
                 logInfo("│ 💭 {}", preview.displayLookingFor());
             }
-            logInfo(CliConstants.BOX_BOTTOM);
+            logInfo(CliSupport.BOX_BOTTOM);
 
             // Completeness
-            ProfilePreviewService.ProfileCompleteness comp = preview.completeness();
+            ProfileCompletionService.ProfileCompleteness comp = preview.completeness();
             logInfo("");
             logInfo("  📊 PROFILE COMPLETENESS: {}%", comp.percentage());
 
             // Render progress bar when profile has some completeness
             if (comp.percentage() > 0 && logger.isInfoEnabled()) {
-                String progressBar = ProfilePreviewService.renderProgressBar(comp.percentage() / 100.0, 20);
+                String progressBar = ProfileCompletionService.renderProgressBar(comp.percentage() / 100.0, 20);
                 logInfo("  {}", progressBar);
             }
 
@@ -169,7 +175,7 @@ public class ProfileHandler {
      * based on lifestyle preferences.
      */
     public void setDealbreakers() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             boolean editing = true;
             while (editing) {
@@ -178,7 +184,7 @@ public class ProfileHandler {
 
                 String choice = inputReader.readLine(PROMPT_CHOICE).trim();
                 if ("0".equals(choice)) {
-                    logInfo(CliConstants.CANCELLED);
+                    logInfo(CliSupport.CANCELLED);
                     editing = false;
                     continue;
                 }
@@ -210,24 +216,6 @@ public class ProfileHandler {
         }
     }
 
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logDebug(String message, Object... args) {
-        if (logger.isDebugEnabled()) {
-            logger.debug(message, args);
-        }
-    }
-
-    private void logTrace(String message, Object... args) {
-        if (logger.isTraceEnabled()) {
-            logger.trace(message, args);
-        }
-    }
-
     /**
      * Prompts the user to enter their bio/description.
      *
@@ -256,7 +244,7 @@ public class ProfileHandler {
      * @param currentUser The user whose gender is being set
      */
     private void promptGender(User currentUser) {
-        logInfo("\n" + CliConstants.GENDER_OPTIONS);
+        logInfo("\n" + CliSupport.GENDER_OPTIONS);
         String genderChoice = inputReader.readLine("Your gender (1/2/3): ");
         Gender gender =
                 switch (genderChoice) {
@@ -271,7 +259,7 @@ public class ProfileHandler {
     }
 
     private void promptInterestedIn(User currentUser) {
-        logInfo("\n" + CliConstants.INTERESTED_IN_PROMPT);
+        logInfo("\n" + CliSupport.INTERESTED_IN_PROMPT);
         String interestedStr = inputReader.readLine("Your preferences: ");
         Set<Gender> interestedIn = parseGenderSet(interestedStr);
         if (!interestedIn.isEmpty()) {
@@ -289,7 +277,8 @@ public class ProfileHandler {
             }
             try {
                 result.add(Gender.valueOf(token));
-            } catch (IllegalArgumentException _) {
+            } catch (IllegalArgumentException ex) {
+                logDebug("Invalid gender selection: {}", ex.getMessage());
                 logInfo("⚠️  Invalid gender: {}", token);
             }
         }
@@ -316,10 +305,8 @@ public class ProfileHandler {
                     currentUser.setInterests(interestSet);
                     logInfo("✅ Interests cleared.\n");
                 }
-                case "0" -> {
-                    editing = false;
-                }
-                default -> logInfo(CliConstants.INVALID_SELECTION);
+                case "0" -> editing = false;
+                default -> logInfo(CliSupport.INVALID_SELECTION);
             }
         }
 
@@ -382,6 +369,7 @@ public class ProfileHandler {
         }
     }
 
+    @Nullable
     private Integer parseInterestIndex(String token, int size) {
         try {
             int idx = Integer.parseInt(token) - 1;
@@ -390,7 +378,8 @@ public class ProfileHandler {
                 return null;
             }
             return idx;
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException ex) {
+            logDebug("Invalid interest selection: {}", ex.getMessage());
             logInfo("⚠️  Invalid selection: {}", token);
             return null;
         }
@@ -486,7 +475,7 @@ public class ProfileHandler {
      * @param currentUser The user whose lifestyle preferences are being set
      */
     private void promptLifestyle(User currentUser) {
-        logInfo("\n" + CliConstants.HEADER_LIFESTYLE + "\n");
+        logInfo("\n" + CliSupport.HEADER_LIFESTYLE + "\n");
 
         String heightStr = inputReader.readLine("Height in cm (e.g., 175, or Enter to skip): ");
         if (!heightStr.isBlank()) {
@@ -505,24 +494,16 @@ public class ProfileHandler {
         }
 
         var smoking = EnumMenu.prompt(inputReader, Lifestyle.Smoking.class, "Select smoking:", true);
-        if (smoking != null) {
-            currentUser.setSmoking(smoking);
-        }
+        smoking.ifPresent(currentUser::setSmoking);
 
         var drinking = EnumMenu.prompt(inputReader, Lifestyle.Drinking.class, "Select drinking:", true);
-        if (drinking != null) {
-            currentUser.setDrinking(drinking);
-        }
+        drinking.ifPresent(currentUser::setDrinking);
 
         var wantsKids = EnumMenu.prompt(inputReader, Lifestyle.WantsKids.class, "Select kids preference:", true);
-        if (wantsKids != null) {
-            currentUser.setWantsKids(wantsKids);
-        }
+        wantsKids.ifPresent(currentUser::setWantsKids);
 
         var lookingFor = EnumMenu.prompt(inputReader, Lifestyle.LookingFor.class, "Select relationship goal:", true);
-        if (lookingFor != null) {
-            currentUser.setLookingFor(lookingFor);
-        }
+        lookingFor.ifPresent(currentUser::setLookingFor);
     }
 
     /**
@@ -537,25 +518,17 @@ public class ProfileHandler {
 
         PacePreferences current = currentUser.getPacePreferences();
 
-        var freq = EnumMenu.prompt(inputReader, MessagingFrequency.class, "Messaging frequency:", false);
-        if (freq == null) {
-            freq = current.messagingFrequency();
-        }
+        var freq = EnumMenu.prompt(inputReader, MessagingFrequency.class, "Messaging frequency:", false)
+                .orElse(current.messagingFrequency());
 
-        var time = EnumMenu.prompt(inputReader, TimeToFirstDate.class, "Time to first date:", false);
-        if (time == null) {
-            time = current.timeToFirstDate();
-        }
+        var time = EnumMenu.prompt(inputReader, TimeToFirstDate.class, "Time to first date:", false)
+                .orElse(current.timeToFirstDate());
 
-        var style = EnumMenu.prompt(inputReader, CommunicationStyle.class, "Communication style:", false);
-        if (style == null) {
-            style = current.communicationStyle();
-        }
+        var style = EnumMenu.prompt(inputReader, CommunicationStyle.class, "Communication style:", false)
+                .orElse(current.communicationStyle());
 
-        var depth = EnumMenu.prompt(inputReader, DepthPreference.class, "Conversation depth:", false);
-        if (depth == null) {
-            depth = current.depthPreference();
-        }
+        var depth = EnumMenu.prompt(inputReader, DepthPreference.class, "Conversation depth:", false)
+                .orElse(current.depthPreference());
 
         currentUser.setPacePreferences(new PacePreferences(freq, time, style, depth));
     }
@@ -563,9 +536,9 @@ public class ProfileHandler {
     // --- Dealbreaker Helpers ---
 
     private void displayCurrentDealbreakers(User currentUser) {
-        logInfo("\n" + CliConstants.SEPARATOR_LINE);
+        logInfo("\n" + CliSupport.SEPARATOR_LINE);
         logInfo("         SET YOUR DEALBREAKERS");
-        logInfo(CliConstants.SEPARATOR_LINE + "\n");
+        logInfo(CliSupport.SEPARATOR_LINE + "\n");
         logInfo("Dealbreakers are HARD filters.\n");
 
         Dealbreakers current = currentUser.getDealbreakers();
@@ -596,7 +569,7 @@ public class ProfileHandler {
     }
 
     private void displayDealbreakerMenu() {
-        logInfo(CliConstants.MENU_DIVIDER);
+        logInfo(CliSupport.MENU_DIVIDER);
         logInfo("  1. Set smoking dealbreaker");
         logInfo("  2. Set drinking dealbreaker");
         logInfo("  3. Set kids stance dealbreaker");
@@ -605,7 +578,7 @@ public class ProfileHandler {
         logInfo("  6. Set max age difference");
         logInfo("  7. Clear all dealbreakers");
         logInfo("  0. Cancel");
-        logInfo(CliConstants.MENU_DIVIDER + "\n");
+        logInfo(CliSupport.MENU_DIVIDER + "\n");
     }
 
     // Note: I am copying the logic from Main.java for dealbreakers
@@ -617,61 +590,68 @@ public class ProfileHandler {
     private void handleDealbreakerChoice(String choice, User currentUser) {
         Dealbreakers current = currentUser.getDealbreakers();
         switch (choice) {
-            case "1" -> editSmokingDealbreaker(currentUser, current);
-            case "2" -> editDrinkingDealbreaker(currentUser, current);
-            case "3" -> editKidsDealbreaker(currentUser, current);
-            case "4" -> editLookingForDealbreaker(currentUser, current);
+            case "1" ->
+                editEnumDealbreaker(
+                        currentUser,
+                        current,
+                        Lifestyle.Smoking.class,
+                        "Accept these smoking values:",
+                        Dealbreakers.Builder::clearSmoking,
+                        Dealbreakers.Builder::acceptSmoking,
+                        "Smoking");
+            case "2" ->
+                editEnumDealbreaker(
+                        currentUser,
+                        current,
+                        Lifestyle.Drinking.class,
+                        "Accept these drinking values:",
+                        Dealbreakers.Builder::clearDrinking,
+                        Dealbreakers.Builder::acceptDrinking,
+                        "Drinking");
+            case "3" ->
+                editEnumDealbreaker(
+                        currentUser,
+                        current,
+                        Lifestyle.WantsKids.class,
+                        "Accept these kids preferences:",
+                        Dealbreakers.Builder::clearKids,
+                        Dealbreakers.Builder::acceptKidsStance,
+                        "Kids stance");
+            case "4" ->
+                editEnumDealbreaker(
+                        currentUser,
+                        current,
+                        Lifestyle.LookingFor.class,
+                        "Accept these relationship goals:",
+                        Dealbreakers.Builder::clearLookingFor,
+                        Dealbreakers.Builder::acceptLookingFor,
+                        "Looking for");
             case "5" -> editHeightDealbreaker(currentUser, current);
             case "6" -> editAgeDealbreaker(currentUser, current);
             case "7" -> {
                 currentUser.setDealbreakers(Dealbreakers.none());
                 logInfo("✅ All dealbreakers cleared.\n");
             }
-            case "0" -> logInfo(CliConstants.CANCELLED);
-            default -> logInfo(CliConstants.INVALID_SELECTION);
+            case "0" -> logInfo(CliSupport.CANCELLED);
+            default -> logInfo(CliSupport.INVALID_SELECTION);
         }
     }
 
-    private void editSmokingDealbreaker(User currentUser, Dealbreakers current) {
-        var selected = EnumMenu.promptMultiple(inputReader, Lifestyle.Smoking.class, "Accept these smoking values:");
-        Dealbreakers.Builder builder = current.toBuilder().clearSmoking();
+    private <E extends Enum<E>> void editEnumDealbreaker(
+            User currentUser,
+            Dealbreakers current,
+            Class<E> enumClass,
+            String promptHeader,
+            java.util.function.UnaryOperator<Dealbreakers.Builder> clearFn,
+            java.util.function.BiFunction<Dealbreakers.Builder, E, Dealbreakers.Builder> acceptFn,
+            String label) {
+        var selected = EnumMenu.promptMultiple(inputReader, enumClass, promptHeader);
+        Dealbreakers.Builder builder = clearFn.apply(current.toBuilder());
         for (var value : selected) {
-            builder.acceptSmoking(value);
+            acceptFn.apply(builder, value);
         }
         currentUser.setDealbreakers(builder.build());
-        logInfo("✅ Smoking dealbreaker updated.\n");
-    }
-
-    private void editDrinkingDealbreaker(User currentUser, Dealbreakers current) {
-        var selected = EnumMenu.promptMultiple(inputReader, Lifestyle.Drinking.class, "Accept these drinking values:");
-        Dealbreakers.Builder builder = current.toBuilder().clearDrinking();
-        for (var value : selected) {
-            builder.acceptDrinking(value);
-        }
-        currentUser.setDealbreakers(builder.build());
-        logInfo("✅ Drinking dealbreaker updated.\n");
-    }
-
-    private void editKidsDealbreaker(User currentUser, Dealbreakers current) {
-        var selected =
-                EnumMenu.promptMultiple(inputReader, Lifestyle.WantsKids.class, "Accept these kids preferences:");
-        Dealbreakers.Builder builder = current.toBuilder().clearKids();
-        for (var value : selected) {
-            builder.acceptKidsStance(value);
-        }
-        currentUser.setDealbreakers(builder.build());
-        logInfo("✅ Kids stance dealbreaker updated.\n");
-    }
-
-    private void editLookingForDealbreaker(User currentUser, Dealbreakers current) {
-        var selected =
-                EnumMenu.promptMultiple(inputReader, Lifestyle.LookingFor.class, "Accept these relationship goals:");
-        Dealbreakers.Builder builder = current.toBuilder().clearLookingFor();
-        for (var value : selected) {
-            builder.acceptLookingFor(value);
-        }
-        currentUser.setDealbreakers(builder.build());
-        logInfo("✅ Looking for dealbreaker updated.\n");
+        logInfo("✅ {} dealbreaker updated.\n", label);
     }
 
     private void editHeightDealbreaker(User currentUser, Dealbreakers current) {
@@ -688,7 +668,7 @@ public class ProfileHandler {
             currentUser.setDealbreakers(builder.build());
             logInfo("✅ Height dealbreaker updated.\n");
         } catch (NumberFormatException _) {
-            logInfo(CliConstants.INVALID_INPUT);
+            logInfo(CliSupport.INVALID_INPUT);
         } catch (IllegalArgumentException e) {
             logInfo("❌ {}\n", e.getMessage());
         }
@@ -704,7 +684,7 @@ public class ProfileHandler {
                 currentUser.setDealbreakers(builder.build());
                 logInfo("✅ Age dealbreaker updated.\n");
             } catch (NumberFormatException _) {
-                logInfo(CliConstants.INVALID_INPUT);
+                logInfo(CliSupport.INVALID_INPUT);
             }
         } else {
             currentUser.setDealbreakers(builder.build());
@@ -767,9 +747,9 @@ public class ProfileHandler {
      * Displays the profile completion score and breakdown for the current user.
      */
     public void viewProfileScore() {
-        CliUtilities.requireLogin(() -> {
+        CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
-            ProfileCompletionService.CompletionResult result = ProfileCompletionService.calculate(currentUser);
+            ProfileCompletionService.CompletionResult result = profileCompletionService.calculate(currentUser);
 
             logInfo("\n───────────────────────────────────────");
             logInfo("      📊 PROFILE COMPLETION SCORE");

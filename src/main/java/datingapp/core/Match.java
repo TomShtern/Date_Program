@@ -15,7 +15,7 @@ import java.util.UUID;
  * always the
  * lexicographically smaller UUID.
  */
-public class Match implements SoftDeletable {
+public class Match {
 
     /** Represents the current state of a match. */
     public static enum State {
@@ -258,16 +258,21 @@ public class Match implements SoftDeletable {
         return endReason;
     }
 
-    // SoftDeletable implementation
+    // Soft-delete support
 
-    @Override
+    /** Returns the deletion timestamp, or {@code null} if not deleted. */
     public Instant getDeletedAt() {
         return deletedAt;
     }
 
-    @Override
+    /** Marks this entity as soft-deleted at the given instant. */
     public void markDeleted(Instant deletedAt) {
         this.deletedAt = Objects.requireNonNull(deletedAt, "deletedAt cannot be null");
+    }
+
+    /** Returns {@code true} if this match has been soft-deleted. */
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 
     /** Sets the deleted-at timestamp; used when reconstructing from storage. */

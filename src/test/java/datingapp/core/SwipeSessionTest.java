@@ -10,10 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.UserInteractions.Like;
+import datingapp.core.testutil.TestClock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,13 +26,25 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class SwipeSessionTest {
 
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+
+    @BeforeEach
+    void setUpClock() {
+        TestClock.setFixed(FIXED_INSTANT);
+    }
+
+    @AfterEach
+    void resetClock() {
+        TestClock.reset();
+    }
+
     @Test
     @DisplayName("SwipeSession can be instantiated with all parameters")
     void canInstantiateWithAllParameters() {
         UUID id = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        Instant createdAt = Instant.now();
-        Instant lastActivityAt = Instant.now();
+        Instant createdAt = AppClock.now();
+        Instant lastActivityAt = AppClock.now();
 
         SwipeSession session =
                 new SwipeSession(id, userId, createdAt, lastActivityAt, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
@@ -185,9 +200,9 @@ class SwipeSessionTest {
             SwipeSession session = new SwipeSession(
                     UUID.randomUUID(),
                     userId,
-                    Instant.now().minus(Duration.ofHours(1)),
-                    Instant.now().minus(Duration.ofHours(1)),
-                    Instant.now().minus(Duration.ofMinutes(30)),
+                    AppClock.now().minus(Duration.ofHours(1)),
+                    AppClock.now().minus(Duration.ofHours(1)),
+                    AppClock.now().minus(Duration.ofMinutes(30)),
                     SwipeSession.State.COMPLETED,
                     5,
                     3,
@@ -205,8 +220,8 @@ class SwipeSessionTest {
             SwipeSession session = new SwipeSession(
                     UUID.randomUUID(),
                     userId,
-                    Instant.now().minus(Duration.ofMinutes(10)),
-                    Instant.now().minus(Duration.ofMinutes(10)), // 10 min ago
+                    AppClock.now().minus(Duration.ofMinutes(10)),
+                    AppClock.now().minus(Duration.ofMinutes(10)), // 10 min ago
                     null,
                     SwipeSession.State.ACTIVE,
                     5,
@@ -267,7 +282,7 @@ class SwipeSessionTest {
         void formattedDuration() {
             UUID userId = UUID.randomUUID();
             // Create session that started 5 minutes and 30 seconds ago
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             SwipeSession session = new SwipeSession(
                     UUID.randomUUID(),
                     userId,
@@ -289,7 +304,7 @@ class SwipeSessionTest {
         @DisplayName("Duration is never negative when start time is in the future")
         void durationNotNegativeForFutureStart() {
             UUID userId = UUID.randomUUID();
-            Instant future = Instant.now().plus(Duration.ofMinutes(5));
+            Instant future = AppClock.now().plus(Duration.ofMinutes(5));
 
             SwipeSession session = new SwipeSession(
                     UUID.randomUUID(), userId, future, future, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
@@ -300,7 +315,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Swipes per minute scales with session duration")
         void swipesPerMinuteScalesWithDuration() {
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             SwipeSession shortSession = new SwipeSession(
                     UUID.randomUUID(),
                     UUID.randomUUID(),
@@ -340,7 +355,7 @@ class SwipeSessionTest {
         void equalById() {
             UUID id = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
 
             SwipeSession session1 = new SwipeSession(id, userId, now, now, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
             SwipeSession session2 = new SwipeSession(id, userId, now, now, null, SwipeSession.State.ACTIVE, 5, 3, 2, 1);
@@ -353,7 +368,7 @@ class SwipeSessionTest {
         @DisplayName("Sessions with different IDs are not equal")
         void notEqualByDifferentId() {
             UUID userId = UUID.randomUUID();
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
 
             SwipeSession session1 =
                     new SwipeSession(UUID.randomUUID(), userId, now, now, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
@@ -566,7 +581,7 @@ class SwipeSessionTest {
         @DisplayName("Formatted duration for completed session shows total duration")
         void formattedDurationForCompletedSession() {
             UUID userId = UUID.randomUUID();
-            Instant start = Instant.now().minus(Duration.ofMinutes(10));
+            Instant start = AppClock.now().minus(Duration.ofMinutes(10));
             Instant end = start.plus(Duration.ofMinutes(5));
 
             SwipeSession session = new SwipeSession(
@@ -590,8 +605,8 @@ class SwipeSessionTest {
             SwipeSession session = new SwipeSession(
                     UUID.randomUUID(),
                     userId,
-                    Instant.now().minus(timeout),
-                    Instant.now().minus(timeout),
+                    AppClock.now().minus(timeout),
+                    AppClock.now().minus(timeout),
                     null,
                     SwipeSession.State.ACTIVE,
                     0,
@@ -611,8 +626,8 @@ class SwipeSessionTest {
             SwipeSession session = new SwipeSession(
                     UUID.randomUUID(),
                     userId,
-                    Instant.now().minus(timeout.minusSeconds(1)),
-                    Instant.now().minus(timeout.minusSeconds(1)),
+                    AppClock.now().minus(timeout.minusSeconds(1)),
+                    AppClock.now().minus(timeout.minusSeconds(1)),
                     null,
                     SwipeSession.State.ACTIVE,
                     0,
@@ -641,9 +656,9 @@ class SwipeSessionTest {
         void gettersReturnConstructedValues() {
             UUID id = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
-            Instant createdAt = Instant.now().minus(Duration.ofMinutes(10));
-            Instant lastActivityAt = Instant.now().minus(Duration.ofMinutes(5));
-            Instant endedAt = Instant.now();
+            Instant createdAt = AppClock.now().minus(Duration.ofMinutes(10));
+            Instant lastActivityAt = AppClock.now().minus(Duration.ofMinutes(5));
+            Instant endedAt = AppClock.now();
 
             SwipeSession session = new SwipeSession(
                     id, userId, createdAt, lastActivityAt, endedAt, SwipeSession.State.COMPLETED, 20, 12, 8, 5);
@@ -671,9 +686,9 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Created session has timestamps set")
         void createdSessionHasTimestamps() {
-            Instant before = Instant.now();
+            Instant before = AppClock.now();
             SwipeSession session = SwipeSession.create(UUID.randomUUID());
-            Instant after = Instant.now();
+            Instant after = AppClock.now();
 
             assertNotNull(session.getStartedAt());
             assertNotNull(session.getLastActivityAt());

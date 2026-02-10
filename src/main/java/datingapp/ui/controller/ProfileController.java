@@ -1,14 +1,14 @@
 package datingapp.ui.controller;
 
 import datingapp.core.Dealbreakers;
-import datingapp.core.Gender;
 import datingapp.core.Preferences.Interest;
 import datingapp.core.Preferences.Lifestyle;
+import datingapp.core.User.Gender;
 import datingapp.ui.NavigationService;
 import datingapp.ui.util.ImageCache;
 import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
-import datingapp.ui.util.UiServices;
+import datingapp.ui.util.UiSupport;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
 import java.net.URL;
@@ -54,6 +54,11 @@ public class ProfileController extends BaseController implements Initializable {
     private javafx.scene.layout.BorderPane rootPane;
 
     private void wireAuxiliaryActions() {
+        wirePhotoActions();
+        wireDealbreakersAction();
+    }
+
+    private void wirePhotoActions() {
         if (cameraButton != null) {
             cameraButton.setOnAction(event -> {
                 event.consume();
@@ -66,6 +71,9 @@ public class ProfileController extends BaseController implements Initializable {
                 handleUploadPhoto();
             });
         }
+    }
+
+    private void wireDealbreakersAction() {
         if (editDealbreakersBtn != null) {
             editDealbreakersBtn.setOnAction(event -> {
                 event.consume();
@@ -448,7 +456,7 @@ public class ProfileController extends BaseController implements Initializable {
             try {
                 int height = Integer.parseInt(newVal.trim());
                 viewModel.heightProperty().set(height);
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException _) {
                 // Non-numeric input ignored; user is still typing
             }
         }));
@@ -607,12 +615,6 @@ public class ProfileController extends BaseController implements Initializable {
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
-    @FXML
-    @SuppressWarnings("unused")
-    private void handleBack() {
-        handleCancel(); // Delegate to avoid duplicate code
-    }
-
     /**
      * Opens a dialog to select interests.
      */
@@ -758,7 +760,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         // --- Smoking Section ---
         content.getChildren()
-                .add(createDealbreakersSection(
+                .add(DealbreakersChipHelper.createSection(
                         "Smoking Preferences",
                         DEALBREAKER_HEADER,
                         Lifestyle.Smoking.values(),
@@ -767,7 +769,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         // --- Drinking Section ---
         content.getChildren()
-                .add(createDealbreakersSection(
+                .add(DealbreakersChipHelper.createSection(
                         "Drinking Preferences",
                         DEALBREAKER_HEADER,
                         Lifestyle.Drinking.values(),
@@ -776,7 +778,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         // --- Kids Section ---
         content.getChildren()
-                .add(createDealbreakersSection(
+                .add(DealbreakersChipHelper.createSection(
                         "Kids Preferences",
                         DEALBREAKER_HEADER,
                         Lifestyle.WantsKids.values(),
@@ -785,7 +787,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         // --- Looking For Section ---
         content.getChildren()
-                .add(createDealbreakersSection(
+                .add(DealbreakersChipHelper.createSection(
                         "Relationship Goals",
                         "Only show people looking for:",
                         Lifestyle.LookingFor.values(),
@@ -798,7 +800,7 @@ public class ProfileController extends BaseController implements Initializable {
                 "-fx-background-color: #64748b; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 8 16;");
         clearAllBtn.setOnAction(event -> {
             event.consume();
-            boolean confirmed = UiServices.showConfirmation(
+            boolean confirmed = UiSupport.showConfirmation(
                     "Clear All Dealbreakers",
                     "Remove all dealbreaker preferences?",
                     "This will reset all your dealbreaker filters. You can set them again anytime.");
@@ -849,60 +851,6 @@ public class ProfileController extends BaseController implements Initializable {
             viewModel.setDealbreakers(newDealbreakers);
             logInfo("Dealbreakers updated");
         });
-    }
-
-    /**
-     * Creates a dealbreakers section with checkable items.
-     */
-    private <T extends Enum<T>> VBox createDealbreakersSection(
-            String title,
-            String subtitle,
-            T[] values,
-            java.util.Set<T> selected,
-            java.util.function.Function<T, String> displayNameFunc) {
-
-        VBox section = new VBox(8);
-
-        Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: white; -fx-font-size: 14px;");
-
-        Label subtitleLabel = new Label(subtitle);
-        subtitleLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 12px;");
-
-        FlowPane itemsPane = new FlowPane(8, 8);
-        for (T value : values) {
-            Button chip = new Button(displayNameFunc.apply(value));
-            boolean isSelected = selected.contains(value);
-            updateDealbreakersChipStyle(chip, isSelected);
-
-            chip.setOnAction(_ -> {
-                if (selected.contains(value)) {
-                    selected.remove(value);
-                    updateDealbreakersChipStyle(chip, false);
-                } else {
-                    selected.add(value);
-                    updateDealbreakersChipStyle(chip, true);
-                }
-            });
-
-            itemsPane.getChildren().add(chip);
-        }
-
-        section.getChildren().addAll(titleLabel, subtitleLabel, itemsPane);
-        return section;
-    }
-
-    /**
-     * Updates the style of a dealbreakers chip button based on selection state.
-     */
-    private void updateDealbreakersChipStyle(Button chip, boolean selected) {
-        if (selected) {
-            chip.setStyle(
-                    "-fx-background-color: #10b981; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 6 12;");
-        } else {
-            chip.setStyle(
-                    "-fx-background-color: #334155; -fx-text-fill: #94a3b8; -fx-background-radius: 20; -fx-padding: 6 12;");
-        }
     }
 
     private void logInfo(String message, Object... args) {

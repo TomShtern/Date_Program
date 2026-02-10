@@ -11,7 +11,8 @@ import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.storage.BlockStorage;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
-import java.time.LocalDate;
+import datingapp.core.testutil.TestClock;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -25,10 +26,12 @@ class CandidateFinderTest {
 
     private CandidateFinder finder;
     private User seeker;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
+        TestClock.setFixed(FIXED_INSTANT);
         // CandidateFinder now requires storage dependencies, but tests only use findCandidates()
         // which doesn't touch the storage fields, so we provide minimal stubs
         UserStorage userStorage = new UserStorage() {
@@ -181,7 +184,12 @@ class CandidateFinderTest {
         };
 
         finder = new CandidateFinder(userStorage, likeStorage, blockStorage, AppConfig.defaults());
-        seeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.0853, 34.7818);
+        seeker = createUser("Seeker", User.Gender.MALE, EnumSet.of(User.Gender.FEMALE), 30, 32.0853, 34.7818);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
     }
 
     @Test
@@ -194,7 +202,7 @@ class CandidateFinderTest {
     @Test
     @DisplayName("Excludes already interacted users")
     void excludesAlreadyInteracted() {
-        User candidate = createUser("Candidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
+        User candidate = createUser("Candidate", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.0, 34.0);
 
         List<User> result = finder.findCandidates(seeker, List.of(candidate), Set.of(candidate.getId()));
         assertTrue(result.isEmpty());
@@ -204,9 +212,10 @@ class CandidateFinderTest {
     @DisplayName("Filters by mutual gender preferences")
     void filtersByMutualGenderPreferences() {
         // Interested in seeker's gender
-        User compatible = createUser("Compatible", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
+        User compatible = createUser("Compatible", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.0, 34.0);
         // NOT interested in seeker's gender
-        User incompatible = createUser("Incompatible", Gender.FEMALE, EnumSet.of(Gender.FEMALE), 28, 32.0, 34.0);
+        User incompatible =
+                createUser("Incompatible", User.Gender.FEMALE, EnumSet.of(User.Gender.FEMALE), 28, 32.0, 34.0);
 
         List<User> result = finder.findCandidates(seeker, List.of(compatible, incompatible), Set.of());
 
@@ -219,11 +228,11 @@ class CandidateFinderTest {
     void filtersByMutualAgePreferences() {
         // Seeker is 30, looking for 25-35
         // Compatible is 28, looking for 25-35 (seeker fits)
-        User compatible = createUser("Compatible", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
+        User compatible = createUser("Compatible", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.0, 34.0);
         compatible.setAgeRange(25, 35);
 
         // TooOld is 28, but only looking for 18-25 (seeker doesn't fit)
-        User tooOld = createUser("TooOld", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
+        User tooOld = createUser("TooOld", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.0, 34.0);
         tooOld.setAgeRange(18, 25);
 
         List<User> result = finder.findCandidates(seeker, List.of(compatible, tooOld), Set.of());
@@ -236,9 +245,9 @@ class CandidateFinderTest {
     @DisplayName("Filters by distance preference")
     void filtersByDistance() {
         // Close candidate - same city
-        User close = createUser("Close", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.1, 34.8);
+        User close = createUser("Close", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.1, 34.8);
         // Far candidate - different city (~60km away)
-        User far = createUser("Far", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 31.7683, 35.2137);
+        User far = createUser("Far", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 31.7683, 35.2137);
 
         seeker.setMaxDistanceKm(30); // Only 30km radius
 
@@ -251,9 +260,9 @@ class CandidateFinderTest {
     @Test
     @DisplayName("Sorts candidates by distance ascending")
     void sortsByDistanceAscending() {
-        User far = createUser("Far", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.5, 35.0);
-        User close = createUser("Close", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.1, 34.8);
-        User medium = createUser("Medium", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.3, 34.9);
+        User far = createUser("Far", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.5, 35.0);
+        User close = createUser("Close", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.1, 34.8);
+        User medium = createUser("Medium", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 32.3, 34.9);
 
         seeker.setMaxDistanceKm(200);
 
@@ -268,20 +277,21 @@ class CandidateFinderTest {
     @Test
     @DisplayName("Treats (0,0) as a valid location when explicitly set")
     void treatsZeroZeroAsValidLocationWhenSet() {
-        User zeroSeeker = createUser("ZeroSeeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 0.0, 0.0);
+        User zeroSeeker = createUser("ZeroSeeker", User.Gender.MALE, EnumSet.of(User.Gender.FEMALE), 30, 0.0, 0.0);
         zeroSeeker.setMaxDistanceKm(1);
 
-        User farCandidate = createUser("FarAway", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 10.0, 10.0);
+        User farCandidate = createUser("FarAway", User.Gender.FEMALE, EnumSet.of(User.Gender.MALE), 28, 10.0, 10.0);
 
         List<User> result = finder.findCandidates(zeroSeeker, List.of(farCandidate), Set.of());
 
         assertTrue(result.isEmpty(), "Distance filtering should apply when (0,0) is explicitly set");
     }
 
-    private User createUser(String name, Gender gender, Set<Gender> interestedIn, int age, double lat, double lon) {
+    private User createUser(
+            String name, User.Gender gender, Set<User.Gender> interestedIn, int age, double lat, double lon) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Bio");
-        user.setBirthDate(LocalDate.now().minusYears(age));
+        user.setBirthDate(AppClock.today().minusYears(age));
         user.setGender(gender);
         user.setInterestedIn(interestedIn);
         user.setLocation(lat, lon);

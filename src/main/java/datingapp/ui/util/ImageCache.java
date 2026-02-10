@@ -1,5 +1,6 @@
 package datingapp.ui.util;
 
+import datingapp.ui.constants.CacheConstants;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -18,10 +19,10 @@ public final class ImageCache {
     private static final Logger logger = LoggerFactory.getLogger(ImageCache.class);
 
     /** Maximum number of images to cache before eviction. */
-    private static final int MAX_CACHE_SIZE = 100;
+    private static final int MAX_CACHE_SIZE = CacheConstants.IMAGE_CACHE_MAX_SIZE;
 
     /** Path to default avatar resource. */
-    private static final String DEFAULT_AVATAR_PATH = "/images/default-avatar.png";
+    private static final String DEFAULT_AVATAR_PATH = CacheConstants.DEFAULT_AVATAR_PATH;
 
     /**
      * Thread-safe LRU cache using LinkedHashMap with access-order.
@@ -174,16 +175,11 @@ public final class ImageCache {
             return;
         }
 
-        String key = path + "@" + width + "x" + height;
-        synchronized (CACHE) {
-            if (CACHE.containsKey(key)) {
-                return; // Already cached
-            }
-        }
-
+        // getImage() already handles cache-check atomically in its synchronized block,
+        // so there is no need to pre-check containsKey outside the lock.
         Thread.ofVirtual().name("image-preload").start(() -> {
             getImage(path, width, height);
-            logDebug("Preloaded image: {}", key);
+            logDebug("Preloaded image: {}", path);
         });
     }
 

@@ -62,7 +62,7 @@ public class DailyService {
         this.dailyPickViewStorage = dailyPickViewStorage;
         this.candidateFinder = candidateFinder;
         this.config = Objects.requireNonNull(config, "config cannot be null");
-        this.clock = clock != null ? clock : Clock.system(config.userTimeZone());
+        this.clock = clock != null ? clock : AppClock.clock();
     }
 
     /** Whether the user can perform a like action today. */

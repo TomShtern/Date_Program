@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.*;
 import datingapp.core.PacePreferences;
+import datingapp.core.User.Gender;
+import datingapp.core.User.VerificationMethod;
 import datingapp.core.UserInteractions.Like;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;

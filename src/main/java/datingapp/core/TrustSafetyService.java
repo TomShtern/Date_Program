@@ -109,7 +109,7 @@ public class TrustSafetyService {
         ensureReportDependencies();
 
         User reporter = userStorage.get(reporterId);
-        if (reporter == null || reporter.getState() != UserState.ACTIVE) {
+        if (reporter == null || reporter.getState() != User.UserState.ACTIVE) {
             return new ReportResult(false, false, "Reporter must be active user");
         }
 
@@ -133,7 +133,7 @@ public class TrustSafetyService {
 
         int reportCount = reportStorage.countReportsAgainst(reportedUserId);
         boolean autoBanned = false;
-        if (reportCount >= config.autoBanThreshold() && reported.getState() != UserState.BANNED) {
+        if (reportCount >= config.autoBanThreshold() && reported.getState() != User.UserState.BANNED) {
             reported.ban();
             userStorage.save(reported);
             autoBanned = true;
@@ -189,7 +189,7 @@ public class TrustSafetyService {
         }
 
         User blocker = userStorage.get(blockerId);
-        if (blocker == null || blocker.getState() != UserState.ACTIVE) {
+        if (blocker == null || blocker.getState() != User.UserState.ACTIVE) {
             return new BlockResult(false, "Blocker must be an active user");
         }
 

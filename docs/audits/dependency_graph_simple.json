@@ -1,0 +1,21 @@
+{
+  "datingapp": [
+    "datingapp.app.cli",
+    "datingapp.core"
+  ],
+  "datingapp.core": [
+    "datingapp.storage"
+  ],
+  "datingapp.ui": [
+    "datingapp.core"
+  ],
+  "datingapp.storage": [
+    "datingapp.core"
+  ],
+  "datingapp.app.api": [
+    "datingapp.core"
+  ],
+  "datingapp.app.cli": [
+    "datingapp.core"
+  ]
+}

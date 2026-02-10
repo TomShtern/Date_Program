@@ -11,6 +11,7 @@ import datingapp.core.User.ProfileNote;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,10 +39,12 @@ class MessagingServiceTest {
     private UUID userA;
     private UUID userB;
     private UUID userC;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
+        TestClock.setFixed(FIXED_INSTANT);
         messagingStorage = new InMemoryMessagingStorage();
         matchStorage = new InMemoryMatchStorage();
         userStorage = new InMemoryUserStorage();
@@ -56,11 +60,16 @@ class MessagingServiceTest {
         userStorage.save(createActiveUser(userC, "Carol"));
     }
 
+    @AfterEach
+    void tearDown() {
+        TestClock.reset();
+    }
+
     private User createActiveUser(UUID id, String name) {
-        Instant now = Instant.now();
+        Instant now = AppClock.now();
         return User.StorageBuilder.create(id, name, now)
                 .bio("Test bio")
-                .state(UserState.ACTIVE)
+                .state(User.UserState.ACTIVE)
                 .updatedAt(now)
                 .build();
     }
@@ -436,7 +445,7 @@ class MessagingServiceTest {
 
             String convoIdAB = Conversation.generateId(userA, userB);
             String convoIdAC = Conversation.generateId(userA, userC);
-            Instant now = Instant.now();
+            Instant now = AppClock.now();
             messagingStorage.updateConversationLastMessageAt(convoIdAB, now);
             messagingStorage.updateConversationLastMessageAt(convoIdAC, now.plusSeconds(1));
 
@@ -473,7 +482,7 @@ class MessagingServiceTest {
 
             messagingService.sendMessage(userA, userB, "First");
             String conversationId = Conversation.generateId(userA, userB);
-            Instant later = Instant.now().plusSeconds(1);
+            Instant later = AppClock.now().plusSeconds(1);
             Message lastMessage = new Message(UUID.randomUUID(), conversationId, userB, "Last message", later);
             messagingStorage.saveMessage(lastMessage);
             messagingStorage.updateConversationLastMessageAt(conversationId, later);
@@ -722,7 +731,7 @@ class MessagingServiceTest {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == UserState.ACTIVE)
+                    .filter(u -> u.getState() == User.UserState.ACTIVE)
                     .toList();
         }
 

@@ -28,22 +28,26 @@ public class StandoutsService {
     private final UserStorage userStorage;
     private final Standout.Storage standoutStorage;
     private final CandidateFinder candidateFinder;
+    private final ProfileCompletionService profileCompletionService;
     private final AppConfig config;
 
     public StandoutsService(
             UserStorage userStorage,
             Standout.Storage standoutStorage,
             CandidateFinder candidateFinder,
+            ProfileCompletionService profileCompletionService,
             AppConfig config) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage required");
         this.standoutStorage = Objects.requireNonNull(standoutStorage, "standoutStorage required");
         this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder required");
+        this.profileCompletionService =
+                Objects.requireNonNull(profileCompletionService, "profileCompletionService required");
         this.config = Objects.requireNonNull(config, "config required");
     }
 
     /** Get today's standouts for a user. Returns cached if available. */
     public Result getStandouts(User seeker) {
-        LocalDate today = LocalDate.now(config.userTimeZone());
+        LocalDate today = AppClock.today(config.userTimeZone());
 
         // Check for cached standouts
         List<Standout> cached = standoutStorage.getStandouts(seeker.getId(), today);
@@ -120,7 +124,7 @@ public class StandoutsService {
         double lifestyleScore = calculateLifestyleScore(seeker, candidate);
 
         // 5. Profile completeness (10%)
-        double completenessScore = ProfileCompletionService.calculate(candidate).score() / 100.0;
+        double completenessScore = profileCompletionService.calculate(candidate).score() / 100.0;
 
         // 6. Activity score (10%)
         double activityScore = calculateActivityScore(candidate);
@@ -282,7 +286,7 @@ public class StandoutsService {
 
     /** Mark a standout as interacted after like/pass. */
     public void markInteracted(UUID seekerId, UUID standoutUserId) {
-        LocalDate today = LocalDate.now(config.userTimeZone());
+        LocalDate today = AppClock.today(config.userTimeZone());
         standoutStorage.markInteracted(seekerId, standoutUserId, today);
     }
 

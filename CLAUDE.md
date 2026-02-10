@@ -74,6 +74,8 @@ These are the **top errors** that cause compilation/runtime failures:
 | Wrong ID for pairs       | `a + "_" + b`                                | `a.compareTo(b) < 0 ? a+"_"+b : b+"_"+a`                                         |
 | Java version mismatch    | `mvn test` fails: "release 25 not supported" | Install JDK 25+ or change `maven.compiler.release` in pom.xml                    |
 | PMD + Spotless conflict  | Add `// NOPMD` then `mvn verify` fails        | Run `spotless:apply` after adding NOPMD comments, then re-verify with `verify`    |
+| ViewModel storage import | `import datingapp.core.storage.UserStorage`   | Use adapter: `import datingapp.ui.viewmodel.data.UiUserStore`                     |
+| Standalone Gender enum   | `import datingapp.core.Gender`                | Use nested: `User.Gender` (Gender.java was deleted)                               |
 
 **Access config via:** `private static final AppConfig CONFIG = AppConfig.defaults();`
 
@@ -89,6 +91,25 @@ mvn test                               # All tests
 mvn spotless:apply && mvn verify       # Format + full quality checks
 ```
 
+### Build Command Discipline (Agents: READ THIS)
+
+**NEVER run `mvn verify`, `mvn test`, or any expensive Maven goal multiple times to extract different info.** Each run repeats the entire build pipeline (compile → test → jacoco → jar → spotless → pmd → jacoco:check). Run ONCE, capture output, then filter:
+
+```powershell
+# CORRECT: one run, multiple queries
+$out = mvn verify 2>&1 | Out-String
+$out | Select-String "BUILD (SUCCESS|FAILURE)" | Select-Object -Last 1
+$out | Select-String "Tests run:" | Select-Object -Last 1
+$out | Select-String "ERROR|WARNING.*violation"
+
+# WRONG: three separate Maven runs with different filters
+mvn verify 2>&1 | Select-String "BUILD (SUCCESS|FAILURE)"   # ← 60s wasted
+mvn verify 2>&1 | Select-String "Tests run:"                # ← 60s wasted
+mvn verify 2>&1 | Select-String "ERROR|WARNING"             # ← 60s wasted
+```
+
+This applies to **any** long-running command (`mvn`, `docker build`, `npm run build`, etc.).
+
 ## Prerequisites
 
 - **JDK 25+** (pom.xml targets `release 25` with `--enable-preview`)
@@ -99,30 +120,42 @@ mvn spotless:apply && mvn verify       # Format + full quality checks
 
 **Phase 2.1** console dating app: **Java 25** + Maven + H2 + JDBI. Features: matching, messaging, relationship transitions, pace compatibility, achievements.
 
-**Stats (2026-02-08):** 182 Java files (126 main + 56 test), ~46K lines (~34K code), 820 tests, 60% coverage min.
+**Stats (2026-02-10):** 189 Java files (131 main + 58 test), ~48K lines (~35K code), 820+ tests, 60% coverage min.
 
 ### Package Structure
 
-| Package         | Purpose                             | Rule                          |
-|-----------------|-------------------------------------|-------------------------------|
-| `core/`         | Pure business logic                 | **ZERO** framework/DB imports |
-| `app/cli/`      | CLI handlers + HandlerFactory       | Thin layer over services      |
-| `storage/`      | JDBI SQL interfaces                 | Implements `core/storage/*`   |
-| `ui/`           | JavaFX (AtlantaFX theme)            | Uses BaseController pattern   |
-| `ui/viewmodel/` | MVVM ViewModels + `ErrorHandler`    | Owns observable properties    |
-| `ui/util/`      | `Toast`, `UiServices`, `ImageCache` | Static UI utilities           |
-| `ui/component/` | `UiComponents` factory methods      | Loading overlays, reusable UI |
+| Package              | Purpose                                  | Rule                                   |
+|----------------------|------------------------------------------|-----------------------------------------|
+| `core/`              | Pure business logic                      | **ZERO** framework/DB imports           |
+| `core/constants/`    | `ScoringConstants`                       | Centralized domain thresholds           |
+| `app/`               | `AppBootstrap`, `ConfigLoader`           | Initialization + infrastructure         |
+| `app/cli/`           | CLI handlers + `HandlerFactory`          | Thin layer over services                |
+| `app/api/`           | REST API (`RestApiServer`, routes)       | Javalin-based HTTP endpoints            |
+| `storage/`           | JDBI SQL interfaces                      | Implements `core/storage/*`             |
+| `storage/schema/`    | `SchemaInitializer`, `MigrationRunner`   | DDL + schema evolution                  |
+| `ui/`                | JavaFX (AtlantaFX theme)                 | Uses BaseController pattern             |
+| `ui/viewmodel/`      | MVVM ViewModels + `ErrorHandler`         | Owns observable properties              |
+| `ui/viewmodel/data/` | `UiUserStore`, `UiMatchDataAccess`       | Adapter interfaces (no storage imports) |
+| `ui/constants/`      | `AnimationConstants`, `CacheConstants`   | Centralized UI timing/sizing            |
+| `ui/util/`           | `Toast`, `UiSupport`, `ImageCache`       | Static UI utilities                     |
+| `ui/component/`      | `UiComponents` factory methods           | Loading overlays, reusable UI           |
 
 ### Bootstrap (Entry Points)
 
 ```java
 // Main.java or DatingApp.java - SINGLE initialization
-ServiceRegistry services = AppBootstrap.initialize();  // Idempotent
+// AppBootstrap lives in app/ (not core/) — it's infrastructure, not domain logic
+ServiceRegistry services = AppBootstrap.initialize();  // Idempotent, uses StorageFactory
 AppSession session = AppSession.getInstance();         // Unified CLI/JavaFX session
 
 // CLI: Lazy handler creation
 HandlerFactory handlers = new HandlerFactory(services, session, inputReader);
 handlers.matching().runMatchingLoop();  // Created on first call
+
+// JavaFX: MVVM adapter wiring
+ViewModelFactory vmFactory = new ViewModelFactory(services);  // Creates UI adapters
+NavigationService nav = NavigationService.getInstance();
+nav.setViewModelFactory(vmFactory);
 ```
 
 ### Domain Models
@@ -130,6 +163,9 @@ handlers.matching().runMatchingLoop();  // Created on first call
 | Model                | Type      | Key Info                                                              |
 |----------------------|-----------|-----------------------------------------------------------------------|
 | `User`               | Mutable   | `INCOMPLETE→ACTIVE↔PAUSED→BANNED`; has `StorageBuilder`               |
+| `User.Gender`        | Enum      | `MALE`, `FEMALE`, `OTHER` (nested `public static enum`)              |
+| `User.UserState`     | Enum      | `INCOMPLETE`, `ACTIVE`, `PAUSED`, `BANNED` (nested)                  |
+| `User.VerificationMethod` | Enum | `EMAIL`, `PHONE` (nested)                                            |
 | `Match`              | Mutable   | `ACTIVE→FRIENDS\|UNMATCHED\|GRACEFUL_EXIT\|BLOCKED`; deterministic ID |
 | `Messaging.*`        | Mixed     | `Message` (record), `Conversation` (class); deterministic ID          |
 | `Preferences.*`      | Mixed     | `Interest` enum (39), `Lifestyle` records, `PacePreferences`          |
@@ -137,8 +173,9 @@ handlers.matching().runMatchingLoop();  // Created on first call
 | `Achievement`        | Enum      | 11 achievements in 4 categories                                       |
 | `AppClock`           | Utility   | Testable time abstraction (`Instant.now()` wrapper)                   |
 | `EnumSetUtil`        | Utility   | Safe EnumSet operations (null-safe `copyOf`)                          |
-| `ErrorMessages`      | Constants | Centralized user-facing error message strings                         |
-| `SoftDeletable`      | Interface | Soft-delete contract for entities                                     |
+| `LoggingSupport`     | Interface | Default logging methods; satisfies PMD GuardLogStatement              |
+| `ScoringConstants`   | Constants | Match quality thresholds, profile completion scoring                  |
+| `StorageFactory`     | Factory   | Wires all 24 services from `DatabaseManager` + `AppConfig`           |
 | `PurgeService`       | Service   | Hard-deletes soft-deleted records past retention                      |
 
 ### Storage Interfaces (`core/storage/`)
@@ -273,6 +310,43 @@ loadingOverlay.visibleProperty().bind(viewModel.loadingProperty());
 loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
 ```
 
+### Soft-Delete Pattern (Direct on Entities)
+```java
+// Each entity implements soft-delete directly (no SoftDeletable interface)
+private Instant deletedAt;
+public Instant getDeletedAt() { return deletedAt; }
+public void markDeleted(Instant when) { this.deletedAt = when; }
+public boolean isDeleted() { return deletedAt != null; }
+// StorageBuilder: .deletedAt(MapperHelper.readInstant(rs, "deleted_at"))
+```
+
+### UI Data Access Adapters (ViewModel Layer)
+```java
+// ViewModels use adapter interfaces - NEVER import core/storage directly
+public interface UiUserStore {
+    List<User> findAll();
+    void save(User user);
+    List<User> findByIds(Set<UUID> ids);
+}
+
+// ViewModelFactory wires the adapters
+UiUserStore userStore = new StorageUiUserStore(services.getUserStorage());
+UiMatchDataAccess matchData = new StorageUiMatchDataAccess(matchStorage, likeStorage, blockStorage);
+
+// ViewModel constructor uses interface only
+public MatchesViewModel(UiUserStore userStore, UiMatchDataAccess matchData) { ... }
+```
+
+### Constants Pattern (No Magic Numbers)
+```java
+// Use centralized constants instead of hardcoded values
+import datingapp.core.constants.ScoringConstants;
+if (score >= ScoringConstants.MatchQuality.STAR_EXCELLENT_THRESHOLD) { ... }  // 90
+
+import datingapp.ui.constants.AnimationConstants;
+Duration duration = AnimationConstants.TOAST_ERROR_DURATION;  // 5 seconds
+```
+
 ## Testing
 
 ### Use TestStorages (Centralized Mocks)
@@ -354,13 +428,16 @@ public interface JdbiUserStorage extends UserStorage {
 - ❌ Import framework/DB in `core/` (zero coupling)
 - ❌ Skip `Objects.requireNonNull()` in constructors
 - ❌ Return mutable collections directly
-- ❌ Forget `static` on nested types
+- ❌ Forget `static` on nested types (enums, records, classes)
 - ❌ Use Mockito (use `TestStorages.*` instead)
 - ❌ Throw from services (return `*Result` records)
-- ❌ Hardcode thresholds (use `AppConfig.defaults()`)
+- ❌ Hardcode thresholds (use `AppConfig.defaults()` or `ScoringConstants`)
 - ❌ Call `new User(...)` in mappers (use `StorageBuilder`)
 - ❌ Use `HashSet` for enums (use `EnumSet`)
 - ❌ Forget `touch()` in setters
+- ❌ Import `core/storage/*` in ViewModels (use `UiUserStore`/`UiMatchDataAccess` adapters)
+- ❌ Use standalone `Gender`/`UserState` (use `User.Gender`, `User.UserState` nested enums)
+- ❌ Hardcode animation timings (use `AnimationConstants.*`)
 
 ## Key Data Flows
 
@@ -372,23 +449,24 @@ public interface JdbiUserStorage extends UserStorage {
 
 ## Documentation Index
 
-| Doc                                    | Purpose               |
-|----------------------------------------|-----------------------|
-| `AGENTS.md`                            | Full coding standards |
-| `docs/architecture.md`                 | Mermaid diagrams      |
-| `docs/completed-plans/`                | Completed designs     |
-| `CONSOLIDATED_CODE_REVIEW_FINDINGS.md` | Code review findings  |
+| Doc                                    | Purpose                          |
+|----------------------------------------|----------------------------------|
+| `AGENTS.md`                            | Full coding standards            |
+| `docs/architecture.md`                 | Mermaid diagrams                 |
+| `docs/completed-plans/`               | Completed designs                |
+| `docs/core-module-overview.md`        | Core module structure & services |
+| `docs/storage-module-overview.md`     | Storage layer & schema details   |
+| `CONSOLIDATED_CODE_REVIEW_FINDINGS.md` | Code review findings             |
 
 ## Recent Updates (2026-02)
 
-- **02-08**: Project config audit: enforced Checkstyle+PMD (custom pmd-rules.xml), cleaned .gitignore, untracked sarif files, fixed stale build commands across all docs, updated stats to 182 files/820 tests
-- **02-07**: CLAUDE.md audit: fixed stale stats (93→126 files, 16K→34K LOC), added Prerequisites, 5 new utility classes, Java version gotcha
-- **02-05**: Enhanced UI/UX: ErrorHandler pattern in ViewModels, navigation context, loading overlays, confirmation dialogs
-- **02-04**: CSS accessibility (focus states all button types), 5 new DB indexes, toast error notifications
+- **02-10**: Major refactoring: nested enums in User (Gender/UserState/VerificationMethod), UI data access adapters (UiUserStore/UiMatchDataAccess), StorageFactory, constants consolidation (ScoringConstants/AnimationConstants), soft-delete as direct fields, moved AppBootstrap/ConfigLoader to app/, deleted 8 files (CliConstants/CliUtilities→CliSupport, UiHelpers/UiServices→UiSupport), added SchemaInitializer/MigrationRunner, LoggingSupport, 189 files/48K lines
+- **02-08**: Project config audit: enforced Checkstyle+PMD (custom pmd-rules.xml), cleaned .gitignore, fixed stale build commands across all docs
+- **02-07**: CLAUDE.md audit: fixed stale stats, added Prerequisites, 5 new utility classes
+- **02-05**: Enhanced UI/UX: ErrorHandler pattern in ViewModels, navigation context, loading overlays
 - **02-03**: Fixed 25+ nested types to `public static`; added `NestedTypeVisibilityTest`
 - **02-01**: Added `AppBootstrap`, `AppSession`, `HandlerFactory` for unified init
 - **01-31**: Centralized validation in `AppConfig`; reorganized `ServiceRegistry`
-- **01-30**: UI Action Handler pattern; `BaseController`; keyboard shortcuts
 - **01-29**: JDBI migration complete; deleted 12 H2*Storage classes
 
 ## Agent Changelog (append-only, trimmed to recent)
@@ -400,4 +478,6 @@ public interface JdbiUserStorage extends UserStorage {
 12|2026-02-07 22:25:00|agent:claude_code|docs-audit|Fixed stale stats, added Prerequisites/Java gotcha, 5 new utility classes, trimmed changelog|CLAUDE.md
 13|2026-02-08 11:15:00|agent:claude_code|config-audit|Enforced Checkstyle+PMD, custom pmd-rules.xml, cleaned .gitignore, untracked sarif, fixed stale build commands in all docs, updated stats|CLAUDE.md;AGENTS.md;README.md;.github/copilot-instructions.md;pom.xml;.gitignore;pmd-rules.xml
 14|2026-02-08 12:30:00|agent:claude_code|docs-pmd-gotcha|Added PMD+Spotless conflict gotcha to Critical Gotchas table; recorded PMD suppression patterns in MEMORY.md|CLAUDE.md;MEMORY.md
+15|2026-02-08 18:00:00|agent:claude_code|build-discipline|Added Build Command Discipline rule: capture expensive commands once, query N times|CLAUDE.md;AGENTS.md
+16|2026-02-10 00:00:00|agent:claude_code|docs-major-refactor|Updated stats 189/48K, added nested enums/UI adapters/StorageFactory/constants/soft-delete/schema patterns; updated package structure table (13 packages); added 3 new gotchas; 3 new NEVER rules|CLAUDE.md
 ---AGENT-LOG-END---

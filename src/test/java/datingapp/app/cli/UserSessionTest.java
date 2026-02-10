@@ -6,14 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppSession;
-import datingapp.core.Gender;
 import datingapp.core.PacePreferences;
 import datingapp.core.PacePreferences.CommunicationStyle;
 import datingapp.core.PacePreferences.DepthPreference;
 import datingapp.core.PacePreferences.MessagingFrequency;
 import datingapp.core.PacePreferences.TimeToFirstDate;
 import datingapp.core.User;
-import datingapp.core.UserState;
+import datingapp.core.User.Gender;
+import datingapp.core.User.UserState;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.UUID;

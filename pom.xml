@@ -25,6 +25,7 @@
         <atlantafx.version>2.1.0</atlantafx.version>
         <javalin.version>6.7.0</javalin.version>
         <hikaricp.version>6.3.0</hikaricp.version>
+        <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
     </properties>
 
     <dependencies>
@@ -143,6 +144,13 @@
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
             <version>${hikaricp.version}</version>
+        </dependency>
+
+        <!-- Nullable annotations -->
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>${jetbrains.annotations.version}</version>
         </dependency>
     </dependencies>
 

@@ -263,7 +263,7 @@ public class MatchingService {
         for (var entry : likeTimes) {
             UUID likerId = entry.getKey();
             User liker = likerUsers.get(likerId);
-            if (liker == null || liker.getState() != UserState.ACTIVE) {
+            if (liker == null || liker.getState() != User.UserState.ACTIVE) {
                 continue;
             }
 

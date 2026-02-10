@@ -9,9 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.Stats.PlatformStats;
 import datingapp.core.Stats.UserStats;
+import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,18 @@ import org.junit.jupiter.api.Timeout;
 @SuppressWarnings("unused") // Test class with @Nested
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class StatsMetricsTest {
+
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+
+    @BeforeEach
+    void setUpClock() {
+        TestClock.setFixed(FIXED_INSTANT);
+    }
+
+    @AfterEach
+    void resetClock() {
+        TestClock.reset();
+    }
 
     // ==================== PLATFORM STATS TESTS ====================
 
@@ -157,7 +172,7 @@ class StatsMetricsTest {
             UUID id = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             Achievement achievement = Achievement.SOCIAL_BUTTERFLY;
-            Instant timestamp = Instant.now().minusSeconds(3600);
+            Instant timestamp = AppClock.now().minusSeconds(3600);
 
             UserAchievement ua = UserAchievement.of(id, userId, achievement, timestamp);
 
@@ -182,7 +197,7 @@ class StatsMetricsTest {
         @DisplayName("Null ID throws NullPointerException")
         void nullIdThrows() {
             UUID userId = UUID.randomUUID();
-            Instant unlockedAt = Instant.now();
+            Instant unlockedAt = AppClock.now();
             assertThrows(
                     NullPointerException.class,
                     () -> UserAchievement.of(null, userId, Achievement.FIRST_SPARK, unlockedAt));
@@ -216,7 +231,7 @@ class StatsMetricsTest {
             UUID id = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             Achievement achievement = Achievement.FIRST_SPARK;
-            Instant timestamp = Instant.now();
+            Instant timestamp = AppClock.now();
 
             UserAchievement ua1 = UserAchievement.of(id, userId, achievement, timestamp);
             UserAchievement ua2 = UserAchievement.of(id, userId, achievement, timestamp);
@@ -254,7 +269,7 @@ class StatsMetricsTest {
                 new UserStats(
                         UUID.randomUUID(),
                         UUID.randomUUID(),
-                        Instant.now(),
+                        AppClock.now(),
                         0,
                         0,
                         0,
@@ -279,7 +294,7 @@ class StatsMetricsTest {
                 new UserStats(
                         UUID.randomUUID(),
                         UUID.randomUUID(),
-                        Instant.now(),
+                        AppClock.now(),
                         0,
                         0,
                         0,
@@ -306,7 +321,7 @@ class StatsMetricsTest {
                 UserStats stats = new UserStats(
                         UUID.randomUUID(),
                         UUID.randomUUID(),
-                        Instant.now(),
+                        AppClock.now(),
                         100,
                         70,
                         30,

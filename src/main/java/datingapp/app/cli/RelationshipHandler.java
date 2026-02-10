@@ -1,6 +1,7 @@
 package datingapp.app.cli;
 
 import datingapp.core.AppSession;
+import datingapp.core.LoggingSupport;
 import datingapp.core.RelationshipTransitionService;
 import datingapp.core.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.Social.FriendRequest;
@@ -17,7 +18,7 @@ import org.slf4j.LoggerFactory;
  * CLI Handler for relationship transitions (Friend Zone, Graceful Exit) and
  * notifications.
  */
-public class RelationshipHandler {
+public class RelationshipHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(RelationshipHandler.class);
 
     private final RelationshipTransitionService transitionService;
@@ -37,6 +38,11 @@ public class RelationshipHandler {
         this.userStorage = userStorage;
         this.session = session;
         this.inputReader = inputReader;
+    }
+
+    @Override
+    public Logger logger() {
+        return logger;
     }
 
     /** Displays and manages pending friend requests. */
@@ -118,11 +124,5 @@ public class RelationshipHandler {
         }
         logInfo("--------------------------\n");
         inputReader.readLine("Press Enter to continue...");
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
     }
 }

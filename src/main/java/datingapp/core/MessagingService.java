@@ -51,13 +51,13 @@ public class MessagingService {
     public SendResult sendMessage(UUID senderId, UUID recipientId, String content) {
         // Validate sender exists and is active
         User sender = userStorage.get(senderId);
-        if (sender == null || sender.getState() != UserState.ACTIVE) {
+        if (sender == null || sender.getState() != User.UserState.ACTIVE) {
             return SendResult.failure(SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
         // Validate recipient exists and is active
         User recipient = userStorage.get(recipientId);
-        if (recipient == null || recipient.getState() != UserState.ACTIVE) {
+        if (recipient == null || recipient.getState() != User.UserState.ACTIVE) {
             return SendResult.failure(RECIPIENT_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 

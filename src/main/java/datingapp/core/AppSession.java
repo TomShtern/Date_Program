@@ -50,7 +50,7 @@ public final class AppSession {
     }
 
     public synchronized boolean isActive() {
-        return currentUser != null && currentUser.getState() == UserState.ACTIVE;
+        return currentUser != null && currentUser.getState() == User.UserState.ACTIVE;
     }
 
     public void logout() {

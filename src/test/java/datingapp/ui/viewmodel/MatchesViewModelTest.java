@@ -4,18 +4,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.DailyService;
-import datingapp.core.Gender;
 import datingapp.core.Match;
 import datingapp.core.MatchingService;
 import datingapp.core.PacePreferences;
 import datingapp.core.User;
+import datingapp.core.User.Gender;
+import datingapp.core.User.UserState;
 import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserState;
+import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
-import java.time.LocalDate;
+import datingapp.ui.viewmodel.data.StorageUiMatchDataAccess;
+import datingapp.ui.viewmodel.data.StorageUiUserStore;
+import datingapp.ui.viewmodel.data.UiMatchDataAccess;
+import datingapp.ui.viewmodel.data.UiUserStore;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -33,10 +39,14 @@ class MatchesViewModelTest {
     private TestStorages.Likes likes;
     private TestStorages.Matches matches;
     private TestStorages.Blocks blocks;
+    private UiMatchDataAccess matchData;
+    private UiUserStore userStore;
     private MatchingService matchingService;
     private DailyService dailyService;
     private MatchesViewModel viewModel;
     private User currentUser;
+
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
@@ -44,9 +54,13 @@ class MatchesViewModelTest {
         likes = new TestStorages.Likes();
         matches = new TestStorages.Matches();
         blocks = new TestStorages.Blocks();
+        TestClock.setFixed(FIXED_INSTANT);
 
         AppConfig config = AppConfig.defaults();
         dailyService = new DailyService(likes, config);
+
+        matchData = new StorageUiMatchDataAccess(matches, likes, blocks);
+        userStore = new StorageUiUserStore(users);
 
         matchingService = MatchingService.builder()
                 .likeStorage(likes)
@@ -55,7 +69,7 @@ class MatchesViewModelTest {
                 .blockStorage(blocks)
                 .build();
 
-        viewModel = new MatchesViewModel(matches, users, likes, blocks, matchingService, dailyService);
+        viewModel = new MatchesViewModel(matchData, userStore, matchingService, dailyService);
         currentUser = createActiveUser("Current");
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
@@ -63,6 +77,7 @@ class MatchesViewModelTest {
 
     @AfterEach
     void tearDown() {
+        TestClock.reset();
         AppSession.getInstance().reset();
     }
 
@@ -72,8 +87,10 @@ class MatchesViewModelTest {
         AppConfig zeroLimitConfig = AppConfig.builder().dailyLikeLimit(0).build();
         DailyService zeroLimitDailyService = new DailyService(likes, zeroLimitConfig);
 
+        User user = createActiveUser("Current");
+        users.save(user);
         MatchesViewModel limitViewModel =
-                new MatchesViewModel(matches, users, likes, blocks, matchingService, zeroLimitDailyService);
+                new MatchesViewModel(matchData, userStore, matchingService, zeroLimitDailyService);
 
         User otherUser = createActiveUser("Other");
         users.save(otherUser);
@@ -211,7 +228,7 @@ class MatchesViewModelTest {
 
     private static User createActiveUser(String name) {
         User user = new User(UUID.randomUUID(), name);
-        user.setBirthDate(LocalDate.now().minusYears(25));
+        user.setBirthDate(AppClock.today().minusYears(25));
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.of(Gender.OTHER));
         user.setAgeRange(18, 60);

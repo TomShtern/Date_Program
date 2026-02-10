@@ -4,6 +4,7 @@ import datingapp.ui.NavigationService;
 import java.util.ArrayList;
 import java.util.List;
 import javafx.animation.Animation;
+import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.layout.StackPane;
 import javafx.util.Subscription;
@@ -100,6 +101,21 @@ public abstract class BaseController {
             }
         }
         overlays.clear();
+    }
+
+    /**
+     * Default back navigation handler for controllers.
+     * Uses history when available, otherwise routes to DASHBOARD.
+     */
+    @SuppressWarnings("unused")
+    @FXML
+    protected void handleBack() {
+        NavigationService navigationService = NavigationService.getInstance();
+        if (navigationService.canGoBack()) {
+            navigationService.goBack();
+            return;
+        }
+        navigationService.navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
     /**
