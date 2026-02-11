@@ -1,9 +1,8 @@
 package datingapp.storage.jdbi;
 
 import datingapp.core.AppClock;
-import datingapp.core.SwipeSession;
+import datingapp.core.model.SwipeSession;
 import datingapp.core.storage.SwipeSessionStorage;
-import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -110,7 +109,7 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
 
     /**
      * Permanently deletes expired session records older than the cutoff date.
-     * Used by CleanupService to purge old session data.
+     * Used by SessionService to purge old session data.
      */
     @SqlUpdate("DELETE FROM swipe_sessions WHERE started_at < :cutoff")
     @Override

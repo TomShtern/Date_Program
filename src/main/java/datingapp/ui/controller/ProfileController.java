@@ -1,9 +1,9 @@
 package datingapp.ui.controller;
 
-import datingapp.core.Dealbreakers;
-import datingapp.core.Preferences.Interest;
-import datingapp.core.Preferences.Lifestyle;
-import datingapp.core.User.Gender;
+import datingapp.core.model.Dealbreakers;
+import datingapp.core.model.Preferences.Interest;
+import datingapp.core.model.Preferences.Lifestyle;
+import datingapp.core.model.User.Gender;
 import datingapp.ui.NavigationService;
 import datingapp.ui.util.ImageCache;
 import datingapp.ui.util.Toast;
@@ -13,6 +13,8 @@ import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
 import java.net.URL;
 import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.function.Function;
 import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
@@ -415,8 +417,7 @@ public class ProfileController extends BaseController implements Initializable {
     /**
      * Creates a StringConverter for enum types using a display name function.
      */
-    private <T extends Enum<T>> StringConverter<T> createEnumStringConverter(
-            java.util.function.Function<T, String> displayNameFunc) {
+    private <T extends Enum<T>> StringConverter<T> createEnumStringConverter(Function<T, String> displayNameFunc) {
         return new StringConverter<>() {
             @Override
             public String toString(T object) {
@@ -433,7 +434,7 @@ public class ProfileController extends BaseController implements Initializable {
     /**
      * Creates a ListCell that displays enum values using their display name.
      */
-    private <T extends Enum<T>> ListCell<T> createDisplayCell(java.util.function.Function<T, String> displayNameFunc) {
+    private <T extends Enum<T>> ListCell<T> createDisplayCell(Function<T, String> displayNameFunc) {
         return new ListCell<>() {
 
             @Override
@@ -457,7 +458,7 @@ public class ProfileController extends BaseController implements Initializable {
                 int height = Integer.parseInt(newVal.trim());
                 viewModel.heightProperty().set(height);
             } catch (NumberFormatException _) {
-                // Non-numeric input ignored; user is still typing
+                assert true; // Non-numeric input ignored; user is still typing
             }
         }));
 
@@ -760,7 +761,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         // --- Smoking Section ---
         content.getChildren()
-                .add(DealbreakersChipHelper.createSection(
+                .add(createDealbreakersSection(
                         "Smoking Preferences",
                         DEALBREAKER_HEADER,
                         Lifestyle.Smoking.values(),
@@ -769,7 +770,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         // --- Drinking Section ---
         content.getChildren()
-                .add(DealbreakersChipHelper.createSection(
+                .add(createDealbreakersSection(
                         "Drinking Preferences",
                         DEALBREAKER_HEADER,
                         Lifestyle.Drinking.values(),
@@ -778,7 +779,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         // --- Kids Section ---
         content.getChildren()
-                .add(DealbreakersChipHelper.createSection(
+                .add(createDealbreakersSection(
                         "Kids Preferences",
                         DEALBREAKER_HEADER,
                         Lifestyle.WantsKids.values(),
@@ -787,7 +788,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         // --- Looking For Section ---
         content.getChildren()
-                .add(DealbreakersChipHelper.createSection(
+                .add(createDealbreakersSection(
                         "Relationship Goals",
                         "Only show people looking for:",
                         Lifestyle.LookingFor.values(),
@@ -868,6 +869,52 @@ public class ProfileController extends BaseController implements Initializable {
     private void logError(String message, Throwable error) {
         if (logger.isErrorEnabled()) {
             logger.error(message, error);
+        }
+    }
+
+    // --- Dealbreaker chip rendering (inlined from DealbreakersChipHelper) ---
+
+    private static <T extends Enum<T>> VBox createDealbreakersSection(
+            String title, String subtitle, T[] values, Set<T> selected, Function<T, String> displayNameFunc) {
+        VBox section = new VBox(8);
+
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: white; -fx-font-size: 14px;");
+
+        Label subtitleLabel = new Label(subtitle);
+        subtitleLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 12px;");
+
+        FlowPane itemsPane = new FlowPane(8, 8);
+        for (T value : values) {
+            Button chip = new Button(displayNameFunc.apply(value));
+            boolean isSelected = selected.contains(value);
+            updateChipStyle(chip, isSelected);
+
+            chip.setOnAction(event -> {
+                event.consume();
+                if (selected.contains(value)) {
+                    selected.remove(value);
+                    updateChipStyle(chip, false);
+                } else {
+                    selected.add(value);
+                    updateChipStyle(chip, true);
+                }
+            });
+
+            itemsPane.getChildren().add(chip);
+        }
+
+        section.getChildren().addAll(titleLabel, subtitleLabel, itemsPane);
+        return section;
+    }
+
+    private static void updateChipStyle(Button chip, boolean selected) {
+        if (selected) {
+            chip.setStyle(
+                    "-fx-background-color: #10b981; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 6 12;");
+        } else {
+            chip.setStyle(
+                    "-fx-background-color: #334155; -fx-text-fill: #94a3b8; -fx-background-radius: 20; -fx-padding: 6 12;");
         }
     }
 }

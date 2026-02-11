@@ -1,16 +1,17 @@
 package datingapp.app.cli;
 
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
-import datingapp.core.Match;
-import datingapp.core.TrustSafetyService;
-import datingapp.core.User;
-import datingapp.core.User.UserState;
-import datingapp.core.User.VerificationMethod;
-import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.Report;
-import datingapp.core.storage.BlockStorage;
+import datingapp.core.model.Match;
+import datingapp.core.model.User;
+import datingapp.core.model.User.UserState;
+import datingapp.core.model.User.VerificationMethod;
+import datingapp.core.model.UserInteractions.Block;
+import datingapp.core.model.UserInteractions.Report;
+import datingapp.core.service.TrustSafetyService;
 import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.List;
 import java.util.Objects;
@@ -28,7 +29,7 @@ public class SafetyHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(SafetyHandler.class);
 
     private final UserStorage userStorage;
-    private final BlockStorage blockStorage;
+    private final TrustSafetyStorage trustSafetyStorage;
     private final MatchStorage matchStorage;
     private final TrustSafetyService trustSafetyService;
     private final AppSession session;
@@ -36,13 +37,13 @@ public class SafetyHandler implements LoggingSupport {
 
     public SafetyHandler(
             UserStorage userStorage,
-            BlockStorage blockStorage,
+            TrustSafetyStorage trustSafetyStorage,
             MatchStorage matchStorage,
             TrustSafetyService trustSafetyService,
             AppSession session,
             InputReader inputReader) {
         this.userStorage = Objects.requireNonNull(userStorage);
-        this.blockStorage = Objects.requireNonNull(blockStorage);
+        this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage);
         this.matchStorage = Objects.requireNonNull(matchStorage);
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
         this.session = Objects.requireNonNull(session);
@@ -75,7 +76,7 @@ public class SafetyHandler implements LoggingSupport {
                     inputReader.readLine(CliSupport.BLOCK_PREFIX + toBlock.getName() + CliSupport.CONFIRM_SUFFIX);
             if ("y".equalsIgnoreCase(confirm)) {
                 Block block = Block.create(currentUser.getId(), toBlock.getId());
-                blockStorage.save(block);
+                trustSafetyStorage.save(block);
 
                 // If matched, end the match
                 String matchId = Match.generateId(currentUser.getId(), toBlock.getId());
@@ -194,7 +195,7 @@ public class SafetyHandler implements LoggingSupport {
 
     private List<User> getBlockableUsers(User currentUser) {
         List<User> allUsers = userStorage.findAll();
-        Set<UUID> alreadyBlocked = blockStorage.getBlockedUserIds(currentUser.getId());
+        Set<UUID> alreadyBlocked = trustSafetyStorage.getBlockedUserIds(currentUser.getId());
 
         return allUsers.stream()
                 .filter(u -> !u.getId().equals(currentUser.getId()))

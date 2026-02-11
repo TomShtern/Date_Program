@@ -130,37 +130,37 @@ mvn verify 2>&1 | Select-String "ERROR|WARNING"
 
 **Layer 1: Core Domain** (`core/`)
 - Pure Java business logic - **ZERO** framework/database imports allowed
-- Domain models: `User`, `Match`, `Messaging`, `UserInteractions`, `Achievement`, `Preferences`, `Dealbreakers`, `Social`, `Stats`, `SwipeSession`, `PacePreferences`, `DailyPick`
-- Standalone enums: `Gender`, `UserState`, `VerificationMethod`
-- Services (17 total): `MatchingService`, `MessagingService`, `CandidateFinder`, `MatchQualityService`, `DailyService`, `AchievementService`, `TrustSafetyService`, `StatsService`, `ProfilePreviewService`, `ProfileCompletionService`, `SessionService`, `UndoService`, `RelationshipTransitionService`, `ValidationService`, `CleanupService`, `PurgeService`, `StandoutsService`
-- Storage interfaces (11 total): `core/storage/{UserStorage,MatchStorage,LikeStorage,BlockStorage,MessagingStorage,SocialStorage,StatsStorage,ReportStorage,SwipeSessionStorage,DailyPickViewStorage,TransactionExecutor}.java`
-- Bootstrap: `AppBootstrap` (singleton init), `AppSession` (unified session), `ServiceRegistry` (DI container)
-- Configuration: `AppConfig` (40+ immutable parameters)
+- Domain models (`core/model/`, 11 files): `User`, `Match`, `Messaging`, `UserInteractions`, `Achievement`, `Preferences`, `Dealbreakers`, `Stats`, `SwipeSession`, `Standout`, `UndoState`
+- Enums nested in `User`: `Gender`, `UserState`, `VerificationMethod`
+- Services (`core/service/`, 14 total): `MatchingService`, `MessagingService`, `CandidateFinder`, `MatchQualityService`, `DailyService`, `AchievementService`, `TrustSafetyService`, `StatsService`, `ProfileCompletionService`, `SessionService`, `UndoService`, `RelationshipTransitionService`, `ValidationService`, `StandoutsService`
+- Storage interfaces (`core/storage/`, 9 total): `UserStorage`, `MatchStorage`, `LikeStorage`, `MessagingStorage`, `SocialStorage`, `StatsStorage`, `SwipeSessionStorage`, `TrustSafetyStorage`, `TransactionExecutor`
+- Bootstrap (`app/`): `AppBootstrap` (singleton init), `ConfigLoader`
+- Configuration: `AppConfig` (40+ immutable parameters, in `core/`)
 
 **Layer 2: Storage** (`storage/`)
 - JDBI 3 + H2 database implementations
-- `jdbi/` package: JDBI storage interfaces (9: `JdbiUserStorage`, `JdbiMatchStorage`, `JdbiLikeStorage`, `JdbiBlockStorage`, `JdbiMessagingStorage`, `JdbiSocialStorage`, `JdbiStatsStorage`, `JdbiReportStorage`, `JdbiSwipeSessionStorage`)
-- `jdbi/` helpers: `JdbiUserStorageAdapter` (wraps JdbiUserStorage), `UserBindingHelper` (User→SQL binding), `EnumSetArgumentFactory`, `EnumSetColumnMapper`
-- `mapper/` package: `MapperHelper` (null-safe ResultSet helpers)
-- `DatabaseManager` (connection pooling, schema auto-creation)
-- `StorageException` (wraps SQLException as RuntimeException)
+- `jdbi/` package (15 files): `JdbiUserStorage`, `JdbiMatchStorage`, `JdbiLikeStorage`, `JdbiMessagingStorage`, `JdbiSocialStorage`, `JdbiStatsStorage`, `JdbiSwipeSessionStorage`, `JdbiTransactionExecutor`, `JdbiTrustSafetyStorage`, `JdbiStandoutStorage`, `JdbiUndoStorage`, `JdbiUserStorageAdapter`, `UserBindingHelper`, `MapperHelper`, `EnumSetJdbiSupport`
+- `schema/` package: `SchemaInitializer`, `MigrationRunner`
+- `DatabaseManager` (connection pooling, schema auto-creation), `StorageFactory` (wires all storage implementations)
 
 **Layer 3A: CLI** (`app/cli/`)
-- Entry point: `Main.java` (root package - console app with interactive menu)
+- Entry point: `Main.java` (root `datingapp` package - console app with interactive menu)
 - Console handlers with lazy initialization via `HandlerFactory`
-- 8 handlers: `MatchingHandler`, `ProfileHandler`, `SafetyHandler`, `StatsHandler`, `ProfileNotesHandler`, `LikerBrowserHandler`, `MessagingHandler`, `RelationshipHandler`
-- Utilities: `InputReader`, `EnumMenu`, `CliUtilities`, `CliConstants`
+- 5 handlers: `MatchingHandler`, `MessagingHandler`, `ProfileHandler`, `SafetyHandler`, `StatsHandler`
+- Utilities: `CliSupport` (consolidated from InputReader, EnumMenu, CliUtilities, CliConstants)
 
 **Layer 3B: JavaFX UI** (`ui/`)
 - MVVM architecture with AtlantaFX theme
 - Entry point: `DatingApp.java` (JavaFX Application)
 - Controllers (11 total): extend `BaseController` for lifecycle management; includes `AchievementPopupController`, `MatchPopupController` for dialogs
-- ViewModels (8 total): observable properties + `ErrorHandler` pattern
+- ViewModels (8 total): observable properties + `ErrorHandler` pattern + `UiDataAdapters` (in `viewmodel/data/`)
 - Navigation: `NavigationService` (view routing with context passing), `ViewModelFactory`
-- UI Utilities: `Toast` (notifications), `UiComponents` (loading overlays), `ImageCache`, `UiAnimations`, `UiHelpers`, `UiServices`, `ConfettiAnimation`
+- UI Utilities (`util/`): `Toast`, `UiAnimations`, `ImageCache`, `UiSupport` (4 files)
+- Constants (`constants/`): `UiConstants` (animation + cache constants)
+- `UiComponents` in `ui/` root (loading overlays, reusable components)
 
 **Critical Rules:**
-- Storage interfaces (11) defined in `core/storage/`, implemented in `storage/jdbi/`
+- Storage interfaces (9) defined in `core/storage/`, implemented in `storage/jdbi/`
 - Core services depend only on interfaces, never implementations
 - Constructor injection only - all dependencies via constructors
 - Initialize once via `AppBootstrap.initialize()` → returns fully wired `ServiceRegistry`
@@ -170,63 +170,25 @@ mvn verify 2>&1 | Select-String "ERROR|WARNING"
 
 **AppBootstrap** (singleton, thread-safe):
 ```java
-// Idempotent initialization - safe to call multiple times
-ServiceRegistry services = AppBootstrap.initialize();
-
-// With custom config
-ServiceRegistry services = AppBootstrap.initialize(customConfig);
-
-// Reset for testing
-AppBootstrap.reset();
+ServiceRegistry services = AppBootstrap.initialize();  // Idempotent - safe to call multiple times
+ServiceRegistry services = AppBootstrap.initialize(customConfig);  // With custom config
+AppBootstrap.reset();  // Reset for testing
 ```
-- Single responsibility: initialize DatabaseManager and ServiceRegistry
-- Returns fully wired ServiceRegistry with all 13 services
-- Thread-safe singleton pattern
 
 **AppSession** (singleton, thread-safe):
 ```java
-// Get singleton instance
 AppSession session = AppSession.getInstance();
-
-// Session management
 session.setCurrentUser(user);
 boolean loggedIn = session.isLoggedIn();
 boolean active = session.isActive();  // Checks ACTIVE state
 session.logout();
-
-// Listener support for JavaFX
-session.addListener(() -> updateUI());
+session.addListener(() -> updateUI());  // Listener support for JavaFX
 ```
-- Unified user session for both CLI and JavaFX
-- Replaces separate CliUtilities.UserSession and ViewModelFactory.UISession
-- Observable pattern for UI binding
 
 **HandlerFactory** (CLI handlers with lazy initialization):
 ```java
-// Constructor takes ServiceRegistry, AppSession, InputReader
 HandlerFactory handlers = new HandlerFactory(services, session, inputReader);
-
-// Lazy initialization - created on first call and cached
-handlers.matching().runMatchingLoop();
-handlers.profile().viewProfile();
-handlers.stats().showStats();
-```
-- 8 factory methods for handlers
-- Each handler created once and cached
-- Handler dependencies injected via nested `Dependencies` record with compact constructor validation
-
-**Example full initialization:**
-```java
-public class Main {
-    public static void main(String[] args) {
-        ServiceRegistry services = AppBootstrap.initialize();
-        AppSession session = AppSession.getInstance();
-        InputReader inputReader = new InputReader(System.in);
-
-        HandlerFactory handlers = new HandlerFactory(services, session, inputReader);
-        handlers.matching().runMatchingLoop();
-    }
-}
+handlers.matching().runMatchingLoop();  // Created on first call and cached
 ```
 
 ## Result Pattern (Services Never Throw)
@@ -240,39 +202,21 @@ public static record SendResult(
     String errorMessage,
     ErrorCode errorCode
 ) {
-    public static SendResult success(Message m) {
-        return new SendResult(true, m, null, null);
-    }
-    public static SendResult failure(String err, ErrorCode code) {
-        return new SendResult(false, null, err, code);
-    }
+    public static SendResult success(Message m) { return new SendResult(true, m, null, null); }
+    public static SendResult failure(String err, ErrorCode code) { return new SendResult(false, null, err, code); }
 }
 
 // Usage in service
 public SendResult sendMessage(UUID senderId, UUID recipientId, String content) {
-    // Validation
-    if (match == null) {
-        return SendResult.failure("Match not found", ErrorCode.MATCH_NOT_FOUND);
-    }
-    if (!match.isActive()) {
-        return SendResult.failure("Match not active", ErrorCode.MATCH_NOT_ACTIVE);
-    }
-    // Create and save message
+    if (match == null) return SendResult.failure("Match not found", ErrorCode.MATCH_NOT_FOUND);
+    if (!match.isActive()) return SendResult.failure("Match not active", ErrorCode.MATCH_NOT_ACTIVE);
     Message message = Message.create(conversationId, senderId, content);
     messagingStorage.saveMessage(message);
     return SendResult.success(message);
 }
 ```
 
-**Services with Result pattern:**
-- `MessagingService.SendResult`
-- `MatchingService` returns `Optional<Match>`
-- `ValidationService.ValidationResult`
-- `ProfileCompletionService` returns completion %
-- `MatchQualityService.MatchQuality` record
-- `UndoService` returns boolean
-- `SessionService.SessionResult`
-- `TrustSafetyService` returns boolean or User
+**Services with Result pattern:** `MessagingService.SendResult`, `MatchingService` (returns `Optional<Match>`), `ValidationService.ValidationResult`, `ProfileCompletionService` (returns completion %), `MatchQualityService.MatchQuality`, `UndoService` (returns boolean), `SessionService.SessionResult`, `TrustSafetyService` (returns boolean or User)
 
 ## MVVM UI Architecture (JavaFX)
 
@@ -349,12 +293,7 @@ loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
 - Use `class` for mutable entities with state machines (`User`, `Match`)
 - Use `enum` for fixed sets (`Preferences.Interest`, `Achievement`, `User.Gender`)
 - Use `Optional<T>` for nullable returns from storage
-<!--ARCHIVE:49:agent:github_copilot:scope:nested-types-->
-- **Nested types MUST be `public static`** (compiler requirement for cross-package access)
-<!--/ARCHIVE-->
-- **Nested types MUST be `public static`** (compiler requirement for cross-package access, including nested records like `User.ProfileNote`).
-49|2026-02-06 10:00:00|agent:github_copilot|scope:nested-types|Clarify nested records must be public static|AGENTS.md
-48|2026-02-05 18:30:00|agent:github_copilot|scope:precommit-fixes|Refactor candidate filtering/lifestyle scoring and make nested types explicit for access checks|src/main/java/datingapp/core/CandidateFinder.java;src/main/java/datingapp/core/StandoutsService.java;src/main/java/datingapp/core/MatchQualityService.java;src/main/java/datingapp/core/MatchingService.java;src/main/java/datingapp/core/UserInteractions.java;src/main/java/datingapp/core/Match.java;src/main/java/datingapp/core/Stats.java;src/main/java/datingapp/storage/jdbi/JdbiStandoutStorage.java;src/test/java/datingapp/core/PerformanceMonitorTest.java;AGENTS.md
+- **Nested types MUST be `public static`** (compiler requirement for cross-package access, including nested records like `User.ProfileNote`)
 
 **State Machines:**
 - `User`: `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`
@@ -368,7 +307,7 @@ loadingOverlay.managedProperty().bind(viewModel.loadingProperty());
 - Business rules: `IllegalArgumentException("Cannot like yourself")`
 - State transitions: `IllegalStateException("User is not ACTIVE")`
 
-**Storage Layer:** Wrap `SQLException` in `StorageException` (RuntimeException)
+**Storage Layer:** Wrap `SQLException` in `RuntimeException` (via `DatabaseManager`)
 
 **Service Layer:** Return Result records (e.g., `SendResult`, `ValidationResult`)
 
@@ -400,7 +339,7 @@ public class TestStorages {
 
     public static class Matches implements MatchStorage { /* similar */ }
     public static class Likes implements LikeStorage { /* similar */ }
-    public static class Blocks implements BlockStorage { /* similar */ }
+    public static class TrustSafety implements TrustSafetyStorage { /* similar */ }
 }
 
 // Usage in test
@@ -429,14 +368,6 @@ void setUp() {
 ## Special Patterns
 
 **Deterministic IDs** (two-user entities):
-<!--ARCHIVE:46:agent:codex:messaging-conversation-id-->
-```java
-// Match.java, Conversation.java - same ID regardless of parameter order
-public static String generateId(UUID a, UUID b) {
-    return a.toString().compareTo(b.toString()) < 0 ? a + "_" + b : b + "_" + a;
-}
-```
-<!--/ARCHIVE-->
 ```java
 // Match.java, Conversation.java - same ID regardless of parameter order
 public static String generateId(UUID a, UUID b) {
@@ -444,7 +375,6 @@ public static String generateId(UUID a, UUID b) {
 }
 ```
 Conversation IDs are strings; treat `conversationId` as `String` in UI/viewmodel code when calling messaging APIs.
-46|2026-02-05 04:02:41|agent:codex|scope:messaging-conversation-id|Clarify conversation ID type for UI/viewmodel usage|AGENTS.md
 
 **StorageBuilder Pattern** (reconstruct from database):
 ```java
@@ -457,14 +387,6 @@ User user = User.StorageBuilder.create(id, name, createdAt)
     .build();
 ```
 
-<!--ARCHIVE:53:agent:codex:scope:logging-support-->
-**Factory Methods** (creating new entities):
-```java
-public static Message create(String conversationId, UUID senderId, String content) {
-    return new Message(UUID.randomUUID(), conversationId, senderId, content, Instant.now());
-}
-```
-<!--/ARCHIVE-->
 **Factory Methods** (creating new entities):
 ```java
 public static Message create(String conversationId, UUID senderId, String content) {
@@ -515,40 +437,27 @@ public void setBio(String bio) {
 
 **Daily Pick Exclusions:** Use `LikeStorage.getLikedOrPassedUserIds()` to avoid resurfacing users already liked or passed.
 
-<!--ARCHIVE:50:agent:codex:scope:candidate-distance-->
-**Candidate Distance:** If either user lacks a location (0,0), skip distance filtering and sort unknown distances last to avoid empty queues.
-<!--/ARCHIVE-->
-<!--ARCHIVE:51:agent:codex:scope:candidate-distance-->
 **Candidate Distance:** If either user lacks a location (`hasLocationSet` is false), skip distance filtering and sort unknown distances last to avoid empty queues.
-50|2026-02-06 19:25:00|agent:codex|scope:candidate-distance|Clarify location-set distance rule|AGENTS.md
-<!--/ARCHIVE-->
-**Candidate Distance:** If either user lacks a location (`hasLocationSet` is false), skip distance filtering and sort unknown distances last to avoid empty queues.
-51|2026-02-06 19:27:00|agent:codex|scope:candidate-distance|Confirm location-set rule placement for docsync|AGENTS.md
 
 ## Handler Dependencies Pattern (CLI)
 
 ```java
 public class MatchingHandler {
-    // Nested Dependencies record with validation
     public record Dependencies(
         CandidateFinder candidateFinder,
         MatchingService matchingService,
-        // ... 10 more dependencies
         AppSession session,
         InputReader inputReader
     ) {
         public Dependencies {  // Compact constructor - validates all fields
             Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
             Objects.requireNonNull(matchingService, "matchingService cannot be null");
-            // ... validate all fields
         }
     }
 
-    // Constructor takes Dependencies record
     public MatchingHandler(Dependencies dependencies) {
         this.candidateFinder = dependencies.candidateFinder();
         this.matchingService = dependencies.matchingService();
-        // ... extract all dependencies
     }
 }
 ```
@@ -556,36 +465,34 @@ public class MatchingHandler {
 ## File Locations
 
 **Core Domain** (`src/main/java/datingapp/core/`)
-- Domain models (12 total): `User.java`, `Match.java`, `Messaging.java`, `Social.java`, `Stats.java`, `UserInteractions.java`, `Preferences.java`, `Dealbreakers.java`, `Achievement.java`, `SwipeSession.java`, `PacePreferences.java`, `DailyPick.java`
-- Standalone enums: `Gender.java`, `UserState.java`, `VerificationMethod.java`
-- Storage interfaces (11 total): `storage/{UserStorage,MatchStorage,LikeStorage,BlockStorage,MessagingStorage,SocialStorage,StatsStorage,ReportStorage,SwipeSessionStorage,DailyPickViewStorage,TransactionExecutor}.java`
-- Services (17 total): `MatchingService.java`, `MessagingService.java`, `CandidateFinder.java`, `MatchQualityService.java`, `DailyService.java`, `AchievementService.java`, `TrustSafetyService.java`, `StatsService.java`, `ProfilePreviewService.java`, `ProfileCompletionService.java`, `SessionService.java`, `UndoService.java`, `RelationshipTransitionService.java`, `ValidationService.java`, `CleanupService.java`, `PurgeService.java`, `StandoutsService.java`
-- Bootstrap: `AppBootstrap.java`, `AppSession.java`, `ServiceRegistry.java`
-- Configuration: `AppConfig.java`
+- Utilities (8): `AppClock`, `AppConfig`, `AppSession`, `EnumSetUtil`, `LoggingSupport`, `PerformanceMonitor`, `ScoringConstants`, `ServiceRegistry`
+- Domain models (`model/`, 11): `Achievement`, `Dealbreakers`, `Match`, `Messaging`, `Preferences`, `Standout`, `Stats`, `SwipeSession`, `UndoState`, `User`, `UserInteractions`
+- Enums nested in `User`: `Gender`, `UserState`, `VerificationMethod` (no standalone enum files)
+- Storage interfaces (`storage/`, 9): `UserStorage`, `MatchStorage`, `LikeStorage`, `MessagingStorage`, `SocialStorage`, `StatsStorage`, `SwipeSessionStorage`, `TrustSafetyStorage`, `TransactionExecutor`
+- Services (`service/`, 14): `AchievementService`, `CandidateFinder`, `DailyService`, `MatchingService`, `MatchQualityService`, `MessagingService`, `ProfileCompletionService`, `RelationshipTransitionService`, `SessionService`, `StandoutsService`, `StatsService`, `TrustSafetyService`, `UndoService`, `ValidationService`
 
 **Storage Layer** (`src/main/java/datingapp/storage/`)
-- JDBI implementations (9 storage interfaces): `jdbi/{JdbiUserStorage,JdbiMatchStorage,JdbiLikeStorage,JdbiBlockStorage,JdbiMessagingStorage,JdbiSocialStorage,JdbiStatsStorage,JdbiReportStorage,JdbiSwipeSessionStorage}.java`
-- JDBI helpers: `jdbi/{JdbiUserStorageAdapter,UserBindingHelper,EnumSetArgumentFactory,EnumSetColumnMapper}.java`
-- SQL helpers: `mapper/MapperHelper.java`, `DatabaseManager.java`, `StorageException.java`
+- Root (2): `DatabaseManager`, `StorageFactory`
+- JDBI implementations (`jdbi/`, 15): `JdbiLikeStorage`, `JdbiMatchStorage`, `JdbiMessagingStorage`, `JdbiSocialStorage`, `JdbiStandoutStorage`, `JdbiStatsStorage`, `JdbiSwipeSessionStorage`, `JdbiTransactionExecutor`, `JdbiTrustSafetyStorage`, `JdbiUndoStorage`, `JdbiUserStorage`, `JdbiUserStorageAdapter`, `MapperHelper`, `UserBindingHelper`, `EnumSetJdbiSupport`
+- Schema (`schema/`, 2): `SchemaInitializer`, `MigrationRunner`
 
-**CLI Layer**
-- Entry point: `src/main/java/datingapp/Main.java` (console app main method)
-- Handler factory: `app/cli/HandlerFactory.java`
-- Handlers (8 total): `app/cli/{MatchingHandler,ProfileHandler,SafetyHandler,StatsHandler,ProfileNotesHandler,LikerBrowserHandler,MessagingHandler,RelationshipHandler}.java`
-- Utilities: `app/cli/{InputReader,EnumMenu,CliUtilities,CliConstants}.java`
+**App Layer** (`src/main/java/datingapp/app/`)
+- Bootstrap (2): `AppBootstrap`, `ConfigLoader`
+- CLI (`cli/`, 7): `HandlerFactory`, `CliSupport`, `MatchingHandler`, `MessagingHandler`, `ProfileHandler`, `SafetyHandler`, `StatsHandler`
+- API (`api/`, 1): `RestApiServer`
 
 **JavaFX UI** (`src/main/java/datingapp/ui/`)
-- Entry: `DatingApp.java`, `NavigationService.java`, `ViewModelFactory.java`
-- Controllers (11 total): `controller/{BaseController,LoginController,ProfileController,DashboardController,MatchingController,MatchesController,ChatController,PreferencesController,StatsController,AchievementPopupController,MatchPopupController}.java`
-- ViewModels (8 total + ErrorHandler): `viewmodel/{LoginViewModel,ProfileViewModel,DashboardViewModel,MatchingViewModel,MatchesViewModel,ChatViewModel,PreferencesViewModel,StatsViewModel,ErrorHandler}.java`
-- UI Utilities (6 files): `util/{Toast,UiServices,UiHelpers,UiAnimations,ImageCache,ConfettiAnimation}.java`
-- UI Components: `component/UiComponents.java`
+- Root (4): `DatingApp`, `NavigationService`, `UiComponents`, `ViewModelFactory`
+- Controllers (`controller/`, 11): `Base`, `Login`, `Profile`, `Dashboard`, `Matching`, `Matches`, `Chat`, `Preferences`, `Stats`, `AchievementPopup`, `MatchPopup`
+- ViewModels (`viewmodel/`, 10): `Login`, `Profile`, `Dashboard`, `Matching`, `Matches`, `Chat`, `Preferences`, `Stats` + `ErrorHandler` + `data/UiDataAdapters`
+- Constants (`constants/`, 1): `UiConstants`
+- Utilities (`util/`, 4): `Toast`, `UiAnimations`, `ImageCache`, `UiSupport`
+
+**Entry Point:** `Main.java` (root `datingapp` package)
 
 **Testing** (`src/test/java/datingapp/`)
-- Test utilities: `core/testutil/TestStorages.java` (in-memory storage mocks), `core/testutil/TestUserFactory.java` (user creation helpers)
-- Core tests (30+ test classes): `core/*Test.java` (service, domain, and regression tests)
-- CLI tests: `app/cli/*Test.java`
-- UI tests: `ui/*Test.java` (CSS validation, etc.)
+- Utilities: `core/testutil/{TestStorages,TestUserFactory}.java`
+- Core tests: `core/*Test.java` (30+ classes) | CLI tests: `app/cli/*Test.java` | UI tests: `ui/*Test.java`
 
 ## Critical Rules
 
@@ -618,37 +525,24 @@ public class MatchingHandler {
 
 ## Design Decision Framework
 
-**When to Create a New Service:**
-- Service has >10 public methods OR >3 distinct responsibilities
-- Need to mock independently in tests
-- Different lifecycle/bounds than existing services
-- Will have multiple implementations (strategy pattern)
+**When to Create a New Service:** >10 public methods OR >3 distinct responsibilities, need to mock independently, different lifecycle/bounds.
 
-**When to Add to Existing Service:**
-- Tightly coupled to existing operations
-- Shares same storage dependencies
-- Logical grouping with current methods
-- <10 total methods after addition
+**When to Add to Existing Service:** Tightly coupled to existing operations, shares storage dependencies, <10 total methods after addition.
 
 **Service vs Utility Class:**
-- **Service**: Has dependencies, stateful operations, business workflows (e.g., `MatchingService`, `ProfilePreviewService`)
-- **Utility**: Stateless, static methods, pure functions (e.g., `GeoUtils`, `InterestMatcher`, `CandidateFinder`)
+- **Service**: Has dependencies, stateful operations, business workflows (e.g., `MatchingService`)
+- **Utility**: Stateless, static methods, pure functions (e.g., `EnumSetUtil`, `ScoringConstants`)
 
 **Storage Schema Evolution:**
 - Use `addColumnIfNotExists()` pattern in storage constructor
 - Keep backward compatibility - never drop columns
 - Add new fields with NULL constraints
-- Map old defaults in `StorageBuilder` for legacy rows
 
 ## Database Patterns (JDBI + H2)
 
 **H2 Database Configuration:**
 - **Location:** `./data/dating.mv.db` (file-based, auto-created on first run)
-- **JDBC URL:** `jdbc:h2:./data/dating`
-- **Username:** `sa`
-- **Password:** `dev` (hardcoded for development; use env var `DATING_APP_DB_PASSWORD` in production)
-- **Mode:** Embedded (no separate server process)
-- **Auto-Server:** Disabled during tests to prevent locking issues
+- **JDBC URL:** `jdbc:h2:./data/dating` | **Username:** `sa` | **Password:** `dev`
 
 **JDBI Storage Implementation:**
 ```java
@@ -676,18 +570,14 @@ public interface JdbiUserStorage extends UserStorage {
 
 **Complex Type Mapping:**
 - **Enums**: Store as VARCHAR, convert with `enum.name()` / `Enum.valueOf()`
-- **EnumSets**: Store as CSV `"A,B,C"`, use custom `EnumSetArgumentFactory` + `EnumSetColumnMapper`
-- **Lists**: Use delimiter not in content (pipe `|` for URLs)
-- **UUIDs**: Use `stmt.setObject()` and `MapperHelper.readUuid(rs, "column")`
-- **Instants**: Use `MapperHelper.readInstant(rs, "column")`
-- **LocalDates**: Use `MapperHelper.readLocalDate(rs, "column")`
+- **EnumSets**: Store as CSV `"A,B,C"`, use `EnumSetJdbiSupport` (consolidated argument factory + column mapper)
+- **UUIDs/Instants/LocalDates**: Use `MapperHelper.readUuid()`, `MapperHelper.readInstant()`, `MapperHelper.readLocalDate()`
 
 **Database Query Optimization:**
 - Use `WHERE` clauses to filter early
 - Avoid `SELECT *` - list needed columns (use `ALL_COLUMNS` constant)
 - Index frequently queried columns (auto in H2)
 - Keep additional index definitions grouped in `DatabaseManager.initializeSchema()` for consistency
-- Use `JOIN` instead of multiple queries
 
 ## CLI Handler Patterns
 
@@ -697,11 +587,7 @@ private void promptNumber(User user) {
     String input = inputReader.readLine("Value: ");
     try {
         int value = Integer.parseInt(input);
-        // Validate business rules
-        if (value < 0) {
-            logger.info("❌ Must be positive.\n");
-            return;
-        }
+        if (value < 0) { logger.info("❌ Must be positive.\n"); return; }
         user.setValue(value);
         logger.info("✅ Updated.\n");
     } catch (NumberFormatException e) {
@@ -710,44 +596,16 @@ private void promptNumber(User user) {
 }
 ```
 
-**Menu Handling:**
-```java
-public void handleMenu() {
-    boolean running = true;
-    while (running) {
-        displayMenu();
-        String choice = inputReader.readLine(PROMPT);
-        switch (choice) {
-            case "0" -> running = false;
-            case "1" -> handleOption1();
-            default -> logger.info(CliConstants.INVALID_SELECTION);
-        }
-    }
-}
-```
-
 **Common UI Patterns:**
 - Use `CliConstants` for all display strings
-- Log with emojis for user-friendly feedback: ✅ ❌ ⚠️ 🎉
+- Log with emojis: ✅ ❌ ⚠️ 🎉
 - Always save to storage after user edits
-- Log confirmation messages
 - Handle all NumberFormatExceptions gracefully
-- Load persisted profile photos into profile views and keep avatar bindings in sync
-- Expose birth date inputs in profile editors so completion scoring can reach 100%
-- Surface missing completion details in profile headers to guide users to 100%
-- Display age ranges with explicit separators to avoid concatenated labels
-- Provide matches tabs for received and sent likes with clear actions (like back, pass, withdraw)
-<!--ARCHIVE:55:agent:github_copilot:scope:ui-matching-queue-->
-- Include default branches in UI switches to satisfy Checkstyle
-<!--/ARCHIVE-->
+- Load persisted profile photos into profile views
+- Expose birth date inputs in profile editors
 - Include default branches in UI switches to satisfy Checkstyle
 - In `MatchingViewModel`, use a thread-safe candidate queue (e.g., `ConcurrentLinkedQueue`) or ensure all queue access occurs on the FX thread.
-55|2026-02-09 18:40:00|agent:github_copilot|scope:ui-matching-queue|Document thread-safe candidate queue requirement for MatchingViewModel|AGENTS.md
-<!--ARCHIVE:45:agent:codex:ui-loading-timing-->
-- Keep loading overlays responsive by toggling loading state on the FX thread before background work and clearing it in finally
-<!--/ARCHIVE-->
 - Keep loading overlays responsive by binding overlays before triggering loads, setting loading on the FX thread before background work, and clearing it on the FX thread after UI updates complete
-45|2026-02-05 03:54:37|agent:codex|scope:ui-loading-timing|Refine loading overlay timing guidance for FX-thread updates and initialization|src/main/java/datingapp/ui/controller/ChatController.java;src/main/java/datingapp/ui/controller/DashboardController.java;src/main/java/datingapp/ui/controller/MatchingController.java;src/main/java/datingapp/ui/viewmodel/ChatViewModel.java;src/main/java/datingapp/ui/viewmodel/DashboardViewModel.java;src/main/java/datingapp/ui/viewmodel/MatchingViewModel.java;AGENTS.md
 - Guard stylesheet resource lookups and log missing stylesheets before applying them
 
 ## Logging Standards
@@ -757,54 +615,29 @@ public void handleMenu() {
 - **INFO**: User-facing messages, state changes
 - **WARN**: Recoverable issues (missing optional fields)
 - **ERROR**: Unrecoverable errors (shouldn't happen)
-- Guard log statements with `logger.isXEnabled()` (or helper) before formatting.
+- Guard log statements with `logger.isXEnabled()` (or `LoggingSupport` helper) before formatting.
 
 **Message Format:**
 - User messages: `"✅ Profile saved!"` (no stack traces)
 - Error messages: `"⚠️  Invalid date format."` (helpful hint)
 - State changes: `"Profile activated."` (clear verb)
-- Progress: `"Processing 15 of 50..."` (if batch operation)
 
 ## Complex Business Logic
 
 **Scoring Algorithm Pattern:**
 ```java
-// 1. Extract components
-double distanceScore = calculateDistanceScore(...);
-double ageScore = calculateAgeScore(...);
-
-// 2. Weighted average (configurable via AppConfig)
-double weighted = distanceScore * config.distanceWeight()
-               + ageScore * config.ageWeight();
-
-// 3. Normalize to 0-100 range
+// 1. Extract components, 2. Weighted average (via AppConfig), 3. Normalize to 0-100
+double weighted = distanceScore * config.distanceWeight() + ageScore * config.ageWeight();
 int score = (int) Math.round(weighted * 100);
 ```
 
 **Multi-Step Workflow with Result Pattern:**
 ```java
 public SendResult complexOperation(Input input) {
-    // 1. Validate
-    if (!input.isValid()) {
-        return SendResult.failure("Invalid input", ErrorCode.INVALID_INPUT);
-    }
-
-    // 2. Load data
+    if (!input.isValid()) return SendResult.failure("Invalid input", ErrorCode.INVALID_INPUT);
     User user = userStorage.findById(input.userId()).orElse(null);
-    if (user == null) {
-        return SendResult.failure("User not found", ErrorCode.USER_NOT_FOUND);
-    }
-
-    // 3. Process
-    Processed processed = processData(user, input);
-
-    // 4. Save
-    storage.save(processed);
-
-    // 5. Side effects (notifications, stats)
-    notifyUser(user);
-    updateStats(processed);
-
+    if (user == null) return SendResult.failure("User not found", ErrorCode.USER_NOT_FOUND);
+    storage.save(processData(user, input));
     return SendResult.success(processed);
 }
 ```
@@ -813,157 +646,73 @@ public SendResult complexOperation(Input input) {
 
 **❌ Bad Test Design:**
 ```java
-// Tests implementation details
-@Test
-void testMapUserMethod() { ... }  // Don't test private methods
-
-// No description
-@Test
-void test1() { ... }
-
-// Magic numbers
-User user = createUser();  // What state is this?
-
-// Using Mockito
+@Test void testMapUserMethod() { ... }  // Don't test private methods
+@Test void test1() { ... }              // No description
+User user = createUser();               // Magic numbers - what state?
 @Mock private UserStorage userStorage;  // Use TestStorages instead
 ```
 
 **✅ Good Test Design:**
 ```java
-// Tests public behavior
-@Nested
-@DisplayName("Profile Activation")
+@Nested @DisplayName("Profile Activation")
 class ActivationTests {
-    @Test
-    @DisplayName("Activates when profile complete")
+    @Test @DisplayName("Activates when profile complete")
     void activatesWhenComplete() { ... }
-
-    @Test
-    @DisplayName("Remains incomplete when missing required fields")
-    void remainsIncompleteWhenMissingFields() { ... }
 }
 
 // Descriptive factory methods
 private User createCompleteUser() { ... }
 private User createIncompleteUserWithoutBio() { ... }
-private User createActiveUserWithInterests() { ... }
-
-// Using TestStorages
-@BeforeEach
-void setUp() {
-    userStorage = new TestStorages.Users();
-    matchStorage = new TestStorages.Matches();
-    service = new MatchingService(userStorage, matchStorage);
-}
 ```
 
 ## Performance Guidelines
 
-**When to Optimize:**
-- N+1 query problem in storage
-- Operations called in tight loops (>1000 iterations)
-- Large collections (>1000 items) repeatedly filtered
-- Profiled bottleneck (never premature optimize)
+**When to Optimize:** N+1 query problem, operations in tight loops (>1000 iterations), large collections repeatedly filtered, profiled bottleneck.
 
 **Collection Choices:**
-- **EnumSet**: When elements are enums, need uniqueness (most efficient)
+- **EnumSet**: Most efficient for enums with uniqueness
 - **HashSet**: General-purpose unique elements
 - **ArrayList**: Ordered, index access needed
 - **HashMap**: Key-value lookups
-- **Stream**: When functional style improves readability, NOT for raw speed
 
 ## Configuration Management (AppConfig)
 
-**AppConfig** is a record with 40+ parameters organized in groups:
+**AppConfig** is a record with 40+ parameters. Access via `private static final AppConfig CONFIG = AppConfig.defaults();`
 
-**Limits:**
-- `dailyLikeLimit(100)` - Max likes per day (-1 = unlimited)
-- `maxSwipesPerSession(500)` - Anti-bot protection
-- `maxPhotos(6)` - Max photos per user
-- `maxInterests(10)` - Max interests per user
+| Group         | Examples                                                           |
+|---------------|--------------------------------------------------------------------|
+| Limits        | `dailyLikeLimit(100)`, `maxSwipesPerSession(500)`                  |
+| Validation    | `minAge(18)`, `maxAge(120)`, `minHeightCm(50)`                     |
+| Algorithm     | `nearbyDistanceKm(5)`, `similarAgeDiff(2)`                         |
+| Match Weights | `distanceWeight(0.15)`, `interestWeight(0.25)`, `paceWeight(0.15)` |
 
-**Validation:**
-- `minAge(18)`, `maxAge(120)` - Valid age range
-- `minHeightCm(50)`, `maxHeightCm(300)` - Valid height range
-- `maxBioLength(500)` - Max bio characters
-
-**Algorithm Thresholds:**
-- `nearbyDistanceKm(5)` - Distance considered "nearby"
-- `similarAgeDiff(2)` - Age difference considered "similar"
-- `minSharedInterests(3)` - Min shared interests for "many"
-- `paceCompatibilityThreshold(50)` - Min pace score for compatibility
-
-**Match Quality Weights:**
-- `distanceWeight(0.15)` - Distance component (15%)
-- `ageWeight(0.10)` - Age component (10%)
-- `interestWeight(0.25)` - Shared interests (25%)
-- `lifestyleWeight(0.25)` - Lifestyle compatibility (25%)
-- `paceWeight(0.15)` - Communication pace (15%)
-- `responseWeight(0.10)` - Response time (10%)
-
-**Usage:**
-```java
-// Access singleton config
-private static final AppConfig CONFIG = AppConfig.defaults();
-
-// Use in validation
-if (age < CONFIG.minAge() || age > CONFIG.maxAge()) {
-    throw new IllegalArgumentException("Age must be between " + CONFIG.minAge() + " and " + CONFIG.maxAge());
-}
-
-// Custom config for testing
-AppConfig testConfig = AppConfig.builder()
-    .dailyLikeLimit(50)
-    .minAge(21)
-    .build();
-```
+**Custom config for testing:** `AppConfig.builder().dailyLikeLimit(50).minAge(21).build()`
 
 ## Code Quality Checklist
 
 Before committing changes, verify:
 
 **Architecture:**
-- [ ] No framework imports in core/
-- [ ] Interfaces in core/storage/, implementations in storage/jdbi/
-- [ ] All dependencies via constructor injection
-- [ ] Service uses only storage interfaces
-- [ ] Nested types are `public static`
+- No framework imports in core/
+- Interfaces in `core/storage/`, implementations in `storage/jdbi/`
+- All dependencies via constructor injection
+- Nested types are `public static`
 
 **Implementation:**
-- [ ] All constructors validate with `Objects.requireNonNull()`
-- [ ] State transitions validated with `IllegalStateException`
-- [ ] Collections defensively copied on return
-- [ ] `updatedAt` timestamps updated on changes (call `touch()`)
-- [ ] Storage exceptions wrapped in `StorageException`
-- [ ] Services return Result records instead of throwing
+- All constructors validate with `Objects.requireNonNull()`
+- State transitions validated with `IllegalStateException`
+- Collections defensively copied on return
+- `updatedAt` timestamps updated on changes (call `touch()`)
+- Services return Result records instead of throwing
 
 **Testing:**
-- [ ] Unit tests for new business logic
-- [ ] Using `TestStorages` (NO Mockito)
-- [ ] `@DisplayName` on all tests
-- [ ] `@Nested` for logical grouping
-- [ ] Edge cases covered
-- [ ] 60%+ line coverage
-
-**CLI/UI:**
-- [ ] No exceptions thrown to user
-- [ ] User-friendly error messages
-- [ ] Input validation with try/catch
-- [ ] Confirmation messages logged
-- [ ] Used `CliConstants` for display text
-- [ ] ViewModel errors via `ErrorHandler` pattern
-
-**Database:**
-- [ ] JDBI annotations (`@SqlQuery`, `@SqlUpdate`)
-- [ ] Using `MapperHelper` for null-safe reads
-- [ ] Try-with-resources for JDBI handles
-- [ ] Schema migration in `DatabaseManager.initializeSchema()`
-- [ ] MERGE for upsert operations
+- Unit tests for new business logic using `TestStorages` (NO Mockito)
+- `@DisplayName` on all tests, `@Nested` for logical grouping
+- Edge cases covered, 60%+ line coverage
 
 **Final:**
-- [ ] `mvn spotless:apply` run
-- [ ] `mvn test` passes
-- [ ] `mvn verify` passes (all quality checks)
+- `mvn spotless:apply` run
+- `mvn test` and `mvn verify` pass
 
 ## Known Limitations
 
@@ -974,18 +723,12 @@ Before committing changes, verify:
 - No caching layer (repeated database queries)
 - MatchQualityService returns static scores (simplified algorithm)
 
-**If You Must Work Around:**
-- Use application-level transactions (try/catch/rollback in service layer)
-- Document in-memory-only state clearly
-- Use feature flags for incomplete features
-- Add TODO comments for future improvements
-
-**Last Updated:** 2026-02-08
-**Phase:** 2.2 (JDBI storage + JavaFX MVVM complete)
+**Last Updated:** 2026-02-11
+**Phase:** 2.3 (codebase consolidation + package reorganization complete)
 **Repository:** https://github.com/TomShtern/Date_Program.git
-**Total Java Files:** 182 in `src/` (126 main + 56 test files)
-**Lines of Code:** ~46K total (~34K code, ~5K comments)
-**Tests:** 820 (all passing)
+**Total Java Files:** 160 in `src/` (102 main + 58 test files)
+**Lines of Code:** ~48K total (~35K code, ~5K comments)
+**Tests:** 813 (all passing)
 **Test Coverage:** 60% minimum (JaCoCo enforced, excludes ui/ and cli/)
 
 
@@ -1050,4 +793,5 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 53|2026-02-08 12:45:00|agent:codex|scope:logging-support|Add LoggingSupport pattern for guarded logging helpers|src/main/java/datingapp/core/LoggingSupport.java;src/main/java/datingapp/core/CandidateFinder.java;src/main/java/datingapp/Main.java;AGENTS.md
 54|2026-02-08 18:00:00|agent:claude_code|scope:build-discipline|Added Build Command Discipline section: capture expensive commands once, query N times|CLAUDE.md;AGENTS.md
 55|2026-02-09 18:40:00|agent:github_copilot|scope:ui-matching-queue|Use thread-safe candidate queue in MatchingViewModel|src/main/java/datingapp/ui/viewmodel/MatchingViewModel.java;AGENTS.md
+56|2026-02-11 12:00:00|agent:github_copilot|scope:codebase-consolidation|Consolidated 189→160 files: models→core/model/, services→core/service/, merged 3 storage interfaces into TrustSafetyStorage (11→9), merged CleanupService→SessionService, consolidated UiDataAdapters/UiConstants/EnumSetJdbiSupport, MapperHelper→storage/jdbi/, ScoringConstants→core/, UiComponents→ui/, deleted StorageException. Updated all 3 doc files.|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
 ---AGENT-LOG-END---

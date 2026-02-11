@@ -2,14 +2,14 @@ package datingapp;
 
 import datingapp.app.AppBootstrap;
 import datingapp.app.cli.CliSupport;
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.app.cli.HandlerFactory;
-import datingapp.app.cli.InputReader;
 import datingapp.core.AppSession;
-import datingapp.core.DailyService;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.SessionService;
-import datingapp.core.User;
+import datingapp.core.model.User;
+import datingapp.core.service.DailyService;
+import datingapp.core.service.SessionService;
 import java.io.PrintStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -99,13 +99,13 @@ public final class Main {
                     case "10" -> safeExecute(() -> handlers.stats().viewStatistics());
                     case "11" -> safeExecute(() -> handlers.profile().previewProfile());
                     case "12" -> safeExecute(() -> handlers.stats().viewAchievements());
-                    case "13" -> safeExecute(() -> handlers.profileNotes().viewAllNotes());
+                    case "13" -> safeExecute(() -> handlers.profile().viewAllNotes());
                     case "14" -> safeExecute(() -> handlers.profile().viewProfileScore());
                     case "15" -> safeExecute(() -> handlers.safety().verifyProfile());
-                    case "16" -> safeExecute(() -> handlers.likerBrowser().browseWhoLikedMe());
+                    case "16" -> safeExecute(() -> handlers.matching().browseWhoLikedMe());
                     case "17" -> safeExecute(() -> handlers.messaging().showConversations());
-                    case "18" -> safeExecute(() -> handlers.relationship().viewNotifications());
-                    case "19" -> safeExecute(() -> handlers.relationship().viewPendingRequests());
+                    case "18" -> safeExecute(() -> handlers.matching().viewNotifications());
+                    case "19" -> safeExecute(() -> handlers.matching().viewPendingRequests());
                     case "20" -> safeExecute(() -> handlers.matching().viewStandouts());
                     case "0" -> {
                         running = false;

@@ -2,12 +2,15 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.*;
-import datingapp.core.User.Gender;
-import datingapp.core.User.VerificationMethod;
-import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.Report;
-import datingapp.core.storage.ReportStorage;
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.VerificationMethod;
+import datingapp.core.model.UserInteractions.Block;
+import datingapp.core.model.UserInteractions.Report;
+import datingapp.core.service.*;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.time.LocalDate;
@@ -23,18 +26,16 @@ import org.junit.jupiter.api.*;
 class SafetyHandlerTest {
 
     private TestStorages.Users userStorage;
-    private TestStorages.Blocks blockStorage;
+    private TestStorages.TrustSafety trustSafetyStorage;
     private TestStorages.Matches matchStorage;
-    private InMemoryReportStorage reportStorage;
     private AppSession session;
     private User testUser;
 
     @BeforeEach
     void setUp() {
         userStorage = new TestStorages.Users();
-        blockStorage = new TestStorages.Blocks();
+        trustSafetyStorage = new TestStorages.TrustSafety();
         matchStorage = new TestStorages.Matches();
-        reportStorage = new InMemoryReportStorage();
 
         session = AppSession.getInstance();
         session.reset();
@@ -47,8 +48,9 @@ class SafetyHandlerTest {
     private SafetyHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         TrustSafetyService trustSafetyService =
-                new TrustSafetyService(reportStorage, userStorage, blockStorage, matchStorage, AppConfig.defaults());
-        return new SafetyHandler(userStorage, blockStorage, matchStorage, trustSafetyService, session, inputReader);
+                new TrustSafetyService(trustSafetyStorage, userStorage, matchStorage, AppConfig.defaults());
+        return new SafetyHandler(
+                userStorage, trustSafetyStorage, matchStorage, trustSafetyService, session, inputReader);
     }
 
     @SuppressWarnings("unused")
@@ -65,7 +67,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\ny\n");
             handler.blockUser();
 
-            assertTrue(blockStorage.isBlocked(testUser.getId(), otherUser.getId()));
+            assertTrue(trustSafetyStorage.isBlocked(testUser.getId(), otherUser.getId()));
         }
 
         @Test
@@ -77,7 +79,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\nn\n");
             handler.blockUser();
 
-            assertFalse(blockStorage.isBlocked(testUser.getId(), otherUser.getId()));
+            assertFalse(trustSafetyStorage.isBlocked(testUser.getId(), otherUser.getId()));
         }
 
         @Test
@@ -100,7 +102,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\ny\n");
             handler.blockUser();
 
-            assertTrue(blockStorage.isBlocked(testUser.getId(), otherUser.getId()));
+            assertTrue(trustSafetyStorage.isBlocked(testUser.getId(), otherUser.getId()));
             Optional<Match> updatedMatch = matchStorage.get(match.getId());
             assertTrue(updatedMatch.isPresent());
             assertEquals(Match.State.BLOCKED, updatedMatch.get().getState());
@@ -112,7 +114,7 @@ class SafetyHandlerTest {
             User blocked = createActiveUser("BlockedUser");
             userStorage.save(blocked);
             Block block = Block.create(testUser.getId(), blocked.getId());
-            blockStorage.save(block);
+            trustSafetyStorage.save(block);
 
             User available = createActiveUser("AvailableUser");
             userStorage.save(available);
@@ -121,7 +123,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\ny\n");
             handler.blockUser();
 
-            assertTrue(blockStorage.isBlocked(testUser.getId(), available.getId()));
+            assertTrue(trustSafetyStorage.isBlocked(testUser.getId(), available.getId()));
         }
 
         @Test
@@ -131,7 +133,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\ny\n");
             handler.blockUser();
 
-            assertEquals(0, blockStorage.size());
+            assertEquals(0, trustSafetyStorage.blockSize());
         }
 
         @Test
@@ -143,7 +145,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("0\n");
             handler.blockUser();
 
-            assertEquals(0, blockStorage.size());
+            assertEquals(0, trustSafetyStorage.blockSize());
         }
     }
 
@@ -162,8 +164,8 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\n1\n\n");
             handler.reportUser();
 
-            assertTrue(reportStorage.hasReported(testUser.getId(), otherUser.getId()));
-            assertTrue(blockStorage.isBlocked(testUser.getId(), otherUser.getId()));
+            assertTrue(trustSafetyStorage.hasReported(testUser.getId(), otherUser.getId()));
+            assertTrue(trustSafetyStorage.isBlocked(testUser.getId(), otherUser.getId()));
         }
 
         @Test
@@ -175,7 +177,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\n1\nThis is a fake profile\n");
             handler.reportUser();
 
-            assertTrue(reportStorage.hasReported(testUser.getId(), otherUser.getId()));
+            assertTrue(trustSafetyStorage.hasReported(testUser.getId(), otherUser.getId()));
         }
 
         @Test
@@ -189,7 +191,7 @@ class SafetyHandlerTest {
                 User reporter = createActiveUser("Reporter" + i);
                 userStorage.save(reporter);
                 Report report = Report.create(reporter.getId(), badUser.getId(), Report.Reason.FAKE_PROFILE, "Fake");
-                reportStorage.save(report);
+                trustSafetyStorage.save(report);
             }
 
             // Handler should work even when user has multiple reports
@@ -214,7 +216,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\n99\n");
             handler.reportUser();
 
-            assertFalse(reportStorage.hasReported(testUser.getId(), otherUser.getId()));
+            assertFalse(trustSafetyStorage.hasReported(testUser.getId(), otherUser.getId()));
         }
 
         @Test
@@ -226,7 +228,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\n1\n\n");
             handler.reportUser();
 
-            assertEquals(0, reportStorage.size());
+            assertEquals(0, trustSafetyStorage.reportSize());
         }
 
         @Test
@@ -236,7 +238,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\n1\n\n");
             handler.reportUser();
 
-            assertEquals(0, reportStorage.size());
+            assertEquals(0, trustSafetyStorage.reportSize());
         }
     }
 
@@ -261,8 +263,8 @@ class SafetyHandlerTest {
             userStorage.save(blocked1);
             userStorage.save(blocked2);
 
-            blockStorage.save(Block.create(testUser.getId(), blocked1.getId()));
-            blockStorage.save(Block.create(testUser.getId(), blocked2.getId()));
+            trustSafetyStorage.save(Block.create(testUser.getId(), blocked1.getId()));
+            trustSafetyStorage.save(Block.create(testUser.getId(), blocked2.getId()));
 
             SafetyHandler handler = createHandler("0\n");
 
@@ -274,13 +276,13 @@ class SafetyHandlerTest {
         void unblocksUserWithConfirmation() {
             User blocked = createActiveUser("BlockedUser");
             userStorage.save(blocked);
-            blockStorage.save(Block.create(testUser.getId(), blocked.getId()));
+            trustSafetyStorage.save(Block.create(testUser.getId(), blocked.getId()));
 
             // Select user 1, confirm unblock
             SafetyHandler handler = createHandler("1\ny\n");
             handler.manageBlockedUsers();
 
-            assertFalse(blockStorage.isBlocked(testUser.getId(), blocked.getId()));
+            assertFalse(trustSafetyStorage.isBlocked(testUser.getId(), blocked.getId()));
         }
 
         @Test
@@ -288,12 +290,12 @@ class SafetyHandlerTest {
         void cancelsUnblockWhenDeclined() {
             User blocked = createActiveUser("BlockedUser");
             userStorage.save(blocked);
-            blockStorage.save(Block.create(testUser.getId(), blocked.getId()));
+            trustSafetyStorage.save(Block.create(testUser.getId(), blocked.getId()));
 
             SafetyHandler handler = createHandler("1\nn\n");
             handler.manageBlockedUsers();
 
-            assertTrue(blockStorage.isBlocked(testUser.getId(), blocked.getId()));
+            assertTrue(trustSafetyStorage.isBlocked(testUser.getId(), blocked.getId()));
         }
 
         @Test
@@ -302,13 +304,13 @@ class SafetyHandlerTest {
             session.logout();
             User blocked = createActiveUser("BlockedUser");
             userStorage.save(blocked);
-            blockStorage.save(Block.create(testUser.getId(), blocked.getId()));
+            trustSafetyStorage.save(Block.create(testUser.getId(), blocked.getId()));
 
             SafetyHandler handler = createHandler("1\ny\n");
             handler.manageBlockedUsers();
 
             // Block should still exist
-            assertTrue(blockStorage.isBlocked(testUser.getId(), blocked.getId()));
+            assertTrue(trustSafetyStorage.isBlocked(testUser.getId(), blocked.getId()));
         }
     }
 
@@ -405,47 +407,5 @@ class SafetyHandlerTest {
                 PacePreferences.DepthPreference.SMALL_TALK));
         user.activate();
         return user;
-    }
-
-    // === In-Memory Mock Storage ===
-
-    private static class InMemoryReportStorage implements ReportStorage {
-        private final List<Report> reports = new ArrayList<>();
-
-        @Override
-        public void save(Report report) {
-            reports.add(report);
-        }
-
-        @Override
-        public int countReportsAgainst(UUID userId) {
-            return (int) reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .count();
-        }
-
-        @Override
-        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
-            return reports.stream()
-                    .anyMatch(r -> r.reporterId().equals(reporterId)
-                            && r.reportedUserId().equals(reportedUserId));
-        }
-
-        @Override
-        public List<Report> getReportsAgainst(UUID userId) {
-            return reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .toList();
-        }
-
-        @Override
-        public int countReportsBy(UUID userId) {
-            return (int)
-                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
-        }
-
-        public int size() {
-            return reports.size();
-        }
     }
 }

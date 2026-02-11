@@ -1,10 +1,11 @@
 package datingapp.core.storage;
 
-import datingapp.core.Achievement;
-import datingapp.core.Achievement.UserAchievement;
-import datingapp.core.Stats.PlatformStats;
-import datingapp.core.Stats.UserStats;
+import datingapp.core.model.Achievement;
+import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.Stats.PlatformStats;
+import datingapp.core.model.Stats.UserStats;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -118,12 +119,41 @@ public interface StatsStorage {
     int countUnlockedAchievements(UUID userId);
 
     // ═══════════════════════════════════════════════════════════════
+    // Daily Pick View Tracking
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Records that a user has viewed their daily pick for a specific date.
+     *
+     * @param userId The user who viewed the pick
+     * @param date The date of the pick
+     */
+    void markDailyPickAsViewed(UUID userId, LocalDate date);
+
+    /**
+     * Checks if a user has viewed their daily pick for a specific date.
+     *
+     * @param userId The user to check
+     * @param date The date to check
+     * @return true if viewed, false otherwise
+     */
+    boolean isDailyPickViewed(UUID userId, LocalDate date);
+
+    /**
+     * Deletes daily pick view records older than the specified date.
+     *
+     * @param before The cutoff date (exclusive)
+     * @return Number of records deleted
+     */
+    int deleteDailyPickViewsOlderThan(LocalDate before);
+
+    // ═══════════════════════════════════════════════════════════════
     // Cleanup Operations
     // ═══════════════════════════════════════════════════════════════
 
     /**
      * Deletes expired daily pick view records older than the cutoff date.
-     * Used by CleanupService to purge stale tracking data.
+     * Used by SessionService to purge stale tracking data.
      *
      * @param cutoff Records older than this instant will be deleted
      * @return Number of records deleted

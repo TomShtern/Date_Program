@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.Preferences.Interest;
-import datingapp.core.Preferences.Lifestyle;
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.Interest;
+import datingapp.core.model.Preferences.Lifestyle;
+import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.time.LocalDate;

@@ -2,8 +2,12 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.*;
-import datingapp.core.User.Gender;
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.User.Gender;
+import datingapp.core.service.*;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.time.LocalDate;
@@ -12,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
 
 /**
- * Unit tests for ProfileNotesHandler CLI commands: manageNoteFor(), viewAllNotes().
+ * Unit tests for profile notes CLI commands: manageNoteFor(), viewAllNotes().
  */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class ProfileNotesHandlerTest {
@@ -33,9 +37,9 @@ class ProfileNotesHandlerTest {
         session.setCurrentUser(testUser);
     }
 
-    private ProfileNotesHandler createHandler(String input) {
+    private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        return new ProfileNotesHandler(userStorage, session, inputReader);
+        return new ProfileHandler(userStorage, null, null, new ValidationService(), session, inputReader);
     }
 
     private void saveNote(UUID authorId, UUID subjectId, String content) {
@@ -55,7 +59,7 @@ class ProfileNotesHandlerTest {
             User target = createActiveUser("Target");
             userStorage.save(target);
 
-            ProfileNotesHandler handler = createHandler("\n");
+            ProfileHandler handler = createHandler("\n");
 
             assertDoesNotThrow(() -> handler.manageNoteFor(target.getId(), target.getName()));
         }
@@ -67,7 +71,7 @@ class ProfileNotesHandlerTest {
             userStorage.save(target);
 
             // Just cancel (return to previous menu)
-            ProfileNotesHandler handler = createHandler("0\n");
+            ProfileHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(() -> handler.manageNoteFor(target.getId(), target.getName()));
         }
@@ -82,7 +86,7 @@ class ProfileNotesHandlerTest {
             saveNote(testUser.getId(), target.getId(), "Great conversation partner!");
 
             // Cancel
-            ProfileNotesHandler handler = createHandler("0\n");
+            ProfileHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(() -> handler.manageNoteFor(target.getId(), target.getName()));
         }
@@ -94,7 +98,7 @@ class ProfileNotesHandlerTest {
             userStorage.save(target);
 
             // Add note (1), enter note content
-            ProfileNotesHandler handler = createHandler("1\nReally nice person!\n");
+            ProfileHandler handler = createHandler("1\nReally nice person!\n");
             handler.manageNoteFor(target.getId(), target.getName());
 
             // Verify note was added via storage
@@ -112,7 +116,7 @@ class ProfileNotesHandlerTest {
             saveNote(testUser.getId(), target.getId(), "Old note");
 
             // Edit (1), enter new content
-            ProfileNotesHandler handler = createHandler("1\nUpdated note!\n");
+            ProfileHandler handler = createHandler("1\nUpdated note!\n");
             handler.manageNoteFor(target.getId(), target.getName());
 
             Optional<User.ProfileNote> note = userStorage.getProfileNote(testUser.getId(), target.getId());
@@ -129,7 +133,7 @@ class ProfileNotesHandlerTest {
             saveNote(testUser.getId(), target.getId(), "Note to delete");
 
             // Delete (2), confirm (y)
-            ProfileNotesHandler handler = createHandler("2\ny\n");
+            ProfileHandler handler = createHandler("2\ny\n");
             handler.manageNoteFor(target.getId(), target.getName());
 
             assertTrue(
@@ -145,7 +149,7 @@ class ProfileNotesHandlerTest {
             saveNote(testUser.getId(), target.getId(), "Keep this note");
 
             // Delete (2), cancel (n)
-            ProfileNotesHandler handler = createHandler("2\nn\n");
+            ProfileHandler handler = createHandler("2\nn\n");
             handler.manageNoteFor(target.getId(), target.getName());
 
             assertTrue(
@@ -159,7 +163,7 @@ class ProfileNotesHandlerTest {
             userStorage.save(target);
 
             // No note exists - try to delete (should be ignored)
-            ProfileNotesHandler handler = createHandler("2\n");
+            ProfileHandler handler = createHandler("2\n");
 
             assertDoesNotThrow(() -> handler.manageNoteFor(target.getId(), target.getName()));
         }
@@ -171,7 +175,7 @@ class ProfileNotesHandlerTest {
             userStorage.save(target);
 
             // Add (1), enter empty string
-            ProfileNotesHandler handler = createHandler("1\n\n");
+            ProfileHandler handler = createHandler("1\n\n");
             handler.manageNoteFor(target.getId(), target.getName());
 
             assertTrue(
@@ -189,7 +193,7 @@ class ProfileNotesHandlerTest {
         void showsMessageWhenNotLoggedIn() {
             session.logout();
 
-            ProfileNotesHandler handler = createHandler("\n");
+            ProfileHandler handler = createHandler("\n");
 
             assertDoesNotThrow(handler::viewAllNotes);
         }
@@ -197,7 +201,7 @@ class ProfileNotesHandlerTest {
         @Test
         @DisplayName("Shows message when no notes exist")
         void showsMessageWhenNoNotesExist() {
-            ProfileNotesHandler handler = createHandler("0\n");
+            ProfileHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(handler::viewAllNotes);
         }
@@ -213,7 +217,7 @@ class ProfileNotesHandlerTest {
             saveNote(testUser.getId(), target1.getId(), "Note for person 1");
             saveNote(testUser.getId(), target2.getId(), "Note for person 2");
 
-            ProfileNotesHandler handler = createHandler("0\n");
+            ProfileHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(handler::viewAllNotes);
         }
@@ -225,7 +229,7 @@ class ProfileNotesHandlerTest {
             saveNote(testUser.getId(), deletedUserId, "Note for deleted user");
 
             // User not in storage - should show "(deleted user)"
-            ProfileNotesHandler handler = createHandler("0\n");
+            ProfileHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(handler::viewAllNotes);
         }
@@ -241,7 +245,7 @@ class ProfileNotesHandlerTest {
             saveNote(testUser.getId(), target1.getId(), "First note");
             saveNote(testUser.getId(), target2.getId(), "Second note");
 
-            ProfileNotesHandler handler = createHandler("0\n");
+            ProfileHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(handler::viewAllNotes);
         }
@@ -255,7 +259,7 @@ class ProfileNotesHandlerTest {
                 saveNote(testUser.getId(), target.getId(), "Note " + i);
             }
 
-            ProfileNotesHandler handler = createHandler("0\n");
+            ProfileHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(handler::viewAllNotes);
             assertEquals(
@@ -275,7 +279,7 @@ class ProfileNotesHandlerTest {
             userStorage.save(target);
             saveNote(testUser.getId(), target.getId(), "A great person!");
 
-            ProfileNotesHandler handler = createHandler("");
+            ProfileHandler handler = createHandler("");
 
             String preview = handler.getNotePreview(testUser.getId(), target.getId());
             assertTrue(preview.contains("A great person!"));
@@ -287,7 +291,7 @@ class ProfileNotesHandlerTest {
             User target = createActiveUser("Target");
             userStorage.save(target);
 
-            ProfileNotesHandler handler = createHandler("");
+            ProfileHandler handler = createHandler("");
 
             String preview = handler.getNotePreview(testUser.getId(), target.getId());
             assertEquals("", preview);
@@ -300,7 +304,7 @@ class ProfileNotesHandlerTest {
             userStorage.save(target);
             saveNote(testUser.getId(), target.getId(), "Some note");
 
-            ProfileNotesHandler handler = createHandler("");
+            ProfileHandler handler = createHandler("");
 
             assertTrue(handler.hasNote(testUser.getId(), target.getId()));
         }
@@ -311,7 +315,7 @@ class ProfileNotesHandlerTest {
             User target = createActiveUser("Target");
             userStorage.save(target);
 
-            ProfileNotesHandler handler = createHandler("");
+            ProfileHandler handler = createHandler("");
 
             assertFalse(handler.hasNote(testUser.getId(), target.getId()));
         }

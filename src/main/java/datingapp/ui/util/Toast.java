@@ -1,6 +1,6 @@
 package datingapp.ui.util;
 
-import datingapp.ui.constants.AnimationConstants;
+import datingapp.ui.constants.UiConstants;
 import java.util.Locale;
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
@@ -39,22 +39,22 @@ public final class Toast {
 
     /** Shows a success toast with green accent. */
     public static void showSuccess(String message) {
-        show(message, ToastLevel.SUCCESS, AnimationConstants.TOAST_SUCCESS_DURATION);
+        show(message, ToastLevel.SUCCESS, UiConstants.TOAST_SUCCESS_DURATION);
     }
 
     /** Shows an error toast with red accent. */
     public static void showError(String message) {
-        show(message, ToastLevel.ERROR, AnimationConstants.TOAST_ERROR_DURATION);
+        show(message, ToastLevel.ERROR, UiConstants.TOAST_ERROR_DURATION);
     }
 
     /** Shows a warning toast with amber accent. */
     public static void showWarning(String message) {
-        show(message, ToastLevel.WARNING, AnimationConstants.TOAST_WARNING_DURATION);
+        show(message, ToastLevel.WARNING, UiConstants.TOAST_WARNING_DURATION);
     }
 
     /** Shows an info toast with blue accent. */
     public static void showInfo(String message) {
-        show(message, ToastLevel.INFO, AnimationConstants.TOAST_INFO_DURATION);
+        show(message, ToastLevel.INFO, UiConstants.TOAST_INFO_DURATION);
     }
 
     private static void show(String message, ToastLevel level, Duration duration) {
@@ -72,10 +72,10 @@ public final class Toast {
         toast.setTranslateY(50);
 
         // Entrance animation: fade in + slide up
-        FadeTransition fadeIn = new FadeTransition(AnimationConstants.TOAST_ENTRANCE_DURATION, toast);
+        FadeTransition fadeIn = new FadeTransition(UiConstants.TOAST_ENTRANCE_DURATION, toast);
         fadeIn.setToValue(1);
 
-        TranslateTransition slideUp = new TranslateTransition(AnimationConstants.TOAST_ENTRANCE_DURATION, toast);
+        TranslateTransition slideUp = new TranslateTransition(UiConstants.TOAST_ENTRANCE_DURATION, toast);
         slideUp.setToY(0);
 
         ParallelTransition entrance = new ParallelTransition(fadeIn, slideUp);
@@ -91,7 +91,7 @@ public final class Toast {
     }
 
     private static void dismiss(HBox toast) {
-        FadeTransition fadeOut = new FadeTransition(AnimationConstants.TOAST_EXIT_DURATION, toast);
+        FadeTransition fadeOut = new FadeTransition(UiConstants.TOAST_EXIT_DURATION, toast);
         fadeOut.setToValue(0);
         fadeOut.setOnFinished(e -> {
             e.consume();

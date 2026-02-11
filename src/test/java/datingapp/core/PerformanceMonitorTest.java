@@ -2,6 +2,8 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.model.*;
+import datingapp.core.service.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

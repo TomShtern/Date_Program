@@ -2,12 +2,15 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
-import datingapp.core.User.ProfileNote;
-import datingapp.core.UserInteractions.Like;
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.service.*;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;

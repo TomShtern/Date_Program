@@ -5,9 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.Messaging.Conversation;
-import datingapp.core.Messaging.Message;
-import datingapp.core.User.ProfileNote;
+import datingapp.core.model.*;
+import datingapp.core.model.Messaging.Conversation;
+import datingapp.core.model.Messaging.Message;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.service.*;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.MessagingStorage;
 import datingapp.core.storage.UserStorage;

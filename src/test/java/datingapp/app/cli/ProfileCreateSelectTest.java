@@ -4,10 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppSession;
-import datingapp.core.User;
-import datingapp.core.User.UserState;
-import datingapp.core.ValidationService;
+import datingapp.core.model.*;
+import datingapp.core.model.User;
+import datingapp.core.model.User.UserState;
+import datingapp.core.service.*;
+import datingapp.core.service.ValidationService;
 import datingapp.core.storage.UserStorage;
 import java.io.StringReader;
 import java.util.ArrayList;

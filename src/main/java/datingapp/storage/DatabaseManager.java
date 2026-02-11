@@ -136,4 +136,27 @@ public final class DatabaseManager {
     private static boolean isLocalFileUrl(String url) {
         return url.startsWith("jdbc:h2:./") || url.startsWith("jdbc:h2:\\") || url.startsWith("jdbc:h2:.");
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // StorageException (nested)
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Unchecked exception for storage-related errors.
+     * Wraps SQLException and other storage exceptions.
+     */
+    public static class StorageException extends RuntimeException {
+
+        public StorageException(String message) {
+            super(message);
+        }
+
+        public StorageException(String message, Throwable cause) {
+            super(message, cause);
+        }
+
+        public StorageException(Throwable cause) {
+            super(cause);
+        }
+    }
 }

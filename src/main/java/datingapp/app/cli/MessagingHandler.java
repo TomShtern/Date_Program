@@ -1,18 +1,19 @@
 package datingapp.app.cli;
 
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
-import datingapp.core.Match;
-import datingapp.core.Messaging.Conversation;
-import datingapp.core.Messaging.Message;
-import datingapp.core.MessagingService;
-import datingapp.core.MessagingService.ConversationPreview;
-import datingapp.core.MessagingService.SendResult;
-import datingapp.core.User;
-import datingapp.core.UserInteractions.Block;
-import datingapp.core.storage.BlockStorage;
+import datingapp.core.model.Match;
+import datingapp.core.model.Messaging.Conversation;
+import datingapp.core.model.Messaging.Message;
+import datingapp.core.model.User;
+import datingapp.core.model.UserInteractions.Block;
+import datingapp.core.service.MessagingService;
+import datingapp.core.service.MessagingService.ConversationPreview;
+import datingapp.core.service.MessagingService.SendResult;
 import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.TrustSafetyStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -35,19 +36,19 @@ public class MessagingHandler implements LoggingSupport {
 
     private final MessagingService messagingService;
     private final MatchStorage matchStorage;
-    private final BlockStorage blockStorage;
+    private final TrustSafetyStorage trustSafetyStorage;
     private final InputReader input;
     private final AppSession session;
 
     public MessagingHandler(
             MessagingService messagingService,
             MatchStorage matchStorage,
-            BlockStorage blockStorage,
+            TrustSafetyStorage trustSafetyStorage,
             InputReader input,
             AppSession session) {
         this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
         this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
-        this.blockStorage = Objects.requireNonNull(blockStorage, "blockStorage cannot be null");
+        this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.input = Objects.requireNonNull(input, "input cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
@@ -377,7 +378,7 @@ public class MessagingHandler implements LoggingSupport {
     /** Blocks another user. */
     private void blockUser(User currentUser, User otherUser) {
         Block block = Block.create(currentUser.getId(), otherUser.getId());
-        blockStorage.save(block);
+        trustSafetyStorage.save(block);
 
         String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
         Optional<Match> matchOpt = matchStorage.get(matchId);

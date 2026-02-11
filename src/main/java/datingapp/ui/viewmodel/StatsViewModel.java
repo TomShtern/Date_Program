@@ -1,12 +1,12 @@
 package datingapp.ui.viewmodel;
 
-import datingapp.core.Achievement;
-import datingapp.core.Achievement.UserAchievement;
-import datingapp.core.AchievementService;
 import datingapp.core.AppSession;
-import datingapp.core.Stats.UserStats;
-import datingapp.core.StatsService;
-import datingapp.core.User;
+import datingapp.core.model.Achievement;
+import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.Stats.UserStats;
+import datingapp.core.model.User;
+import datingapp.core.service.AchievementService;
+import datingapp.core.service.StatsService;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;

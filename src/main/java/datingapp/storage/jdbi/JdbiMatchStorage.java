@@ -1,10 +1,9 @@
 package datingapp.storage.jdbi;
 
-import datingapp.core.Match;
-import datingapp.core.Match.ArchiveReason;
-import datingapp.core.Match.State;
+import datingapp.core.model.Match;
+import datingapp.core.model.Match.ArchiveReason;
+import datingapp.core.model.Match.State;
 import datingapp.core.storage.MatchStorage;
-import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;

@@ -2,6 +2,9 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
@@ -43,9 +46,9 @@ class StandoutsServiceTest {
         config = AppConfig.defaults();
         userStorage = new TestStorages.Users();
         TestStorages.Likes likeStorage = new TestStorages.Likes();
-        TestStorages.Blocks blockStorage = new TestStorages.Blocks();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
         standoutStorage = new TestStandoutStorage();
-        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, config);
+        candidateFinder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, config);
         profileCompletionService = new ProfileCompletionService(config);
         service = new StandoutsService(userStorage, standoutStorage, candidateFinder, profileCompletionService, config);
     }

@@ -2,8 +2,10 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.UndoService.UndoResult;
-import datingapp.core.UserInteractions.Like;
+import datingapp.core.model.*;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.service.*;
+import datingapp.core.service.UndoService.UndoResult;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.testutil.TestStorages;

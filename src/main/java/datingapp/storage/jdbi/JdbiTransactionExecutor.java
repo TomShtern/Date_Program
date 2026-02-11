@@ -1,7 +1,7 @@
 package datingapp.storage.jdbi;
 
 import datingapp.core.storage.TransactionExecutor;
-import datingapp.storage.StorageException;
+import datingapp.storage.DatabaseManager.StorageException;
 import java.util.Objects;
 import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;

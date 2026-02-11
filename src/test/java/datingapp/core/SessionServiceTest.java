@@ -7,9 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.UserInteractions.Like;
+import datingapp.core.model.*;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.service.*;
+import datingapp.core.storage.StatsStorage;
 import datingapp.core.storage.SwipeSessionStorage;
 import datingapp.core.testutil.TestClock;
+import datingapp.core.testutil.TestStorages;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -28,6 +32,7 @@ import org.junit.jupiter.api.Timeout;
 class SessionServiceTest {
 
     private InMemorySwipeSessionStorage storage;
+    private StatsStorage statsStorage;
     private AppConfig config;
     private SessionService service;
     private UUID userId;
@@ -37,12 +42,13 @@ class SessionServiceTest {
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
         storage = new InMemorySwipeSessionStorage();
+        statsStorage = new TestStorages.Stats();
         config = AppConfig.builder()
                 .sessionTimeoutMinutes(5)
                 .maxSwipesPerSession(100)
                 .suspiciousSwipeVelocity(30.0)
                 .build();
-        service = new SessionService(storage, config);
+        service = new SessionService(storage, statsStorage, config);
         userId = UUID.randomUUID();
     }
 

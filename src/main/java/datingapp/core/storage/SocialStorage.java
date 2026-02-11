@@ -1,7 +1,7 @@
 package datingapp.core.storage;
 
-import datingapp.core.Social.FriendRequest;
-import datingapp.core.Social.Notification;
+import datingapp.core.model.UserInteractions.FriendRequest;
+import datingapp.core.model.UserInteractions.Notification;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

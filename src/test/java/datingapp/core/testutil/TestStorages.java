@@ -1,18 +1,33 @@
 package datingapp.core.testutil;
 
 import datingapp.core.AppClock;
-import datingapp.core.Match;
-import datingapp.core.Standout;
-import datingapp.core.User;
-import datingapp.core.User.ProfileNote;
-import datingapp.core.User.UserState;
-import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.Like;
-import datingapp.core.storage.BlockStorage;
+import datingapp.core.model.*;
+import datingapp.core.model.Achievement;
+import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.Match;
+import datingapp.core.model.Messaging.Conversation;
+import datingapp.core.model.Messaging.Message;
+import datingapp.core.model.Standout;
+import datingapp.core.model.Stats.PlatformStats;
+import datingapp.core.model.Stats.UserStats;
+import datingapp.core.model.User;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserInteractions.Block;
+import datingapp.core.model.UserInteractions.FriendRequest;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.UserInteractions.Notification;
+import datingapp.core.model.UserInteractions.Report;
+import datingapp.core.service.*;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.MessagingStorage;
+import datingapp.core.storage.SocialStorage;
+import datingapp.core.storage.StatsStorage;
+import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * var userStorage = new TestStorages.Users();
  * var likeStorage = new TestStorages.Likes();
  * var matchStorage = new TestStorages.Matches();
- * var blockStorage = new TestStorages.Blocks();
+ * var trustSafetyStorage = new TestStorages.TrustSafety();
  * </pre>
  */
 public final class TestStorages {
@@ -106,10 +121,13 @@ public final class TestStorages {
     }
 
     /**
-     * In-memory BlockStorage implementation for testing.
+     * In-memory TrustSafetyStorage implementation for testing.
      */
-    public static class Blocks implements BlockStorage {
+    public static class TrustSafety implements TrustSafetyStorage {
         private final Set<Block> blocks = new HashSet<>();
+        private final List<Report> reports = new ArrayList<>();
+
+        // ─── Block operations ───
 
         @Override
         public void save(Block block) {
@@ -142,7 +160,7 @@ public final class TestStorages {
         }
 
         @Override
-        public boolean delete(UUID blockerId, UUID blockedId) {
+        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
             return blocks.removeIf(
                     b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
         }
@@ -159,16 +177,61 @@ public final class TestStorages {
                     blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
         }
 
-        // === Test Helpers ===
+        // ─── Report operations ───
 
-        /** Clears all blocks */
+        @Override
+        public void save(Report report) {
+            reports.add(report);
+        }
+
+        @Override
+        public int countReportsAgainst(UUID userId) {
+            return (int) reports.stream()
+                    .filter(r -> r.reportedUserId().equals(userId))
+                    .count();
+        }
+
+        @Override
+        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
+            return reports.stream()
+                    .anyMatch(r -> r.reporterId().equals(reporterId)
+                            && r.reportedUserId().equals(reportedUserId));
+        }
+
+        @Override
+        public List<Report> getReportsAgainst(UUID userId) {
+            return reports.stream()
+                    .filter(r -> r.reportedUserId().equals(userId))
+                    .toList();
+        }
+
+        @Override
+        public int countReportsBy(UUID userId) {
+            return (int)
+                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
+        }
+
+        // ─── Test Helpers ───
+
+        /** Clears all blocks and reports */
         public void clear() {
             blocks.clear();
+            reports.clear();
         }
 
         /** Returns number of blocks stored */
-        public int size() {
+        public int blockSize() {
             return blocks.size();
+        }
+
+        /** Returns number of reports stored */
+        public int reportSize() {
+            return reports.size();
+        }
+
+        /** Returns total size (blocks + reports) */
+        public int size() {
+            return blocks.size() + reports.size();
         }
     }
 
@@ -418,16 +481,16 @@ public final class TestStorages {
     /**
      * In-memory UndoState.Storage implementation for testing.
      */
-    public static class Undos implements datingapp.core.UndoState.Storage {
-        private final Map<UUID, datingapp.core.UndoState> undoStates = new HashMap<>();
+    public static class Undos implements datingapp.core.model.UndoState.Storage {
+        private final Map<UUID, datingapp.core.model.UndoState> undoStates = new HashMap<>();
 
         @Override
-        public void save(datingapp.core.UndoState state) {
+        public void save(datingapp.core.model.UndoState state) {
             undoStates.put(state.userId(), state);
         }
 
         @Override
-        public java.util.Optional<datingapp.core.UndoState> findByUserId(UUID userId) {
+        public java.util.Optional<datingapp.core.model.UndoState> findByUserId(UUID userId) {
             return java.util.Optional.ofNullable(undoStates.get(userId));
         }
 
@@ -451,7 +514,7 @@ public final class TestStorages {
         }
 
         @Override
-        public java.util.List<datingapp.core.UndoState> findAll() {
+        public java.util.List<datingapp.core.model.UndoState> findAll() {
             return new java.util.ArrayList<>(undoStates.values());
         }
 
@@ -461,6 +524,339 @@ public final class TestStorages {
 
         public int size() {
             return undoStates.size();
+        }
+    }
+
+    /**
+     * In-memory StatsStorage implementation for testing.
+     */
+    public static class Stats implements StatsStorage {
+        private final Map<UUID, List<UserStats>> userStats = new HashMap<>();
+        private final List<PlatformStats> platformStats = new ArrayList<>();
+        private final Map<String, Instant> profileViews = new HashMap<>();
+        private final Map<UUID, List<UserAchievement>> achievements = new HashMap<>();
+        private final Set<String> dailyPickViews = new HashSet<>();
+
+        @Override
+        public void saveUserStats(UserStats stats) {
+            userStats
+                    .computeIfAbsent(stats.userId(), ignored -> new ArrayList<>())
+                    .add(stats);
+        }
+
+        @Override
+        public Optional<UserStats> getLatestUserStats(UUID userId) {
+            List<UserStats> list = userStats.get(userId);
+            return list == null || list.isEmpty() ? Optional.empty() : Optional.of(list.get(list.size() - 1));
+        }
+
+        @Override
+        public List<UserStats> getUserStatsHistory(UUID userId, int limit) {
+            List<UserStats> list = userStats.getOrDefault(userId, List.of());
+            return list.subList(Math.max(0, list.size() - limit), list.size());
+        }
+
+        @Override
+        public List<UserStats> getAllLatestUserStats() {
+            List<UserStats> result = new ArrayList<>();
+            for (List<UserStats> list : userStats.values()) {
+                if (!list.isEmpty()) {
+                    result.add(list.get(list.size() - 1));
+                }
+            }
+            return result;
+        }
+
+        @Override
+        public int deleteUserStatsOlderThan(Instant cutoff) {
+            return 0;
+        }
+
+        @Override
+        public void savePlatformStats(PlatformStats stats) {
+            platformStats.add(stats);
+        }
+
+        @Override
+        public Optional<PlatformStats> getLatestPlatformStats() {
+            return platformStats.isEmpty()
+                    ? Optional.empty()
+                    : Optional.of(platformStats.get(platformStats.size() - 1));
+        }
+
+        @Override
+        public List<PlatformStats> getPlatformStatsHistory(int limit) {
+            int size = platformStats.size();
+            return platformStats.subList(Math.max(0, size - limit), size);
+        }
+
+        @Override
+        public void recordProfileView(UUID viewerId, UUID viewedId) {
+            profileViews.put(viewerId + "_" + viewedId, Instant.now());
+        }
+
+        @Override
+        public int getProfileViewCount(UUID userId) {
+            return (int) profileViews.keySet().stream()
+                    .filter(k -> k.endsWith("_" + userId))
+                    .count();
+        }
+
+        @Override
+        public int getUniqueViewerCount(UUID userId) {
+            return getProfileViewCount(userId);
+        }
+
+        @Override
+        public List<UUID> getRecentViewers(UUID userId, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
+            return profileViews.containsKey(viewerId + "_" + viewedId);
+        }
+
+        @Override
+        public void saveUserAchievement(UserAchievement achievement) {
+            achievements
+                    .computeIfAbsent(achievement.userId(), ignored -> new ArrayList<>())
+                    .add(achievement);
+        }
+
+        @Override
+        public List<UserAchievement> getUnlockedAchievements(UUID userId) {
+            return achievements.getOrDefault(userId, List.of());
+        }
+
+        @Override
+        public boolean hasAchievement(UUID userId, Achievement achievement) {
+            return achievements.getOrDefault(userId, List.of()).stream().anyMatch(a -> a.achievement() == achievement);
+        }
+
+        @Override
+        public int countUnlockedAchievements(UUID userId) {
+            return achievements.getOrDefault(userId, List.of()).size();
+        }
+
+        @Override
+        public void markDailyPickAsViewed(UUID userId, LocalDate date) {
+            dailyPickViews.add(userId + "_" + date);
+        }
+
+        @Override
+        public boolean isDailyPickViewed(UUID userId, LocalDate date) {
+            return dailyPickViews.contains(userId + "_" + date);
+        }
+
+        @Override
+        public int deleteDailyPickViewsOlderThan(LocalDate before) {
+            return 0;
+        }
+
+        @Override
+        public int deleteExpiredDailyPickViews(Instant cutoff) {
+            return 0;
+        }
+
+        public void clear() {
+            userStats.clear();
+            platformStats.clear();
+            profileViews.clear();
+            achievements.clear();
+            dailyPickViews.clear();
+        }
+    }
+
+    /**
+     * In-memory SocialStorage implementation for testing.
+     */
+    public static class Social implements SocialStorage {
+        private final Map<UUID, FriendRequest> friendRequests = new HashMap<>();
+        private final Map<UUID, Notification> notifications = new HashMap<>();
+
+        @Override
+        public void saveFriendRequest(FriendRequest request) {
+            friendRequests.put(request.id(), request);
+        }
+
+        @Override
+        public void updateFriendRequest(FriendRequest request) {
+            friendRequests.put(request.id(), request);
+        }
+
+        @Override
+        public Optional<FriendRequest> getFriendRequest(UUID id) {
+            return Optional.ofNullable(friendRequests.get(id));
+        }
+
+        @Override
+        public Optional<FriendRequest> getPendingFriendRequestBetween(UUID user1, UUID user2) {
+            return friendRequests.values().stream()
+                    .filter(FriendRequest::isPending)
+                    .filter(r -> (r.fromUserId().equals(user1) && r.toUserId().equals(user2))
+                            || (r.fromUserId().equals(user2) && r.toUserId().equals(user1)))
+                    .findFirst();
+        }
+
+        @Override
+        public List<FriendRequest> getPendingFriendRequestsForUser(UUID userId) {
+            return friendRequests.values().stream()
+                    .filter(r -> r.toUserId().equals(userId) && r.isPending())
+                    .toList();
+        }
+
+        @Override
+        public void deleteFriendRequest(UUID id) {
+            friendRequests.remove(id);
+        }
+
+        @Override
+        public void saveNotification(Notification notification) {
+            notifications.put(notification.id(), notification);
+        }
+
+        @Override
+        public void markNotificationAsRead(UUID id) {
+            Notification n = notifications.get(id);
+            if (n != null && !n.isRead()) {
+                notifications.put(
+                        id,
+                        new Notification(
+                                n.id(), n.userId(), n.type(), n.title(), n.message(), n.createdAt(), true, n.data()));
+            }
+        }
+
+        @Override
+        public List<Notification> getNotificationsForUser(UUID userId, boolean unreadOnly) {
+            return notifications.values().stream()
+                    .filter(n -> n.userId().equals(userId))
+                    .filter(n -> !unreadOnly || !n.isRead())
+                    .sorted((a, b) -> b.createdAt().compareTo(a.createdAt()))
+                    .toList();
+        }
+
+        @Override
+        public Optional<Notification> getNotification(UUID id) {
+            return Optional.ofNullable(notifications.get(id));
+        }
+
+        @Override
+        public void deleteNotification(UUID id) {
+            notifications.remove(id);
+        }
+
+        @Override
+        public void deleteOldNotifications(Instant before) {
+            notifications.entrySet().removeIf(e -> e.getValue().createdAt().isBefore(before));
+        }
+
+        public void clear() {
+            friendRequests.clear();
+            notifications.clear();
+        }
+    }
+
+    /**
+     * In-memory MessagingStorage implementation for testing.
+     */
+    public static class Messaging implements MessagingStorage {
+        private final Map<String, Conversation> conversations = new HashMap<>();
+        private final Map<String, List<Message>> messages = new HashMap<>();
+
+        @Override
+        public void saveConversation(Conversation conversation) {
+            conversations.put(conversation.getId(), conversation);
+        }
+
+        @Override
+        public Optional<Conversation> getConversation(String conversationId) {
+            return Optional.ofNullable(conversations.get(conversationId));
+        }
+
+        @Override
+        public Optional<Conversation> getConversationByUsers(UUID userA, UUID userB) {
+            String id = Conversation.generateId(userA, userB);
+            return getConversation(id);
+        }
+
+        @Override
+        public List<Conversation> getConversationsFor(UUID userId) {
+            return conversations.values().stream()
+                    .filter(c -> c.involves(userId))
+                    .toList();
+        }
+
+        @Override
+        public void updateConversationLastMessageAt(String conversationId, Instant timestamp) {
+            // No-op for tests
+        }
+
+        @Override
+        public void updateConversationReadTimestamp(String conversationId, UUID userId, Instant timestamp) {
+            // No-op for tests
+        }
+
+        @Override
+        public void archiveConversation(String conversationId, Match.ArchiveReason reason) {
+            // No-op for tests
+        }
+
+        @Override
+        public void setConversationVisibility(String conversationId, UUID userId, boolean visible) {
+            // No-op for tests
+        }
+
+        @Override
+        public void deleteConversation(String conversationId) {
+            conversations.remove(conversationId);
+        }
+
+        @Override
+        public void saveMessage(Message message) {
+            messages.computeIfAbsent(message.conversationId(), ignored -> new ArrayList<>())
+                    .add(message);
+        }
+
+        @Override
+        public List<Message> getMessages(String conversationId, int limit, int offset) {
+            return messages.getOrDefault(conversationId, List.of());
+        }
+
+        @Override
+        public Optional<Message> getLatestMessage(String conversationId) {
+            List<Message> list = messages.get(conversationId);
+            return list == null || list.isEmpty() ? Optional.empty() : Optional.of(list.get(list.size() - 1));
+        }
+
+        @Override
+        public int countMessages(String conversationId) {
+            return messages.getOrDefault(conversationId, List.of()).size();
+        }
+
+        @Override
+        public int countMessagesAfter(String conversationId, Instant after) {
+            return 0;
+        }
+
+        @Override
+        public int countMessagesNotFromSender(String conversationId, UUID senderId) {
+            return 0;
+        }
+
+        @Override
+        public int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId) {
+            return 0;
+        }
+
+        @Override
+        public void deleteMessagesByConversation(String conversationId) {
+            messages.remove(conversationId);
+        }
+
+        public void clear() {
+            conversations.clear();
+            messages.clear();
         }
     }
 }

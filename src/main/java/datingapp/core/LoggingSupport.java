@@ -2,9 +2,6 @@ package datingapp.core;
 
 import org.slf4j.Logger;
 
-/**
- * Shared logging helpers to satisfy GuardLogStatement without duplicating guards.
- */
 public interface LoggingSupport {
 
     /**

@@ -1,6 +1,6 @@
 package datingapp.ui.util;
 
-import datingapp.ui.constants.CacheConstants;
+import datingapp.ui.constants.UiConstants;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -19,10 +19,10 @@ public final class ImageCache {
     private static final Logger logger = LoggerFactory.getLogger(ImageCache.class);
 
     /** Maximum number of images to cache before eviction. */
-    private static final int MAX_CACHE_SIZE = CacheConstants.IMAGE_CACHE_MAX_SIZE;
+    private static final int MAX_CACHE_SIZE = UiConstants.IMAGE_CACHE_MAX_SIZE;
 
     /** Path to default avatar resource. */
-    private static final String DEFAULT_AVATAR_PATH = CacheConstants.DEFAULT_AVATAR_PATH;
+    private static final String DEFAULT_AVATAR_PATH = UiConstants.DEFAULT_AVATAR_PATH;
 
     /**
      * Thread-safe LRU cache using LinkedHashMap with access-order.

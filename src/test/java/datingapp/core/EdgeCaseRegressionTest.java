@@ -2,11 +2,14 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
-import datingapp.core.UserInteractions.Like;
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.service.*;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.testutil.TestClock;
@@ -195,7 +198,10 @@ class EdgeCaseRegressionTest {
         void emptyActiveUsersReturnsEmpty() {
             // Create minimal stubs for storage dependencies (not used by findCandidates)
             CandidateFinder finder = new CandidateFinder(
-                    createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage(), AppConfig.defaults());
+                    createStubUserStorage(),
+                    createStubLikeStorage(),
+                    createStubTrustSafetyStorage(),
+                    AppConfig.defaults());
             User seeker = createCompleteActiveUser("Seeker");
 
             var candidates = finder.findCandidates(seeker, List.of(), Set.of());
@@ -208,7 +214,10 @@ class EdgeCaseRegressionTest {
         void seekerWithNullInterestedIn() {
             // Create minimal stubs for storage dependencies (not used by findCandidates)
             CandidateFinder finder = new CandidateFinder(
-                    createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage(), AppConfig.defaults());
+                    createStubUserStorage(),
+                    createStubLikeStorage(),
+                    createStubTrustSafetyStorage(),
+                    AppConfig.defaults());
             User seeker = createCompleteActiveUser("Seeker");
             seeker.setInterestedIn(null);
 
@@ -224,7 +233,10 @@ class EdgeCaseRegressionTest {
         void candidateFinderFiltersBannedUsers() {
             // Create minimal stubs for storage dependencies (not used by findCandidates)
             CandidateFinder finder = new CandidateFinder(
-                    createStubUserStorage(), createStubLikeStorage(), createStubBlockStorage(), AppConfig.defaults());
+                    createStubUserStorage(),
+                    createStubLikeStorage(),
+                    createStubTrustSafetyStorage(),
+                    AppConfig.defaults());
 
             User seeker = createCompleteActiveUser("Seeker");
             User bannedUser = createCompleteActiveUser("Banned");
@@ -543,8 +555,8 @@ class EdgeCaseRegressionTest {
         };
     }
 
-    private static datingapp.core.storage.BlockStorage createStubBlockStorage() {
-        return new datingapp.core.storage.BlockStorage() {
+    private static datingapp.core.storage.TrustSafetyStorage createStubTrustSafetyStorage() {
+        return new datingapp.core.storage.TrustSafetyStorage() {
             @Override
             public Set<UUID> getBlockedUserIds(UUID userId) {
                 return Set.of();
@@ -566,7 +578,7 @@ class EdgeCaseRegressionTest {
             }
 
             @Override
-            public boolean delete(UUID blockerId, UUID blockedId) {
+            public boolean deleteBlock(UUID blockerId, UUID blockedId) {
                 return false;
             }
 
@@ -577,6 +589,31 @@ class EdgeCaseRegressionTest {
 
             @Override
             public int countBlocksReceived(UUID userId) {
+                return 0;
+            }
+
+            @Override
+            public void save(UserInteractions.Report report) {
+                // no-op for test
+            }
+
+            @Override
+            public int countReportsAgainst(UUID userId) {
+                return 0;
+            }
+
+            @Override
+            public boolean hasReported(UUID reporterId, UUID reportedUserId) {
+                return false;
+            }
+
+            @Override
+            public List<UserInteractions.Report> getReportsAgainst(UUID userId) {
+                return List.of();
+            }
+
+            @Override
+            public int countReportsBy(UUID userId) {
                 return 0;
             }
         };

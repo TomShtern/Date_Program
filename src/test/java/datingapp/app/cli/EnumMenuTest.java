@@ -3,6 +3,10 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.cli.CliSupport.EnumMenu;
+import datingapp.app.cli.CliSupport.InputReader;
+import datingapp.core.model.*;
+import datingapp.core.service.*;
 import java.io.StringReader;
 import java.util.EnumSet;
 import java.util.Optional;

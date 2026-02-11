@@ -1,22 +1,31 @@
 package datingapp.ui.controller;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
-import datingapp.core.ProfileCompletionService;
-import datingapp.core.User;
-import datingapp.core.User.Gender;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
+import datingapp.core.service.ProfileCompletionService;
 import datingapp.ui.NavigationService;
 import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
+import datingapp.ui.util.UiSupport;
 import datingapp.ui.viewmodel.LoginViewModel;
 import java.net.URL;
+import java.time.Instant;
+import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ResourceBundle;
+import javafx.animation.Interpolator;
+import javafx.animation.ScaleTransition;
 import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
@@ -28,11 +37,15 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Circle;
+import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,7 +144,7 @@ public class LoginController extends BaseController implements Initializable {
 
     private void bindUserList() {
         userListView.setItems(viewModel.getFilteredUsers());
-        userListView.setCellFactory(lv -> UserListCellFactory.create(profileCompletionService));
+        userListView.setCellFactory(lv -> UserListCellRenderer.create(profileCompletionService));
         addSubscription(userListView.getSelectionModel().selectedItemProperty().subscribe(viewModel::setSelectedUser));
         loginButton.disableProperty().bind(viewModel.loginDisabledProperty());
 
@@ -445,6 +458,200 @@ public class LoginController extends BaseController implements Initializable {
     private void logWarn(String message, Object... args) {
         if (logger.isWarnEnabled()) {
             logger.warn(message, args);
+        }
+    }
+
+    // --- User list cell rendering (inlined from UserListCellFactory) ---
+
+    private static final class UserListCellRenderer {
+        private static final String TEXT_UNKNOWN = "Unknown";
+        private static final String TEXT_ACTIVE_RECENTLY = "Active recently";
+        private static final String TEXT_ACTIVE_JUST_NOW = "Active just now";
+        private static final String TEXT_VERIFIED = " • Verified";
+        private static final String TEXT_PROFILE_PREFIX = "Profile ";
+        private static final String TEXT_PERCENT_SUFFIX = "%";
+        private static final String TEXT_ACTIVE_PREFIX = "Active ";
+        private static final String TEXT_MINUTES_SUFFIX = "m ago";
+        private static final String TEXT_HOURS_SUFFIX = "h ago";
+        private static final String TEXT_DAYS_SUFFIX = "d ago";
+        private static final String TEXT_WEEKS_SUFFIX = "w ago";
+        private static final String TEXT_MONTHS_SUFFIX = "mo ago";
+
+        private static final String CSS_LOGIN_AVATAR_CONTAINER = "login-avatar-container";
+        private static final String CSS_LOGIN_USER_CELL = "login-user-cell";
+        private static final String CSS_LOGIN_USER_NAME = "login-user-name";
+        private static final String CSS_TEXT_SECONDARY = "text-secondary";
+        private static final String CSS_LOGIN_USER_DETAILS = "login-user-details";
+        private static final String CSS_LOGIN_BADGE_ROW = "login-badge-row";
+        private static final String CSS_LOGIN_BADGE = "login-badge";
+        private static final String CSS_LOGIN_BADGE_PRIMARY = "login-badge-primary";
+        private static final String CSS_LOGIN_BADGE_MUTED = "login-badge-muted";
+        private static final String CSS_LOGIN_BADGE_SUCCESS = "login-badge-success";
+        private static final String CSS_LOGIN_BADGE_WARNING = "login-badge-warning";
+
+        @SuppressWarnings("PMD.UnnecessaryConstructor")
+        private UserListCellRenderer() {}
+
+        static ListCell<User> create(ProfileCompletionService profileCompletionService) {
+            return new UserListCell(profileCompletionService);
+        }
+
+        private static final class UserListCell extends ListCell<User> {
+            private static final double AVATAR_SIZE = 44;
+            private static final double SELECT_SCALE = 1.03;
+
+            private final ProfileCompletionService profileCompletionService;
+            private final HBox container = new HBox(15);
+            private final StackPane avatarContainer = new StackPane();
+            private final ImageView avatarView = new ImageView();
+            private final Circle avatarClip = new Circle(AVATAR_SIZE / 2);
+            private final VBox textBox = new VBox(2);
+            private final Label nameLabel = new Label();
+            private final Label detailsLabel = new Label();
+            private final HBox badgeRow = new HBox(6);
+            private final Label completionBadge = new Label();
+            private final Label activityBadge = new Label();
+
+            private UserListCell(ProfileCompletionService profileCompletionService) {
+                this.profileCompletionService = profileCompletionService;
+                avatarView.setFitWidth(AVATAR_SIZE);
+                avatarView.setFitHeight(AVATAR_SIZE);
+                avatarView.setPreserveRatio(true);
+                avatarClip.setCenterX(AVATAR_SIZE / 2);
+                avatarClip.setCenterY(AVATAR_SIZE / 2);
+                avatarView.setClip(avatarClip);
+
+                avatarContainer.getStyleClass().add(CSS_LOGIN_AVATAR_CONTAINER);
+                avatarContainer.getChildren().add(avatarView);
+
+                container.getStyleClass().add(CSS_LOGIN_USER_CELL);
+                nameLabel.getStyleClass().add(CSS_LOGIN_USER_NAME);
+                detailsLabel.getStyleClass().addAll(CSS_TEXT_SECONDARY, CSS_LOGIN_USER_DETAILS);
+
+                badgeRow.getStyleClass().add(CSS_LOGIN_BADGE_ROW);
+                completionBadge.getStyleClass().addAll(CSS_LOGIN_BADGE, CSS_LOGIN_BADGE_PRIMARY);
+                activityBadge.getStyleClass().addAll(CSS_LOGIN_BADGE, CSS_LOGIN_BADGE_MUTED);
+                badgeRow.getChildren().addAll(completionBadge, activityBadge);
+
+                textBox.getChildren().addAll(nameLabel, detailsLabel, badgeRow);
+                container.setAlignment(Pos.CENTER_LEFT);
+                container.setPadding(new Insets(8, 12, 8, 12));
+                container.getChildren().addAll(avatarContainer, textBox);
+
+                selectedProperty().addListener((obs, oldVal, newVal) -> animateSelection(newVal));
+            }
+
+            @Override
+            protected void updateItem(User user, boolean empty) {
+                super.updateItem(user, empty);
+                if (empty || user == null) {
+                    setText(null);
+                    setGraphic(null);
+                    container.setScaleX(1.0);
+                    container.setScaleY(1.0);
+                } else {
+                    setText(null);
+                    nameLabel.setText(user.getName() + ", " + user.getAge());
+
+                    StringBuilder sb = new StringBuilder(formatState(user.getState()));
+                    if (user.isVerified()) {
+                        sb.append(TEXT_VERIFIED);
+                    }
+                    detailsLabel.setText(sb.toString());
+
+                    updateCompletionBadge(user);
+                    activityBadge.setText(formatActivity(user.getUpdatedAt()));
+                    avatarView.setImage(UiSupport.getAvatar(resolveAvatarPath(user), AVATAR_SIZE));
+
+                    setGraphic(container);
+                }
+            }
+
+            private void updateCompletionBadge(User user) {
+                ProfileCompletionService.CompletionResult result = profileCompletionService.calculate(user);
+                int score = result.score();
+                completionBadge.setText(TEXT_PROFILE_PREFIX + score + TEXT_PERCENT_SUFFIX);
+
+                completionBadge
+                        .getStyleClass()
+                        .removeAll(CSS_LOGIN_BADGE_PRIMARY, CSS_LOGIN_BADGE_SUCCESS, CSS_LOGIN_BADGE_WARNING);
+                if (score >= 90) {
+                    completionBadge.getStyleClass().add(CSS_LOGIN_BADGE_SUCCESS);
+                } else if (score >= 60) {
+                    completionBadge.getStyleClass().add(CSS_LOGIN_BADGE_PRIMARY);
+                } else {
+                    completionBadge.getStyleClass().add(CSS_LOGIN_BADGE_WARNING);
+                }
+            }
+
+            private void animateSelection(boolean selected) {
+                double target = selected ? SELECT_SCALE : 1.0;
+                ScaleTransition transition = new ScaleTransition(Duration.millis(140), container);
+                transition.setInterpolator(Interpolator.EASE_OUT);
+                transition.setToX(target);
+                transition.setToY(target);
+                transition.play();
+            }
+
+            private static String resolveAvatarPath(User user) {
+                List<String> urls = user.getPhotoUrls();
+                if (urls == null || urls.isEmpty()) {
+                    return null;
+                }
+                String first = urls.get(0);
+                if (first == null || first.isBlank()) {
+                    return null;
+                }
+                if (first.startsWith("placeholder://")) {
+                    return null;
+                }
+                return first;
+            }
+
+            private static String formatState(UserState state) {
+                if (state == null) {
+                    return TEXT_UNKNOWN;
+                }
+                String raw = state.name().toLowerCase(Locale.ROOT);
+                return Character.toUpperCase(raw.charAt(0)) + raw.substring(1);
+            }
+
+            private static String formatActivity(Instant updatedAt) {
+                if (updatedAt == null) {
+                    return TEXT_ACTIVE_RECENTLY;
+                }
+
+                java.time.Duration duration = java.time.Duration.between(updatedAt, AppClock.now());
+                if (duration.isNegative()) {
+                    duration = java.time.Duration.ZERO;
+                }
+
+                long minutes = duration.toMinutes();
+                if (minutes < 1) {
+                    return TEXT_ACTIVE_JUST_NOW;
+                }
+                if (minutes < 60) {
+                    return TEXT_ACTIVE_PREFIX + minutes + TEXT_MINUTES_SUFFIX;
+                }
+
+                long hours = duration.toHours();
+                if (hours < 24) {
+                    return TEXT_ACTIVE_PREFIX + hours + TEXT_HOURS_SUFFIX;
+                }
+
+                long days = duration.toDays();
+                if (days < 7) {
+                    return TEXT_ACTIVE_PREFIX + days + TEXT_DAYS_SUFFIX;
+                }
+
+                long weeks = days / 7;
+                if (weeks < 5) {
+                    return TEXT_ACTIVE_PREFIX + weeks + TEXT_WEEKS_SUFFIX;
+                }
+
+                long months = days / 30;
+                return TEXT_ACTIVE_PREFIX + months + TEXT_MONTHS_SUFFIX;
+            }
         }
     }
 }

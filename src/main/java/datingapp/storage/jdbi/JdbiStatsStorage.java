@@ -1,15 +1,15 @@
 package datingapp.storage.jdbi;
 
-import datingapp.core.Achievement;
-import datingapp.core.Achievement.UserAchievement;
 import datingapp.core.AppClock;
-import datingapp.core.Stats.PlatformStats;
-import datingapp.core.Stats.UserStats;
+import datingapp.core.model.Achievement;
+import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.Stats.PlatformStats;
+import datingapp.core.model.Stats.UserStats;
 import datingapp.core.storage.StatsStorage;
-import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -222,12 +222,33 @@ public interface JdbiStatsStorage extends StatsStorage {
     int countUnlockedAchievements(@Bind("userId") UUID userId);
 
     // ═══════════════════════════════════════════════════════════════
+    // Daily Pick View Operations
+    // ═══════════════════════════════════════════════════════════════
+
+    @SqlUpdate(
+            "MERGE INTO daily_pick_views (user_id, viewed_date, viewed_at) KEY (user_id, viewed_date) VALUES (:userId, :date, :at)")
+    void saveDailyPickView(@Bind("userId") UUID userId, @Bind("date") LocalDate date, @Bind("at") Instant at);
+
+    @Override
+    default void markDailyPickAsViewed(UUID userId, LocalDate date) {
+        saveDailyPickView(userId, date, AppClock.now());
+    }
+
+    @Override
+    @SqlQuery("SELECT COUNT(*) > 0 FROM daily_pick_views WHERE user_id = :userId AND viewed_date = :date")
+    boolean isDailyPickViewed(@Bind("userId") UUID userId, @Bind("date") LocalDate date);
+
+    @Override
+    @SqlUpdate("DELETE FROM daily_pick_views WHERE viewed_date < :before")
+    int deleteDailyPickViewsOlderThan(@Bind("before") LocalDate before);
+
+    // ═══════════════════════════════════════════════════════════════
     // Cleanup Operations
     // ═══════════════════════════════════════════════════════════════
 
     /**
      * Deletes expired daily pick view records older than the cutoff date.
-     * Used by CleanupService to purge stale tracking data.
+     * Used by SessionService to purge stale tracking data.
      */
     @SqlUpdate("DELETE FROM daily_pick_views WHERE viewed_at < :cutoff")
     @Override

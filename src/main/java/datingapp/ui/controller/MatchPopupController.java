@@ -1,7 +1,7 @@
 package datingapp.ui.controller;
 
-import datingapp.core.User;
-import datingapp.ui.util.ConfettiAnimation;
+import datingapp.core.model.User;
+import datingapp.ui.util.UiAnimations.ConfettiAnimation;
 import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.animation.FadeTransition;

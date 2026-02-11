@@ -1,8 +1,10 @@
 package datingapp.core.testutil;
 
 import datingapp.core.AppClock;
-import datingapp.core.User;
-import datingapp.core.User.Gender;
+import datingapp.core.model.*;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.service.*;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -43,11 +45,11 @@ public final class TestUserFactory {
                 .photoUrls(java.util.List.of("http://example.com/photo.jpg"))
                 .location(32.0853, 34.7818)
                 .hasLocationSet(true)
-                .pacePreferences(new datingapp.core.PacePreferences(
-                        datingapp.core.PacePreferences.MessagingFrequency.OFTEN,
-                        datingapp.core.PacePreferences.TimeToFirstDate.FEW_DAYS,
-                        datingapp.core.PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
-                        datingapp.core.PacePreferences.DepthPreference.DEEP_CHAT))
+                .pacePreferences(new datingapp.core.model.Preferences.PacePreferences(
+                        datingapp.core.model.Preferences.PacePreferences.MessagingFrequency.OFTEN,
+                        datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
+                        datingapp.core.model.Preferences.PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                        datingapp.core.model.Preferences.PacePreferences.DepthPreference.DEEP_CHAT))
                 .build();
     }
 

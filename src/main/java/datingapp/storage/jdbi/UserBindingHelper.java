@@ -1,8 +1,8 @@
 package datingapp.storage.jdbi;
 
-import datingapp.core.Dealbreakers;
-import datingapp.core.PacePreferences;
-import datingapp.core.User;
+import datingapp.core.model.Dealbreakers;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.User;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;

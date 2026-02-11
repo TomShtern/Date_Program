@@ -1,7 +1,7 @@
 package datingapp.ui.controller;
 
-import datingapp.core.Match;
-import datingapp.core.User;
+import datingapp.core.model.Match;
+import datingapp.core.model.User;
 import datingapp.ui.NavigationService;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.MatchingViewModel;

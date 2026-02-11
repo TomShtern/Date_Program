@@ -2,11 +2,13 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.Stats.PlatformStats;
-import datingapp.core.Stats.UserStats;
-import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.Report;
+import datingapp.core.model.*;
+import datingapp.core.model.Stats.PlatformStats;
+import datingapp.core.model.Stats.UserStats;
+import datingapp.core.model.UserInteractions.Block;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.UserInteractions.Report;
+import datingapp.core.service.*;
 import datingapp.core.storage.*;
 import java.time.Instant;
 import java.util.*;
@@ -24,8 +26,7 @@ class StatsServiceTest {
 
     private InMemoryLikeStorage likeStorage;
     private InMemoryMatchStorage matchStorage;
-    private InMemoryBlockStorage blockStorage;
-    private InMemoryReportStorage reportStorage;
+    private InMemoryTrustSafetyStorage trustSafetyStorage;
     private InMemoryStatsStorage statsStorage;
     private StatsService statsService;
 
@@ -36,11 +37,10 @@ class StatsServiceTest {
     void setUp() {
         likeStorage = new InMemoryLikeStorage();
         matchStorage = new InMemoryMatchStorage();
-        blockStorage = new InMemoryBlockStorage();
-        reportStorage = new InMemoryReportStorage();
+        trustSafetyStorage = new InMemoryTrustSafetyStorage();
         statsStorage = new InMemoryStatsStorage();
 
-        statsService = new StatsService(likeStorage, matchStorage, blockStorage, reportStorage, statsStorage);
+        statsService = new StatsService(likeStorage, matchStorage, trustSafetyStorage, statsStorage);
 
         userId = UUID.randomUUID();
         otherUserId = UUID.randomUUID();
@@ -149,9 +149,9 @@ class StatsServiceTest {
         @Test
         @DisplayName("Counts blocks given and received")
         void countsBlocksGivenAndReceived() {
-            blockStorage.addBlock(userId, UUID.randomUUID()); // User blocked someone
-            blockStorage.addBlock(userId, UUID.randomUUID()); // User blocked another
-            blockStorage.addBlock(UUID.randomUUID(), userId); // Someone blocked user
+            trustSafetyStorage.addBlock(userId, UUID.randomUUID()); // User blocked someone
+            trustSafetyStorage.addBlock(userId, UUID.randomUUID()); // User blocked another
+            trustSafetyStorage.addBlock(UUID.randomUUID(), userId); // Someone blocked user
 
             UserStats stats = statsService.computeAndSaveStats(userId);
 
@@ -162,9 +162,9 @@ class StatsServiceTest {
         @Test
         @DisplayName("Counts reports given and received")
         void countsReportsGivenAndReceived() {
-            reportStorage.addReport(userId, UUID.randomUUID()); // User reported someone
-            reportStorage.addReport(UUID.randomUUID(), userId); // Someone reported user
-            reportStorage.addReport(UUID.randomUUID(), userId); // Another reported user
+            trustSafetyStorage.addReport(userId, UUID.randomUUID()); // User reported someone
+            trustSafetyStorage.addReport(UUID.randomUUID(), userId); // Someone reported user
+            trustSafetyStorage.addReport(UUID.randomUUID(), userId); // Another reported user
 
             UserStats stats = statsService.computeAndSaveStats(userId);
 
@@ -485,12 +485,9 @@ class StatsServiceTest {
         }
     }
 
-    private static class InMemoryBlockStorage implements BlockStorage {
+    private static class InMemoryTrustSafetyStorage implements TrustSafetyStorage {
         private final List<Block> blocks = new ArrayList<>();
-
-        void addBlock(UUID blocker, UUID blocked) {
-            blocks.add(Block.create(blocker, blocked));
-        }
+        private final List<Report> reports = new ArrayList<>();
 
         @Override
         public void save(Block block) {
@@ -507,12 +504,9 @@ class StatsServiceTest {
         @Override
         public Set<UUID> getBlockedUserIds(UUID userId) {
             Set<UUID> result = new HashSet<>();
-            for (Block b : blocks) {
-                if (b.blockerId().equals(userId)) {
-                    result.add(b.blockedId());
-                } else if (b.blockedId().equals(userId)) {
-                    result.add(b.blockerId());
-                }
+            for (Block block : blocks) {
+                if (block.blockerId().equals(userId)) result.add(block.blockedId());
+                if (block.blockedId().equals(userId)) result.add(block.blockerId());
             }
             return result;
         }
@@ -523,7 +517,7 @@ class StatsServiceTest {
         }
 
         @Override
-        public boolean delete(UUID blockerId, UUID blockedId) {
+        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
             return blocks.removeIf(
                     b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
         }
@@ -539,31 +533,10 @@ class StatsServiceTest {
             return (int)
                     blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
         }
-    }
-
-    private static class InMemoryReportStorage implements ReportStorage {
-        private final List<Report> reports = new ArrayList<>();
-
-        void addReport(UUID reporter, UUID reported) {
-            reports.add(Report.create(reporter, reported, Report.Reason.INAPPROPRIATE_CONTENT, null));
-        }
 
         @Override
         public void save(Report report) {
             reports.add(report);
-        }
-
-        @Override
-        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
-            return reports.stream()
-                    .anyMatch(r -> r.reporterId().equals(reporterId)
-                            && r.reportedUserId().equals(reportedUserId));
-        }
-
-        @Override
-        public int countReportsBy(UUID userId) {
-            return (int)
-                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
         }
 
         @Override
@@ -574,10 +547,32 @@ class StatsServiceTest {
         }
 
         @Override
+        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
+            return reports.stream()
+                    .anyMatch(r -> r.reporterId().equals(reporterId)
+                            && r.reportedUserId().equals(reportedUserId));
+        }
+
+        @Override
         public List<Report> getReportsAgainst(UUID userId) {
             return reports.stream()
                     .filter(r -> r.reportedUserId().equals(userId))
                     .toList();
+        }
+
+        @Override
+        public int countReportsBy(UUID userId) {
+            return (int)
+                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
+        }
+
+        // Test helpers
+        void addBlock(UUID blockerId, UUID blockedId) {
+            blocks.add(Block.create(blockerId, blockedId));
+        }
+
+        void addReport(UUID reporterId, UUID reportedUserId) {
+            reports.add(Report.create(reporterId, reportedUserId, Report.Reason.SPAM, null));
         }
     }
 
@@ -683,6 +678,21 @@ class StatsServiceTest {
 
         @Override
         public int deleteExpiredDailyPickViews(Instant cutoff) {
+            return 0; // Not needed for stats tests
+        }
+
+        @Override
+        public void markDailyPickAsViewed(UUID userId, java.time.LocalDate date) {
+            // Not needed for stats tests
+        }
+
+        @Override
+        public boolean isDailyPickViewed(UUID userId, java.time.LocalDate date) {
+            return false; // Not needed for stats tests
+        }
+
+        @Override
+        public int deleteDailyPickViewsOlderThan(java.time.LocalDate before) {
             return 0; // Not needed for stats tests
         }
     }

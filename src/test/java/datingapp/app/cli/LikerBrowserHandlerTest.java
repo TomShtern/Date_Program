@@ -2,11 +2,14 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.*;
-import datingapp.core.PacePreferences;
-import datingapp.core.User.Gender;
-import datingapp.core.User.VerificationMethod;
-import datingapp.core.UserInteractions.Like;
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.VerificationMethod;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.service.*;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.time.LocalDate;
@@ -15,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
 
 /**
- * Unit tests for LikerBrowserHandler CLI commands: browseWhoLikedMe().
+ * Unit tests for liker browser CLI commands: browseWhoLikedMe().
  */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class LikerBrowserHandlerTest {
@@ -23,7 +26,10 @@ class LikerBrowserHandlerTest {
     private TestStorages.Users userStorage;
     private TestStorages.Likes likeStorage;
     private TestStorages.Matches matchStorage;
-    private TestStorages.Blocks blockStorage;
+    private TestStorages.TrustSafety trustSafetyStorage;
+    private TestStorages.Stats statsStorage;
+    private TestStorages.Social socialStorage;
+    private TestStorages.Messaging messagingStorage;
     private AppSession session;
     private User testUser;
 
@@ -32,7 +38,10 @@ class LikerBrowserHandlerTest {
         userStorage = new TestStorages.Users();
         likeStorage = new TestStorages.Likes();
         matchStorage = new TestStorages.Matches();
-        blockStorage = new TestStorages.Blocks();
+        trustSafetyStorage = new TestStorages.TrustSafety();
+        statsStorage = new TestStorages.Stats();
+        socialStorage = new TestStorages.Social();
+        messagingStorage = new TestStorages.Messaging();
 
         session = AppSession.getInstance();
         session.reset();
@@ -42,15 +51,43 @@ class LikerBrowserHandlerTest {
         session.setCurrentUser(testUser);
     }
 
-    private LikerBrowserHandler createHandler(String input) {
+    private MatchingHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
+        AppConfig config = AppConfig.defaults();
         MatchingService matchingService = MatchingService.builder()
                 .likeStorage(likeStorage)
                 .matchStorage(matchStorage)
                 .userStorage(userStorage)
-                .blockStorage(blockStorage)
+                .trustSafetyStorage(trustSafetyStorage)
                 .build();
-        return new LikerBrowserHandler(matchingService, session, inputReader);
+        CandidateFinder candidateFinder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, config);
+        MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
+        ProfileCompletionService profileCompletionService = new ProfileCompletionService(config);
+        MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
+                candidateFinder,
+                matchingService,
+                matchStorage,
+                trustSafetyStorage,
+                new DailyService(likeStorage, config),
+                new UndoService(likeStorage, matchStorage, new TestStorages.Undos(), config),
+                matchQualityService,
+                userStorage,
+                new AchievementService(
+                        statsStorage,
+                        matchStorage,
+                        likeStorage,
+                        userStorage,
+                        trustSafetyStorage,
+                        profileCompletionService,
+                        config),
+                statsStorage,
+                new RelationshipTransitionService(matchStorage, socialStorage, messagingStorage),
+                new StandoutsService(
+                        userStorage, new TestStorages.Standouts(), candidateFinder, profileCompletionService, config),
+                socialStorage,
+                session,
+                inputReader);
+        return new MatchingHandler(deps);
     }
 
     @SuppressWarnings("unused")
@@ -61,7 +98,7 @@ class LikerBrowserHandlerTest {
         @Test
         @DisplayName("Shows message when no likes")
         void showsMessageWhenNoLikes() {
-            LikerBrowserHandler handler = createHandler("0\n");
+            MatchingHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(handler::browseWhoLikedMe);
         }
@@ -76,7 +113,7 @@ class LikerBrowserHandlerTest {
             likeStorage.save(like);
 
             // Stop after viewing list
-            LikerBrowserHandler handler = createHandler("0\n");
+            MatchingHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(handler::browseWhoLikedMe);
         }
@@ -91,7 +128,7 @@ class LikerBrowserHandlerTest {
             likeStorage.save(like);
 
             // Like back
-            LikerBrowserHandler handler = createHandler("1\n0\n");
+            MatchingHandler handler = createHandler("1\n0\n");
             handler.browseWhoLikedMe();
 
             // Should have a mutual like now
@@ -108,7 +145,7 @@ class LikerBrowserHandlerTest {
             likeStorage.save(like);
 
             // Like back
-            LikerBrowserHandler handler = createHandler("1\n0\n");
+            MatchingHandler handler = createHandler("1\n0\n");
             handler.browseWhoLikedMe();
 
             // Should have created a match
@@ -126,7 +163,7 @@ class LikerBrowserHandlerTest {
             likeStorage.save(like);
 
             // Pass
-            LikerBrowserHandler handler = createHandler("2\n0\n");
+            MatchingHandler handler = createHandler("2\n0\n");
             handler.browseWhoLikedMe();
 
             // Should have a pass
@@ -147,7 +184,7 @@ class LikerBrowserHandlerTest {
             likeStorage.save(Like.create(liker2.getId(), testUser.getId(), Like.Direction.LIKE));
 
             // Stop immediately
-            LikerBrowserHandler handler = createHandler("0\n");
+            MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();
 
             // Should not have interacted with any likers
@@ -165,9 +202,10 @@ class LikerBrowserHandlerTest {
             likeStorage.save(Like.create(blockedLiker.getId(), testUser.getId(), Like.Direction.LIKE));
 
             // But we blocked them
-            blockStorage.save(datingapp.core.UserInteractions.Block.create(testUser.getId(), blockedLiker.getId()));
+            trustSafetyStorage.save(
+                    datingapp.core.model.UserInteractions.Block.create(testUser.getId(), blockedLiker.getId()));
 
-            LikerBrowserHandler handler = createHandler("0\n");
+            MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();
 
             // Should show "No new likes yet" since the only liker is blocked
@@ -187,7 +225,7 @@ class LikerBrowserHandlerTest {
             Match match = Match.create(testUser.getId(), matchedUser.getId());
             matchStorage.save(match);
 
-            LikerBrowserHandler handler = createHandler("0\n");
+            MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();
 
             // Should not show matched user in pending likers
@@ -205,7 +243,7 @@ class LikerBrowserHandlerTest {
             // We already responded with a pass
             likeStorage.save(Like.create(testUser.getId(), liker.getId(), Like.Direction.PASS));
 
-            LikerBrowserHandler handler = createHandler("0\n");
+            MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();
 
             // Should not show in pending likers
@@ -224,7 +262,7 @@ class LikerBrowserHandlerTest {
             // They liked us before becoming inactive
             likeStorage.save(Like.create(inactiveLiker.getId(), testUser.getId(), Like.Direction.LIKE));
 
-            LikerBrowserHandler handler = createHandler("0\n");
+            MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();
 
             // Should not show inactive user in pending likers
@@ -239,7 +277,7 @@ class LikerBrowserHandlerTest {
             likeStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
 
             // Like and continue - should reach end of list
-            LikerBrowserHandler handler = createHandler("1\n");
+            MatchingHandler handler = createHandler("1\n");
 
             assertDoesNotThrow(handler::browseWhoLikedMe);
         }
@@ -253,7 +291,7 @@ class LikerBrowserHandlerTest {
 
             likeStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
 
-            LikerBrowserHandler handler = createHandler("1\n");
+            MatchingHandler handler = createHandler("1\n");
             handler.browseWhoLikedMe();
 
             // Should not have recorded any interaction
@@ -269,7 +307,7 @@ class LikerBrowserHandlerTest {
             likeStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
 
             // Invalid selection, then stop
-            LikerBrowserHandler handler = createHandler("99\n0\n");
+            MatchingHandler handler = createHandler("99\n0\n");
 
             assertDoesNotThrow(handler::browseWhoLikedMe);
         }
@@ -284,7 +322,7 @@ class LikerBrowserHandlerTest {
 
             likeStorage.save(Like.create(verifiedLiker.getId(), testUser.getId(), Like.Direction.LIKE));
 
-            LikerBrowserHandler handler = createHandler("0\n");
+            MatchingHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(handler::browseWhoLikedMe);
         }
@@ -298,7 +336,7 @@ class LikerBrowserHandlerTest {
 
             likeStorage.save(Like.create(likerWithBio.getId(), testUser.getId(), Like.Direction.LIKE));
 
-            LikerBrowserHandler handler = createHandler("0\n");
+            MatchingHandler handler = createHandler("0\n");
 
             assertDoesNotThrow(handler::browseWhoLikedMe);
         }

@@ -1,8 +1,7 @@
 package datingapp.storage.jdbi;
 
-import datingapp.core.UserInteractions.Like;
+import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.storage.LikeStorage;
-import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;

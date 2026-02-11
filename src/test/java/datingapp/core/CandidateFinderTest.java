@@ -3,13 +3,17 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.CandidateFinder.GeoUtils;
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
-import datingapp.core.storage.BlockStorage;
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.model.UserInteractions.Report;
+import datingapp.core.service.*;
+import datingapp.core.service.CandidateFinder.GeoUtils;
 import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
@@ -146,7 +150,7 @@ class CandidateFinderTest {
                 // no-op for test
             }
         };
-        BlockStorage blockStorage = new BlockStorage() {
+        TrustSafetyStorage trustSafetyStorage = new TrustSafetyStorage() {
             @Override
             public Set<UUID> getBlockedUserIds(UUID userId) {
                 return Set.of();
@@ -168,7 +172,7 @@ class CandidateFinderTest {
             }
 
             @Override
-            public boolean delete(UUID blockerId, UUID blockedId) {
+            public boolean deleteBlock(UUID blockerId, UUID blockedId) {
                 return false;
             }
 
@@ -181,9 +185,32 @@ class CandidateFinderTest {
             public int countBlocksReceived(UUID userId) {
                 return 0;
             }
+
+            @Override
+            public void save(Report report) {}
+
+            @Override
+            public int countReportsAgainst(UUID userId) {
+                return 0;
+            }
+
+            @Override
+            public boolean hasReported(UUID reporterId, UUID reportedUserId) {
+                return false;
+            }
+
+            @Override
+            public List<Report> getReportsAgainst(UUID userId) {
+                return List.of();
+            }
+
+            @Override
+            public int countReportsBy(UUID userId) {
+                return 0;
+            }
         };
 
-        finder = new CandidateFinder(userStorage, likeStorage, blockStorage, AppConfig.defaults());
+        finder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, AppConfig.defaults());
         seeker = createUser("Seeker", User.Gender.MALE, EnumSet.of(User.Gender.FEMALE), 30, 32.0853, 34.7818);
     }
 

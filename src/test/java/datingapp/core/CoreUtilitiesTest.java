@@ -6,8 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.CandidateFinder.GeoUtils;
-import datingapp.core.Preferences.Interest;
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.Interest;
+import datingapp.core.service.*;
+import datingapp.core.service.CandidateFinder.GeoUtils;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;

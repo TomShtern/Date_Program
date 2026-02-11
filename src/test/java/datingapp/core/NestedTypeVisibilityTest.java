@@ -2,8 +2,11 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.app.cli.InputReader;
-import datingapp.ui.util.ConfettiAnimation;
+import datingapp.app.cli.CliSupport.InputReader;
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.service.*;
+import datingapp.ui.util.UiAnimations;
 import java.lang.reflect.Modifier;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
@@ -80,8 +83,10 @@ class NestedTypeVisibilityTest {
                 Modifier.isPublic(User.VerificationMethod.class.getModifiers()),
                 "User.VerificationMethod must be public");
         assertTrue(Modifier.isPublic(PacePreferences.class.getModifiers()), "PacePreferences must be public");
-        assertTrue(Modifier.isPublic(DailyPick.class.getModifiers()), "DailyPick must be public");
+        assertTrue(Modifier.isPublic(DailyService.DailyPick.class.getModifiers()), "DailyPick must be public");
         assertTrue(Modifier.isPublic(InputReader.class.getModifiers()), "InputReader must be public");
-        assertTrue(Modifier.isPublic(ConfettiAnimation.class.getModifiers()), "ConfettiAnimation must be public");
+        assertTrue(
+                Modifier.isPublic(UiAnimations.ConfettiAnimation.class.getModifiers()),
+                "ConfettiAnimation must be public");
     }
 }

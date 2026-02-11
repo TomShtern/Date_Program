@@ -3,6 +3,8 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import datingapp.core.model.*;
+import datingapp.core.service.*;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.StorageFactory;
 import java.util.UUID;
@@ -96,15 +98,9 @@ class ServiceRegistryTest {
         }
 
         @Test
-        @DisplayName("getBlockStorage returns non-null")
-        void getBlockStorage() {
-            assertNotNull(registry.getBlockStorage());
-        }
-
-        @Test
-        @DisplayName("getReportStorage returns non-null")
-        void getReportStorage() {
-            assertNotNull(registry.getReportStorage());
+        @DisplayName("getTrustSafetyStorage returns non-null")
+        void getTrustSafetyStorage() {
+            assertNotNull(registry.getTrustSafetyStorage());
         }
 
         @Test

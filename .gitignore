@@ -131,3 +131,4 @@ cUserstom7sAppDataLocalTempclaude-*
 2026-02-01-static-nested-types-claude.txt
 /.ai/mcp/mcp.json
 /.output.txt
+.claude/settings.local.json

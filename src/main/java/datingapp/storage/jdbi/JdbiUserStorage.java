@@ -1,15 +1,14 @@
 package datingapp.storage.jdbi;
 
-import datingapp.core.Dealbreakers;
-import datingapp.core.PacePreferences;
-import datingapp.core.Preferences.Interest;
-import datingapp.core.Preferences.Lifestyle;
-import datingapp.core.User;
-import datingapp.core.User.Gender;
-import datingapp.core.User.ProfileNote;
-import datingapp.core.User.UserState;
-import datingapp.core.User.VerificationMethod;
-import datingapp.storage.mapper.MapperHelper;
+import datingapp.core.model.Dealbreakers;
+import datingapp.core.model.Preferences.Interest;
+import datingapp.core.model.Preferences.Lifestyle;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.User.UserState;
+import datingapp.core.model.User.VerificationMethod;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;

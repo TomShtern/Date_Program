@@ -1,6 +1,6 @@
 package datingapp.storage.jdbi;
 
-import datingapp.core.Standout;
+import datingapp.core.model.Standout;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;

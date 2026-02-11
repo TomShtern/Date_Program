@@ -1,7 +1,11 @@
 package datingapp.ui.util;
 
-import datingapp.ui.constants.AnimationConstants;
+import datingapp.ui.constants.UiConstants;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import javafx.animation.Animation;
+import javafx.animation.AnimationTimer;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
@@ -10,6 +14,8 @@ import javafx.animation.ScaleTransition;
 import javafx.animation.Timeline;
 import javafx.animation.TranslateTransition;
 import javafx.scene.Node;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
@@ -52,11 +58,11 @@ public final class UiAnimations {
      * Adds a subtle pulse effect on hover.
      */
     public static void addPulseOnHover(Node node) {
-        ScaleTransition st = new ScaleTransition(AnimationConstants.HOVER_PULSE_DURATION, node);
+        ScaleTransition st = new ScaleTransition(UiConstants.HOVER_PULSE_DURATION, node);
         st.setFromX(1.0);
         st.setFromY(1.0);
-        st.setToX(AnimationConstants.HOVER_PULSE_SCALE);
-        st.setToY(AnimationConstants.HOVER_PULSE_SCALE);
+        st.setToX(UiConstants.HOVER_PULSE_SCALE);
+        st.setToY(UiConstants.HOVER_PULSE_SCALE);
 
         node.setOnMouseEntered(e -> {
             e.consume();
@@ -75,11 +81,11 @@ public final class UiAnimations {
      * Per JavaFX Skill Cheatsheet Section 14.
      */
     public static void pulseScale(Node node) {
-        ScaleTransition scale = new ScaleTransition(AnimationConstants.BUTTON_PULSE_DURATION, node);
-        scale.setToX(AnimationConstants.BUTTON_PULSE_SCALE);
-        scale.setToY(AnimationConstants.BUTTON_PULSE_SCALE);
+        ScaleTransition scale = new ScaleTransition(UiConstants.BUTTON_PULSE_DURATION, node);
+        scale.setToX(UiConstants.BUTTON_PULSE_SCALE);
+        scale.setToY(UiConstants.BUTTON_PULSE_SCALE);
         scale.setAutoReverse(true);
-        scale.setCycleCount(AnimationConstants.BUTTON_PULSE_CYCLES);
+        scale.setCycleCount(UiConstants.BUTTON_PULSE_CYCLES);
         scale.play();
     }
 
@@ -92,22 +98,22 @@ public final class UiAnimations {
     public static void addPulsingGlow(Node node, Color glowColor) {
         DropShadow glow = new DropShadow();
         glow.setColor(glowColor);
-        glow.setRadius(AnimationConstants.GLOW_RADIUS_MIN);
-        glow.setSpread(AnimationConstants.GLOW_SPREAD_INITIAL);
+        glow.setRadius(UiConstants.GLOW_RADIUS_MIN);
+        glow.setSpread(UiConstants.GLOW_SPREAD_INITIAL);
 
         Timeline timeline = new Timeline(
                 new KeyFrame(
-                        AnimationConstants.GLOW_START_TIME,
-                        new KeyValue(glow.radiusProperty(), AnimationConstants.GLOW_RADIUS_MIN),
-                        new KeyValue(glow.spreadProperty(), AnimationConstants.GLOW_SPREAD_MIN)),
+                        UiConstants.GLOW_START_TIME,
+                        new KeyValue(glow.radiusProperty(), UiConstants.GLOW_RADIUS_MIN),
+                        new KeyValue(glow.spreadProperty(), UiConstants.GLOW_SPREAD_MIN)),
                 new KeyFrame(
-                        AnimationConstants.GLOW_MID_TIME,
-                        new KeyValue(glow.radiusProperty(), AnimationConstants.GLOW_RADIUS_MAX),
-                        new KeyValue(glow.spreadProperty(), AnimationConstants.GLOW_SPREAD_MAX)),
+                        UiConstants.GLOW_MID_TIME,
+                        new KeyValue(glow.radiusProperty(), UiConstants.GLOW_RADIUS_MAX),
+                        new KeyValue(glow.spreadProperty(), UiConstants.GLOW_SPREAD_MAX)),
                 new KeyFrame(
-                        AnimationConstants.GLOW_END_TIME,
-                        new KeyValue(glow.radiusProperty(), AnimationConstants.GLOW_RADIUS_MIN),
-                        new KeyValue(glow.spreadProperty(), AnimationConstants.GLOW_SPREAD_MIN)));
+                        UiConstants.GLOW_END_TIME,
+                        new KeyValue(glow.radiusProperty(), UiConstants.GLOW_RADIUS_MIN),
+                        new KeyValue(glow.spreadProperty(), UiConstants.GLOW_SPREAD_MIN)));
         timeline.setCycleCount(Animation.INDEFINITE);
 
         node.setEffect(glow);
@@ -149,13 +155,13 @@ public final class UiAnimations {
      * @return The ScaleTransition (not yet played)
      */
     public static ScaleTransition createPulse(Node node) {
-        ScaleTransition pulse = new ScaleTransition(AnimationConstants.ICON_PULSE_DURATION, node);
+        ScaleTransition pulse = new ScaleTransition(UiConstants.ICON_PULSE_DURATION, node);
         pulse.setFromX(1.0);
         pulse.setFromY(1.0);
-        pulse.setToX(AnimationConstants.ICON_PULSE_SCALE);
-        pulse.setToY(AnimationConstants.ICON_PULSE_SCALE);
+        pulse.setToX(UiConstants.ICON_PULSE_SCALE);
+        pulse.setToY(UiConstants.ICON_PULSE_SCALE);
         pulse.setAutoReverse(true);
-        pulse.setCycleCount(AnimationConstants.ICON_PULSE_CYCLES);
+        pulse.setCycleCount(UiConstants.ICON_PULSE_CYCLES);
         return pulse;
     }
 
@@ -165,10 +171,10 @@ public final class UiAnimations {
      * @param node The node to shake
      */
     public static void playShake(Node node) {
-        TranslateTransition shake = new TranslateTransition(AnimationConstants.SHAKE_DURATION, node);
-        shake.setFromX(-AnimationConstants.SHAKE_DISTANCE);
-        shake.setToX(AnimationConstants.SHAKE_DISTANCE);
-        shake.setCycleCount(AnimationConstants.SHAKE_CYCLES);
+        TranslateTransition shake = new TranslateTransition(UiConstants.SHAKE_DURATION, node);
+        shake.setFromX(-UiConstants.SHAKE_DISTANCE);
+        shake.setToX(UiConstants.SHAKE_DISTANCE);
+        shake.setCycleCount(UiConstants.SHAKE_CYCLES);
         shake.setAutoReverse(true);
         shake.setOnFinished(e -> {
             e.consume();
@@ -186,7 +192,7 @@ public final class UiAnimations {
         node.setScaleX(0);
         node.setScaleY(0);
 
-        ScaleTransition scale = new ScaleTransition(AnimationConstants.BOUNCE_IN_DURATION, node);
+        ScaleTransition scale = new ScaleTransition(UiConstants.BOUNCE_IN_DURATION, node);
         scale.setFromX(0);
         scale.setFromY(0);
         scale.setToX(1);
@@ -194,13 +200,13 @@ public final class UiAnimations {
         scale.setInterpolator(Interpolator.EASE_OUT);
 
         // Overshoot effect
-        ScaleTransition overshoot = new ScaleTransition(AnimationConstants.BOUNCE_OVERSHOOT_DURATION, node);
+        ScaleTransition overshoot = new ScaleTransition(UiConstants.BOUNCE_OVERSHOOT_DURATION, node);
         overshoot.setFromX(1);
         overshoot.setFromY(1);
-        overshoot.setToX(AnimationConstants.BOUNCE_OVERSHOOT_SCALE);
-        overshoot.setToY(AnimationConstants.BOUNCE_OVERSHOOT_SCALE);
+        overshoot.setToX(UiConstants.BOUNCE_OVERSHOOT_SCALE);
+        overshoot.setToY(UiConstants.BOUNCE_OVERSHOOT_SCALE);
         overshoot.setAutoReverse(true);
-        overshoot.setCycleCount(AnimationConstants.BOUNCE_OVERSHOOT_CYCLES);
+        overshoot.setCycleCount(UiConstants.BOUNCE_OVERSHOOT_CYCLES);
 
         scale.setOnFinished(e -> {
             e.consume();
@@ -250,11 +256,133 @@ public final class UiAnimations {
                 double offsetX = (e.getSceneX() - centerX) / centerX * intensity;
                 double offsetY = (e.getSceneY() - centerY) / centerY * intensity;
 
-                TranslateTransition move = new TranslateTransition(AnimationConstants.PARALLAX_MOVE_DURATION, node);
+                TranslateTransition move = new TranslateTransition(UiConstants.PARALLAX_MOVE_DURATION, node);
                 move.setToX(offsetX);
                 move.setToY(offsetY);
                 move.play();
             });
         });
+    }
+
+    /**
+     * Confetti particle effect animation for celebration moments.
+     * Uses a Canvas to render falling confetti particles.
+     */
+    public static final class ConfettiAnimation {
+
+        private static final int PARTICLE_COUNT = 100;
+        private static final Color[] COLORS = {
+            Color.web("#f43f5e"), // Rose
+            Color.web("#a855f7"), // Purple
+            Color.web("#f59e0b"), // Amber
+            Color.web("#10b981"), // Emerald
+            Color.web("#3b82f6"), // Blue
+            Color.web("#ec4899"), // Pink
+            Color.web("#8b5cf6") // Violet
+        };
+
+        private final List<Particle> particles = new ArrayList<>();
+        private AnimationTimer timer;
+        private final Random random = new Random();
+        private Canvas canvas;
+
+        /** Starts the confetti animation on the specified canvas. */
+        public void play(Canvas canvas) {
+            this.canvas = canvas;
+            initParticles();
+            startAnimation();
+        }
+
+        /** Stops the confetti animation. */
+        public void stop() {
+            if (timer != null) {
+                timer.stop();
+                timer = null;
+            }
+            particles.clear();
+        }
+
+        private void initParticles() {
+            particles.clear();
+            double width = canvas.getWidth();
+            double height = canvas.getHeight();
+
+            for (int i = 0; i < PARTICLE_COUNT; i++) {
+                particles.add(new Particle(width, height, random));
+            }
+        }
+
+        private void startAnimation() {
+            GraphicsContext gc = canvas.getGraphicsContext2D();
+
+            timer = new AnimationTimer() {
+                @Override
+                public void handle(long now) {
+                    update();
+                    render(gc);
+                }
+            };
+            timer.start();
+        }
+
+        private void update() {
+            double height = canvas.getHeight();
+            double width = canvas.getWidth();
+
+            for (Particle p : particles) {
+                p.update();
+                if (p.posY > height + 20) {
+                    p.reset(width, random);
+                }
+            }
+        }
+
+        private void render(GraphicsContext gc) {
+            gc.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
+
+            for (Particle p : particles) {
+                gc.save();
+                gc.translate(p.posX, p.posY);
+                gc.rotate(p.rotation);
+                gc.setFill(p.color);
+                gc.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+                gc.restore();
+            }
+        }
+
+        private static class Particle {
+            double posX;
+            double posY;
+            double vx;
+            double vy;
+            double rotation;
+            double rotationSpeed;
+            double size;
+            Color color;
+
+            Particle(double canvasWidth, double canvasHeight, Random random) {
+                reset(canvasWidth, random);
+                this.posY = random.nextDouble() * canvasHeight * 0.5;
+            }
+
+            void reset(double canvasWidth, Random random) {
+                this.posX = random.nextDouble() * canvasWidth;
+                this.posY = -20;
+                this.vx = (random.nextDouble() - 0.5) * 2;
+                this.vy = random.nextDouble() * 2 + 1.5;
+                this.rotation = random.nextDouble() * 360;
+                this.rotationSpeed = (random.nextDouble() - 0.5) * 10;
+                this.size = random.nextDouble() * 8 + 4;
+                this.color = COLORS[random.nextInt(COLORS.length)];
+            }
+
+            void update() {
+                posX += vx;
+                posY += vy;
+                rotation += rotationSpeed;
+                vy += 0.03;
+                vx *= 0.99;
+            }
+        }
     }
 }

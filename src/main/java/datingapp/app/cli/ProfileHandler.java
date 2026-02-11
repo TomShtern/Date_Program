@@ -1,23 +1,25 @@
 package datingapp.app.cli;
 
-import datingapp.core.Achievement.UserAchievement;
-import datingapp.core.AchievementService;
+import datingapp.app.cli.CliSupport.EnumMenu;
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppSession;
-import datingapp.core.Dealbreakers;
 import datingapp.core.EnumSetUtil;
 import datingapp.core.LoggingSupport;
-import datingapp.core.PacePreferences;
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
-import datingapp.core.Preferences.Interest;
-import datingapp.core.Preferences.Lifestyle;
-import datingapp.core.ProfileCompletionService;
-import datingapp.core.User;
-import datingapp.core.User.Gender;
-import datingapp.core.User.UserState;
-import datingapp.core.ValidationService;
+import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.Dealbreakers;
+import datingapp.core.model.Preferences.Interest;
+import datingapp.core.model.Preferences.Lifestyle;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
+import datingapp.core.service.AchievementService;
+import datingapp.core.service.ProfileCompletionService;
+import datingapp.core.service.ValidationService;
 import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -25,6 +27,7 @@ import java.time.format.DateTimeParseException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -305,7 +308,9 @@ public class ProfileHandler implements LoggingSupport {
                     currentUser.setInterests(interestSet);
                     logInfo("✅ Interests cleared.\n");
                 }
-                case "0" -> editing = false;
+                case "0" -> {
+                    editing = false;
+                } // NOPMD AssignmentInOperand
                 default -> logInfo(CliSupport.INVALID_SELECTION);
             }
         }
@@ -689,6 +694,176 @@ public class ProfileHandler implements LoggingSupport {
         } else {
             currentUser.setDealbreakers(builder.build());
             logInfo("✅ Age dealbreaker cleared.\n");
+        }
+    }
+
+    // --- Profile Notes Methods ---
+
+    /**
+     * Shows the note management menu for a specific user.
+     *
+     * @param subjectId   the ID of the user the note is about
+     * @param subjectName the name of the user (for display)
+     */
+    public void manageNoteFor(UUID subjectId, String subjectName) {
+        CliSupport.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
+
+            logInfo("\n" + CliSupport.MENU_DIVIDER);
+            logInfo("       📝 NOTES ABOUT {}", subjectName.toUpperCase(Locale.ROOT));
+            logInfo(CliSupport.MENU_DIVIDER);
+
+            Optional<User.ProfileNote> existingNote = userStorage.getProfileNote(currentUser.getId(), subjectId);
+
+            if (existingNote.isPresent()) {
+                logInfo("\nCurrent note:");
+                logInfo("\"{}\"", existingNote.get().content());
+                logInfo("\n  1. Edit note");
+                logInfo("  2. Delete note");
+                logInfo("  0. Back");
+
+                String choice = inputReader.readLine("\nChoice: ");
+                switch (choice) {
+                    case "1" -> editNote(existingNote.get());
+                    case "2" -> deleteNote(currentUser.getId(), subjectId, subjectName);
+                    default -> {
+                        /* back */ }
+                }
+            } else {
+                logInfo("\nNo notes yet.");
+                logInfo("  1. Add a note");
+                logInfo("  0. Back");
+
+                String choice = inputReader.readLine("\nChoice: ");
+                if ("1".equals(choice)) {
+                    addNote(currentUser.getId(), subjectId, subjectName);
+                }
+            }
+        });
+    }
+
+    /** Views all notes the current user has created. */
+    public void viewAllNotes() {
+        CliSupport.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
+
+            logInfo("\n" + CliSupport.MENU_DIVIDER);
+            logInfo("         📝 MY PROFILE NOTES");
+            logInfo(CliSupport.MENU_DIVIDER + "\n");
+
+            List<User.ProfileNote> notes = userStorage.getProfileNotesByAuthor(currentUser.getId());
+
+            if (notes.isEmpty()) {
+                logInfo("You haven't added any notes yet.");
+                logInfo("Tip: Add notes when viewing matches to remember details!\n");
+                return;
+            }
+
+            logInfo("You have {} note(s):\n", notes.size());
+
+            for (int i = 0; i < notes.size(); i++) {
+                User.ProfileNote note = notes.get(i);
+                User subject = userStorage.get(note.subjectId());
+                String subjectName = subject != null ? subject.getName() : "(deleted user)";
+
+                logInfo("  {}. {} - \"{}\"", i + 1, subjectName, note.getPreview());
+            }
+
+            logInfo("\nEnter number to view/edit, or 0 to go back:");
+            String input = inputReader.readLine("Choice: ");
+
+            try {
+                int idx = Integer.parseInt(input) - 1;
+                if (idx >= 0 && idx < notes.size()) {
+                    User.ProfileNote note = notes.get(idx);
+                    User subject = userStorage.get(note.subjectId());
+                    String subjectName = subject != null ? subject.getName() : "this user";
+                    manageNoteFor(note.subjectId(), subjectName);
+                }
+            } catch (NumberFormatException e) {
+                logTrace("Non-numeric input for note selection: {}", e.getMessage());
+                // Back to menu - user entered non-numeric input
+            }
+        });
+    }
+
+    /**
+     * Gets the preview of a note for display in match lists.
+     *
+     * @param authorId  the note author
+     * @param subjectId the subject of the note
+     * @return the note preview, or empty string if no note exists
+     */
+    public String getNotePreview(UUID authorId, UUID subjectId) {
+        return userStorage
+                .getProfileNote(authorId, subjectId)
+                .map(n -> "📝 " + n.getPreview())
+                .orElse("");
+    }
+
+    /** Checks if a note exists for the given subject. */
+    public boolean hasNote(UUID authorId, UUID subjectId) {
+        return userStorage.getProfileNote(authorId, subjectId).isPresent();
+    }
+
+    private void addNote(UUID authorId, UUID subjectId, String subjectName) {
+        logInfo("\nEnter your note about {} (max {} chars):", subjectName, User.ProfileNote.MAX_LENGTH);
+        logInfo("Examples: \"Met at coffee shop\", \"Loves hiking\", \"Dinner Thursday 7pm\"");
+        String content = inputReader.readLine("\nNote: ");
+
+        if (content.isBlank()) {
+            logInfo("⚠️  Note cannot be empty.");
+            return;
+        }
+
+        if (content.length() > User.ProfileNote.MAX_LENGTH) {
+            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), User.ProfileNote.MAX_LENGTH);
+            return;
+        }
+
+        try {
+            User.ProfileNote note = User.ProfileNote.create(authorId, subjectId, content);
+            userStorage.saveProfileNote(note);
+            logInfo("✅ Note saved!\n");
+        } catch (IllegalArgumentException e) {
+            logInfo("❌ {}\n", e.getMessage());
+        }
+    }
+
+    private void editNote(User.ProfileNote existing) {
+        logInfo("\nCurrent note: \"{}\"\n", existing.content());
+        logInfo("Enter new note (or press Enter to keep current):");
+        String content = inputReader.readLine("Note: ");
+
+        if (content.isBlank()) {
+            logInfo("✓ Note unchanged.\n");
+            return;
+        }
+
+        if (content.length() > User.ProfileNote.MAX_LENGTH) {
+            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), User.ProfileNote.MAX_LENGTH);
+            return;
+        }
+
+        try {
+            User.ProfileNote updated = existing.withContent(content);
+            userStorage.saveProfileNote(updated);
+            logInfo("✅ Note updated!\n");
+        } catch (IllegalArgumentException e) {
+            logInfo("❌ {}\n", e.getMessage());
+        }
+    }
+
+    private void deleteNote(UUID authorId, UUID subjectId, String subjectName) {
+        String confirm = inputReader.readLine("Delete note about " + subjectName + "? (y/n): ");
+        if ("y".equalsIgnoreCase(confirm)) {
+            if (userStorage.deleteProfileNote(authorId, subjectId)) {
+                logInfo("✅ Note deleted.\n");
+            } else {
+                logInfo("⚠️  Note not found.\n");
+            }
+        } else {
+            logInfo("Cancelled.\n");
         }
     }
 

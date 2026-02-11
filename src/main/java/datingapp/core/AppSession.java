@@ -1,25 +1,12 @@
 package datingapp.core;
 
+import datingapp.core.model.User;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Unified session management for both CLI and JavaFX interfaces.
- *
- * <p>
- * This singleton replaces the separate CliUtilities.UserSession and
- * ViewModelFactory.UISession
- * with a single source of truth. Supports both plain access (CLI) and
- * listener-based binding
- * (JavaFX).
- *
- * <p>
- * Thread-safe: all methods accessing mutable state are synchronized,
- * and CopyOnWriteArrayList provides safe listener iteration.
- */
 @SuppressWarnings("java:S6548")
 public final class AppSession {
     private static final AppSession INSTANCE = new AppSession();

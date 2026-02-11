@@ -1,12 +1,13 @@
 package datingapp.app.cli;
 
-import datingapp.core.Achievement.UserAchievement;
-import datingapp.core.AchievementService;
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
-import datingapp.core.Stats.UserStats;
-import datingapp.core.StatsService;
-import datingapp.core.User;
+import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.Stats.UserStats;
+import datingapp.core.model.User;
+import datingapp.core.service.AchievementService;
+import datingapp.core.service.StatsService;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

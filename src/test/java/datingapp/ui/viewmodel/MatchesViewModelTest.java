@@ -7,20 +7,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.DailyService;
-import datingapp.core.Match;
-import datingapp.core.MatchingService;
-import datingapp.core.PacePreferences;
-import datingapp.core.User;
-import datingapp.core.User.Gender;
-import datingapp.core.User.UserState;
-import datingapp.core.UserInteractions.Like;
+import datingapp.core.model.*;
+import datingapp.core.model.Match;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.service.*;
+import datingapp.core.service.DailyService;
+import datingapp.core.service.MatchingService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
-import datingapp.ui.viewmodel.data.StorageUiMatchDataAccess;
-import datingapp.ui.viewmodel.data.StorageUiUserStore;
-import datingapp.ui.viewmodel.data.UiMatchDataAccess;
-import datingapp.ui.viewmodel.data.UiUserStore;
+import datingapp.ui.viewmodel.data.UiDataAdapters.StorageUiMatchDataAccess;
+import datingapp.ui.viewmodel.data.UiDataAdapters.StorageUiUserStore;
+import datingapp.ui.viewmodel.data.UiDataAdapters.UiMatchDataAccess;
+import datingapp.ui.viewmodel.data.UiDataAdapters.UiUserStore;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.UUID;
@@ -38,7 +40,7 @@ class MatchesViewModelTest {
     private TestStorages.Users users;
     private TestStorages.Likes likes;
     private TestStorages.Matches matches;
-    private TestStorages.Blocks blocks;
+    private TestStorages.TrustSafety trustSafety;
     private UiMatchDataAccess matchData;
     private UiUserStore userStore;
     private MatchingService matchingService;
@@ -53,20 +55,20 @@ class MatchesViewModelTest {
         users = new TestStorages.Users();
         likes = new TestStorages.Likes();
         matches = new TestStorages.Matches();
-        blocks = new TestStorages.Blocks();
+        trustSafety = new TestStorages.TrustSafety();
         TestClock.setFixed(FIXED_INSTANT);
 
         AppConfig config = AppConfig.defaults();
         dailyService = new DailyService(likes, config);
 
-        matchData = new StorageUiMatchDataAccess(matches, likes, blocks);
+        matchData = new StorageUiMatchDataAccess(matches, likes, trustSafety);
         userStore = new StorageUiUserStore(users);
 
         matchingService = MatchingService.builder()
                 .likeStorage(likes)
                 .matchStorage(matches)
                 .userStorage(users)
-                .blockStorage(blocks)
+                .trustSafetyStorage(trustSafety)
                 .build();
 
         viewModel = new MatchesViewModel(matchData, userStore, matchingService, dailyService);

@@ -15,9 +15,21 @@
 # Dating App CLI - Project Context
 
 ## Overview
-This is a command-line based dating application built with Java 21, Maven, and H2 embedded database. The project follows a clean architecture with strict separation between business logic and persistence layers. It has evolved from basic matching to include sophisticated features like messaging, relationship transitions, pace compatibility matching, and gamification.
+This is a command-line based dating application built with Java 21, Maven, and H2 embedded database. The project follows a clean architecture with strict separation between business logic and persistence layers. It has evolved from basic matching to include sophisticated features like messaging, relationship transitions, pace compatibility matching, gamification, profile verification, standout recommendations, and comprehensive safety features.
 
-The application has both CLI and UI interfaces, with the UI layer built using JavaFX.
+The application has both CLI and UI interfaces, with the UI layer built using JavaFX. The architecture emphasizes clean separation of concerns with core business logic completely isolated from database and framework dependencies.
+
+## Key Features
+- **User Management**: Complete user lifecycle with profile creation, verification, and state management
+- **Advanced Matching**: Multi-factor compatibility scoring with configurable weights
+- **Messaging System**: Full-featured conversation management between matches
+- **Relationship Transitions**: Friend zone requests and graceful exit options
+- **Gamification**: Achievement system with 11 different milestones
+- **Safety & Trust**: Reporting, blocking, and verification systems
+- **Profile Enhancement**: Notes, standouts, and profile completion scoring
+- **Configurable Parameters**: Extensive configuration options for all aspects of the app
+- **Data Retention**: Soft-delete support with configurable cleanup policies
+- **Performance Monitoring**: Built-in performance monitoring capabilities
 
 ## Project Structure
 ```
@@ -47,27 +59,35 @@ datingapp/
 7. **Consolidated Storage**: Using JDBI for database access with SQL Object pattern
 8. **Centralized Configuration**: All configurable values in `AppConfig` record
 9. **Service Registry**: Single point of access for all services via `ServiceRegistry`
+10. **Single Responsibility**: Each class has a single, well-defined responsibility
+11. **Defensive Copying**: Collections are defensively copied when returned from getters
+12. **Fail-Fast Validation**: Constructor parameters are validated immediately
+13. **Soft-Delete Support**: All entities support soft-delete with configurable retention
+14. **Performance Monitoring**: Built-in performance monitoring for critical operations
+15. **External Configuration**: Configurable via JSON files and environment variables
 
-## Key Features (Phase 2.1)
+## Key Features (Phase 4)
 
 ### Core Domain Models
-- `User` - Mutable entity with state machine: `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`. Includes interests set (max 10), verification status, profile completeness metrics, pace preferences
+- `User` - Mutable entity with state machine: `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`. Includes interests set (max 10), verification status, profile completeness metrics, pace preferences, soft-delete support. Contains nested enums: `Gender`, `UserState`, `VerificationMethod`
 - `Like` - Immutable record with `LIKE` or `PASS` direction and timestamp
-- `Match` - Mutable entity with state machine: `ACTIVE → FRIENDS | UNMATCHED | GRACEFUL_EXIT | BLOCKED`. Deterministic ID generated from sorted UUIDs (lexicographically smaller UUID first) using `Match.generateId(userA, userB)`
+- `Match` - Mutable entity with state machine: `ACTIVE → FRIENDS | UNMATCHED | GRACEFUL_EXIT | BLOCKED`. Deterministic ID generated from sorted UUIDs (lexicographically smaller UUID first) using `Match.generateId(userA, userB)`. Contains nested enums: `State`, `ArchiveReason`
 - `Block` - Immutable record for bidirectional blocking
 - `Report` - Immutable record with reason enum (SPAM, HARASSMENT, FAKE_PROFILE, etc.)
 - `SwipeSession` - Mutable entity tracking continuous swiping activity
 - `MatchQuality` - Immutable record containing compatibility score (0-100), star rating (1-5), highlights
 - `Dealbreakers` - Immutable record defining user's filtering preferences
-- `Interest` - Enum of 37 predefined interests across 6 categories (OUTDOORS, ARTS & CULTURE, FOOD & DRINK, SPORTS & FITNESS, GAMES & TECH, SOCIAL)
-- `Achievement` - Enum of 11 gamification achievements across 4 categories (Matching Milestones, Behavior, Profile Excellence, Safety & Community)
+- `Interest` - Enum of 37 predefined interests across 6 categories (OUTDOORS, ARTS & CULTURE, FOOD & DRINK, SPORTS & FITNESS, GAMES & TECH, SOCIAL). Contains nested `Category` enum.
+- `Achievement` - Enum of 11 gamification achievements across 4 categories (Matching Milestones, Behavior, Profile Excellence, Safety & Community). Contains nested `Category` enum.
 - `UserAchievement` - Immutable record linking users to unlocked achievements
 - `ProfileNote` - Immutable record for private notes about other users (max 500 chars)
 - `Messaging.Message` - Immutable record with max 1000 chars, timestamp, sender reference
-- `Messaging.Conversation` - Mutable entity with deterministic ID (userA_userB where UUIDs are sorted lexicographically), per-user read timestamps
+- `Messaging.Conversation` - Mutable entity with deterministic ID (userA_userB where UUIDs are sorted lexicographically), per-user read timestamps, archiving support
 - `Social.FriendRequest` - Immutable record for Friend Zone requests with status tracking
 - `Social.Notification` - Immutable record for user notifications with type and metadata
-- `PacePreferences` - Immutable record tracking messaging frequency, time to first date, communication style, and depth preference
+- `PacePreferences` - Immutable record tracking messaging frequency, time to first date, communication style, and depth preference. Contains nested enums: `MessagingFrequency`, `TimeToFirstDate`, `CommunicationStyle`, `DepthPreference`
+- `Standout` - Immutable record for standout recommendations with scoring algorithm
+- `Lifestyle` - Container class with nested enums: `Smoking`, `Drinking`, `WantsKids`, `LookingFor`, `Education`
 
 ### Core Services
 - `CandidateFinder` - Multi-stage filter pipeline following 7-stage Stream pattern:
@@ -96,6 +116,9 @@ datingapp/
 - `VerificationService` - Profile verification workflow management
 - `MessagingService` - Full-featured messaging system with authorization checks
 - `RelationshipTransitionService` - Manages relationship lifecycle transitions: Friend Zone requests and Graceful Exit
+- `StandoutsService` - Generates standout recommendations based on compatibility and activity
+- `CleanupService` - Handles soft-delete cleanup and data retention policies
+- `TrustSafetyService` - Consolidated trust and safety operations
 
 ### Storage Interfaces (defined in `core/`, implemented in `storage/`)
 - `UserStorage`, `LikeStorage`, `MatchStorage`, `BlockStorage`, `ReportStorage`
@@ -108,7 +131,7 @@ datingapp/
 - `Main` - Orchestrator with menu loop and dependency wiring (in `datingapp/` package)
 - `HandlerFactory` - Factory for creating CLI handlers with proper dependency injection
 - `ProfileHandler` - Profile completion, dealbreakers configuration, profile preview
-- `MatchingHandler` - Candidate browsing, daily pick display, match viewing
+- `MatchingHandler` - Candidate browsing, daily pick display, match viewing, standout recommendations
 - `SafetyHandler` - Blocking and reporting
 - `StatsHandler` - Statistics and achievement display
 - `ProfileNotesHandler` - Private note-taking for profiles
@@ -116,7 +139,9 @@ datingapp/
 - `MessagingHandler` - Conversation list, message view, send/receive UI
 - `RelationshipHandler` - Friend Zone requests, notifications, and relationship transitions UI
 - `InputReader` - I/O abstraction over Scanner
-- `CliConstants` - UI string constants and formatting
+- `CliSupport` - UI string constants and formatting utilities
+- `AppBootstrap` - Centralized application initialization for both CLI and JavaFX
+- `ConfigLoader` - Configuration loading from JSON files and environment variables
 
 ### UI Layer (JavaFX)
 - `DatingApp` - JavaFX Application entry point
@@ -128,6 +153,11 @@ datingapp/
 - `viewmodel/` - ViewModel classes for managing UI state
 - FXML files for UI layout
 - CSS files for styling (theme.css)
+- MVVM Pattern: Uses Model-View-ViewModel architecture for clean separation of concerns
+
+### API Layer
+- `RestApiServer` - REST API server implementation with endpoints for all major functionality
+- `Endpoints` - HTTP endpoint definitions following REST conventions
 
 ## Interests System
 The application includes 37 predefined interests across 6 categories:
@@ -175,7 +205,7 @@ The application includes 11 gamification achievements across 4 categories:
 The application uses a Service Registry pattern for dependency management:
 
 - `ServiceRegistry` - Central container holding all services and storage implementations
-- `ServiceRegistryBuilder` - Factory for wiring H2 or in-memory implementations
+- `StorageFactory` - Factory for wiring H2 implementations and service initialization (replaces deprecated ServiceRegistryBuilder)
 - All services are injected via constructors following pure dependency injection
 - The registry is built once in `Main.java` and dependencies are passed to handlers
 
@@ -319,7 +349,7 @@ mvn clean verify package
 - **Ikonli**: Core, JavaFX, MaterialDesign2 pack (12.4.0) - Professional SVG icon library
 
 ## Configuration
-The application uses `AppConfig` with 40+ configurable parameters:
+The application uses `AppConfig` with 60+ configurable parameters:
 
 ### Matching & Discovery
 - `maxDistanceKm` (default: 500) - Maximum candidate search radius
@@ -327,6 +357,7 @@ The application uses `AppConfig` with 40+ configurable parameters:
 
 ### Daily Limits
 - `dailyLikeLimit` (default: 100) - Max likes per day (-1 = unlimited)
+- `dailySuperLikeLimit` (default: 1) - Max super likes per day
 - `dailyPassLimit` (default: -1) - Max passes per day (-1 = unlimited)
 - `userTimeZone` (default: system) - Timezone for midnight reset and daily pick rotation
 
@@ -349,6 +380,14 @@ The application uses `AppConfig` with 40+ configurable parameters:
 - `paceWeight` (default: 0.15) - Weight for pace score
 - `responseWeight` (default: 0.10) - Weight for response time score
 
+### Standout Scoring Weights
+- `standoutDistanceWeight` (default: 0.20) - Weight for distance in standouts
+- `standoutAgeWeight` (default: 0.15) - Weight for age in standouts
+- `standoutInterestWeight` (default: 0.25) - Weight for interests in standouts
+- `standoutLifestyleWeight` (default: 0.20) - Weight for lifestyle in standouts
+- `standoutCompletenessWeight` (default: 0.10) - Weight for profile completeness
+- `standoutActivityWeight` (default: 0.10) - Weight for activity recency
+
 ### Algorithm Thresholds
 - `nearbyDistanceKm` (default: 5) - Distance considered "nearby"
 - `closeDistanceKm` (default: 10) - Distance considered "close"
@@ -359,6 +398,8 @@ The application uses `AppConfig` with 40+ configurable parameters:
 - `responseTimeExcellentHours` (default: 1) - Response time for "excellent"
 - `responseTimeGreatHours` (default: 24) - Response time for "great"
 - `responseTimeGoodHours` (default: 72) - Response time for "good"
+- `responseTimeWeekHours` (default: 168) - Response time threshold for "okay"
+- `responseTimeMonthHours` (default: 720) - Response time threshold for "low"
 
 ### Achievement Thresholds
 - `achievementMatchTier1` (default: 1) - First match milestone
@@ -367,6 +408,10 @@ The application uses `AppConfig` with 40+ configurable parameters:
 - `achievementMatchTier4` (default: 25) - Fourth match milestone
 - `achievementMatchTier5` (default: 50) - Fifth match milestone
 - `minSwipesForBehaviorAchievement` (default: 50) - Min swipes to evaluate behavior
+- `selectiveThreshold` (default: 0.20) - Like ratio below which behavior is "selective"
+- `openMindedThreshold` (default: 0.60) - Like ratio above which behavior is "open-minded"
+- `bioAchievementLength` (default: 100) - Min bio length for detailed writer achievement
+- `lifestyleFieldTarget` (default: 5) - Lifestyle fields needed for guru achievement
 
 ### Validation Bounds
 - `minAge` (default: 18) - Min legal age
@@ -376,6 +421,15 @@ The application uses `AppConfig` with 40+ configurable parameters:
 - `minDistanceKm` (default: 1) - Min search distance
 - `maxNameLength` (default: 100) - Max name length
 - `minAgeRangeSpan` (default: 5) - Min age range span
+- `maxInterests` (default: 10) - Max interests per user
+- `maxPhotos` (default: 2) - Max photos per user
+- `maxBioLength` (default: 500) - Max bio length
+- `maxReportDescLength` (default: 500) - Max report description length
+
+### Data Retention & Cleanup
+- `cleanupRetentionDays` (default: 30) - Days to retain expired data before cleanup
+- `softDeleteRetentionDays` (default: 90) - Days before purging soft-deleted rows
+- `messageMaxPageSize` (default: 100) - Max messages per page query
 
 ### Additional Configuration Options
 Beyond the basic configuration, the application supports additional settings:
@@ -384,17 +438,18 @@ Beyond the basic configuration, the application supports additional settings:
 - **Performance Tuning**: Database connection pool settings, cache sizes
 - **Feature Flags**: Enable/disable specific features dynamically
 - **Localization**: Potential for multi-language support (though not currently implemented)
+- **External Configuration**: JSON files and environment variables support
 
 
 ## Database Schema
 - Persistent data stored in `./data/dating.mv.db`
-- **Users table**: Stores user profiles with all attributes (location, preferences, interests, lifestyle, verification, pace preferences, etc.)
-- **Likes table**: Records user interactions (likes/passes) with timestamps
-- **Matches table**: Stores mutual likes with deterministic IDs
-- **Blocks table**: Bidirectional blocking relationships
-- **Reports table**: User reports with reasons
-- **Conversations table**: Messaging conversations between matched users
-- **Messages table**: Individual messages with foreign key to conversations
+- **Users table**: Stores user profiles with all attributes (location, preferences, interests, lifestyle, verification, pace preferences, etc.) with soft-delete support
+- **Likes table**: Records user interactions (likes/passes) with timestamps and soft-delete support
+- **Matches table**: Stores mutual likes with deterministic IDs and soft-delete support
+- **Blocks table**: Bidirectional blocking relationships with soft-delete support
+- **Reports table**: User reports with reasons and soft-delete support
+- **Conversations table**: Messaging conversations between matched users with soft-delete support
+- **Messages table**: Individual messages with foreign key to conversations and soft-delete support
 - **Swipe sessions table**: Session tracking with timestamps and counters
 - **User stats table**: User statistics snapshots
 - **Platform stats table**: Platform-wide statistics
@@ -405,6 +460,8 @@ Beyond the basic configuration, the application supports additional settings:
 - **Profile notes table**: Private notes about other users
 - **Profile views table**: Tracks profile viewing history
 - **Schema version table**: Tracks database schema version for migrations
+- **Foreign Key Constraints**: Added for referential integrity with cascade deletes
+- **Migration Support**: Automated schema migration system for backward compatibility
 
 
 
@@ -423,6 +480,9 @@ Beyond the basic configuration, the application supports additional settings:
 - **Pure Core:** The `core/` package is a "POJO-only" zone. No JDBC, no Jackson, no JavaFX.
 - **Deterministic Logic:** Everything from Match IDs to Daily Picks must be reproducible (seeded randomness or sorted IDs).
 - **Safety First:** Use a "fail-fast" approach. Validate state and nulls in constructors, not during execution.
+- **Single Responsibility:** Each class has a single, well-defined responsibility.
+- **Defensive Programming:** Use defensive copying for collections and validate inputs.
+- **External Configuration:** Support configuration via JSON files and environment variables.
 
 ### Naming Conventions
 **Classes:**
@@ -432,12 +492,14 @@ Beyond the basic configuration, the application supports additional settings:
 - Storage implementations: Prefix with database type (`H2UserStorage`)
 - Handlers: Suffix with "Handler" (`ProfileHandler`, `MatchingHandler`)
 - Utilities: Descriptive names (`GeoUtils`, `InterestMatcher`)
+- Containers: For grouping related classes (`Messaging`, `Social`, `Preferences`, `Lifestyle`)
 
 **Methods:**
 - Factory methods: `create()`, `of()`, `fromDatabase()`, `builder()`
 - Getters/Setters: `getId()`, `getState()`, `getName()`, `setName()`
 - Predicates: `isComplete()`, `hasAnyDealbreaker()`, `canLike()`
 - State transitions: `activate()`, `pause()`, `ban()`, `unmatch()`
+- Bulk operations: `findAll()`, `findByUser()`, `deleteAll()`
 
 **Variables:**
 - Specific entity references: `userId`, `matchId`, `likeId`
@@ -448,17 +510,29 @@ Beyond the basic configuration, the application supports additional settings:
 ### Storage Pattern
 - **JDBI Framework:** Using JDBI 3 with SQL Object pattern for database access
 - **SQL Patterns:**
-  - All tables defined in `DatabaseManager.initSchema()` using `IF NOT EXISTS`
+  - Schema initialization handled by `MigrationRunner.migrateV1()` and `SchemaInitializer.createAllTables()` using `IF NOT EXISTS`
   - Use JDBI's SQL Object pattern for type-safe queries
   - Wrap `SQLException` in custom `RuntimeException` (e.g., `StorageException`)
 - **Null Safety:** Use `Optional<T>` for all storage lookups and nullable service returns
+- **Soft Deletes:** Support soft-delete with configurable retention period
+- **Foreign Keys:** Use foreign key constraints with cascade deletes for referential integrity
 
+### Configuration Pattern
+- **AppConfig Record:** Centralized configuration using a record with validation
+- **Builder Pattern:** Support for custom configuration via builder
+- **External Loading:** Load from JSON files and environment variables
+- **Validation:** Validate configuration values at startup
+
+### Service Initialization Pattern
+- **StorageFactory:** Uses `StorageFactory.buildH2()` method to wire all services and storage implementations
+- **AppBootstrap:** Centralized application initialization for both CLI and JavaFX entry points
+- **AppSession:** Unified session management singleton for current user state across all interfaces
 
 ### Logging
 - **Framework:** Use SLF4J
 - **Declaration:** `private static final Logger logger = LoggerFactory.getLogger(YourClass.class);`
 - **Placeholders:** Use `logger.info("User {} matched", id);` instead of string concatenation
-
+- **Levels:** Use appropriate log levels (info, warn, debug, error)
 
 ### Code Organization Patterns
 **Service Structure:**
@@ -557,6 +631,12 @@ public void save(Like like) {
 }
 ```
 
+### Performance Optimization
+**Monitoring:** Built-in performance monitoring for critical operations
+**Efficiency:** Use efficient algorithms and minimize database queries
+**Caching:** Consider caching for frequently accessed data
+**Pagination:** Implement pagination for large datasets
+
 ## Templates
 
 ### New Service Implementation
@@ -595,10 +675,12 @@ public Optional<User> get(UUID id) {
 3. Storage Layer: Implement H2*Storage classes
 4. CLI Layer: Add handler methods or new handler
 5. UI Layer: Add controller, viewmodel, and FXML if needed
-6. Tests: Write unit tests (core/) and integration tests (storage/)
-7. Format: Run `mvn spotless:apply`
-8. Verify: Run `mvn clean verify`
-9. Document: Update CLAUDE.md and architecture.md
+6. API Layer: Add REST endpoints if needed
+7. Wire Service: Register the new service in `StorageFactory` for proper dependency injection
+8. Tests: Write unit tests (core/) and integration tests (storage/)
+9. Format: Run `mvn spotless:apply`
+10. Verify: Run `mvn clean verify`
+11. Document: Update CLAUDE.md and architecture.md
 
 ### Adding a New Domain Model
 **Immutable (Record):**
@@ -729,6 +811,21 @@ public class H2NewStorage implements NewStorage {
 }
 ```
 
+### Adding Configuration Parameter
+1. Add parameter to `AppConfig` record with validation
+2. Update `AppConfig.defaults()` with default value
+3. Add to `AppConfig.Builder` with setter method
+4. Update JSON configuration loading in `ConfigLoader`
+5. Update environment variable loading in `ConfigLoader`
+6. Use parameter in relevant services
+
+### Adding Soft-Delete Support
+1. Add `deleted_at` column to relevant tables
+2. Update storage interfaces and implementations to handle soft deletes
+3. Add methods to check if entity is deleted
+4. Update queries to exclude soft-deleted records
+5. Implement cleanup service to periodically purge old records
+
 ## Critical Rules & Guardrails
 
 ### ❌ NEVER DO THIS
@@ -744,6 +841,16 @@ public class H2NewStorage implements NewStorage {
 10. Update documentation without timestamp
 11. Use raw JDBC directly - always use JDBI
 12. Store services as static variables outside ServiceRegistry
+13. Bypass validation in storage layer
+14. Expose mutable internal state
+15. Ignore soft-delete status in queries
+16. Hardcode configuration values outside AppConfig
+17. Skip null checks in public APIs
+18. Use magic numbers in business logic
+19. Create circular dependencies between services
+20. Bypass the service registry for dependency access
+21. Use deprecated ServiceRegistryBuilder instead of StorageFactory
+22. Access AppSession directly without proper initialization
 
 ### ✅ ALWAYS DO THIS
 1. Run `mvn spotless:apply` before committing
@@ -758,18 +865,30 @@ public class H2NewStorage implements NewStorage {
 10. Update QWEN.md "Recent Updates" section with changes
 11. Use JDBI SQL Object pattern for database operations
 12. Access all services through ServiceRegistry
+13. Handle soft-delete status consistently across all layers
+14. Use external configuration for all configurable values
+15. Implement proper logging with appropriate log levels
+16. Follow naming conventions consistently
+17. Use enums for fixed sets of values
+18. Implement proper error handling and exception wrapping
+19. Use records for immutable data structures
+20. Apply the single responsibility principle to all classes
+21. Use StorageFactory for service initialization instead of ServiceRegistryBuilder
+22. Initialize AppSession properly through AppBootstrap
 
 ## Final Checklist Before Completion
 Before considering a task complete, verify:
 1. Did I run `mvn spotless:apply`?
-2. Did I wire the service in `ServiceRegistryBuilder`?
+2. Did I wire the service in `StorageFactory` (not deprecated ServiceRegistryBuilder)?
 3. Did I add a `@Nested` test class for this feature?
 4. Did I use `Optional` for null safety?
+5. Did I properly initialize `AppSession` through `AppBootstrap`?
+6. Did I update documentation to reflect nested enums in domain models?
 
 ## Current Status (Phase 4)
-- **Completed**: Basic matching, daily limits, undo, interests, achievements, messaging, relationship transitions, verification, pace preferences, comprehensive stats, social features
-- **In Development**: Advanced UI features, notification delivery mechanisms
-- **Architecture**: Clean, well-tested, extensible with JDBI integration
+- **Completed**: Basic matching, daily limits, undo, interests, achievements, messaging, relationship transitions, verification, pace preferences, comprehensive stats, social features, standout recommendations, soft-delete support, external configuration
+- **In Development**: Advanced UI features, notification delivery mechanisms, performance optimizations
+- **Architecture**: Clean, well-tested, extensible with JDBI integration and external configuration support
 
 ## Known Limitations
 - No database transactions (undo deletions not atomic)
@@ -779,7 +898,7 @@ Before considering a task complete, verify:
 - Location: Geolocation is manual (users enter lat/lon coordinates)
 - JavaFX UI is experimental and not fully integrated
 - JDBI integration: Some complex queries may require custom solutions
-
+- Configuration: External configuration supports JSON and environment variables but could be extended to other formats
 
 ## Key Files to Know
 - `CLAUDE.md` - Comprehensive project documentation for and from Claude-Code.
@@ -790,11 +909,16 @@ Before considering a task complete, verify:
 - `pom.xml` - Build configuration
 - `Main.java` - CLI application entry point
 - `datingapp.ui.DatingApp` - JavaFX UI application entry point
+- `datingapp.app.api.RestApiServer` - REST API server implementation
 - `src/main/resources/logback.xml` - Logging configuration
+- `datingapp.app.AppBootstrap` - Centralized application initialization
+- `datingapp.app.ConfigLoader` - Configuration loading from JSON and environment variables
+- `datingapp.core.AppSession` - Unified session management for current user state
+- `datingapp.storage.StorageFactory` - Factory for wiring all services and storage implementations
 
 ## Recent Additions (Phase 4)
 - **JDBI Integration**: Migration from raw JDBC to JDBI 3 for type-safe database access
-- **Service Registry Consolidation**: Unified service creation and dependency injection
+- **Service Registry Consolidation**: Unified service creation using StorageFactory instead of ServiceRegistryBuilder
 - **Messaging System**: Full conversation and message management
 - **Relationship Transitions**: Friend zone requests and graceful exit
 - **Social Features**: Friend requests and notification system
@@ -805,6 +929,14 @@ Before considering a task complete, verify:
 - **Comprehensive Stats**: User and platform statistics with snapshot system
 - **Profile Management**: Notes, views, and privacy controls
 - **Safety & Moderation**: Reporting, blocking, and verification systems
+- **Standout Recommendations**: Personalized standout recommendations based on compatibility
+- **Soft-Delete Support**: Configurable soft-delete with retention policies
+- **External Configuration**: JSON file and environment variable configuration support
+- **Performance Monitoring**: Built-in performance monitoring capabilities
+- **Migration System**: Automated schema migration for backward compatibility
+- **REST API**: Full-featured REST API server implementation
+- **Unified Session Management**: AppSession singleton for consistent user state across interfaces
+- **Centralized Bootstrapping**: AppBootstrap for unified application initialization
 
 This project serves as an excellent example of clean architecture principles applied to a real-world application with comprehensive testing and quality controls.
 

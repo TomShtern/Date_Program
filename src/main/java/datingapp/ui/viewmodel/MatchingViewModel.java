@@ -1,15 +1,15 @@
 package datingapp.ui.viewmodel;
 
-import static datingapp.core.CandidateFinder.GeoUtils.distanceKm;
+import static datingapp.core.service.CandidateFinder.GeoUtils.distanceKm;
 
 import datingapp.core.AppSession;
-import datingapp.core.CandidateFinder;
-import datingapp.core.Match;
-import datingapp.core.MatchQualityService;
-import datingapp.core.MatchingService;
-import datingapp.core.UndoService;
-import datingapp.core.User;
-import datingapp.core.User.UserState;
+import datingapp.core.model.Match;
+import datingapp.core.model.User;
+import datingapp.core.model.User.UserState;
+import datingapp.core.service.CandidateFinder;
+import datingapp.core.service.MatchQualityService;
+import datingapp.core.service.MatchingService;
+import datingapp.core.service.UndoService;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;

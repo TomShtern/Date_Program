@@ -1,7 +1,7 @@
 package datingapp.storage.jdbi;
 
-import datingapp.core.UndoState;
-import datingapp.core.UserInteractions;
+import datingapp.core.model.UndoState;
+import datingapp.core.model.UserInteractions;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;

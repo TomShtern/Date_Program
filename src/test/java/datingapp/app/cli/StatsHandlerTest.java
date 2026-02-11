@@ -2,16 +2,19 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.Achievement;
-import datingapp.core.Achievement.UserAchievement;
-import datingapp.core.AchievementService;
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.Match;
-import datingapp.core.ProfileCompletionService;
-import datingapp.core.Stats.UserStats;
-import datingapp.core.StatsService;
-import datingapp.core.User;
+import datingapp.core.model.*;
+import datingapp.core.model.Achievement;
+import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.Match;
+import datingapp.core.model.Stats.UserStats;
+import datingapp.core.model.User;
+import datingapp.core.service.*;
+import datingapp.core.service.AchievementService;
+import datingapp.core.service.ProfileCompletionService;
+import datingapp.core.service.StatsService;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.time.Instant;
@@ -28,8 +31,7 @@ class StatsHandlerTest {
     private TestStorages.Users userStorage;
     private TestStorages.Likes likeStorage;
     private TestStorages.Matches matchStorage;
-    private TestStorages.Blocks blockStorage;
-    private InMemoryReportStorage reportStorage;
+    private TestStorages.TrustSafety trustSafetyStorage;
     private InMemoryStatsStorage statsStorage;
     private AppSession session;
     private User testUser;
@@ -39,8 +41,7 @@ class StatsHandlerTest {
         userStorage = new TestStorages.Users();
         likeStorage = new TestStorages.Likes();
         matchStorage = new TestStorages.Matches();
-        blockStorage = new TestStorages.Blocks();
-        reportStorage = new InMemoryReportStorage();
+        trustSafetyStorage = new TestStorages.TrustSafety();
         statsStorage = new InMemoryStatsStorage();
 
         session = AppSession.getInstance();
@@ -53,15 +54,14 @@ class StatsHandlerTest {
 
     private StatsHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        StatsService statsService =
-                new StatsService(likeStorage, matchStorage, blockStorage, reportStorage, statsStorage);
+        StatsService statsService = new StatsService(likeStorage, matchStorage, trustSafetyStorage, statsStorage);
         ProfileCompletionService profileCompletionService = new ProfileCompletionService(AppConfig.defaults());
         AchievementService achievementService = new AchievementService(
                 statsStorage,
                 matchStorage,
                 likeStorage,
                 userStorage,
-                reportStorage,
+                trustSafetyStorage,
                 profileCompletionService,
                 AppConfig.defaults());
         return new StatsHandler(statsService, achievementService, session, inputReader);
@@ -186,56 +186,20 @@ class StatsHandlerTest {
         user.setGender(User.Gender.OTHER);
         user.setInterestedIn(EnumSet.of(User.Gender.OTHER));
         user.addPhotoUrl("https://example.com/photo.jpg");
-        user.setPacePreferences(new datingapp.core.PacePreferences(
-                datingapp.core.PacePreferences.MessagingFrequency.OFTEN,
-                datingapp.core.PacePreferences.TimeToFirstDate.FEW_DAYS,
-                datingapp.core.PacePreferences.CommunicationStyle.TEXT_ONLY,
-                datingapp.core.PacePreferences.DepthPreference.SMALL_TALK));
+        user.setPacePreferences(new datingapp.core.model.Preferences.PacePreferences(
+                datingapp.core.model.Preferences.PacePreferences.MessagingFrequency.OFTEN,
+                datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
+                datingapp.core.model.Preferences.PacePreferences.CommunicationStyle.TEXT_ONLY,
+                datingapp.core.model.Preferences.PacePreferences.DepthPreference.SMALL_TALK));
         user.activate();
         return user;
     }
 
     // === In-Memory Mock Storage ===
 
-    private static class InMemoryReportStorage implements datingapp.core.storage.ReportStorage {
-        private final List<datingapp.core.UserInteractions.Report> reports = new ArrayList<>();
-
-        @Override
-        public void save(datingapp.core.UserInteractions.Report report) {
-            reports.add(report);
-        }
-
-        @Override
-        public int countReportsAgainst(UUID userId) {
-            return (int) reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .count();
-        }
-
-        @Override
-        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
-            return reports.stream()
-                    .anyMatch(r -> r.reporterId().equals(reporterId)
-                            && r.reportedUserId().equals(reportedUserId));
-        }
-
-        @Override
-        public List<datingapp.core.UserInteractions.Report> getReportsAgainst(UUID userId) {
-            return reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .toList();
-        }
-
-        @Override
-        public int countReportsBy(UUID userId) {
-            return (int)
-                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
-        }
-    }
-
     private static class InMemoryStatsStorage implements datingapp.core.storage.StatsStorage {
         private final Map<UUID, List<UserStats>> userStatsMap = new HashMap<>();
-        private final List<datingapp.core.Stats.PlatformStats> platformStats = new ArrayList<>();
+        private final List<datingapp.core.model.Stats.PlatformStats> platformStats = new ArrayList<>();
         private final Map<UUID, Set<Achievement>> achievements = new HashMap<>();
 
         @Override
@@ -269,19 +233,19 @@ class StatsHandlerTest {
         }
 
         @Override
-        public void savePlatformStats(datingapp.core.Stats.PlatformStats stats) {
+        public void savePlatformStats(datingapp.core.model.Stats.PlatformStats stats) {
             platformStats.add(stats);
         }
 
         @Override
-        public Optional<datingapp.core.Stats.PlatformStats> getLatestPlatformStats() {
+        public Optional<datingapp.core.model.Stats.PlatformStats> getLatestPlatformStats() {
             return platformStats.isEmpty()
                     ? Optional.empty()
                     : Optional.of(platformStats.get(platformStats.size() - 1));
         }
 
         @Override
-        public List<datingapp.core.Stats.PlatformStats> getPlatformStatsHistory(int limit) {
+        public List<datingapp.core.model.Stats.PlatformStats> getPlatformStatsHistory(int limit) {
             return platformStats.subList(0, Math.min(platformStats.size(), limit));
         }
 
@@ -334,6 +298,19 @@ class StatsHandlerTest {
 
         @Override
         public int deleteExpiredDailyPickViews(Instant cutoff) {
+            return 0;
+        }
+
+        @Override
+        public void markDailyPickAsViewed(UUID userId, java.time.LocalDate date) {}
+
+        @Override
+        public boolean isDailyPickViewed(UUID userId, java.time.LocalDate date) {
+            return false;
+        }
+
+        @Override
+        public int deleteDailyPickViewsOlderThan(java.time.LocalDate before) {
             return 0;
         }
     }

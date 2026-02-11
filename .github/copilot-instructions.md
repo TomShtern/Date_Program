@@ -50,7 +50,7 @@ You are operating in an environment where ast-grep is installed. For any code se
 # Dating App - AI Agent Instructions
 
 **Platform:** Windows 11 | PowerShell | VS Code Insiders | Java 25 | JavaFX 25.0.1
-**Stats:** 126 main + 56 test Java files | ~46K lines (~34K code) | 60% coverage min | 820 tests | 17 core services
+**Stats:** 102 main + 58 test Java files | ~48K lines (~35K code) | 60% coverage min | 825 tests | 14 core services
 
 ## ⚠️ Critical Gotchas (Compilation Failures)
 
@@ -70,17 +70,21 @@ You are operating in an environment where ast-grep is installed. For any code se
 
 **Clean Architecture with MVVM for JavaFX UI:**
 ```
-core/              Pure Java business logic - ZERO framework/database imports
-core/storage/      11 storage interfaces (UserStorage, MatchStorage, LikeStorage...)
-storage/jdbi/      JDBI implementations with @SqlQuery/@SqlUpdate annotations
-storage/mapper/    MapperHelper utilities for null-safe ResultSet reading
-app/cli/           CLI handlers + HandlerFactory (lazy handler creation)
-app/api/           REST API server + routes (Javalin-based)
-ui/                JavaFX application layer (AtlantaFX 2.1.0 theme)
-ui/viewmodel/      ViewModels with JavaFX properties + ErrorHandler pattern
-ui/controller/     Controllers (extend BaseController for lifecycle)
-ui/component/      UiComponents factory methods (loading overlays, etc.)
-ui/util/           Toast, UiServices, ImageCache, UiHelpers
+core/              Utility/infra: AppConfig, AppSession, ServiceRegistry, EnumSetUtil, ScoringConstants...
+core/model/        11 domain models: User, Match, Messaging, Preferences, UserInteractions...
+core/service/      14 services: MatchingService, MessagingService, CandidateFinder...
+core/storage/      9 storage interfaces (UserStorage, MatchStorage, TrustSafetyStorage...)
+storage/           DatabaseManager, StorageFactory
+storage/jdbi/      JDBI implementations + MapperHelper + EnumSetJdbiSupport
+storage/schema/    SchemaInitializer, MigrationRunner
+app/               AppBootstrap, ConfigLoader
+app/cli/           5 CLI handlers + HandlerFactory + CliSupport
+app/api/           RestApiServer (routes inlined)
+ui/                DatingApp, NavigationService, UiComponents, ViewModelFactory
+ui/viewmodel/      8 ViewModels + ErrorHandler + data/UiDataAdapters
+ui/controller/     11 controllers (extend BaseController for lifecycle)
+ui/constants/      UiConstants (animation + cache constants)
+ui/util/           Toast, UiSupport, ImageCache, UiAnimations
 ```
 
 **Entry Points:**
@@ -102,13 +106,13 @@ nav.initialize(primaryStage);
 
 ## Key Domain Models
 
-| Model              | Type          | Location                     | Notes                                                          |
-|--------------------|---------------|------------------------------|----------------------------------------------------------------|
-| `User`             | Mutable class | `core/User.java`             | State: `INCOMPLETE→ACTIVE↔PAUSED→BANNED`; has `StorageBuilder` |
-| `Match`            | Mutable class | `core/Match.java`            | State: `ACTIVE→FRIENDS\|UNMATCHED\|BLOCKED`; deterministic ID  |
-| `UserInteractions` | Container     | `core/UserInteractions.java` | Contains: `Like`, `Block`, `Report` records                    |
-| `Messaging`        | Container     | `core/Messaging.java`        | Contains: `Message`, `Conversation` with deterministic ID      |
-| `Preferences`      | Container     | `core/Preferences.java`      | Contains: `Interest` enum (39 values), `Lifestyle` records     |
+| Model              | Type          | Location                           | Notes                                                                        |
+|--------------------|---------------|------------------------------------|------------------------------------------------------------------------------|
+| `User`             | Mutable class | `core/model/User.java`             | State: `INCOMPLETE→ACTIVE↔PAUSED→BANNED`; has `StorageBuilder`               |
+| `Match`            | Mutable class | `core/model/Match.java`            | State: `ACTIVE→FRIENDS\|UNMATCHED\|BLOCKED`; deterministic ID                |
+| `UserInteractions` | Container     | `core/model/UserInteractions.java` | Contains: `Like`, `Block`, `Report`, `FriendRequest`, `Notification` records |
+| `Messaging`        | Container     | `core/model/Messaging.java`        | Contains: `Message`, `Conversation` with deterministic ID                    |
+| `Preferences`      | Container     | `core/model/Preferences.java`      | Contains: `Interest` enum (39 values), `Lifestyle`, `PacePreferences`        |
 
 **Deterministic IDs for Two-User Entities:**
 ```java
@@ -197,7 +201,7 @@ StackPane overlay = UiComponents.createLoadingOverlay();
 overlay.visibleProperty().bind(viewModel.loadingProperty());
 
 // Confirmation dialogs
-boolean confirmed = UiHelpers.showConfirmation(
+boolean confirmed = UiSupport.showConfirmation(
     "Unmatch",
     "Are you sure you want to unmatch with " + name + "?"
 );
@@ -208,7 +212,7 @@ boolean confirmed = UiHelpers.showConfirmation(
 ```bash
 mvn compile && mvn exec:exec              # Compile + Run CLI (forked JVM with --enable-preview)
 mvn javafx:run                            # Run JavaFX GUI
-mvn test                                  # All tests (820+)
+mvn test                                  # All tests (825+)
 mvn test -Dtest=MatchingServiceTest#mutualLikesCreateMatch  # Single method
 mvn spotless:apply && mvn verify          # Format + full quality checks (REQUIRED before commit)
 ```
@@ -221,7 +225,7 @@ mvn spotless:apply && mvn verify          # Format + full quality checks (REQUIR
 var userStorage = new TestStorages.Users();
 var likeStorage = new TestStorages.Likes();
 var matchStorage = new TestStorages.Matches();
-var blockStorage = new TestStorages.Blocks();
+var trustSafetyStorage = new TestStorages.TrustSafety();
 ```
 
 **Test Structure:**
@@ -336,7 +340,7 @@ public interface JdbiUserStorage extends UserStorage {
 }
 ```
 
-### MapperHelper Utilities (storage/mapper/)
+### MapperHelper Utilities (storage/jdbi/)
 ```java
 // Null-safe reading from ResultSet
 UUID id = MapperHelper.readUuid(rs, "id");
@@ -363,25 +367,26 @@ List<String> urls = MapperHelper.readCsvAsList(rs, "photo_urls");
 
 ## File Structure Reference
 
-| Purpose            | Location                                                                     |
-|--------------------|------------------------------------------------------------------------------|
-| Domain models      | `core/{User,Match,Messaging,UserInteractions,Preferences,Dealbreakers}.java` |
-| Storage interfaces | `core/storage/*Storage.java` (9 interfaces)                                  |
-| Services           | `core/*Service.java` (17 services)                                           |
-| JDBI storage       | `storage/jdbi/Jdbi*Storage.java`                                             |
-| Storage mappers    | `storage/mapper/MapperHelper.java`, `*BindingHelper.java`                    |
-| Service wiring     | `core/ServiceRegistry.java`, `AppBootstrap.java`                             |
-| Session management | `core/AppSession.java`                                                       |
-| CLI handlers       | `app/cli/*Handler.java`, `HandlerFactory.java`                               |
-| REST API           | `app/api/RestApiServer.java`, `*Routes.java`                                 |
-| JavaFX entry       | `ui/DatingApp.java`                                                          |
-| ViewModels         | `ui/viewmodel/*ViewModel.java`, `ErrorHandler.java`                          |
-| Controllers        | `ui/controller/*Controller.java`, `BaseController.java`                      |
-| Navigation         | `ui/NavigationService.java`, `ViewModelFactory.java`                         |
-| UI components      | `ui/component/UiComponents.java`                                             |
-| UI utilities       | `ui/util/{Toast,UiServices,ImageCache,UiHelpers}.java`                       |
-| Configuration      | `core/AppConfig.java` (40+ params)                                           |
-| Test utilities     | `test/.../testutil/{TestStorages,TestUserFactory}.java`                      |
+| Purpose            | Location                                                                           |
+|--------------------|------------------------------------------------------------------------------------|
+| Domain models      | `core/model/{User,Match,Messaging,UserInteractions,Preferences,Dealbreakers}.java` |
+| Storage interfaces | `core/storage/*Storage.java` (9 interfaces)                                        |
+| Services           | `core/service/*Service.java` (14 services)                                         |
+| JDBI storage       | `storage/jdbi/Jdbi*Storage.java`                                                   |
+| Storage mappers    | `storage/jdbi/MapperHelper.java`, `UserBindingHelper.java`                         |
+| Service wiring     | `core/ServiceRegistry.java`, `app/AppBootstrap.java`                               |
+| Session management | `core/AppSession.java`                                                             |
+| CLI handlers       | `app/cli/{Matching,Messaging,Profile,Safety,Stats}Handler.java`                    |
+| REST API           | `app/api/RestApiServer.java` (routes inlined)                                      |
+| JavaFX entry       | `ui/DatingApp.java`                                                                |
+| ViewModels         | `ui/viewmodel/*ViewModel.java`, `ErrorHandler.java`                                |
+| Controllers        | `ui/controller/*Controller.java`, `BaseController.java`                            |
+| Navigation         | `ui/NavigationService.java`, `ui/ViewModelFactory.java`                            |
+| UI components      | `ui/UiComponents.java`                                                             |
+| UI utilities       | `ui/util/{Toast,UiSupport,ImageCache,UiAnimations}.java`                           |
+| UI constants       | `ui/constants/UiConstants.java`                                                    |
+| Configuration      | `core/AppConfig.java` (40+ params)                                                 |
+| Test utilities     | `test/.../testutil/{TestStorages,TestUserFactory,TestClock}.java`                  |
 
 ## Data Flow
 
@@ -413,11 +418,11 @@ List<String> urls = MapperHelper.readCsvAsList(rs, "photo_urls");
 - ❌ Forget `static` on nested types
 - ❌ Use Mockito (use `TestStorages.*` instead)
 - ❌ Throw from services (return `*Result` records)
-- ❌ Hardcode thresholds (use `AppConfig.defaults()`)
+- ❌ Hardcode thresholds (use `AppConfig.defaults()` or `ScoringConstants`)
 - ❌ Call `new User(...)` in mappers (use `StorageBuilder`)
 - ❌ Use `HashSet` for enums (use `EnumSet`)
 - ❌ Forget `touch()` in setters
-- ❌ Expose ViewModels to other ViewModels (use services)
+- ❌ Import `core/storage/*` in ViewModels (use `UiDataAdapters` adapters)
 - ❌ Call database from ViewModel directly (use services)
 
 ## Known Limitations (Don't Fix)

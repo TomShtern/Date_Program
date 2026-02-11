@@ -1,6 +1,6 @@
 package datingapp.core.storage;
 
-import datingapp.core.SwipeSession;
+import datingapp.core.model.SwipeSession;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -52,7 +52,7 @@ public interface SwipeSessionStorage {
 
     /**
      * Permanently deletes expired session records older than the cutoff date.
-     * Used by CleanupService to purge old session data.
+     * Used by SessionService to purge old session data.
      *
      * @param cutoff Sessions older than this instant will be deleted
      * @return Number of sessions deleted

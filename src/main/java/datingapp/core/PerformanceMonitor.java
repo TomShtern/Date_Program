@@ -7,27 +7,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Simple performance monitoring utility for tracking operation timings.
- * Thread-safe and designed for minimal overhead.
- *
- * <p>
- * Usage:
- *
- * <pre>
- * try (var timer = PerformanceMonitor.startTimer("CandidateFinder.findCandidates")) {
- *     // ... operation
- * }
- * </pre>
- *
- * <p>
- * METRICS can be queried and logged periodically:
- *
- * <pre>
- * PerformanceMonitor.logMetrics();
- * PerformanceMonitor.reset();
- * </pre>
- */
 public final class PerformanceMonitor {
     private static final Logger logger = LoggerFactory.getLogger(PerformanceMonitor.class);
 

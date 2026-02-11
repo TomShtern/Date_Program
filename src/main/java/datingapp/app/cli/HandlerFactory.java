@@ -1,8 +1,9 @@
 package datingapp.app.cli;
 
+import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.ValidationService;
+import datingapp.core.service.ValidationService;
 import java.util.Objects;
 
 /**
@@ -19,10 +20,7 @@ public final class HandlerFactory {
     private ProfileHandler profileHandler;
     private SafetyHandler safetyHandler;
     private StatsHandler statsHandler;
-    private ProfileNotesHandler profileNotesHandler;
-    private LikerBrowserHandler likerBrowserHandler;
     private MessagingHandler messagingHandler;
-    private RelationshipHandler relationshipHandler;
 
     /**
      * Creates a new HandlerFactory with dependencies from ServiceRegistry.
@@ -46,7 +44,7 @@ public final class HandlerFactory {
                     services.getCandidateFinder(),
                     services.getMatchingService(),
                     services.getMatchStorage(),
-                    services.getBlockStorage(),
+                    services.getTrustSafetyStorage(),
                     services.getDailyService(),
                     services.getUndoService(),
                     services.getMatchQualityService(),
@@ -55,6 +53,7 @@ public final class HandlerFactory {
                     services.getStatsStorage(),
                     services.getRelationshipTransitionService(),
                     services.getStandoutsService(),
+                    services.getSocialStorage(),
                     session,
                     inputReader);
             matchingHandler = new MatchingHandler(deps);
@@ -85,7 +84,7 @@ public final class HandlerFactory {
         if (safetyHandler == null) {
             safetyHandler = new SafetyHandler(
                     services.getUserStorage(),
-                    services.getBlockStorage(),
+                    services.getTrustSafetyStorage(),
                     services.getMatchStorage(),
                     services.getTrustSafetyService(),
                     session,
@@ -106,26 +105,6 @@ public final class HandlerFactory {
     }
 
     /**
-     * Returns the ProfileNotesHandler (lazy-initialized).
-     */
-    public ProfileNotesHandler profileNotes() {
-        if (profileNotesHandler == null) {
-            profileNotesHandler = new ProfileNotesHandler(services.getUserStorage(), session, inputReader);
-        }
-        return profileNotesHandler;
-    }
-
-    /**
-     * Returns the LikerBrowserHandler (lazy-initialized).
-     */
-    public LikerBrowserHandler likerBrowser() {
-        if (likerBrowserHandler == null) {
-            likerBrowserHandler = new LikerBrowserHandler(services.getMatchingService(), session, inputReader);
-        }
-        return likerBrowserHandler;
-    }
-
-    /**
      * Returns the MessagingHandler (lazy-initialized).
      */
     public MessagingHandler messaging() {
@@ -133,25 +112,10 @@ public final class HandlerFactory {
             messagingHandler = new MessagingHandler(
                     services.getMessagingService(),
                     services.getMatchStorage(),
-                    services.getBlockStorage(),
+                    services.getTrustSafetyStorage(),
                     inputReader,
                     session);
         }
         return messagingHandler;
-    }
-
-    /**
-     * Returns the RelationshipHandler (lazy-initialized).
-     */
-    public RelationshipHandler relationship() {
-        if (relationshipHandler == null) {
-            relationshipHandler = new RelationshipHandler(
-                    services.getRelationshipTransitionService(),
-                    services.getSocialStorage(),
-                    services.getUserStorage(),
-                    session,
-                    inputReader);
-        }
-        return relationshipHandler;
     }
 }

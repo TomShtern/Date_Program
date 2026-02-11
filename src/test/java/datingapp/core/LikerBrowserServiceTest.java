@@ -2,13 +2,16 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import datingapp.core.MatchingService.PendingLiker;
-import datingapp.core.User.ProfileNote;
-import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.Like;
-import datingapp.core.storage.BlockStorage;
+import datingapp.core.model.*;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.UserInteractions.Block;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.UserInteractions.Report;
+import datingapp.core.service.*;
+import datingapp.core.service.MatchingService.PendingLiker;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -46,8 +49,8 @@ class LikerBrowserServiceTest {
 
         likeStorage.addAlreadyInteracted(alreadyInteractedId);
 
-        InMemoryBlockStorage blockStorage = new InMemoryBlockStorage();
-        blockStorage.save(Block.create(currentUserId, blockedId));
+        InMemoryTrustSafetyStorage trustSafetyStorage = new InMemoryTrustSafetyStorage();
+        trustSafetyStorage.save(Block.create(currentUserId, blockedId));
 
         InMemoryMatchStorage matchStorage = new InMemoryMatchStorage();
         matchStorage.matches.add(Match.create(currentUserId, matchedId));
@@ -63,7 +66,7 @@ class LikerBrowserServiceTest {
                 .likeStorage(likeStorage)
                 .matchStorage(matchStorage)
                 .userStorage(userStorage)
-                .blockStorage(blockStorage)
+                .trustSafetyStorage(trustSafetyStorage)
                 .build();
 
         List<User> pending = service.findPendingLikers(currentUserId);
@@ -92,7 +95,7 @@ class LikerBrowserServiceTest {
                 .likeStorage(likeStorage)
                 .matchStorage(new InMemoryMatchStorage())
                 .userStorage(userStorage)
-                .blockStorage(new InMemoryBlockStorage())
+                .trustSafetyStorage(new InMemoryTrustSafetyStorage())
                 .build();
 
         List<PendingLiker> pending = service.findPendingLikersWithTimes(currentUserId);
@@ -305,8 +308,9 @@ class LikerBrowserServiceTest {
         }
     }
 
-    private static class InMemoryBlockStorage implements BlockStorage {
+    private static class InMemoryTrustSafetyStorage implements TrustSafetyStorage {
         private final List<Block> blocks = new ArrayList<>();
+        private final List<Report> reports = new ArrayList<>();
 
         @Override
         public void save(Block block) {
@@ -339,7 +343,7 @@ class LikerBrowserServiceTest {
         }
 
         @Override
-        public boolean delete(UUID blockerId, UUID blockedId) {
+        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
             return blocks.removeIf(
                     b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
         }
@@ -354,6 +358,38 @@ class LikerBrowserServiceTest {
         public int countBlocksReceived(UUID userId) {
             return (int)
                     blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
+        }
+
+        @Override
+        public void save(Report report) {
+            reports.add(report);
+        }
+
+        @Override
+        public int countReportsAgainst(UUID userId) {
+            return (int) reports.stream()
+                    .filter(r -> r.reportedUserId().equals(userId))
+                    .count();
+        }
+
+        @Override
+        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
+            return reports.stream()
+                    .anyMatch(r -> r.reporterId().equals(reporterId)
+                            && r.reportedUserId().equals(reportedUserId));
+        }
+
+        @Override
+        public List<Report> getReportsAgainst(UUID userId) {
+            return reports.stream()
+                    .filter(r -> r.reportedUserId().equals(userId))
+                    .toList();
+        }
+
+        @Override
+        public int countReportsBy(UUID userId) {
+            return (int)
+                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
         }
     }
 }

@@ -2,7 +2,11 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.UserInteractions.Like;
+import datingapp.core.model.*;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.service.*;
+import datingapp.core.service.DailyService.DailyPick;
+import datingapp.core.storage.StatsStorage;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import java.time.Clock;
@@ -25,8 +29,8 @@ class DailyServiceTest {
 
     private TestStorages.Users userStorage;
     private TestStorages.Likes likeStorage;
-    private TestStorages.Blocks blockStorage;
-    private DailyPickViewStorageMock dailyPickViewStorage;
+    private TestStorages.TrustSafety trustSafetyStorage;
+    private DailyPickViewStorageMock statsStorageMock;
     private CandidateFinder candidateFinder;
     private DailyService service;
     private AppConfig config;
@@ -37,8 +41,8 @@ class DailyServiceTest {
     void setUp() {
         userStorage = new TestStorages.Users();
         likeStorage = new TestStorages.Likes();
-        blockStorage = new TestStorages.Blocks();
-        dailyPickViewStorage = new DailyPickViewStorageMock();
+        trustSafetyStorage = new TestStorages.TrustSafety();
+        statsStorageMock = new DailyPickViewStorageMock();
 
         config = AppConfig.builder()
                 .dailyLikeLimit(5)
@@ -49,9 +53,9 @@ class DailyServiceTest {
         todayStart = LocalDate.of(2026, 2, 6).atStartOfDay(ZoneId.of("UTC")).toInstant();
         fixedClock = Clock.fixed(todayStart.plus(Duration.ofHours(12)), ZoneId.of("UTC")); // Noon UTC
 
-        candidateFinder = new CandidateFinder(userStorage, likeStorage, blockStorage, config);
+        candidateFinder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, config);
         service = new DailyService(
-                userStorage, likeStorage, blockStorage, dailyPickViewStorage, candidateFinder, config, fixedClock);
+                userStorage, likeStorage, trustSafetyStorage, statsStorageMock, candidateFinder, config, fixedClock);
     }
 
     @Nested
@@ -93,8 +97,8 @@ class DailyServiceTest {
             DailyService unlimitedService = new DailyService(
                     userStorage,
                     likeStorage,
-                    blockStorage,
-                    dailyPickViewStorage,
+                    trustSafetyStorage,
+                    statsStorageMock,
                     candidateFinder,
                     unlimitedConfig,
                     fixedClock);
@@ -132,8 +136,8 @@ class DailyServiceTest {
             DailyService unlimitedService = new DailyService(
                     userStorage,
                     likeStorage,
-                    blockStorage,
-                    dailyPickViewStorage,
+                    trustSafetyStorage,
+                    statsStorageMock,
                     candidateFinder,
                     unlimitedConfig,
                     fixedClock);
@@ -207,7 +211,7 @@ class DailyServiceTest {
 
             service.markDailyPickViewed(userId);
             assertTrue(service.hasViewedDailyPick(userId));
-            assertTrue(dailyPickViewStorage.isViewed(userId, LocalDate.now(fixedClock)));
+            assertTrue(statsStorageMock.isDailyPickViewed(userId, LocalDate.now(fixedClock)));
         }
 
         @Test
@@ -271,23 +275,115 @@ class DailyServiceTest {
         }
     }
 
-    // Mock for DailyPickViewStorage
-    private static class DailyPickViewStorageMock implements datingapp.core.storage.DailyPickViewStorage {
+    // Minimal StatsStorage mock — only daily pick view methods are meaningful
+    @SuppressWarnings("unused")
+    private static class DailyPickViewStorageMock implements StatsStorage {
         private final Set<String> viewed = new java.util.HashSet<>();
 
         @Override
-        public void markAsViewed(UUID userId, LocalDate date) {
+        public void markDailyPickAsViewed(UUID userId, LocalDate date) {
             viewed.add(userId + "_" + date);
         }
 
         @Override
-        public boolean isViewed(UUID userId, LocalDate date) {
+        public boolean isDailyPickViewed(UUID userId, LocalDate date) {
             return viewed.contains(userId + "_" + date);
         }
 
         @Override
-        public int deleteOlderThan(LocalDate date) {
-            return 0; // Not needed for these tests
+        public int deleteDailyPickViewsOlderThan(LocalDate date) {
+            return 0;
+        }
+
+        // Remaining StatsStorage methods — not used by DailyService
+        @Override
+        public void saveUserStats(datingapp.core.model.Stats.UserStats stats) {
+            /* not used */
+        }
+
+        @Override
+        public java.util.Optional<datingapp.core.model.Stats.UserStats> getLatestUserStats(UUID userId) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public java.util.List<datingapp.core.model.Stats.UserStats> getUserStatsHistory(UUID userId, int limit) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public java.util.List<datingapp.core.model.Stats.UserStats> getAllLatestUserStats() {
+            return java.util.List.of();
+        }
+
+        @Override
+        public int deleteUserStatsOlderThan(java.time.Instant cutoff) {
+            return 0;
+        }
+
+        @Override
+        public void savePlatformStats(datingapp.core.model.Stats.PlatformStats stats) {
+            /* not used */
+        }
+
+        @Override
+        public java.util.Optional<datingapp.core.model.Stats.PlatformStats> getLatestPlatformStats() {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public java.util.List<datingapp.core.model.Stats.PlatformStats> getPlatformStatsHistory(int limit) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public void recordProfileView(UUID viewerId, UUID viewedId) {
+            /* not used */
+        }
+
+        @Override
+        public int getProfileViewCount(UUID userId) {
+            return 0;
+        }
+
+        @Override
+        public int getUniqueViewerCount(UUID userId) {
+            return 0;
+        }
+
+        @Override
+        public java.util.List<UUID> getRecentViewers(UUID userId, int limit) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
+            return false;
+        }
+
+        @Override
+        public void saveUserAchievement(datingapp.core.model.Achievement.UserAchievement achievement) {
+            /* not used */
+        }
+
+        @Override
+        public java.util.List<datingapp.core.model.Achievement.UserAchievement> getUnlockedAchievements(UUID userId) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public boolean hasAchievement(UUID userId, datingapp.core.model.Achievement achievement) {
+            return false;
+        }
+
+        @Override
+        public int countUnlockedAchievements(UUID userId) {
+            return 0;
+        }
+
+        @Override
+        public int deleteExpiredDailyPickViews(java.time.Instant cutoff) {
+            return 0;
         }
     }
 }

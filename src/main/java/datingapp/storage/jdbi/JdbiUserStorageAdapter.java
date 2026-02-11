@@ -1,7 +1,7 @@
 package datingapp.storage.jdbi;
 
-import datingapp.core.User;
-import datingapp.core.User.ProfileNote;
+import datingapp.core.model.User;
+import datingapp.core.model.User.ProfileNote;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.ArrayList;

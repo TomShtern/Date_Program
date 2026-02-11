@@ -2,6 +2,9 @@ package datingapp.storage.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.model.*;
+import datingapp.core.service.*;
+import datingapp.storage.jdbi.MapperHelper;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;

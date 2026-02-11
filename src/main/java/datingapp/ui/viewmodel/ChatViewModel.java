@@ -1,11 +1,11 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.AppSession;
-import datingapp.core.Messaging.Conversation;
-import datingapp.core.Messaging.Message;
-import datingapp.core.MessagingService;
-import datingapp.core.MessagingService.ConversationPreview;
-import datingapp.core.User;
+import datingapp.core.model.Messaging.Conversation;
+import datingapp.core.model.Messaging.Message;
+import datingapp.core.model.User;
+import datingapp.core.service.MessagingService;
+import datingapp.core.service.MessagingService.ConversationPreview;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;

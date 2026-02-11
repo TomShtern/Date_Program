@@ -2,6 +2,8 @@ package datingapp.ui;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.model.*;
+import datingapp.core.service.*;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.URL;

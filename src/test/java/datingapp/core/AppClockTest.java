@@ -2,6 +2,8 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.model.*;
+import datingapp.core.service.*;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;

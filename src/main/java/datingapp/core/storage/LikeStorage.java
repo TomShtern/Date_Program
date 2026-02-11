@@ -1,6 +1,6 @@
 package datingapp.core.storage;
 
-import datingapp.core.UserInteractions.Like;
+import datingapp.core.model.UserInteractions.Like;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.model.*;
+import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.UUID;

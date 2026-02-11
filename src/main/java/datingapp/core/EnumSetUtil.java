@@ -5,18 +5,6 @@ import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
 
-/**
- * Utility for null-safe and empty-safe {@link EnumSet} operations.
- *
- * <p>Replaces ad-hoc null/empty guards like:
- * <pre>
- *   interests != null ? EnumSet.copyOf(interests) : EnumSet.noneOf(Interest.class)
- * </pre>
- * with:
- * <pre>
- *   EnumSetUtil.safeCopy(interests, Interest.class)
- * </pre>
- */
 public final class EnumSetUtil {
 
     private EnumSetUtil() {

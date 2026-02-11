@@ -5,15 +5,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.PacePreferences.CommunicationStyle;
-import datingapp.core.PacePreferences.DepthPreference;
-import datingapp.core.PacePreferences.MessagingFrequency;
-import datingapp.core.PacePreferences.TimeToFirstDate;
-import datingapp.core.User.ProfileNote;
-import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.Report;
-import datingapp.core.storage.BlockStorage;
-import datingapp.core.storage.ReportStorage;
+import datingapp.core.model.*;
+import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
+import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
+import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
+import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.UserInteractions.Block;
+import datingapp.core.model.UserInteractions.Report;
+import datingapp.core.service.*;
+import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
 import java.time.Duration;
@@ -70,9 +72,8 @@ class TrustSafetyServiceTest {
     @DisplayName("Report Functionality")
     class ReportFunctionality {
 
-        private InMemoryReportStorage reportStorage;
         private InMemoryUserStorage userStorage;
-        private InMemoryBlockStorage blockStorage;
+        private InMemoryTrustSafetyStorage trustSafetyStorage;
         private TrustSafetyService trustSafetyService;
 
         private User activeReporter;
@@ -80,12 +81,11 @@ class TrustSafetyServiceTest {
 
         @BeforeEach
         void setUp() {
-            reportStorage = new InMemoryReportStorage();
             userStorage = new InMemoryUserStorage();
-            blockStorage = new InMemoryBlockStorage();
+            trustSafetyStorage = new InMemoryTrustSafetyStorage();
 
             AppConfig config = AppConfig.builder().autoBanThreshold(3).build();
-            trustSafetyService = new TrustSafetyService(reportStorage, userStorage, blockStorage, null, config);
+            trustSafetyService = new TrustSafetyService(trustSafetyStorage, userStorage, null, config);
 
             // Create test users
             activeReporter = createActiveUser("Reporter");
@@ -115,7 +115,7 @@ class TrustSafetyServiceTest {
                 trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.HARASSMENT, null);
 
                 assertTrue(
-                        blockStorage.isBlocked(activeReporter.getId(), reportedUser.getId()),
+                        trustSafetyStorage.isBlocked(activeReporter.getId(), reportedUser.getId()),
                         "Reporter should have blocked the reported user");
             }
 
@@ -126,9 +126,9 @@ class TrustSafetyServiceTest {
                         activeReporter.getId(), reportedUser.getId(), Report.Reason.FAKE_PROFILE, "Fake photos");
 
                 assertTrue(
-                        reportStorage.hasReported(activeReporter.getId(), reportedUser.getId()),
+                        trustSafetyStorage.hasReported(activeReporter.getId(), reportedUser.getId()),
                         "Report should be persisted");
-                assertEquals(1, reportStorage.countReportsAgainst(reportedUser.getId()), "Should have 1 report");
+                assertEquals(1, trustSafetyStorage.countReportsAgainst(reportedUser.getId()), "Should have 1 report");
             }
         }
 
@@ -169,7 +169,7 @@ class TrustSafetyServiceTest {
             void customThresholdWorks() {
                 AppConfig customConfig = AppConfig.builder().autoBanThreshold(2).build();
                 TrustSafetyService customService =
-                        new TrustSafetyService(reportStorage, userStorage, blockStorage, null, customConfig);
+                        new TrustSafetyService(trustSafetyStorage, userStorage, null, customConfig);
 
                 User reporter2 = createActiveUser("Reporter2");
                 userStorage.save(reporter2);
@@ -232,17 +232,17 @@ class TrustSafetyServiceTest {
             @DisplayName("Successfully unblocks a blocked user")
             void successfullyUnblocksBlockedUser() {
                 Block block = Block.create(activeReporter.getId(), reportedUser.getId());
-                blockStorage.save(block);
+                trustSafetyStorage.save(block);
 
                 assertTrue(
-                        blockStorage.isBlocked(activeReporter.getId(), reportedUser.getId()),
+                        trustSafetyStorage.isBlocked(activeReporter.getId(), reportedUser.getId()),
                         "Users should be blocked initially");
 
                 boolean result = trustSafetyService.unblock(activeReporter.getId(), reportedUser.getId());
 
                 assertTrue(result, "Unblock should succeed");
                 assertFalse(
-                        blockStorage.isBlocked(activeReporter.getId(), reportedUser.getId()),
+                        trustSafetyStorage.isBlocked(activeReporter.getId(), reportedUser.getId()),
                         "Users should no longer be blocked");
             }
 
@@ -264,9 +264,9 @@ class TrustSafetyServiceTest {
                 userStorage.save(user2);
                 userStorage.save(user3);
 
-                blockStorage.save(Block.create(activeReporter.getId(), user1.getId()));
-                blockStorage.save(Block.create(activeReporter.getId(), user2.getId()));
-                blockStorage.save(Block.create(activeReporter.getId(), user3.getId()));
+                trustSafetyStorage.save(Block.create(activeReporter.getId(), user1.getId()));
+                trustSafetyStorage.save(Block.create(activeReporter.getId(), user2.getId()));
+                trustSafetyStorage.save(Block.create(activeReporter.getId(), user3.getId()));
 
                 List<User> blockedUsers = trustSafetyService.getBlockedUsers(activeReporter.getId());
 
@@ -386,8 +386,11 @@ class TrustSafetyServiceTest {
     // IN-MEMORY MOCK STORAGE IMPLEMENTATIONS
     // ============================================================
 
-    private static class InMemoryReportStorage implements ReportStorage {
+    private static class InMemoryTrustSafetyStorage implements TrustSafetyStorage {
         private final List<Report> reports = new ArrayList<>();
+        private final List<Block> blocks = new ArrayList<>();
+
+        // ─── Report operations ───
 
         @Override
         public void save(Report report) {
@@ -419,6 +422,57 @@ class TrustSafetyServiceTest {
         public int countReportsBy(UUID userId) {
             return (int)
                     reports.stream().filter(r -> r.reporterId().equals(userId)).count();
+        }
+
+        // ─── Block operations ───
+
+        @Override
+        public void save(Block block) {
+            blocks.add(block);
+        }
+
+        @Override
+        public boolean isBlocked(UUID userA, UUID userB) {
+            return blocks.stream()
+                    .anyMatch(b -> (b.blockerId().equals(userA) && b.blockedId().equals(userB))
+                            || (b.blockerId().equals(userB) && b.blockedId().equals(userA)));
+        }
+
+        @Override
+        public Set<UUID> getBlockedUserIds(UUID userId) {
+            Set<UUID> result = new HashSet<>();
+            for (Block block : blocks) {
+                if (block.blockerId().equals(userId)) {
+                    result.add(block.blockedId());
+                }
+                if (block.blockedId().equals(userId)) {
+                    result.add(block.blockerId());
+                }
+            }
+            return result;
+        }
+
+        @Override
+        public List<Block> findByBlocker(UUID blockerId) {
+            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
+        }
+
+        @Override
+        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
+            return blocks.removeIf(
+                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
+        }
+
+        @Override
+        public int countBlocksGiven(UUID userId) {
+            return (int)
+                    blocks.stream().filter(b -> b.blockerId().equals(userId)).count();
+        }
+
+        @Override
+        public int countBlocksReceived(UUID userId) {
+            return (int)
+                    blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
         }
     }
 
@@ -478,59 +532,6 @@ class TrustSafetyServiceTest {
         @Override
         public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
             return profileNotes.remove(noteKey(authorId, subjectId)) != null;
-        }
-    }
-
-    private static class InMemoryBlockStorage implements BlockStorage {
-        private final List<Block> blocks = new ArrayList<>();
-
-        @Override
-        public void save(Block block) {
-            blocks.add(block);
-        }
-
-        @Override
-        public boolean isBlocked(UUID userA, UUID userB) {
-            return blocks.stream()
-                    .anyMatch(b -> (b.blockerId().equals(userA) && b.blockedId().equals(userB))
-                            || (b.blockerId().equals(userB) && b.blockedId().equals(userA)));
-        }
-
-        @Override
-        public Set<UUID> getBlockedUserIds(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Block block : blocks) {
-                if (block.blockerId().equals(userId)) {
-                    result.add(block.blockedId());
-                }
-                if (block.blockedId().equals(userId)) {
-                    result.add(block.blockerId());
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public List<Block> findByBlocker(UUID blockerId) {
-            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
-        }
-
-        @Override
-        public boolean delete(UUID blockerId, UUID blockedId) {
-            return blocks.removeIf(
-                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
-        }
-
-        @Override
-        public int countBlocksGiven(UUID userId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockerId().equals(userId)).count();
-        }
-
-        @Override
-        public int countBlocksReceived(UUID userId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
         }
     }
 }

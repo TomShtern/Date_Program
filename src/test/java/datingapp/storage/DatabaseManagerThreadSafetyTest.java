@@ -2,6 +2,8 @@ package datingapp.storage;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.model.*;
+import datingapp.core.service.*;
 import java.sql.Connection;
 import java.util.List;
 import java.util.UUID;

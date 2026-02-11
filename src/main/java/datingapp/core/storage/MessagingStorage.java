@@ -1,8 +1,8 @@
 package datingapp.core.storage;
 
-import datingapp.core.Match;
-import datingapp.core.Messaging.Conversation;
-import datingapp.core.Messaging.Message;
+import datingapp.core.model.Match;
+import datingapp.core.model.Messaging.Conversation;
+import datingapp.core.model.Messaging.Message;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

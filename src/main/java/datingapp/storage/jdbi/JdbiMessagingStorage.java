@@ -1,11 +1,10 @@
 package datingapp.storage.jdbi;
 
 import datingapp.core.AppClock;
-import datingapp.core.Match;
-import datingapp.core.Messaging.Conversation;
-import datingapp.core.Messaging.Message;
+import datingapp.core.model.Match;
+import datingapp.core.model.Messaging.Conversation;
+import datingapp.core.model.Messaging.Message;
 import datingapp.core.storage.MessagingStorage;
-import datingapp.storage.mapper.MapperHelper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;

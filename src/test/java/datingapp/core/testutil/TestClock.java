@@ -1,6 +1,8 @@
 package datingapp.core.testutil;
 
 import datingapp.core.AppClock;
+import datingapp.core.model.*;
+import datingapp.core.service.*;
 import java.time.Instant;
 import java.util.Objects;
 

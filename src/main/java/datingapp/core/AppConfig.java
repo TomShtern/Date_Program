@@ -4,16 +4,6 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Objects;
 
-/**
- * Centralized, immutable application configuration. All configurable values
- * should be defined here
- * for easy modification.
- *
- * <p>
- * This enables future drop-in changes: - Different profiles (dev/prod) -
- * External configuration
- * (properties files, env vars) - Testing with different thresholds
- */
 public record AppConfig(
         int autoBanThreshold, // Number of reports before auto-ban
         int dailyLikeLimit, // Max likes per day (-1 = unlimited)

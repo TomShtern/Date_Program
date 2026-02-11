@@ -1,8 +1,11 @@
 package datingapp.app.cli;
 
 import datingapp.core.AppSession;
+import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Scanner;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,5 +107,107 @@ public final class CliSupport {
         }
         action.run();
         return true;
+    }
+
+    // ═══ Nested Utility Classes ═══
+
+    /** Handles user input from the console, providing prompt display and line reading. */
+    public static class InputReader {
+        private static final Logger log = LoggerFactory.getLogger(InputReader.class);
+        private final Scanner scanner;
+
+        public InputReader(Scanner scanner) {
+            this.scanner = scanner;
+        }
+
+        public String readLine(String prompt) {
+            log.info(prompt);
+            if (scanner.hasNextLine()) {
+                return scanner.nextLine().trim();
+            }
+            return "";
+        }
+    }
+
+    /**
+     * Generic utility for displaying enum options and parsing user selection.
+     * Reduces repetitive switch statements in CLI handlers.
+     */
+    public static final class EnumMenu {
+
+        private static final Logger log = LoggerFactory.getLogger(EnumMenu.class);
+
+        private EnumMenu() {}
+
+        public static <E extends Enum<E>> Optional<E> prompt(
+                InputReader reader, Class<E> enumClass, String prompt, boolean allowSkip) {
+            E[] values = enumClass.getEnumConstants();
+
+            if (log.isInfoEnabled()) {
+                log.info("\n{}", prompt);
+                for (int i = 0; i < values.length; i++) {
+                    log.info("  {}. {}", i + 1, getDisplayName(values[i]));
+                }
+                if (allowSkip) {
+                    log.info("  0. Skip");
+                }
+            }
+
+            String input = reader.readLine("Your choice: ");
+            try {
+                int choice = Integer.parseInt(input.trim());
+                if (choice == 0 && allowSkip) {
+                    return Optional.empty();
+                }
+                if (choice >= 1 && choice <= values.length) {
+                    return Optional.of(values[choice - 1]);
+                }
+            } catch (NumberFormatException ignored) {
+                log.debug("Invalid numeric selection", ignored);
+            }
+
+            log.info("⚠️ Invalid selection, skipping.");
+            return Optional.empty();
+        }
+
+        public static <E extends Enum<E>> Set<E> promptMultiple(InputReader reader, Class<E> enumClass, String prompt) {
+            E[] values = enumClass.getEnumConstants();
+
+            if (log.isInfoEnabled()) {
+                log.info("\n{} (comma-separated, e.g., 1,2,3)", prompt);
+                for (int i = 0; i < values.length; i++) {
+                    log.info("  {}. {}", i + 1, getDisplayName(values[i]));
+                }
+                log.info("  0. Clear/None");
+            }
+
+            String input = reader.readLine("Your choices: ");
+            if ("0".equals(input.trim())) {
+                return EnumSet.noneOf(enumClass);
+            }
+
+            Set<E> result = EnumSet.noneOf(enumClass);
+            for (String part : input.split(",")) {
+                try {
+                    int choice = Integer.parseInt(part.trim());
+                    if (choice >= 1 && choice <= values.length) {
+                        result.add(values[choice - 1]);
+                    }
+                } catch (NumberFormatException ignored) {
+                    log.debug("Skipping invalid selection entry", ignored);
+                }
+            }
+            return result;
+        }
+
+        private static <E extends Enum<E>> String getDisplayName(E value) {
+            try {
+                var method = value.getClass().getMethod("getDisplayName");
+                return (String) method.invoke(value);
+            } catch (ReflectiveOperationException _) {
+                String name = value.name().replace("_", " ").toLowerCase(Locale.ROOT);
+                return Character.toUpperCase(name.charAt(0)) + name.substring(1);
+            }
+        }
     }
 }

@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.MatchQualityService.MatchQuality;
+import datingapp.core.model.*;
+import datingapp.core.service.*;
+import datingapp.core.service.MatchQualityService.MatchQuality;
 import datingapp.core.testutil.TestClock;
 import java.time.Duration;
 import java.time.Instant;

@@ -9,7 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.UserInteractions.Like;
+import datingapp.core.model.*;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import java.time.Duration;
 import java.time.Instant;

@@ -5,8 +5,25 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import datingapp.app.AppBootstrap;
 import datingapp.core.ServiceRegistry;
+import datingapp.core.model.Match;
+import datingapp.core.model.Messaging.Conversation;
+import datingapp.core.model.Messaging.Message;
+import datingapp.core.model.User;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.service.CandidateFinder;
+import datingapp.core.service.MatchingService;
+import datingapp.core.service.MessagingService;
+import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.MessagingStorage;
+import datingapp.core.storage.UserStorage;
 import io.javalin.Javalin;
+import io.javalin.http.Context;
+import io.javalin.http.NotFoundResponse;
 import io.javalin.json.JavalinJackson;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +51,15 @@ public class RestApiServer {
 
     private static final Logger logger = LoggerFactory.getLogger(RestApiServer.class);
     private static final int DEFAULT_PORT = 7070;
+    private static final int DEFAULT_MESSAGE_LIMIT = 50;
+    private static final String UNKNOWN_USER = "Unknown";
 
-    private final ServiceRegistry services;
+    private final UserStorage userStorage;
+    private final MatchStorage matchStorage;
+    private final CandidateFinder candidateFinder;
+    private final MatchingService matchingService;
+    private final MessagingStorage messagingStorage;
+    private final MessagingService messagingService;
     private final int port;
     private Javalin app;
 
@@ -46,7 +70,12 @@ public class RestApiServer {
 
     /** Creates a server with the given services and port. */
     public RestApiServer(ServiceRegistry services, int port) {
-        this.services = services;
+        this.userStorage = services.getUserStorage();
+        this.matchStorage = services.getMatchStorage();
+        this.candidateFinder = services.getCandidateFinder();
+        this.matchingService = services.getMatchingService();
+        this.messagingStorage = services.getMessagingStorage();
+        this.messagingService = services.getMessagingService();
         this.port = port;
     }
 
@@ -81,6 +110,189 @@ public class RestApiServer {
         return app;
     }
 
+    // ── Route Registration ──────────────────────────────────────────────
+
+    private void registerRoutes() {
+        // Health check
+        app.get("/api/health", ctx -> ctx.json(new HealthResponse("ok", System.currentTimeMillis())));
+
+        // User routes
+        app.get("/api/users", this::listUsers);
+        app.get("/api/users/{id}", this::getUser);
+        app.get("/api/users/{id}/candidates", this::getCandidates);
+
+        // Match routes
+        app.get("/api/users/{id}/matches", this::getMatches);
+        app.post("/api/users/{id}/like/{targetId}", this::likeUser);
+        app.post("/api/users/{id}/pass/{targetId}", this::passUser);
+
+        // Messaging routes
+        app.get("/api/users/{id}/conversations", this::getConversations);
+        app.get("/api/conversations/{conversationId}/messages", this::getMessages);
+        app.post("/api/conversations/{conversationId}/messages", this::sendMessage);
+    }
+
+    // ── User Handlers ───────────────────────────────────────────────────
+
+    private void listUsers(Context ctx) {
+        List<UserSummary> users =
+                userStorage.findAll().stream().map(UserSummary::from).toList();
+        ctx.json(users);
+    }
+
+    private void getUser(Context ctx) {
+        UUID id = parseUuid(ctx.pathParam("id"));
+        User user = userStorage.get(id);
+        if (user == null) {
+            throw new NotFoundResponse("User not found");
+        }
+        ctx.json(UserDetail.from(user));
+    }
+
+    private void getCandidates(Context ctx) {
+        UUID id = parseUuid(ctx.pathParam("id"));
+        User user = userStorage.get(id);
+        if (user == null) {
+            throw new NotFoundResponse("User not found");
+        }
+        List<UserSummary> candidates = candidateFinder.findCandidatesForUser(user).stream()
+                .map(UserSummary::from)
+                .toList();
+        ctx.json(candidates);
+    }
+
+    // ── Match Handlers ──────────────────────────────────────────────────
+
+    private void getMatches(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        validateUserExists(userId);
+        List<MatchSummary> matches = matchStorage.getAllMatchesFor(userId).stream()
+                .map(m -> toMatchSummary(m, userId))
+                .toList();
+        ctx.json(matches);
+    }
+
+    private void likeUser(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        UUID targetId = parseUuid(ctx.pathParam("targetId"));
+        validateUserExists(userId);
+        validateUserExists(targetId);
+
+        Like like = Like.create(userId, targetId, Like.Direction.LIKE);
+        Optional<Match> match = matchingService.recordLike(like);
+
+        if (match.isPresent()) {
+            ctx.status(201);
+            ctx.json(new LikeResponse(true, "It's a match!", MatchSummary.from(match.get(), userId)));
+        } else {
+            ctx.status(200);
+            ctx.json(new LikeResponse(false, "Like recorded", null));
+        }
+    }
+
+    private void passUser(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        UUID targetId = parseUuid(ctx.pathParam("targetId"));
+        validateUserExists(userId);
+        validateUserExists(targetId);
+
+        Like pass = Like.create(userId, targetId, Like.Direction.PASS);
+        matchingService.recordLike(pass);
+        ctx.status(200);
+        ctx.json(new PassResponse("Passed"));
+    }
+
+    // ── Messaging Handlers ──────────────────────────────────────────────
+
+    private void getConversations(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        validateUserExists(userId);
+        List<ConversationSummary> conversations = messagingStorage.getConversationsFor(userId).stream()
+                .map(c -> toConversationSummary(c, userId))
+                .toList();
+        ctx.json(conversations);
+    }
+
+    private void getMessages(Context ctx) {
+        String conversationId = ctx.pathParam("conversationId");
+        int limit = ctx.queryParamAsClass("limit", Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
+        int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
+
+        List<MessageDto> messages = messagingStorage.getMessages(conversationId, limit, offset).stream()
+                .map(MessageDto::from)
+                .toList();
+        ctx.json(messages);
+    }
+
+    private void sendMessage(Context ctx) {
+        String conversationId = ctx.pathParam("conversationId");
+        SendMessageRequest request = ctx.bodyAsClass(SendMessageRequest.class);
+
+        if (request.senderId() == null || request.content() == null) {
+            throw new IllegalArgumentException("senderId and content are required");
+        }
+
+        UUID recipientId = extractRecipientFromConversation(conversationId, request.senderId());
+        var result = messagingService.sendMessage(request.senderId(), recipientId, request.content());
+
+        if (result.success()) {
+            ctx.status(201);
+            ctx.json(MessageDto.from(result.message()));
+        } else {
+            ctx.status(400);
+            ctx.json(new ErrorResponse(result.errorCode().name(), result.errorMessage()));
+        }
+    }
+
+    // ── Shared Helpers ──────────────────────────────────────────────────
+
+    private UUID parseUuid(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid UUID format: " + value, e);
+        }
+    }
+
+    private void validateUserExists(UUID userId) {
+        if (userStorage.get(userId) == null) {
+            throw new NotFoundResponse("User not found: " + userId);
+        }
+    }
+
+    private MatchSummary toMatchSummary(Match match, UUID currentUserId) {
+        UUID otherUserId = match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
+        User otherUser = userStorage.get(otherUserId);
+        String otherUserName = otherUser != null ? otherUser.getName() : UNKNOWN_USER;
+        return new MatchSummary(
+                match.getId(), otherUserId, otherUserName, match.getState().name(), match.getCreatedAt());
+    }
+
+    private ConversationSummary toConversationSummary(Conversation conversation, UUID currentUserId) {
+        UUID otherUserId = extractRecipientFromConversation(conversation.getId(), currentUserId);
+        User otherUser = userStorage.get(otherUserId);
+        String otherUserName = otherUser != null ? otherUser.getName() : UNKNOWN_USER;
+        int messageCount = messagingStorage.countMessages(conversation.getId());
+        return new ConversationSummary(
+                conversation.getId(), otherUserId, otherUserName, messageCount, conversation.getLastMessageAt());
+    }
+
+    private UUID extractRecipientFromConversation(String conversationId, UUID senderId) {
+        String[] parts = conversationId.split("_");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("Invalid conversation ID format");
+        }
+        try {
+            UUID id1 = UUID.fromString(parts[0]);
+            UUID id2 = UUID.fromString(parts[1]);
+            return id1.equals(senderId) ? id2 : id1;
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid conversation ID format", ex);
+        }
+    }
+
+    // ── Infrastructure ──────────────────────────────────────────────────
+
     private ObjectMapper createObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
@@ -91,30 +303,6 @@ public class RestApiServer {
 
     private static io.javalin.json.JsonMapper createJsonMapper(ObjectMapper mapper) {
         return new JavalinJackson(mapper, true);
-    }
-
-    private void registerRoutes() {
-        var userRoutes = new UserRoutes(services);
-        var matchRoutes = new MatchRoutes(services);
-        var messagingRoutes = new MessagingRoutes(services);
-
-        // Health check
-        app.get("/api/health", ctx -> ctx.json(new HealthResponse("ok", System.currentTimeMillis())));
-
-        // User routes
-        app.get("/api/users", userRoutes::listUsers);
-        app.get("/api/users/{id}", userRoutes::getUser);
-        app.get("/api/users/{id}/candidates", userRoutes::getCandidates);
-
-        // Match routes
-        app.get("/api/users/{id}/matches", matchRoutes::getMatches);
-        app.post("/api/users/{id}/like/{targetId}", matchRoutes::likeUser);
-        app.post("/api/users/{id}/pass/{targetId}", matchRoutes::passUser);
-
-        // Messaging routes
-        app.get("/api/users/{id}/conversations", messagingRoutes::getConversations);
-        app.get("/api/conversations/{conversationId}/messages", messagingRoutes::getMessages);
-        app.post("/api/conversations/{conversationId}/messages", messagingRoutes::sendMessage);
     }
 
     private void registerExceptionHandlers() {
@@ -147,11 +335,81 @@ public class RestApiServer {
         });
     }
 
+    // ── Response Records ────────────────────────────────────────────────
+
     /** Health check response. */
-    public record HealthResponse(String status, long timestamp) {}
+    public static record HealthResponse(String status, long timestamp) {}
 
     /** Error response. */
-    public record ErrorResponse(String code, String message) {}
+    public static record ErrorResponse(String code, String message) {}
+
+    /** Minimal user info for lists. */
+    public static record UserSummary(UUID id, String name, int age, String state) {
+        public static UserSummary from(User user) {
+            return new UserSummary(
+                    user.getId(), user.getName(), user.getAge(), user.getState().name());
+        }
+    }
+
+    /** Full user detail for single-user queries. */
+    public static record UserDetail(
+            UUID id,
+            String name,
+            int age,
+            String bio,
+            String gender,
+            List<String> interestedIn,
+            double latitude,
+            double longitude,
+            int maxDistanceKm,
+            List<String> photoUrls,
+            String state) {
+        public static UserDetail from(User user) {
+            return new UserDetail(
+                    user.getId(),
+                    user.getName(),
+                    user.getAge(),
+                    user.getBio(),
+                    user.getGender() != null ? user.getGender().name() : null,
+                    user.getInterestedIn().stream().map(Enum::name).toList(),
+                    user.getLat(),
+                    user.getLon(),
+                    user.getMaxDistanceKm(),
+                    user.getPhotoUrls(),
+                    user.getState().name());
+        }
+    }
+
+    /** Match summary for API responses. */
+    public static record MatchSummary(
+            String matchId, UUID otherUserId, String otherUserName, String state, Instant createdAt) {
+        public static MatchSummary from(Match match, UUID currentUserId) {
+            UUID otherUserId = match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
+            return new MatchSummary(
+                    match.getId(), otherUserId, UNKNOWN_USER, match.getState().name(), match.getCreatedAt());
+        }
+    }
+
+    /** Response for like action. */
+    public static record LikeResponse(boolean isMatch, String message, MatchSummary match) {}
+
+    /** Response for pass action. */
+    public static record PassResponse(String message) {}
+
+    /** Conversation summary for API responses. */
+    public static record ConversationSummary(
+            String id, UUID otherUserId, String otherUserName, int messageCount, Instant lastMessageAt) {}
+
+    /** Message DTO for API responses. */
+    public static record MessageDto(UUID id, String conversationId, UUID senderId, String content, Instant sentAt) {
+        public static MessageDto from(Message message) {
+            return new MessageDto(
+                    message.id(), message.conversationId(), message.senderId(), message.content(), message.createdAt());
+        }
+    }
+
+    /** Request body for sending a message. */
+    public static record SendMessageRequest(UUID senderId, String content) {}
 
     /** Main entry point for standalone REST API server. */
     public static void main(String[] args) {

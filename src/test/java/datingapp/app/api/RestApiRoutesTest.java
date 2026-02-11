@@ -2,6 +2,8 @@ package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.model.*;
+import datingapp.core.service.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -16,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class RestApiRoutesTest {
 
     @Nested
-    @DisplayName("MessagingRoutes.MessageDto")
+    @DisplayName("RestApiServer.MessageDto")
     class MessageDtoTests {
 
         @Test
@@ -24,10 +26,10 @@ class RestApiRoutesTest {
         void createsFromMessage() {
             java.util.UUID senderId = java.util.UUID.randomUUID();
             String conversationId = "test-conversation";
-            datingapp.core.Messaging.Message message =
-                    datingapp.core.Messaging.Message.create(conversationId, senderId, "Hello!");
+            datingapp.core.model.Messaging.Message message =
+                    datingapp.core.model.Messaging.Message.create(conversationId, senderId, "Hello!");
 
-            MessagingRoutes.MessageDto dto = MessagingRoutes.MessageDto.from(message);
+            RestApiServer.MessageDto dto = RestApiServer.MessageDto.from(message);
 
             assertEquals(message.id(), dto.id());
             assertEquals(conversationId, dto.conversationId());

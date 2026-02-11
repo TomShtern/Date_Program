@@ -1,27 +1,28 @@
 package datingapp.core;
 
-import datingapp.core.storage.BlockStorage;
-import datingapp.core.storage.DailyPickViewStorage;
+import datingapp.core.service.AchievementService;
+import datingapp.core.service.CandidateFinder;
+import datingapp.core.service.DailyService;
+import datingapp.core.service.MatchQualityService;
+import datingapp.core.service.MatchingService;
+import datingapp.core.service.MessagingService;
+import datingapp.core.service.ProfileCompletionService;
+import datingapp.core.service.RelationshipTransitionService;
+import datingapp.core.service.SessionService;
+import datingapp.core.service.StandoutsService;
+import datingapp.core.service.StatsService;
+import datingapp.core.service.TrustSafetyService;
+import datingapp.core.service.UndoService;
 import datingapp.core.storage.LikeStorage;
 import datingapp.core.storage.MatchStorage;
 import datingapp.core.storage.MessagingStorage;
-import datingapp.core.storage.ReportStorage;
 import datingapp.core.storage.SocialStorage;
 import datingapp.core.storage.StatsStorage;
 import datingapp.core.storage.SwipeSessionStorage;
+import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.Objects;
 
-/**
- * Central registry holding all storage and service instances. Provides a single
- * point of access for
- * all application components.
- *
- * <p>
- * This pattern enables: - Easy testing with mock implementations - Swapping
- * storage backends (H2
- * -> PostgreSQL) - Adding new services without modifying Main
- */
 @SuppressWarnings("java:S6539")
 public class ServiceRegistry {
 
@@ -36,14 +37,12 @@ public class ServiceRegistry {
     private final UserStorage userStorage;
     private final LikeStorage likeStorage;
     private final MatchStorage matchStorage;
-    private final BlockStorage blockStorage;
-    private final DailyPickViewStorage dailyPickViewStorage;
     private final SwipeSessionStorage sessionStorage;
 
     // ─────────────────────────────────────────────
     // Trust & Safety Storage
     // ─────────────────────────────────────────────
-    private final ReportStorage reportStorage;
+    private final TrustSafetyStorage trustSafetyStorage;
 
     // ─────────────────────────────────────────────
     // Profile & Stats Storage
@@ -87,7 +86,6 @@ public class ServiceRegistry {
     // ─────────────────────────────────────────────
     // Maintenance Services
     // ─────────────────────────────────────────────
-    private final CleanupService cleanupService;
     private final StandoutsService standoutsService;
 
     /** Public constructor — use {@link datingapp.storage.StorageFactory} for convenient wiring. */
@@ -97,9 +95,7 @@ public class ServiceRegistry {
             UserStorage userStorage,
             LikeStorage likeStorage,
             MatchStorage matchStorage,
-            BlockStorage blockStorage,
-            DailyPickViewStorage dailyPickViewStorage,
-            ReportStorage reportStorage,
+            TrustSafetyStorage trustSafetyStorage,
             SwipeSessionStorage sessionStorage,
             StatsStorage statsStorage,
             MessagingStorage messagingStorage,
@@ -116,15 +112,12 @@ public class ServiceRegistry {
             AchievementService achievementService,
             MessagingService messagingService,
             RelationshipTransitionService relationshipTransitionService,
-            CleanupService cleanupService,
             StandoutsService standoutsService) {
         this.config = Objects.requireNonNull(config);
         this.userStorage = Objects.requireNonNull(userStorage);
         this.likeStorage = Objects.requireNonNull(likeStorage);
         this.matchStorage = Objects.requireNonNull(matchStorage);
-        this.blockStorage = Objects.requireNonNull(blockStorage);
-        this.dailyPickViewStorage = Objects.requireNonNull(dailyPickViewStorage);
-        this.reportStorage = Objects.requireNonNull(reportStorage);
+        this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage);
         this.sessionStorage = Objects.requireNonNull(sessionStorage);
         this.statsStorage = Objects.requireNonNull(statsStorage);
         this.messagingStorage = Objects.requireNonNull(messagingStorage);
@@ -141,7 +134,6 @@ public class ServiceRegistry {
         this.achievementService = Objects.requireNonNull(achievementService);
         this.messagingService = Objects.requireNonNull(messagingService);
         this.relationshipTransitionService = Objects.requireNonNull(relationshipTransitionService);
-        this.cleanupService = Objects.requireNonNull(cleanupService);
         this.standoutsService = Objects.requireNonNull(standoutsService);
     }
 
@@ -165,22 +157,14 @@ public class ServiceRegistry {
         return matchStorage;
     }
 
-    public BlockStorage getBlockStorage() {
-        return blockStorage;
-    }
-
     public SwipeSessionStorage getSessionStorage() {
         return sessionStorage;
     }
 
-    public DailyPickViewStorage getDailyPickViewStorage() {
-        return dailyPickViewStorage;
-    }
-
     // === Trust & Safety Storage ===
 
-    public ReportStorage getReportStorage() {
-        return reportStorage;
+    public TrustSafetyStorage getTrustSafetyStorage() {
+        return trustSafetyStorage;
     }
 
     // === Profile & Stats Storage ===
@@ -256,15 +240,6 @@ public class ServiceRegistry {
     }
 
     // === Maintenance Services ===
-
-    /**
-     * Gets the cleanup service for purging expired data.
-     *
-     * @return The cleanup service
-     */
-    public CleanupService getCleanupService() {
-        return cleanupService;
-    }
 
     public StandoutsService getStandoutsService() {
         return standoutsService;

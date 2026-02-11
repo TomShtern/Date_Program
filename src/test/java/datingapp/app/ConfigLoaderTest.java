@@ -3,6 +3,8 @@ package datingapp.app;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.AppConfig;
+import datingapp.core.model.*;
+import datingapp.core.service.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

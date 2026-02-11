@@ -1,31 +1,39 @@
 package datingapp.app.cli;
 
-import datingapp.core.Achievement;
-import datingapp.core.AchievementService;
+import datingapp.app.cli.CliSupport.InputReader;
+import datingapp.core.AppClock;
 import datingapp.core.AppSession;
-import datingapp.core.CandidateFinder;
-import datingapp.core.CandidateFinder.GeoUtils;
-import datingapp.core.DailyPick;
-import datingapp.core.DailyService;
 import datingapp.core.LoggingSupport;
-import datingapp.core.Match;
-import datingapp.core.MatchQualityService;
-import datingapp.core.MatchQualityService.InterestMatcher;
-import datingapp.core.MatchQualityService.MatchQuality;
-import datingapp.core.MatchingService;
-import datingapp.core.RelationshipTransitionService;
-import datingapp.core.RelationshipTransitionService.TransitionValidationException;
-import datingapp.core.Standout;
-import datingapp.core.StandoutsService;
-import datingapp.core.UndoService;
-import datingapp.core.User;
-import datingapp.core.User.UserState;
-import datingapp.core.UserInteractions.Block;
-import datingapp.core.UserInteractions.Like;
-import datingapp.core.storage.BlockStorage;
+import datingapp.core.model.Achievement;
+import datingapp.core.model.Match;
+import datingapp.core.model.Standout;
+import datingapp.core.model.User;
+import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserInteractions.Block;
+import datingapp.core.model.UserInteractions.FriendRequest;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.UserInteractions.Notification;
+import datingapp.core.service.AchievementService;
+import datingapp.core.service.CandidateFinder;
+import datingapp.core.service.CandidateFinder.GeoUtils;
+import datingapp.core.service.DailyService;
+import datingapp.core.service.DailyService.DailyPick;
+import datingapp.core.service.MatchQualityService;
+import datingapp.core.service.MatchQualityService.InterestMatcher;
+import datingapp.core.service.MatchQualityService.MatchQuality;
+import datingapp.core.service.MatchingService;
+import datingapp.core.service.MatchingService.PendingLiker;
+import datingapp.core.service.RelationshipTransitionService;
+import datingapp.core.service.RelationshipTransitionService.TransitionValidationException;
+import datingapp.core.service.StandoutsService;
+import datingapp.core.service.UndoService;
 import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.SocialStorage;
 import datingapp.core.storage.StatsStorage;
+import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -45,7 +53,7 @@ public class MatchingHandler implements LoggingSupport {
     private final CandidateFinder candidateFinderService;
     private final MatchingService matchingService;
     private final MatchStorage matchStorage;
-    private final BlockStorage blockStorage;
+    private final TrustSafetyStorage trustSafetyStorage;
     private final DailyService dailyService;
     private final UndoService undoService;
     private final MatchQualityService matchQualityService;
@@ -54,6 +62,7 @@ public class MatchingHandler implements LoggingSupport {
     private final StatsStorage statsStorage;
     private final RelationshipTransitionService transitionService;
     private final StandoutsService standoutsService;
+    private final SocialStorage socialStorage;
     private final AppSession session;
     private final InputReader inputReader;
 
@@ -61,7 +70,7 @@ public class MatchingHandler implements LoggingSupport {
         this.candidateFinderService = dependencies.candidateFinderService();
         this.matchingService = dependencies.matchingService();
         this.matchStorage = dependencies.matchStorage();
-        this.blockStorage = dependencies.blockStorage();
+        this.trustSafetyStorage = dependencies.trustSafetyStorage();
         this.dailyService = dependencies.dailyService();
         this.undoService = dependencies.undoService();
         this.matchQualityService = dependencies.matchQualityService();
@@ -70,6 +79,7 @@ public class MatchingHandler implements LoggingSupport {
         this.statsStorage = dependencies.statsStorage();
         this.transitionService = dependencies.transitionService();
         this.standoutsService = dependencies.standoutsService();
+        this.socialStorage = dependencies.socialStorage();
         this.session = dependencies.userSession();
         this.inputReader = dependencies.inputReader();
     }
@@ -83,7 +93,7 @@ public class MatchingHandler implements LoggingSupport {
             CandidateFinder candidateFinderService,
             MatchingService matchingService,
             MatchStorage matchStorage,
-            BlockStorage blockStorage,
+            TrustSafetyStorage trustSafetyStorage,
             DailyService dailyService,
             UndoService undoService,
             MatchQualityService matchQualityService,
@@ -92,6 +102,7 @@ public class MatchingHandler implements LoggingSupport {
             StatsStorage statsStorage,
             RelationshipTransitionService transitionService,
             StandoutsService standoutsService,
+            SocialStorage socialStorage,
             AppSession userSession,
             InputReader inputReader) {
 
@@ -99,7 +110,7 @@ public class MatchingHandler implements LoggingSupport {
             Objects.requireNonNull(candidateFinderService);
             Objects.requireNonNull(matchingService);
             Objects.requireNonNull(matchStorage);
-            Objects.requireNonNull(blockStorage);
+            Objects.requireNonNull(trustSafetyStorage);
             Objects.requireNonNull(dailyService);
             Objects.requireNonNull(undoService);
             Objects.requireNonNull(matchQualityService);
@@ -108,6 +119,7 @@ public class MatchingHandler implements LoggingSupport {
             Objects.requireNonNull(statsStorage);
             Objects.requireNonNull(transitionService);
             Objects.requireNonNull(standoutsService);
+            Objects.requireNonNull(socialStorage);
             Objects.requireNonNull(userSession);
             Objects.requireNonNull(inputReader);
         }
@@ -390,7 +402,7 @@ public class MatchingHandler implements LoggingSupport {
                         inputReader.readLine(CliSupport.BLOCK_PREFIX + otherUser.getName() + CliSupport.CONFIRM_SUFFIX);
                 if ("y".equalsIgnoreCase(confirm)) {
                     Block block = Block.create(currentUser.getId(), otherUserId);
-                    blockStorage.save(block);
+                    trustSafetyStorage.save(block);
                     match.block(currentUser.getId());
                     matchStorage.update(match);
                     logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
@@ -464,7 +476,7 @@ public class MatchingHandler implements LoggingSupport {
                     CliSupport.BLOCK_PREFIX + otherUser.getName() + "? This will end your match. (y/n): ");
             if ("y".equalsIgnoreCase(confirm)) {
                 Block block = Block.create(currentUser.getId(), otherUserId);
-                blockStorage.save(block);
+                trustSafetyStorage.save(block);
                 match.block(currentUser.getId());
                 matchStorage.update(match);
                 logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
@@ -729,5 +741,182 @@ public class MatchingHandler implements LoggingSupport {
             case 3 -> "🥉";
             default -> "⭐";
         };
+    }
+
+    // --- Friend Requests & Notifications (from RelationshipHandler) ---
+
+    /** Displays and manages pending friend requests. */
+    public void viewPendingRequests() {
+        User currentUser = session.getCurrentUser();
+        if (currentUser == null) {
+            logInfo("\n⚠️ Please log in first.\n");
+            return;
+        }
+
+        List<FriendRequest> requests = transitionService.getPendingRequestsFor(currentUser.getId());
+        if (requests.isEmpty()) {
+            logInfo("\nNo pending friend requests.\n");
+            return;
+        }
+
+        logInfo("\n--- PENDING FRIEND REQUESTS ---");
+        for (int i = 0; i < requests.size(); i++) {
+            FriendRequest req = requests.get(i);
+            User from = userStorage.get(req.fromUserId());
+            String fromName = from != null ? from.getName() : "Unknown User";
+            logInfo("  {}. From: {} (Received: {})", i + 1, fromName, req.createdAt());
+        }
+
+        String choice = inputReader.readLine("\nEnter request number to respond (or 'b' to go back): ");
+        if ("b".equalsIgnoreCase(choice)) {
+            return;
+        }
+
+        handleFriendRequestResponse(requests, choice);
+    }
+
+    private void handleFriendRequestResponse(List<FriendRequest> requests, String choice) {
+        try {
+            int idx = Integer.parseInt(choice) - 1;
+            if (idx < 0 || idx >= requests.size()) {
+                logInfo("Invalid selection.");
+                return;
+            }
+
+            FriendRequest req = requests.get(idx);
+            User from = userStorage.get(req.fromUserId());
+            String fromName = from != null ? from.getName() : "Unknown User";
+            logInfo("\nFriend Request from {}", fromName);
+
+            String action = inputReader
+                    .readLine("Do you want to (A)ccept or (D)ecline? ")
+                    .toLowerCase(Locale.ROOT);
+            User currentUser = session.getCurrentUser();
+
+            if ("a".equals(action)) {
+                transitionService.acceptFriendZone(req.id(), currentUser.getId());
+                logInfo("✅ You are now friends with {}! You can find them in your matches.\n", fromName);
+            } else if ("d".equals(action)) {
+                transitionService.declineFriendZone(req.id(), currentUser.getId());
+                logInfo("Declined friend request from {}.\n", fromName);
+            }
+        } catch (NumberFormatException | TransitionValidationException e) {
+            logInfo("Error processing request: {}\n", e.getMessage());
+        }
+    }
+
+    /** Displays notifications for the current user. */
+    public void viewNotifications() {
+        User currentUser = session.getCurrentUser();
+        if (currentUser == null) {
+            logInfo("\n⚠️ Please log in first.\n");
+            return;
+        }
+
+        List<Notification> notifications = socialStorage.getNotificationsForUser(currentUser.getId(), false);
+        if (notifications.isEmpty()) {
+            logInfo("\nNo notifications.\n");
+            return;
+        }
+
+        logInfo("\n--- YOUR NOTIFICATIONS ---");
+        for (Notification n : notifications) {
+            String status = n.isRead() ? "  " : "🆕";
+            logInfo("{} [{}] {}: {}", status, n.createdAt(), n.title(), n.message());
+            if (!n.isRead()) {
+                socialStorage.markNotificationAsRead(n.id());
+            }
+        }
+
+        logInfo("--------------------------\n");
+        inputReader.readLine("Press Enter to continue...");
+    }
+
+    // --- Liker Browser (from LikerBrowserHandler) ---
+
+    /** Browse pending likers who have liked the current user. */
+    public void browseWhoLikedMe() {
+        CliSupport.requireLogin(() -> {
+            User currentUser = session.getCurrentUser();
+            List<PendingLiker> likers = matchingService.findPendingLikersWithTimes(currentUser.getId());
+
+            if (likers.isEmpty()) {
+                logInfo("\nNo new likes yet.\n");
+                return;
+            }
+
+            logInfo("\n--- Who Liked Me ({} pending) ---\n", likers.size());
+            for (PendingLiker liker : likers) {
+                showLikerCard(liker);
+
+                logInfo("1. Like back");
+                logInfo("2. Pass");
+                logInfo("0. Stop\n");
+
+                String choice = inputReader.readLine("Choice: ");
+                switch (choice) {
+                    case "1" -> recordLikerSwipe(currentUser, liker.user(), Like.Direction.LIKE);
+                    case "2" -> recordLikerSwipe(currentUser, liker.user(), Like.Direction.PASS);
+                    case "0" -> {
+                        return;
+                    }
+                    default -> logInfo(CliSupport.INVALID_SELECTION);
+                }
+            }
+            logInfo("\nEnd of list.\n");
+        });
+    }
+
+    private void showLikerCard(PendingLiker pending) {
+        User user = pending.user();
+        String verifiedBadge = user.isVerified() ? " ✅ Verified" : "";
+        String likedAgo = formatTimeAgo(pending.likedAt());
+
+        logInfo(CliSupport.BOX_TOP);
+        logInfo("│ 💝 {}, {} years old{}", user.getName(), user.getAge(), verifiedBadge);
+        logInfo("│ 🕒 Liked you {}", likedAgo);
+        logInfo("│ 📍 Location: {}, {}", user.getLat(), user.getLon());
+
+        String bio = user.getBio() == null ? "" : user.getBio();
+        if (bio.length() > 50) {
+            bio = bio.substring(0, 47) + "...";
+        }
+        logInfo(CliSupport.PROFILE_BIO_FORMAT, bio);
+        logInfo(CliSupport.BOX_BOTTOM);
+        logInfo("");
+    }
+
+    private void recordLikerSwipe(User currentUser, User other, Like.Direction direction) {
+        matchingService.recordLike(Like.create(currentUser.getId(), other.getId(), direction));
+        logInfo("✅ Saved.\n");
+    }
+
+    private String formatTimeAgo(Instant likedAt) {
+        if (likedAt == null) {
+            return "(unknown)";
+        }
+
+        Duration duration = Duration.between(likedAt, AppClock.now());
+        if (duration.isNegative()) {
+            duration = Duration.ZERO;
+        }
+
+        long seconds = duration.getSeconds();
+        if (seconds < 60) {
+            return seconds + "s ago";
+        }
+
+        long minutes = seconds / 60;
+        if (minutes < 60) {
+            return minutes + "m ago";
+        }
+
+        long hours = minutes / 60;
+        if (hours < 24) {
+            return hours + "h ago";
+        }
+
+        long days = hours / 24;
+        return days + "d ago";
     }
 }

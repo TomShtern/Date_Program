@@ -1,7 +1,7 @@
 package datingapp.core.storage;
 
-import datingapp.core.User;
-import datingapp.core.User.ProfileNote;
+import datingapp.core.model.User;
+import datingapp.core.model.User.ProfileNote;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

@@ -2,12 +2,15 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.Achievement.UserAchievement;
-import datingapp.core.Preferences.Interest;
-import datingapp.core.Preferences.Lifestyle;
-import datingapp.core.User.ProfileNote;
-import datingapp.core.UserInteractions.Like;
-import datingapp.core.UserInteractions.Report;
+import datingapp.core.model.*;
+import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.Preferences.Interest;
+import datingapp.core.model.Preferences.Lifestyle;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.UserInteractions.Block;
+import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.UserInteractions.Report;
+import datingapp.core.service.*;
 import datingapp.core.storage.*;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
@@ -25,7 +28,7 @@ class AchievementServiceTest {
     private InMemoryMatchStorage matchStorage;
     private InMemoryLikeStorage likeStorage;
     private InMemoryUserStorage userStorage;
-    private InMemoryReportStorage reportStorage;
+    private InMemoryTrustSafetyStorage trustSafetyStorage;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
     private ProfileCompletionService profileCompletionService;
     private AchievementService service;
@@ -39,7 +42,7 @@ class AchievementServiceTest {
         matchStorage = new InMemoryMatchStorage();
         likeStorage = new InMemoryLikeStorage();
         userStorage = new InMemoryUserStorage();
-        reportStorage = new InMemoryReportStorage();
+        trustSafetyStorage = new InMemoryTrustSafetyStorage();
         profileCompletionService = new ProfileCompletionService(AppConfig.defaults());
 
         service = new AchievementService(
@@ -47,7 +50,7 @@ class AchievementServiceTest {
                 matchStorage,
                 likeStorage,
                 userStorage,
-                reportStorage,
+                trustSafetyStorage,
                 profileCompletionService,
                 AppConfig.defaults());
 
@@ -216,7 +219,7 @@ class AchievementServiceTest {
         @Test
         @DisplayName("Reporting a user unlocks GUARDIAN")
         void checkAndUnlock_reportSubmitted_unlocksGuardian() {
-            reportStorage.addReportBy(userId);
+            trustSafetyStorage.addReportBy(userId);
 
             List<UserAchievement> unlocked = service.checkAndUnlock(userId);
 
@@ -356,22 +359,22 @@ class AchievementServiceTest {
 
         // User Stats methods (stubs - not needed for achievement tests)
         @Override
-        public void saveUserStats(datingapp.core.Stats.UserStats stats) {
+        public void saveUserStats(datingapp.core.model.Stats.UserStats stats) {
             throw new UnsupportedOperationException("Not needed for achievement tests");
         }
 
         @Override
-        public Optional<datingapp.core.Stats.UserStats> getLatestUserStats(UUID userId) {
+        public Optional<datingapp.core.model.Stats.UserStats> getLatestUserStats(UUID userId) {
             return Optional.empty();
         }
 
         @Override
-        public List<datingapp.core.Stats.UserStats> getUserStatsHistory(UUID userId, int limit) {
+        public List<datingapp.core.model.Stats.UserStats> getUserStatsHistory(UUID userId, int limit) {
             return List.of();
         }
 
         @Override
-        public List<datingapp.core.Stats.UserStats> getAllLatestUserStats() {
+        public List<datingapp.core.model.Stats.UserStats> getAllLatestUserStats() {
             return List.of();
         }
 
@@ -382,17 +385,17 @@ class AchievementServiceTest {
 
         // Platform Stats methods (stubs - not needed for achievement tests)
         @Override
-        public void savePlatformStats(datingapp.core.Stats.PlatformStats stats) {
+        public void savePlatformStats(datingapp.core.model.Stats.PlatformStats stats) {
             throw new UnsupportedOperationException("Not needed for achievement tests");
         }
 
         @Override
-        public Optional<datingapp.core.Stats.PlatformStats> getLatestPlatformStats() {
+        public Optional<datingapp.core.model.Stats.PlatformStats> getLatestPlatformStats() {
             return Optional.empty();
         }
 
         @Override
-        public List<datingapp.core.Stats.PlatformStats> getPlatformStatsHistory(int limit) {
+        public List<datingapp.core.model.Stats.PlatformStats> getPlatformStatsHistory(int limit) {
             return List.of();
         }
 
@@ -425,6 +428,21 @@ class AchievementServiceTest {
         @Override
         public int deleteExpiredDailyPickViews(Instant cutoff) {
             return 0; // Not needed for achievement tests
+        }
+
+        @Override
+        public void markDailyPickAsViewed(java.util.UUID userId, java.time.LocalDate date) {
+            // Not needed for achievement tests
+        }
+
+        @Override
+        public boolean isDailyPickViewed(java.util.UUID userId, java.time.LocalDate date) {
+            return false;
+        }
+
+        @Override
+        public int deleteDailyPickViewsOlderThan(java.time.LocalDate before) {
+            return 0;
         }
     }
 
@@ -611,12 +629,51 @@ class AchievementServiceTest {
         }
     }
 
-    private static class InMemoryReportStorage implements ReportStorage {
+    private static class InMemoryTrustSafetyStorage implements TrustSafetyStorage {
         private final Map<UUID, Integer> reportsByUser = new HashMap<>();
 
         void addReportBy(UUID userId) {
             reportsByUser.merge(userId, 1, Integer::sum);
         }
+
+        // Block operations (stubs - not needed for achievement tests)
+
+        @Override
+        public void save(Block block) {
+            /* no-op */
+        }
+
+        @Override
+        public boolean isBlocked(UUID userA, UUID userB) {
+            return false;
+        }
+
+        @Override
+        public Set<UUID> getBlockedUserIds(UUID userId) {
+            return Set.of();
+        }
+
+        @Override
+        public List<Block> findByBlocker(UUID blockerId) {
+            return List.of();
+        }
+
+        @Override
+        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
+            return false;
+        }
+
+        @Override
+        public int countBlocksGiven(UUID userId) {
+            return 0;
+        }
+
+        @Override
+        public int countBlocksReceived(UUID userId) {
+            return 0;
+        }
+
+        // Report operations
 
         @Override
         public void save(Report report) {
