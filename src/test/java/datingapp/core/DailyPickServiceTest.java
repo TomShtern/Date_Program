@@ -11,14 +11,11 @@ import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.UserInteractions.Block;
 import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.model.UserInteractions.Report;
 import datingapp.core.service.*;
 import datingapp.core.service.DailyService.DailyPick;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.StatsStorage;
-import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
+import datingapp.core.testutil.TestStorages;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -35,9 +32,9 @@ class DailyPickServiceTest {
 
     private DailyService service;
     private InMemoryUserStorage userStorage;
-    private InMemoryLikeStorage likeStorage;
-    private InMemoryTrustSafetyStorage trustSafetyStorage;
-    private InMemoryStatsStorageMock statsStorage;
+    private TestStorages.Interactions interactionStorage;
+    private TestStorages.TrustSafety trustSafetyStorage;
+    private TestStorages.Analytics analyticsStorage;
     private CandidateFinder candidateFinder;
     private AppConfig config;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
@@ -46,13 +43,20 @@ class DailyPickServiceTest {
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
         userStorage = new InMemoryUserStorage();
-        likeStorage = new InMemoryLikeStorage();
-        trustSafetyStorage = new InMemoryTrustSafetyStorage();
-        statsStorage = new InMemoryStatsStorageMock();
+        interactionStorage = new TestStorages.Interactions();
+        trustSafetyStorage = new TestStorages.TrustSafety();
+        analyticsStorage = new TestStorages.Analytics();
         config = AppConfig.defaults();
 
-        candidateFinder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, config);
-        service = new DailyService(userStorage, likeStorage, trustSafetyStorage, statsStorage, candidateFinder, config);
+        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
+        service = new DailyService(
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                analyticsStorage,
+                candidateFinder,
+                config,
+                AppClock.clock());
     }
 
     @AfterEach
@@ -141,7 +145,7 @@ class DailyPickServiceTest {
         userStorage.save(candidate3);
 
         // Like one candidate
-        likeStorage.save(Like.create(seeker.getId(), candidate1.getId(), Like.Direction.LIKE));
+        interactionStorage.save(Like.create(seeker.getId(), candidate1.getId(), Like.Direction.LIKE));
 
         // Get daily pick - should not include already-liked user
         Optional<DailyPick> pick = service.getDailyPick(seeker);
@@ -169,7 +173,7 @@ class DailyPickServiceTest {
         userStorage.save(candidate);
 
         // Swipe on the only candidate
-        likeStorage.save(Like.create(seeker.getId(), candidate.getId(), Like.Direction.PASS));
+        interactionStorage.save(Like.create(seeker.getId(), candidate.getId(), Like.Direction.PASS));
 
         Optional<DailyPick> pick = service.getDailyPick(seeker);
 
@@ -244,7 +248,13 @@ class DailyPickServiceTest {
         ZoneId zone = config.userTimeZone();
         Clock oldClock = Clock.fixed(oldDate.atStartOfDay(zone).toInstant(), zone);
         DailyService oldService = new DailyService(
-                userStorage, likeStorage, trustSafetyStorage, statsStorage, candidateFinder, config, oldClock);
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                analyticsStorage,
+                candidateFinder,
+                config,
+                oldClock);
 
         User seeker = createActiveUser("Alice", 25);
         userStorage.save(seeker);
@@ -365,315 +375,6 @@ class DailyPickServiceTest {
 
         private static String noteKey(UUID authorId, UUID subjectId) {
             return authorId + "_" + subjectId;
-        }
-    }
-
-    private static class InMemoryLikeStorage implements LikeStorage {
-        private final List<Like> likes = new ArrayList<>();
-
-        @Override
-        public void save(Like like) {
-            likes.add(like);
-        }
-
-        @Override
-        public boolean exists(UUID whoLikes, UUID whoGotLiked) {
-            return likes.stream()
-                    .anyMatch(l ->
-                            l.whoLikes().equals(whoLikes) && l.whoGotLiked().equals(whoGotLiked));
-        }
-
-        @Override
-        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-            return likes.stream()
-                    .filter(l ->
-                            l.whoLikes().equals(fromUserId) && l.whoGotLiked().equals(toUserId))
-                    .findFirst();
-        }
-
-        @Override
-        public boolean mutualLikeExists(UUID a, UUID b) {
-            return exists(a, b) && exists(b, a);
-        }
-
-        @Override
-        public java.util.Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-            return likes.stream()
-                    .filter(l -> l.whoLikes().equals(userId))
-                    .map(Like::whoGotLiked)
-                    .collect(java.util.stream.Collectors.toSet());
-        }
-
-        @Override
-        public java.util.Set<UUID> getUserIdsWhoLiked(UUID userId) {
-            return likes.stream()
-                    .filter(l -> l.whoGotLiked().equals(userId))
-                    .filter(l -> l.direction() == Like.Direction.LIKE)
-                    .map(Like::whoLikes)
-                    .collect(java.util.stream.Collectors.toSet());
-        }
-
-        @Override
-        public List<java.util.Map.Entry<UUID, java.time.Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
-            return likes.stream()
-                    .filter(l -> l.whoGotLiked().equals(userId))
-                    .filter(l -> l.direction() == Like.Direction.LIKE)
-                    .map(l -> java.util.Map.entry(l.whoLikes(), l.createdAt()))
-                    .toList();
-        }
-
-        @Override
-        public int countByDirection(UUID userId, Like.Direction direction) {
-            return (int) likes.stream()
-                    .filter(l -> l.whoLikes().equals(userId))
-                    .filter(l -> l.direction() == direction)
-                    .count();
-        }
-
-        @Override
-        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
-            return (int) likes.stream()
-                    .filter(l -> l.whoGotLiked().equals(userId))
-                    .filter(l -> l.direction() == direction)
-                    .count();
-        }
-
-        @Override
-        public int countMutualLikes(UUID userId) {
-            return (int) likes.stream()
-                    .filter(l -> l.whoLikes().equals(userId))
-                    .filter(l -> l.direction() == Like.Direction.LIKE)
-                    .filter(l -> exists(l.whoGotLiked(), userId))
-                    .count();
-        }
-
-        @Override
-        public void delete(UUID likeId) {
-            likes.removeIf(l -> l.id().equals(likeId));
-        }
-
-        @Override
-        public int countLikesToday(UUID userId, java.time.Instant startOfDay) {
-            return (int) likes.stream()
-                    .filter(l -> l.whoLikes().equals(userId))
-                    .filter(l -> l.direction() == Like.Direction.LIKE)
-                    .filter(l -> l.createdAt().isAfter(startOfDay))
-                    .count();
-        }
-
-        @Override
-        public int countPassesToday(UUID userId, java.time.Instant startOfDay) {
-            return (int) likes.stream()
-                    .filter(l -> l.whoLikes().equals(userId))
-                    .filter(l -> l.direction() == Like.Direction.PASS)
-                    .filter(l -> l.createdAt().isAfter(startOfDay))
-                    .count();
-        }
-    }
-
-    // Minimal StatsStorage mock — only daily pick view methods have real logic
-    @SuppressWarnings("unused")
-    private static class InMemoryStatsStorageMock implements StatsStorage {
-        private final Map<UUID, Set<LocalDate>> views = new HashMap<>();
-
-        @Override
-        public void markDailyPickAsViewed(UUID userId, LocalDate date) {
-            views.computeIfAbsent(userId, k -> new HashSet<>()).add(date);
-        }
-
-        @Override
-        public boolean isDailyPickViewed(UUID userId, LocalDate date) {
-            return views.getOrDefault(userId, Set.of()).contains(date);
-        }
-
-        @Override
-        public int deleteDailyPickViewsOlderThan(LocalDate before) {
-            int removed = 0;
-            for (Set<LocalDate> dates : views.values()) {
-                int sizeBefore = dates.size();
-                dates.removeIf(d -> d.isBefore(before));
-                removed += (sizeBefore - dates.size());
-            }
-            return removed;
-        }
-
-        // Remaining StatsStorage methods — not used by DailyService
-        @Override
-        public void saveUserStats(datingapp.core.model.Stats.UserStats stats) {
-            /* not used */
-        }
-
-        @Override
-        public java.util.Optional<datingapp.core.model.Stats.UserStats> getLatestUserStats(UUID userId) {
-            return java.util.Optional.empty();
-        }
-
-        @Override
-        public java.util.List<datingapp.core.model.Stats.UserStats> getUserStatsHistory(UUID userId, int limit) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public java.util.List<datingapp.core.model.Stats.UserStats> getAllLatestUserStats() {
-            return java.util.List.of();
-        }
-
-        @Override
-        public int deleteUserStatsOlderThan(java.time.Instant cutoff) {
-            return 0;
-        }
-
-        @Override
-        public void savePlatformStats(datingapp.core.model.Stats.PlatformStats stats) {
-            /* not used */
-        }
-
-        @Override
-        public java.util.Optional<datingapp.core.model.Stats.PlatformStats> getLatestPlatformStats() {
-            return java.util.Optional.empty();
-        }
-
-        @Override
-        public java.util.List<datingapp.core.model.Stats.PlatformStats> getPlatformStatsHistory(int limit) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public void recordProfileView(UUID viewerId, UUID viewedId) {
-            /* not used */
-        }
-
-        @Override
-        public int getProfileViewCount(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public int getUniqueViewerCount(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public java.util.List<UUID> getRecentViewers(UUID userId, int limit) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
-            return false;
-        }
-
-        @Override
-        public void saveUserAchievement(datingapp.core.model.Achievement.UserAchievement achievement) {
-            /* not used */
-        }
-
-        @Override
-        public java.util.List<datingapp.core.model.Achievement.UserAchievement> getUnlockedAchievements(UUID userId) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public boolean hasAchievement(UUID userId, datingapp.core.model.Achievement achievement) {
-            return false;
-        }
-
-        @Override
-        public int countUnlockedAchievements(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public int deleteExpiredDailyPickViews(java.time.Instant cutoff) {
-            return 0;
-        }
-    }
-
-    private static class InMemoryTrustSafetyStorage implements TrustSafetyStorage {
-        private final List<Block> blocks = new ArrayList<>();
-
-        @Override
-        public void save(Block block) {
-            blocks.add(block);
-        }
-
-        @Override
-        public boolean isBlocked(UUID blockerId, UUID blockedId) {
-            return blocks.stream()
-                    .anyMatch(b -> (b.blockerId().equals(blockerId)
-                                    && b.blockedId().equals(blockedId))
-                            || (b.blockerId().equals(blockedId) && b.blockedId().equals(blockerId)));
-        }
-
-        @Override
-        public java.util.Set<UUID> getBlockedUserIds(UUID blockerId) {
-            java.util.Set<UUID> blockedIds = new java.util.HashSet<>();
-            for (Block block : blocks) {
-                if (block.blockerId().equals(blockerId)) {
-                    blockedIds.add(block.blockedId());
-                } else if (block.blockedId().equals(blockerId)) {
-                    blockedIds.add(block.blockerId());
-                }
-            }
-            return blockedIds;
-        }
-
-        @Override
-        public List<Block> findByBlocker(UUID blockerId) {
-            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
-        }
-
-        @Override
-        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
-            return blocks.removeIf(
-                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
-        }
-
-        @Override
-        public int countBlocksGiven(UUID blockerId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockerId().equals(blockerId)).count();
-        }
-
-        @Override
-        public int countBlocksReceived(UUID blockedId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockedId().equals(blockedId)).count();
-        }
-
-        // Report stubs
-        private final List<Report> reports = new ArrayList<>();
-
-        @Override
-        public void save(Report report) {
-            reports.add(report);
-        }
-
-        @Override
-        public int countReportsAgainst(UUID userId) {
-            return (int) reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .count();
-        }
-
-        @Override
-        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
-            return reports.stream()
-                    .anyMatch(r -> r.reporterId().equals(reporterId)
-                            && r.reportedUserId().equals(reportedUserId));
-        }
-
-        @Override
-        public List<Report> getReportsAgainst(UUID userId) {
-            return reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .toList();
-        }
-
-        @Override
-        public int countReportsBy(UUID userId) {
-            return (int)
-                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
         }
     }
 }

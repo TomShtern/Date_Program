@@ -86,45 +86,21 @@ class ServiceRegistryTest {
         }
 
         @Test
-        @DisplayName("getLikeStorage returns non-null")
-        void getLikeStorage() {
-            assertNotNull(registry.getLikeStorage());
+        @DisplayName("getInteractionStorage returns non-null")
+        void getInteractionStorage() {
+            assertNotNull(registry.getInteractionStorage());
         }
 
         @Test
-        @DisplayName("getMatchStorage returns non-null")
-        void getMatchStorage() {
-            assertNotNull(registry.getMatchStorage());
+        @DisplayName("getCommunicationStorage returns non-null")
+        void getCommunicationStorage() {
+            assertNotNull(registry.getCommunicationStorage());
         }
 
         @Test
-        @DisplayName("getTrustSafetyStorage returns non-null")
-        void getTrustSafetyStorage() {
-            assertNotNull(registry.getTrustSafetyStorage());
-        }
-
-        @Test
-        @DisplayName("getSessionStorage returns non-null")
-        void getSessionStorage() {
-            assertNotNull(registry.getSessionStorage());
-        }
-
-        @Test
-        @DisplayName("getStatsStorage returns non-null")
-        void getStatsStorage() {
-            assertNotNull(registry.getStatsStorage());
-        }
-
-        @Test
-        @DisplayName("getMessagingStorage returns non-null")
-        void getMessagingStorage() {
-            assertNotNull(registry.getMessagingStorage());
-        }
-
-        @Test
-        @DisplayName("getSocialStorage returns non-null")
-        void getSocialStorage() {
-            assertNotNull(registry.getSocialStorage());
+        @DisplayName("getAnalyticsStorage returns non-null")
+        void getAnalyticsStorage() {
+            assertNotNull(registry.getAnalyticsStorage());
         }
     }
 

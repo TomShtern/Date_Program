@@ -1,0 +1,1835 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< com.datingapp:dating-app >----------------------
+[INFO] Building Dating App 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- checkstyle:3.6.0:check (checkstyle-check) @ dating-app ---
+[INFO] Starting audit...
+Audit done.
+[INFO] You have 0 Checkstyle violations.
+[INFO] 
+[INFO] --- jacoco:0.8.14:prepare-agent (prepare-agent) @ dating-app ---
+[INFO] argLine set to -javaagent:C:\\Users\\tom7s\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.14\\org.jacoco.agent-0.8.14-runtime.jar=destfile=C:\\Users\\tom7s\\Desktopp\\Claude_Folder_2\\Date_Program\\target\\jacoco.exec
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ dating-app ---
+[INFO] Copying 13 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ dating-app ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ dating-app ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ dating-app ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.4:test (default-test) @ dating-app ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running REST API DTOs
+[INFO] Running RestApiServer.HealthResponse
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.086 s -- in RestApiServer.HealthResponse
+[INFO] Running RestApiServer.ErrorResponse
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in RestApiServer.ErrorResponse
+[INFO] Running RestApiServer.MessageDto
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.153 s -- in RestApiServer.MessageDto
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.321 s -- in REST API DTOs
+[INFO] Running EnumMenu
+[INFO] Running promptMultiple
+
+Pick: (comma-separated, e.g., 1,2,3)
+  1. First
+  2. Second
+  3. Third
+  0. Clear/None
+Your choices: 
+
+Pick: (comma-separated, e.g., 1,2,3)
+  1. First
+  2. Second
+  3. Third
+  0. Clear/None
+Your choices: 
+
+Pick: (comma-separated, e.g., 1,2,3)
+  1. First
+  2. Second
+  3. Third
+  0. Clear/None
+Your choices: 
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.841 s -- in promptMultiple
+[INFO] Running prompt
+
+Pick:
+  1. First
+  2. Second
+  3. Third
+  0. Skip
+Your choice: 
+
+Pick:
+  1. First
+  2. Second
+  3. Third
+  0. Skip
+Your choice: 
+?? Invalid selection, skipping.
+
+Pick:
+  1. First
+  2. Second
+  3. Third
+Your choice: 
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in prompt
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.899 s -- in EnumMenu
+[INFO] Running datingapp.app.cli.LikerBrowserHandlerTest
+[INFO] Running Browse Who Liked Me
+
+No new likes yet.
+
+
+--- Who Liked Me (1 pending) ---
+
+???????????????????????????????????????????
+? ? Liker, 36 years old
+? ? Liked you 0s ago
+? ? Location: 0.0, 0.0
+? ? Test bio for Liker
+???????????????????????????????????????????
+
+1. Like back
+2. Pass
+0. Stop
+
+Choice: 
+? Saved.
+
+
+End of list.
+
+
+--- Who Liked Me (1 pending) ---
+
+???????????????????????????????????????????
+? ? Liker, 36 years old
+? ? Liked you 0s ago
+? ? Location: 0.0, 0.0
+? ? Test bio for Liker
+???????????????????????????????????????????
+
+1. Like back
+2. Pass
+0. Stop
+
+Choice: 
+
+No new likes yet.
+
+
+--- Who Liked Me (1 pending) ---
+
+???????????????????????????????????????????
+? ? Liker, 36 years old
+? ? Liked you 0s ago
+? ? Location: 0.0, 0.0
+? ? Test bio for Liker
+???????????????????????????????????????????
+
+1. Like back
+2. Pass
+0. Stop
+
+Choice: 
+? Saved.
+
+
+End of list.
+
+
+--- Who Liked Me (1 pending) ---
+
+???????????????????????????????????????????
+? ? Liker, 36 years old
+? ? Liked you 0s ago
+? ? Location: 0.0, 0.0
+? ? Test bio for Liker
+???????????????????????????????????????????
+
+1. Like back
+2. Pass
+0. Stop
+
+Choice: 
+
+? Invalid selection.
+
+
+End of list.
+
+
+--- Who Liked Me (1 pending) ---
+
+???????????????????????????????????????????
+? ? VerifiedUser, 36 years old ? Verified
+? ? Liked you 0s ago
+? ? Location: 0.0, 0.0
+? ? Test bio for VerifiedUser
+???????????????????????????????????????????
+
+1. Like back
+2. Pass
+0. Stop
+
+Choice: 
+
+No new likes yet.
+
+
+--- Who Liked Me (1 pending) ---
+
+???????????????????????????????????????????
+? ? BioPerson, 36 years old
+? ? Liked you 0s ago
+? ? Location: 0.0, 0.0
+? ? I love hiking and traveling around the world ex...
+???????????????????????????????????????????
+
+1. Like back
+2. Pass
+0. Stop
+
+Choice: 
+
+No new likes yet.
+
+
+--- Who Liked Me (1 pending) ---
+
+???????????????????????????????????????????
+? ? Liker, 36 years old
+? ? Liked you 0s ago
+? ? Location: 0.0, 0.0
+? ? Test bio for Liker
+???????????????????????????????????????????
+
+1. Like back
+2. Pass
+0. Stop
+
+Choice: 
+? Saved.
+
+
+End of list.
+
+
+--- Who Liked Me (2 pending) ---
+
+???????????????????????????????????????????
+? ? Liker1, 36 years old
+? ? Liked you 0s ago
+? ? Location: 0.0, 0.0
+? ? Test bio for Liker1
+???????????????????????????????????????????
+
+1. Like back
+2. Pass
+0. Stop
+
+Choice: 
+
+--- Who Liked Me (1 pending) ---
+
+???????????????????????????????????????????
+? ? Liker, 36 years old
+? ? Liked you 0s ago
+? ? Location: 0.0, 0.0
+? ? Test bio for Liker
+???????????????????????????????????????????
+
+1. Like back
+2. Pass
+0. Stop
+
+Choice: 
+? Saved.
+
+
+End of list.
+
+
+No new likes yet.
+
+
+??  Please select or create a user first.
+
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.231 s -- in Browse Who Liked Me
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.236 s -- in datingapp.app.cli.LikerBrowserHandlerTest
+[INFO] Running datingapp.app.cli.MessagingHandlerTest
+[INFO] Running Unread Count
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.109 s -- in Unread Count
+[INFO] Running View Conversation
+
+???????????????????????????????????????
+       ? YOUR CONVERSATIONS
+???????????????????????????????????????
+1. OtherMsgUsere7ba5ae5-463c-40f1-aa8a-56ea7c3f30e7 � never
+
+???????????????????????????????????????
+[#] Select conversation  [B] Back
+> 
+
+???????????????????????????????????????
+       ? YOUR CONVERSATIONS
+???????????????????????????????????????
+1. OtherUsere48c6cfd-0769-40ff-bf86-e91de83abf66 � never
+
+???????????????????????????????????????
+[#] Select conversation  [B] Back
+> 
+[ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 0.176 s <<< FAILURE! -- in View Conversation
+[ERROR] datingapp.app.cli.MessagingHandlerTest.showsMessagesInConversation -- Time elapsed: 0.123 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.jdbi.v3.core.mapper.NoSuchMapperException: No mapper registered for type datingapp.core.model.Messaging$Conversation
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at org.junit.jupiter.api.AssertDoesNotThrow.createAssertionFailedError(AssertDoesNotThrow.java:84)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:53)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:36)
+	at org.junit.jupiter.api.Assertions.assertDoesNotThrow(Assertions.java:3199)
+	at datingapp.app.cli.MessagingHandlerTest$ViewConversation.showsMessagesInConversation(MessagingHandlerTest.java:160)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+Caused by: org.jdbi.v3.core.mapper.NoSuchMapperException: No mapper registered for type datingapp.core.model.Messaging$Conversation
+	at org.jdbi.v3.core.result.ResultBearing.lambda$mapTo$1(ResultBearing.java:132)
+	at java.base/java.util.Optional.orElseThrow(Optional.java:403)
+	at org.jdbi.v3.core.result.ResultBearing.lambda$mapTo$0(ResultBearing.java:132)
+	at org.jdbi.v3.core.result.ResultBearing$1.scanResultSet(ResultBearing.java:59)
+	at org.jdbi.v3.core.statement.Query.scanResultSet(Query.java:61)
+	at org.jdbi.v3.core.result.ResultBearing.mapTo(ResultBearing.java:130)
+	at org.jdbi.v3.sqlobject.statement.internal.SqlQueryHandler.lambda$configureReturner$0(SqlQueryHandler.java:61)
+	at org.jdbi.v3.sqlobject.statement.internal.CustomizingStatementHandler$3.invoke(CustomizingStatementHandler.java:195)
+	at org.jdbi.v3.core.extension.ExtensionMetadata$ExtensionHandlerInvoker.lambda$invoke$0(ExtensionMetadata.java:344)
+	at org.jdbi.v3.core.AbstractHandleSupplier.invokeInContext(AbstractHandleSupplier.java:36)
+	at org.jdbi.v3.core.extension.ExtensionMetadata$ExtensionHandlerInvoker.call(ExtensionMetadata.java:362)
+	at org.jdbi.v3.core.extension.ExtensionMetadata$ExtensionHandlerInvoker.invoke(ExtensionMetadata.java:345)
+	at org.jdbi.v3.core.extension.ExtensionFactoryDelegate.lambda$attach$0(ExtensionFactoryDelegate.java:117)
+	at org.jdbi.v3.core.internal.OnDemandExtensions.invoke(OnDemandExtensions.java:86)
+	at org.jdbi.v3.core.internal.OnDemandExtensions.lambda$createProxy$1(OnDemandExtensions.java:72)
+	at org.jdbi.v3.core.Jdbi.callWithExtension(Jdbi.java:558)
+	at org.jdbi.v3.core.Jdbi.withExtension(Jdbi.java:545)
+	at org.jdbi.v3.core.internal.OnDemandExtensions.lambda$createProxy$0(OnDemandExtensions.java:72)
+	at jdk.proxy2/jdk.proxy2.$Proxy33.getConversation(Unknown Source)
+	at datingapp.storage.jdbi.JdbiCommunicationStorageAdapter.getConversation(JdbiCommunicationStorageAdapter.java:40)
+	at datingapp.core.service.MessagingService.markAsRead(MessagingService.java:166)
+	at datingapp.app.cli.MessagingHandler.showConversation(MessagingHandler.java:169)
+	at datingapp.app.cli.MessagingHandler.handleConversationSelection(MessagingHandler.java:138)
+	at datingapp.app.cli.MessagingHandler.showConversations(MessagingHandler.java:85)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:49)
+	... 7 more
+
+[ERROR] datingapp.app.cli.MessagingHandlerTest.showsNoMessagesForEmptyConversation -- Time elapsed: 0.042 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.jdbi.v3.core.mapper.NoSuchMapperException: No mapper registered for type datingapp.core.model.Messaging$Conversation
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at org.junit.jupiter.api.AssertDoesNotThrow.createAssertionFailedError(AssertDoesNotThrow.java:84)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:53)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:36)
+	at org.junit.jupiter.api.Assertions.assertDoesNotThrow(Assertions.java:3199)
+	at datingapp.app.cli.MessagingHandlerTest$ViewConversation.showsNoMessagesForEmptyConversation(MessagingHandlerTest.java:140)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+Caused by: org.jdbi.v3.core.mapper.NoSuchMapperException: No mapper registered for type datingapp.core.model.Messaging$Conversation
+	at org.jdbi.v3.core.result.ResultBearing.lambda$mapTo$1(ResultBearing.java:132)
+	at java.base/java.util.Optional.orElseThrow(Optional.java:403)
+	at org.jdbi.v3.core.result.ResultBearing.lambda$mapTo$0(ResultBearing.java:132)
+	at org.jdbi.v3.core.result.ResultBearing$1.scanResultSet(ResultBearing.java:59)
+	at org.jdbi.v3.core.statement.Query.scanResultSet(Query.java:61)
+	at org.jdbi.v3.core.result.ResultBearing.mapTo(ResultBearing.java:130)
+	at org.jdbi.v3.sqlobject.statement.internal.SqlQueryHandler.lambda$configureReturner$0(SqlQueryHandler.java:61)
+	at org.jdbi.v3.sqlobject.statement.internal.CustomizingStatementHandler$3.invoke(CustomizingStatementHandler.java:195)
+	at org.jdbi.v3.core.extension.ExtensionMetadata$ExtensionHandlerInvoker.lambda$invoke$0(ExtensionMetadata.java:344)
+	at org.jdbi.v3.core.AbstractHandleSupplier.invokeInContext(AbstractHandleSupplier.java:36)
+	at org.jdbi.v3.core.extension.ExtensionMetadata$ExtensionHandlerInvoker.call(ExtensionMetadata.java:362)
+	at org.jdbi.v3.core.extension.ExtensionMetadata$ExtensionHandlerInvoker.invoke(ExtensionMetadata.java:345)
+	at org.jdbi.v3.core.extension.ExtensionFactoryDelegate.lambda$attach$0(ExtensionFactoryDelegate.java:117)
+	at org.jdbi.v3.core.internal.OnDemandExtensions.invoke(OnDemandExtensions.java:86)
+	at org.jdbi.v3.core.internal.OnDemandExtensions.lambda$createProxy$1(OnDemandExtensions.java:72)
+	at org.jdbi.v3.core.Jdbi.callWithExtension(Jdbi.java:558)
+	at org.jdbi.v3.core.Jdbi.withExtension(Jdbi.java:545)
+	at org.jdbi.v3.core.internal.OnDemandExtensions.lambda$createProxy$0(OnDemandExtensions.java:72)
+	at jdk.proxy2/jdk.proxy2.$Proxy33.getConversation(Unknown Source)
+	at datingapp.storage.jdbi.JdbiCommunicationStorageAdapter.getConversation(JdbiCommunicationStorageAdapter.java:40)
+	at datingapp.core.service.MessagingService.markAsRead(MessagingService.java:166)
+	at datingapp.app.cli.MessagingHandler.showConversation(MessagingHandler.java:169)
+	at datingapp.app.cli.MessagingHandler.handleConversationSelection(MessagingHandler.java:138)
+	at datingapp.app.cli.MessagingHandler.showConversations(MessagingHandler.java:85)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:49)
+	... 7 more
+
+[INFO] Running Show Conversations
+
+???????????????????????????????????????
+       ? YOUR CONVERSATIONS
+???????????????????????????????????????
+1. OtherUser � never
+
+???????????????????????????????????????
+[#] Select conversation  [B] Back
+> 
+
+??  Please select or create a user first.
+
+
+???????????????????????????????????????
+       ? YOUR CONVERSATIONS
+???????????????????????????????????????
+
+  No conversations yet.
+  Start by matching with someone and send a message!
+
+???????????????????????????????????????
+[B] Back
+> 
+
+???????????????????????????????????????
+       ? YOUR CONVERSATIONS
+???????????????????????????????????????
+
+  No conversations yet.
+  Start by matching with someone and send a message!
+
+???????????????????????????????????????
+[B] Back
+> 
+[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.066 s <<< FAILURE! -- in Show Conversations
+[ERROR] datingapp.app.cli.MessagingHandlerTest.listsConversationsWithActiveMatch -- Time elapsed: 0.033 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.jdbi.v3.core.mapper.NoSuchMapperException: No mapper registered for type datingapp.core.model.Messaging$Conversation
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at org.junit.jupiter.api.AssertDoesNotThrow.createAssertionFailedError(AssertDoesNotThrow.java:84)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:53)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:36)
+	at org.junit.jupiter.api.Assertions.assertDoesNotThrow(Assertions.java:3199)
+	at datingapp.app.cli.MessagingHandlerTest$ShowConversations.listsConversationsWithActiveMatch(MessagingHandlerTest.java:109)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+Caused by: org.jdbi.v3.core.mapper.NoSuchMapperException: No mapper registered for type datingapp.core.model.Messaging$Conversation
+	at org.jdbi.v3.core.result.ResultBearing.lambda$mapTo$1(ResultBearing.java:132)
+	at java.base/java.util.Optional.orElseThrow(Optional.java:403)
+	at org.jdbi.v3.core.result.ResultBearing.lambda$mapTo$0(ResultBearing.java:132)
+	at org.jdbi.v3.core.result.ResultBearing$1.scanResultSet(ResultBearing.java:59)
+	at org.jdbi.v3.core.statement.Query.scanResultSet(Query.java:61)
+	at org.jdbi.v3.core.result.ResultBearing.mapTo(ResultBearing.java:130)
+	at org.jdbi.v3.sqlobject.statement.internal.SqlQueryHandler.lambda$configureReturner$0(SqlQueryHandler.java:61)
+	at org.jdbi.v3.sqlobject.statement.internal.CustomizingStatementHandler$3.invoke(CustomizingStatementHandler.java:195)
+	at org.jdbi.v3.core.extension.ExtensionMetadata$ExtensionHandlerInvoker.lambda$invoke$0(ExtensionMetadata.java:344)
+	at org.jdbi.v3.core.AbstractHandleSupplier.invokeInContext(AbstractHandleSupplier.java:36)
+	at org.jdbi.v3.core.extension.ExtensionMetadata$ExtensionHandlerInvoker.call(ExtensionMetadata.java:362)
+	at org.jdbi.v3.core.extension.ExtensionMetadata$ExtensionHandlerInvoker.invoke(ExtensionMetadata.java:345)
+	at org.jdbi.v3.core.extension.ExtensionFactoryDelegate.lambda$attach$0(ExtensionFactoryDelegate.java:117)
+	at org.jdbi.v3.core.internal.OnDemandExtensions.invoke(OnDemandExtensions.java:86)
+	at org.jdbi.v3.core.internal.OnDemandExtensions.lambda$createProxy$1(OnDemandExtensions.java:72)
+	at org.jdbi.v3.core.Jdbi.callWithExtension(Jdbi.java:558)
+	at org.jdbi.v3.core.Jdbi.withExtension(Jdbi.java:545)
+	at org.jdbi.v3.core.internal.OnDemandExtensions.lambda$createProxy$0(OnDemandExtensions.java:72)
+	at jdk.proxy2/jdk.proxy2.$Proxy33.getConversation(Unknown Source)
+	at datingapp.storage.jdbi.JdbiCommunicationStorageAdapter.getConversation(JdbiCommunicationStorageAdapter.java:40)
+	at datingapp.core.service.MessagingService.markAsRead(MessagingService.java:166)
+	at datingapp.app.cli.MessagingHandler.showConversation(MessagingHandler.java:169)
+	at datingapp.app.cli.MessagingHandler.handleConversationSelection(MessagingHandler.java:138)
+	at datingapp.app.cli.MessagingHandler.showConversations(MessagingHandler.java:85)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:49)
+	... 7 more
+
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.051 s -- in datingapp.app.cli.MessagingHandlerTest
+[INFO] Running datingapp.app.cli.ProfileCreateSelectTest
+[INFO] Running Select User
+
+--- Select User ---
+
+No users found. Create one first!
+
+
+--- Select User ---
+
+  1. Alice (INCOMPLETE)
+  2. Bob (INCOMPLETE)
+
+Select user number (or 0 to cancel): 
+
+? Selected: Alice
+
+
+--- Select User ---
+
+  1. Alice (INCOMPLETE)
+
+Select user number (or 0 to cancel): 
+
+--- Select User ---
+
+  1. Alice (INCOMPLETE)
+
+Select user number (or 0 to cancel): 
+
+? Invalid selection.
+
+
+--- Select User ---
+
+  1. Alice (INCOMPLETE)
+
+Select user number (or 0 to cancel): 
+
+? Invalid selection.
+
+
+--- Select User ---
+
+  1. Alice (INCOMPLETE)
+
+Select user number (or 0 to cancel): 
+? Invalid input.
+
+
+--- Select User ---
+
+  1. Alice (INCOMPLETE)
+  2. Bob (INCOMPLETE)
+
+Select user number (or 0 to cancel): 
+
+? Selected: Bob
+
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.179 s -- in Select User
+[INFO] Running Create User
+
+--- Create New User ---
+
+Enter your name: 
+
+? User created! ID: e5e82340-2066-4068-8784-3fa2394631a0
+   Status: INCOMPLETE (Complete your profile to become ACTIVE)
+
+
+--- Create New User ---
+
+Enter your name: 
+
+? User created! ID: 67e879e5-8ed0-48a2-83ab-7f54f5585234
+   Status: INCOMPLETE (Complete your profile to become ACTIVE)
+
+
+--- Create New User ---
+
+Enter your name: 
+? Name cannot be empty.
+
+
+--- Create New User ---
+
+Enter your name: 
+? Name cannot be empty.
+
+
+--- Create New User ---
+
+Enter your name: 
+
+? User created! ID: 7e4318fb-c232-4cad-ade1-e2860752c0cb
+   Status: INCOMPLETE (Complete your profile to become ACTIVE)
+
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.053 s -- in Create User
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.248 s -- in datingapp.app.cli.ProfileCreateSelectTest
+[INFO] Running datingapp.app.cli.ProfileNotesHandlerTest
+[INFO] Running Note Preview and Has Note
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.024 s -- in Note Preview and Has Note
+[INFO] Running View All Notes
+
+???????????????????????????????????????
+         ? MY PROFILE NOTES
+???????????????????????????????????????
+
+You have 5 note(s):
+
+  1. Person2 - "Note 2"
+  2. Person1 - "Note 1"
+  3. Person4 - "Note 4"
+  4. Person3 - "Note 3"
+  5. Person0 - "Note 0"
+
+Enter number to view/edit, or 0 to go back:
+Choice: 
+
+??  Please select or create a user first.
+
+
+???????????????????????????????????????
+         ? MY PROFILE NOTES
+???????????????????????????????????????
+
+You have 2 note(s):
+
+  1. FirstNote - "First note"
+  2. SecondNote - "Second note"
+
+Enter number to view/edit, or 0 to go back:
+Choice: 
+
+???????????????????????????????????????
+         ? MY PROFILE NOTES
+???????????????????????????????????????
+
+You haven't added any notes yet.
+Tip: Add notes when viewing matches to remember details!
+
+
+???????????????????????????????????????
+         ? MY PROFILE NOTES
+???????????????????????????????????????
+
+You have 1 note(s):
+
+  1. (deleted user) - "Note for deleted user"
+
+Enter number to view/edit, or 0 to go back:
+Choice: 
+
+???????????????????????????????????????
+         ? MY PROFILE NOTES
+???????????????????????????????????????
+
+You have 2 note(s):
+
+  1. Person2 - "Note for person 2"
+  2. Person1 - "Note for person 1"
+
+Enter number to view/edit, or 0 to go back:
+Choice: 
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in View All Notes
+[INFO] Running Manage Note For User
+
+???????????????????????????????????????
+       ? NOTES ABOUT TARGET
+???????????????????????????????????????
+
+Current note:
+"Note to delete"
+
+  1. Edit note
+  2. Delete note
+  0. Back
+
+Choice: 
+Delete note about Target? (y/n): 
+? Note deleted.
+
+
+???????????????????????????????????????
+       ? NOTES ABOUT TARGET
+???????????????????????????????????????
+
+Current note:
+"Great conversation partner!"
+
+  1. Edit note
+  2. Delete note
+  0. Back
+
+Choice: 
+
+??  Please select or create a user first.
+
+
+???????????????????????????????????????
+       ? NOTES ABOUT TARGET
+???????????????????????????????????????
+
+No notes yet.
+  1. Add a note
+  0. Back
+
+Choice: 
+
+Enter your note about Target (max 500 chars):
+Examples: "Met at coffee shop", "Loves hiking", "Dinner Thursday 7pm"
+
+Note: 
+??  Note cannot be empty.
+
+???????????????????????????????????????
+       ? NOTES ABOUT TARGET
+???????????????????????????????????????
+
+No notes yet.
+  1. Add a note
+  0. Back
+
+Choice: 
+
+???????????????????????????????????????
+       ? NOTES ABOUT TARGET
+???????????????????????????????????????
+
+Current note:
+"Keep this note"
+
+  1. Edit note
+  2. Delete note
+  0. Back
+
+Choice: 
+Delete note about Target? (y/n): 
+Cancelled.
+
+
+???????????????????????????????????????
+       ? NOTES ABOUT TARGET
+???????????????????????????????????????
+
+Current note:
+"Old note"
+
+  1. Edit note
+  2. Delete note
+  0. Back
+
+Choice: 
+
+Current note: "Old note"
+
+Enter new note (or press Enter to keep current):
+Note: 
+? Note updated!
+
+
+???????????????????????????????????????
+       ? NOTES ABOUT TARGET
+???????????????????????????????????????
+
+No notes yet.
+  1. Add a note
+  0. Back
+
+Choice: 
+
+???????????????????????????????????????
+       ? NOTES ABOUT TARGET
+???????????????????????????????????????
+
+No notes yet.
+  1. Add a note
+  0. Back
+
+Choice: 
+
+Enter your note about Target (max 500 chars):
+Examples: "Met at coffee shop", "Loves hiking", "Dinner Thursday 7pm"
+
+Note: 
+? Note saved!
+
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.043 s -- in Manage Note For User
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.100 s -- in datingapp.app.cli.ProfileNotesHandlerTest
+[INFO] Running datingapp.app.cli.RelationshipHandlerTest
+[INFO] Running View Notifications
+
+?? Please log in first.
+
+
+--- YOUR NOTIFICATIONS ---
+? [2026-02-11T20:31:26.439144600Z] New Message: You received a new message!
+--------------------------
+
+Press Enter to continue...
+
+--- YOUR NOTIFICATIONS ---
+? [2026-02-11T20:31:26.443145500Z] New Match!: You have a new match!
+--------------------------
+
+Press Enter to continue...
+
+No notifications.
+
+
+--- YOUR NOTIFICATIONS ---
+? [2026-02-11T20:31:26.450210800Z] Match 1: You matched!
+? [2026-02-11T20:31:26.450210800Z] Message: New message!
+? [2026-02-11T20:31:26.450210800Z] Friend Request: Someone wants to be friends!
+--------------------------
+
+Press Enter to continue...
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.023 s -- in View Notifications
+[INFO] Running View Pending Requests
+
+--- PENDING FRIEND REQUESTS ---
+  1. From: OtherUser (Received: 2026-02-11T20:31:26.455210600Z)
+
+Enter request number to respond (or 'b' to go back): 
+
+--- PENDING FRIEND REQUESTS ---
+  1. From: OtherUser (Received: 2026-02-11T20:31:26.461724500Z)
+
+Enter request number to respond (or 'b' to go back): 
+
+Friend Request from OtherUser
+Do you want to (A)ccept or (D)ecline? 
+Declined friend request from OtherUser.
+
+
+?? Please log in first.
+
+
+--- PENDING FRIEND REQUESTS ---
+  1. From: OtherUser (Received: 2026-02-11T20:31:26.470267800Z)
+
+Enter request number to respond (or 'b' to go back): 
+Invalid selection.
+
+--- PENDING FRIEND REQUESTS ---
+  1. From: OtherUser (Received: 2026-02-11T20:31:26.475267800Z)
+
+Enter request number to respond (or 'b' to go back): 
+
+Friend Request from OtherUser
+Do you want to (A)ccept or (D)ecline? 
+? You are now friends with OtherUser! You can find them in your matches.
+
+
+No pending friend requests.
+
+
+--- PENDING FRIEND REQUESTS ---
+  1. From: OtherUser (Received: 2026-02-11T20:31:26.484090400Z)
+
+Enter request number to respond (or 'b' to go back): 
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s -- in View Pending Requests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.062 s -- in datingapp.app.cli.RelationshipHandlerTest
+[INFO] Running datingapp.app.cli.SafetyHandlerTest
+[INFO] Running Verify Profile
+
+? Profile already verified (2026-02-11T20:31:26.497161700Z).
+
+
+--- Profile Verification ---
+
+1. Verify by email
+2. Verify by phone
+0. Back
+
+Choice: 
+Email: 
+
+[SIMULATED DELIVERY] Your verification code is: 909929
+
+Enter the code: 
+? Incorrect code.
+
+
+--- Profile Verification ---
+
+1. Verify by email
+2. Verify by phone
+0. Back
+
+Choice: 
+Email: 
+
+[SIMULATED DELIVERY] Your verification code is: 982783
+
+Enter the code: 
+? Incorrect code.
+
+
+--- Profile Verification ---
+
+1. Verify by email
+2. Verify by phone
+0. Back
+
+Choice: 
+Phone: 
+? Phone required.
+
+
+--- Profile Verification ---
+
+1. Verify by email
+2. Verify by phone
+0. Back
+
+Choice: 
+Email: 
+? Email required.
+
+
+??  Please select or create a user first.
+
+
+--- Profile Verification ---
+
+1. Verify by email
+2. Verify by phone
+0. Back
+
+Choice: 
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s -- in Verify Profile
+[INFO] Running Manage Blocked Users
+
+--- Blocked Users ---
+
+  1. BlockedUser (ACTIVE)
+
+Enter number to unblock (or 0 to go back): 
+Unblock BlockedUser? (y/n): 
+22:31:26.549 [main] INFO  d.core.service.TrustSafetyService - User 2b265e4a-a3af-404f-8d2d-15e65659831d unblocked user 98b64d13-0f11-4fe7-aba6-ad7887b1bf7f
+? Unblocked BlockedUser.
+
+
+??  Please select or create a user first.
+
+
+--- Blocked Users ---
+
+  1. BlockedUser (ACTIVE)
+
+Enter number to unblock (or 0 to go back): 
+Unblock BlockedUser? (y/n): 
+Cancelled.
+
+
+--- Blocked Users ---
+
+  1. Blocked1 (ACTIVE)
+  2. Blocked2 (ACTIVE)
+
+Enter number to unblock (or 0 to go back): 
+
+You haven't blocked anyone.
+
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.059 s -- in Manage Blocked Users
+[INFO] Running Report User
+
+--- Report a User ---
+
+  1. OtherUser (ACTIVE)
+
+Select user to report (or 0 to cancel): 
+
+Reason for report:
+  1. SPAM
+  2. INAPPROPRIATE_CONTENT
+  3. HARASSMENT
+  4. FAKE_PROFILE
+  5. UNDERAGE
+  6. OTHER
+Select reason: 
+? Invalid reason.
+
+
+??  You must be ACTIVE to report users.
+
+
+--- Report a User ---
+
+No users to report.
+
+
+--- Report a User ---
+
+  1. BadUser (ACTIVE)
+
+Select user to report (or 0 to cancel): 
+
+Reason for report:
+  1. SPAM
+  2. INAPPROPRIATE_CONTENT
+  3. HARASSMENT
+  4. FAKE_PROFILE
+  5. UNDERAGE
+  6. OTHER
+Select reason: 
+Additional details (optional, max 500 chars): 
+
+? Report submitted. BadUser has been blocked.
+
+
+--- Report a User ---
+
+  1. BadUser (ACTIVE)
+
+Select user to report (or 0 to cancel): 
+
+Reason for report:
+  1. SPAM
+  2. INAPPROPRIATE_CONTENT
+  3. HARASSMENT
+  4. FAKE_PROFILE
+  5. UNDERAGE
+  6. OTHER
+Select reason: 
+Additional details (optional, max 500 chars): 
+
+? Report submitted. BadUser has been blocked.
+
+
+--- Report a User ---
+
+  1. Reporter3 (ACTIVE)
+  2. Reporter1 (ACTIVE)
+  3. BadUser (ACTIVE)
+  4. Reporter0 (ACTIVE)
+  5. Reporter2 (ACTIVE)
+
+Select user to report (or 0 to cancel): 
+
+??  Please select or create a user first.
+
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.055 s -- in Report User
+[INFO] Running Block User
+
+--- Block a User ---
+
+  1. OtherUser
+
+Select user to block (or 0 to cancel): 
+Block OtherUser? (y/n): 
+Cancelled.
+
+
+--- Block a User ---
+
+  1. OtherUser
+
+Select user to block (or 0 to cancel): 
+
+--- Block a User ---
+
+  1. AvailableUser
+
+Select user to block (or 0 to cancel): 
+Block AvailableUser? (y/n): 
+22:31:26.670 [main] INFO  d.core.service.TrustSafetyService - User 9e38ba1d-6f8b-4586-884b-613406befb4f blocked user b93b7d33-f310-4911-a5b9-b346d05d1bb1
+? Blocked AvailableUser.
+
+
+--- Block a User ---
+
+No users to block.
+
+
+--- Block a User ---
+
+  1. OtherUser
+
+Select user to block (or 0 to cancel): 
+Block OtherUser? (y/n): 
+22:31:26.683 [main] INFO  d.core.service.TrustSafetyService - User 552092fc-ccac-4f8a-b097-2507c533fe4b blocked user 8d6d750f-c239-457f-9751-43c2b7a47587
+? Blocked OtherUser.
+
+
+--- Block a User ---
+
+  1. OtherUser
+
+Select user to block (or 0 to cancel): 
+Block OtherUser? (y/n): 
+22:31:26.689 [main] INFO  d.core.service.TrustSafetyService - Match 36d346c2-db03-4860-91b1-9bc8b14428ba_643e09ab-a79d-40ee-824f-30f4a181e5d5 transitioned to BLOCKED by user 36d346c2-db03-4860-91b1-9bc8b14428ba
+22:31:26.689 [main] INFO  d.core.service.TrustSafetyService - User 36d346c2-db03-4860-91b1-9bc8b14428ba blocked user 643e09ab-a79d-40ee-824f-30f4a181e5d5
+? Blocked OtherUser.
+
+
+??  Please select or create a user first.
+
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.044 s -- in Block User
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.207 s -- in datingapp.app.cli.SafetyHandlerTest
+[INFO] Running datingapp.app.cli.StatsHandlerTest
+[INFO] Running View Achievements
+
+???????????????????????????????????????
+         ? YOUR ACHIEVEMENTS
+???????????????????????????????????????
+
+  Unlocked: 1 / ???
+
+  ? First Spark - Get your first match
+     (Unlocked: 2026-02-11)
+
+Press Enter to return...
+
+???????????????????????????????????????
+         ? YOUR ACHIEVEMENTS
+???????????????????????????????????????
+
+  No achievements yet. Keep swiping!
+
+Press Enter to return...
+
+??  Please select or create a user first.
+
+
+? NEW ACHIEVEMENTS UNLOCKED! ?
+  ? First Spark - Get your first match
+
+
+???????????????????????????????????????
+         ? YOUR ACHIEVEMENTS
+???????????????????????????????????????
+
+  Unlocked: 1 / ???
+
+  ? First Spark - Get your first match
+     (Unlocked: 2026-02-11)
+
+Press Enter to return...
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.039 s -- in View Achievements
+[INFO] Running View Statistics
+
+???????????????????????????????????????
+         YOUR DATING STATISTICS
+???????????????????????????????????????
+
+  Last updated: 2026-02-11 20:31
+
+  ? ACTIVITY
+  ???????????????????????????????????
+  Swipes given:     0 (0 likes, 0 passes)
+  Like ratio:       0.0% (you're selective)
+  Swipes received:  0 (0 likes, 0 passes)
+
+  ? MATCHES
+  ???????????????????????????????????
+  Total matches:    0
+  Active matches:   0
+  Match rate:       0.0% (below average)
+
+  ? YOUR SCORES
+  ???????????????????????????????????
+  Reciprocity:      0.0% (of your likes, liked you back)
+  Selectiveness:    Average
+  Attractiveness:   Average
+
+Press Enter to return...
+
+???????????????????????????????????????
+         YOUR DATING STATISTICS
+???????????????????????????????????????
+
+  Last updated: 2026-02-11 20:31
+
+  ? ACTIVITY
+  ???????????????????????????????????
+  Swipes given:     0 (10 likes, 0 passes)
+  Like ratio:       0.0% (you're selective)
+  Swipes received:  0 (0 likes, 0 passes)
+
+  ? MATCHES
+  ???????????????????????????????????
+  Total matches:    0
+  Active matches:   0
+  Match rate:       0.0% (below average)
+
+  ? YOUR SCORES
+  ???????????????????????????????????
+  Reciprocity:      0.0% (of your likes, liked you back)
+  Selectiveness:    Average
+  Attractiveness:   Average
+
+Press Enter to return...
+
+???????????????????????????????????????
+         YOUR DATING STATISTICS
+???????????????????????????????????????
+
+  Last updated: 2026-02-11 20:31
+
+  ? ACTIVITY
+  ???????????????????????????????????
+  Swipes given:     0 (0 likes, 0 passes)
+  Like ratio:       0.0% (you're selective)
+  Swipes received:  0 (0 likes, 0 passes)
+
+  ? MATCHES
+  ???????????????????????????????????
+  Total matches:    0
+  Active matches:   0
+  Match rate:       0.0% (below average)
+
+  ? YOUR SCORES
+  ???????????????????????????????????
+  Reciprocity:      0.0% (of your likes, liked you back)
+  Selectiveness:    Average
+  Attractiveness:   Average
+
+Press Enter to return...
+
+??  Please select or create a user first.
+
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.061 s -- in View Statistics
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.106 s -- in datingapp.app.cli.StatsHandlerTest
+[INFO] Running datingapp.app.cli.UserSessionTest
+[INFO] Running Login State Checks
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in Login State Checks
+[INFO] Running Session State Management
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in Session State Management
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.033 s -- in datingapp.app.cli.UserSessionTest
+[INFO] Running ConfigLoader
+[INFO] Running Field coverage
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.075 s -- in Field coverage
+[INFO] Running fromJson
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in fromJson
+[INFO] Running load from file
+Failed to parse JSON config
+com.fasterxml.jackson.core.JsonParseException: Unexpected character ('i' (code 105)): was expecting double-quote to start field name
+ at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 3]
+	at com.fasterxml.jackson.core.JsonParser._constructReadException(JsonParser.java:2675)
+	at com.fasterxml.jackson.core.base.ParserMinimalBase._reportUnexpectedChar(ParserMinimalBase.java:743)
+	at com.fasterxml.jackson.core.json.ReaderBasedJsonParser._handleOddName(ReaderBasedJsonParser.java:1909)
+	at com.fasterxml.jackson.core.json.ReaderBasedJsonParser.nextFieldName(ReaderBasedJsonParser.java:939)
+	at com.fasterxml.jackson.databind.deser.std.BaseNodeDeserializer._deserializeContainerNoRecursion(JsonNodeDeserializer.java:535)
+	at com.fasterxml.jackson.databind.deser.std.JsonNodeDeserializer.deserialize(JsonNodeDeserializer.java:99)
+	at com.fasterxml.jackson.databind.deser.std.JsonNodeDeserializer.deserialize(JsonNodeDeserializer.java:24)
+	at com.fasterxml.jackson.databind.deser.DefaultDeserializationContext.readRootValue(DefaultDeserializationContext.java:342)
+	at com.fasterxml.jackson.databind.ObjectMapper._readTreeAndClose(ObjectMapper.java:5094)
+	at com.fasterxml.jackson.databind.ObjectMapper.readTree(ObjectMapper.java:3349)
+	at datingapp.app.ConfigLoader.applyJsonConfig(ConfigLoader.java:97)
+	at datingapp.app.ConfigLoader.load(ConfigLoader.java:67)
+	at datingapp.app.ConfigLoaderTest$LoadFromFile.handlesMalformedJson(ConfigLoaderTest.java:67)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:786)
+	at org.junit.platform.commons.support.ReflectionSupport.invokeMethod(ReflectionSupport.java:514)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.SameThreadTimeoutInvocation.proceed(SameThreadTimeoutInvocation.java:49)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:161)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:152)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:91)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:112)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:94)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:87)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$4(TestMethodTestDescriptor.java:221)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:217)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:159)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:70)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:157)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:147)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:145)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:101)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:161)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:147)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:145)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:101)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:161)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:147)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:145)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:101)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:161)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:147)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:145)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:101)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.executeEngine(EngineExecutionOrchestrator.java:230)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.failOrExecuteEngine(EngineExecutionOrchestrator.java:204)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:172)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:101)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:64)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:150)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:63)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:109)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:91)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$execute$1(InterceptingLauncher.java:39)
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+	at org.junit.platform.launcher.core.InterceptingLauncher.execute(InterceptingLauncher.java:38)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.executeWithoutCancellationToken(LauncherAdapter.java:60)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.execute(LauncherAdapter.java:52)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:203)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:168)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:136)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Loaded configuration from: C:\Users\tom7s\AppData\Local\Temp\junit-16846777932084718371\bad.json
+Loaded configuration from: C:\Users\tom7s\AppData\Local\Temp\junit-6209137378587448938\config.json
+Config file not found at C:\Users\tom7s\AppData\Local\Temp\junit-16491135819351317009\nonexistent.json, using defaults
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.067 s -- in load from file
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.188 s -- in ConfigLoader
+[INFO] Running datingapp.core.AchievementServiceTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.035 s -- in datingapp.core.AchievementServiceTest
+[INFO] Running AppClock
+[INFO] Running Reset
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in Reset
+[INFO] Running Custom clock
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in Custom clock
+[INFO] Running Fixed clock
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in Fixed clock
+[INFO] Running Default behavior
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in Default behavior
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.048 s -- in AppClock
+[INFO] Running datingapp.core.AppConfigTest
+[INFO] Running Weight Validation
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in Weight Validation
+[INFO] Running Record Immutability
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in Record Immutability
+[INFO] Running Builder Pattern
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in Builder Pattern
+[INFO] Running Default Configuration
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in Default Configuration
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.072 s -- in datingapp.core.AppConfigTest
+[INFO] Running datingapp.core.CandidateFinderTest
+22:31:27.200 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=MALE, interestedIn=[FEMALE], age=30, minAge=18, maxAge=60)
+22:31:27.201 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 1
+22:31:27.201 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.207 [main] DEBUG d.core.service.CandidateFinder - CandidateFinder: Found 0 candidates for Seeker (from 1 active users)
+22:31:27.211 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=MALE, interestedIn=[FEMALE], age=30, minAge=18, maxAge=60)
+22:31:27.212 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 3
+22:31:27.212 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.218 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 3 candidates for Seeker (from 3 active users)
+22:31:27.222 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=MALE, interestedIn=[FEMALE], age=30, minAge=18, maxAge=60)
+22:31:27.222 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 2
+22:31:27.222 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.223 [main] DEBUG d.core.service.CandidateFinder - Rejecting TooOld (c9223810-fc9a-438f-a035-18764646f3e1): AGE MISMATCH - seeker(age=30, range=18-60), candidate(age=28, range=18-25)
+22:31:27.223 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 1 candidates for Seeker (from 2 active users)
+22:31:27.226 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for ZeroSeeker (state=ACTIVE, gender=MALE, interestedIn=[FEMALE], age=30, minAge=18, maxAge=60)
+22:31:27.226 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 1
+22:31:27.226 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.227 [main] DEBUG d.core.service.CandidateFinder - Rejecting FarAway (cc940116-f822-40c7-b2c1-921b37a7e9ab): TOO FAR - distance=1568.5km, max=1km
+22:31:27.227 [main] DEBUG d.core.service.CandidateFinder - CandidateFinder: Found 0 candidates for ZeroSeeker (from 1 active users)
+22:31:27.231 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=MALE, interestedIn=[FEMALE], age=30, minAge=18, maxAge=60)
+22:31:27.231 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 1
+22:31:27.231 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 1 users
+22:31:27.231 [main] DEBUG d.core.service.CandidateFinder - CandidateFinder: Found 0 candidates for Seeker (from 1 active users)
+22:31:27.234 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=MALE, interestedIn=[FEMALE], age=30, minAge=18, maxAge=60)
+22:31:27.234 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 2
+22:31:27.234 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.235 [main] DEBUG d.core.service.CandidateFinder - Rejecting Incompatible (028be2d2-b07b-4fc2-8b1a-acc36dd68ea8): GENDER MISMATCH - seeker(MALE)?interestedIn([FEMALE]), candidate(FEMALE)?interestedIn([FEMALE])
+22:31:27.235 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 1 candidates for Seeker (from 2 active users)
+22:31:27.237 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=MALE, interestedIn=[FEMALE], age=30, minAge=18, maxAge=60)
+22:31:27.238 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 2
+22:31:27.238 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.238 [main] DEBUG d.core.service.CandidateFinder - Rejecting Far (96a056f8-3aba-4f25-8aec-255ddc52d361): TOO FAR - distance=53.9km, max=30km
+22:31:27.238 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 1 candidates for Seeker (from 2 active users)
+[INFO] Running GeoUtils.distanceKm
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.018 s -- in GeoUtils.distanceKm
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.063 s -- in datingapp.core.CandidateFinderTest
+[INFO] Running SessionService cleanup
+[INFO] Running CleanupResult
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in CleanupResult
+[INFO] Running runCleanup
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s -- in runCleanup
+[INFO] Running Constructor validation
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s -- in Constructor validation
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.060 s -- in SessionService cleanup
+[INFO] Running datingapp.core.CoreUtilitiesTest
+[INFO] Running Match - Domain Model
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in Match - Domain Model
+[INFO] Running Interest - Enum and Category Lookups
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in Interest - Enum and Category Lookups
+[INFO] Running GeoUtils - Geographic Distance Calculations
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in GeoUtils - Geographic Distance Calculations
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.069 s -- in datingapp.core.CoreUtilitiesTest
+[INFO] Running datingapp.core.DailyLimitServiceTest
+[INFO] Running Edge cases
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in Edge cases
+[INFO] Running Time reset tests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in Time reset tests
+[INFO] Running getStatus tests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.046 s -- in getStatus tests
+[INFO] Running canPass tests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.040 s -- in canPass tests
+[INFO] Running canLike tests
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in canLike tests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.180 s -- in datingapp.core.DailyLimitServiceTest
+[INFO] Running datingapp.core.DailyPickServiceTest
+22:31:27.599 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Alice (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.599 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 4
+22:31:27.599 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.600 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 3 candidates for Alice (from 4 active users)
+22:31:27.619 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Alice (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.621 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 4
+22:31:27.621 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.622 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 3 candidates for Alice (from 4 active users)
+22:31:27.676 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Alice (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.680 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 3
+22:31:27.682 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 1 users
+22:31:27.684 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 1 candidates for Alice (from 3 active users)
+22:31:27.693 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Alice (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.695 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 1
+22:31:27.695 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.695 [main] DEBUG d.core.service.CandidateFinder - CandidateFinder: Found 0 candidates for Alice (from 1 active users)
+22:31:27.708 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.708 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 4
+22:31:27.708 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.709 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 3 candidates for Seeker (from 4 active users)
+22:31:27.711 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.712 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 3
+22:31:27.712 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.713 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 2 candidates for Seeker (from 3 active users)
+22:31:27.720 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Alice (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.721 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 2
+22:31:27.722 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 1 users
+22:31:27.722 [main] DEBUG d.core.service.CandidateFinder - CandidateFinder: Found 0 candidates for Alice (from 2 active users)
+22:31:27.730 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Alice (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.731 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 2
+22:31:27.731 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.732 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 1 candidates for Alice (from 2 active users)
+22:31:27.747 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Alice (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.751 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 4
+22:31:27.754 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 1 users
+22:31:27.755 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 2 candidates for Alice (from 4 active users)
+22:31:27.797 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Alice (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.799 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 5
+22:31:27.800 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.802 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 4 candidates for Alice (from 5 active users)
+22:31:27.803 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Bob (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=26, minAge=18, maxAge=99)
+22:31:27.804 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 5
+22:31:27.804 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.805 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 4 candidates for Bob (from 5 active users)
+22:31:27.824 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Alice (state=ACTIVE, gender=FEMALE, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:27.828 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 2
+22:31:27.830 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:27.836 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 1 candidates for Alice (from 2 active users)
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.274 s -- in datingapp.core.DailyPickServiceTest
+[INFO] Running datingapp.core.DailyServiceTest
+[INFO] Running Time Reset Tests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.122 s -- in Time Reset Tests
+[INFO] Running Daily Limits Secondary Tests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.033 s -- in Daily Limits Secondary Tests
+[INFO] Running Daily Picks Tests
+22:31:28.055 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=MALE, interestedIn=[FEMALE], age=25, minAge=18, maxAge=99)
+22:31:28.055 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 11
+22:31:28.056 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:28.057 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 10 candidates for Seeker (from 11 active users)
+22:31:28.059 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=MALE, interestedIn=[FEMALE], age=25, minAge=18, maxAge=99)
+22:31:28.060 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 11
+22:31:28.060 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:28.061 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 10 candidates for Seeker (from 11 active users)
+22:31:28.135 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=MALE, interestedIn=[FEMALE], age=25, minAge=18, maxAge=99)
+22:31:28.136 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 3
+22:31:28.143 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 1 users
+22:31:28.144 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 1 candidates for Seeker (from 3 active users)
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.122 s -- in Daily Picks Tests
+[INFO] Running Daily Limits Tests
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s -- in Daily Limits Tests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.332 s -- in datingapp.core.DailyServiceTest
+[INFO] Running datingapp.core.DealbreakersEvaluatorTest
+[INFO] Running Failed dealbreakers list
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.027 s -- in Failed dealbreakers list
+[INFO] Running Null candidate fields
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.060 s -- in Null candidate fields
+[INFO] Running Multiple dealbreakers
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in Multiple dealbreakers
+[INFO] Running Age difference dealbreaker
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in Age difference dealbreaker
+[INFO] Running Height dealbreaker
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in Height dealbreaker
+[INFO] Running Looking for dealbreaker
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in Looking for dealbreaker
+[INFO] Running Kids stance dealbreaker
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in Kids stance dealbreaker
+[INFO] Running Drinking dealbreaker
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in Drinking dealbreaker
+[INFO] Running Smoking dealbreaker
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in Smoking dealbreaker
+[INFO] Running No dealbreakers
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in No dealbreakers
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.178 s -- in datingapp.core.DealbreakersEvaluatorTest
+[INFO] Running datingapp.core.DealbreakersTest
+[INFO] Running Defensive copy tests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in Defensive copy tests
+[INFO] Running Factory and builder tests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in Factory and builder tests
+[INFO] Running Validation tests
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in Validation tests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in datingapp.core.DealbreakersTest
+[INFO] Running datingapp.core.EdgeCaseRegressionTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in datingapp.core.EdgeCaseRegressionTest
+[INFO] Running EnumSetUtil
+[INFO] Running defensiveCopy
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in defensiveCopy
+[INFO] Running safeCopy(Set)
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in safeCopy(Set)
+[INFO] Running safeCopy(Collection)
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in safeCopy(Collection)
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.044 s -- in EnumSetUtil
+[INFO] Running datingapp.core.LikerBrowserServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in datingapp.core.LikerBrowserServiceTest
+[INFO] Running datingapp.core.MatchingServiceTest
+[INFO] Running Process Swipe Guard
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in Process Swipe Guard
+[INFO] Running Edge Cases
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in Edge Cases
+[INFO] Running Recording Likes
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in Recording Likes
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in datingapp.core.MatchingServiceTest
+[INFO] Running MatchQualityService Tests
+[INFO] Running InterestMatcher - Format Shared Interests
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.030 s -- in InterestMatcher - Format Shared Interests
+[INFO] Running InterestMatcher - Compare
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in InterestMatcher - Compare
+[INFO] Running AppConfig Match Quality Weights
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in AppConfig Match Quality Weights
+[INFO] Running Progress Bar Rendering
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in Progress Bar Rendering
+[INFO] Running Highlight Generation
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in Highlight Generation
+[INFO] Running Score Calculations
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in Score Calculations
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.098 s -- in MatchQualityService Tests
+[INFO] Running MatchQuality Tests
+[INFO] Running Display Methods
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in Display Methods
+[INFO] Running Star Rating
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in Star Rating
+[INFO] Running Validation
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in Validation
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.072 s -- in MatchQuality Tests
+[INFO] Running datingapp.core.MatchStateTest
+[INFO] Running Match Utility Methods
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in Match Utility Methods
+[INFO] Running Match Reconstruction
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in Match Reconstruction
+[INFO] Running Match State Transitions
+[INFO] Running Match.generateId
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in Match.generateId
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.051 s -- in Match State Transitions
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.091 s -- in datingapp.core.MatchStateTest
+[INFO] Running datingapp.core.MatchTest
+[INFO] Running Match Creation
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in Match Creation
+[INFO] Running Graceful Exit
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in Graceful Exit
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in datingapp.core.MatchTest
+[INFO] Running Messaging Domain Tests
+[INFO] Running Conversation Entity
+[INFO] Running Validation
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in Validation
+[INFO] Running Timestamp Updates
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s -- in Timestamp Updates
+[INFO] Running User Queries
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in User Queries
+[INFO] Running generateId
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in generateId
+[INFO] Running Conversation Creation
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in Conversation Creation
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.039 s -- in Conversation Entity
+[INFO] Running Message Entity
+[INFO] Running Message Validation
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in Message Validation
+[INFO] Running Message Creation
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s -- in Message Creation
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.032 s -- in Message Entity
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.071 s -- in Messaging Domain Tests
+[INFO] Running MessagingService Tests
+[INFO] Running getOrCreateConversation
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in getOrCreateConversation
+[INFO] Running getConversations
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in getConversations
+[INFO] Running getTotalUnreadCount
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in getTotalUnreadCount
+[INFO] Running getUnreadCount
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in getUnreadCount
+[INFO] Running markAsRead
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in markAsRead
+[INFO] Running canMessage
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in canMessage
+[INFO] Running getMessages
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in getMessages
+[INFO] Running sendMessage
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in sendMessage
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.084 s -- in MessagingService Tests
+[INFO] Running datingapp.core.NestedTypeVisibilityTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in datingapp.core.NestedTypeVisibilityTest
+[INFO] Running datingapp.core.PaceCompatibilityTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in datingapp.core.PaceCompatibilityTest
+[INFO] Running PerformanceMonitor
+[INFO] Running Bounded Metrics Map
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in Bounded Metrics Map
+[INFO] Running Logging
+22:31:28.974 [main] INFO  datingapp.core.PerformanceMonitor - No performance METRICS recorded
+22:31:28.978 [main] DEBUG datingapp.core.PerformanceMonitor - debug.test: count=1, avg=100ms
+22:31:28.983 [main] INFO  datingapp.core.PerformanceMonitor - 
+=== Performance METRICS ===
+  log.test: count=1, avg=100ms, min=100ms, max=100ms
+
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in Logging
+[INFO] Running OperationMetrics
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in OperationMetrics
+[INFO] Running Reset
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in Reset
+[INFO] Running Timer
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in Timer
+[INFO] Running Basic recording
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in Basic recording
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.045 s -- in PerformanceMonitor
+[INFO] Running ProfileCompletionService
+[INFO] Running generateTips()
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.040 s -- in generateTips()
+[INFO] Running generatePreview()
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in generatePreview()
+[INFO] Running calculateCompleteness()
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.023 s -- in calculateCompleteness()
+[INFO] Running renderProgressBar()
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in renderProgressBar()
+[INFO] Running CompletionResult
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in CompletionResult
+[INFO] Running calculate()
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in calculate()
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.152 s -- in ProfileCompletionService
+[INFO] Running User.ProfileNote
+[INFO] Running getPreview()
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.098 s -- in getPreview()
+[INFO] Running withContent()
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in withContent()
+[INFO] Running create()
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.162 s -- in create()
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.290 s -- in User.ProfileNote
+[INFO] Running datingapp.core.RelationshipTransitionServiceTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.156 s -- in datingapp.core.RelationshipTransitionServiceTest
+[INFO] Running ServiceRegistry
+[INFO] Running Config Getter
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in Config Getter
+[INFO] Running Service Getters
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.051 s -- in Service Getters
+[INFO] Running Storage Getters
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s -- in Storage Getters
+[INFO] Running Builder.buildH2
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.048 s -- in Builder.buildH2
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.170 s -- in ServiceRegistry
+[INFO] Running datingapp.core.SessionServiceTest
+[INFO] Running History and aggregates tests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in History and aggregates tests
+[INFO] Running Session ending tests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in Session ending tests
+[INFO] Running Swipe recording tests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.032 s -- in Swipe recording tests
+[INFO] Running Session creation tests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.023 s -- in Session creation tests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.129 s -- in datingapp.core.SessionServiceTest
+[INFO] Running Soft-delete behavior
+[INFO] Running Match soft-delete
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.057 s -- in Match soft-delete
+[INFO] Running User soft-delete
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.053 s -- in User soft-delete
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.120 s -- in Soft-delete behavior
+[INFO] Running StandoutsService
+[INFO] Running Result record
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.027 s -- in Result record
+[INFO] Running resolveUsers
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in resolveUsers
+[INFO] Running markInteracted
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in markInteracted
+[INFO] Running getStandouts
+22:31:30.125 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=FEMALE, interestedIn=[MALE], age=25, minAge=18, maxAge=99)
+22:31:30.126 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 16
+22:31:30.127 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:30.128 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 15 candidates for Seeker (from 16 active users)
+22:31:30.146 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=FEMALE, interestedIn=[MALE], age=25, minAge=18, maxAge=99)
+22:31:30.146 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 3
+22:31:30.146 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:30.147 [main] INFO  d.core.service.CandidateFinder - CandidateFinder: Found 2 candidates for Seeker (from 3 active users)
+22:31:30.157 [main] DEBUG d.core.service.CandidateFinder - Finding candidates for Seeker (state=ACTIVE, gender=OTHER, interestedIn=[MALE, FEMALE, OTHER], age=25, minAge=18, maxAge=99)
+22:31:30.158 [main] DEBUG d.core.service.CandidateFinder - Total active users to filter: 1
+22:31:30.158 [main] DEBUG d.core.service.CandidateFinder - Already interacted with: 0 users
+22:31:30.158 [main] DEBUG d.core.service.CandidateFinder - CandidateFinder: Found 0 candidates for Seeker (from 1 active users)
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.050 s -- in getStandouts
+[INFO] Running Constructor validation
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.063 s -- in Constructor validation
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.172 s -- in StandoutsService
+[INFO] Running datingapp.core.StatsMetricsTest
+[INFO] Running UserStats Domain Model
+[INFO] Running Display formatting tests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in Display formatting tests
+[INFO] Running Builder tests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in Builder tests
+[INFO] Running Validation tests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in Validation tests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.066 s -- in UserStats Domain Model
+[INFO] Running UserAchievement Domain Model
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.075 s -- in UserAchievement Domain Model
+[INFO] Running PlatformStats Domain Model
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.059 s -- in PlatformStats Domain Model
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.205 s -- in datingapp.core.StatsMetricsTest
+[INFO] Running StatsService
+[INFO] Running getPlatformStats
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in getPlatformStats
+[INFO] Running computeAndSavePlatformStats
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.029 s -- in computeAndSavePlatformStats
+[INFO] Running getStats
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in getStats
+[INFO] Running getOrComputeStats
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in getOrComputeStats
+[INFO] Running computeAndSaveStats
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.067 s -- in computeAndSaveStats
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.172 s -- in StatsService
+[INFO] Running datingapp.core.SwipeSessionTest
+[INFO] Running Large dataset tests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in Large dataset tests
+[INFO] Running Getter validation tests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in Getter validation tests
+[INFO] Running Timeout boundary tests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.027 s -- in Timeout boundary tests
+[INFO] Running Computed properties edge cases
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in Computed properties edge cases
+[INFO] Running State validation tests
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in State validation tests
+[INFO] Running Edge case swipe tests
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in Edge case swipe tests
+[INFO] Running Equality tests
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in Equality tests
+[INFO] Running Computed properties tests
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.058 s -- in Computed properties tests
+[INFO] Running Timeout tests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in Timeout tests
+[INFO] Running Session ending tests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in Session ending tests
+[INFO] Running Swipe recording tests
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in Swipe recording tests
+[INFO] Running Creation tests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in Creation tests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.391 s -- in datingapp.core.SwipeSessionTest
+[INFO] Running TrustSafetyService
+[INFO] Running Verification Code
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in Verification Code
+[INFO] Running Report Functionality
+[INFO] Running Unblock Functionality
+22:31:31.078 [main] DEBUG d.core.service.TrustSafetyService - No block found between f355a082-58c5-4b13-935d-8e3f8acfa344 and f0ee5061-21de-4c06-9659-035446b44dac
+22:31:31.095 [main] INFO  d.core.service.TrustSafetyService - User 4138f2a3-7f23-4811-9823-0e80cd257ed5 unblocked user 731f781b-30b0-45ec-ad6f-fab704dbf21c
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in Unblock Functionality
+[INFO] Running Validation Errors
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.024 s -- in Validation Errors
+[INFO] Running Auto-Ban Logic
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s -- in Auto-Ban Logic
+[INFO] Running Successful Reports
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.020 s -- in Successful Reports
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.109 s -- in Report Functionality
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.148 s -- in TrustSafetyService
+[INFO] Running UndoService
+[INFO] Running clearUndo
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in clearUndo
+[INFO] Running undo
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.045 s -- in undo
+[INFO] Running getSecondsRemaining
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in getSecondsRemaining
+[INFO] Running canUndo
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.035 s -- in canUndo
+[INFO] Running recordSwipe
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.020 s -- in recordSwipe
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.159 s -- in UndoService
+[INFO] Running datingapp.core.UserInteractionsTest
+[INFO] Running Report Domain Model
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.046 s -- in Report Domain Model
+[INFO] Running Block Domain Model
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.040 s -- in Block Domain Model
+[INFO] Running Like Domain Model
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.042 s -- in Like Domain Model
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.130 s -- in datingapp.core.UserInteractionsTest
+[INFO] Running datingapp.core.UserTest
+[INFO] Running StorageBuilder
+[INFO] Tests run: 18, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in StorageBuilder
+[INFO] Running ProfileNote
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.060 s -- in ProfileNote
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.109 s -- in datingapp.core.UserTest
+[INFO] Running datingapp.core.ValidationServiceTest
+[INFO] Running Location Validation
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in Location Validation
+[INFO] Running Age Range Validation
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in Age Range Validation
+[INFO] Running Bio Validation
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in Bio Validation
+[INFO] Running Distance Validation
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in Distance Validation
+[INFO] Running Height Validation
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in Height Validation
+[INFO] Running Age Validation
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in Age Validation
+[INFO] Running Name Validation
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.020 s -- in Name Validation
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.142 s -- in datingapp.core.ValidationServiceTest
+[INFO] Running datingapp.storage.DatabaseManagerThreadSafetyTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.395 s -- in datingapp.storage.DatabaseManagerThreadSafetyTest
+[INFO] Running datingapp.storage.mapper.MapperHelperTest
+Skipping invalid TestEnum value 'INVALID' in column 'col'
+[INFO] Running readEnum validation
+Skipping invalid TestEnum value 'NONEXISTENT' in column 'col'
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in readEnum validation
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.027 s -- in datingapp.storage.mapper.MapperHelperTest
+[INFO] Running datingapp.storage.schema.SchemaInitializerTest
+[INFO] Running MigrationRunner.migrateV1
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.407 s -- in MigrationRunner.migrateV1
+[INFO] Running createAllTables
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.142 s -- in createAllTables
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.554 s -- in datingapp.storage.schema.SchemaInitializerTest
+[INFO] Running JavaFX CSS Validation
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.124 s -- in JavaFX CSS Validation
+[INFO] Running MatchesViewModel
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.067 s -- in MatchesViewModel
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   MessagingHandlerTest.listsConversationsWithActiveMatch Unexpected exception thrown: org.jdbi.v3.core.mapper.NoSuchMapperException: No mapper registered for type datingapp.core.model.Messaging$Conversation
+[ERROR]   MessagingHandlerTest.showsMessagesInConversation Unexpected exception thrown: org.jdbi.v3.core.mapper.NoSuchMapperException: No mapper registered for type datingapp.core.model.Messaging$Conversation
+[ERROR]   MessagingHandlerTest.showsNoMessagesForEmptyConversation Unexpected exception thrown: org.jdbi.v3.core.mapper.NoSuchMapperException: No mapper registered for type datingapp.core.model.Messaging$Conversation
+[INFO] 
+[ERROR] Tests run: 802, Failures: 3, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  22.786 s
+[INFO] Finished at: 2026-02-11T22:31:35+02:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.4:test (default-test) on project dating-app: There are test failures.
+[ERROR] 
+[ERROR] See C:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+

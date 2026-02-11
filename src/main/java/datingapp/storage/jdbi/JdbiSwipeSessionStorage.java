@@ -2,7 +2,7 @@ package datingapp.storage.jdbi;
 
 import datingapp.core.AppClock;
 import datingapp.core.model.SwipeSession;
-import datingapp.core.storage.SwipeSessionStorage;
+import datingapp.core.storage.AnalyticsStorage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -23,7 +23,7 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  * Uses declarative SQL methods instead of manual JDBC.
  */
 @RegisterRowMapper(JdbiSwipeSessionStorage.Mapper.class)
-public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
+public interface JdbiSwipeSessionStorage {
 
     @SqlUpdate("""
                         MERGE INTO swipe_sessions (id, user_id, started_at, last_activity_at, ended_at,
@@ -32,7 +32,6 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
                         VALUES (:id, :userId, :startedAt, :lastActivityAt, :endedAt,
                                 :state, :swipeCount, :likeCount, :passCount, :matchCount)
                         """)
-    @Override
     void save(@BindBean SwipeSession session);
 
     @SqlQuery("""
@@ -40,7 +39,6 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
                                state, swipe_count, like_count, pass_count, match_count
                         FROM swipe_sessions WHERE id = :sessionId
                         """)
-    @Override
     Optional<SwipeSession> get(@Bind("sessionId") UUID sessionId);
 
     @SqlQuery("""
@@ -49,7 +47,6 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
                         FROM swipe_sessions WHERE user_id = :userId AND state = 'ACTIVE'
                         LIMIT 1
                         """)
-    @Override
     Optional<SwipeSession> getActiveSession(@Bind("userId") UUID userId);
 
     @SqlQuery("""
@@ -58,7 +55,6 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
                         FROM swipe_sessions WHERE user_id = :userId
                         ORDER BY started_at DESC LIMIT :limit
                         """)
-    @Override
     List<SwipeSession> getSessionsFor(@Bind("userId") UUID userId, @Bind("limit") int limit);
 
     @SqlQuery("""
@@ -68,7 +64,6 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
                         WHERE user_id = :userId AND started_at >= :start AND started_at <= :end
                         ORDER BY started_at DESC
                         """)
-    @Override
     List<SwipeSession> getSessionsInRange(
             @Bind("userId") UUID userId, @Bind("start") Instant start, @Bind("end") Instant end);
 
@@ -83,12 +78,28 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
                                 CASE WHEN ended_at IS NOT NULL
                                 THEN DATEDIFF('SECOND', started_at, ended_at)
                                 ELSE 0 END
-                            ), 0) as avg_duration_seconds
+                            ), 0) as avg_session_duration_seconds,
+                            CASE
+                                WHEN COUNT(*) = 0 THEN 0
+                                ELSE COALESCE(SUM(swipe_count), 0) * 1.0 / COUNT(*)
+                            END as avg_swipes_per_session,
+                            CASE
+                                WHEN COALESCE(SUM(
+                                    CASE WHEN ended_at IS NOT NULL
+                                    THEN DATEDIFF('SECOND', started_at, ended_at)
+                                    ELSE 0 END
+                                ), 0) = 0 THEN 0
+                                ELSE COALESCE(SUM(swipe_count), 0) * 1.0 /
+                                    COALESCE(SUM(
+                                        CASE WHEN ended_at IS NOT NULL
+                                        THEN DATEDIFF('SECOND', started_at, ended_at)
+                                        ELSE 0 END
+                                    ), 0)
+                            END as avg_swipe_velocity
                         FROM swipe_sessions
                         WHERE user_id = :userId
                         """)
-    @Override
-    SessionAggregates getAggregates(@Bind("userId") UUID userId);
+    AnalyticsStorage.SessionAggregates getAggregates(@Bind("userId") UUID userId);
 
     @SqlUpdate("""
                         UPDATE swipe_sessions
@@ -100,7 +111,6 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
     /**
      * Wrapper method to match the interface signature with Duration parameter.
      */
-    @Override
     default int endStaleSessions(Duration timeout) {
         Instant now = AppClock.now();
         Instant cutoff = now.minus(timeout);
@@ -112,7 +122,6 @@ public interface JdbiSwipeSessionStorage extends SwipeSessionStorage {
      * Used by SessionService to purge old session data.
      */
     @SqlUpdate("DELETE FROM swipe_sessions WHERE started_at < :cutoff")
-    @Override
     int deleteExpiredSessions(@Bind("cutoff") Instant cutoff);
 
     /**

@@ -9,7 +9,6 @@ import datingapp.core.model.Match;
 import datingapp.core.model.Standout;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
-import datingapp.core.model.UserInteractions.Block;
 import datingapp.core.model.UserInteractions.FriendRequest;
 import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.model.UserInteractions.Notification;
@@ -26,11 +25,11 @@ import datingapp.core.service.MatchingService.PendingLiker;
 import datingapp.core.service.RelationshipTransitionService;
 import datingapp.core.service.RelationshipTransitionService.TransitionValidationException;
 import datingapp.core.service.StandoutsService;
+import datingapp.core.service.TrustSafetyService;
 import datingapp.core.service.UndoService;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.SocialStorage;
-import datingapp.core.storage.StatsStorage;
-import datingapp.core.storage.TrustSafetyStorage;
+import datingapp.core.storage.AnalyticsStorage;
+import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
@@ -52,34 +51,34 @@ public class MatchingHandler implements LoggingSupport {
 
     private final CandidateFinder candidateFinderService;
     private final MatchingService matchingService;
-    private final MatchStorage matchStorage;
-    private final TrustSafetyStorage trustSafetyStorage;
+    private final InteractionStorage interactionStorage;
     private final DailyService dailyService;
     private final UndoService undoService;
     private final MatchQualityService matchQualityService;
     private final UserStorage userStorage;
     private final AchievementService achievementService;
-    private final StatsStorage statsStorage;
+    private final AnalyticsStorage analyticsStorage;
+    private final TrustSafetyService trustSafetyService;
     private final RelationshipTransitionService transitionService;
     private final StandoutsService standoutsService;
-    private final SocialStorage socialStorage;
+    private final CommunicationStorage communicationStorage;
     private final AppSession session;
     private final InputReader inputReader;
 
     public MatchingHandler(Dependencies dependencies) {
         this.candidateFinderService = dependencies.candidateFinderService();
         this.matchingService = dependencies.matchingService();
-        this.matchStorage = dependencies.matchStorage();
-        this.trustSafetyStorage = dependencies.trustSafetyStorage();
+        this.interactionStorage = dependencies.interactionStorage();
         this.dailyService = dependencies.dailyService();
         this.undoService = dependencies.undoService();
         this.matchQualityService = dependencies.matchQualityService();
         this.userStorage = dependencies.userStorage();
         this.achievementService = dependencies.achievementService();
-        this.statsStorage = dependencies.statsStorage();
+        this.analyticsStorage = dependencies.analyticsStorage();
+        this.trustSafetyService = dependencies.trustSafetyService();
         this.transitionService = dependencies.transitionService();
         this.standoutsService = dependencies.standoutsService();
-        this.socialStorage = dependencies.socialStorage();
+        this.communicationStorage = dependencies.communicationStorage();
         this.session = dependencies.userSession();
         this.inputReader = dependencies.inputReader();
     }
@@ -92,34 +91,34 @@ public class MatchingHandler implements LoggingSupport {
     public record Dependencies(
             CandidateFinder candidateFinderService,
             MatchingService matchingService,
-            MatchStorage matchStorage,
-            TrustSafetyStorage trustSafetyStorage,
+            InteractionStorage interactionStorage,
             DailyService dailyService,
             UndoService undoService,
             MatchQualityService matchQualityService,
             UserStorage userStorage,
             AchievementService achievementService,
-            StatsStorage statsStorage,
+            AnalyticsStorage analyticsStorage,
+            TrustSafetyService trustSafetyService,
             RelationshipTransitionService transitionService,
             StandoutsService standoutsService,
-            SocialStorage socialStorage,
+            CommunicationStorage communicationStorage,
             AppSession userSession,
             InputReader inputReader) {
 
         public Dependencies {
             Objects.requireNonNull(candidateFinderService);
             Objects.requireNonNull(matchingService);
-            Objects.requireNonNull(matchStorage);
-            Objects.requireNonNull(trustSafetyStorage);
+            Objects.requireNonNull(interactionStorage);
             Objects.requireNonNull(dailyService);
             Objects.requireNonNull(undoService);
             Objects.requireNonNull(matchQualityService);
             Objects.requireNonNull(userStorage);
             Objects.requireNonNull(achievementService);
-            Objects.requireNonNull(statsStorage);
+            Objects.requireNonNull(analyticsStorage);
+            Objects.requireNonNull(trustSafetyService);
             Objects.requireNonNull(transitionService);
             Objects.requireNonNull(standoutsService);
-            Objects.requireNonNull(socialStorage);
+            Objects.requireNonNull(communicationStorage);
             Objects.requireNonNull(userSession);
             Objects.requireNonNull(inputReader);
         }
@@ -164,7 +163,7 @@ public class MatchingHandler implements LoggingSupport {
 
     private boolean processCandidateInteraction(User candidate, User currentUser) {
         // Record this profile view
-        statsStorage.recordProfileView(currentUser.getId(), candidate.getId());
+        analyticsStorage.recordProfileView(currentUser.getId(), candidate.getId());
 
         double distance = GeoUtils.distanceKm(
                 currentUser.getLat(), currentUser.getLon(),
@@ -237,7 +236,7 @@ public class MatchingHandler implements LoggingSupport {
             logInfo("         YOUR MATCHES");
             logInfo(CliSupport.SEPARATOR_LINE + "\n");
 
-            List<Match> matches = matchStorage.getActiveMatchesFor(currentUser.getId());
+            List<Match> matches = interactionStorage.getActiveMatchesFor(currentUser.getId());
 
             if (matches.isEmpty()) {
                 logInfo("😢 No matches yet. Keep swiping!\n");
@@ -393,7 +392,7 @@ public class MatchingHandler implements LoggingSupport {
                 String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
                 if ("y".equalsIgnoreCase(confirm)) {
                     match.unmatch(currentUser.getId());
-                    matchStorage.update(match);
+                    interactionStorage.update(match);
                     logInfo("✅ Unmatched with {}.\n", otherUser.getName());
                 }
             }
@@ -401,11 +400,12 @@ public class MatchingHandler implements LoggingSupport {
                 String confirm =
                         inputReader.readLine(CliSupport.BLOCK_PREFIX + otherUser.getName() + CliSupport.CONFIRM_SUFFIX);
                 if ("y".equalsIgnoreCase(confirm)) {
-                    Block block = Block.create(currentUser.getId(), otherUserId);
-                    trustSafetyStorage.save(block);
-                    match.block(currentUser.getId());
-                    matchStorage.update(match);
-                    logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
+                    TrustSafetyService.BlockResult result = trustSafetyService.block(currentUser.getId(), otherUserId);
+                    if (result.success()) {
+                        logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
+                    } else {
+                        logInfo("❌ {}\n", result.errorMessage());
+                    }
                 }
             }
             case "f" -> {
@@ -449,7 +449,7 @@ public class MatchingHandler implements LoggingSupport {
             String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
             if ("y".equalsIgnoreCase(confirm)) {
                 match.unmatch(currentUser.getId());
-                matchStorage.update(match);
+                interactionStorage.update(match);
                 logInfo("✅ Unmatched with {}.\n", otherUser.getName());
             } else {
                 logInfo(CliSupport.CANCELLED);
@@ -475,11 +475,12 @@ public class MatchingHandler implements LoggingSupport {
             String confirm = inputReader.readLine(
                     CliSupport.BLOCK_PREFIX + otherUser.getName() + "? This will end your match. (y/n): ");
             if ("y".equalsIgnoreCase(confirm)) {
-                Block block = Block.create(currentUser.getId(), otherUserId);
-                trustSafetyStorage.save(block);
-                match.block(currentUser.getId());
-                matchStorage.update(match);
-                logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
+                TrustSafetyService.BlockResult result = trustSafetyService.block(currentUser.getId(), otherUserId);
+                if (result.success()) {
+                    logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
+                } else {
+                    logInfo("❌ {}\n", result.errorMessage());
+                }
             } else {
                 logInfo(CliSupport.CANCELLED);
             }
@@ -813,7 +814,7 @@ public class MatchingHandler implements LoggingSupport {
             return;
         }
 
-        List<Notification> notifications = socialStorage.getNotificationsForUser(currentUser.getId(), false);
+        List<Notification> notifications = communicationStorage.getNotificationsForUser(currentUser.getId(), false);
         if (notifications.isEmpty()) {
             logInfo("\nNo notifications.\n");
             return;
@@ -824,7 +825,7 @@ public class MatchingHandler implements LoggingSupport {
             String status = n.isRead() ? "  " : "🆕";
             logInfo("{} [{}] {}: {}", status, n.createdAt(), n.title(), n.message());
             if (!n.isRead()) {
-                socialStorage.markNotificationAsRead(n.id());
+                communicationStorage.markNotificationAsRead(n.id());
             }
         }
 

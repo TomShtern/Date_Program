@@ -10,14 +10,12 @@ import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.*;
 import datingapp.core.service.MatchQualityService.InterestMatcher;
 import datingapp.core.service.MatchQualityService.MatchQuality;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
+import datingapp.core.testutil.TestStorages;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -31,15 +29,15 @@ import org.junit.jupiter.api.*;
 class MatchQualityServiceTest {
 
     private MatchQualityService service;
-    private TestUserStorage userStorage;
-    private TestLikeStorage likeStorage;
+    private TestStorages.Users userStorage;
+    private TestStorages.Interactions likeStorage;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
-        userStorage = new TestUserStorage();
-        likeStorage = new TestLikeStorage();
+        userStorage = new TestStorages.Users();
+        likeStorage = new TestStorages.Interactions();
         service = new MatchQualityService(userStorage, likeStorage, AppConfig.defaults());
     }
 
@@ -589,145 +587,5 @@ class MatchQualityServiceTest {
         Like likeB = Like.create(userB, userA, Like.Direction.LIKE);
         likeStorage.save(likeA);
         likeStorage.save(likeB);
-    }
-
-    // === Test Doubles ===
-
-    private static class TestUserStorage implements UserStorage {
-        private final java.util.Map<UUID, User> users = new java.util.HashMap<>();
-        private final java.util.Map<String, ProfileNote> profileNotes = new java.util.concurrent.ConcurrentHashMap<>();
-
-        private static String noteKey(UUID authorId, UUID subjectId) {
-            return authorId + "_" + subjectId;
-        }
-
-        @Override
-        public void save(User user) {
-            users.put(user.getId(), user);
-        }
-
-        @Override
-        public User get(UUID id) {
-            return users.get(id);
-        }
-
-        @Override
-        public java.util.List<User> findAll() {
-            return new java.util.ArrayList<>(users.values());
-        }
-
-        @Override
-        public java.util.List<User> findActive() {
-            return users.values().stream()
-                    .filter(u -> u.getState() == User.UserState.ACTIVE)
-                    .toList();
-        }
-
-        @Override
-        public void delete(UUID id) {
-            users.remove(id);
-        }
-
-        @Override
-        public void saveProfileNote(ProfileNote note) {
-            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
-        }
-
-        @Override
-        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
-            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
-        }
-
-        @Override
-        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
-            return profileNotes.values().stream()
-                    .filter(note -> note.authorId().equals(authorId))
-                    .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))
-                    .toList();
-        }
-
-        @Override
-        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
-            return profileNotes.remove(noteKey(authorId, subjectId)) != null;
-        }
-    }
-
-    private static class TestLikeStorage implements LikeStorage {
-        private final java.util.Map<String, Like> likes = new java.util.HashMap<>();
-
-        private static String key(UUID from, UUID to) {
-            return from + "_" + to;
-        }
-
-        @Override
-        public void save(Like like) {
-            likes.put(key(like.whoLikes(), like.whoGotLiked()), like);
-        }
-
-        @Override
-        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-            return Optional.ofNullable(likes.get(key(fromUserId, toUserId)));
-        }
-
-        @Override
-        public boolean exists(UUID from, UUID to) {
-            return likes.containsKey(key(from, to));
-        }
-
-        @Override
-        public boolean mutualLikeExists(UUID a, UUID b) {
-            return likes.containsKey(key(a, b)) && likes.containsKey(key(b, a));
-        }
-
-        @Override
-        public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-            return Set.of();
-        }
-
-        @Override
-        public Set<UUID> getUserIdsWhoLiked(UUID userId) {
-            return Set.of();
-        }
-
-        @Override
-        public java.util.List<java.util.Map.Entry<UUID, java.time.Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
-            java.util.List<java.util.Map.Entry<UUID, java.time.Instant>> result = new java.util.ArrayList<>();
-            for (Like like : likes.values()) {
-                if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
-                    result.add(java.util.Map.entry(like.whoLikes(), like.createdAt()));
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public int countByDirection(UUID userId, Like.Direction direction) {
-            return 0;
-        }
-
-        @Override
-        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
-            return 0;
-        }
-
-        @Override
-        public int countMutualLikes(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public int countLikesToday(UUID userId, java.time.Instant startOfDay) {
-            return 0;
-        }
-
-        @Override
-        public int countPassesToday(UUID userId, java.time.Instant startOfDay) {
-            return 0;
-        }
-
-        @Override
-        public void delete(UUID likeId) {
-            likes.values().removeIf(like -> like.id().equals(likeId));
-        }
     }
 }

@@ -17,23 +17,16 @@ import datingapp.core.service.StandoutsService;
 import datingapp.core.service.StatsService;
 import datingapp.core.service.TrustSafetyService;
 import datingapp.core.service.UndoService;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.MessagingStorage;
-import datingapp.core.storage.SocialStorage;
-import datingapp.core.storage.StatsStorage;
-import datingapp.core.storage.SwipeSessionStorage;
+import datingapp.core.storage.AnalyticsStorage;
+import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.storage.jdbi.EnumSetJdbiSupport;
-import datingapp.storage.jdbi.JdbiLikeStorage;
-import datingapp.storage.jdbi.JdbiMatchStorage;
-import datingapp.storage.jdbi.JdbiMessagingStorage;
-import datingapp.storage.jdbi.JdbiSocialStorage;
+import datingapp.storage.jdbi.JdbiAnalyticsStorageAdapter;
+import datingapp.storage.jdbi.JdbiCommunicationStorageAdapter;
+import datingapp.storage.jdbi.JdbiInteractionStorageAdapter;
 import datingapp.storage.jdbi.JdbiStandoutStorage;
-import datingapp.storage.jdbi.JdbiStatsStorage;
-import datingapp.storage.jdbi.JdbiSwipeSessionStorage;
-import datingapp.storage.jdbi.JdbiTransactionExecutor;
 import datingapp.storage.jdbi.JdbiTrustSafetyStorage;
 import datingapp.storage.jdbi.JdbiUndoStorage;
 import datingapp.storage.jdbi.JdbiUserStorageAdapter;
@@ -90,66 +83,59 @@ public final class StorageFactory {
         });
 
         // ═══════════════════════════════════════════════════════════════
-        // Storage Instantiation
+        // Storage Instantiation (4 consolidated adapters)
         // ═══════════════════════════════════════════════════════════════
         UserStorage userStorage = new JdbiUserStorageAdapter(jdbi);
-        LikeStorage likeStorage = jdbi.onDemand(JdbiLikeStorage.class);
-        MatchStorage matchStorage = jdbi.onDemand(JdbiMatchStorage.class);
+        InteractionStorage interactionStorage = new JdbiInteractionStorageAdapter(jdbi);
+        CommunicationStorage communicationStorage = new JdbiCommunicationStorageAdapter(jdbi);
+        AnalyticsStorage analyticsStorage = new JdbiAnalyticsStorageAdapter(jdbi);
         TrustSafetyStorage trustSafetyStorage = jdbi.onDemand(JdbiTrustSafetyStorage.class);
-        SwipeSessionStorage sessionStorage = jdbi.onDemand(JdbiSwipeSessionStorage.class);
-        StatsStorage statsStorage = jdbi.onDemand(JdbiStatsStorage.class);
-        MessagingStorage messagingStorage = jdbi.onDemand(JdbiMessagingStorage.class);
-        SocialStorage socialStorage = jdbi.onDemand(JdbiSocialStorage.class);
 
         UndoState.Storage undoStorage = createUndoStorage(jdbi);
 
         // ═══════════════════════════════════════════════════════════════
         // Matching Services
         // ═══════════════════════════════════════════════════════════════
-        CandidateFinder candidateFinder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, config);
+        CandidateFinder candidateFinder =
+                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
         DailyService dailyService =
-                new DailyService(userStorage, likeStorage, trustSafetyStorage, statsStorage, candidateFinder, config);
-        UndoService undoService = new UndoService(likeStorage, matchStorage, undoStorage, config);
+                new DailyService(userStorage, interactionStorage, analyticsStorage, candidateFinder, config);
+        UndoService undoService = new UndoService(interactionStorage, undoStorage, config);
 
-        JdbiTransactionExecutor txExecutor = new JdbiTransactionExecutor(jdbi);
-        undoService.setTransactionExecutor(txExecutor);
-
-        SessionService sessionService = new SessionService(sessionStorage, statsStorage, config);
+        SessionService sessionService = new SessionService(analyticsStorage, config);
         MatchingService matchingService = MatchingService.builder()
-                .likeStorage(likeStorage)
-                .matchStorage(matchStorage)
-                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
                 .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
                 .sessionService(sessionService)
                 .undoService(undoService)
                 .dailyService(dailyService)
                 .build();
-        MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
+        MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
 
         // ═══════════════════════════════════════════════════════════════
         // Messaging Services
         // ═══════════════════════════════════════════════════════════════
-        MessagingService messagingService = new MessagingService(messagingStorage, matchStorage, userStorage);
+        MessagingService messagingService = new MessagingService(communicationStorage, interactionStorage, userStorage);
         RelationshipTransitionService relationshipTransitionService =
-                new RelationshipTransitionService(matchStorage, socialStorage, messagingStorage);
+                new RelationshipTransitionService(interactionStorage, communicationStorage);
 
         // ═══════════════════════════════════════════════════════════════
         // Safety Services
         // ═══════════════════════════════════════════════════════════════
         TrustSafetyService trustSafetyService =
-                new TrustSafetyService(trustSafetyStorage, userStorage, matchStorage, config);
+                new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
 
         // ═══════════════════════════════════════════════════════════════
         // Stats Services
         // ═══════════════════════════════════════════════════════════════
         ProfileCompletionService profileCompletionService = new ProfileCompletionService(config);
-        StatsService statsService = new StatsService(likeStorage, matchStorage, trustSafetyStorage, statsStorage);
+        StatsService statsService = new StatsService(interactionStorage, trustSafetyStorage, analyticsStorage);
         AchievementService achievementService = new AchievementService(
-                statsStorage,
-                matchStorage,
-                likeStorage,
-                userStorage,
+                analyticsStorage,
+                interactionStorage,
                 trustSafetyStorage,
+                userStorage,
                 profileCompletionService,
                 config);
 
@@ -166,13 +152,10 @@ public final class StorageFactory {
         return new ServiceRegistry(
                 config,
                 userStorage,
-                likeStorage,
-                matchStorage,
+                interactionStorage,
+                communicationStorage,
+                analyticsStorage,
                 trustSafetyStorage,
-                sessionStorage,
-                statsStorage,
-                messagingStorage,
-                socialStorage,
                 candidateFinder,
                 matchingService,
                 trustSafetyService,

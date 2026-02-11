@@ -9,10 +9,8 @@ import datingapp.core.model.UserInteractions.Block;
 import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.model.UserInteractions.Report;
 import datingapp.core.service.*;
-import datingapp.core.storage.*;
-import java.time.Instant;
+import datingapp.core.testutil.TestStorages;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
 
@@ -24,10 +22,9 @@ import org.junit.jupiter.api.*;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class StatsServiceTest {
 
-    private InMemoryLikeStorage likeStorage;
-    private InMemoryMatchStorage matchStorage;
-    private InMemoryTrustSafetyStorage trustSafetyStorage;
-    private InMemoryStatsStorage statsStorage;
+    private TestStorages.Interactions interactionStorage;
+    private TestStorages.TrustSafety trustSafetyStorage;
+    private TestStorages.Analytics analyticsStorage;
     private StatsService statsService;
 
     private UUID userId;
@@ -35,12 +32,11 @@ class StatsServiceTest {
 
     @BeforeEach
     void setUp() {
-        likeStorage = new InMemoryLikeStorage();
-        matchStorage = new InMemoryMatchStorage();
-        trustSafetyStorage = new InMemoryTrustSafetyStorage();
-        statsStorage = new InMemoryStatsStorage();
+        interactionStorage = new TestStorages.Interactions();
+        trustSafetyStorage = new TestStorages.TrustSafety();
+        analyticsStorage = new TestStorages.Analytics();
 
-        statsService = new StatsService(likeStorage, matchStorage, trustSafetyStorage, statsStorage);
+        statsService = new StatsService(interactionStorage, trustSafetyStorage, analyticsStorage);
 
         userId = UUID.randomUUID();
         otherUserId = UUID.randomUUID();
@@ -54,13 +50,13 @@ class StatsServiceTest {
         @DisplayName("Computes correct like counts")
         void computesCorrectLikeCounts() {
             // User liked 3 people
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.LIKE));
 
             // User passed on 2 people
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.PASS);
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.PASS);
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.PASS));
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.PASS));
 
             UserStats stats = statsService.computeAndSaveStats(userId);
 
@@ -73,10 +69,10 @@ class StatsServiceTest {
         @DisplayName("Computes correct like ratio")
         void computesCorrectLikeRatio() {
             // 2 likes out of 4 swipes = 0.5 ratio
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.PASS);
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.PASS);
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.PASS));
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.PASS));
 
             UserStats stats = statsService.computeAndSaveStats(userId);
 
@@ -100,11 +96,11 @@ class StatsServiceTest {
         @DisplayName("Computes incoming likes received")
         void computesIncomingLikesReceived() {
             // 3 people liked this user
-            likeStorage.addLike(UUID.randomUUID(), userId, Like.Direction.LIKE);
-            likeStorage.addLike(UUID.randomUUID(), userId, Like.Direction.LIKE);
-            likeStorage.addLike(UUID.randomUUID(), userId, Like.Direction.LIKE);
+            interactionStorage.save(Like.create(UUID.randomUUID(), userId, Like.Direction.LIKE));
+            interactionStorage.save(Like.create(UUID.randomUUID(), userId, Like.Direction.LIKE));
+            interactionStorage.save(Like.create(UUID.randomUUID(), userId, Like.Direction.LIKE));
             // 1 person passed on this user
-            likeStorage.addLike(UUID.randomUUID(), userId, Like.Direction.PASS);
+            interactionStorage.save(Like.create(UUID.randomUUID(), userId, Like.Direction.PASS));
 
             UserStats stats = statsService.computeAndSaveStats(userId);
 
@@ -122,8 +118,8 @@ class StatsServiceTest {
             Match match2 = Match.create(userId, UUID.randomUUID());
             match2.unmatch(userId); // Make one inactive
 
-            matchStorage.save(match1);
-            matchStorage.save(match2);
+            interactionStorage.save(match1);
+            interactionStorage.save(match2);
 
             UserStats stats = statsService.computeAndSaveStats(userId);
 
@@ -136,10 +132,10 @@ class StatsServiceTest {
         void computesMatchRateCorrectly() {
             // 5 likes given, 2 matches = 40% rate
             for (int i = 0; i < 5; i++) {
-                likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);
+                interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.LIKE));
             }
-            matchStorage.save(Match.create(userId, UUID.randomUUID()));
-            matchStorage.save(Match.create(userId, UUID.randomUUID()));
+            interactionStorage.save(Match.create(userId, UUID.randomUUID()));
+            interactionStorage.save(Match.create(userId, UUID.randomUUID()));
 
             UserStats stats = statsService.computeAndSaveStats(userId);
 
@@ -149,9 +145,9 @@ class StatsServiceTest {
         @Test
         @DisplayName("Counts blocks given and received")
         void countsBlocksGivenAndReceived() {
-            trustSafetyStorage.addBlock(userId, UUID.randomUUID()); // User blocked someone
-            trustSafetyStorage.addBlock(userId, UUID.randomUUID()); // User blocked another
-            trustSafetyStorage.addBlock(UUID.randomUUID(), userId); // Someone blocked user
+            trustSafetyStorage.save(Block.create(userId, UUID.randomUUID())); // User blocked someone
+            trustSafetyStorage.save(Block.create(userId, UUID.randomUUID())); // User blocked another
+            trustSafetyStorage.save(Block.create(UUID.randomUUID(), userId)); // Someone blocked user
 
             UserStats stats = statsService.computeAndSaveStats(userId);
 
@@ -162,9 +158,12 @@ class StatsServiceTest {
         @Test
         @DisplayName("Counts reports given and received")
         void countsReportsGivenAndReceived() {
-            trustSafetyStorage.addReport(userId, UUID.randomUUID()); // User reported someone
-            trustSafetyStorage.addReport(UUID.randomUUID(), userId); // Someone reported user
-            trustSafetyStorage.addReport(UUID.randomUUID(), userId); // Another reported user
+            trustSafetyStorage.save(
+                    Report.create(userId, UUID.randomUUID(), Report.Reason.SPAM, null)); // User reported someone
+            trustSafetyStorage.save(
+                    Report.create(UUID.randomUUID(), userId, Report.Reason.SPAM, null)); // Someone reported user
+            trustSafetyStorage.save(
+                    Report.create(UUID.randomUUID(), userId, Report.Reason.SPAM, null)); // Another reported user
 
             UserStats stats = statsService.computeAndSaveStats(userId);
 
@@ -177,7 +176,7 @@ class StatsServiceTest {
         void savesStatsToStorage() {
             statsService.computeAndSaveStats(userId);
 
-            Optional<UserStats> saved = statsStorage.getLatestUserStats(userId);
+            Optional<UserStats> saved = analyticsStorage.getLatestUserStats(userId);
             assertTrue(saved.isPresent());
             assertEquals(userId, saved.get().userId());
         }
@@ -191,11 +190,11 @@ class StatsServiceTest {
         @DisplayName("Returns cached stats if fresh")
         void returnsCachedIfFresh() {
             // First compute
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.LIKE));
             statsService.computeAndSaveStats(userId);
 
             // Add more likes but don't recompute
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.LIKE));
 
             // Should return cached (1 like, not 2)
             UserStats cached = statsService.getOrComputeStats(userId);
@@ -206,7 +205,7 @@ class StatsServiceTest {
         @Test
         @DisplayName("Computes new stats if none exist")
         void computesNewIfNoneExist() {
-            likeStorage.addLike(userId, UUID.randomUUID(), Like.Direction.LIKE);
+            interactionStorage.save(Like.create(userId, UUID.randomUUID(), Like.Direction.LIKE));
 
             UserStats stats = statsService.getOrComputeStats(userId);
 
@@ -261,20 +260,20 @@ class StatsServiceTest {
 
             // User 1: 4 likes given, 2 received
             for (int i = 0; i < 4; i++) {
-                likeStorage.addLike(user1, UUID.randomUUID(), Like.Direction.LIKE);
+                interactionStorage.save(Like.create(user1, UUID.randomUUID(), Like.Direction.LIKE));
             }
-            likeStorage.addLike(UUID.randomUUID(), user1, Like.Direction.LIKE);
-            likeStorage.addLike(UUID.randomUUID(), user1, Like.Direction.LIKE);
-            matchStorage.save(Match.create(user1, UUID.randomUUID()));
+            interactionStorage.save(Like.create(UUID.randomUUID(), user1, Like.Direction.LIKE));
+            interactionStorage.save(Like.create(UUID.randomUUID(), user1, Like.Direction.LIKE));
+            interactionStorage.save(Match.create(user1, UUID.randomUUID()));
 
             // User 2: 2 likes given, 4 received
-            likeStorage.addLike(user2, UUID.randomUUID(), Like.Direction.LIKE);
-            likeStorage.addLike(user2, UUID.randomUUID(), Like.Direction.LIKE);
+            interactionStorage.save(Like.create(user2, UUID.randomUUID(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(user2, UUID.randomUUID(), Like.Direction.LIKE));
             for (int i = 0; i < 4; i++) {
-                likeStorage.addLike(UUID.randomUUID(), user2, Like.Direction.LIKE);
+                interactionStorage.save(Like.create(UUID.randomUUID(), user2, Like.Direction.LIKE));
             }
-            matchStorage.save(Match.create(user2, UUID.randomUUID()));
-            matchStorage.save(Match.create(user2, UUID.randomUUID()));
+            interactionStorage.save(Match.create(user2, UUID.randomUUID()));
+            interactionStorage.save(Match.create(user2, UUID.randomUUID()));
 
             statsService.computeAndSaveStats(user1);
             statsService.computeAndSaveStats(user2);
@@ -293,7 +292,7 @@ class StatsServiceTest {
         void savesPlatformStatsToStorage() {
             statsService.computeAndSavePlatformStats();
 
-            Optional<PlatformStats> saved = statsStorage.getLatestPlatformStats();
+            Optional<PlatformStats> saved = analyticsStorage.getLatestPlatformStats();
             assertTrue(saved.isPresent());
         }
     }
@@ -318,382 +317,6 @@ class StatsServiceTest {
             Optional<PlatformStats> stats = statsService.getPlatformStats();
 
             assertTrue(stats.isPresent());
-        }
-    }
-
-    // ============================================================
-    // IN-MEMORY MOCK STORAGES
-    // ============================================================
-
-    private static class InMemoryLikeStorage implements LikeStorage {
-        private final List<Like> likes = new ArrayList<>();
-
-        void addLike(UUID from, UUID to, Like.Direction direction) {
-            likes.add(Like.create(from, to, direction));
-        }
-
-        @Override
-        public void save(Like like) {
-            likes.add(like);
-        }
-
-        @Override
-        public boolean exists(UUID from, UUID to) {
-            return likes.stream()
-                    .anyMatch(l -> l.whoLikes().equals(from) && l.whoGotLiked().equals(to));
-        }
-
-        @Override
-        public boolean mutualLikeExists(UUID a, UUID b) {
-            boolean aLikesB = likes.stream()
-                    .anyMatch(l -> l.whoLikes().equals(a)
-                            && l.whoGotLiked().equals(b)
-                            && l.direction() == Like.Direction.LIKE);
-            boolean bLikesA = likes.stream()
-                    .anyMatch(l -> l.whoLikes().equals(b)
-                            && l.whoGotLiked().equals(a)
-                            && l.direction() == Like.Direction.LIKE);
-            return aLikesB && bLikesA;
-        }
-
-        @Override
-        public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Like l : likes) {
-                if (l.whoLikes().equals(userId)) {
-                    result.add(l.whoGotLiked());
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public Set<UUID> getUserIdsWhoLiked(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Like l : likes) {
-                if (l.whoGotLiked().equals(userId) && l.direction() == Like.Direction.LIKE) {
-                    result.add(l.whoLikes());
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
-            List<Map.Entry<UUID, Instant>> result = new ArrayList<>();
-            for (Like l : likes) {
-                if (l.whoGotLiked().equals(userId) && l.direction() == Like.Direction.LIKE) {
-                    result.add(Map.entry(l.whoLikes(), l.createdAt()));
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public int countByDirection(UUID userId, Like.Direction direction) {
-            return (int) likes.stream()
-                    .filter(l -> l.whoLikes().equals(userId) && l.direction() == direction)
-                    .count();
-        }
-
-        @Override
-        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
-            return (int) likes.stream()
-                    .filter(l -> l.whoGotLiked().equals(userId) && l.direction() == direction)
-                    .count();
-        }
-
-        @Override
-        public int countMutualLikes(UUID userId) {
-            return (int) likes.stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.LIKE
-                            && mutualLikeExists(userId, l.whoGotLiked()))
-                    .count();
-        }
-
-        @Override
-        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-            return likes.stream()
-                    .filter(l ->
-                            l.whoLikes().equals(fromUserId) && l.whoGotLiked().equals(toUserId))
-                    .findFirst();
-        }
-
-        @Override
-        public int countLikesToday(UUID userId, Instant startOfDay) {
-            return (int) likes.stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.LIKE
-                            && l.createdAt().isAfter(startOfDay))
-                    .count();
-        }
-
-        @Override
-        public int countPassesToday(UUID userId, Instant startOfDay) {
-            return (int) likes.stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.PASS
-                            && l.createdAt().isAfter(startOfDay))
-                    .count();
-        }
-
-        @Override
-        public void delete(UUID likeId) {
-            likes.removeIf(l -> l.id().equals(likeId));
-        }
-    }
-
-    private static class InMemoryMatchStorage implements MatchStorage {
-        private final Map<String, Match> matches = new HashMap<>();
-
-        @Override
-        public void save(Match match) {
-            matches.put(match.getId(), match);
-        }
-
-        @Override
-        public void update(Match match) {
-            matches.put(match.getId(), match);
-        }
-
-        @Override
-        public Optional<Match> get(String matchId) {
-            return Optional.ofNullable(matches.get(matchId));
-        }
-
-        @Override
-        public boolean exists(String matchId) {
-            return matches.containsKey(matchId);
-        }
-
-        @Override
-        public List<Match> getActiveMatchesFor(UUID userId) {
-            return matches.values().stream()
-                    .filter(m -> m.involves(userId) && m.isActive())
-                    .toList();
-        }
-
-        @Override
-        public List<Match> getAllMatchesFor(UUID userId) {
-            return matches.values().stream().filter(m -> m.involves(userId)).toList();
-        }
-
-        @Override
-        public void delete(String matchId) {
-            matches.remove(matchId);
-        }
-    }
-
-    private static class InMemoryTrustSafetyStorage implements TrustSafetyStorage {
-        private final List<Block> blocks = new ArrayList<>();
-        private final List<Report> reports = new ArrayList<>();
-
-        @Override
-        public void save(Block block) {
-            blocks.add(block);
-        }
-
-        @Override
-        public boolean isBlocked(UUID userA, UUID userB) {
-            return blocks.stream()
-                    .anyMatch(b -> (b.blockerId().equals(userA) && b.blockedId().equals(userB))
-                            || (b.blockerId().equals(userB) && b.blockedId().equals(userA)));
-        }
-
-        @Override
-        public Set<UUID> getBlockedUserIds(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Block block : blocks) {
-                if (block.blockerId().equals(userId)) result.add(block.blockedId());
-                if (block.blockedId().equals(userId)) result.add(block.blockerId());
-            }
-            return result;
-        }
-
-        @Override
-        public List<Block> findByBlocker(UUID blockerId) {
-            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
-        }
-
-        @Override
-        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
-            return blocks.removeIf(
-                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
-        }
-
-        @Override
-        public int countBlocksGiven(UUID userId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockerId().equals(userId)).count();
-        }
-
-        @Override
-        public int countBlocksReceived(UUID userId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
-        }
-
-        @Override
-        public void save(Report report) {
-            reports.add(report);
-        }
-
-        @Override
-        public int countReportsAgainst(UUID userId) {
-            return (int) reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .count();
-        }
-
-        @Override
-        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
-            return reports.stream()
-                    .anyMatch(r -> r.reporterId().equals(reporterId)
-                            && r.reportedUserId().equals(reportedUserId));
-        }
-
-        @Override
-        public List<Report> getReportsAgainst(UUID userId) {
-            return reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .toList();
-        }
-
-        @Override
-        public int countReportsBy(UUID userId) {
-            return (int)
-                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
-        }
-
-        // Test helpers
-        void addBlock(UUID blockerId, UUID blockedId) {
-            blocks.add(Block.create(blockerId, blockedId));
-        }
-
-        void addReport(UUID reporterId, UUID reportedUserId) {
-            reports.add(Report.create(reporterId, reportedUserId, Report.Reason.SPAM, null));
-        }
-    }
-
-    private static class InMemoryStatsStorage implements StatsStorage {
-        private final Map<UUID, UserStats> userStats = new HashMap<>();
-        private final Map<UUID, List<Achievement.UserAchievement>> achievements = new ConcurrentHashMap<>();
-        private final Map<String, Integer> profileViews = new ConcurrentHashMap<>();
-        private PlatformStats latestPlatformStats;
-
-        @Override
-        public void saveUserStats(UserStats stats) {
-            userStats.put(stats.userId(), stats);
-        }
-
-        @Override
-        public Optional<UserStats> getLatestUserStats(UUID userId) {
-            return Optional.ofNullable(userStats.get(userId));
-        }
-
-        @Override
-        public List<UserStats> getUserStatsHistory(UUID userId, int limit) {
-            UserStats s = userStats.get(userId);
-            return s == null ? List.of() : List.of(s);
-        }
-
-        @Override
-        public List<UserStats> getAllLatestUserStats() {
-            return new ArrayList<>(userStats.values());
-        }
-
-        @Override
-        public int deleteUserStatsOlderThan(Instant cutoff) {
-            // No-op for tests - all stats are fresh
-            return 0;
-        }
-
-        @Override
-        public void savePlatformStats(PlatformStats stats) {
-            this.latestPlatformStats = stats;
-        }
-
-        @Override
-        public Optional<PlatformStats> getLatestPlatformStats() {
-            return Optional.ofNullable(latestPlatformStats);
-        }
-
-        @Override
-        public List<PlatformStats> getPlatformStatsHistory(int limit) {
-            return latestPlatformStats == null ? List.of() : List.of(latestPlatformStats);
-        }
-
-        @Override
-        public void recordProfileView(UUID viewerId, UUID viewedId) {
-            if (!viewerId.equals(viewedId)) {
-                profileViews.merge(viewerId + "_" + viewedId, 1, Integer::sum);
-            }
-        }
-
-        @Override
-        public int getProfileViewCount(UUID userId) {
-            return (int) profileViews.keySet().stream()
-                    .filter(key -> key.endsWith("_" + userId))
-                    .count();
-        }
-
-        @Override
-        public int getUniqueViewerCount(UUID userId) {
-            return getProfileViewCount(userId); // Same for in-memory test
-        }
-
-        @Override
-        public List<UUID> getRecentViewers(UUID userId, int limit) {
-            return Collections.emptyList(); // Not needed for stats tests
-        }
-
-        @Override
-        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
-            return profileViews.containsKey(viewerId + "_" + viewedId);
-        }
-
-        @Override
-        public void saveUserAchievement(Achievement.UserAchievement achievement) {
-            achievements
-                    .computeIfAbsent(achievement.userId(), k -> new ArrayList<>())
-                    .add(achievement);
-        }
-
-        @Override
-        public List<Achievement.UserAchievement> getUnlockedAchievements(UUID userId) {
-            return achievements.getOrDefault(userId, Collections.emptyList());
-        }
-
-        @Override
-        public boolean hasAchievement(UUID userId, Achievement achievement) {
-            return achievements.getOrDefault(userId, Collections.emptyList()).stream()
-                    .anyMatch(ua -> ua.achievement() == achievement);
-        }
-
-        @Override
-        public int countUnlockedAchievements(UUID userId) {
-            return achievements.getOrDefault(userId, Collections.emptyList()).size();
-        }
-
-        @Override
-        public int deleteExpiredDailyPickViews(Instant cutoff) {
-            return 0; // Not needed for stats tests
-        }
-
-        @Override
-        public void markDailyPickAsViewed(UUID userId, java.time.LocalDate date) {
-            // Not needed for stats tests
-        }
-
-        @Override
-        public boolean isDailyPickViewed(UUID userId, java.time.LocalDate date) {
-            return false; // Not needed for stats tests
-        }
-
-        @Override
-        public int deleteDailyPickViewsOlderThan(java.time.LocalDate before) {
-            return 0; // Not needed for stats tests
         }
     }
 }

@@ -1,7 +1,6 @@
 package datingapp.storage.jdbi;
 
 import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.storage.LikeStorage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -23,21 +22,19 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  * Uses declarative SQL methods instead of manual JDBC.
  */
 @RegisterRowMapper(JdbiLikeStorage.Mapper.class)
-public interface JdbiLikeStorage extends LikeStorage {
+public interface JdbiLikeStorage {
 
     @SqlQuery("""
       SELECT id, who_likes, who_got_liked, direction, created_at
       FROM likes
       WHERE who_likes = :fromUserId AND who_got_liked = :toUserId
       """)
-    @Override
     Optional<Like> getLike(@Bind("fromUserId") UUID fromUserId, @Bind("toUserId") UUID toUserId);
 
     @SqlUpdate("""
       INSERT INTO likes (id, who_likes, who_got_liked, direction, created_at)
       VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt)
       """)
-    @Override
     void save(@BindBean Like like);
 
     @SqlQuery("""
@@ -46,7 +43,6 @@ public interface JdbiLikeStorage extends LikeStorage {
           WHERE who_likes = :from AND who_got_liked = :to
       )
       """)
-    @Override
     boolean exists(@Bind("from") UUID from, @Bind("to") UUID to);
 
     @SqlQuery("""
@@ -58,23 +54,20 @@ public interface JdbiLikeStorage extends LikeStorage {
             AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
       )
       """)
-    @Override
     boolean mutualLikeExists(@Bind("a") UUID a, @Bind("b") UUID b);
 
     @SqlQuery("SELECT who_got_liked FROM likes WHERE who_likes = :userId")
-    @Override
     Set<UUID> getLikedOrPassedUserIds(@Bind("userId") UUID userId);
 
     @SqlQuery("""
       SELECT who_likes FROM likes
       WHERE who_got_liked = :userId AND direction = 'LIKE'
       """)
-    @Override
     Set<UUID> getUserIdsWhoLiked(@Bind("userId") UUID userId);
 
     /**
      * Internal query that returns like times as DTOs.
-     * Not exposed in LikeStorage interface - used by default methods.
+     * Not exposed in InteractionStorage interface - used by default methods.
      */
     @SqlQuery("""
       SELECT who_likes, created_at FROM likes
@@ -83,7 +76,6 @@ public interface JdbiLikeStorage extends LikeStorage {
     @RegisterRowMapper(LikeTimeEntryMapper.class)
     List<LikeTimeEntry> getLikeTimesInternal(@Bind("userId") UUID userId);
 
-    @Override
     default List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
         return getLikeTimesInternal(userId).stream()
                 .map(e -> Map.entry(e.userId(), e.likedAt()))
@@ -107,14 +99,12 @@ public interface JdbiLikeStorage extends LikeStorage {
       SELECT COUNT(*) FROM likes
       WHERE who_likes = :userId AND direction = :direction
       """)
-    @Override
     int countByDirection(@Bind("userId") UUID userId, @Bind("direction") Like.Direction direction);
 
     @SqlQuery("""
       SELECT COUNT(*) FROM likes
       WHERE who_got_liked = :userId AND direction = :direction
       """)
-    @Override
     int countReceivedByDirection(@Bind("userId") UUID userId, @Bind("direction") Like.Direction direction);
 
     @SqlQuery("""
@@ -124,7 +114,6 @@ public interface JdbiLikeStorage extends LikeStorage {
       WHERE l1.who_likes = :userId
         AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
       """)
-    @Override
     int countMutualLikes(@Bind("userId") UUID userId);
 
     @SqlQuery("""
@@ -133,7 +122,6 @@ public interface JdbiLikeStorage extends LikeStorage {
         AND direction = 'LIKE'
         AND created_at >= :startOfDay
       """)
-    @Override
     int countLikesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
     @SqlQuery("""
@@ -142,11 +130,9 @@ public interface JdbiLikeStorage extends LikeStorage {
         AND direction = 'PASS'
         AND created_at >= :startOfDay
       """)
-    @Override
     int countPassesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
     @SqlUpdate("DELETE FROM likes WHERE id = :likeId")
-    @Override
     void delete(@Bind("likeId") UUID likeId);
 
     /** Row mapper for Like records - inlined from former LikeMapper class. */

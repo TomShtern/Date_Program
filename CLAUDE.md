@@ -120,7 +120,7 @@ This applies to **any** long-running command (`mvn`, `docker build`, `npm run bu
 
 **Phase 2.1** console dating app: **Java 25** + Maven + H2 + JDBI. Features: matching, messaging, relationship transitions, pace compatibility, achievements.
 
-**Stats (2026-02-11):** 160 Java files (102 main + 58 test), ~47K lines (~35K code), 813 tests, 60% coverage min.
+**Stats (2026-02-11):** 160 Java files (102 main + 58 test), ~47K lines (~35K code), 802 tests, 60% coverage min.
 
 ### Package Structure
 
@@ -129,7 +129,7 @@ This applies to **any** long-running command (`mvn`, `docker build`, `npm run bu
 | `core/`              | Utilities + config + bootstrap                                       | **ZERO** framework/DB imports          |
 | `core/model/`        | 11 domain models                                                     | Pure data + state machines             |
 | `core/service/`      | 14 services                                                          | Business logic, returns Result records |
-| `core/storage/`      | 9 storage interfaces                                                 | Contracts only, no implementations     |
+| `core/storage/`      | 5 storage interfaces                                                 | Contracts only, no implementations     |
 | `app/`               | `AppBootstrap`, `ConfigLoader`                                       | Initialization + infrastructure        |
 | `app/cli/`           | 5 CLI handlers + `HandlerFactory`                                    | Thin layer over services               |
 | `app/api/`           | `RestApiServer` (routes inlined)                                     | Javalin-based HTTP endpoints           |
@@ -182,7 +182,7 @@ nav.setViewModelFactory(vmFactory);
 
 ### Storage Interfaces (`core/storage/`)
 
-9 interfaces: `UserStorage`, `MatchStorage`, `LikeStorage`, `MessagingStorage`, `StatsStorage`, `SocialStorage`, `SwipeSessionStorage`, `TrustSafetyStorage`, `TransactionExecutor`
+5 interfaces: `UserStorage`, `InteractionStorage`, `CommunicationStorage`, `AnalyticsStorage`, `TrustSafetyStorage`
 
 Implementations in `storage/jdbi/` (15 files) use `@SqlQuery`/`@SqlUpdate` annotations. Includes `MapperHelper`, `UserBindingHelper`, `EnumSetJdbiSupport`.
 
@@ -459,7 +459,8 @@ public interface JdbiUserStorage extends UserStorage {
 
 ## Recent Updates (2026-02)
 
-- **02-11**: Codebase consolidation complete: 189→160 files (-29), models→`core/model/`, services→`core/service/`, Block/Report/DailyPickView storages merged into TrustSafetyStorage (11→9 interfaces), CleanupService→SessionService, UiDataAdapters consolidated, UiConstants consolidated, EnumSetJdbiSupport consolidated, MapperHelper→`storage/jdbi/`, ScoringConstants→`core/`, UiComponents→`ui/`, StorageException deleted
+- **02-11**: Codebase consolidation complete: 189→160 files (-29), models→`core/model/`, services→`core/service/`, storage interfaces consolidated to domain boundaries (11→9→5 via `InteractionStorage`, `CommunicationStorage`, `AnalyticsStorage`), CleanupService→SessionService, UiDataAdapters consolidated, UiConstants consolidated, EnumSetJdbiSupport consolidated, MapperHelper→`storage/jdbi/`, ScoringConstants→`core/`, UiComponents→`ui/`, StorageException deleted
+- **02-11**: Documentation sync pass: refreshed tested baseline to 802 passing tests and aligned instruction docs with current consolidated storage architecture
 - **02-10**: Nested enums in User (Gender/UserState/VerificationMethod), UI data access adapters, StorageFactory, soft-delete as direct fields, moved AppBootstrap/ConfigLoader to app/, LoggingSupport
 - **02-08**: Project config audit: enforced Checkstyle+PMD (custom pmd-rules.xml), cleaned .gitignore, fixed stale build commands across all docs
 - **02-05**: Enhanced UI/UX: ErrorHandler pattern in ViewModels, navigation context, loading overlays
@@ -479,4 +480,5 @@ public interface JdbiUserStorage extends UserStorage {
 15|2026-02-08 18:00:00|agent:claude_code|build-discipline|Added Build Command Discipline rule: capture expensive commands once, query N times|CLAUDE.md;AGENTS.md
 16|2026-02-10 00:00:00|agent:claude_code|docs-major-refactor|Updated stats 189/48K, added nested enums/UI adapters/StorageFactory/constants/soft-delete/schema patterns; updated package structure table (13 packages); added 3 new gotchas; 3 new NEVER rules|CLAUDE.md
 17|2026-02-11 12:00:00|agent:github_copilot|scope:codebase-consolidation|Consolidated 189→160 files: models→core/model, services→core/service, merged 3 storage interfaces into TrustSafetyStorage, merged CleanupService→SessionService, consolidated UiDataAdapters/UiConstants/EnumSetJdbiSupport, updated all 3 doc files|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
+18|2026-02-11 22:52:00|agent:codex|scope:docs-stats-sync|Synced docs to latest verified baseline (802 tests) and refreshed storage-consolidation documentation consistency|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
 ---AGENT-LOG-END---

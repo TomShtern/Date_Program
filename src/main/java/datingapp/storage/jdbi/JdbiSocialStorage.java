@@ -7,7 +7,6 @@ import datingapp.core.model.UserInteractions.FriendRequest;
 import datingapp.core.model.UserInteractions.FriendRequest.Status;
 import datingapp.core.model.UserInteractions.Notification;
 import datingapp.core.model.UserInteractions.Notification.Type;
-import datingapp.core.storage.SocialStorage;
 import datingapp.storage.DatabaseManager.StorageException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -31,7 +30,7 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  */
 @RegisterRowMapper(JdbiSocialStorage.FriendRequestMapper.class)
 @RegisterRowMapper(JdbiSocialStorage.NotificationMapper.class)
-public interface JdbiSocialStorage extends SocialStorage {
+public interface JdbiSocialStorage {
 
     ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -43,21 +42,18 @@ public interface JdbiSocialStorage extends SocialStorage {
             INSERT INTO friend_requests (id, from_user_id, to_user_id, created_at, status, responded_at)
             VALUES (:id, :fromUserId, :toUserId, :createdAt, :status, :respondedAt)
             """)
-    @Override
     void saveFriendRequest(@BindBean FriendRequest request);
 
     @SqlUpdate("""
             UPDATE friend_requests SET status = :status, responded_at = :respondedAt
             WHERE id = :id
             """)
-    @Override
     void updateFriendRequest(@BindBean FriendRequest request);
 
     @SqlQuery("""
             SELECT id, from_user_id, to_user_id, created_at, status, responded_at
             FROM friend_requests WHERE id = :id
             """)
-    @Override
     Optional<FriendRequest> getFriendRequest(@Bind("id") UUID id);
 
     @SqlQuery("""
@@ -66,7 +62,6 @@ public interface JdbiSocialStorage extends SocialStorage {
             WHERE ((from_user_id = :user1 AND to_user_id = :user2) OR (from_user_id = :user2 AND to_user_id = :user1))
             AND status = 'PENDING'
             """)
-    @Override
     Optional<FriendRequest> getPendingFriendRequestBetween(@Bind("user1") UUID user1, @Bind("user2") UUID user2);
 
     @SqlQuery("""
@@ -74,11 +69,9 @@ public interface JdbiSocialStorage extends SocialStorage {
             FROM friend_requests
             WHERE to_user_id = :userId AND status = 'PENDING'
             """)
-    @Override
     List<FriendRequest> getPendingFriendRequestsForUser(@Bind("userId") UUID userId);
 
     @SqlUpdate("DELETE FROM friend_requests WHERE id = :id")
-    @Override
     void deleteFriendRequest(@Bind("id") UUID id);
 
     // ═══════════════════════════════════════════════════════════════
@@ -89,32 +82,14 @@ public interface JdbiSocialStorage extends SocialStorage {
             INSERT INTO notifications (id, user_id, type, title, message, created_at, is_read, data_json)
             VALUES (:id, :userId, :type, :title, :message, :createdAt, :isRead, :dataJson)
             """)
-    void saveNotificationInternal(
-            @Bind("id") UUID id,
-            @Bind("userId") UUID userId,
-            @Bind("type") String type,
-            @Bind("title") String title,
-            @Bind("message") String message,
-            @Bind("createdAt") Instant createdAt,
-            @Bind("isRead") boolean isRead,
-            @Bind("dataJson") String dataJson);
+    void saveNotificationInternal(@BindBean Notification notification, @Bind("dataJson") String dataJson);
 
-    @Override
     default void saveNotification(Notification notification) {
         String dataJson = toJson(notification.data());
-        saveNotificationInternal(
-                notification.id(),
-                notification.userId(),
-                notification.type().name(),
-                notification.title(),
-                notification.message(),
-                notification.createdAt(),
-                notification.isRead(),
-                dataJson);
+        saveNotificationInternal(notification, dataJson);
     }
 
     @SqlUpdate("UPDATE notifications SET is_read = TRUE WHERE id = :id")
-    @Override
     void markNotificationAsRead(@Bind("id") UUID id);
 
     @SqlQuery("""
@@ -131,7 +106,6 @@ public interface JdbiSocialStorage extends SocialStorage {
             """)
     List<Notification> getUnreadNotificationsForUser(@Bind("userId") UUID userId);
 
-    @Override
     default List<Notification> getNotificationsForUser(UUID userId, boolean unreadOnly) {
         return unreadOnly ? getUnreadNotificationsForUser(userId) : getAllNotificationsForUser(userId);
     }
@@ -140,15 +114,12 @@ public interface JdbiSocialStorage extends SocialStorage {
             SELECT id, user_id, type, title, message, created_at, is_read, data_json
             FROM notifications WHERE id = :id
             """)
-    @Override
     Optional<Notification> getNotification(@Bind("id") UUID id);
 
     @SqlUpdate("DELETE FROM notifications WHERE id = :id")
-    @Override
     void deleteNotification(@Bind("id") UUID id);
 
     @SqlUpdate("DELETE FROM notifications WHERE created_at < :before")
-    @Override
     void deleteOldNotifications(@Bind("before") Instant before);
 
     // ═══════════════════════════════════════════════════════════════

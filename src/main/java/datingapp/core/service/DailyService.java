@@ -4,8 +4,8 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.model.User;
 import datingapp.core.service.CandidateFinder.GeoUtils;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.StatsStorage;
+import datingapp.core.storage.AnalyticsStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Clock;
@@ -27,41 +27,40 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DailyService {
 
     private final UserStorage userStorage;
-    private final LikeStorage likeStorage;
+    private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
-    private final StatsStorage statsStorage;
+    private final AnalyticsStorage analyticsStorage;
     private final CandidateFinder candidateFinder;
     private final AppConfig config;
     private final Clock clock;
 
     private final Map<String, UUID> cachedDailyPicks = new ConcurrentHashMap<>();
 
-    public DailyService(LikeStorage likeStorage, AppConfig config) {
-        this(null, likeStorage, null, null, null, config, null);
+    public DailyService(InteractionStorage interactionStorage, AppConfig config) {
+        this(null, interactionStorage, null, null, null, config, null);
     }
 
     public DailyService(
             UserStorage userStorage,
-            LikeStorage likeStorage,
-            TrustSafetyStorage trustSafetyStorage,
-            StatsStorage statsStorage,
+            InteractionStorage interactionStorage,
+            AnalyticsStorage analyticsStorage,
             CandidateFinder candidateFinder,
             AppConfig config) {
-        this(userStorage, likeStorage, trustSafetyStorage, statsStorage, candidateFinder, config, null);
+        this(userStorage, interactionStorage, null, analyticsStorage, candidateFinder, config, null);
     }
 
     public DailyService(
             UserStorage userStorage,
-            LikeStorage likeStorage,
+            InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
-            StatsStorage statsStorage,
+            AnalyticsStorage analyticsStorage,
             CandidateFinder candidateFinder,
             AppConfig config,
             Clock clock) {
         this.userStorage = userStorage;
-        this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = trustSafetyStorage;
-        this.statsStorage = statsStorage;
+        this.analyticsStorage = analyticsStorage;
         this.candidateFinder = candidateFinder;
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.clock = clock != null ? clock : AppClock.clock();
@@ -70,14 +69,14 @@ public class DailyService {
     /** Whether the user can perform a like action today. */
     public boolean canLike(UUID userId) {
         Instant startOfDay = getStartOfToday();
-        int likesUsed = likeStorage.countLikesToday(userId, startOfDay);
+        int likesUsed = interactionStorage.countLikesToday(userId, startOfDay);
         return canPerform(config.hasUnlimitedLikes(), config.dailyLikeLimit(), likesUsed);
     }
 
     /** Whether the user can perform a pass action today. */
     public boolean canPass(UUID userId) {
         Instant startOfDay = getStartOfToday();
-        int passesUsed = likeStorage.countPassesToday(userId, startOfDay);
+        int passesUsed = interactionStorage.countPassesToday(userId, startOfDay);
         return canPerform(config.hasUnlimitedPasses(), config.dailyPassLimit(), passesUsed);
     }
 
@@ -87,8 +86,8 @@ public class DailyService {
         Instant resetTime = getResetTime();
         LocalDate today = getToday();
 
-        int likesUsed = likeStorage.countLikesToday(userId, startOfDay);
-        int passesUsed = likeStorage.countPassesToday(userId, startOfDay);
+        int likesUsed = interactionStorage.countLikesToday(userId, startOfDay);
+        int passesUsed = interactionStorage.countPassesToday(userId, startOfDay);
 
         int likesRemaining = remainingFor(config.hasUnlimitedLikes(), config.dailyLikeLimit(), likesUsed);
         int passesRemaining = remainingFor(config.hasUnlimitedPasses(), config.dailyPassLimit(), passesUsed);
@@ -129,10 +128,10 @@ public class DailyService {
         } else {
             // Fallback for tests/configurations without CandidateFinder
             List<User> allActive = userStorage.findActive();
-            Set<UUID> alreadyInteracted = new HashSet<>(likeStorage.getLikedOrPassedUserIds(seeker.getId()));
+            Set<UUID> alreadyInteracted = new HashSet<>(interactionStorage.getLikedOrPassedUserIds(seeker.getId()));
             candidates = allActive.stream()
                     .filter(u -> !u.getId().equals(seeker.getId()))
-                    .filter(u -> !trustSafetyStorage.isBlocked(seeker.getId(), u.getId()))
+                    .filter(u -> !isBlockedFallback(seeker.getId(), u.getId()))
                     .filter(u -> !alreadyInteracted.contains(u.getId()))
                     .toList();
         }
@@ -191,21 +190,21 @@ public class DailyService {
 
     /** Internal: Check if user has viewed daily pick for a specific date. */
     private boolean hasViewedDailyPick(UUID userId, LocalDate date) {
-        return statsStorage != null && statsStorage.isDailyPickViewed(userId, date);
+        return analyticsStorage != null && analyticsStorage.isDailyPickViewed(userId, date);
     }
 
     /** Internal: Mark daily pick as viewed for a specific date. */
     private void markDailyPickViewed(UUID userId, LocalDate date) {
-        if (statsStorage != null) {
-            statsStorage.markDailyPickAsViewed(userId, date);
+        if (analyticsStorage != null) {
+            analyticsStorage.markDailyPickAsViewed(userId, date);
         }
     }
 
     /** Cleanup old daily pick view records (for maintenance). */
     public int cleanupOldDailyPickViews(LocalDate before) {
         int removed = 0;
-        if (statsStorage != null) {
-            removed = statsStorage.deleteDailyPickViewsOlderThan(before);
+        if (analyticsStorage != null) {
+            removed = analyticsStorage.deleteDailyPickViewsOlderThan(before);
         }
         String todaySuffix = "_" + LocalDate.now(clock);
         cachedDailyPicks.entrySet().removeIf(entry -> !entry.getKey().endsWith(todaySuffix));
@@ -213,7 +212,7 @@ public class DailyService {
     }
 
     private void ensureDailyPickDependencies() {
-        if (userStorage == null || trustSafetyStorage == null || statsStorage == null) {
+        if (userStorage == null || analyticsStorage == null) {
             throw new IllegalStateException("Daily pick dependencies are not configured");
         }
     }
@@ -297,6 +296,10 @@ public class DailyService {
 
     private static <T> boolean sameNonNull(T left, T right) {
         return left != null && left.equals(right);
+    }
+
+    private boolean isBlockedFallback(UUID seekerId, UUID candidateId) {
+        return trustSafetyStorage != null && trustSafetyStorage.isBlocked(seekerId, candidateId);
     }
 
     /** Daily pick payload. */

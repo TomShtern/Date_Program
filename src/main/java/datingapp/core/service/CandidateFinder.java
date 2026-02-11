@@ -5,7 +5,7 @@ import datingapp.core.LoggingSupport;
 import datingapp.core.PerformanceMonitor;
 import datingapp.core.model.Dealbreakers;
 import datingapp.core.model.User;
-import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.Comparator;
@@ -22,7 +22,7 @@ public class CandidateFinder implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(CandidateFinder.class);
 
     private final UserStorage userStorage;
-    private final LikeStorage likeStorage;
+    private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
     private final AppConfig config;
 
@@ -30,14 +30,17 @@ public class CandidateFinder implements LoggingSupport {
      * Constructs a CandidateFinder with the required storage dependencies.
      *
      * @param userStorage the user storage implementation
-     * @param likeStorage the like storage implementation
-     * @param trustSafetyStorage the trust and safety storage implementation
+     * @param interactionStorage the interaction storage implementation
+     * @param trustSafetyStorage the trust safety storage implementation
      * @throws NullPointerException if any parameter is null
      */
     public CandidateFinder(
-            UserStorage userStorage, LikeStorage likeStorage, TrustSafetyStorage trustSafetyStorage, AppConfig config) {
+            UserStorage userStorage,
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            AppConfig config) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
-        this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
     }
@@ -143,7 +146,7 @@ public class CandidateFinder implements LoggingSupport {
     public List<User> findCandidatesForUser(User currentUser) {
         try (PerformanceMonitor.Timer timer = PerformanceMonitor.startTimer("CandidateFinder.findCandidatesForUser")) {
             List<User> activeUsers = userStorage.findActive();
-            Set<UUID> excluded = new HashSet<>(likeStorage.getLikedOrPassedUserIds(currentUser.getId()));
+            Set<UUID> excluded = new HashSet<>(interactionStorage.getLikedOrPassedUserIds(currentUser.getId()));
             excluded.addAll(trustSafetyStorage.getBlockedUserIds(currentUser.getId()));
             List<User> candidates = findCandidates(currentUser, activeUsers, excluded);
             if (logger.isTraceEnabled()) {

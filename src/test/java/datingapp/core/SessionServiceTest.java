@@ -10,8 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.model.*;
 import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.*;
-import datingapp.core.storage.StatsStorage;
-import datingapp.core.storage.SwipeSessionStorage;
+import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Duration;
@@ -31,8 +30,7 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class SessionServiceTest {
 
-    private InMemorySwipeSessionStorage storage;
-    private StatsStorage statsStorage;
+    private AnalyticsStorage analyticsStorage;
     private AppConfig config;
     private SessionService service;
     private UUID userId;
@@ -41,14 +39,13 @@ class SessionServiceTest {
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
-        storage = new InMemorySwipeSessionStorage();
-        statsStorage = new TestStorages.Stats();
+        analyticsStorage = new TestStorages.Analytics();
         config = AppConfig.builder()
                 .sessionTimeoutMinutes(5)
                 .maxSwipesPerSession(100)
                 .suspiciousSwipeVelocity(30.0)
                 .build();
-        service = new SessionService(storage, statsStorage, config);
+        service = new SessionService(analyticsStorage, config);
         userId = UUID.randomUUID();
     }
 
@@ -98,7 +95,7 @@ class SessionServiceTest {
                     3,
                     2,
                     1);
-            storage.save(oldSession);
+            analyticsStorage.saveSession(oldSession);
 
             // Now get session again - should create new one
             SwipeSession newSession = service.getOrCreateSession(userId);
@@ -130,7 +127,7 @@ class SessionServiceTest {
             for (int i = 0; i < 100; i++) {
                 session.recordSwipe(Like.Direction.LIKE, false);
             }
-            storage.save(session);
+            analyticsStorage.saveSession(session);
 
             // Try one more
             SessionService.SwipeResult result = service.recordSwipe(userId, Like.Direction.LIKE, false);
@@ -189,94 +186,14 @@ class SessionServiceTest {
             SwipeSession session = service.getOrCreateSession(userId);
             session.recordSwipe(Like.Direction.LIKE, true);
             session.recordSwipe(Like.Direction.PASS, false);
-            storage.save(session);
+            analyticsStorage.saveSession(session);
 
-            SwipeSessionStorage.SessionAggregates agg = service.getAggregates(userId);
+            AnalyticsStorage.SessionAggregates agg = service.getAggregates(userId);
 
             assertEquals(1, agg.totalSessions());
             assertEquals(2, agg.totalSwipes());
             assertEquals(1, agg.totalLikes());
             assertEquals(1, agg.totalPasses());
-        }
-    }
-
-    /** Simple in-memory implementation for testing. */
-    private static class InMemorySwipeSessionStorage implements SwipeSessionStorage {
-        private final java.util.Map<UUID, SwipeSession> sessions = new java.util.concurrent.ConcurrentHashMap<>();
-
-        @Override
-        public void save(SwipeSession session) {
-            sessions.put(session.getId(), session);
-        }
-
-        @Override
-        public Optional<SwipeSession> get(UUID sessionId) {
-            return Optional.ofNullable(sessions.get(sessionId));
-        }
-
-        @Override
-        public Optional<SwipeSession> getActiveSession(UUID userId) {
-            return sessions.values().stream()
-                    .filter(s -> s.getUserId().equals(userId) && s.isActive())
-                    .findFirst();
-        }
-
-        @Override
-        public List<SwipeSession> getSessionsFor(UUID userId, int limit) {
-            return sessions.values().stream()
-                    .filter(s -> s.getUserId().equals(userId))
-                    .sorted((a, b) -> b.getStartedAt().compareTo(a.getStartedAt()))
-                    .limit(limit)
-                    .toList();
-        }
-
-        @Override
-        public List<SwipeSession> getSessionsInRange(UUID userId, Instant start, Instant end) {
-            return sessions.values().stream()
-                    .filter(s -> s.getUserId().equals(userId))
-                    .filter(s -> !s.getStartedAt().isBefore(start)
-                            && !s.getStartedAt().isAfter(end))
-                    .toList();
-        }
-
-        @Override
-        public SessionAggregates getAggregates(UUID userId) {
-            List<SwipeSession> userSessions = sessions.values().stream()
-                    .filter(s -> s.getUserId().equals(userId))
-                    .toList();
-
-            if (userSessions.isEmpty()) {
-                return SessionAggregates.empty();
-            }
-
-            int totalSwipes =
-                    userSessions.stream().mapToInt(SwipeSession::getSwipeCount).sum();
-            int totalLikes =
-                    userSessions.stream().mapToInt(SwipeSession::getLikeCount).sum();
-            int totalPasses =
-                    userSessions.stream().mapToInt(SwipeSession::getPassCount).sum();
-            int totalMatches =
-                    userSessions.stream().mapToInt(SwipeSession::getMatchCount).sum();
-
-            return new SessionAggregates(
-                    userSessions.size(), totalSwipes, totalLikes, totalPasses, totalMatches, 0.0, 0.0, 0.0);
-        }
-
-        @Override
-        public int endStaleSessions(Duration timeout) {
-            int count = 0;
-            for (SwipeSession session : sessions.values()) {
-                if (session.isActive() && session.isTimedOut(timeout)) {
-                    session.end();
-                    count++;
-                }
-            }
-            return count;
-        }
-
-        @Override
-        public int deleteExpiredSessions(Instant cutoff) {
-            return 0; // Not needed for session tests
         }
     }
 }

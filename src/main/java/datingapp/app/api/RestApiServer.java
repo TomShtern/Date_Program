@@ -13,8 +13,8 @@ import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.CandidateFinder;
 import datingapp.core.service.MatchingService;
 import datingapp.core.service.MessagingService;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.MessagingStorage;
+import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
@@ -55,10 +55,10 @@ public class RestApiServer {
     private static final String UNKNOWN_USER = "Unknown";
 
     private final UserStorage userStorage;
-    private final MatchStorage matchStorage;
+    private final InteractionStorage interactionStorage;
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
-    private final MessagingStorage messagingStorage;
+    private final CommunicationStorage communicationStorage;
     private final MessagingService messagingService;
     private final int port;
     private Javalin app;
@@ -71,10 +71,10 @@ public class RestApiServer {
     /** Creates a server with the given services and port. */
     public RestApiServer(ServiceRegistry services, int port) {
         this.userStorage = services.getUserStorage();
-        this.matchStorage = services.getMatchStorage();
+        this.interactionStorage = services.getInteractionStorage();
         this.candidateFinder = services.getCandidateFinder();
         this.matchingService = services.getMatchingService();
-        this.messagingStorage = services.getMessagingStorage();
+        this.communicationStorage = services.getCommunicationStorage();
         this.messagingService = services.getMessagingService();
         this.port = port;
     }
@@ -166,7 +166,7 @@ public class RestApiServer {
     private void getMatches(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         validateUserExists(userId);
-        List<MatchSummary> matches = matchStorage.getAllMatchesFor(userId).stream()
+        List<MatchSummary> matches = interactionStorage.getAllMatchesFor(userId).stream()
                 .map(m -> toMatchSummary(m, userId))
                 .toList();
         ctx.json(matches);
@@ -207,7 +207,7 @@ public class RestApiServer {
     private void getConversations(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         validateUserExists(userId);
-        List<ConversationSummary> conversations = messagingStorage.getConversationsFor(userId).stream()
+        List<ConversationSummary> conversations = communicationStorage.getConversationsFor(userId).stream()
                 .map(c -> toConversationSummary(c, userId))
                 .toList();
         ctx.json(conversations);
@@ -218,7 +218,7 @@ public class RestApiServer {
         int limit = ctx.queryParamAsClass("limit", Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
         int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
 
-        List<MessageDto> messages = messagingStorage.getMessages(conversationId, limit, offset).stream()
+        List<MessageDto> messages = communicationStorage.getMessages(conversationId, limit, offset).stream()
                 .map(MessageDto::from)
                 .toList();
         ctx.json(messages);
@@ -272,7 +272,7 @@ public class RestApiServer {
         UUID otherUserId = extractRecipientFromConversation(conversation.getId(), currentUserId);
         User otherUser = userStorage.get(otherUserId);
         String otherUserName = otherUser != null ? otherUser.getName() : UNKNOWN_USER;
-        int messageCount = messagingStorage.countMessages(conversation.getId());
+        int messageCount = communicationStorage.countMessages(conversation.getId());
         return new ConversationSummary(
                 conversation.getId(), otherUserId, otherUserName, messageCount, conversation.getLastMessageAt());
     }

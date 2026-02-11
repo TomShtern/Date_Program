@@ -3,8 +3,7 @@ package datingapp.core.service;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
@@ -26,27 +25,24 @@ public class MatchingService {
 
     private static final String LIKE_REQUIRED = "like cannot be null";
 
-    private final LikeStorage likeStorage;
-    private final MatchStorage matchStorage;
-    private final UserStorage userStorage;
+    private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
+    private final UserStorage userStorage;
     private SessionService sessionService; // Optional (Phase 0.5b)
     private UndoService undoService; // Optional
     private DailyService dailyService; // Optional
 
     /** Constructor with all dependencies (optional dependencies may be null). */
     public MatchingService(
-            LikeStorage likeStorage,
-            MatchStorage matchStorage,
-            UserStorage userStorage,
+            InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
+            UserStorage userStorage,
             SessionService sessionService,
             UndoService undoService,
             DailyService dailyService) {
-        this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
-        this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+        this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.userStorage = userStorage;
-        this.trustSafetyStorage = trustSafetyStorage;
         this.sessionService = sessionService;
         this.undoService = undoService;
         this.dailyService = dailyService;
@@ -57,31 +53,25 @@ public class MatchingService {
     }
 
     public static class Builder {
-        private LikeStorage likeStorage;
-        private MatchStorage matchStorage;
-        private UserStorage userStorage;
+        private InteractionStorage interactionStorage;
         private TrustSafetyStorage trustSafetyStorage;
+        private UserStorage userStorage;
         private SessionService sessionService;
         private UndoService undoService;
         private DailyService dailyService;
 
-        public Builder likeStorage(LikeStorage storage) {
-            this.likeStorage = storage;
-            return this;
-        }
-
-        public Builder matchStorage(MatchStorage storage) {
-            this.matchStorage = storage;
-            return this;
-        }
-
-        public Builder userStorage(UserStorage storage) {
-            this.userStorage = storage;
+        public Builder interactionStorage(InteractionStorage storage) {
+            this.interactionStorage = storage;
             return this;
         }
 
         public Builder trustSafetyStorage(TrustSafetyStorage storage) {
             this.trustSafetyStorage = storage;
+            return this;
+        }
+
+        public Builder userStorage(UserStorage storage) {
+            this.userStorage = storage;
             return this;
         }
 
@@ -102,13 +92,7 @@ public class MatchingService {
 
         public MatchingService build() {
             return new MatchingService(
-                    likeStorage,
-                    matchStorage,
-                    userStorage,
-                    trustSafetyStorage,
-                    sessionService,
-                    undoService,
-                    dailyService);
+                    interactionStorage, trustSafetyStorage, userStorage, sessionService, undoService, dailyService);
         }
     }
 
@@ -123,12 +107,12 @@ public class MatchingService {
     public Optional<Match> recordLike(Like like) {
         Objects.requireNonNull(like, LIKE_REQUIRED);
         // Check if already exists
-        if (likeStorage.exists(like.whoLikes(), like.whoGotLiked())) {
+        if (interactionStorage.exists(like.whoLikes(), like.whoGotLiked())) {
             return Optional.empty(); // Already recorded
         }
 
         // Save the like
-        likeStorage.save(like);
+        interactionStorage.save(like);
 
         // If it's a PASS, no match possible
         if (like.direction() == Like.Direction.PASS) {
@@ -141,13 +125,13 @@ public class MatchingService {
         Optional<Match> matchResult = Optional.empty();
 
         // Check for mutual LIKE
-        if (likeStorage.mutualLikeExists(like.whoLikes(), like.whoGotLiked())) {
+        if (interactionStorage.mutualLikeExists(like.whoLikes(), like.whoGotLiked())) {
             // Create match with deterministic ID (allows idempotent saves)
             Match match = Match.create(like.whoLikes(), like.whoGotLiked());
 
             try {
                 // Save using upsert semantics (MERGE) - idempotent operation
-                matchStorage.save(match);
+                interactionStorage.save(match);
 
                 matchResult = Optional.of(match);
             } catch (RuntimeException ex) {
@@ -158,7 +142,7 @@ public class MatchingService {
                 }
                 // Guard fallback query (EH-004 fix)
                 try {
-                    matchResult = matchStorage
+                    matchResult = interactionStorage
                             .get(match.getId())
                             .filter(existing -> existing.getState() == Match.State.ACTIVE);
                 } catch (RuntimeException fallbackEx) {
@@ -233,16 +217,15 @@ public class MatchingService {
     public List<PendingLiker> findPendingLikersWithTimes(UUID currentUserId) {
         Objects.requireNonNull(currentUserId, "currentUserId cannot be null");
 
-        if (userStorage == null || trustSafetyStorage == null) {
-            throw new IllegalStateException(
-                    "userStorage and trustSafetyStorage required for liker browsing. Use full constructor.");
+        if (userStorage == null) {
+            throw new IllegalStateException("userStorage required for liker browsing. Use full constructor.");
         }
 
-        Set<UUID> alreadyInteracted = likeStorage.getLikedOrPassedUserIds(currentUserId);
+        Set<UUID> alreadyInteracted = interactionStorage.getLikedOrPassedUserIds(currentUserId);
         Set<UUID> blocked = trustSafetyStorage.getBlockedUserIds(currentUserId);
 
         Set<UUID> matched = new HashSet<>();
-        for (Match match : matchStorage.getAllMatchesFor(currentUserId)) {
+        for (Match match : interactionStorage.getAllMatchesFor(currentUserId)) {
             matched.add(otherUserId(match, currentUserId));
         }
 
@@ -250,7 +233,7 @@ public class MatchingService {
         excluded.addAll(blocked);
         excluded.addAll(matched);
 
-        var likeTimes = likeStorage.getLikeTimesForUsersWhoLiked(currentUserId);
+        var likeTimes = interactionStorage.getLikeTimesForUsersWhoLiked(currentUserId);
 
         // Batch-load all potential likers in one query
         Set<UUID> likerIds = new HashSet<>();

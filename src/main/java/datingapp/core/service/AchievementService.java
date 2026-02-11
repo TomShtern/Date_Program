@@ -5,9 +5,8 @@ import datingapp.core.model.Achievement;
 import datingapp.core.model.Achievement.UserAchievement;
 import datingapp.core.model.User;
 import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.StatsStorage;
+import datingapp.core.storage.AnalyticsStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.ArrayList;
@@ -19,27 +18,24 @@ import java.util.UUID;
 
 public class AchievementService {
 
-    private final StatsStorage achievementStorage;
-    private final MatchStorage matchStorage;
-    private final LikeStorage likeStorage;
-    private final UserStorage userStorage;
+    private final AnalyticsStorage analyticsStorage;
+    private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
+    private final UserStorage userStorage;
     private final ProfileCompletionService profileCompletionService;
     private final AppConfig config;
 
     public AchievementService(
-            StatsStorage achievementStorage,
-            MatchStorage matchStorage,
-            LikeStorage likeStorage,
-            UserStorage userStorage,
+            AnalyticsStorage analyticsStorage,
+            InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
+            UserStorage userStorage,
             ProfileCompletionService profileCompletionService,
             AppConfig config) {
-        this.achievementStorage = Objects.requireNonNull(achievementStorage);
-        this.matchStorage = Objects.requireNonNull(matchStorage);
-        this.likeStorage = Objects.requireNonNull(likeStorage);
-        this.userStorage = Objects.requireNonNull(userStorage);
+        this.analyticsStorage = Objects.requireNonNull(analyticsStorage);
+        this.interactionStorage = Objects.requireNonNull(interactionStorage);
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage);
+        this.userStorage = Objects.requireNonNull(userStorage);
         this.profileCompletionService = Objects.requireNonNull(profileCompletionService);
         this.config = Objects.requireNonNull(config);
     }
@@ -98,9 +94,9 @@ public class AchievementService {
 
         // Check each achievement
         for (Achievement achievement : Achievement.values()) {
-            if (!achievementStorage.hasAchievement(userId, achievement) && isEarned(userId, user, achievement)) {
+            if (!analyticsStorage.hasAchievement(userId, achievement) && isEarned(userId, user, achievement)) {
                 UserAchievement unlocked = UserAchievement.create(userId, achievement);
-                achievementStorage.saveUserAchievement(unlocked);
+                analyticsStorage.saveUserAchievement(unlocked);
                 newlyUnlocked.add(unlocked);
             }
         }
@@ -110,7 +106,7 @@ public class AchievementService {
 
     /** Get all unlocked achievements for a user. */
     public List<UserAchievement> getUnlocked(UUID userId) {
-        return achievementStorage.getUnlockedAchievements(userId);
+        return analyticsStorage.getUnlockedAchievements(userId);
     }
 
     /**
@@ -127,7 +123,7 @@ public class AchievementService {
         }
 
         for (Achievement achievement : Achievement.values()) {
-            boolean unlocked = achievementStorage.hasAchievement(userId, achievement);
+            boolean unlocked = analyticsStorage.hasAchievement(userId, achievement);
             int[] currentAndTarget = getProgressValues(userId, user, achievement);
             progress.add(new AchievementProgress(achievement, currentAndTarget[0], currentAndTarget[1], unlocked));
         }
@@ -206,12 +202,12 @@ public class AchievementService {
     // === Helper Methods ===
 
     private int getMatchCount(UUID userId) {
-        return matchStorage.getAllMatchesFor(userId).size();
+        return interactionStorage.getAllMatchesFor(userId).size();
     }
 
     private int getTotalSwipes(UUID userId) {
-        return likeStorage.countByDirection(userId, Like.Direction.LIKE)
-                + likeStorage.countByDirection(userId, Like.Direction.PASS);
+        return interactionStorage.countByDirection(userId, Like.Direction.LIKE)
+                + interactionStorage.countByDirection(userId, Like.Direction.PASS);
     }
 
     private boolean isSelective(UUID userId) {
@@ -219,7 +215,7 @@ public class AchievementService {
         if (totalSwipes < config.minSwipesForBehaviorAchievement()) {
             return false;
         }
-        int likes = likeStorage.countByDirection(userId, Like.Direction.LIKE);
+        int likes = interactionStorage.countByDirection(userId, Like.Direction.LIKE);
         double likeRatio = (double) likes / totalSwipes;
         return likeRatio < config.selectiveThreshold();
     }
@@ -229,7 +225,7 @@ public class AchievementService {
         if (totalSwipes < config.minSwipesForBehaviorAchievement()) {
             return false;
         }
-        int likes = likeStorage.countByDirection(userId, Like.Direction.LIKE);
+        int likes = interactionStorage.countByDirection(userId, Like.Direction.LIKE);
         double likeRatio = (double) likes / totalSwipes;
         return likeRatio > config.openMindedThreshold();
     }
@@ -286,6 +282,6 @@ public class AchievementService {
 
     /** Count total unlocked achievements. */
     public int countUnlocked(UUID userId) {
-        return achievementStorage.countUnlockedAchievements(userId);
+        return analyticsStorage.countUnlockedAchievements(userId);
     }
 }

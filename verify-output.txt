@@ -1,0 +1,290 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< com.datingapp:dating-app >----------------------
+[INFO] Building Dating App 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- checkstyle:3.6.0:check (checkstyle-check) @ dating-app ---
+[INFO] Starting audit...
+Audit done.
+[INFO] You have 0 Checkstyle violations.
+[INFO] 
+[INFO] --- jacoco:0.8.14:prepare-agent (prepare-agent) @ dating-app ---
+[INFO] argLine set to -javaagent:C:\\Users\\tom7s\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.14\\org.jacoco.agent-0.8.14-runtime.jar=destfile=C:\\Users\\tom7s\\Desktopp\\Claude_Folder_2\\Date_Program\\target\\jacoco.exec
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ dating-app ---
+[INFO] Copying 13 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ dating-app ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ dating-app ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ dating-app ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.4:test (default-test) @ dating-app ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[ERROR] TestEngine with ID 'junit-jupiter' encountered a critical issue during test discovery:
+
+(1) [ERROR] NestedClassSelector [enclosingClassNames = [datingapp.core.ProfileCompletionServiceTest], nestedClassName = 'datingapp.core.ProfileCompletionServiceTest$Calculate', classLoader = jdk.internal.loader.ClassLoaders$AppClassLoader@764c12b6] resolution failed
+    Cause: java.lang.NoClassDefFoundError: datingapp/core/service/ProfileCompletionService$CategoryBreakdown
+	at java.base/java.lang.Class.getDeclaredMethods0(Native Method)
+	at java.base/java.lang.Class.privateGetDeclaredMethods(Class.java:3010)
+	at java.base/java.lang.Class.getDeclaredMethods(Class.java:2329)
+	at org.junit.platform.commons.util.ReflectionUtils.getDeclaredMethods(ReflectionUtils.java:1820)
+	at org.junit.platform.commons.util.ReflectionUtils.findAllMethodsInHierarchy(ReflectionUtils.java:1760)
+	at org.junit.platform.commons.util.ReflectionUtils.streamMethods(ReflectionUtils.java:1745)
+	at org.junit.platform.commons.util.ReflectionUtils.findMethods(ReflectionUtils.java:1729)
+	at org.junit.platform.commons.util.AnnotationUtils.findAnnotatedMethods(AnnotationUtils.java:499)
+	at org.junit.platform.commons.support.AnnotationSupport.findAnnotatedMethods(AnnotationSupport.java:581)
+	at org.junit.jupiter.engine.descriptor.LifecycleMethodUtils.findMethodsAndCheckVoidReturnType(LifecycleMethodUtils.java:134)
+	at org.junit.jupiter.engine.descriptor.LifecycleMethodUtils.findMethodsAndCheckStatic(LifecycleMethodUtils.java:118)
+	at org.junit.jupiter.engine.descriptor.LifecycleMethodUtils.findBeforeAllMethods(LifecycleMethodUtils.java:53)
+	at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor$LifecycleMethods.<init>(ClassBasedTestDescriptor.java:586)
+	at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor.<init>(ClassBasedTestDescriptor.java:103)
+	at org.junit.jupiter.engine.descriptor.NestedClassTestDescriptor.<init>(NestedClassTestDescriptor.java:55)
+	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.newNestedClassTestDescriptor(ClassSelectorResolver.java:265)
+	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.newMemberClassTestDescriptor(ClassSelectorResolver.java:253)
+	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.lambda$resolve$4(ClassSelectorResolver.java:125)
+	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution$DefaultContext.createAndAdd(EngineDiscoveryRequestResolution.java:250)
+	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution$DefaultContext.addToParent(EngineDiscoveryRequestResolution.java:220)
+	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.resolve(ClassSelectorResolver.java:124)
+	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.lambda$resolve$2(EngineDiscoveryRequestResolution.java:141)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.tryAdvance(ArrayList.java:1693)
+	at java.base/java.util.stream.ReferencePipeline.forEachWithCancel(ReferencePipeline.java:147)
+	at java.base/java.util.stream.AbstractPipeline.copyIntoWithCancel(AbstractPipeline.java:588)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:574)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560)
+	at java.base/java.util.stream.FindOps$FindOp.evaluateSequential(FindOps.java:150)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265)
+	at java.base/java.util.stream.ReferencePipeline.findFirst(ReferencePipeline.java:683)
+	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.resolve(EngineDiscoveryRequestResolution.java:189)
+	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.resolve(EngineDiscoveryRequestResolution.java:126)
+	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.resolveCompletely(EngineDiscoveryRequestResolution.java:92)
+	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.run(EngineDiscoveryRequestResolution.java:83)
+	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolver.resolve(EngineDiscoveryRequestResolver.java:149)
+	at org.junit.jupiter.engine.discovery.DiscoverySelectorResolver.resolveSelectors(DiscoverySelectorResolver.java:63)
+	at org.junit.jupiter.engine.JupiterTestEngine.discover(JupiterTestEngine.java:70)
+	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discoverEngineRoot(EngineDiscoveryOrchestrator.java:195)
+	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discoverSafely(EngineDiscoveryOrchestrator.java:174)
+	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discover(EngineDiscoveryOrchestrator.java:119)
+	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discover(EngineDiscoveryOrchestrator.java:84)
+	at org.junit.platform.launcher.core.DefaultLauncher.discover(DefaultLauncher.java:104)
+	at org.junit.platform.launcher.core.DefaultLauncher.discover(DefaultLauncher.java:83)
+	at org.junit.platform.launcher.core.DelegatingLauncher.discover(DelegatingLauncher.java:42)
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$discover$0(InterceptingLauncher.java:33)
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+	at org.junit.platform.launcher.core.InterceptingLauncher.discover(InterceptingLauncher.java:33)
+	at org.junit.platform.launcher.core.DelegatingLauncher.discover(DelegatingLauncher.java:42)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.discover(LauncherAdapter.java:47)
+	at org.apache.maven.surefire.junitplatform.TestPlanScannerFilter.accept(TestPlanScannerFilter.java:51)
+	at org.apache.maven.surefire.api.util.DefaultScanResult.applyFilter(DefaultScanResult.java:87)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.scanClasspath(JUnitPlatformProvider.java:156)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:136)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: java.lang.ClassNotFoundException: datingapp.core.service.ProfileCompletionService$CategoryBreakdown
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:580)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:490)
+	... 58 more
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  19.750 s
+[INFO] Finished at: 2026-02-11T22:29:55+02:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.4:test (default-test) on project dating-app: 
+[ERROR] 
+[ERROR] See C:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] There was an error in the forked process
+[ERROR] TestEngine with ID 'junit-jupiter' encountered a critical issue during test discovery:
+[ERROR] 
+[ERROR] (1) [ERROR] NestedClassSelector [enclosingClassNames = [datingapp.core.ProfileCompletionServiceTest], nestedClassName = 'datingapp.core.ProfileCompletionServiceTest$Calculate', classLoader = jdk.internal.loader.ClassLoaders$AppClassLoader@764c12b6] resolution failed
+[ERROR]     Cause: java.lang.NoClassDefFoundError: datingapp/core/service/ProfileCompletionService$CategoryBreakdown
+[ERROR] 	at java.base/java.lang.Class.getDeclaredMethods0(Native Method)
+[ERROR] 	at java.base/java.lang.Class.privateGetDeclaredMethods(Class.java:3010)
+[ERROR] 	at java.base/java.lang.Class.getDeclaredMethods(Class.java:2329)
+[ERROR] 	at org.junit.platform.commons.util.ReflectionUtils.getDeclaredMethods(ReflectionUtils.java:1820)
+[ERROR] 	at org.junit.platform.commons.util.ReflectionUtils.findAllMethodsInHierarchy(ReflectionUtils.java:1760)
+[ERROR] 	at org.junit.platform.commons.util.ReflectionUtils.streamMethods(ReflectionUtils.java:1745)
+[ERROR] 	at org.junit.platform.commons.util.ReflectionUtils.findMethods(ReflectionUtils.java:1729)
+[ERROR] 	at org.junit.platform.commons.util.AnnotationUtils.findAnnotatedMethods(AnnotationUtils.java:499)
+[ERROR] 	at org.junit.platform.commons.support.AnnotationSupport.findAnnotatedMethods(AnnotationSupport.java:581)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.LifecycleMethodUtils.findMethodsAndCheckVoidReturnType(LifecycleMethodUtils.java:134)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.LifecycleMethodUtils.findMethodsAndCheckStatic(LifecycleMethodUtils.java:118)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.LifecycleMethodUtils.findBeforeAllMethods(LifecycleMethodUtils.java:53)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor$LifecycleMethods.<init>(ClassBasedTestDescriptor.java:586)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor.<init>(ClassBasedTestDescriptor.java:103)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.NestedClassTestDescriptor.<init>(NestedClassTestDescriptor.java:55)
+[ERROR] 	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.newNestedClassTestDescriptor(ClassSelectorResolver.java:265)
+[ERROR] 	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.newMemberClassTestDescriptor(ClassSelectorResolver.java:253)
+[ERROR] 	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.lambda$resolve$4(ClassSelectorResolver.java:125)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution$DefaultContext.createAndAdd(EngineDiscoveryRequestResolution.java:250)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution$DefaultContext.addToParent(EngineDiscoveryRequestResolution.java:220)
+[ERROR] 	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.resolve(ClassSelectorResolver.java:124)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.lambda$resolve$2(EngineDiscoveryRequestResolution.java:141)
+[ERROR] 	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+[ERROR] 	at java.base/java.util.ArrayList$ArrayListSpliterator.tryAdvance(ArrayList.java:1693)
+[ERROR] 	at java.base/java.util.stream.ReferencePipeline.forEachWithCancel(ReferencePipeline.java:147)
+[ERROR] 	at java.base/java.util.stream.AbstractPipeline.copyIntoWithCancel(AbstractPipeline.java:588)
+[ERROR] 	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:574)
+[ERROR] 	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560)
+[ERROR] 	at java.base/java.util.stream.FindOps$FindOp.evaluateSequential(FindOps.java:150)
+[ERROR] 	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265)
+[ERROR] 	at java.base/java.util.stream.ReferencePipeline.findFirst(ReferencePipeline.java:683)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.resolve(EngineDiscoveryRequestResolution.java:189)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.resolve(EngineDiscoveryRequestResolution.java:126)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.resolveCompletely(EngineDiscoveryRequestResolution.java:92)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.run(EngineDiscoveryRequestResolution.java:83)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolver.resolve(EngineDiscoveryRequestResolver.java:149)
+[ERROR] 	at org.junit.jupiter.engine.discovery.DiscoverySelectorResolver.resolveSelectors(DiscoverySelectorResolver.java:63)
+[ERROR] 	at org.junit.jupiter.engine.JupiterTestEngine.discover(JupiterTestEngine.java:70)
+[ERROR] 	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discoverEngineRoot(EngineDiscoveryOrchestrator.java:195)
+[ERROR] 	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discoverSafely(EngineDiscoveryOrchestrator.java:174)
+[ERROR] 	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discover(EngineDiscoveryOrchestrator.java:119)
+[ERROR] 	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discover(EngineDiscoveryOrchestrator.java:84)
+[ERROR] 	at org.junit.platform.launcher.core.DefaultLauncher.discover(DefaultLauncher.java:104)
+[ERROR] 	at org.junit.platform.launcher.core.DefaultLauncher.discover(DefaultLauncher.java:83)
+[ERROR] 	at org.junit.platform.launcher.core.DelegatingLauncher.discover(DelegatingLauncher.java:42)
+[ERROR] 	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$discover$0(InterceptingLauncher.java:33)
+[ERROR] 	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+[ERROR] 	at org.junit.platform.launcher.core.InterceptingLauncher.discover(InterceptingLauncher.java:33)
+[ERROR] 	at org.junit.platform.launcher.core.DelegatingLauncher.discover(DelegatingLauncher.java:42)
+[ERROR] 	at org.apache.maven.surefire.junitplatform.LauncherAdapter.discover(LauncherAdapter.java:47)
+[ERROR] 	at org.apache.maven.surefire.junitplatform.TestPlanScannerFilter.accept(TestPlanScannerFilter.java:51)
+[ERROR] 	at org.apache.maven.surefire.api.util.DefaultScanResult.applyFilter(DefaultScanResult.java:87)
+[ERROR] 	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.scanClasspath(JUnitPlatformProvider.java:156)
+[ERROR] 	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:136)
+[ERROR] 	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+[ERROR] 	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+[ERROR] 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+[ERROR] 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+[ERROR] Caused by: java.lang.ClassNotFoundException: datingapp.core.service.ProfileCompletionService$CategoryBreakdown
+[ERROR] 	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:580)
+[ERROR] 	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:490)
+[ERROR] 	... 58 more
+[ERROR] 
+[ERROR] org.apache.maven.surefire.booter.SurefireBooterForkException: There was an error in the forked process
+[ERROR] TestEngine with ID 'junit-jupiter' encountered a critical issue during test discovery:
+[ERROR] 
+[ERROR] (1) [ERROR] NestedClassSelector [enclosingClassNames = [datingapp.core.ProfileCompletionServiceTest], nestedClassName = 'datingapp.core.ProfileCompletionServiceTest$Calculate', classLoader = jdk.internal.loader.ClassLoaders$AppClassLoader@764c12b6] resolution failed
+[ERROR]     Cause: java.lang.NoClassDefFoundError: datingapp/core/service/ProfileCompletionService$CategoryBreakdown
+[ERROR] 	at java.base/java.lang.Class.getDeclaredMethods0(Native Method)
+[ERROR] 	at java.base/java.lang.Class.privateGetDeclaredMethods(Class.java:3010)
+[ERROR] 	at java.base/java.lang.Class.getDeclaredMethods(Class.java:2329)
+[ERROR] 	at org.junit.platform.commons.util.ReflectionUtils.getDeclaredMethods(ReflectionUtils.java:1820)
+[ERROR] 	at org.junit.platform.commons.util.ReflectionUtils.findAllMethodsInHierarchy(ReflectionUtils.java:1760)
+[ERROR] 	at org.junit.platform.commons.util.ReflectionUtils.streamMethods(ReflectionUtils.java:1745)
+[ERROR] 	at org.junit.platform.commons.util.ReflectionUtils.findMethods(ReflectionUtils.java:1729)
+[ERROR] 	at org.junit.platform.commons.util.AnnotationUtils.findAnnotatedMethods(AnnotationUtils.java:499)
+[ERROR] 	at org.junit.platform.commons.support.AnnotationSupport.findAnnotatedMethods(AnnotationSupport.java:581)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.LifecycleMethodUtils.findMethodsAndCheckVoidReturnType(LifecycleMethodUtils.java:134)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.LifecycleMethodUtils.findMethodsAndCheckStatic(LifecycleMethodUtils.java:118)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.LifecycleMethodUtils.findBeforeAllMethods(LifecycleMethodUtils.java:53)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor$LifecycleMethods.<init>(ClassBasedTestDescriptor.java:586)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor.<init>(ClassBasedTestDescriptor.java:103)
+[ERROR] 	at org.junit.jupiter.engine.descriptor.NestedClassTestDescriptor.<init>(NestedClassTestDescriptor.java:55)
+[ERROR] 	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.newNestedClassTestDescriptor(ClassSelectorResolver.java:265)
+[ERROR] 	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.newMemberClassTestDescriptor(ClassSelectorResolver.java:253)
+[ERROR] 	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.lambda$resolve$4(ClassSelectorResolver.java:125)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution$DefaultContext.createAndAdd(EngineDiscoveryRequestResolution.java:250)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution$DefaultContext.addToParent(EngineDiscoveryRequestResolution.java:220)
+[ERROR] 	at org.junit.jupiter.engine.discovery.ClassSelectorResolver.resolve(ClassSelectorResolver.java:124)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.lambda$resolve$2(EngineDiscoveryRequestResolution.java:141)
+[ERROR] 	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:214)
+[ERROR] 	at java.base/java.util.ArrayList$ArrayListSpliterator.tryAdvance(ArrayList.java:1693)
+[ERROR] 	at java.base/java.util.stream.ReferencePipeline.forEachWithCancel(ReferencePipeline.java:147)
+[ERROR] 	at java.base/java.util.stream.AbstractPipeline.copyIntoWithCancel(AbstractPipeline.java:588)
+[ERROR] 	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:574)
+[ERROR] 	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560)
+[ERROR] 	at java.base/java.util.stream.FindOps$FindOp.evaluateSequential(FindOps.java:150)
+[ERROR] 	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265)
+[ERROR] 	at java.base/java.util.stream.ReferencePipeline.findFirst(ReferencePipeline.java:683)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.resolve(EngineDiscoveryRequestResolution.java:189)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.resolve(EngineDiscoveryRequestResolution.java:126)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.resolveCompletely(EngineDiscoveryRequestResolution.java:92)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolution.run(EngineDiscoveryRequestResolution.java:83)
+[ERROR] 	at org.junit.platform.engine.support.discovery.EngineDiscoveryRequestResolver.resolve(EngineDiscoveryRequestResolver.java:149)
+[ERROR] 	at org.junit.jupiter.engine.discovery.DiscoverySelectorResolver.resolveSelectors(DiscoverySelectorResolver.java:63)
+[ERROR] 	at org.junit.jupiter.engine.JupiterTestEngine.discover(JupiterTestEngine.java:70)
+[ERROR] 	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discoverEngineRoot(EngineDiscoveryOrchestrator.java:195)
+[ERROR] 	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discoverSafely(EngineDiscoveryOrchestrator.java:174)
+[ERROR] 	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discover(EngineDiscoveryOrchestrator.java:119)
+[ERROR] 	at org.junit.platform.launcher.core.EngineDiscoveryOrchestrator.discover(EngineDiscoveryOrchestrator.java:84)
+[ERROR] 	at org.junit.platform.launcher.core.DefaultLauncher.discover(DefaultLauncher.java:104)
+[ERROR] 	at org.junit.platform.launcher.core.DefaultLauncher.discover(DefaultLauncher.java:83)
+[ERROR] 	at org.junit.platform.launcher.core.DelegatingLauncher.discover(DelegatingLauncher.java:42)
+[ERROR] 	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$discover$0(InterceptingLauncher.java:33)
+[ERROR] 	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+[ERROR] 	at org.junit.platform.launcher.core.InterceptingLauncher.discover(InterceptingLauncher.java:33)
+[ERROR] 	at org.junit.platform.launcher.core.DelegatingLauncher.discover(DelegatingLauncher.java:42)
+[ERROR] 	at org.apache.maven.surefire.junitplatform.LauncherAdapter.discover(LauncherAdapter.java:47)
+[ERROR] 	at org.apache.maven.surefire.junitplatform.TestPlanScannerFilter.accept(TestPlanScannerFilter.java:51)
+[ERROR] 	at org.apache.maven.surefire.api.util.DefaultScanResult.applyFilter(DefaultScanResult.java:87)
+[ERROR] 	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.scanClasspath(JUnitPlatformProvider.java:156)
+[ERROR] 	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:136)
+[ERROR] 	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+[ERROR] 	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+[ERROR] 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+[ERROR] 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+[ERROR] Caused by: java.lang.ClassNotFoundException: datingapp.core.service.ProfileCompletionService$CategoryBreakdown
+[ERROR] 	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:580)
+[ERROR] 	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:490)
+[ERROR] 	... 58 more
+[ERROR] 
+[ERROR] 	at org.apache.maven.plugin.surefire.booterclient.ForkStarter.fork(ForkStarter.java:631)
+[ERROR] 	at org.apache.maven.plugin.surefire.booterclient.ForkStarter.run(ForkStarter.java:285)
+[ERROR] 	at org.apache.maven.plugin.surefire.booterclient.ForkStarter.run(ForkStarter.java:250)
+[ERROR] 	at org.apache.maven.plugin.surefire.AbstractSurefireMojo.executeProvider(AbstractSurefireMojo.java:1337)
+[ERROR] 	at org.apache.maven.plugin.surefire.AbstractSurefireMojo.executeAfterPreconditionsChecked(AbstractSurefireMojo.java:1135)
+[ERROR] 	at org.apache.maven.plugin.surefire.AbstractSurefireMojo.execute(AbstractSurefireMojo.java:969)
+[ERROR] 	at org.apache.maven.plugin.DefaultBuildPluginManager.executeMojo(DefaultBuildPluginManager.java:126)
+[ERROR] 	at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute2(MojoExecutor.java:328)
+[ERROR] 	at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute(MojoExecutor.java:316)
+[ERROR] 	at org.apache.maven.lifecycle.internal.MojoExecutor.execute(MojoExecutor.java:212)
+[ERROR] 	at org.apache.maven.lifecycle.internal.MojoExecutor.execute(MojoExecutor.java:174)
+[ERROR] 	at org.apache.maven.lifecycle.internal.MojoExecutor.access$000(MojoExecutor.java:75)
+[ERROR] 	at org.apache.maven.lifecycle.internal.MojoExecutor$1.run(MojoExecutor.java:162)
+[ERROR] 	at org.apache.maven.plugin.DefaultMojosExecutionStrategy.execute(DefaultMojosExecutionStrategy.java:39)
+[ERROR] 	at org.apache.maven.lifecycle.internal.MojoExecutor.execute(MojoExecutor.java:159)
+[ERROR] 	at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject(LifecycleModuleBuilder.java:105)
+[ERROR] 	at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject(LifecycleModuleBuilder.java:73)
+[ERROR] 	at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build(SingleThreadedBuilder.java:53)
+[ERROR] 	at org.apache.maven.lifecycle.internal.LifecycleStarter.execute(LifecycleStarter.java:118)
+[ERROR] 	at org.apache.maven.DefaultMaven.doExecute(DefaultMaven.java:261)
+[ERROR] 	at org.apache.maven.DefaultMaven.doExecute(DefaultMaven.java:173)
+[ERROR] 	at org.apache.maven.DefaultMaven.execute(DefaultMaven.java:101)
+[ERROR] 	at org.apache.maven.cli.MavenCli.execute(MavenCli.java:919)
+[ERROR] 	at org.apache.maven.cli.MavenCli.doMain(MavenCli.java:285)
+[ERROR] 	at org.apache.maven.cli.MavenCli.main(MavenCli.java:207)
+[ERROR] 	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+[ERROR] 	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+[ERROR] 	at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced(Launcher.java:255)
+[ERROR] 	at org.codehaus.plexus.classworlds.launcher.Launcher.launch(Launcher.java:201)
+[ERROR] 	at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode(Launcher.java:361)
+[ERROR] 	at org.codehaus.plexus.classworlds.launcher.Launcher.main(Launcher.java:314)
+[ERROR] 
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+

@@ -50,7 +50,7 @@ You are operating in an environment where ast-grep is installed. For any code se
 # Dating App - AI Agent Instructions
 
 **Platform:** Windows 11 | PowerShell | VS Code Insiders | Java 25 | JavaFX 25.0.1
-**Stats:** 102 main + 58 test Java files | ~48K lines (~35K code) | 60% coverage min | 825 tests | 14 core services
+**Stats:** 102 main + 58 test Java files | ~48K lines (~35K code) | 60% coverage min | 802 tests | 14 core services
 
 ## ⚠️ Critical Gotchas (Compilation Failures)
 
@@ -73,7 +73,7 @@ You are operating in an environment where ast-grep is installed. For any code se
 core/              Utility/infra: AppConfig, AppSession, ServiceRegistry, EnumSetUtil, ScoringConstants...
 core/model/        11 domain models: User, Match, Messaging, Preferences, UserInteractions...
 core/service/      14 services: MatchingService, MessagingService, CandidateFinder...
-core/storage/      9 storage interfaces (UserStorage, MatchStorage, TrustSafetyStorage...)
+core/storage/      5 storage interfaces (UserStorage, InteractionStorage, CommunicationStorage, AnalyticsStorage, TrustSafetyStorage)
 storage/           DatabaseManager, StorageFactory
 storage/jdbi/      JDBI implementations + MapperHelper + EnumSetJdbiSupport
 storage/schema/    SchemaInitializer, MigrationRunner
@@ -212,7 +212,7 @@ boolean confirmed = UiSupport.showConfirmation(
 ```bash
 mvn compile && mvn exec:exec              # Compile + Run CLI (forked JVM with --enable-preview)
 mvn javafx:run                            # Run JavaFX GUI
-mvn test                                  # All tests (825+)
+mvn test                                  # All tests (802+)
 mvn test -Dtest=MatchingServiceTest#mutualLikesCreateMatch  # Single method
 mvn spotless:apply && mvn verify          # Format + full quality checks (REQUIRED before commit)
 ```
@@ -370,7 +370,7 @@ List<String> urls = MapperHelper.readCsvAsList(rs, "photo_urls");
 | Purpose            | Location                                                                           |
 |--------------------|------------------------------------------------------------------------------------|
 | Domain models      | `core/model/{User,Match,Messaging,UserInteractions,Preferences,Dealbreakers}.java` |
-| Storage interfaces | `core/storage/*Storage.java` (9 interfaces)                                        |
+| Storage interfaces | `core/storage/*Storage.java` (5 interfaces)                                        |
 | Services           | `core/service/*Service.java` (14 services)                                         |
 | JDBI storage       | `storage/jdbi/Jdbi*Storage.java`                                                   |
 | Storage mappers    | `storage/jdbi/MapperHelper.java`, `UserBindingHelper.java`                         |

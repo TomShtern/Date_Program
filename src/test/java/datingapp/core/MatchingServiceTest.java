@@ -22,19 +22,19 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MatchingServiceTest {
 
-    private TestStorages.Likes likeStorage;
-    private TestStorages.Matches matchStorage;
+    private TestStorages.Interactions interactionStorage;
+    private TestStorages.TrustSafety trustSafetyStorage;
     private MatchingService matchingService;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
-        likeStorage = new TestStorages.Likes();
-        matchStorage = new TestStorages.Matches();
+        interactionStorage = new TestStorages.Interactions();
+        trustSafetyStorage = new TestStorages.TrustSafety();
         matchingService = MatchingService.builder()
-                .likeStorage(likeStorage)
-                .matchStorage(matchStorage)
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
                 .build();
     }
 
@@ -57,7 +57,7 @@ class MatchingServiceTest {
             Optional<Match> result = matchingService.recordLike(like);
 
             assertTrue(result.isEmpty(), "First like should not create match");
-            assertTrue(likeStorage.exists(alice, bob), "Like should be saved");
+            assertTrue(interactionStorage.exists(alice, bob), "Like should be saved");
         }
 
         @Test
@@ -67,7 +67,7 @@ class MatchingServiceTest {
             UUID bob = UUID.randomUUID();
 
             // Bob likes Alice first
-            likeStorage.save(Like.create(bob, alice, Like.Direction.LIKE));
+            interactionStorage.save(Like.create(bob, alice, Like.Direction.LIKE));
 
             // Alice passes Bob
             Like pass = Like.create(alice, bob, Like.Direction.PASS);
@@ -94,7 +94,7 @@ class MatchingServiceTest {
             Match match = result.get();
             assertTrue(match.involves(alice), "Match should involve Alice");
             assertTrue(match.involves(bob), "Match should involve Bob");
-            assertTrue(matchStorage.exists(match.getId()), "Match should be saved");
+            assertTrue(interactionStorage.exists(match.getId()), "Match should be saved");
         }
 
         @Test
@@ -147,7 +147,7 @@ class MatchingServiceTest {
 
             // Since there's no way to "re-swipe" in current model,
             // Bob already passed so no match possible
-            assertFalse(matchStorage.exists(Match.generateId(alice, bob)), "No match should exist after pass");
+            assertFalse(interactionStorage.exists(Match.generateId(alice, bob)), "No match should exist after pass");
         }
 
         @Test

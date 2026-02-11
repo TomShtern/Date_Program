@@ -4,10 +4,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.*;
 import datingapp.core.service.*;
-import datingapp.core.storage.StatsStorage;
-import datingapp.core.storage.SwipeSessionStorage;
+import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.testutil.TestClock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,8 +27,7 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("SessionService cleanup")
 class CleanupServiceTest {
 
-    private TestStatsStorage statsStorage;
-    private TestSessionStorage sessionStorage;
+    private TestCleanupAnalytics analyticsStorage;
     private SessionService service;
     private AppConfig config;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
@@ -33,9 +36,8 @@ class CleanupServiceTest {
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
         config = AppConfig.defaults();
-        statsStorage = new TestStatsStorage();
-        sessionStorage = new TestSessionStorage();
-        service = new SessionService(sessionStorage, statsStorage, config);
+        analyticsStorage = new TestCleanupAnalytics();
+        service = new SessionService(analyticsStorage, config);
     }
 
     @AfterEach
@@ -48,21 +50,15 @@ class CleanupServiceTest {
     class ConstructorValidation {
 
         @Test
-        @DisplayName("Should require non-null sessionStorage")
-        void requiresSessionStorage() {
-            assertThrows(NullPointerException.class, () -> new SessionService(null, statsStorage, config));
-        }
-
-        @Test
-        @DisplayName("Should require non-null statsStorage")
-        void requiresStatsStorage() {
-            assertThrows(NullPointerException.class, () -> new SessionService(sessionStorage, null, config));
+        @DisplayName("Should require non-null analyticsStorage")
+        void requiresAnalyticsStorage() {
+            assertThrows(NullPointerException.class, () -> new SessionService(null, config));
         }
 
         @Test
         @DisplayName("Should require non-null config")
         void requiresConfig() {
-            assertThrows(NullPointerException.class, () -> new SessionService(sessionStorage, statsStorage, null));
+            assertThrows(NullPointerException.class, () -> new SessionService(analyticsStorage, null));
         }
     }
 
@@ -73,8 +69,8 @@ class CleanupServiceTest {
         @Test
         @DisplayName("Should return cleanup result with counts")
         void returnsCleanupResult() {
-            statsStorage.setDeletedCount(5);
-            sessionStorage.setDeletedCount(3);
+            analyticsStorage.setDailyPickDeletedCount(5);
+            analyticsStorage.setSessionDeletedCount(3);
 
             SessionService.CleanupResult result = service.runCleanup();
 
@@ -87,8 +83,8 @@ class CleanupServiceTest {
         @Test
         @DisplayName("Should report no work when nothing deleted")
         void reportsNoWork() {
-            statsStorage.setDeletedCount(0);
-            sessionStorage.setDeletedCount(0);
+            analyticsStorage.setDailyPickDeletedCount(0);
+            analyticsStorage.setSessionDeletedCount(0);
 
             SessionService.CleanupResult result = service.runCleanup();
 
@@ -101,10 +97,10 @@ class CleanupServiceTest {
         void passesCutoffDate() {
             service.runCleanup();
 
-            assertNotNull(statsStorage.receivedCutoff);
-            assertNotNull(sessionStorage.receivedCutoff);
+            assertNotNull(analyticsStorage.receivedDailyPickCutoff);
+            assertNotNull(analyticsStorage.receivedSessionCutoff);
             // Cutoff should be in the past
-            assertTrue(statsStorage.receivedCutoff.isBefore(AppClock.now()));
+            assertTrue(analyticsStorage.receivedDailyPickCutoff.isBefore(AppClock.now()));
         }
     }
 
@@ -144,42 +140,54 @@ class CleanupServiceTest {
         }
     }
 
-    // === Test Doubles ===
+    // === Test Double ===
 
-    private static class TestStatsStorage implements StatsStorage {
-        int deletedCount = 0;
-        Instant receivedCutoff;
+    /**
+     * Analytics storage that tracks cleanup method calls for testing.
+     * Implements only behavior needed for SessionService cleanup tests.
+     */
+    private static class TestCleanupAnalytics implements AnalyticsStorage {
+        int dailyPickDeletedCount = 0;
+        int sessionDeletedCount = 0;
+        Instant receivedDailyPickCutoff;
+        Instant receivedSessionCutoff;
 
-        void setDeletedCount(int count) {
-            this.deletedCount = count;
+        void setDailyPickDeletedCount(int count) {
+            this.dailyPickDeletedCount = count;
+        }
+
+        void setSessionDeletedCount(int count) {
+            this.sessionDeletedCount = count;
         }
 
         @Override
         public int deleteExpiredDailyPickViews(Instant before) {
-            this.receivedCutoff = before;
-            return deletedCount;
-        }
-
-        // Unused methods - required by interface
-        @Override
-        public void saveUserStats(datingapp.core.model.Stats.UserStats stats) {
-            // Not used in cleanup tests
+            this.receivedDailyPickCutoff = before;
+            return dailyPickDeletedCount;
         }
 
         @Override
-        public java.util.Optional<datingapp.core.model.Stats.UserStats> getLatestUserStats(java.util.UUID userId) {
-            return java.util.Optional.empty();
+        public int deleteExpiredSessions(Instant cutoff) {
+            this.receivedSessionCutoff = cutoff;
+            return sessionDeletedCount;
         }
 
         @Override
-        public java.util.List<datingapp.core.model.Stats.UserStats> getUserStatsHistory(
-                java.util.UUID userId, int limit) {
-            return java.util.List.of();
+        public void saveUserStats(Stats.UserStats stats) {}
+
+        @Override
+        public Optional<Stats.UserStats> getLatestUserStats(UUID userId) {
+            return Optional.empty();
         }
 
         @Override
-        public java.util.List<datingapp.core.model.Stats.UserStats> getAllLatestUserStats() {
-            return java.util.List.of();
+        public List<Stats.UserStats> getUserStatsHistory(UUID userId, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<Stats.UserStats> getAllLatestUserStats() {
+            return List.of();
         }
 
         @Override
@@ -188,128 +196,102 @@ class CleanupServiceTest {
         }
 
         @Override
-        public void savePlatformStats(datingapp.core.model.Stats.PlatformStats stats) {
-            // Not used in cleanup tests
+        public void savePlatformStats(Stats.PlatformStats stats) {}
+
+        @Override
+        public Optional<Stats.PlatformStats> getLatestPlatformStats() {
+            return Optional.empty();
         }
 
         @Override
-        public java.util.Optional<datingapp.core.model.Stats.PlatformStats> getLatestPlatformStats() {
-            return java.util.Optional.empty();
+        public List<Stats.PlatformStats> getPlatformStatsHistory(int limit) {
+            return List.of();
         }
 
         @Override
-        public java.util.List<datingapp.core.model.Stats.PlatformStats> getPlatformStatsHistory(int limit) {
-            return java.util.List.of();
-        }
+        public void recordProfileView(UUID viewerId, UUID viewedId) {}
 
         @Override
-        public void recordProfileView(java.util.UUID viewerId, java.util.UUID viewedId) {
-            // Not used in cleanup tests
-        }
-
-        @Override
-        public int getProfileViewCount(java.util.UUID userId) {
+        public int getProfileViewCount(UUID userId) {
             return 0;
         }
 
         @Override
-        public int getUniqueViewerCount(java.util.UUID userId) {
+        public int getUniqueViewerCount(UUID userId) {
             return 0;
         }
 
         @Override
-        public java.util.List<java.util.UUID> getRecentViewers(java.util.UUID userId, int limit) {
-            return java.util.List.of();
+        public List<UUID> getRecentViewers(UUID userId, int limit) {
+            return List.of();
         }
 
         @Override
-        public boolean hasViewedProfile(java.util.UUID viewerId, java.util.UUID viewedId) {
+        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
             return false;
         }
 
         @Override
-        public void saveUserAchievement(datingapp.core.model.Achievement.UserAchievement achievement) {
-            // Not used in cleanup tests
+        public void saveUserAchievement(Achievement.UserAchievement achievement) {}
+
+        @Override
+        public List<Achievement.UserAchievement> getUnlockedAchievements(UUID userId) {
+            return List.of();
         }
 
         @Override
-        public java.util.List<datingapp.core.model.Achievement.UserAchievement> getUnlockedAchievements(
-                java.util.UUID userId) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public boolean hasAchievement(java.util.UUID userId, datingapp.core.model.Achievement achievement) {
+        public boolean hasAchievement(UUID userId, Achievement achievement) {
             return false;
         }
 
         @Override
-        public int countUnlockedAchievements(java.util.UUID userId) {
+        public int countUnlockedAchievements(UUID userId) {
             return 0;
         }
 
         @Override
-        public void markDailyPickAsViewed(java.util.UUID userId, java.time.LocalDate date) {
-            // Not used in cleanup tests
-        }
+        public void markDailyPickAsViewed(UUID userId, LocalDate date) {}
 
         @Override
-        public boolean isDailyPickViewed(java.util.UUID userId, java.time.LocalDate date) {
+        public boolean isDailyPickViewed(UUID userId, LocalDate date) {
             return false;
         }
 
         @Override
-        public int deleteDailyPickViewsOlderThan(java.time.LocalDate before) {
+        public int deleteDailyPickViewsOlderThan(LocalDate before) {
             return 0;
         }
-    }
 
-    private static class TestSessionStorage implements SwipeSessionStorage {
-        int deletedCount = 0;
-        Instant receivedCutoff;
+        @Override
+        public void saveSession(SwipeSession session) {}
 
-        void setDeletedCount(int count) {
-            this.deletedCount = count;
+        @Override
+        public Optional<SwipeSession> getSession(UUID sessionId) {
+            return Optional.empty();
         }
 
         @Override
-        public int deleteExpiredSessions(Instant before) {
-            this.receivedCutoff = before;
-            return deletedCount;
+        public Optional<SwipeSession> getActiveSession(UUID userId) {
+            return Optional.empty();
         }
 
         @Override
-        public void save(SwipeSession session) {
-            // Not used in cleanup tests
+        public List<SwipeSession> getSessionsFor(UUID userId, int limit) {
+            return List.of();
         }
 
         @Override
-        public java.util.Optional<SwipeSession> get(java.util.UUID sessionId) {
-            return java.util.Optional.empty();
+        public List<SwipeSession> getSessionsInRange(UUID userId, Instant start, Instant end) {
+            return List.of();
         }
 
         @Override
-        public java.util.Optional<SwipeSession> getActiveSession(java.util.UUID userId) {
-            return java.util.Optional.empty();
+        public SessionAggregates getSessionAggregates(UUID userId) {
+            return SessionAggregates.empty();
         }
 
         @Override
-        public java.util.List<SwipeSession> getSessionsFor(java.util.UUID userId, int limit) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public java.util.List<SwipeSession> getSessionsInRange(java.util.UUID userId, Instant start, Instant end) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public SwipeSessionStorage.SessionAggregates getAggregates(java.util.UUID userId) {
-            return SwipeSessionStorage.SessionAggregates.empty();
-        }
-
-        @Override
-        public int endStaleSessions(java.time.Duration timeout) {
+        public int endStaleSessions(Duration timeout) {
             return 0;
         }
     }

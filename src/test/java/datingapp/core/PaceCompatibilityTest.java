@@ -8,14 +8,8 @@ import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
-import datingapp.core.model.User.ProfileNote;
-import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.*;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.UserStorage;
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import datingapp.core.testutil.TestStorages;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,7 +28,8 @@ class PaceCompatibilityTest {
 
     @BeforeEach
     void setUp() {
-        service = new MatchQualityService(new MinimalUserStorage(), new MinimalLikeStorage(), AppConfig.defaults());
+        service = new MatchQualityService(
+                new TestStorages.Users(), new TestStorages.Interactions(), AppConfig.defaults());
     }
 
     @Test
@@ -161,130 +156,5 @@ class PaceCompatibilityTest {
                 );
 
         assertEquals(60, service.calculatePaceCompatibility(p1, p2));
-    }
-
-    // Minimal mock storage implementations for constructor requirements
-
-    private static class MinimalUserStorage implements UserStorage {
-        private final Map<String, ProfileNote> profileNotes = new ConcurrentHashMap<>();
-
-        @Override
-        public void save(User user) {
-            // no-op for test
-        }
-
-        @Override
-        public User get(UUID id) {
-            return null;
-        }
-
-        @Override
-        public List<User> findAll() {
-            return List.of();
-        }
-
-        @Override
-        public List<User> findActive() {
-            return List.of();
-        }
-
-        @Override
-        public void delete(UUID id) {
-            // No-op for minimal storage
-        }
-
-        @Override
-        public void saveProfileNote(ProfileNote note) {
-            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
-        }
-
-        @Override
-        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
-            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
-        }
-
-        @Override
-        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
-            return profileNotes.values().stream()
-                    .filter(note -> note.authorId().equals(authorId))
-                    .toList();
-        }
-
-        @Override
-        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
-            String key = noteKey(authorId, subjectId);
-            return profileNotes.remove(key) != null;
-        }
-
-        private static String noteKey(UUID authorId, UUID subjectId) {
-            return authorId + "_" + subjectId;
-        }
-    }
-
-    private static class MinimalLikeStorage implements LikeStorage {
-        @Override
-        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-            return Optional.empty();
-        }
-
-        @Override
-        public void save(Like like) {
-            // no-op for test
-        }
-
-        @Override
-        public boolean exists(UUID from, UUID to) {
-            return false;
-        }
-
-        @Override
-        public boolean mutualLikeExists(UUID a, UUID b) {
-            return false;
-        }
-
-        @Override
-        public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-            return Set.of();
-        }
-
-        @Override
-        public Set<UUID> getUserIdsWhoLiked(UUID userId) {
-            return Set.of();
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
-            return List.of();
-        }
-
-        @Override
-        public int countByDirection(UUID userId, Like.Direction direction) {
-            return 0;
-        }
-
-        @Override
-        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
-            return 0;
-        }
-
-        @Override
-        public int countMutualLikes(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public int countLikesToday(UUID userId, Instant startOfDay) {
-            return 0;
-        }
-
-        @Override
-        public int countPassesToday(UUID userId, Instant startOfDay) {
-            return 0;
-        }
-
-        @Override
-        public void delete(UUID likeId) {
-            // no-op for test
-        }
     }
 }

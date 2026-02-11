@@ -4,7 +4,6 @@ import datingapp.core.AppClock;
 import datingapp.core.model.Match;
 import datingapp.core.model.Messaging.Conversation;
 import datingapp.core.model.Messaging.Message;
-import datingapp.core.storage.MessagingStorage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -24,7 +23,9 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  * Combines operations from former JdbiConversationStorage and
  * JdbiMessageStorage.
  */
-public interface JdbiMessagingStorage extends MessagingStorage {
+@RegisterRowMapper(JdbiMessagingStorage.ConversationMapper.class)
+@RegisterRowMapper(JdbiMessagingStorage.MessageMapper.class)
+public interface JdbiMessagingStorage {
 
     // ═══════════════════════════════════════════════════════════════
     // Conversation Operations
@@ -38,7 +39,6 @@ public interface JdbiMessagingStorage extends MessagingStorage {
                     :userAReadAt, :userBReadAt, :archivedAt, :archiveReason,
                     :visibleToUserA, :visibleToUserB)
             """)
-    @Override
     void saveConversation(@BindBean Conversation conversation);
 
     @SqlQuery("""
@@ -48,11 +48,8 @@ public interface JdbiMessagingStorage extends MessagingStorage {
             FROM conversations
             WHERE id = :conversationId
             """)
-    @RegisterRowMapper(ConversationMapper.class)
-    @Override
     Optional<Conversation> getConversation(@Bind("conversationId") String conversationId);
 
-    @Override
     default Optional<Conversation> getConversationByUsers(UUID userA, UUID userB) {
         String conversationId = Conversation.generateId(userA, userB);
         return getConversation(conversationId);
@@ -67,11 +64,9 @@ public interface JdbiMessagingStorage extends MessagingStorage {
             ORDER BY COALESCE(last_message_at, created_at) DESC
             """)
     @RegisterRowMapper(ConversationMapper.class)
-    @Override
     List<Conversation> getConversationsFor(@Bind("userId") UUID userId);
 
     @SqlUpdate("UPDATE conversations SET last_message_at = :timestamp WHERE id = :conversationId")
-    @Override
     void updateConversationLastMessageAt(
             @Bind("conversationId") String conversationId, @Bind("timestamp") Instant timestamp);
 
@@ -81,13 +76,11 @@ public interface JdbiMessagingStorage extends MessagingStorage {
                 user_b_last_read_at = CASE WHEN user_b = :userId THEN :timestamp ELSE user_b_last_read_at END
             WHERE id = :conversationId AND (user_a = :userId OR user_b = :userId)
             """)
-    @Override
     void updateConversationReadTimestamp(
             @Bind("conversationId") String conversationId,
             @Bind("userId") UUID userId,
             @Bind("timestamp") Instant timestamp);
 
-    @Override
     default void archiveConversation(String conversationId, Match.ArchiveReason reason) {
         archiveConversationInternal(conversationId, AppClock.now(), reason);
     }
@@ -105,14 +98,12 @@ public interface JdbiMessagingStorage extends MessagingStorage {
                 visible_to_user_b = CASE WHEN user_b = :userId THEN :visible ELSE visible_to_user_b END
             WHERE id = :conversationId
             """)
-    @Override
     void setConversationVisibility(
             @Bind("conversationId") String conversationId,
             @Bind("userId") UUID userId,
             @Bind("visible") boolean visible);
 
     @SqlUpdate("DELETE FROM conversations WHERE id = :conversationId")
-    @Override
     void deleteConversation(@Bind("conversationId") String conversationId);
 
     // ═══════════════════════════════════════════════════════════════
@@ -123,7 +114,6 @@ public interface JdbiMessagingStorage extends MessagingStorage {
             INSERT INTO messages (id, conversation_id, sender_id, content, created_at)
             VALUES (:id, :conversationId, :senderId, :content, :createdAt)
             """)
-    @Override
     void saveMessage(@BindBean Message message);
 
     @SqlQuery("""
@@ -134,7 +124,6 @@ public interface JdbiMessagingStorage extends MessagingStorage {
             LIMIT :limit OFFSET :offset
             """)
     @RegisterRowMapper(MessageMapper.class)
-    @Override
     List<Message> getMessages(
             @Bind("conversationId") String conversationId, @Bind("limit") int limit, @Bind("offset") int offset);
 
@@ -146,11 +135,9 @@ public interface JdbiMessagingStorage extends MessagingStorage {
             LIMIT 1
             """)
     @RegisterRowMapper(MessageMapper.class)
-    @Override
     Optional<Message> getLatestMessage(@Bind("conversationId") String conversationId);
 
     @SqlQuery("SELECT COUNT(*) FROM messages WHERE conversation_id = :conversationId")
-    @Override
     int countMessages(@Bind("conversationId") String conversationId);
 
     @SqlQuery("""
@@ -158,7 +145,6 @@ public interface JdbiMessagingStorage extends MessagingStorage {
             WHERE conversation_id = :conversationId
             AND created_at > :after
             """)
-    @Override
     int countMessagesAfter(@Bind("conversationId") String conversationId, @Bind("after") Instant after);
 
     @SqlQuery("""
@@ -166,7 +152,6 @@ public interface JdbiMessagingStorage extends MessagingStorage {
             WHERE conversation_id = :conversationId
             AND sender_id != :senderId
             """)
-    @Override
     int countMessagesNotFromSender(@Bind("conversationId") String conversationId, @Bind("senderId") UUID senderId);
 
     @SqlQuery("""
@@ -175,14 +160,12 @@ public interface JdbiMessagingStorage extends MessagingStorage {
             AND created_at > :after
             AND sender_id != :excludeSenderId
             """)
-    @Override
     int countMessagesAfterNotFrom(
             @Bind("conversationId") String conversationId,
             @Bind("after") Instant after,
             @Bind("excludeSenderId") UUID excludeSenderId);
 
     @SqlUpdate("DELETE FROM messages WHERE conversation_id = :conversationId")
-    @Override
     void deleteMessagesByConversation(@Bind("conversationId") String conversationId);
 
     // ═══════════════════════════════════════════════════════════════

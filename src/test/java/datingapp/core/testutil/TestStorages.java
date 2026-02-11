@@ -1,7 +1,7 @@
 package datingapp.core.testutil;
 
 import datingapp.core.AppClock;
-import datingapp.core.model.*;
+import datingapp.core.AppConfig;
 import datingapp.core.model.Achievement;
 import datingapp.core.model.Achievement.UserAchievement;
 import datingapp.core.model.Match;
@@ -10,48 +10,60 @@ import datingapp.core.model.Messaging.Message;
 import datingapp.core.model.Standout;
 import datingapp.core.model.Stats.PlatformStats;
 import datingapp.core.model.Stats.UserStats;
+import datingapp.core.model.SwipeSession;
+import datingapp.core.model.UndoState;
 import datingapp.core.model.User;
 import datingapp.core.model.User.ProfileNote;
-import datingapp.core.model.User.UserState;
 import datingapp.core.model.UserInteractions.Block;
 import datingapp.core.model.UserInteractions.FriendRequest;
 import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.model.UserInteractions.Notification;
 import datingapp.core.model.UserInteractions.Report;
-import datingapp.core.service.*;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.MessagingStorage;
-import datingapp.core.storage.SocialStorage;
-import datingapp.core.storage.StatsStorage;
+import datingapp.core.storage.AnalyticsStorage;
+import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
-/**
- * Consolidated in-memory storage implementations for unit testing.
- * All implementations are simple HashMap-backed mocks with test helper methods.
- *
- * <p>Usage:
- * <pre>
- * var userStorage = new TestStorages.Users();
- * var likeStorage = new TestStorages.Likes();
- * var matchStorage = new TestStorages.Matches();
- * var trustSafetyStorage = new TestStorages.TrustSafety();
- * </pre>
- */
+/** In-memory storages for tests. */
 public final class TestStorages {
-    private TestStorages() {} // Utility class - no instantiation
 
-    /**
-     * In-memory UserStorage implementation for testing.
-     */
+    private static final String NOTE_DELIMITER = ":";
+    private static final String DAILY_PICK_DELIMITER = "|";
+    private static final String STANDOUT_DELIMITER = "|";
+
+    private TestStorages() {}
+
+    private static String profileNoteKey(UUID authorId, UUID subjectId) {
+        return authorId + NOTE_DELIMITER + subjectId;
+    }
+
+    private static String dailyPickKey(UUID userId, LocalDate date) {
+        return userId + DAILY_PICK_DELIMITER + date;
+    }
+
+    private static String standoutKey(UUID seekerId, LocalDate date) {
+        return seekerId + STANDOUT_DELIMITER + date;
+    }
+
     public static class Users implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
-        private final Map<String, ProfileNote> profileNotes = new ConcurrentHashMap<>();
+        private final Map<String, ProfileNote> profileNotes = new HashMap<>();
 
         @Override
         public void save(User user) {
@@ -66,7 +78,7 @@ public final class TestStorages {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == UserState.ACTIVE)
+                    .filter(user -> user.getState() == User.UserState.ACTIVE)
                     .toList();
         }
 
@@ -76,170 +88,174 @@ public final class TestStorages {
         }
 
         @Override
+        public Map<UUID, User> findByIds(Set<UUID> ids) {
+            if (ids == null || ids.isEmpty()) {
+                return Map.of();
+            }
+            Map<UUID, User> found = new HashMap<>();
+            for (UUID id : ids) {
+                User user = users.get(id);
+                if (user != null) {
+                    found.put(id, user);
+                }
+            }
+            return found;
+        }
+
+        @Override
         public void delete(UUID id) {
             users.remove(id);
         }
 
         @Override
         public void saveProfileNote(ProfileNote note) {
-            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
+            profileNotes.put(profileNoteKey(note.authorId(), note.subjectId()), note);
         }
 
         @Override
         public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
-            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
+            return Optional.ofNullable(profileNotes.get(profileNoteKey(authorId, subjectId)));
         }
 
         @Override
         public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
             return profileNotes.values().stream()
                     .filter(note -> note.authorId().equals(authorId))
-                    .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))
+                    .sorted(Comparator.comparing(ProfileNote::updatedAt).reversed())
                     .toList();
         }
 
         @Override
         public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
-            return profileNotes.remove(noteKey(authorId, subjectId)) != null;
+            return profileNotes.remove(profileNoteKey(authorId, subjectId)) != null;
         }
 
-        // === Test Helpers ===
-
-        /** Clears all users */
         public void clear() {
             users.clear();
+            profileNotes.clear();
         }
 
-        /** Returns number of users stored */
         public int size() {
             return users.size();
         }
-
-        private static String noteKey(UUID authorId, UUID subjectId) {
-            return authorId + "_" + subjectId;
-        }
     }
 
-    /**
-     * In-memory TrustSafetyStorage implementation for testing.
-     */
-    public static class TrustSafety implements TrustSafetyStorage {
-        private final Set<Block> blocks = new HashSet<>();
-        private final List<Report> reports = new ArrayList<>();
-
-        // ─── Block operations ───
+    public static class Interactions implements InteractionStorage {
+        private final Map<UUID, Like> likes = new HashMap<>();
+        private final Map<String, Match> matches = new HashMap<>();
 
         @Override
-        public void save(Block block) {
-            blocks.add(block);
+        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
+            return likes.values().stream()
+                    .filter(like -> like.whoLikes().equals(fromUserId))
+                    .filter(like -> like.whoGotLiked().equals(toUserId))
+                    .findFirst();
         }
 
         @Override
-        public boolean isBlocked(UUID userA, UUID userB) {
-            return blocks.stream()
-                    .anyMatch(b -> (b.blockerId().equals(userA) && b.blockedId().equals(userB))
-                            || (b.blockerId().equals(userB) && b.blockedId().equals(userA)));
+        public void save(Like like) {
+            likes.put(like.id(), like);
         }
 
         @Override
-        public Set<UUID> getBlockedUserIds(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Block block : blocks) {
-                if (block.blockerId().equals(userId)) {
-                    result.add(block.blockedId());
-                } else if (block.blockedId().equals(userId)) {
-                    result.add(block.blockerId());
-                }
-            }
-            return result;
+        public boolean exists(UUID from, UUID to) {
+            return getLike(from, to).isPresent();
         }
 
         @Override
-        public List<Block> findByBlocker(UUID blockerId) {
-            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
+        public boolean mutualLikeExists(UUID a, UUID b) {
+            boolean forward = likes.values().stream()
+                    .anyMatch(like -> like.whoLikes().equals(a)
+                            && like.whoGotLiked().equals(b)
+                            && like.direction() == Like.Direction.LIKE);
+            boolean backward = likes.values().stream()
+                    .anyMatch(like -> like.whoLikes().equals(b)
+                            && like.whoGotLiked().equals(a)
+                            && like.direction() == Like.Direction.LIKE);
+            return forward && backward;
         }
 
         @Override
-        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
-            return blocks.removeIf(
-                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
+        public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
+            return likes.values().stream()
+                    .filter(like -> like.whoLikes().equals(userId))
+                    .map(Like::whoGotLiked)
+                    .collect(Collectors.toSet());
         }
 
         @Override
-        public int countBlocksGiven(UUID userId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockerId().equals(userId)).count();
+        public Set<UUID> getUserIdsWhoLiked(UUID userId) {
+            return likes.values().stream()
+                    .filter(like -> like.whoGotLiked().equals(userId))
+                    .filter(like -> like.direction() == Like.Direction.LIKE)
+                    .map(Like::whoLikes)
+                    .collect(Collectors.toSet());
         }
 
         @Override
-        public int countBlocksReceived(UUID userId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
-        }
-
-        // ─── Report operations ───
-
-        @Override
-        public void save(Report report) {
-            reports.add(report);
-        }
-
-        @Override
-        public int countReportsAgainst(UUID userId) {
-            return (int) reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .count();
-        }
-
-        @Override
-        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
-            return reports.stream()
-                    .anyMatch(r -> r.reporterId().equals(reporterId)
-                            && r.reportedUserId().equals(reportedUserId));
-        }
-
-        @Override
-        public List<Report> getReportsAgainst(UUID userId) {
-            return reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
+            return likes.values().stream()
+                    .filter(like -> like.whoGotLiked().equals(userId))
+                    .filter(like -> like.direction() == Like.Direction.LIKE)
+                    .sorted(Comparator.comparing(Like::createdAt))
+                    .map(like -> Map.entry(like.whoLikes(), like.createdAt()))
                     .toList();
         }
 
         @Override
-        public int countReportsBy(UUID userId) {
-            return (int)
-                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
+        public int countByDirection(UUID userId, Like.Direction direction) {
+            return (int) likes.values().stream()
+                    .filter(like -> like.whoLikes().equals(userId))
+                    .filter(like -> like.direction() == direction)
+                    .count();
         }
 
-        // ─── Test Helpers ───
-
-        /** Clears all blocks and reports */
-        public void clear() {
-            blocks.clear();
-            reports.clear();
+        @Override
+        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
+            return (int) likes.values().stream()
+                    .filter(like -> like.whoGotLiked().equals(userId))
+                    .filter(like -> like.direction() == direction)
+                    .count();
         }
 
-        /** Returns number of blocks stored */
-        public int blockSize() {
-            return blocks.size();
+        @Override
+        public int countMutualLikes(UUID userId) {
+            Set<UUID> likedByUser = likes.values().stream()
+                    .filter(like -> like.whoLikes().equals(userId))
+                    .filter(like -> like.direction() == Like.Direction.LIKE)
+                    .map(Like::whoGotLiked)
+                    .collect(Collectors.toSet());
+            return (int) likes.values().stream()
+                    .filter(like -> like.whoGotLiked().equals(userId))
+                    .filter(like -> like.direction() == Like.Direction.LIKE)
+                    .map(Like::whoLikes)
+                    .filter(likedByUser::contains)
+                    .distinct()
+                    .count();
         }
 
-        /** Returns number of reports stored */
-        public int reportSize() {
-            return reports.size();
+        @Override
+        public int countLikesToday(UUID userId, Instant startOfDay) {
+            return (int) likes.values().stream()
+                    .filter(like -> like.whoLikes().equals(userId))
+                    .filter(like -> like.direction() == Like.Direction.LIKE)
+                    .filter(like -> !like.createdAt().isBefore(startOfDay))
+                    .count();
         }
 
-        /** Returns total size (blocks + reports) */
-        public int size() {
-            return blocks.size() + reports.size();
+        @Override
+        public int countPassesToday(UUID userId, Instant startOfDay) {
+            return (int) likes.values().stream()
+                    .filter(like -> like.whoLikes().equals(userId))
+                    .filter(like -> like.direction() == Like.Direction.PASS)
+                    .filter(like -> !like.createdAt().isBefore(startOfDay))
+                    .count();
         }
-    }
 
-    /**
-     * In-memory MatchStorage implementation for testing.
-     */
-    public static class Matches implements MatchStorage {
-        private final Map<String, Match> matches = new HashMap<>();
+        @Override
+        public void delete(UUID likeId) {
+            likes.remove(likeId);
+        }
 
         @Override
         public void save(Match match) {
@@ -253,427 +269,216 @@ public final class TestStorages {
 
         @Override
         public Optional<Match> get(String matchId) {
-            return Optional.ofNullable(matches.get(matchId));
+            Match match = matches.get(matchId);
+            if (match == null || match.getDeletedAt() != null) {
+                return Optional.empty();
+            }
+            return Optional.of(match);
         }
 
         @Override
         public boolean exists(String matchId) {
-            return matches.containsKey(matchId);
+            Match match = matches.get(matchId);
+            return match != null && match.getDeletedAt() == null;
         }
 
         @Override
         public List<Match> getActiveMatchesFor(UUID userId) {
             return matches.values().stream()
-                    .filter(m -> m.involves(userId) && m.isActive())
+                    .filter(match -> match.getDeletedAt() == null)
+                    .filter(match -> match.getState() == Match.State.ACTIVE)
+                    .filter(match -> match.involves(userId))
                     .toList();
         }
 
         @Override
         public List<Match> getAllMatchesFor(UUID userId) {
-            return matches.values().stream().filter(m -> m.involves(userId)).toList();
+            return matches.values().stream()
+                    .filter(match -> match.getDeletedAt() == null)
+                    .filter(match -> match.involves(userId))
+                    .toList();
         }
 
         @Override
         public void delete(String matchId) {
-            matches.remove(matchId);
+            Match match = matches.get(matchId);
+            if (match != null) {
+                match.setDeletedAt(AppClock.now());
+            }
         }
 
-        // === Test Helpers ===
+        @Override
+        public int purgeDeletedBefore(Instant threshold) {
+            int before = matches.size();
+            matches.entrySet().removeIf(entry -> {
+                Instant deletedAt = entry.getValue().getDeletedAt();
+                return deletedAt != null && deletedAt.isBefore(threshold);
+            });
+            return before - matches.size();
+        }
 
-        /** Clears all matches */
+        @Override
+        public boolean atomicUndoDelete(UUID likeId, String matchId) {
+            Like removed = likes.remove(likeId);
+            if (removed == null) {
+                return false;
+            }
+            if (matchId != null) {
+                matches.remove(matchId);
+            }
+            return true;
+        }
+
         public void clear() {
+            likes.clear();
             matches.clear();
         }
 
-        /** Returns number of matches stored */
-        public int size() {
-            return matches.size();
-        }
-
-        /** Returns all matches */
-        public List<Match> getAll() {
-            return new ArrayList<>(matches.values());
-        }
-    }
-
-    /**
-     * In-memory LikeStorage implementation for testing.
-     */
-    public static class Likes implements LikeStorage {
-        private final Map<String, Like> likes = new HashMap<>();
-
-        @Override
-        public boolean exists(UUID from, UUID to) {
-            return likes.containsKey(key(from, to));
-        }
-
-        @Override
-        public void save(Like like) {
-            likes.put(key(like.whoLikes(), like.whoGotLiked()), like);
-        }
-
-        @Override
-        public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Like like : likes.values()) {
-                if (like.whoLikes().equals(userId)) {
-                    result.add(like.whoGotLiked());
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public Set<UUID> getUserIdsWhoLiked(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Like like : likes.values()) {
-                if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
-                    result.add(like.whoLikes());
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
-            List<Map.Entry<UUID, Instant>> result = new ArrayList<>();
-            for (Like like : likes.values()) {
-                if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
-                    result.add(Map.entry(like.whoLikes(), like.createdAt()));
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public boolean mutualLikeExists(UUID user1, UUID user2) {
-            Like like1 = likes.get(key(user1, user2));
-            Like like2 = likes.get(key(user2, user1));
-            return like1 != null
-                    && like1.direction() == Like.Direction.LIKE
-                    && like2 != null
-                    && like2.direction() == Like.Direction.LIKE;
-        }
-
-        @Override
-        public int countByDirection(UUID userId, Like.Direction direction) {
-            return (int) likes.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId) && l.direction() == direction)
-                    .count();
-        }
-
-        @Override
-        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
-            return (int) likes.values().stream()
-                    .filter(l -> l.whoGotLiked().equals(userId) && l.direction() == direction)
-                    .count();
-        }
-
-        @Override
-        public int countMutualLikes(UUID userId) {
-            return (int) likes.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.LIKE
-                            && mutualLikeExists(userId, l.whoGotLiked()))
-                    .count();
-        }
-
-        @Override
-        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-            return Optional.ofNullable(likes.get(key(fromUserId, toUserId)));
-        }
-
-        @Override
-        public int countLikesToday(UUID userId, Instant startOfDay) {
-            return (int) likes.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.LIKE
-                            && !l.createdAt().isBefore(startOfDay))
-                    .count();
-        }
-
-        @Override
-        public int countPassesToday(UUID userId, Instant startOfDay) {
-            return (int) likes.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.PASS
-                            && !l.createdAt().isBefore(startOfDay))
-                    .count();
-        }
-
-        @Override
-        public void delete(UUID likeId) {
-            likes.values().removeIf(like -> like.id().equals(likeId));
-        }
-
-        // === Test Helpers ===
-
-        /** Clears all likes */
-        public void clear() {
-            likes.clear();
-        }
-
-        /** Returns number of likes stored */
-        public int size() {
+        public int likeSize() {
             return likes.size();
         }
 
-        private String key(UUID from, UUID to) {
-            return from.toString() + "->" + to.toString();
-        }
-    }
-
-    /**
-     * In-memory Standout.Storage implementation for testing.
-     */
-    public static class Standouts implements Standout.Storage {
-        private final Map<String, List<Standout>> standoutsByDate = new HashMap<>();
-
-        @Override
-        public void saveStandouts(UUID seekerId, List<Standout> standouts, java.time.LocalDate date) {
-            standoutsByDate.put(key(seekerId, date), new ArrayList<>(standouts));
-        }
-
-        @Override
-        public List<Standout> getStandouts(UUID seekerId, java.time.LocalDate date) {
-            return standoutsByDate.getOrDefault(key(seekerId, date), List.of());
-        }
-
-        @Override
-        public void markInteracted(UUID seekerId, UUID standoutUserId, java.time.LocalDate date) {
-            List<Standout> list = standoutsByDate.get(key(seekerId, date));
-            if (list != null) {
-                for (int i = 0; i < list.size(); i++) {
-                    Standout s = list.get(i);
-                    if (s.standoutUserId().equals(standoutUserId)) {
-                        list.set(i, s.withInteraction(AppClock.now()));
-                        break;
-                    }
-                }
-            }
-        }
-
-        @Override
-        public int cleanup(java.time.LocalDate before) {
-            int removed = 0;
-            var iter = standoutsByDate.entrySet().iterator();
-            while (iter.hasNext()) {
-                var entry = iter.next();
-                java.time.LocalDate date =
-                        java.time.LocalDate.parse(entry.getKey().split("\\|")[1]);
-                if (date.isBefore(before)) {
-                    removed += entry.getValue().size();
-                    iter.remove();
-                }
-            }
-            return removed;
-        }
-
-        private String key(UUID seekerId, java.time.LocalDate date) {
-            return seekerId.toString() + "|" + date.toString();
-        }
-
-        public void clear() {
-            standoutsByDate.clear();
-        }
-    }
-
-    /**
-     * In-memory UndoState.Storage implementation for testing.
-     */
-    public static class Undos implements datingapp.core.model.UndoState.Storage {
-        private final Map<UUID, datingapp.core.model.UndoState> undoStates = new HashMap<>();
-
-        @Override
-        public void save(datingapp.core.model.UndoState state) {
-            undoStates.put(state.userId(), state);
-        }
-
-        @Override
-        public java.util.Optional<datingapp.core.model.UndoState> findByUserId(UUID userId) {
-            return java.util.Optional.ofNullable(undoStates.get(userId));
-        }
-
-        @Override
-        public boolean delete(UUID userId) {
-            return undoStates.remove(userId) != null;
-        }
-
-        @Override
-        public int deleteExpired(Instant now) {
-            int removed = 0;
-            var iter = undoStates.entrySet().iterator();
-            while (iter.hasNext()) {
-                var entry = iter.next();
-                if (entry.getValue().isExpired(now)) {
-                    iter.remove();
-                    removed++;
-                }
-            }
-            return removed;
-        }
-
-        @Override
-        public java.util.List<datingapp.core.model.UndoState> findAll() {
-            return new java.util.ArrayList<>(undoStates.values());
-        }
-
-        public void clear() {
-            undoStates.clear();
+        public int matchSize() {
+            return matches.size();
         }
 
         public int size() {
-            return undoStates.size();
+            return likes.size() + matches.size();
         }
     }
 
-    /**
-     * In-memory StatsStorage implementation for testing.
-     */
-    public static class Stats implements StatsStorage {
-        private final Map<UUID, List<UserStats>> userStats = new HashMap<>();
-        private final List<PlatformStats> platformStats = new ArrayList<>();
-        private final Map<String, Instant> profileViews = new HashMap<>();
-        private final Map<UUID, List<UserAchievement>> achievements = new HashMap<>();
-        private final Set<String> dailyPickViews = new HashSet<>();
+    public static class Communications implements CommunicationStorage {
+        private final Map<String, Conversation> conversations = new HashMap<>();
+        private final Map<String, List<Message>> messagesByConversation = new HashMap<>();
+        private final Map<UUID, FriendRequest> friendRequests = new HashMap<>();
+        private final Map<UUID, Notification> notifications = new HashMap<>();
 
         @Override
-        public void saveUserStats(UserStats stats) {
-            userStats
-                    .computeIfAbsent(stats.userId(), ignored -> new ArrayList<>())
-                    .add(stats);
+        public void saveConversation(Conversation conversation) {
+            conversations.put(conversation.getId(), conversation);
         }
 
         @Override
-        public Optional<UserStats> getLatestUserStats(UUID userId) {
-            List<UserStats> list = userStats.get(userId);
-            return list == null || list.isEmpty() ? Optional.empty() : Optional.of(list.get(list.size() - 1));
+        public Optional<Conversation> getConversation(String conversationId) {
+            return Optional.ofNullable(conversations.get(conversationId));
         }
 
         @Override
-        public List<UserStats> getUserStatsHistory(UUID userId, int limit) {
-            List<UserStats> list = userStats.getOrDefault(userId, List.of());
-            return list.subList(Math.max(0, list.size() - limit), list.size());
+        public Optional<Conversation> getConversationByUsers(UUID userA, UUID userB) {
+            return getConversation(Conversation.generateId(userA, userB));
         }
 
         @Override
-        public List<UserStats> getAllLatestUserStats() {
-            List<UserStats> result = new ArrayList<>();
-            for (List<UserStats> list : userStats.values()) {
-                if (!list.isEmpty()) {
-                    result.add(list.get(list.size() - 1));
-                }
+        public List<Conversation> getConversationsFor(UUID userId) {
+            return conversations.values().stream()
+                    .filter(conversation -> conversation.involves(userId))
+                    .sorted(Comparator.comparing((Conversation conversation) -> {
+                                Instant last = conversation.getLastMessageAt();
+                                return last != null ? last : conversation.getCreatedAt();
+                            })
+                            .reversed())
+                    .toList();
+        }
+
+        @Override
+        public void updateConversationLastMessageAt(String conversationId, Instant timestamp) {
+            Conversation conversation = conversations.get(conversationId);
+            if (conversation != null) {
+                conversation.updateLastMessageAt(timestamp);
             }
-            return result;
         }
 
         @Override
-        public int deleteUserStatsOlderThan(Instant cutoff) {
-            return 0;
+        public void updateConversationReadTimestamp(String conversationId, UUID userId, Instant timestamp) {
+            Conversation conversation = conversations.get(conversationId);
+            if (conversation != null && conversation.involves(userId)) {
+                conversation.updateReadTimestamp(userId, timestamp);
+            }
         }
 
         @Override
-        public void savePlatformStats(PlatformStats stats) {
-            platformStats.add(stats);
+        public void archiveConversation(String conversationId, Match.ArchiveReason reason) {
+            Conversation conversation = conversations.get(conversationId);
+            if (conversation != null) {
+                conversation.archive(reason);
+            }
         }
 
         @Override
-        public Optional<PlatformStats> getLatestPlatformStats() {
-            return platformStats.isEmpty()
-                    ? Optional.empty()
-                    : Optional.of(platformStats.get(platformStats.size() - 1));
+        public void setConversationVisibility(String conversationId, UUID userId, boolean visible) {
+            Conversation conversation = conversations.get(conversationId);
+            if (conversation != null && conversation.involves(userId)) {
+                conversation.setVisibility(userId, visible);
+            }
         }
 
         @Override
-        public List<PlatformStats> getPlatformStatsHistory(int limit) {
-            int size = platformStats.size();
-            return platformStats.subList(Math.max(0, size - limit), size);
+        public void deleteConversation(String conversationId) {
+            conversations.remove(conversationId);
+            messagesByConversation.remove(conversationId);
         }
 
         @Override
-        public void recordProfileView(UUID viewerId, UUID viewedId) {
-            profileViews.put(viewerId + "_" + viewedId, Instant.now());
+        public void saveMessage(Message message) {
+            messagesByConversation
+                    .computeIfAbsent(message.conversationId(), ignored -> new ArrayList<>())
+                    .add(message);
         }
 
         @Override
-        public int getProfileViewCount(UUID userId) {
-            return (int) profileViews.keySet().stream()
-                    .filter(k -> k.endsWith("_" + userId))
+        public List<Message> getMessages(String conversationId, int limit, int offset) {
+            if (limit <= 0 || offset < 0) {
+                return List.of();
+            }
+            List<Message> all = messagesByConversation.getOrDefault(conversationId, List.of()).stream()
+                    .sorted(Comparator.comparing(Message::createdAt))
+                    .toList();
+            if (offset >= all.size()) {
+                return List.of();
+            }
+            int end = Math.min(all.size(), offset + limit);
+            return new ArrayList<>(all.subList(offset, end));
+        }
+
+        @Override
+        public Optional<Message> getLatestMessage(String conversationId) {
+            return messagesByConversation.getOrDefault(conversationId, List.of()).stream()
+                    .max(Comparator.comparing(Message::createdAt));
+        }
+
+        @Override
+        public int countMessages(String conversationId) {
+            return messagesByConversation
+                    .getOrDefault(conversationId, List.of())
+                    .size();
+        }
+
+        @Override
+        public int countMessagesAfter(String conversationId, Instant after) {
+            return (int) messagesByConversation.getOrDefault(conversationId, List.of()).stream()
+                    .filter(message -> message.createdAt().isAfter(after))
                     .count();
         }
 
         @Override
-        public int getUniqueViewerCount(UUID userId) {
-            return getProfileViewCount(userId);
+        public int countMessagesNotFromSender(String conversationId, UUID senderId) {
+            return (int) messagesByConversation.getOrDefault(conversationId, List.of()).stream()
+                    .filter(message -> !message.senderId().equals(senderId))
+                    .count();
         }
 
         @Override
-        public List<UUID> getRecentViewers(UUID userId, int limit) {
-            return List.of();
+        public int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId) {
+            return (int) messagesByConversation.getOrDefault(conversationId, List.of()).stream()
+                    .filter(message -> message.createdAt().isAfter(after))
+                    .filter(message -> !message.senderId().equals(excludeSenderId))
+                    .count();
         }
 
         @Override
-        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
-            return profileViews.containsKey(viewerId + "_" + viewedId);
+        public void deleteMessagesByConversation(String conversationId) {
+            messagesByConversation.remove(conversationId);
         }
-
-        @Override
-        public void saveUserAchievement(UserAchievement achievement) {
-            achievements
-                    .computeIfAbsent(achievement.userId(), ignored -> new ArrayList<>())
-                    .add(achievement);
-        }
-
-        @Override
-        public List<UserAchievement> getUnlockedAchievements(UUID userId) {
-            return achievements.getOrDefault(userId, List.of());
-        }
-
-        @Override
-        public boolean hasAchievement(UUID userId, Achievement achievement) {
-            return achievements.getOrDefault(userId, List.of()).stream().anyMatch(a -> a.achievement() == achievement);
-        }
-
-        @Override
-        public int countUnlockedAchievements(UUID userId) {
-            return achievements.getOrDefault(userId, List.of()).size();
-        }
-
-        @Override
-        public void markDailyPickAsViewed(UUID userId, LocalDate date) {
-            dailyPickViews.add(userId + "_" + date);
-        }
-
-        @Override
-        public boolean isDailyPickViewed(UUID userId, LocalDate date) {
-            return dailyPickViews.contains(userId + "_" + date);
-        }
-
-        @Override
-        public int deleteDailyPickViewsOlderThan(LocalDate before) {
-            return 0;
-        }
-
-        @Override
-        public int deleteExpiredDailyPickViews(Instant cutoff) {
-            return 0;
-        }
-
-        public void clear() {
-            userStats.clear();
-            platformStats.clear();
-            profileViews.clear();
-            achievements.clear();
-            dailyPickViews.clear();
-        }
-    }
-
-    /**
-     * In-memory SocialStorage implementation for testing.
-     */
-    public static class Social implements SocialStorage {
-        private final Map<UUID, FriendRequest> friendRequests = new HashMap<>();
-        private final Map<UUID, Notification> notifications = new HashMap<>();
 
         @Override
         public void saveFriendRequest(FriendRequest request) {
@@ -693,16 +498,19 @@ public final class TestStorages {
         @Override
         public Optional<FriendRequest> getPendingFriendRequestBetween(UUID user1, UUID user2) {
             return friendRequests.values().stream()
-                    .filter(FriendRequest::isPending)
-                    .filter(r -> (r.fromUserId().equals(user1) && r.toUserId().equals(user2))
-                            || (r.fromUserId().equals(user2) && r.toUserId().equals(user1)))
+                    .filter(request -> request.status() == FriendRequest.Status.PENDING)
+                    .filter(request -> (request.fromUserId().equals(user1)
+                                    && request.toUserId().equals(user2))
+                            || (request.fromUserId().equals(user2)
+                                    && request.toUserId().equals(user1)))
                     .findFirst();
         }
 
         @Override
         public List<FriendRequest> getPendingFriendRequestsForUser(UUID userId) {
             return friendRequests.values().stream()
-                    .filter(r -> r.toUserId().equals(userId) && r.isPending())
+                    .filter(request -> request.status() == FriendRequest.Status.PENDING)
+                    .filter(request -> request.toUserId().equals(userId))
                     .toList();
         }
 
@@ -718,21 +526,28 @@ public final class TestStorages {
 
         @Override
         public void markNotificationAsRead(UUID id) {
-            Notification n = notifications.get(id);
-            if (n != null && !n.isRead()) {
-                notifications.put(
-                        id,
-                        new Notification(
-                                n.id(), n.userId(), n.type(), n.title(), n.message(), n.createdAt(), true, n.data()));
+            Notification existing = notifications.get(id);
+            if (existing == null || existing.isRead()) {
+                return;
             }
+            Notification updated = new Notification(
+                    existing.id(),
+                    existing.userId(),
+                    existing.type(),
+                    existing.title(),
+                    existing.message(),
+                    existing.createdAt(),
+                    true,
+                    existing.data());
+            notifications.put(id, updated);
         }
 
         @Override
         public List<Notification> getNotificationsForUser(UUID userId, boolean unreadOnly) {
             return notifications.values().stream()
-                    .filter(n -> n.userId().equals(userId))
-                    .filter(n -> !unreadOnly || !n.isRead())
-                    .sorted((a, b) -> b.createdAt().compareTo(a.createdAt()))
+                    .filter(notification -> notification.userId().equals(userId))
+                    .filter(notification -> !unreadOnly || !notification.isRead())
+                    .sorted(Comparator.comparing(Notification::createdAt).reversed())
                     .toList();
         }
 
@@ -748,115 +563,460 @@ public final class TestStorages {
 
         @Override
         public void deleteOldNotifications(Instant before) {
-            notifications.entrySet().removeIf(e -> e.getValue().createdAt().isBefore(before));
-        }
-
-        public void clear() {
-            friendRequests.clear();
-            notifications.clear();
+            notifications
+                    .values()
+                    .removeIf(notification -> notification.createdAt().isBefore(before));
         }
     }
 
-    /**
-     * In-memory MessagingStorage implementation for testing.
-     */
-    public static class Messaging implements MessagingStorage {
-        private final Map<String, Conversation> conversations = new HashMap<>();
-        private final Map<String, List<Message>> messages = new HashMap<>();
+    public static class Analytics implements AnalyticsStorage {
+        private final Map<UUID, List<UserStats>> userStatsHistory = new HashMap<>();
+        private final List<PlatformStats> platformStatsHistory = new ArrayList<>();
+        private final List<ProfileViewEvent> profileViews = new ArrayList<>();
+        private final Map<UUID, List<UserAchievement>> achievements = new HashMap<>();
+        private final Set<String> dailyPickViews = new HashSet<>();
+        private final Map<UUID, SwipeSession> sessions = new HashMap<>();
 
         @Override
-        public void saveConversation(Conversation conversation) {
-            conversations.put(conversation.getId(), conversation);
+        public void saveUserStats(UserStats stats) {
+            userStatsHistory
+                    .computeIfAbsent(stats.userId(), ignored -> new ArrayList<>())
+                    .add(stats);
         }
 
         @Override
-        public Optional<Conversation> getConversation(String conversationId) {
-            return Optional.ofNullable(conversations.get(conversationId));
+        public Optional<UserStats> getLatestUserStats(UUID userId) {
+            return userStatsHistory.getOrDefault(userId, List.of()).stream()
+                    .max(Comparator.comparing(UserStats::computedAt));
         }
 
         @Override
-        public Optional<Conversation> getConversationByUsers(UUID userA, UUID userB) {
-            String id = Conversation.generateId(userA, userB);
-            return getConversation(id);
-        }
-
-        @Override
-        public List<Conversation> getConversationsFor(UUID userId) {
-            return conversations.values().stream()
-                    .filter(c -> c.involves(userId))
+        public List<UserStats> getUserStatsHistory(UUID userId, int limit) {
+            if (limit <= 0) {
+                return List.of();
+            }
+            return userStatsHistory.getOrDefault(userId, List.of()).stream()
+                    .sorted(Comparator.comparing(UserStats::computedAt).reversed())
+                    .limit(limit)
                     .toList();
         }
 
         @Override
-        public void updateConversationLastMessageAt(String conversationId, Instant timestamp) {
-            // No-op for tests
+        public List<UserStats> getAllLatestUserStats() {
+            return userStatsHistory.values().stream()
+                    .map(list -> list.stream().max(Comparator.comparing(UserStats::computedAt)))
+                    .flatMap(Optional::stream)
+                    .toList();
         }
 
         @Override
-        public void updateConversationReadTimestamp(String conversationId, UUID userId, Instant timestamp) {
-            // No-op for tests
+        public int deleteUserStatsOlderThan(Instant cutoff) {
+            int removed = 0;
+            for (List<UserStats> stats : userStatsHistory.values()) {
+                int before = stats.size();
+                stats.removeIf(item -> item.computedAt().isBefore(cutoff));
+                removed += before - stats.size();
+            }
+            return removed;
         }
 
         @Override
-        public void archiveConversation(String conversationId, Match.ArchiveReason reason) {
-            // No-op for tests
+        public void savePlatformStats(PlatformStats stats) {
+            platformStatsHistory.add(stats);
         }
 
         @Override
-        public void setConversationVisibility(String conversationId, UUID userId, boolean visible) {
-            // No-op for tests
+        public Optional<PlatformStats> getLatestPlatformStats() {
+            return platformStatsHistory.stream().max(Comparator.comparing(PlatformStats::computedAt));
         }
 
         @Override
-        public void deleteConversation(String conversationId) {
-            conversations.remove(conversationId);
+        public List<PlatformStats> getPlatformStatsHistory(int limit) {
+            if (limit <= 0) {
+                return List.of();
+            }
+            return platformStatsHistory.stream()
+                    .sorted(Comparator.comparing(PlatformStats::computedAt).reversed())
+                    .limit(limit)
+                    .toList();
         }
 
         @Override
-        public void saveMessage(Message message) {
-            messages.computeIfAbsent(message.conversationId(), ignored -> new ArrayList<>())
-                    .add(message);
+        public void recordProfileView(UUID viewerId, UUID viewedId) {
+            if (viewerId.equals(viewedId)) {
+                return;
+            }
+            profileViews.add(new ProfileViewEvent(viewerId, viewedId, AppClock.now()));
         }
 
         @Override
-        public List<Message> getMessages(String conversationId, int limit, int offset) {
-            return messages.getOrDefault(conversationId, List.of());
+        public int getProfileViewCount(UUID userId) {
+            return (int) profileViews.stream()
+                    .filter(event -> event.viewedId().equals(userId))
+                    .count();
         }
 
         @Override
-        public Optional<Message> getLatestMessage(String conversationId) {
-            List<Message> list = messages.get(conversationId);
-            return list == null || list.isEmpty() ? Optional.empty() : Optional.of(list.get(list.size() - 1));
+        public int getUniqueViewerCount(UUID userId) {
+            return (int) profileViews.stream()
+                    .filter(event -> event.viewedId().equals(userId))
+                    .map(ProfileViewEvent::viewerId)
+                    .distinct()
+                    .count();
         }
 
         @Override
-        public int countMessages(String conversationId) {
-            return messages.getOrDefault(conversationId, List.of()).size();
+        public List<UUID> getRecentViewers(UUID userId, int limit) {
+            if (limit <= 0) {
+                return List.of();
+            }
+            Map<UUID, Instant> newestViewByViewer = new HashMap<>();
+            for (ProfileViewEvent event : profileViews) {
+                if (!event.viewedId().equals(userId)) {
+                    continue;
+                }
+                newestViewByViewer.merge(
+                        event.viewerId(),
+                        event.viewedAt(),
+                        (current, candidate) -> candidate.isAfter(current) ? candidate : current);
+            }
+            return newestViewByViewer.entrySet().stream()
+                    .sorted(Map.Entry.<UUID, Instant>comparingByValue().reversed())
+                    .limit(limit)
+                    .map(Map.Entry::getKey)
+                    .toList();
         }
 
         @Override
-        public int countMessagesAfter(String conversationId, Instant after) {
-            return 0;
+        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
+            return profileViews.stream()
+                    .anyMatch(event -> event.viewerId().equals(viewerId)
+                            && event.viewedId().equals(viewedId));
         }
 
         @Override
-        public int countMessagesNotFromSender(String conversationId, UUID senderId) {
-            return 0;
+        public void saveUserAchievement(UserAchievement achievement) {
+            List<UserAchievement> unlocked =
+                    achievements.computeIfAbsent(achievement.userId(), ignored -> new ArrayList<>());
+            unlocked.removeIf(existing -> existing.achievement() == achievement.achievement());
+            unlocked.add(achievement);
         }
 
         @Override
-        public int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId) {
-            return 0;
+        public List<UserAchievement> getUnlockedAchievements(UUID userId) {
+            return achievements.getOrDefault(userId, List.of()).stream()
+                    .sorted(Comparator.comparing(UserAchievement::unlockedAt).reversed())
+                    .toList();
         }
 
         @Override
-        public void deleteMessagesByConversation(String conversationId) {
-            messages.remove(conversationId);
+        public boolean hasAchievement(UUID userId, Achievement achievement) {
+            return achievements.getOrDefault(userId, List.of()).stream()
+                    .anyMatch(unlocked -> unlocked.achievement() == achievement);
         }
 
-        public void clear() {
-            conversations.clear();
-            messages.clear();
+        @Override
+        public int countUnlockedAchievements(UUID userId) {
+            return achievements.getOrDefault(userId, List.of()).size();
+        }
+
+        @Override
+        public void markDailyPickAsViewed(UUID userId, LocalDate date) {
+            dailyPickViews.add(dailyPickKey(userId, date));
+        }
+
+        @Override
+        public boolean isDailyPickViewed(UUID userId, LocalDate date) {
+            return dailyPickViews.contains(dailyPickKey(userId, date));
+        }
+
+        @Override
+        public int deleteDailyPickViewsOlderThan(LocalDate before) {
+            int beforeCount = dailyPickViews.size();
+            dailyPickViews.removeIf(key -> {
+                String[] parts = key.split("\\Q" + DAILY_PICK_DELIMITER + "\\E");
+                if (parts.length != 2) {
+                    return false;
+                }
+                LocalDate viewedDate = LocalDate.parse(parts[1]);
+                return viewedDate.isBefore(before);
+            });
+            return beforeCount - dailyPickViews.size();
+        }
+
+        @Override
+        public int deleteExpiredDailyPickViews(Instant cutoff) {
+            return deleteDailyPickViewsOlderThan(
+                    cutoff.atZone(AppConfig.defaults().userTimeZone()).toLocalDate());
+        }
+
+        @Override
+        public void saveSession(SwipeSession session) {
+            sessions.put(session.getId(), session);
+        }
+
+        @Override
+        public Optional<SwipeSession> getSession(UUID sessionId) {
+            return Optional.ofNullable(sessions.get(sessionId));
+        }
+
+        @Override
+        public Optional<SwipeSession> getActiveSession(UUID userId) {
+            return sessions.values().stream()
+                    .filter(session -> session.getUserId().equals(userId))
+                    .filter(SwipeSession::isActive)
+                    .max(Comparator.comparing(SwipeSession::getStartedAt));
+        }
+
+        @Override
+        public List<SwipeSession> getSessionsFor(UUID userId, int limit) {
+            if (limit <= 0) {
+                return List.of();
+            }
+            return sessions.values().stream()
+                    .filter(session -> session.getUserId().equals(userId))
+                    .sorted(Comparator.comparing(SwipeSession::getStartedAt).reversed())
+                    .limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public List<SwipeSession> getSessionsInRange(UUID userId, Instant start, Instant end) {
+            return sessions.values().stream()
+                    .filter(session -> session.getUserId().equals(userId))
+                    .filter(session -> !session.getStartedAt().isBefore(start))
+                    .filter(session -> !session.getStartedAt().isAfter(end))
+                    .sorted(Comparator.comparing(SwipeSession::getStartedAt).reversed())
+                    .toList();
+        }
+
+        @Override
+        public SessionAggregates getSessionAggregates(UUID userId) {
+            List<SwipeSession> userSessions = sessions.values().stream()
+                    .filter(session -> session.getUserId().equals(userId))
+                    .toList();
+            if (userSessions.isEmpty()) {
+                return SessionAggregates.empty();
+            }
+
+            int totalSessions = userSessions.size();
+            int totalSwipes =
+                    userSessions.stream().mapToInt(SwipeSession::getSwipeCount).sum();
+            int totalLikes =
+                    userSessions.stream().mapToInt(SwipeSession::getLikeCount).sum();
+            int totalPasses =
+                    userSessions.stream().mapToInt(SwipeSession::getPassCount).sum();
+            int totalMatches =
+                    userSessions.stream().mapToInt(SwipeSession::getMatchCount).sum();
+            double totalDurationSeconds = userSessions.stream()
+                    .mapToLong(SwipeSession::getDurationSeconds)
+                    .sum();
+            double avgSessionDurationSeconds = totalDurationSeconds / totalSessions;
+            double avgSwipesPerSession = totalSwipes / (double) totalSessions;
+            double avgSwipeVelocity = totalDurationSeconds == 0.0 ? 0.0 : totalSwipes / totalDurationSeconds;
+
+            return new SessionAggregates(
+                    totalSessions,
+                    totalSwipes,
+                    totalLikes,
+                    totalPasses,
+                    totalMatches,
+                    avgSessionDurationSeconds,
+                    avgSwipesPerSession,
+                    avgSwipeVelocity);
+        }
+
+        @Override
+        public int endStaleSessions(Duration timeout) {
+            int ended = 0;
+            for (SwipeSession session : sessions.values()) {
+                if (session.isActive() && session.isTimedOut(timeout)) {
+                    session.end();
+                    ended++;
+                }
+            }
+            return ended;
+        }
+
+        @Override
+        public int deleteExpiredSessions(Instant cutoff) {
+            int before = sessions.size();
+            sessions.values().removeIf(session -> session.getStartedAt().isBefore(cutoff));
+            return before - sessions.size();
+        }
+
+        private record ProfileViewEvent(UUID viewerId, UUID viewedId, Instant viewedAt) {}
+    }
+
+    public static class TrustSafety implements TrustSafetyStorage {
+        private final Map<UUID, Block> blocks = new HashMap<>();
+        private final Map<UUID, Report> reports = new HashMap<>();
+
+        @Override
+        public void save(Block block) {
+            blocks.put(block.id(), block);
+        }
+
+        @Override
+        public boolean isBlocked(UUID userA, UUID userB) {
+            return blocks.values().stream()
+                    .anyMatch(block -> (block.blockerId().equals(userA)
+                                    && block.blockedId().equals(userB))
+                            || (block.blockerId().equals(userB)
+                                    && block.blockedId().equals(userA)));
+        }
+
+        @Override
+        public Set<UUID> getBlockedUserIds(UUID userId) {
+            return blocks.values().stream()
+                    .filter(block -> block.blockerId().equals(userId))
+                    .map(Block::blockedId)
+                    .collect(Collectors.toSet());
+        }
+
+        @Override
+        public List<Block> findByBlocker(UUID blockerId) {
+            return blocks.values().stream()
+                    .filter(block -> block.blockerId().equals(blockerId))
+                    .toList();
+        }
+
+        @Override
+        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
+            List<UUID> toDelete = blocks.values().stream()
+                    .filter(block -> block.blockerId().equals(blockerId))
+                    .filter(block -> block.blockedId().equals(blockedId))
+                    .map(Block::id)
+                    .toList();
+            toDelete.forEach(blocks::remove);
+            return !toDelete.isEmpty();
+        }
+
+        @Override
+        public int countBlocksGiven(UUID userId) {
+            return (int) blocks.values().stream()
+                    .filter(block -> block.blockerId().equals(userId))
+                    .count();
+        }
+
+        @Override
+        public int countBlocksReceived(UUID userId) {
+            return (int) blocks.values().stream()
+                    .filter(block -> block.blockedId().equals(userId))
+                    .count();
+        }
+
+        @Override
+        public void save(Report report) {
+            reports.put(report.id(), report);
+        }
+
+        @Override
+        public int countReportsAgainst(UUID userId) {
+            return (int) reports.values().stream()
+                    .filter(report -> report.reportedUserId().equals(userId))
+                    .count();
+        }
+
+        @Override
+        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
+            return reports.values().stream()
+                    .anyMatch(report -> report.reporterId().equals(reporterId)
+                            && report.reportedUserId().equals(reportedUserId));
+        }
+
+        @Override
+        public List<Report> getReportsAgainst(UUID userId) {
+            return reports.values().stream()
+                    .filter(report -> report.reportedUserId().equals(userId))
+                    .toList();
+        }
+
+        @Override
+        public int countReportsBy(UUID userId) {
+            return (int) reports.values().stream()
+                    .filter(report -> report.reporterId().equals(userId))
+                    .count();
+        }
+    }
+
+    public static class Undos implements UndoState.Storage {
+        private final Map<UUID, UndoState> byUser = new HashMap<>();
+
+        @Override
+        public void save(UndoState state) {
+            byUser.put(state.userId(), state);
+        }
+
+        @Override
+        public Optional<UndoState> findByUserId(UUID userId) {
+            return Optional.ofNullable(byUser.get(userId));
+        }
+
+        @Override
+        public boolean delete(UUID userId) {
+            return byUser.remove(userId) != null;
+        }
+
+        @Override
+        public int deleteExpired(Instant now) {
+            int before = byUser.size();
+            byUser.values().removeIf(state -> state.expiresAt().isBefore(now));
+            return before - byUser.size();
+        }
+
+        @Override
+        public List<UndoState> findAll() {
+            return new ArrayList<>(byUser.values());
+        }
+    }
+
+    public static class Standouts implements Standout.Storage {
+        private final Map<String, List<Standout>> bySeekerAndDate = new HashMap<>();
+        private final Clock clock;
+
+        public Standouts() {
+            this(Clock.systemUTC());
+        }
+
+        public Standouts(Clock clock) {
+            this.clock = Objects.requireNonNull(clock, "clock cannot be null");
+        }
+
+        @Override
+        public void saveStandouts(UUID seekerId, List<Standout> standouts, LocalDate date) {
+            bySeekerAndDate.put(standoutKey(seekerId, date), new ArrayList<>(standouts));
+        }
+
+        @Override
+        public List<Standout> getStandouts(UUID seekerId, LocalDate date) {
+            return new ArrayList<>(bySeekerAndDate.getOrDefault(standoutKey(seekerId, date), List.of()));
+        }
+
+        @Override
+        public void markInteracted(UUID seekerId, UUID standoutUserId, LocalDate date) {
+            String key = standoutKey(seekerId, date);
+            List<Standout> existing = bySeekerAndDate.getOrDefault(key, List.of());
+            List<Standout> updated = existing.stream()
+                    .map(standout -> standout.standoutUserId().equals(standoutUserId)
+                            ? standout.withInteraction(Instant.now(clock))
+                            : standout)
+                    .toList();
+            bySeekerAndDate.put(key, new ArrayList<>(updated));
+        }
+
+        @Override
+        public int cleanup(LocalDate before) {
+            int prior = bySeekerAndDate.size();
+            bySeekerAndDate.keySet().removeIf(key -> {
+                String[] parts = key.split("\\Q" + STANDOUT_DELIMITER + "\\E");
+                if (parts.length != 2) {
+                    return false;
+                }
+                LocalDate date = LocalDate.parse(parts[1]);
+                return date.isBefore(before);
+            });
+            return prior - bySeekerAndDate.size();
         }
     }
 }

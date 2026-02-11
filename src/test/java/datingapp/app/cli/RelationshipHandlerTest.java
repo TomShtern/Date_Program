@@ -24,24 +24,20 @@ import org.junit.jupiter.api.*;
 class RelationshipHandlerTest {
 
     private TestStorages.Users userStorage;
-    private TestStorages.Likes likeStorage;
-    private TestStorages.Matches matchStorage;
+    private TestStorages.Interactions interactionStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
-    private TestStorages.Stats statsStorage;
-    private TestStorages.Social socialStorage;
-    private TestStorages.Messaging messagingStorage;
+    private TestStorages.Analytics analyticsStorage;
+    private TestStorages.Communications communicationStorage;
     private AppSession session;
     private User testUser;
 
     @BeforeEach
     void setUp() {
         userStorage = new TestStorages.Users();
-        likeStorage = new TestStorages.Likes();
-        matchStorage = new TestStorages.Matches();
+        interactionStorage = new TestStorages.Interactions();
         trustSafetyStorage = new TestStorages.TrustSafety();
-        statsStorage = new TestStorages.Stats();
-        socialStorage = new TestStorages.Social();
-        messagingStorage = new TestStorages.Messaging();
+        analyticsStorage = new TestStorages.Analytics();
+        communicationStorage = new TestStorages.Communications();
 
         session = AppSession.getInstance();
         session.reset();
@@ -55,38 +51,39 @@ class RelationshipHandlerTest {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         AppConfig config = AppConfig.defaults();
         MatchingService matchingService = MatchingService.builder()
-                .likeStorage(likeStorage)
-                .matchStorage(matchStorage)
-                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
                 .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
                 .build();
+        TrustSafetyService trustSafetyService =
+                new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
         RelationshipTransitionService transitionService =
-                new RelationshipTransitionService(matchStorage, socialStorage, messagingStorage);
-        CandidateFinder candidateFinder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, config);
-        MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
+                new RelationshipTransitionService(interactionStorage, communicationStorage);
+        CandidateFinder candidateFinder =
+                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
+        MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
         ProfileCompletionService profileCompletionService = new ProfileCompletionService(config);
         MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
                 candidateFinder,
                 matchingService,
-                matchStorage,
-                trustSafetyStorage,
-                new DailyService(likeStorage, config),
-                new UndoService(likeStorage, matchStorage, new TestStorages.Undos(), config),
+                interactionStorage,
+                new DailyService(interactionStorage, config),
+                new UndoService(interactionStorage, new TestStorages.Undos(), config),
                 matchQualityService,
                 userStorage,
                 new AchievementService(
-                        statsStorage,
-                        matchStorage,
-                        likeStorage,
-                        userStorage,
+                        analyticsStorage,
+                        interactionStorage,
                         trustSafetyStorage,
+                        userStorage,
                         profileCompletionService,
                         config),
-                statsStorage,
+                analyticsStorage,
+                trustSafetyService,
                 transitionService,
                 new StandoutsService(
                         userStorage, new TestStorages.Standouts(), candidateFinder, profileCompletionService, config),
-                socialStorage,
+                communicationStorage,
                 session,
                 inputReader);
         return new MatchingHandler(deps);
@@ -122,7 +119,7 @@ class RelationshipHandlerTest {
 
             // Create friend request TO testUser
             FriendRequest request = FriendRequest.create(otherUser.getId(), testUser.getId());
-            socialStorage.saveFriendRequest(request);
+            communicationStorage.saveFriendRequest(request);
 
             MatchingHandler handler = createHandler("b\n");
 
@@ -137,18 +134,18 @@ class RelationshipHandlerTest {
 
             // Create match first (required for friend zone)
             Match match = Match.create(testUser.getId(), otherUser.getId());
-            matchStorage.save(match);
+            interactionStorage.save(match);
 
             // Create friend request
             FriendRequest request = FriendRequest.create(otherUser.getId(), testUser.getId());
-            socialStorage.saveFriendRequest(request);
+            communicationStorage.saveFriendRequest(request);
 
             // Select request 1, accept
             MatchingHandler handler = createHandler("1\na\n");
             handler.viewPendingRequests();
 
             // Request should be accepted
-            Optional<FriendRequest> updated = socialStorage.getFriendRequest(request.id());
+            Optional<FriendRequest> updated = communicationStorage.getFriendRequest(request.id());
             assertTrue(updated.isPresent());
             assertEquals(FriendRequest.Status.ACCEPTED, updated.get().status());
         }
@@ -160,16 +157,16 @@ class RelationshipHandlerTest {
             userStorage.save(otherUser);
 
             Match match = Match.create(testUser.getId(), otherUser.getId());
-            matchStorage.save(match);
+            interactionStorage.save(match);
 
             FriendRequest request = FriendRequest.create(otherUser.getId(), testUser.getId());
-            socialStorage.saveFriendRequest(request);
+            communicationStorage.saveFriendRequest(request);
 
             // Select request 1, decline
             MatchingHandler handler = createHandler("1\nd\n");
             handler.viewPendingRequests();
 
-            Optional<FriendRequest> updated = socialStorage.getFriendRequest(request.id());
+            Optional<FriendRequest> updated = communicationStorage.getFriendRequest(request.id());
             assertTrue(updated.isPresent());
             assertEquals(FriendRequest.Status.DECLINED, updated.get().status());
         }
@@ -181,7 +178,7 @@ class RelationshipHandlerTest {
             userStorage.save(otherUser);
 
             FriendRequest request = FriendRequest.create(otherUser.getId(), testUser.getId());
-            socialStorage.saveFriendRequest(request);
+            communicationStorage.saveFriendRequest(request);
 
             MatchingHandler handler = createHandler("b\n");
 
@@ -195,10 +192,10 @@ class RelationshipHandlerTest {
             userStorage.save(otherUser);
 
             Match match = Match.create(testUser.getId(), otherUser.getId());
-            matchStorage.save(match);
+            interactionStorage.save(match);
 
             FriendRequest request = FriendRequest.create(otherUser.getId(), testUser.getId());
-            socialStorage.saveFriendRequest(request);
+            communicationStorage.saveFriendRequest(request);
 
             // Invalid selection
             MatchingHandler handler = createHandler("99\n");
@@ -234,7 +231,7 @@ class RelationshipHandlerTest {
         void listsNotifications() {
             Notification notification = Notification.create(
                     testUser.getId(), Notification.Type.MATCH_FOUND, "New Match!", "You have a new match!", Map.of());
-            socialStorage.saveNotification(notification);
+            communicationStorage.saveNotification(notification);
 
             MatchingHandler handler = createHandler("\n");
 
@@ -250,7 +247,7 @@ class RelationshipHandlerTest {
                     "New Message",
                     "You received a new message!",
                     Map.of());
-            socialStorage.saveNotification(notification);
+            communicationStorage.saveNotification(notification);
 
             assertFalse(notification.isRead());
 
@@ -258,7 +255,7 @@ class RelationshipHandlerTest {
             handler.viewNotifications();
 
             // Notification should be marked as read
-            Optional<Notification> updated = socialStorage.getNotification(notification.id());
+            Optional<Notification> updated = communicationStorage.getNotification(notification.id());
             assertTrue(updated.isPresent());
             assertTrue(updated.get().isRead());
         }
@@ -277,9 +274,9 @@ class RelationshipHandlerTest {
                     "Someone wants to be friends!",
                     Map.of());
 
-            socialStorage.saveNotification(n1);
-            socialStorage.saveNotification(n2);
-            socialStorage.saveNotification(n3);
+            communicationStorage.saveNotification(n1);
+            communicationStorage.saveNotification(n2);
+            communicationStorage.saveNotification(n3);
 
             MatchingHandler handler = createHandler("\n");
 

@@ -24,24 +24,20 @@ import org.junit.jupiter.api.*;
 class LikerBrowserHandlerTest {
 
     private TestStorages.Users userStorage;
-    private TestStorages.Likes likeStorage;
-    private TestStorages.Matches matchStorage;
+    private TestStorages.Interactions interactionStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
-    private TestStorages.Stats statsStorage;
-    private TestStorages.Social socialStorage;
-    private TestStorages.Messaging messagingStorage;
+    private TestStorages.Analytics analyticsStorage;
+    private TestStorages.Communications communicationStorage;
     private AppSession session;
     private User testUser;
 
     @BeforeEach
     void setUp() {
         userStorage = new TestStorages.Users();
-        likeStorage = new TestStorages.Likes();
-        matchStorage = new TestStorages.Matches();
+        interactionStorage = new TestStorages.Interactions();
         trustSafetyStorage = new TestStorages.TrustSafety();
-        statsStorage = new TestStorages.Stats();
-        socialStorage = new TestStorages.Social();
-        messagingStorage = new TestStorages.Messaging();
+        analyticsStorage = new TestStorages.Analytics();
+        communicationStorage = new TestStorages.Communications();
 
         session = AppSession.getInstance();
         session.reset();
@@ -55,36 +51,37 @@ class LikerBrowserHandlerTest {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         AppConfig config = AppConfig.defaults();
         MatchingService matchingService = MatchingService.builder()
-                .likeStorage(likeStorage)
-                .matchStorage(matchStorage)
-                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
                 .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
                 .build();
-        CandidateFinder candidateFinder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, config);
-        MatchQualityService matchQualityService = new MatchQualityService(userStorage, likeStorage, config);
+        TrustSafetyService trustSafetyService =
+                new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
+        CandidateFinder candidateFinder =
+                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
+        MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
         ProfileCompletionService profileCompletionService = new ProfileCompletionService(config);
         MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
                 candidateFinder,
                 matchingService,
-                matchStorage,
-                trustSafetyStorage,
-                new DailyService(likeStorage, config),
-                new UndoService(likeStorage, matchStorage, new TestStorages.Undos(), config),
+                interactionStorage,
+                new DailyService(interactionStorage, config),
+                new UndoService(interactionStorage, new TestStorages.Undos(), config),
                 matchQualityService,
                 userStorage,
                 new AchievementService(
-                        statsStorage,
-                        matchStorage,
-                        likeStorage,
-                        userStorage,
+                        analyticsStorage,
+                        interactionStorage,
                         trustSafetyStorage,
+                        userStorage,
                         profileCompletionService,
                         config),
-                statsStorage,
-                new RelationshipTransitionService(matchStorage, socialStorage, messagingStorage),
+                analyticsStorage,
+                trustSafetyService,
+                new RelationshipTransitionService(interactionStorage, communicationStorage),
                 new StandoutsService(
                         userStorage, new TestStorages.Standouts(), candidateFinder, profileCompletionService, config),
-                socialStorage,
+                communicationStorage,
                 session,
                 inputReader);
         return new MatchingHandler(deps);
@@ -110,7 +107,7 @@ class LikerBrowserHandlerTest {
             userStorage.save(liker);
 
             Like like = Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE);
-            likeStorage.save(like);
+            interactionStorage.save(like);
 
             // Stop after viewing list
             MatchingHandler handler = createHandler("0\n");
@@ -125,14 +122,14 @@ class LikerBrowserHandlerTest {
             userStorage.save(liker);
 
             Like like = Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE);
-            likeStorage.save(like);
+            interactionStorage.save(like);
 
             // Like back
             MatchingHandler handler = createHandler("1\n0\n");
             handler.browseWhoLikedMe();
 
             // Should have a mutual like now
-            assertTrue(likeStorage.exists(testUser.getId(), liker.getId()));
+            assertTrue(interactionStorage.exists(testUser.getId(), liker.getId()));
         }
 
         @Test
@@ -142,7 +139,7 @@ class LikerBrowserHandlerTest {
             userStorage.save(liker);
 
             Like like = Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE);
-            likeStorage.save(like);
+            interactionStorage.save(like);
 
             // Like back
             MatchingHandler handler = createHandler("1\n0\n");
@@ -150,7 +147,7 @@ class LikerBrowserHandlerTest {
 
             // Should have created a match
             String matchId = Match.generateId(testUser.getId(), liker.getId());
-            assertTrue(matchStorage.exists(matchId));
+            assertTrue(interactionStorage.exists(matchId));
         }
 
         @Test
@@ -160,14 +157,14 @@ class LikerBrowserHandlerTest {
             userStorage.save(liker);
 
             Like like = Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE);
-            likeStorage.save(like);
+            interactionStorage.save(like);
 
             // Pass
             MatchingHandler handler = createHandler("2\n0\n");
             handler.browseWhoLikedMe();
 
             // Should have a pass
-            Optional<Like> recorded = likeStorage.getLike(testUser.getId(), liker.getId());
+            Optional<Like> recorded = interactionStorage.getLike(testUser.getId(), liker.getId());
             assertTrue(recorded.isPresent());
             assertEquals(Like.Direction.PASS, recorded.get().direction());
         }
@@ -180,16 +177,16 @@ class LikerBrowserHandlerTest {
             userStorage.save(liker1);
             userStorage.save(liker2);
 
-            likeStorage.save(Like.create(liker1.getId(), testUser.getId(), Like.Direction.LIKE));
-            likeStorage.save(Like.create(liker2.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(liker1.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(liker2.getId(), testUser.getId(), Like.Direction.LIKE));
 
             // Stop immediately
             MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();
 
             // Should not have interacted with any likers
-            assertFalse(likeStorage.exists(testUser.getId(), liker1.getId()));
-            assertFalse(likeStorage.exists(testUser.getId(), liker2.getId()));
+            assertFalse(interactionStorage.exists(testUser.getId(), liker1.getId()));
+            assertFalse(interactionStorage.exists(testUser.getId(), liker2.getId()));
         }
 
         @Test
@@ -199,7 +196,7 @@ class LikerBrowserHandlerTest {
             userStorage.save(blockedLiker);
 
             // They liked us
-            likeStorage.save(Like.create(blockedLiker.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(blockedLiker.getId(), testUser.getId(), Like.Direction.LIKE));
 
             // But we blocked them
             trustSafetyStorage.save(
@@ -219,11 +216,11 @@ class LikerBrowserHandlerTest {
             userStorage.save(matchedUser);
 
             // They liked us
-            likeStorage.save(Like.create(matchedUser.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(matchedUser.getId(), testUser.getId(), Like.Direction.LIKE));
 
             // But we already matched
             Match match = Match.create(testUser.getId(), matchedUser.getId());
-            matchStorage.save(match);
+            interactionStorage.save(match);
 
             MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();
@@ -238,10 +235,10 @@ class LikerBrowserHandlerTest {
             userStorage.save(liker);
 
             // They liked us
-            likeStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
 
             // We already responded with a pass
-            likeStorage.save(Like.create(testUser.getId(), liker.getId(), Like.Direction.PASS));
+            interactionStorage.save(Like.create(testUser.getId(), liker.getId(), Like.Direction.PASS));
 
             MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();
@@ -260,7 +257,7 @@ class LikerBrowserHandlerTest {
             userStorage.save(inactiveLiker);
 
             // They liked us before becoming inactive
-            likeStorage.save(Like.create(inactiveLiker.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(inactiveLiker.getId(), testUser.getId(), Like.Direction.LIKE));
 
             MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();
@@ -274,7 +271,7 @@ class LikerBrowserHandlerTest {
             User liker = createActiveUser("Liker");
             userStorage.save(liker);
 
-            likeStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
 
             // Like and continue - should reach end of list
             MatchingHandler handler = createHandler("1\n");
@@ -289,13 +286,13 @@ class LikerBrowserHandlerTest {
             User liker = createActiveUser("Liker");
             userStorage.save(liker);
 
-            likeStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
 
             MatchingHandler handler = createHandler("1\n");
             handler.browseWhoLikedMe();
 
             // Should not have recorded any interaction
-            assertFalse(likeStorage.exists(testUser.getId(), liker.getId()));
+            assertFalse(interactionStorage.exists(testUser.getId(), liker.getId()));
         }
 
         @Test
@@ -304,7 +301,7 @@ class LikerBrowserHandlerTest {
             User liker = createActiveUser("Liker");
             userStorage.save(liker);
 
-            likeStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
 
             // Invalid selection, then stop
             MatchingHandler handler = createHandler("99\n0\n");
@@ -320,7 +317,7 @@ class LikerBrowserHandlerTest {
             verifiedLiker.markVerified();
             userStorage.save(verifiedLiker);
 
-            likeStorage.save(Like.create(verifiedLiker.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(verifiedLiker.getId(), testUser.getId(), Like.Direction.LIKE));
 
             MatchingHandler handler = createHandler("0\n");
 
@@ -334,7 +331,7 @@ class LikerBrowserHandlerTest {
             likerWithBio.setBio("I love hiking and traveling around the world exploring new cultures and cuisines!");
             userStorage.save(likerWithBio);
 
-            likeStorage.save(Like.create(likerWithBio.getId(), testUser.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(likerWithBio.getId(), testUser.getId(), Like.Direction.LIKE));
 
             MatchingHandler handler = createHandler("0\n");
 

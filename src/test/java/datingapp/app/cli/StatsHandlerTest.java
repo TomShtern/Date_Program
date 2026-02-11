@@ -17,7 +17,6 @@ import datingapp.core.service.ProfileCompletionService;
 import datingapp.core.service.StatsService;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
@@ -29,20 +28,18 @@ import org.junit.jupiter.api.*;
 class StatsHandlerTest {
 
     private TestStorages.Users userStorage;
-    private TestStorages.Likes likeStorage;
-    private TestStorages.Matches matchStorage;
+    private TestStorages.Interactions interactionStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
-    private InMemoryStatsStorage statsStorage;
+    private TestStorages.Analytics analyticsStorage;
     private AppSession session;
     private User testUser;
 
     @BeforeEach
     void setUp() {
         userStorage = new TestStorages.Users();
-        likeStorage = new TestStorages.Likes();
-        matchStorage = new TestStorages.Matches();
+        interactionStorage = new TestStorages.Interactions();
         trustSafetyStorage = new TestStorages.TrustSafety();
-        statsStorage = new InMemoryStatsStorage();
+        analyticsStorage = new TestStorages.Analytics();
 
         session = AppSession.getInstance();
         session.reset();
@@ -54,14 +51,13 @@ class StatsHandlerTest {
 
     private StatsHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        StatsService statsService = new StatsService(likeStorage, matchStorage, trustSafetyStorage, statsStorage);
+        StatsService statsService = new StatsService(interactionStorage, trustSafetyStorage, analyticsStorage);
         ProfileCompletionService profileCompletionService = new ProfileCompletionService(AppConfig.defaults());
         AchievementService achievementService = new AchievementService(
-                statsStorage,
-                matchStorage,
-                likeStorage,
-                userStorage,
+                analyticsStorage,
+                interactionStorage,
                 trustSafetyStorage,
+                userStorage,
                 profileCompletionService,
                 AppConfig.defaults());
         return new StatsHandler(statsService, achievementService, session, inputReader);
@@ -89,7 +85,7 @@ class StatsHandlerTest {
             handler.viewStatistics();
 
             // Stats should have been computed and saved
-            assertTrue(statsStorage.getLatestUserStats(testUser.getId()).isPresent());
+            assertTrue(analyticsStorage.getLatestUserStats(testUser.getId()).isPresent());
         }
 
         @Test
@@ -99,14 +95,15 @@ class StatsHandlerTest {
             UserStats.StatsBuilder builder = new UserStats.StatsBuilder();
             builder.likesGiven = 10;
             UserStats stats = UserStats.create(testUser.getId(), builder);
-            statsStorage.saveUserStats(stats);
+            analyticsStorage.saveUserStats(stats);
 
             StatsHandler handler = createHandler("\n");
             handler.viewStatistics();
 
             // Should have used existing stats (only 1 saved)
             assertEquals(
-                    1, statsStorage.getUserStatsHistory(testUser.getId(), 10).size());
+                    1,
+                    analyticsStorage.getUserStatsHistory(testUser.getId(), 10).size());
         }
 
         @Test
@@ -118,7 +115,7 @@ class StatsHandlerTest {
             handler.viewStatistics();
 
             // Should return early without creating stats
-            assertFalse(statsStorage.getLatestUserStats(testUser.getId()).isPresent());
+            assertFalse(analyticsStorage.getLatestUserStats(testUser.getId()).isPresent());
         }
     }
 
@@ -141,7 +138,7 @@ class StatsHandlerTest {
         void displaysUnlockedAchievements() {
             // Unlock an achievement
             UserAchievement achievement = UserAchievement.create(testUser.getId(), Achievement.FIRST_SPARK);
-            statsStorage.saveUserAchievement(achievement);
+            analyticsStorage.saveUserAchievement(achievement);
 
             StatsHandler handler = createHandler("\n");
 
@@ -155,13 +152,13 @@ class StatsHandlerTest {
             User otherUser = createActiveUser("Other");
             userStorage.save(otherUser);
             Match match = Match.create(testUser.getId(), otherUser.getId());
-            matchStorage.save(match);
+            interactionStorage.save(match);
 
             StatsHandler handler = createHandler("\n");
             handler.viewAchievements();
 
             // FIRST_SPARK should be unlocked
-            assertTrue(statsStorage.hasAchievement(testUser.getId(), Achievement.FIRST_SPARK));
+            assertTrue(analyticsStorage.hasAchievement(testUser.getId(), Achievement.FIRST_SPARK));
         }
 
         @Test
@@ -173,7 +170,7 @@ class StatsHandlerTest {
             handler.viewAchievements();
 
             // Should not check achievements
-            assertFalse(statsStorage.hasAchievement(testUser.getId(), Achievement.FIRST_SPARK));
+            assertFalse(analyticsStorage.hasAchievement(testUser.getId(), Achievement.FIRST_SPARK));
         }
     }
 
@@ -193,125 +190,5 @@ class StatsHandlerTest {
                 datingapp.core.model.Preferences.PacePreferences.DepthPreference.SMALL_TALK));
         user.activate();
         return user;
-    }
-
-    // === In-Memory Mock Storage ===
-
-    private static class InMemoryStatsStorage implements datingapp.core.storage.StatsStorage {
-        private final Map<UUID, List<UserStats>> userStatsMap = new HashMap<>();
-        private final List<datingapp.core.model.Stats.PlatformStats> platformStats = new ArrayList<>();
-        private final Map<UUID, Set<Achievement>> achievements = new HashMap<>();
-
-        @Override
-        public void saveUserStats(UserStats stats) {
-            userStatsMap.computeIfAbsent(stats.userId(), k -> new ArrayList<>()).add(stats);
-        }
-
-        @Override
-        public Optional<UserStats> getLatestUserStats(UUID userId) {
-            List<UserStats> list = userStatsMap.get(userId);
-            return list == null || list.isEmpty() ? Optional.empty() : Optional.of(list.get(list.size() - 1));
-        }
-
-        @Override
-        public List<UserStats> getUserStatsHistory(UUID userId, int limit) {
-            List<UserStats> list = userStatsMap.getOrDefault(userId, List.of());
-            return list.subList(0, Math.min(list.size(), limit));
-        }
-
-        @Override
-        public List<UserStats> getAllLatestUserStats() {
-            return userStatsMap.values().stream()
-                    .filter(l -> !l.isEmpty())
-                    .map(l -> l.get(l.size() - 1))
-                    .toList();
-        }
-
-        @Override
-        public int deleteUserStatsOlderThan(Instant cutoff) {
-            return 0;
-        }
-
-        @Override
-        public void savePlatformStats(datingapp.core.model.Stats.PlatformStats stats) {
-            platformStats.add(stats);
-        }
-
-        @Override
-        public Optional<datingapp.core.model.Stats.PlatformStats> getLatestPlatformStats() {
-            return platformStats.isEmpty()
-                    ? Optional.empty()
-                    : Optional.of(platformStats.get(platformStats.size() - 1));
-        }
-
-        @Override
-        public List<datingapp.core.model.Stats.PlatformStats> getPlatformStatsHistory(int limit) {
-            return platformStats.subList(0, Math.min(platformStats.size(), limit));
-        }
-
-        @Override
-        public void recordProfileView(UUID viewerId, UUID viewedId) {}
-
-        @Override
-        public int getProfileViewCount(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public int getUniqueViewerCount(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public List<UUID> getRecentViewers(UUID userId, int limit) {
-            return List.of();
-        }
-
-        @Override
-        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
-            return false;
-        }
-
-        @Override
-        public void saveUserAchievement(UserAchievement achievement) {
-            achievements
-                    .computeIfAbsent(achievement.userId(), k -> new HashSet<>())
-                    .add(achievement.achievement());
-        }
-
-        @Override
-        public List<UserAchievement> getUnlockedAchievements(UUID userId) {
-            return achievements.getOrDefault(userId, Set.of()).stream()
-                    .map(a -> UserAchievement.create(userId, a))
-                    .toList();
-        }
-
-        @Override
-        public boolean hasAchievement(UUID userId, Achievement achievement) {
-            return achievements.getOrDefault(userId, Set.of()).contains(achievement);
-        }
-
-        @Override
-        public int countUnlockedAchievements(UUID userId) {
-            return achievements.getOrDefault(userId, Set.of()).size();
-        }
-
-        @Override
-        public int deleteExpiredDailyPickViews(Instant cutoff) {
-            return 0;
-        }
-
-        @Override
-        public void markDailyPickAsViewed(UUID userId, java.time.LocalDate date) {}
-
-        @Override
-        public boolean isDailyPickViewed(UUID userId, java.time.LocalDate date) {
-            return false;
-        }
-
-        @Override
-        public int deleteDailyPickViewsOlderThan(java.time.LocalDate before) {
-            return 0;
-        }
     }
 }

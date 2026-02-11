@@ -3,8 +3,7 @@ package datingapp.ui.viewmodel.data;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.List;
@@ -93,25 +92,22 @@ public final class UiDataAdapters {
     /** Bridges the UI layer to the core match/like/block storage interfaces. */
     public static final class StorageUiMatchDataAccess implements UiMatchDataAccess {
 
-        private final MatchStorage matchStorage;
-        private final LikeStorage likeStorage;
+        private final InteractionStorage interactionStorage;
         private final TrustSafetyStorage trustSafetyStorage;
 
-        public StorageUiMatchDataAccess(
-                MatchStorage matchStorage, LikeStorage likeStorage, TrustSafetyStorage trustSafetyStorage) {
-            this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
-            this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
+        public StorageUiMatchDataAccess(InteractionStorage interactionStorage, TrustSafetyStorage trustSafetyStorage) {
+            this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
             this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         }
 
         @Override
         public List<Match> getActiveMatchesFor(UUID userId) {
-            return matchStorage.getActiveMatchesFor(userId);
+            return interactionStorage.getActiveMatchesFor(userId);
         }
 
         @Override
         public List<Match> getAllMatchesFor(UUID userId) {
-            return matchStorage.getAllMatchesFor(userId);
+            return interactionStorage.getAllMatchesFor(userId);
         }
 
         @Override
@@ -121,17 +117,17 @@ public final class UiDataAdapters {
 
         @Override
         public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-            return likeStorage.getLikedOrPassedUserIds(userId);
+            return interactionStorage.getLikedOrPassedUserIds(userId);
         }
 
         @Override
         public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-            return likeStorage.getLike(fromUserId, toUserId);
+            return interactionStorage.getLike(fromUserId, toUserId);
         }
 
         @Override
         public void deleteLike(UUID likeId) {
-            likeStorage.delete(likeId);
+            interactionStorage.delete(likeId);
         }
     }
 }

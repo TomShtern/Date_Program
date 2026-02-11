@@ -6,7 +6,7 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.UserInteractions.Block;
 import datingapp.core.model.UserInteractions.Report;
-import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Duration;
@@ -24,8 +24,8 @@ public class TrustSafetyService {
     public static final Duration DEFAULT_VERIFICATION_TTL = Duration.ofMinutes(15);
 
     private final TrustSafetyStorage trustSafetyStorage;
+    private final InteractionStorage interactionStorage;
     private final UserStorage userStorage;
-    private final MatchStorage matchStorage;
     private final AppConfig config;
     private final Duration verificationTtl;
     private final Random random;
@@ -42,13 +42,13 @@ public class TrustSafetyService {
 
     public TrustSafetyService(
             TrustSafetyStorage trustSafetyStorage,
+            InteractionStorage interactionStorage,
             UserStorage userStorage,
-            MatchStorage matchStorage,
             AppConfig config) {
         this(
                 Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null"),
+                Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null"),
                 Objects.requireNonNull(userStorage, "userStorage cannot be null"),
-                matchStorage, // Optional - may be null for backward compatibility
                 Objects.requireNonNull(config, "config cannot be null"),
                 DEFAULT_VERIFICATION_TTL,
                 new Random());
@@ -56,14 +56,14 @@ public class TrustSafetyService {
 
     public TrustSafetyService(
             TrustSafetyStorage trustSafetyStorage,
+            InteractionStorage interactionStorage,
             UserStorage userStorage,
-            MatchStorage matchStorage,
             AppConfig config,
             Duration verificationTtl,
             Random random) {
         this.trustSafetyStorage = trustSafetyStorage;
+        this.interactionStorage = interactionStorage;
         this.userStorage = userStorage;
-        this.matchStorage = matchStorage;
         this.config = config;
         this.verificationTtl = Objects.requireNonNull(verificationTtl, "verificationTtl cannot be null");
         this.random = Objects.requireNonNull(random, "random cannot be null");
@@ -147,17 +147,17 @@ public class TrustSafetyService {
 
     /**
      * Updates the match state to BLOCKED if a match exists between the two users.
-     * Silently succeeds if matchStorage is not configured or no match exists.
+     * Silently succeeds if interactionStorage is not configured or no match exists.
      */
     private void updateMatchStateForBlock(UUID blockerId, UUID blockedId) {
-        if (matchStorage == null) {
-            logger.debug("MatchStorage not configured; skipping match state update for block");
+        if (interactionStorage == null) {
+            logger.debug("InteractionStorage not configured; skipping match state update for block");
             return;
         }
-        matchStorage.getByUsers(blockerId, blockedId).ifPresent(match -> {
+        interactionStorage.getByUsers(blockerId, blockedId).ifPresent(match -> {
             if (match.getState() != Match.State.BLOCKED) {
                 match.block(blockerId);
-                matchStorage.update(match);
+                interactionStorage.update(match);
                 if (logger.isInfoEnabled()) {
                     logger.info("Match {} transitioned to BLOCKED by user {}", match.getId(), blockerId);
                 }

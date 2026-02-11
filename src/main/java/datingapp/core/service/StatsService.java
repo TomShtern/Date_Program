@@ -5,9 +5,8 @@ import datingapp.core.model.Match;
 import datingapp.core.model.Stats.PlatformStats;
 import datingapp.core.model.Stats.UserStats;
 import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.StatsStorage;
+import datingapp.core.storage.AnalyticsStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import java.time.Duration;
 import java.util.List;
@@ -17,20 +16,17 @@ import java.util.UUID;
 
 public class StatsService {
 
-    private final LikeStorage likeStorage;
-    private final MatchStorage matchStorage;
+    private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
-    private final StatsStorage statsStorage;
+    private final AnalyticsStorage analyticsStorage;
 
     public StatsService(
-            LikeStorage likeStorage,
-            MatchStorage matchStorage,
+            InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
-            StatsStorage statsStorage) {
-        this.likeStorage = Objects.requireNonNull(likeStorage);
-        this.matchStorage = Objects.requireNonNull(matchStorage);
+            AnalyticsStorage analyticsStorage) {
+        this.interactionStorage = Objects.requireNonNull(interactionStorage);
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage);
-        this.statsStorage = Objects.requireNonNull(statsStorage);
+        this.analyticsStorage = Objects.requireNonNull(analyticsStorage);
     }
 
     /**
@@ -43,20 +39,20 @@ public class StatsService {
         UserStats.StatsBuilder builder = new UserStats.StatsBuilder();
 
         // --- Outgoing Activity ---
-        builder.likesGiven = likeStorage.countByDirection(userId, Like.Direction.LIKE);
-        builder.passesGiven = likeStorage.countByDirection(userId, Like.Direction.PASS);
+        builder.likesGiven = interactionStorage.countByDirection(userId, Like.Direction.LIKE);
+        builder.passesGiven = interactionStorage.countByDirection(userId, Like.Direction.PASS);
         builder.totalSwipesGiven = builder.likesGiven + builder.passesGiven;
         builder.likeRatio = builder.totalSwipesGiven > 0 ? (double) builder.likesGiven / builder.totalSwipesGiven : 0.0;
 
         // --- Incoming Activity ---
-        builder.likesReceived = likeStorage.countReceivedByDirection(userId, Like.Direction.LIKE);
-        builder.passesReceived = likeStorage.countReceivedByDirection(userId, Like.Direction.PASS);
+        builder.likesReceived = interactionStorage.countReceivedByDirection(userId, Like.Direction.LIKE);
+        builder.passesReceived = interactionStorage.countReceivedByDirection(userId, Like.Direction.PASS);
         builder.totalSwipesReceived = builder.likesReceived + builder.passesReceived;
         builder.incomingLikeRatio =
                 builder.totalSwipesReceived > 0 ? (double) builder.likesReceived / builder.totalSwipesReceived : 0.0;
 
         // --- Matches ---
-        List<Match> allMatches = matchStorage.getAllMatchesFor(userId);
+        List<Match> allMatches = interactionStorage.getAllMatchesFor(userId);
         builder.totalMatches = allMatches.size();
         builder.activeMatches =
                 (int) allMatches.stream().filter(Match::isActive).count();
@@ -71,12 +67,12 @@ public class StatsService {
 
         // --- Reciprocity Score ---
         // Of all the people I liked, what % liked me back?
-        int mutualLikes = likeStorage.countMutualLikes(userId);
+        int mutualLikes = interactionStorage.countMutualLikes(userId);
         builder.reciprocityScore =
                 builder.likesGiven > 0 ? Math.min(1.0, (double) mutualLikes / builder.likesGiven) : 0.0;
 
         // --- Derived Scores (require platform averages) ---
-        Optional<PlatformStats> platformStats = statsStorage.getLatestPlatformStats();
+        Optional<PlatformStats> platformStats = analyticsStorage.getLatestPlatformStats();
         if (platformStats.isPresent()) {
             PlatformStats ps = platformStats.get();
 
@@ -95,7 +91,7 @@ public class StatsService {
         }
 
         UserStats stats = UserStats.create(userId, builder);
-        statsStorage.saveUserStats(stats);
+        analyticsStorage.saveUserStats(stats);
         return stats;
     }
 
@@ -106,7 +102,7 @@ public class StatsService {
      * @return the latest or freshly computed statistics
      */
     public UserStats getOrComputeStats(UUID userId) {
-        Optional<UserStats> existing = statsStorage.getLatestUserStats(userId);
+        Optional<UserStats> existing = analyticsStorage.getLatestUserStats(userId);
 
         if (existing.isPresent()) {
             // Check if stale (older than 24 hours)
@@ -126,7 +122,7 @@ public class StatsService {
      * @return the latest statistics if available
      */
     public Optional<UserStats> getStats(UUID userId) {
-        return statsStorage.getLatestUserStats(userId);
+        return analyticsStorage.getLatestUserStats(userId);
     }
 
     /**
@@ -135,11 +131,11 @@ public class StatsService {
      * @return the computed platform statistics
      */
     public PlatformStats computeAndSavePlatformStats() {
-        List<UserStats> allStats = statsStorage.getAllLatestUserStats();
+        List<UserStats> allStats = analyticsStorage.getAllLatestUserStats();
 
         if (allStats.isEmpty()) {
             PlatformStats stats = PlatformStats.empty();
-            statsStorage.savePlatformStats(stats);
+            analyticsStorage.savePlatformStats(stats);
             return stats;
         }
 
@@ -159,7 +155,7 @@ public class StatsService {
         PlatformStats stats = PlatformStats.create(
                 n, totalLikesReceived / n, totalLikesGiven / n, totalMatchRate / n, totalLikeRatio / n);
 
-        statsStorage.savePlatformStats(stats);
+        analyticsStorage.savePlatformStats(stats);
         return stats;
     }
 
@@ -169,6 +165,6 @@ public class StatsService {
      * @return the latest platform statistics if available
      */
     public Optional<PlatformStats> getPlatformStats() {
-        return statsStorage.getLatestPlatformStats();
+        return analyticsStorage.getLatestPlatformStats();
     }
 }

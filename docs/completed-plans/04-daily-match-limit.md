@@ -1,6 +1,6 @@
 # Feature 4: Daily Match Limit
 
-**Status:** ✅ COMPLETE (Implemented 2026-01-08)
+**Status:** ✅ COMPLETE✅ (Implemented 2026-01-08)
 **Priority:** Medium
 **Complexity:** Low
 **Dependencies:** None
@@ -186,13 +186,13 @@ public Instant getResetTime() {
 
 ## Edge Cases
 
-| Scenario | Behavior |
-|----------|----------|
-| User at 99/100 likes | Can make 1 more like |
-| User at 100/100 likes | Cannot like, can still pass |
-| Midnight crosses during session | Next like triggers fresh count |
-| Config limit = -1 | No limit enforced (unlimited) |
-| Config limit = 0 | All likes blocked (maintenance mode) |
+| Scenario                        | Behavior                             |
+|---------------------------------|--------------------------------------|
+| User at 99/100 likes            | Can make 1 more like                 |
+| User at 100/100 likes           | Cannot like, can still pass          |
+| Midnight crosses during session | Next like triggers fresh count       |
+| Config limit = -1               | No limit enforced (unlimited)        |
+| Config limit = 0                | All likes blocked (maintenance mode) |
 
 ---
 
@@ -254,15 +254,15 @@ public static AppConfig defaults() {
 
 ## File Summary
 
-| File | Action | Lines |
-|------|--------|-------|
-| `DailyLimitService.java` | NEW | ~70 |
-| `AppConfig.java` | MODIFY | +15 |
-| `LikeStorage.java` | MODIFY | +4 |
-| `H2LikeStorage.java` | MODIFY | +25 |
-| `ServiceRegistry.java` | MODIFY | +5 |
-| `ServiceRegistryBuilder.java` | MODIFY | +3 |
-| `Main.java` | MODIFY | +35 |
-| `DailyLimitServiceTest.java` | NEW | ~80 |
+| File                          | Action | Lines |
+|-------------------------------|--------|-------|
+| `DailyLimitService.java`      | NEW    | ~70   |
+| `AppConfig.java`              | MODIFY | +15   |
+| `LikeStorage.java`            | MODIFY | +4    |
+| `H2LikeStorage.java`          | MODIFY | +25   |
+| `ServiceRegistry.java`        | MODIFY | +5    |
+| `ServiceRegistryBuilder.java` | MODIFY | +3    |
+| `Main.java`                   | MODIFY | +35   |
+| `DailyLimitServiceTest.java`  | NEW    | ~80   |
 
 **Total estimated: ~240 lines**

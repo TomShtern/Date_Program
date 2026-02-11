@@ -5,7 +5,6 @@ import datingapp.core.model.Achievement;
 import datingapp.core.model.Achievement.UserAchievement;
 import datingapp.core.model.Stats.PlatformStats;
 import datingapp.core.model.Stats.UserStats;
-import datingapp.core.storage.StatsStorage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -27,7 +26,7 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  * JdbiPlatformStatsStorage, and now includes ProfileView and UserAchievement operations.
  */
 @RegisterRowMapper(JdbiStatsStorage.UserAchievementMapper.class)
-public interface JdbiStatsStorage extends StatsStorage {
+public interface JdbiStatsStorage {
 
     // ═══════════════════════════════════════════════════════════════
     // User Stats Operations
@@ -46,7 +45,6 @@ public interface JdbiStatsStorage extends StatsStorage {
                 :blocksGiven, :blocksReceived, :reportsGiven, :reportsReceived,
                 :reciprocityScore, :selectivenessScore, :attractivenessScore)
             """)
-    @Override
     void saveUserStats(@BindBean UserStats stats);
 
     @SqlQuery("""
@@ -62,7 +60,6 @@ public interface JdbiStatsStorage extends StatsStorage {
             LIMIT 1
             """)
     @RegisterRowMapper(UserStatsMapper.class)
-    @Override
     Optional<UserStats> getLatestUserStats(@Bind("userId") UUID userId);
 
     @SqlQuery("""
@@ -78,7 +75,6 @@ public interface JdbiStatsStorage extends StatsStorage {
             LIMIT :limit
             """)
     @RegisterRowMapper(UserStatsMapper.class)
-    @Override
     List<UserStats> getUserStatsHistory(@Bind("userId") UUID userId, @Bind("limit") int limit);
 
     @SqlQuery("""
@@ -95,11 +91,9 @@ public interface JdbiStatsStorage extends StatsStorage {
             )
             """)
     @RegisterRowMapper(UserStatsMapper.class)
-    @Override
     List<UserStats> getAllLatestUserStats();
 
     @SqlUpdate("DELETE FROM user_stats WHERE computed_at < :cutoff")
-    @Override
     int deleteUserStatsOlderThan(@Bind("cutoff") Instant cutoff);
 
     // ═══════════════════════════════════════════════════════════════
@@ -112,7 +106,6 @@ public interface JdbiStatsStorage extends StatsStorage {
             VALUES (:id, :computedAt, :totalActiveUsers, :avgLikesReceived,
                 :avgLikesGiven, :avgMatchRate, :avgLikeRatio)
             """)
-    @Override
     void savePlatformStats(@BindBean PlatformStats stats);
 
     @SqlQuery("""
@@ -123,7 +116,6 @@ public interface JdbiStatsStorage extends StatsStorage {
             LIMIT 1
             """)
     @RegisterRowMapper(PlatformStatsMapper.class)
-    @Override
     Optional<PlatformStats> getLatestPlatformStats();
 
     @SqlQuery("""
@@ -134,7 +126,6 @@ public interface JdbiStatsStorage extends StatsStorage {
             LIMIT :limit
             """)
     @RegisterRowMapper(PlatformStatsMapper.class)
-    @Override
     List<PlatformStats> getPlatformStatsHistory(@Bind("limit") int limit);
 
     // ═══════════════════════════════════════════════════════════════
@@ -148,7 +139,6 @@ public interface JdbiStatsStorage extends StatsStorage {
     void insertView(
             @Bind("viewerId") UUID viewerId, @Bind("viewedId") UUID viewedId, @Bind("viewedAt") Instant viewedAt);
 
-    @Override
     default void recordProfileView(UUID viewerId, UUID viewedId) {
         if (viewerId.equals(viewedId)) {
             return; // Don't record self-views
@@ -157,11 +147,9 @@ public interface JdbiStatsStorage extends StatsStorage {
     }
 
     @SqlQuery("SELECT COUNT(*) FROM profile_views WHERE viewed_id = :userId")
-    @Override
     int getProfileViewCount(@Bind("userId") UUID userId);
 
     @SqlQuery("SELECT COUNT(DISTINCT viewer_id) FROM profile_views WHERE viewed_id = :userId")
-    @Override
     int getUniqueViewerCount(@Bind("userId") UUID userId);
 
     @SqlQuery("""
@@ -174,7 +162,6 @@ public interface JdbiStatsStorage extends StatsStorage {
             """)
     List<UUID> getRecentViewersRaw(@Bind("userId") UUID userId, @Bind("limit") int limit);
 
-    @Override
     default List<UUID> getRecentViewers(UUID userId, int limit) {
         return getRecentViewersRaw(userId, limit);
     }
@@ -186,7 +173,6 @@ public interface JdbiStatsStorage extends StatsStorage {
                 LIMIT 1
             )
             """)
-    @Override
     boolean hasViewedProfile(@Bind("viewerId") UUID viewerId, @Bind("viewedId") UUID viewedId);
 
     // ═══════════════════════════════════════════════════════════════
@@ -198,7 +184,6 @@ public interface JdbiStatsStorage extends StatsStorage {
                         KEY (user_id, achievement)
                         VALUES (:id, :userId, :achievement, :unlockedAt)
                         """)
-    @Override
     void saveUserAchievement(@BindBean UserAchievement achievement);
 
     @SqlQuery("""
@@ -207,18 +192,15 @@ public interface JdbiStatsStorage extends StatsStorage {
                         WHERE user_id = :userId
                         ORDER BY unlocked_at DESC
                         """)
-    @Override
     List<UserAchievement> getUnlockedAchievements(@Bind("userId") UUID userId);
 
     @SqlQuery("""
                         SELECT COUNT(*) > 0 FROM user_achievements
                         WHERE user_id = :userId AND achievement = :achievement
                         """)
-    @Override
     boolean hasAchievement(@Bind("userId") UUID userId, @Bind("achievement") Achievement achievement);
 
     @SqlQuery("SELECT COUNT(*) FROM user_achievements WHERE user_id = :userId")
-    @Override
     int countUnlockedAchievements(@Bind("userId") UUID userId);
 
     // ═══════════════════════════════════════════════════════════════
@@ -229,16 +211,13 @@ public interface JdbiStatsStorage extends StatsStorage {
             "MERGE INTO daily_pick_views (user_id, viewed_date, viewed_at) KEY (user_id, viewed_date) VALUES (:userId, :date, :at)")
     void saveDailyPickView(@Bind("userId") UUID userId, @Bind("date") LocalDate date, @Bind("at") Instant at);
 
-    @Override
     default void markDailyPickAsViewed(UUID userId, LocalDate date) {
         saveDailyPickView(userId, date, AppClock.now());
     }
 
-    @Override
     @SqlQuery("SELECT COUNT(*) > 0 FROM daily_pick_views WHERE user_id = :userId AND viewed_date = :date")
     boolean isDailyPickViewed(@Bind("userId") UUID userId, @Bind("date") LocalDate date);
 
-    @Override
     @SqlUpdate("DELETE FROM daily_pick_views WHERE viewed_date < :before")
     int deleteDailyPickViewsOlderThan(@Bind("before") LocalDate before);
 
@@ -251,7 +230,6 @@ public interface JdbiStatsStorage extends StatsStorage {
      * Used by SessionService to purge stale tracking data.
      */
     @SqlUpdate("DELETE FROM daily_pick_views WHERE viewed_at < :cutoff")
-    @Override
     int deleteExpiredDailyPickViews(@Bind("cutoff") Instant cutoff);
 
     // ═══════════════════════════════════════════════════════════════

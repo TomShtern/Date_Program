@@ -8,12 +8,11 @@ import datingapp.core.model.Match;
 import datingapp.core.model.Messaging.Conversation;
 import datingapp.core.model.Messaging.Message;
 import datingapp.core.model.User;
-import datingapp.core.model.UserInteractions.Block;
 import datingapp.core.service.MessagingService;
 import datingapp.core.service.MessagingService.ConversationPreview;
 import datingapp.core.service.MessagingService.SendResult;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.TrustSafetyStorage;
+import datingapp.core.service.TrustSafetyService;
+import datingapp.core.storage.InteractionStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -35,20 +34,20 @@ public class MessagingHandler implements LoggingSupport {
             DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
 
     private final MessagingService messagingService;
-    private final MatchStorage matchStorage;
-    private final TrustSafetyStorage trustSafetyStorage;
+    private final InteractionStorage interactionStorage;
+    private final TrustSafetyService trustSafetyService;
     private final InputReader input;
     private final AppSession session;
 
     public MessagingHandler(
             MessagingService messagingService,
-            MatchStorage matchStorage,
-            TrustSafetyStorage trustSafetyStorage,
+            InteractionStorage interactionStorage,
+            TrustSafetyService trustSafetyService,
             InputReader input,
             AppSession session) {
         this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
-        this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
-        this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
         this.input = Objects.requireNonNull(input, "input cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
@@ -177,7 +176,7 @@ public class MessagingHandler implements LoggingSupport {
                     messagingService.getMessages(currentUser.getId(), otherUser.getId(), MESSAGES_PER_PAGE + offset, 0);
 
             String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-            Optional<Match> matchOpt = matchStorage.get(matchId);
+            Optional<Match> matchOpt = interactionStorage.get(matchId);
             boolean canMessage = matchOpt.isPresent() && matchOpt.get().isActive();
 
             printConversationHeader(otherUser.getName(), canMessage);
@@ -377,32 +376,24 @@ public class MessagingHandler implements LoggingSupport {
 
     /** Blocks another user. */
     private void blockUser(User currentUser, User otherUser) {
-        Block block = Block.create(currentUser.getId(), otherUser.getId());
-        trustSafetyStorage.save(block);
-
-        String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-        Optional<Match> matchOpt = matchStorage.get(matchId);
-        if (matchOpt.isPresent()) {
-            Match match = matchOpt.get();
-            if (match.isActive()) {
-                match.block(currentUser.getId());
-                matchStorage.update(match);
-            }
+        TrustSafetyService.BlockResult result = trustSafetyService.block(currentUser.getId(), otherUser.getId());
+        if (result.success()) {
+            logInfo("\n✓ {} has been blocked.", otherUser.getName());
+        } else {
+            logInfo("\n❌ {}", result.errorMessage());
         }
-
-        logInfo("\n✓ {} has been blocked.", otherUser.getName());
     }
 
     /** Unmatches from another user. */
     private void unmatchUser(User currentUser, User otherUser) {
         String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-        Optional<Match> matchOpt = matchStorage.get(matchId);
+        Optional<Match> matchOpt = interactionStorage.get(matchId);
 
         if (matchOpt.isPresent()) {
             Match match = matchOpt.get();
             if (match.isActive()) {
                 match.unmatch(currentUser.getId());
-                matchStorage.update(match);
+                interactionStorage.update(match);
                 logInfo("\n✓ Unmatched from {}.", otherUser.getName());
             } else {
                 logInfo("\n⚠️  Match is already ended.");

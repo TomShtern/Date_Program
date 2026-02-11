@@ -4,8 +4,7 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.model.SwipeSession;
 import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.storage.StatsStorage;
-import datingapp.core.storage.SwipeSessionStorage;
+import datingapp.core.storage.AnalyticsStorage;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -15,8 +14,7 @@ import java.util.UUID;
 
 public class SessionService {
 
-    private final SwipeSessionStorage sessionStorage;
-    private final StatsStorage statsStorage;
+    private final AnalyticsStorage analyticsStorage;
     private final AppConfig config;
 
     /** Fixed lock stripes to prevent race conditions in swipe recording. */
@@ -24,9 +22,8 @@ public class SessionService {
 
     private final Object[] lockStripes;
 
-    public SessionService(SwipeSessionStorage sessionStorage, StatsStorage statsStorage, AppConfig config) {
-        this.sessionStorage = Objects.requireNonNull(sessionStorage, "sessionStorage cannot be null");
-        this.statsStorage = Objects.requireNonNull(statsStorage, "statsStorage cannot be null");
+    public SessionService(AnalyticsStorage analyticsStorage, AppConfig config) {
+        this.analyticsStorage = Objects.requireNonNull(analyticsStorage, "analyticsStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.lockStripes = new Object[LOCK_STRIPE_COUNT];
         for (int i = 0; i < LOCK_STRIPE_COUNT; i++) {
@@ -42,7 +39,7 @@ public class SessionService {
      * @return an active session for the user
      */
     public SwipeSession getOrCreateSession(UUID userId) {
-        Optional<SwipeSession> existing = sessionStorage.getActiveSession(userId);
+        Optional<SwipeSession> existing = analyticsStorage.getActiveSession(userId);
 
         if (existing.isPresent()) {
             SwipeSession session = existing.get();
@@ -50,7 +47,7 @@ public class SessionService {
             // Check if timed out
             if (session.isTimedOut(config.getSessionTimeout())) {
                 session.end();
-                sessionStorage.save(session);
+                analyticsStorage.saveSession(session);
                 return createNewSession(userId);
             }
 
@@ -63,7 +60,7 @@ public class SessionService {
     /** Create a new session for the user. */
     private SwipeSession createNewSession(UUID userId) {
         SwipeSession session = SwipeSession.create(userId);
-        sessionStorage.save(session);
+        analyticsStorage.saveSession(session);
         return session;
     }
 
@@ -88,7 +85,7 @@ public class SessionService {
 
             // Record the swipe
             session.recordSwipe(direction, matched);
-            sessionStorage.save(session);
+            analyticsStorage.saveSession(session);
 
             // Check for suspicious velocity
             String warning = null;
@@ -106,11 +103,11 @@ public class SessionService {
      * @param userId the user ID
      */
     public void recordMatch(UUID userId) {
-        Optional<SwipeSession> active = sessionStorage.getActiveSession(userId);
+        Optional<SwipeSession> active = analyticsStorage.getActiveSession(userId);
         if (active.isPresent()) {
             SwipeSession session = active.get();
             session.incrementMatchCount();
-            sessionStorage.save(session);
+            analyticsStorage.saveSession(session);
         }
     }
 
@@ -120,11 +117,11 @@ public class SessionService {
      * @param userId the user ID
      */
     public void endSession(UUID userId) {
-        Optional<SwipeSession> active = sessionStorage.getActiveSession(userId);
+        Optional<SwipeSession> active = analyticsStorage.getActiveSession(userId);
         if (active.isPresent()) {
             SwipeSession session = active.get();
             session.end();
-            sessionStorage.save(session);
+            analyticsStorage.saveSession(session);
         }
     }
 
@@ -135,7 +132,7 @@ public class SessionService {
      * @return the active session, or empty if none
      */
     public Optional<SwipeSession> getCurrentSession(UUID userId) {
-        return sessionStorage.getActiveSession(userId);
+        return analyticsStorage.getActiveSession(userId);
     }
 
     /**
@@ -146,7 +143,7 @@ public class SessionService {
      * @return list of sessions, most recent first
      */
     public List<SwipeSession> getSessionHistory(UUID userId, int limit) {
-        return sessionStorage.getSessionsFor(userId, limit);
+        return analyticsStorage.getSessionsFor(userId, limit);
     }
 
     /**
@@ -159,7 +156,7 @@ public class SessionService {
         Instant startOfDay = AppClock.today(config.userTimeZone())
                 .atStartOfDay(config.userTimeZone())
                 .toInstant();
-        return sessionStorage.getSessionsInRange(userId, startOfDay, AppClock.now());
+        return analyticsStorage.getSessionsInRange(userId, startOfDay, AppClock.now());
     }
 
     /**
@@ -168,8 +165,8 @@ public class SessionService {
      * @param userId the user ID
      * @return aggregate statistics
      */
-    public SwipeSessionStorage.SessionAggregates getAggregates(UUID userId) {
-        return sessionStorage.getAggregates(userId);
+    public AnalyticsStorage.SessionAggregates getAggregates(UUID userId) {
+        return analyticsStorage.getSessionAggregates(userId);
     }
 
     /**
@@ -178,7 +175,7 @@ public class SessionService {
      * @return number of sessions ended
      */
     public int cleanupStaleSessions() {
-        return sessionStorage.endStaleSessions(config.getSessionTimeout());
+        return analyticsStorage.endStaleSessions(config.getSessionTimeout());
     }
 
     /**
@@ -189,8 +186,8 @@ public class SessionService {
      */
     public CleanupResult runCleanup() {
         Instant cutoffDate = AppClock.now().minus(config.cleanupRetentionDays(), ChronoUnit.DAYS);
-        int dailyPicksDeleted = statsStorage.deleteExpiredDailyPickViews(cutoffDate);
-        int sessionsDeleted = sessionStorage.deleteExpiredSessions(cutoffDate);
+        int dailyPicksDeleted = analyticsStorage.deleteExpiredDailyPickViews(cutoffDate);
+        int sessionsDeleted = analyticsStorage.deleteExpiredSessions(cutoffDate);
         return new CleanupResult(dailyPicksDeleted, sessionsDeleted);
     }
 

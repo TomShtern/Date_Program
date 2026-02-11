@@ -10,12 +10,12 @@ import datingapp.core.model.Messaging.Conversation;
 import datingapp.core.model.Messaging.Message;
 import datingapp.core.model.User.ProfileNote;
 import datingapp.core.service.*;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.MessagingStorage;
+import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
+import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +33,8 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MessagingServiceTest {
 
-    private InMemoryMessagingStorage messagingStorage;
-    private InMemoryMatchStorage matchStorage;
+    private CommunicationStorage messagingStorage;
+    private InteractionStorage matchStorage;
     private InMemoryUserStorage userStorage;
     private MessagingService messagingService;
 
@@ -47,8 +47,8 @@ class MessagingServiceTest {
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
-        messagingStorage = new InMemoryMessagingStorage();
-        matchStorage = new InMemoryMatchStorage();
+        messagingStorage = new TestStorages.Communications();
+        matchStorage = new TestStorages.Interactions();
         userStorage = new InMemoryUserStorage();
         messagingService = new MessagingService(messagingStorage, matchStorage, userStorage);
 
@@ -543,174 +543,6 @@ class MessagingServiceTest {
     }
 
     // ===== In-Memory Test Implementations =====
-
-    static class InMemoryMessagingStorage implements MessagingStorage {
-        private final Map<String, Conversation> conversations = new HashMap<>();
-        private final Map<String, List<Message>> messagesByConvo = new HashMap<>();
-
-        // Conversation operations
-        @Override
-        public void saveConversation(Conversation conversation) {
-            conversations.put(conversation.getId(), conversation);
-        }
-
-        @Override
-        public Optional<Conversation> getConversation(String conversationId) {
-            return Optional.ofNullable(conversations.get(conversationId));
-        }
-
-        @Override
-        public Optional<Conversation> getConversationByUsers(UUID userA, UUID userB) {
-            return getConversation(Conversation.generateId(userA, userB));
-        }
-
-        @Override
-        public List<Conversation> getConversationsFor(UUID userId) {
-            return conversations.values().stream()
-                    .filter(c -> c.involves(userId))
-                    .sorted((a, b) -> {
-                        Instant aTime = a.getLastMessageAt() != null ? a.getLastMessageAt() : a.getCreatedAt();
-                        Instant bTime = b.getLastMessageAt() != null ? b.getLastMessageAt() : b.getCreatedAt();
-                        return bTime.compareTo(aTime);
-                    })
-                    .toList();
-        }
-
-        @Override
-        public void updateConversationLastMessageAt(String conversationId, Instant timestamp) {
-            Conversation convo = conversations.get(conversationId);
-            if (convo != null) {
-                convo.updateLastMessageAt(timestamp);
-            }
-        }
-
-        @Override
-        public void updateConversationReadTimestamp(String conversationId, UUID userId, Instant timestamp) {
-            Conversation convo = conversations.get(conversationId);
-            if (convo != null) {
-                convo.updateReadTimestamp(userId, timestamp);
-            }
-        }
-
-        @Override
-        public void archiveConversation(String conversationId, Match.ArchiveReason reason) {
-            Conversation convo = conversations.get(conversationId);
-            if (convo != null) {
-                convo.archive(reason);
-            }
-        }
-
-        @Override
-        public void setConversationVisibility(String conversationId, UUID userId, boolean visible) {
-            Conversation convo = conversations.get(conversationId);
-            if (convo != null) {
-                convo.setVisibility(userId, visible);
-            }
-        }
-
-        @Override
-        public void deleteConversation(String conversationId) {
-            conversations.remove(conversationId);
-            messagesByConvo.remove(conversationId);
-        }
-
-        // Message operations
-        @Override
-        public void saveMessage(Message message) {
-            messagesByConvo
-                    .computeIfAbsent(message.conversationId(), k -> new ArrayList<>())
-                    .add(message);
-        }
-
-        @Override
-        public List<Message> getMessages(String conversationId, int limit, int offset) {
-            List<Message> msgs = messagesByConvo.getOrDefault(conversationId, List.of());
-            return msgs.stream()
-                    .sorted((a, b) -> a.createdAt().compareTo(b.createdAt()))
-                    .skip(offset)
-                    .limit(limit)
-                    .toList();
-        }
-
-        @Override
-        public Optional<Message> getLatestMessage(String conversationId) {
-            List<Message> msgs = messagesByConvo.getOrDefault(conversationId, List.of());
-            return msgs.stream().max((a, b) -> a.createdAt().compareTo(b.createdAt()));
-        }
-
-        @Override
-        public int countMessages(String conversationId) {
-            return messagesByConvo.getOrDefault(conversationId, List.of()).size();
-        }
-
-        @Override
-        public int countMessagesAfter(String conversationId, Instant after) {
-            return (int) messagesByConvo.getOrDefault(conversationId, List.of()).stream()
-                    .filter(m -> m.createdAt().isAfter(after))
-                    .count();
-        }
-
-        @Override
-        public int countMessagesNotFromSender(String conversationId, UUID senderId) {
-            return (int) messagesByConvo.getOrDefault(conversationId, List.of()).stream()
-                    .filter(m -> !m.senderId().equals(senderId))
-                    .count();
-        }
-
-        @Override
-        public int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId) {
-            return (int) messagesByConvo.getOrDefault(conversationId, List.of()).stream()
-                    .filter(m -> m.createdAt().isAfter(after))
-                    .filter(m -> !m.senderId().equals(excludeSenderId))
-                    .count();
-        }
-
-        @Override
-        public void deleteMessagesByConversation(String conversationId) {
-            messagesByConvo.remove(conversationId);
-        }
-    }
-
-    static class InMemoryMatchStorage implements MatchStorage {
-        private final Map<String, Match> matches = new HashMap<>();
-
-        @Override
-        public void save(Match match) {
-            matches.put(match.getId(), match);
-        }
-
-        @Override
-        public void update(Match match) {
-            matches.put(match.getId(), match);
-        }
-
-        @Override
-        public Optional<Match> get(String matchId) {
-            return Optional.ofNullable(matches.get(matchId));
-        }
-
-        @Override
-        public boolean exists(String matchId) {
-            return matches.containsKey(matchId);
-        }
-
-        @Override
-        public List<Match> getActiveMatchesFor(UUID userId) {
-            return matches.values().stream()
-                    .filter(m -> m.involves(userId) && m.isActive())
-                    .toList();
-        }
-
-        @Override
-        public List<Match> getAllMatchesFor(UUID userId) {
-            return matches.values().stream().filter(m -> m.involves(userId)).toList();
-        }
-
-        @Override
-        public void delete(String matchId) {
-            matches.remove(matchId);
-        }
-    }
 
     static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();

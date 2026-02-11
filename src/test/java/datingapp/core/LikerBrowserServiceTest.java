@@ -2,20 +2,28 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import datingapp.core.model.*;
+import datingapp.core.model.Match;
+import datingapp.core.model.User;
 import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.UserInteractions.Block;
 import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.model.UserInteractions.Report;
-import datingapp.core.service.*;
+import datingapp.core.service.MatchingService;
 import datingapp.core.service.MatchingService.PendingLiker;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,20 +48,19 @@ class LikerBrowserServiceTest {
         UUID matchedId = UUID.randomUUID();
         UUID inactiveId = UUID.randomUUID();
 
-        InMemoryLikeStorage likeStorage = new InMemoryLikeStorage();
-        likeStorage.addIncomingLike(pendingLikerId);
-        likeStorage.addIncomingLike(alreadyInteractedId);
-        likeStorage.addIncomingLike(blockedId);
-        likeStorage.addIncomingLike(matchedId);
-        likeStorage.addIncomingLike(inactiveId);
+        InMemoryInteractionStorage interactionStorage = new InMemoryInteractionStorage();
+        interactionStorage.addIncomingLike(pendingLikerId);
+        interactionStorage.addIncomingLike(alreadyInteractedId);
+        interactionStorage.addIncomingLike(blockedId);
+        interactionStorage.addIncomingLike(matchedId);
+        interactionStorage.addIncomingLike(inactiveId);
 
-        likeStorage.addAlreadyInteracted(alreadyInteractedId);
+        interactionStorage.addAlreadyInteracted(alreadyInteractedId);
 
         InMemoryTrustSafetyStorage trustSafetyStorage = new InMemoryTrustSafetyStorage();
         trustSafetyStorage.save(Block.create(currentUserId, blockedId));
 
-        InMemoryMatchStorage matchStorage = new InMemoryMatchStorage();
-        matchStorage.matches.add(Match.create(currentUserId, matchedId));
+        interactionStorage.addMatch(Match.create(currentUserId, matchedId));
 
         InMemoryUserStorage userStorage = new InMemoryUserStorage();
         userStorage.put(activeUser(pendingLikerId, "Pending"));
@@ -63,10 +70,9 @@ class LikerBrowserServiceTest {
         userStorage.put(incompleteUser(inactiveId, "Inactive"));
 
         MatchingService service = MatchingService.builder()
-                .likeStorage(likeStorage)
-                .matchStorage(matchStorage)
-                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
                 .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
                 .build();
 
         List<User> pending = service.findPendingLikers(currentUserId);
@@ -83,19 +89,18 @@ class LikerBrowserServiceTest {
         UUID olderLikerId = UUID.randomUUID();
         UUID newerLikerId = UUID.randomUUID();
 
-        InMemoryLikeStorage likeStorage = new InMemoryLikeStorage();
-        likeStorage.addIncomingLike(olderLikerId, Instant.parse("2026-01-01T00:00:00Z"));
-        likeStorage.addIncomingLike(newerLikerId, Instant.parse("2026-01-02T00:00:00Z"));
+        InMemoryInteractionStorage interactionStorage = new InMemoryInteractionStorage();
+        interactionStorage.addIncomingLike(olderLikerId, Instant.parse("2026-01-01T00:00:00Z"));
+        interactionStorage.addIncomingLike(newerLikerId, Instant.parse("2026-01-02T00:00:00Z"));
 
         InMemoryUserStorage userStorage = new InMemoryUserStorage();
         userStorage.put(activeUser(olderLikerId, "Older"));
         userStorage.put(activeUser(newerLikerId, "Newer"));
 
         MatchingService service = MatchingService.builder()
-                .likeStorage(likeStorage)
-                .matchStorage(new InMemoryMatchStorage())
-                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
                 .trustSafetyStorage(new InMemoryTrustSafetyStorage())
+                .userStorage(userStorage)
                 .build();
 
         List<PendingLiker> pending = service.findPendingLikersWithTimes(currentUserId);
@@ -124,87 +129,213 @@ class LikerBrowserServiceTest {
                 .build();
     }
 
-    private static class InMemoryLikeStorage implements LikeStorage {
-        private final Set<UUID> whoLikedCurrent = new HashSet<>();
+    private static class InMemoryInteractionStorage implements InteractionStorage {
+        private final List<Map.Entry<UUID, Instant>> incomingLikes = new ArrayList<>();
         private final Set<UUID> alreadyInteracted = new HashSet<>();
-        private final Map<UUID, Instant> likeTimes = new HashMap<>();
+        private final Map<String, Match> matches = new HashMap<>();
 
         void addIncomingLike(UUID fromUserId) {
-            addIncomingLike(fromUserId, Instant.EPOCH);
+            addIncomingLike(fromUserId, Instant.now());
         }
 
         void addIncomingLike(UUID fromUserId, Instant likedAt) {
-            whoLikedCurrent.add(fromUserId);
-            likeTimes.put(fromUserId, likedAt);
+            incomingLikes.add(Map.entry(fromUserId, likedAt));
         }
 
-        void addAlreadyInteracted(UUID toUserId) {
-            alreadyInteracted.add(toUserId);
+        void addAlreadyInteracted(UUID userId) {
+            alreadyInteracted.add(userId);
+        }
+
+        void addMatch(Match match) {
+            matches.put(match.getId(), match);
         }
 
         @Override
         public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-            throw new UnsupportedOperationException();
+            return Optional.empty();
         }
 
         @Override
-        public void save(Like like) {
-            throw new UnsupportedOperationException();
-        }
+        public void save(Like like) {}
 
         @Override
         public boolean exists(UUID from, UUID to) {
-            throw new UnsupportedOperationException();
+            return false;
         }
 
         @Override
         public boolean mutualLikeExists(UUID a, UUID b) {
-            throw new UnsupportedOperationException();
+            return false;
         }
 
         @Override
         public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-            return alreadyInteracted;
+            return Set.copyOf(alreadyInteracted);
         }
 
         @Override
         public Set<UUID> getUserIdsWhoLiked(UUID userId) {
-            return whoLikedCurrent;
+            return incomingLikes.stream().map(Map.Entry::getKey).collect(java.util.stream.Collectors.toSet());
         }
 
         @Override
         public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
-            return new ArrayList<>(likeTimes.entrySet());
+            return List.copyOf(incomingLikes);
         }
 
         @Override
         public int countByDirection(UUID userId, Like.Direction direction) {
-            throw new UnsupportedOperationException();
+            return 0;
         }
 
         @Override
         public int countReceivedByDirection(UUID userId, Like.Direction direction) {
-            throw new UnsupportedOperationException();
+            return 0;
         }
 
         @Override
         public int countMutualLikes(UUID userId) {
-            throw new UnsupportedOperationException();
+            return 0;
         }
 
         @Override
         public int countLikesToday(UUID userId, Instant startOfDay) {
-            throw new UnsupportedOperationException();
+            return 0;
         }
 
         @Override
         public int countPassesToday(UUID userId, Instant startOfDay) {
-            throw new UnsupportedOperationException();
+            return 0;
         }
 
         @Override
-        public void delete(UUID likeId) {
-            throw new UnsupportedOperationException();
+        public void delete(UUID likeId) {}
+
+        @Override
+        public void save(Match match) {
+            matches.put(match.getId(), match);
+        }
+
+        @Override
+        public void update(Match match) {
+            matches.put(match.getId(), match);
+        }
+
+        @Override
+        public Optional<Match> get(String matchId) {
+            return Optional.ofNullable(matches.get(matchId));
+        }
+
+        @Override
+        public boolean exists(String matchId) {
+            return matches.containsKey(matchId);
+        }
+
+        @Override
+        public List<Match> getActiveMatchesFor(UUID userId) {
+            return getAllMatchesFor(userId).stream().filter(Match::isActive).toList();
+        }
+
+        @Override
+        public List<Match> getAllMatchesFor(UUID userId) {
+            return matches.values().stream().filter(m -> m.involves(userId)).toList();
+        }
+
+        @Override
+        public void delete(String matchId) {
+            matches.remove(matchId);
+        }
+
+        @Override
+        public boolean atomicUndoDelete(UUID likeId, String matchId) {
+            return false;
+        }
+    }
+
+    private static class InMemoryTrustSafetyStorage implements TrustSafetyStorage {
+        private final List<Block> blocks = new ArrayList<>();
+        private final List<Report> reports = new ArrayList<>();
+
+        @Override
+        public void save(Block block) {
+            blocks.add(block);
+        }
+
+        @Override
+        public boolean isBlocked(UUID userA, UUID userB) {
+            return blocks.stream()
+                    .anyMatch(block -> (block.blockerId().equals(userA)
+                                    && block.blockedId().equals(userB))
+                            || (block.blockerId().equals(userB)
+                                    && block.blockedId().equals(userA)));
+        }
+
+        @Override
+        public Set<UUID> getBlockedUserIds(UUID userId) {
+            return blocks.stream()
+                    .filter(block -> block.blockerId().equals(userId))
+                    .map(Block::blockedId)
+                    .collect(java.util.stream.Collectors.toSet());
+        }
+
+        @Override
+        public List<Block> findByBlocker(UUID blockerId) {
+            return blocks.stream()
+                    .filter(block -> block.blockerId().equals(blockerId))
+                    .toList();
+        }
+
+        @Override
+        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
+            return blocks.removeIf(block ->
+                    block.blockerId().equals(blockerId) && block.blockedId().equals(blockedId));
+        }
+
+        @Override
+        public int countBlocksGiven(UUID userId) {
+            return (int) blocks.stream()
+                    .filter(block -> block.blockerId().equals(userId))
+                    .count();
+        }
+
+        @Override
+        public int countBlocksReceived(UUID userId) {
+            return (int) blocks.stream()
+                    .filter(block -> block.blockedId().equals(userId))
+                    .count();
+        }
+
+        @Override
+        public void save(Report report) {
+            reports.add(report);
+        }
+
+        @Override
+        public int countReportsAgainst(UUID userId) {
+            return (int) reports.stream()
+                    .filter(report -> report.reportedUserId().equals(userId))
+                    .count();
+        }
+
+        @Override
+        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
+            return reports.stream()
+                    .anyMatch(report -> report.reporterId().equals(reporterId)
+                            && report.reportedUserId().equals(reportedUserId));
+        }
+
+        @Override
+        public List<Report> getReportsAgainst(UUID userId) {
+            return reports.stream()
+                    .filter(report -> report.reportedUserId().equals(userId))
+                    .toList();
+        }
+
+        @Override
+        public int countReportsBy(UUID userId) {
+            return (int) reports.stream()
+                    .filter(report -> report.reporterId().equals(userId))
+                    .count();
         }
     }
 
@@ -237,7 +368,9 @@ class LikerBrowserServiceTest {
 
         @Override
         public List<User> findActive() {
-            throw new UnsupportedOperationException();
+            return users.values().stream()
+                    .filter(user -> user.getState() == User.UserState.ACTIVE)
+                    .toList();
         }
 
         @Override
@@ -266,130 +399,6 @@ class LikerBrowserServiceTest {
         @Override
         public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
             return profileNotes.remove(noteKey(authorId, subjectId)) != null;
-        }
-    }
-
-    private static class InMemoryMatchStorage implements MatchStorage {
-        private final List<Match> matches = new ArrayList<>();
-
-        @Override
-        public void save(Match match) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void update(Match match) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Optional<Match> get(String matchId) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean exists(String matchId) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<Match> getActiveMatchesFor(UUID userId) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<Match> getAllMatchesFor(UUID userId) {
-            return matches;
-        }
-
-        @Override
-        public void delete(String matchId) {
-            throw new UnsupportedOperationException();
-        }
-    }
-
-    private static class InMemoryTrustSafetyStorage implements TrustSafetyStorage {
-        private final List<Block> blocks = new ArrayList<>();
-        private final List<Report> reports = new ArrayList<>();
-
-        @Override
-        public void save(Block block) {
-            blocks.add(block);
-        }
-
-        @Override
-        public boolean isBlocked(UUID userA, UUID userB) {
-            return blocks.stream()
-                    .anyMatch(b -> (b.blockerId().equals(userA) && b.blockedId().equals(userB))
-                            || (b.blockerId().equals(userB) && b.blockedId().equals(userA)));
-        }
-
-        @Override
-        public Set<UUID> getBlockedUserIds(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Block block : blocks) {
-                if (block.blockerId().equals(userId)) {
-                    result.add(block.blockedId());
-                } else if (block.blockedId().equals(userId)) {
-                    result.add(block.blockerId());
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public List<Block> findByBlocker(UUID blockerId) {
-            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
-        }
-
-        @Override
-        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
-            return blocks.removeIf(
-                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
-        }
-
-        @Override
-        public int countBlocksGiven(UUID userId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockerId().equals(userId)).count();
-        }
-
-        @Override
-        public int countBlocksReceived(UUID userId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
-        }
-
-        @Override
-        public void save(Report report) {
-            reports.add(report);
-        }
-
-        @Override
-        public int countReportsAgainst(UUID userId) {
-            return (int) reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .count();
-        }
-
-        @Override
-        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
-            return reports.stream()
-                    .anyMatch(r -> r.reporterId().equals(reporterId)
-                            && r.reportedUserId().equals(reportedUserId));
-        }
-
-        @Override
-        public List<Report> getReportsAgainst(UUID userId) {
-            return reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .toList();
-        }
-
-        @Override
-        public int countReportsBy(UUID userId) {
-            return (int)
-                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
         }
     }
 }

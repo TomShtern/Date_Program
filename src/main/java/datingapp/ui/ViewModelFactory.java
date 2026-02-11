@@ -253,8 +253,7 @@ public class ViewModelFactory {
     }
 
     private UiMatchDataAccess createUiMatchDataAccess() {
-        return new StorageUiMatchDataAccess(
-                services.getMatchStorage(), services.getLikeStorage(), services.getTrustSafetyStorage());
+        return new StorageUiMatchDataAccess(services.getInteractionStorage(), services.getTrustSafetyStorage());
     }
 
     private void logDebug(String message, Object... args) {

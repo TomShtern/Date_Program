@@ -43,17 +43,17 @@ public final class HandlerFactory {
             MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
                     services.getCandidateFinder(),
                     services.getMatchingService(),
-                    services.getMatchStorage(),
-                    services.getTrustSafetyStorage(),
+                    services.getInteractionStorage(),
                     services.getDailyService(),
                     services.getUndoService(),
                     services.getMatchQualityService(),
                     services.getUserStorage(),
                     services.getAchievementService(),
-                    services.getStatsStorage(),
+                    services.getAnalyticsStorage(),
+                    services.getTrustSafetyService(),
                     services.getRelationshipTransitionService(),
                     services.getStandoutsService(),
-                    services.getSocialStorage(),
+                    services.getCommunicationStorage(),
                     session,
                     inputReader);
             matchingHandler = new MatchingHandler(deps);
@@ -83,12 +83,7 @@ public final class HandlerFactory {
     public SafetyHandler safety() {
         if (safetyHandler == null) {
             safetyHandler = new SafetyHandler(
-                    services.getUserStorage(),
-                    services.getTrustSafetyStorage(),
-                    services.getMatchStorage(),
-                    services.getTrustSafetyService(),
-                    session,
-                    inputReader);
+                    services.getUserStorage(), services.getTrustSafetyService(), session, inputReader);
         }
         return safetyHandler;
     }
@@ -111,8 +106,8 @@ public final class HandlerFactory {
         if (messagingHandler == null) {
             messagingHandler = new MessagingHandler(
                     services.getMessagingService(),
-                    services.getMatchStorage(),
-                    services.getTrustSafetyStorage(),
+                    services.getInteractionStorage(),
+                    services.getTrustSafetyService(),
                     inputReader,
                     session);
         }

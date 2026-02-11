@@ -133,13 +133,13 @@ mvn verify 2>&1 | Select-String "ERROR|WARNING"
 - Domain models (`core/model/`, 11 files): `User`, `Match`, `Messaging`, `UserInteractions`, `Achievement`, `Preferences`, `Dealbreakers`, `Stats`, `SwipeSession`, `Standout`, `UndoState`
 - Enums nested in `User`: `Gender`, `UserState`, `VerificationMethod`
 - Services (`core/service/`, 14 total): `MatchingService`, `MessagingService`, `CandidateFinder`, `MatchQualityService`, `DailyService`, `AchievementService`, `TrustSafetyService`, `StatsService`, `ProfileCompletionService`, `SessionService`, `UndoService`, `RelationshipTransitionService`, `ValidationService`, `StandoutsService`
-- Storage interfaces (`core/storage/`, 9 total): `UserStorage`, `MatchStorage`, `LikeStorage`, `MessagingStorage`, `SocialStorage`, `StatsStorage`, `SwipeSessionStorage`, `TrustSafetyStorage`, `TransactionExecutor`
+- Storage interfaces (`core/storage/`, 5 total): `UserStorage`, `InteractionStorage`, `CommunicationStorage`, `AnalyticsStorage`, `TrustSafetyStorage`
 - Bootstrap (`app/`): `AppBootstrap` (singleton init), `ConfigLoader`
 - Configuration: `AppConfig` (40+ immutable parameters, in `core/`)
 
 **Layer 2: Storage** (`storage/`)
 - JDBI 3 + H2 database implementations
-- `jdbi/` package (15 files): `JdbiUserStorage`, `JdbiMatchStorage`, `JdbiLikeStorage`, `JdbiMessagingStorage`, `JdbiSocialStorage`, `JdbiStatsStorage`, `JdbiSwipeSessionStorage`, `JdbiTransactionExecutor`, `JdbiTrustSafetyStorage`, `JdbiStandoutStorage`, `JdbiUndoStorage`, `JdbiUserStorageAdapter`, `UserBindingHelper`, `MapperHelper`, `EnumSetJdbiSupport`
+- `jdbi/` package (17 files): `JdbiUserStorage`, `JdbiUserStorageAdapter`, `JdbiInteractionStorageAdapter`, `JdbiCommunicationStorageAdapter`, `JdbiAnalyticsStorageAdapter`, `JdbiLikeStorage`, `JdbiMatchStorage`, `JdbiMessagingStorage`, `JdbiSocialStorage`, `JdbiStatsStorage`, `JdbiSwipeSessionStorage`, `JdbiTrustSafetyStorage`, `JdbiStandoutStorage`, `JdbiUndoStorage`, `UserBindingHelper`, `MapperHelper`, `EnumSetJdbiSupport`
 - `schema/` package: `SchemaInitializer`, `MigrationRunner`
 - `DatabaseManager` (connection pooling, schema auto-creation), `StorageFactory` (wires all storage implementations)
 
@@ -337,8 +337,7 @@ public class TestStorages {
         public int size() { return users.size(); }
     }
 
-    public static class Matches implements MatchStorage { /* similar */ }
-    public static class Likes implements LikeStorage { /* similar */ }
+    public static class Interactions implements InteractionStorage { /* combines likes + matches */ }
     public static class TrustSafety implements TrustSafetyStorage { /* similar */ }
 }
 
@@ -346,9 +345,8 @@ public class TestStorages {
 @BeforeEach
 void setUp() {
     var userStorage = new TestStorages.Users();
-    var likeStorage = new TestStorages.Likes();
-    var matchStorage = new TestStorages.Matches();
-    matchingService = new MatchingService(likeStorage, matchStorage);
+    var interactionStorage = new TestStorages.Interactions();
+    matchingService = new MatchingService(interactionStorage);
 }
 ```
 
@@ -435,7 +433,7 @@ public void setBio(String bio) {
 }
 ```
 
-**Daily Pick Exclusions:** Use `LikeStorage.getLikedOrPassedUserIds()` to avoid resurfacing users already liked or passed.
+**Daily Pick Exclusions:** Use `InteractionStorage.getLikedOrPassedUserIds()` to avoid resurfacing users already liked or passed.
 
 **Candidate Distance:** If either user lacks a location (`hasLocationSet` is false), skip distance filtering and sort unknown distances last to avoid empty queues.
 
@@ -468,12 +466,12 @@ public class MatchingHandler {
 - Utilities (8): `AppClock`, `AppConfig`, `AppSession`, `EnumSetUtil`, `LoggingSupport`, `PerformanceMonitor`, `ScoringConstants`, `ServiceRegistry`
 - Domain models (`model/`, 11): `Achievement`, `Dealbreakers`, `Match`, `Messaging`, `Preferences`, `Standout`, `Stats`, `SwipeSession`, `UndoState`, `User`, `UserInteractions`
 - Enums nested in `User`: `Gender`, `UserState`, `VerificationMethod` (no standalone enum files)
-- Storage interfaces (`storage/`, 9): `UserStorage`, `MatchStorage`, `LikeStorage`, `MessagingStorage`, `SocialStorage`, `StatsStorage`, `SwipeSessionStorage`, `TrustSafetyStorage`, `TransactionExecutor`
+- Storage interfaces (`storage/`, 5): `UserStorage`, `InteractionStorage`, `CommunicationStorage`, `AnalyticsStorage`, `TrustSafetyStorage`
 - Services (`service/`, 14): `AchievementService`, `CandidateFinder`, `DailyService`, `MatchingService`, `MatchQualityService`, `MessagingService`, `ProfileCompletionService`, `RelationshipTransitionService`, `SessionService`, `StandoutsService`, `StatsService`, `TrustSafetyService`, `UndoService`, `ValidationService`
 
 **Storage Layer** (`src/main/java/datingapp/storage/`)
 - Root (2): `DatabaseManager`, `StorageFactory`
-- JDBI implementations (`jdbi/`, 15): `JdbiLikeStorage`, `JdbiMatchStorage`, `JdbiMessagingStorage`, `JdbiSocialStorage`, `JdbiStandoutStorage`, `JdbiStatsStorage`, `JdbiSwipeSessionStorage`, `JdbiTransactionExecutor`, `JdbiTrustSafetyStorage`, `JdbiUndoStorage`, `JdbiUserStorage`, `JdbiUserStorageAdapter`, `MapperHelper`, `UserBindingHelper`, `EnumSetJdbiSupport`
+- JDBI implementations (`jdbi/`, 17): `JdbiUserStorage`, `JdbiUserStorageAdapter`, `JdbiInteractionStorageAdapter`, `JdbiCommunicationStorageAdapter`, `JdbiAnalyticsStorageAdapter`, `JdbiLikeStorage`, `JdbiMatchStorage`, `JdbiMessagingStorage`, `JdbiSocialStorage`, `JdbiStatsStorage`, `JdbiSwipeSessionStorage`, `JdbiStandoutStorage`, `JdbiTrustSafetyStorage`, `JdbiUndoStorage`, `MapperHelper`, `UserBindingHelper`, `EnumSetJdbiSupport`
 - Schema (`schema/`, 2): `SchemaInitializer`, `MigrationRunner`
 
 **App Layer** (`src/main/java/datingapp/app/`)
@@ -728,7 +726,7 @@ Before committing changes, verify:
 **Repository:** https://github.com/TomShtern/Date_Program.git
 **Total Java Files:** 160 in `src/` (102 main + 58 test files)
 **Lines of Code:** ~48K total (~35K code, ~5K comments)
-**Tests:** 813 (all passing)
+**Tests:** 802 (all passing)
 **Test Coverage:** 60% minimum (JaCoCo enforced, excludes ui/ and cli/)
 
 
@@ -794,4 +792,6 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 54|2026-02-08 18:00:00|agent:claude_code|scope:build-discipline|Added Build Command Discipline section: capture expensive commands once, query N times|CLAUDE.md;AGENTS.md
 55|2026-02-09 18:40:00|agent:github_copilot|scope:ui-matching-queue|Use thread-safe candidate queue in MatchingViewModel|src/main/java/datingapp/ui/viewmodel/MatchingViewModel.java;AGENTS.md
 56|2026-02-11 12:00:00|agent:github_copilot|scope:codebase-consolidation|Consolidated 189→160 files: models→core/model/, services→core/service/, merged 3 storage interfaces into TrustSafetyStorage (11→9), merged CleanupService→SessionService, consolidated UiDataAdapters/UiConstants/EnumSetJdbiSupport, MapperHelper→storage/jdbi/, ScoringConstants→core/, UiComponents→ui/, deleted StorageException. Updated all 3 doc files.|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
+57|2026-02-11 22:40:00|agent:codex|scope:storage-5-doc-sync|Update docs for final storage consolidation to 5 interfaces and 17 JDBI files; refresh TestStorages and daily-pick references|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
+58|2026-02-11 22:52:00|agent:codex|scope:docs-stats-sync|Update documented test baseline from 813 to 802 and align cross-doc stats references|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
 ---AGENT-LOG-END---

@@ -11,7 +11,7 @@ import datingapp.core.model.Preferences.PacePreferences;
 import datingapp.core.model.User;
 import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.CandidateFinder.GeoUtils;
-import datingapp.core.storage.LikeStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
@@ -27,7 +27,7 @@ import java.util.UUID;
 public class MatchQualityService {
 
     private final UserStorage userStorage;
-    private final LikeStorage likeStorage;
+    private final InteractionStorage interactionStorage;
     private final AppConfig config;
 
     /**
@@ -291,9 +291,9 @@ public class MatchQualityService {
         }
     }
 
-    public MatchQualityService(UserStorage userStorage, LikeStorage likeStorage, AppConfig config) {
+    public MatchQualityService(UserStorage userStorage, InteractionStorage interactionStorage, AppConfig config) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
-        this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
     }
 
@@ -560,8 +560,8 @@ public class MatchQualityService {
 
     private Duration calculateTimeBetweenLikes(UUID userId, UUID otherId) {
         // Get the two likes that created this match
-        Optional<Like> myLike = likeStorage.getLike(userId, otherId);
-        Optional<Like> theirLike = likeStorage.getLike(otherId, userId);
+        Optional<Like> myLike = interactionStorage.getLike(userId, otherId);
+        Optional<Like> theirLike = interactionStorage.getLike(otherId, userId);
 
         if (myLike.isEmpty() || theirLike.isEmpty()) {
             return Duration.ZERO; // Shouldn't happen, but handle gracefully

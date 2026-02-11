@@ -6,8 +6,6 @@ import datingapp.core.model.*;
 import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.*;
 import datingapp.core.service.UndoService.UndoResult;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
 import datingapp.core.testutil.TestStorages;
 import java.time.Clock;
 import java.time.Instant;
@@ -24,8 +22,7 @@ import org.junit.jupiter.api.*;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class UndoServiceTest {
 
-    private InMemoryLikeStorage likeStorage;
-    private InMemoryMatchStorage matchStorage;
+    private TestStorages.Interactions interactionStorage;
     private TestStorages.Undos undoStorage;
     private AppConfig config;
     private UndoService undoService;
@@ -36,12 +33,11 @@ class UndoServiceTest {
 
     @BeforeEach
     void setUp() {
-        likeStorage = new InMemoryLikeStorage();
-        matchStorage = new InMemoryMatchStorage();
+        interactionStorage = new TestStorages.Interactions();
         undoStorage = new TestStorages.Undos();
         config = AppConfig.builder().undoWindowSeconds(30).build(); // 30 second undo window
         clock = new TestClock(Instant.parse("2026-01-26T00:00:00Z"));
-        undoService = new UndoService(likeStorage, matchStorage, undoStorage, config, clock);
+        undoService = new UndoService(interactionStorage, undoStorage, config, clock);
 
         userId = UUID.randomUUID();
         targetUserId = UUID.randomUUID();
@@ -77,8 +73,8 @@ class UndoServiceTest {
         void overwritesPreviousUndoState() {
             Like firstLike = Like.create(userId, targetUserId, Like.Direction.LIKE);
             Like secondLike = Like.create(userId, UUID.randomUUID(), Like.Direction.PASS);
-            likeStorage.save(firstLike);
-            likeStorage.save(secondLike);
+            interactionStorage.save(firstLike);
+            interactionStorage.save(secondLike);
 
             undoService.recordSwipe(userId, firstLike, null);
             undoService.recordSwipe(userId, secondLike, null);
@@ -139,7 +135,7 @@ class UndoServiceTest {
             TestClock shortClock = new TestClock(clock.instant());
             TestStorages.Undos shortUndoStorage = new TestStorages.Undos();
             UndoService shortUndoService =
-                    new UndoService(likeStorage, matchStorage, shortUndoStorage, shortConfig, shortClock);
+                    new UndoService(interactionStorage, shortUndoStorage, shortConfig, shortClock);
 
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             shortUndoService.recordSwipe(userId, like, null);
@@ -204,7 +200,7 @@ class UndoServiceTest {
         @DisplayName("Succeeds within window")
         void succeedsWithinWindow() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            likeStorage.save(like);
+            interactionStorage.save(like);
             undoService.recordSwipe(userId, like, null);
 
             UndoResult result = undoService.undo(userId);
@@ -218,12 +214,12 @@ class UndoServiceTest {
         @DisplayName("Deletes like from storage")
         void deletesLikeFromStorage() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            likeStorage.save(like);
+            interactionStorage.save(like);
             undoService.recordSwipe(userId, like, null);
 
             undoService.undo(userId);
 
-            assertFalse(likeStorage.exists(userId, targetUserId));
+            assertFalse(interactionStorage.exists(userId, targetUserId));
         }
 
         @Test
@@ -231,22 +227,22 @@ class UndoServiceTest {
         void deletesMatchWhenPresent() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             Match match = Match.create(userId, targetUserId);
-            likeStorage.save(like);
-            matchStorage.save(match);
+            interactionStorage.save(like);
+            interactionStorage.save(match);
             undoService.recordSwipe(userId, like, match);
 
             UndoResult result = undoService.undo(userId);
 
             assertTrue(result.success());
             assertTrue(result.matchDeleted());
-            assertFalse(matchStorage.exists(match.getId()));
+            assertFalse(interactionStorage.exists(match.getId()));
         }
 
         @Test
         @DisplayName("Reports match not deleted when no match")
         void reportsNoMatchDeleted() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            likeStorage.save(like);
+            interactionStorage.save(like);
             undoService.recordSwipe(userId, like, null);
 
             UndoResult result = undoService.undo(userId);
@@ -259,7 +255,7 @@ class UndoServiceTest {
         @DisplayName("Clears undo state after successful undo")
         void clearsStateAfterSuccess() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            likeStorage.save(like);
+            interactionStorage.save(like);
             undoService.recordSwipe(userId, like, null);
 
             undoService.undo(userId);
@@ -271,7 +267,7 @@ class UndoServiceTest {
         @DisplayName("Cannot undo twice")
         void cannotUndoTwice() {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            likeStorage.save(like);
+            interactionStorage.save(like);
             undoService.recordSwipe(userId, like, null);
 
             UndoResult first = undoService.undo(userId);
@@ -289,10 +285,10 @@ class UndoServiceTest {
             TestClock shortClock = new TestClock(clock.instant());
             TestStorages.Undos shortUndoStorage = new TestStorages.Undos();
             UndoService shortUndoService =
-                    new UndoService(likeStorage, matchStorage, shortUndoStorage, shortConfig, shortClock);
+                    new UndoService(interactionStorage, shortUndoStorage, shortConfig, shortClock);
 
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
-            likeStorage.save(like);
+            interactionStorage.save(like);
             shortUndoService.recordSwipe(userId, like, null);
 
             // Advance time beyond expiry
@@ -327,168 +323,6 @@ class UndoServiceTest {
             undoService.clearUndo(userId);
 
             assertFalse(undoService.canUndo(userId));
-        }
-    }
-
-    // ============================================================
-    // IN-MEMORY MOCK STORAGES
-    // ============================================================
-
-    private static class InMemoryLikeStorage implements LikeStorage {
-        private final Map<UUID, Like> likesById = new HashMap<>();
-        private final Map<String, Like> likesByKey = new HashMap<>(); // from_to key
-
-        private String key(UUID from, UUID to) {
-            return from.toString() + "_" + to.toString();
-        }
-
-        @Override
-        public void save(Like like) {
-            likesById.put(like.id(), like);
-            likesByKey.put(key(like.whoLikes(), like.whoGotLiked()), like);
-        }
-
-        @Override
-        public boolean exists(UUID from, UUID to) {
-            return likesByKey.containsKey(key(from, to));
-        }
-
-        @Override
-        public boolean mutualLikeExists(UUID a, UUID b) {
-            Like aToB = likesByKey.get(key(a, b));
-            Like bToA = likesByKey.get(key(b, a));
-            return aToB != null
-                    && bToA != null
-                    && aToB.direction() == Like.Direction.LIKE
-                    && bToA.direction() == Like.Direction.LIKE;
-        }
-
-        @Override
-        public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Like l : likesById.values()) {
-                if (l.whoLikes().equals(userId)) {
-                    result.add(l.whoGotLiked());
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public Set<UUID> getUserIdsWhoLiked(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Like l : likesById.values()) {
-                if (l.whoGotLiked().equals(userId) && l.direction() == Like.Direction.LIKE) {
-                    result.add(l.whoLikes());
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
-            List<Map.Entry<UUID, Instant>> result = new ArrayList<>();
-            for (Like l : likesById.values()) {
-                if (l.whoGotLiked().equals(userId) && l.direction() == Like.Direction.LIKE) {
-                    result.add(Map.entry(l.whoLikes(), l.createdAt()));
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public int countByDirection(UUID userId, Like.Direction direction) {
-            return (int) likesById.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId) && l.direction() == direction)
-                    .count();
-        }
-
-        @Override
-        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
-            return (int) likesById.values().stream()
-                    .filter(l -> l.whoGotLiked().equals(userId) && l.direction() == direction)
-                    .count();
-        }
-
-        @Override
-        public int countMutualLikes(UUID userId) {
-            return (int) likesById.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.LIKE
-                            && mutualLikeExists(userId, l.whoGotLiked()))
-                    .count();
-        }
-
-        @Override
-        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-            return Optional.ofNullable(likesByKey.get(key(fromUserId, toUserId)));
-        }
-
-        @Override
-        public int countLikesToday(UUID userId, Instant startOfDay) {
-            return (int) likesById.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.LIKE
-                            && l.createdAt().isAfter(startOfDay))
-                    .count();
-        }
-
-        @Override
-        public int countPassesToday(UUID userId, Instant startOfDay) {
-            return (int) likesById.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.PASS
-                            && l.createdAt().isAfter(startOfDay))
-                    .count();
-        }
-
-        @Override
-        public void delete(UUID likeId) {
-            Like removed = likesById.remove(likeId);
-            if (removed != null) {
-                likesByKey.remove(key(removed.whoLikes(), removed.whoGotLiked()));
-            }
-        }
-    }
-
-    private static class InMemoryMatchStorage implements MatchStorage {
-        private final Map<String, Match> matches = new HashMap<>();
-
-        @Override
-        public void save(Match match) {
-            matches.put(match.getId(), match);
-        }
-
-        @Override
-        public void update(Match match) {
-            matches.put(match.getId(), match);
-        }
-
-        @Override
-        public Optional<Match> get(String matchId) {
-            return Optional.ofNullable(matches.get(matchId));
-        }
-
-        @Override
-        public boolean exists(String matchId) {
-            return matches.containsKey(matchId);
-        }
-
-        @Override
-        public List<Match> getActiveMatchesFor(UUID userId) {
-            return matches.values().stream()
-                    .filter(m -> m.involves(userId) && m.isActive())
-                    .toList();
-        }
-
-        @Override
-        public List<Match> getAllMatchesFor(UUID userId) {
-            return matches.values().stream().filter(m -> m.involves(userId)).toList();
-        }
-
-        @Override
-        public void delete(String matchId) {
-            matches.remove(matchId);
         }
     }
 

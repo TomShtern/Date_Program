@@ -38,9 +38,8 @@ import org.junit.jupiter.api.Timeout;
 class MatchesViewModelTest {
 
     private TestStorages.Users users;
-    private TestStorages.Likes likes;
-    private TestStorages.Matches matches;
-    private TestStorages.TrustSafety trustSafety;
+    private TestStorages.Interactions interactions;
+    private TestStorages.TrustSafety trustSafetyStorage;
     private UiMatchDataAccess matchData;
     private UiUserStore userStore;
     private MatchingService matchingService;
@@ -53,22 +52,20 @@ class MatchesViewModelTest {
     @BeforeEach
     void setUp() {
         users = new TestStorages.Users();
-        likes = new TestStorages.Likes();
-        matches = new TestStorages.Matches();
-        trustSafety = new TestStorages.TrustSafety();
+        interactions = new TestStorages.Interactions();
+        trustSafetyStorage = new TestStorages.TrustSafety();
         TestClock.setFixed(FIXED_INSTANT);
 
         AppConfig config = AppConfig.defaults();
-        dailyService = new DailyService(likes, config);
+        dailyService = new DailyService(interactions, config);
 
-        matchData = new StorageUiMatchDataAccess(matches, likes, trustSafety);
+        matchData = new StorageUiMatchDataAccess(interactions, trustSafetyStorage);
         userStore = new StorageUiUserStore(users);
 
         matchingService = MatchingService.builder()
-                .likeStorage(likes)
-                .matchStorage(matches)
+                .interactionStorage(interactions)
+                .trustSafetyStorage(trustSafetyStorage)
                 .userStorage(users)
-                .trustSafetyStorage(trustSafety)
                 .build();
 
         viewModel = new MatchesViewModel(matchData, userStore, matchingService, dailyService);
@@ -87,7 +84,7 @@ class MatchesViewModelTest {
     @DisplayName("likeBack does not create like when daily limit reached")
     void likeBackRespectsDailyLimit() {
         AppConfig zeroLimitConfig = AppConfig.builder().dailyLikeLimit(0).build();
-        DailyService zeroLimitDailyService = new DailyService(likes, zeroLimitConfig);
+        DailyService zeroLimitDailyService = new DailyService(interactions, zeroLimitConfig);
 
         User user = createActiveUser("Current");
         users.save(user);
@@ -103,7 +100,7 @@ class MatchesViewModelTest {
         limitViewModel.likeBack(likeCard);
 
         assertFalse(
-                likes.exists(currentUser.getId(), otherUser.getId()),
+                interactions.exists(currentUser.getId(), otherUser.getId()),
                 "Like should not be created when daily limit is reached");
     }
 
@@ -113,7 +110,7 @@ class MatchesViewModelTest {
         User otherUser = createActiveUser("MatchedUser");
         users.save(otherUser);
         Match match = Match.create(currentUser.getId(), otherUser.getId());
-        matches.save(match);
+        interactions.save(match);
 
         viewModel.initialize(); // Calls refreshAll which calls refreshMatches
 
@@ -128,7 +125,7 @@ class MatchesViewModelTest {
         User otherUser = createActiveUser("Liker");
         users.save(otherUser);
         Like like = Like.create(otherUser.getId(), currentUser.getId(), Like.Direction.LIKE);
-        likes.save(like);
+        interactions.save(like);
 
         viewModel.initialize();
 
@@ -143,7 +140,7 @@ class MatchesViewModelTest {
         User otherUser = createActiveUser("LikedUser");
         users.save(otherUser);
         Like like = Like.create(currentUser.getId(), otherUser.getId(), Like.Direction.LIKE);
-        likes.save(like);
+        interactions.save(like);
 
         viewModel.initialize();
 
@@ -158,11 +155,11 @@ class MatchesViewModelTest {
         User otherUser = createActiveUser("MatchedUser");
         users.save(otherUser);
         Like like = Like.create(currentUser.getId(), otherUser.getId(), Like.Direction.LIKE);
-        likes.save(like);
+        interactions.save(like);
 
         // Create match
         Match match = Match.create(currentUser.getId(), otherUser.getId());
-        matches.save(match);
+        interactions.save(match);
 
         viewModel.initialize();
 
@@ -175,7 +172,7 @@ class MatchesViewModelTest {
         User otherUser = createActiveUser("LikedUser");
         users.save(otherUser);
         Like like = Like.create(currentUser.getId(), otherUser.getId(), Like.Direction.LIKE);
-        likes.save(like);
+        interactions.save(like);
 
         viewModel.initialize();
         assertEquals(1, viewModel.getLikesSent().size());
@@ -183,7 +180,7 @@ class MatchesViewModelTest {
         MatchesViewModel.LikeCardData likeCard = viewModel.getLikesSent().get(0);
         viewModel.withdrawLike(likeCard);
 
-        assertFalse(likes.exists(currentUser.getId(), otherUser.getId()));
+        assertFalse(interactions.exists(currentUser.getId(), otherUser.getId()));
         assertEquals(0, viewModel.getLikesSent().size());
     }
 
@@ -193,7 +190,7 @@ class MatchesViewModelTest {
         User otherUser = createActiveUser("Liker");
         users.save(otherUser);
         Like receivedLike = Like.create(otherUser.getId(), currentUser.getId(), Like.Direction.LIKE);
-        likes.save(receivedLike);
+        interactions.save(receivedLike);
 
         viewModel.initialize();
         assertEquals(1, viewModel.getLikesReceived().size());
@@ -202,7 +199,8 @@ class MatchesViewModelTest {
         viewModel.passOn(likeCard);
 
         // Check that a PASS exists from current user to other user
-        assertTrue(likes.getLike(currentUser.getId(), otherUser.getId())
+        assertTrue(interactions
+                .getLike(currentUser.getId(), otherUser.getId())
                 .map(l -> l.direction() == Like.Direction.PASS)
                 .orElse(false));
 
@@ -215,15 +213,15 @@ class MatchesViewModelTest {
     void likeBackCreatesMatch() {
         User otherUser = createActiveUser("Liker");
         users.save(otherUser);
-        likes.save(Like.create(otherUser.getId(), currentUser.getId(), Like.Direction.LIKE));
+        interactions.save(Like.create(otherUser.getId(), currentUser.getId(), Like.Direction.LIKE));
 
         viewModel.initialize();
         MatchesViewModel.LikeCardData likeCard = viewModel.getLikesReceived().get(0);
 
         viewModel.likeBack(likeCard);
 
-        assertTrue(
-                matches.getActiveMatchesFor(currentUser.getId()).stream().anyMatch(m -> m.involves(otherUser.getId())));
+        assertTrue(interactions.getActiveMatchesFor(currentUser.getId()).stream()
+                .anyMatch(m -> m.involves(otherUser.getId())));
         assertEquals(1, viewModel.getMatches().size());
         assertEquals(0, viewModel.getLikesReceived().size());
     }

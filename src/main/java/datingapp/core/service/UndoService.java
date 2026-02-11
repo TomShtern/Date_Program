@@ -4,9 +4,7 @@ import datingapp.core.AppConfig;
 import datingapp.core.model.Match;
 import datingapp.core.model.UndoState;
 import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.TransactionExecutor;
+import datingapp.core.storage.InteractionStorage;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,49 +14,28 @@ import java.util.UUID;
 
 public class UndoService {
 
-    private final LikeStorage likeStorage;
-    private final MatchStorage matchStorage;
+    private final InteractionStorage interactionStorage;
     private final UndoState.Storage undoStorage;
     private final AppConfig config;
     private final Clock clock;
-    private volatile TransactionExecutor transactionExecutor;
 
     /**
      * Constructor for UndoService with persistent storage.
-     * Use {@link #setTransactionExecutor} to enable atomic undo operations.
      *
-     * @param likeStorage  Storage interface for managing likes
-     * @param matchStorage Storage interface for managing matches
-     * @param undoStorage  Storage interface for persisting undo state
-     * @param config       Application configuration with undo window setting
+     * @param interactionStorage Storage interface for managing likes and atomic undo
+     * @param undoStorage        Storage interface for persisting undo state
+     * @param config             Application configuration with undo window setting
      */
-    public UndoService(
-            LikeStorage likeStorage, MatchStorage matchStorage, UndoState.Storage undoStorage, AppConfig config) {
-        this(likeStorage, matchStorage, undoStorage, config, Clock.systemUTC());
+    public UndoService(InteractionStorage interactionStorage, UndoState.Storage undoStorage, AppConfig config) {
+        this(interactionStorage, undoStorage, config, Clock.systemUTC());
     }
 
     public UndoService(
-            LikeStorage likeStorage,
-            MatchStorage matchStorage,
-            UndoState.Storage undoStorage,
-            AppConfig config,
-            Clock clock) {
-        this.likeStorage = Objects.requireNonNull(likeStorage, "likeStorage cannot be null");
-        this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
+            InteractionStorage interactionStorage, UndoState.Storage undoStorage, AppConfig config, Clock clock) {
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.undoStorage = Objects.requireNonNull(undoStorage, "undoStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.clock = Objects.requireNonNull(clock, "clock cannot be null");
-    }
-
-    /**
-     * Sets the transaction executor for atomic undo operations.
-     * When set, undo operations will be performed atomically within a database
-     * transaction.
-     *
-     * @param transactionExecutor The executor for atomic operations
-     */
-    public void setTransactionExecutor(TransactionExecutor transactionExecutor) {
-        this.transactionExecutor = transactionExecutor;
     }
 
     /**
@@ -123,11 +100,8 @@ public class UndoService {
 
     /**
      * Executes an undo operation. Validates that undo is available, then deletes
-     * the Like and any resulting Match. Clears the undo state so the same action
-     * cannot be undone twice.
-     *
-     * <p>
-     * When a TransactionExecutor is configured, deletions are performed atomically.
+     * the Like and any resulting Match atomically. Clears the undo state so the
+     * same action cannot be undone twice.
      *
      * @param userId The user requesting the undo
      * @return UndoResult with success status, message, and side effects
@@ -148,23 +122,13 @@ public class UndoService {
             return UndoResult.failure("Undo window expired");
         }
 
-        // Execute undo - use transaction if available
+        // Execute undo - use atomic delete
         try {
             boolean matchDeleted = state.matchId() != null;
 
-            if (transactionExecutor != null) {
-                // Atomic delete using transaction
-                boolean success =
-                        transactionExecutor.atomicUndoDelete(state.like().id(), state.matchId());
-                if (!success) {
-                    return UndoResult.failure("Like not found in database");
-                }
-            } else {
-                // Fallback to non-atomic deletes (backward compatibility)
-                likeStorage.delete(state.like().id());
-                if (matchDeleted) {
-                    matchStorage.delete(state.matchId());
-                }
+            boolean success = interactionStorage.atomicUndoDelete(state.like().id(), state.matchId());
+            if (!success) {
+                return UndoResult.failure("Like not found in database");
             }
 
             // Clear undo state (no re-undo)

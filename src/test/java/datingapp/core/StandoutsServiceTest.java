@@ -45,10 +45,10 @@ class StandoutsServiceTest {
         TestClock.setFixed(FIXED_INSTANT);
         config = AppConfig.defaults();
         userStorage = new TestStorages.Users();
-        TestStorages.Likes likeStorage = new TestStorages.Likes();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
         TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
         standoutStorage = new TestStandoutStorage();
-        candidateFinder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, config);
+        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
         profileCompletionService = new ProfileCompletionService(config);
         service = new StandoutsService(userStorage, standoutStorage, candidateFinder, profileCompletionService, config);
     }

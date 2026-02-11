@@ -6,7 +6,6 @@ import datingapp.core.model.*;
 import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.*;
 import datingapp.core.service.DailyService.DailyPick;
-import datingapp.core.storage.StatsStorage;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import java.time.Clock;
@@ -28,9 +27,9 @@ import org.junit.jupiter.api.Timeout;
 class DailyServiceTest {
 
     private TestStorages.Users userStorage;
-    private TestStorages.Likes likeStorage;
+    private TestStorages.Interactions interactionStorage;
+    private TestStorages.Analytics analyticsStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
-    private DailyPickViewStorageMock statsStorageMock;
     private CandidateFinder candidateFinder;
     private DailyService service;
     private AppConfig config;
@@ -40,9 +39,9 @@ class DailyServiceTest {
     @BeforeEach
     void setUp() {
         userStorage = new TestStorages.Users();
-        likeStorage = new TestStorages.Likes();
+        interactionStorage = new TestStorages.Interactions();
+        analyticsStorage = new TestStorages.Analytics();
         trustSafetyStorage = new TestStorages.TrustSafety();
-        statsStorageMock = new DailyPickViewStorageMock();
 
         config = AppConfig.builder()
                 .dailyLikeLimit(5)
@@ -53,9 +52,15 @@ class DailyServiceTest {
         todayStart = LocalDate.of(2026, 2, 6).atStartOfDay(ZoneId.of("UTC")).toInstant();
         fixedClock = Clock.fixed(todayStart.plus(Duration.ofHours(12)), ZoneId.of("UTC")); // Noon UTC
 
-        candidateFinder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, config);
+        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
         service = new DailyService(
-                userStorage, likeStorage, trustSafetyStorage, statsStorageMock, candidateFinder, config, fixedClock);
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                analyticsStorage,
+                candidateFinder,
+                config,
+                fixedClock);
     }
 
     @Nested
@@ -69,7 +74,7 @@ class DailyServiceTest {
 
             // Add 4 likes (limit is 5)
             for (int i = 0; i < 4; i++) {
-                likeStorage.save(new Like(
+                interactionStorage.save(new Like(
                         UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, todayStart.plusSeconds(i)));
             }
             assertTrue(service.canLike(userId));
@@ -81,7 +86,7 @@ class DailyServiceTest {
             UUID userId = UUID.randomUUID();
             // Add 5 likes
             for (int i = 0; i < 5; i++) {
-                likeStorage.save(new Like(
+                interactionStorage.save(new Like(
                         UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, todayStart.plusSeconds(i)));
             }
             assertFalse(service.canLike(userId));
@@ -96,16 +101,16 @@ class DailyServiceTest {
                     .build();
             DailyService unlimitedService = new DailyService(
                     userStorage,
-                    likeStorage,
+                    interactionStorage,
                     trustSafetyStorage,
-                    statsStorageMock,
+                    analyticsStorage,
                     candidateFinder,
                     unlimitedConfig,
                     fixedClock);
 
             UUID userId = UUID.randomUUID();
             for (int i = 0; i < 100; i++) {
-                likeStorage.save(new Like(
+                interactionStorage.save(new Like(
                         UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, todayStart.plusSeconds(i)));
             }
             assertTrue(unlimitedService.canLike(userId));
@@ -116,9 +121,9 @@ class DailyServiceTest {
         void getStatus_remainingLikes() {
             UUID userId = UUID.randomUUID();
             // 2 likes used out of 5
-            likeStorage.save(new Like(
+            interactionStorage.save(new Like(
                     UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, todayStart.plusSeconds(1)));
-            likeStorage.save(new Like(
+            interactionStorage.save(new Like(
                     UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, todayStart.plusSeconds(2)));
 
             DailyService.DailyStatus status = service.getStatus(userId);
@@ -135,9 +140,9 @@ class DailyServiceTest {
                     .build();
             DailyService unlimitedService = new DailyService(
                     userStorage,
-                    likeStorage,
+                    interactionStorage,
                     trustSafetyStorage,
-                    statsStorageMock,
+                    analyticsStorage,
                     candidateFinder,
                     unlimitedConfig,
                     fixedClock);
@@ -171,7 +176,7 @@ class DailyServiceTest {
             userStorage.save(candidate2);
 
             // Like candidate1
-            likeStorage.save(Like.create(seeker.getId(), candidate1.getId(), Like.Direction.LIKE));
+            interactionStorage.save(Like.create(seeker.getId(), candidate1.getId(), Like.Direction.LIKE));
 
             // candidate1 should be filtered out, candidate2 must be picked
             Optional<DailyPick> pick = service.getDailyPick(seeker);
@@ -211,7 +216,7 @@ class DailyServiceTest {
 
             service.markDailyPickViewed(userId);
             assertTrue(service.hasViewedDailyPick(userId));
-            assertTrue(statsStorageMock.isDailyPickViewed(userId, LocalDate.now(fixedClock)));
+            assertTrue(analyticsStorage.isDailyPickViewed(userId, LocalDate.now(fixedClock)));
         }
 
         @Test
@@ -226,7 +231,7 @@ class DailyServiceTest {
         @Test
         @DisplayName("ensureDailyPickDependencies throws if missing")
         void ensureDailyPickDependencies_throws() {
-            DailyService incompleteService = new DailyService(likeStorage, config);
+            DailyService incompleteService = new DailyService(interactionStorage, config);
             assertThrows(IllegalStateException.class, () -> incompleteService.getDailyPick(null));
         }
     }
@@ -272,118 +277,6 @@ class DailyServiceTest {
             assertEquals("12h 00m", DailyService.formatDuration(Duration.ofHours(12)));
             assertEquals("30m", DailyService.formatDuration(Duration.ofMinutes(30)));
             assertEquals("45m", DailyService.formatDuration(Duration.ofMinutes(45)));
-        }
-    }
-
-    // Minimal StatsStorage mock — only daily pick view methods are meaningful
-    @SuppressWarnings("unused")
-    private static class DailyPickViewStorageMock implements StatsStorage {
-        private final Set<String> viewed = new java.util.HashSet<>();
-
-        @Override
-        public void markDailyPickAsViewed(UUID userId, LocalDate date) {
-            viewed.add(userId + "_" + date);
-        }
-
-        @Override
-        public boolean isDailyPickViewed(UUID userId, LocalDate date) {
-            return viewed.contains(userId + "_" + date);
-        }
-
-        @Override
-        public int deleteDailyPickViewsOlderThan(LocalDate date) {
-            return 0;
-        }
-
-        // Remaining StatsStorage methods — not used by DailyService
-        @Override
-        public void saveUserStats(datingapp.core.model.Stats.UserStats stats) {
-            /* not used */
-        }
-
-        @Override
-        public java.util.Optional<datingapp.core.model.Stats.UserStats> getLatestUserStats(UUID userId) {
-            return java.util.Optional.empty();
-        }
-
-        @Override
-        public java.util.List<datingapp.core.model.Stats.UserStats> getUserStatsHistory(UUID userId, int limit) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public java.util.List<datingapp.core.model.Stats.UserStats> getAllLatestUserStats() {
-            return java.util.List.of();
-        }
-
-        @Override
-        public int deleteUserStatsOlderThan(java.time.Instant cutoff) {
-            return 0;
-        }
-
-        @Override
-        public void savePlatformStats(datingapp.core.model.Stats.PlatformStats stats) {
-            /* not used */
-        }
-
-        @Override
-        public java.util.Optional<datingapp.core.model.Stats.PlatformStats> getLatestPlatformStats() {
-            return java.util.Optional.empty();
-        }
-
-        @Override
-        public java.util.List<datingapp.core.model.Stats.PlatformStats> getPlatformStatsHistory(int limit) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public void recordProfileView(UUID viewerId, UUID viewedId) {
-            /* not used */
-        }
-
-        @Override
-        public int getProfileViewCount(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public int getUniqueViewerCount(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public java.util.List<UUID> getRecentViewers(UUID userId, int limit) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public boolean hasViewedProfile(UUID viewerId, UUID viewedId) {
-            return false;
-        }
-
-        @Override
-        public void saveUserAchievement(datingapp.core.model.Achievement.UserAchievement achievement) {
-            /* not used */
-        }
-
-        @Override
-        public java.util.List<datingapp.core.model.Achievement.UserAchievement> getUnlockedAchievements(UUID userId) {
-            return java.util.List.of();
-        }
-
-        @Override
-        public boolean hasAchievement(UUID userId, datingapp.core.model.Achievement achievement) {
-            return false;
-        }
-
-        @Override
-        public int countUnlockedAchievements(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public int deleteExpiredDailyPickViews(java.time.Instant cutoff) {
-            return 0;
         }
     }
 }

@@ -13,12 +13,9 @@ import datingapp.core.service.StandoutsService;
 import datingapp.core.service.StatsService;
 import datingapp.core.service.TrustSafetyService;
 import datingapp.core.service.UndoService;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.MessagingStorage;
-import datingapp.core.storage.SocialStorage;
-import datingapp.core.storage.StatsStorage;
-import datingapp.core.storage.SwipeSessionStorage;
+import datingapp.core.storage.AnalyticsStorage;
+import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.Objects;
@@ -32,28 +29,13 @@ public class ServiceRegistry {
     private final AppConfig config;
 
     // ─────────────────────────────────────────────
-    // Core Storage (Users, Likes, Matches)
+    // Storage (4 consolidated interfaces)
     // ─────────────────────────────────────────────
     private final UserStorage userStorage;
-    private final LikeStorage likeStorage;
-    private final MatchStorage matchStorage;
-    private final SwipeSessionStorage sessionStorage;
-
-    // ─────────────────────────────────────────────
-    // Trust & Safety Storage
-    // ─────────────────────────────────────────────
+    private final InteractionStorage interactionStorage;
+    private final CommunicationStorage communicationStorage;
+    private final AnalyticsStorage analyticsStorage;
     private final TrustSafetyStorage trustSafetyStorage;
-
-    // ─────────────────────────────────────────────
-    // Profile & Stats Storage
-    // ─────────────────────────────────────────────
-    private final StatsStorage statsStorage; // Consolidated: user + platform stats
-
-    // ─────────────────────────────────────────────
-    // Messaging & Social Storage
-    // ─────────────────────────────────────────────
-    private final MessagingStorage messagingStorage; // Consolidated: conversation + message
-    private final SocialStorage socialStorage; // Consolidated: friend request + notification
 
     // ─────────────────────────────────────────────
     // Core Services (Matching)
@@ -93,13 +75,10 @@ public class ServiceRegistry {
     public ServiceRegistry(
             AppConfig config,
             UserStorage userStorage,
-            LikeStorage likeStorage,
-            MatchStorage matchStorage,
+            InteractionStorage interactionStorage,
+            CommunicationStorage communicationStorage,
+            AnalyticsStorage analyticsStorage,
             TrustSafetyStorage trustSafetyStorage,
-            SwipeSessionStorage sessionStorage,
-            StatsStorage statsStorage,
-            MessagingStorage messagingStorage,
-            SocialStorage socialStorage,
             CandidateFinder candidateFinder,
             MatchingService matchingService,
             TrustSafetyService trustSafetyService,
@@ -115,13 +94,10 @@ public class ServiceRegistry {
             StandoutsService standoutsService) {
         this.config = Objects.requireNonNull(config);
         this.userStorage = Objects.requireNonNull(userStorage);
-        this.likeStorage = Objects.requireNonNull(likeStorage);
-        this.matchStorage = Objects.requireNonNull(matchStorage);
+        this.interactionStorage = Objects.requireNonNull(interactionStorage);
+        this.communicationStorage = Objects.requireNonNull(communicationStorage);
+        this.analyticsStorage = Objects.requireNonNull(analyticsStorage);
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage);
-        this.sessionStorage = Objects.requireNonNull(sessionStorage);
-        this.statsStorage = Objects.requireNonNull(statsStorage);
-        this.messagingStorage = Objects.requireNonNull(messagingStorage);
-        this.socialStorage = Objects.requireNonNull(socialStorage);
         this.candidateFinder = Objects.requireNonNull(candidateFinder);
         this.matchingService = Objects.requireNonNull(matchingService);
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
@@ -149,38 +125,20 @@ public class ServiceRegistry {
         return userStorage;
     }
 
-    public LikeStorage getLikeStorage() {
-        return likeStorage;
+    public InteractionStorage getInteractionStorage() {
+        return interactionStorage;
     }
 
-    public MatchStorage getMatchStorage() {
-        return matchStorage;
+    public CommunicationStorage getCommunicationStorage() {
+        return communicationStorage;
     }
 
-    public SwipeSessionStorage getSessionStorage() {
-        return sessionStorage;
+    public AnalyticsStorage getAnalyticsStorage() {
+        return analyticsStorage;
     }
-
-    // === Trust & Safety Storage ===
 
     public TrustSafetyStorage getTrustSafetyStorage() {
         return trustSafetyStorage;
-    }
-
-    // === Profile & Stats Storage ===
-
-    public StatsStorage getStatsStorage() {
-        return statsStorage;
-    }
-
-    // === Messaging & Social Storage ===
-
-    public MessagingStorage getMessagingStorage() {
-        return messagingStorage;
-    }
-
-    public SocialStorage getSocialStorage() {
-        return socialStorage;
     }
 
     // === Matching Services ===

@@ -5,9 +5,8 @@ import datingapp.core.model.Match;
 import datingapp.core.model.Messaging.Conversation;
 import datingapp.core.model.UserInteractions.FriendRequest;
 import datingapp.core.model.UserInteractions.Notification;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.MessagingStorage;
-import datingapp.core.storage.SocialStorage;
+import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.InteractionStorage;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,15 +22,13 @@ public class RelationshipTransitionService {
         }
     }
 
-    private final MatchStorage matchStorage;
-    private final SocialStorage socialStorage;
-    private final MessagingStorage messagingStorage;
+    private final InteractionStorage interactionStorage;
+    private final CommunicationStorage communicationStorage;
 
     public RelationshipTransitionService(
-            MatchStorage matchStorage, SocialStorage socialStorage, MessagingStorage messagingStorage) {
-        this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
-        this.socialStorage = Objects.requireNonNull(socialStorage, "socialStorage cannot be null");
-        this.messagingStorage = Objects.requireNonNull(messagingStorage, "messagingStorage cannot be null");
+            InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+        this.communicationStorage = Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
     }
 
     /**
@@ -45,23 +42,24 @@ public class RelationshipTransitionService {
      */
     public FriendRequest requestFriendZone(UUID fromUserId, UUID targetUserId) {
         String matchId = Match.generateId(fromUserId, targetUserId);
-        Optional<Match> matchOpt = matchStorage.get(matchId);
+        Optional<Match> matchOpt = interactionStorage.get(matchId);
 
         if (matchOpt.isEmpty() || !matchOpt.get().isActive()) {
             throw new TransitionValidationException("An active match is required to request the Friend Zone.");
         }
 
         // Check for existing pending request
-        Optional<FriendRequest> existing = socialStorage.getPendingFriendRequestBetween(fromUserId, targetUserId);
+        Optional<FriendRequest> existing =
+                communicationStorage.getPendingFriendRequestBetween(fromUserId, targetUserId);
         if (existing.isPresent()) {
             throw new TransitionValidationException("A friend zone request is already pending between these users.");
         }
 
         FriendRequest request = FriendRequest.create(fromUserId, targetUserId);
-        socialStorage.saveFriendRequest(request);
+        communicationStorage.saveFriendRequest(request);
 
         // Send Notification
-        socialStorage.saveNotification(Notification.create(
+        communicationStorage.saveNotification(Notification.create(
                 targetUserId,
                 Notification.Type.FRIEND_REQUEST,
                 "New Friend Request",
@@ -79,7 +77,7 @@ public class RelationshipTransitionService {
      * @throws TransitionValidationException if request not found or not pending
      */
     public void acceptFriendZone(UUID requestId, UUID responderId) {
-        FriendRequest request = socialStorage
+        FriendRequest request = communicationStorage
                 .getFriendRequest(requestId)
                 .orElseThrow(() -> new TransitionValidationException("Friend request not found."));
 
@@ -93,12 +91,12 @@ public class RelationshipTransitionService {
 
         // 1. Update match state
         String matchId = Match.generateId(request.fromUserId(), request.toUserId());
-        Match match = matchStorage
+        Match match = interactionStorage
                 .get(matchId)
                 .orElseThrow(() -> new IllegalStateException("Match disappeared from storage."));
 
         match.transitionToFriends(request.fromUserId()); // Originator of request is considered starter of transition
-        matchStorage.update(match);
+        interactionStorage.update(match);
 
         // 2. Update request status
         FriendRequest updated = new FriendRequest(
@@ -108,10 +106,10 @@ public class RelationshipTransitionService {
                 request.createdAt(),
                 FriendRequest.Status.ACCEPTED,
                 AppClock.now());
-        socialStorage.updateFriendRequest(updated);
+        communicationStorage.updateFriendRequest(updated);
 
         // 3. Send Notification
-        socialStorage.saveNotification(Notification.create(
+        communicationStorage.saveNotification(Notification.create(
                 request.fromUserId(),
                 Notification.Type.FRIEND_REQUEST_ACCEPTED,
                 "Friend Request Accepted",
@@ -126,7 +124,7 @@ public class RelationshipTransitionService {
      * @param responderId The user responding
      */
     public void declineFriendZone(UUID requestId, UUID responderId) {
-        FriendRequest request = socialStorage
+        FriendRequest request = communicationStorage
                 .getFriendRequest(requestId)
                 .orElseThrow(() -> new TransitionValidationException("Friend request not found."));
 
@@ -145,7 +143,7 @@ public class RelationshipTransitionService {
                 request.createdAt(),
                 FriendRequest.Status.DECLINED,
                 AppClock.now());
-        socialStorage.updateFriendRequest(updated);
+        communicationStorage.updateFriendRequest(updated);
     }
 
     /**
@@ -156,7 +154,7 @@ public class RelationshipTransitionService {
      */
     public void gracefulExit(UUID initiatorId, UUID targetUserId) {
         String matchId = Match.generateId(initiatorId, targetUserId);
-        Match match = matchStorage
+        Match match = interactionStorage
                 .get(matchId)
                 .orElseThrow(
                         () -> new TransitionValidationException("No active relationship found between these users."));
@@ -167,17 +165,17 @@ public class RelationshipTransitionService {
 
         // 1. Update Match State
         match.gracefulExit(initiatorId);
-        matchStorage.update(match);
+        interactionStorage.update(match);
 
         // 2. Archive Conversation
-        Optional<Conversation> convoOpt = messagingStorage.getConversationByUsers(initiatorId, targetUserId);
+        Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetUserId);
         convoOpt.ifPresent(convo -> {
             convo.archive(Match.ArchiveReason.GRACEFUL_EXIT);
-            messagingStorage.archiveConversation(convo.getId(), Match.ArchiveReason.GRACEFUL_EXIT);
+            communicationStorage.archiveConversation(convo.getId(), Match.ArchiveReason.GRACEFUL_EXIT);
         });
 
         // 3. Send Notification to target user
-        socialStorage.saveNotification(Notification.create(
+        communicationStorage.saveNotification(Notification.create(
                 targetUserId,
                 Notification.Type.GRACEFUL_EXIT,
                 "Relationship Ended",
@@ -186,6 +184,6 @@ public class RelationshipTransitionService {
     }
 
     public List<FriendRequest> getPendingRequestsFor(UUID userId) {
-        return socialStorage.getPendingFriendRequestsForUser(userId);
+        return communicationStorage.getPendingFriendRequestsForUser(userId);
     }
 }

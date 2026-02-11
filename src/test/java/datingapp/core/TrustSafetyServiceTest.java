@@ -15,21 +15,19 @@ import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.UserInteractions.Block;
 import datingapp.core.model.UserInteractions.Report;
 import datingapp.core.service.*;
-import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
+import datingapp.core.testutil.TestStorages;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
@@ -73,7 +71,8 @@ class TrustSafetyServiceTest {
     class ReportFunctionality {
 
         private InMemoryUserStorage userStorage;
-        private InMemoryTrustSafetyStorage trustSafetyStorage;
+        private TestStorages.TrustSafety trustSafetyStorage;
+        private TestStorages.Interactions interactionStorage;
         private TrustSafetyService trustSafetyService;
 
         private User activeReporter;
@@ -82,10 +81,11 @@ class TrustSafetyServiceTest {
         @BeforeEach
         void setUp() {
             userStorage = new InMemoryUserStorage();
-            trustSafetyStorage = new InMemoryTrustSafetyStorage();
+            trustSafetyStorage = new TestStorages.TrustSafety();
+            interactionStorage = new TestStorages.Interactions();
 
             AppConfig config = AppConfig.builder().autoBanThreshold(3).build();
-            trustSafetyService = new TrustSafetyService(trustSafetyStorage, userStorage, null, config);
+            trustSafetyService = new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
 
             // Create test users
             activeReporter = createActiveUser("Reporter");
@@ -169,7 +169,7 @@ class TrustSafetyServiceTest {
             void customThresholdWorks() {
                 AppConfig customConfig = AppConfig.builder().autoBanThreshold(2).build();
                 TrustSafetyService customService =
-                        new TrustSafetyService(trustSafetyStorage, userStorage, null, customConfig);
+                        new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, customConfig);
 
                 User reporter2 = createActiveUser("Reporter2");
                 userStorage.save(reporter2);
@@ -385,96 +385,6 @@ class TrustSafetyServiceTest {
     // ============================================================
     // IN-MEMORY MOCK STORAGE IMPLEMENTATIONS
     // ============================================================
-
-    private static class InMemoryTrustSafetyStorage implements TrustSafetyStorage {
-        private final List<Report> reports = new ArrayList<>();
-        private final List<Block> blocks = new ArrayList<>();
-
-        // ─── Report operations ───
-
-        @Override
-        public void save(Report report) {
-            reports.add(report);
-        }
-
-        @Override
-        public int countReportsAgainst(UUID userId) {
-            return (int) reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .count();
-        }
-
-        @Override
-        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
-            return reports.stream()
-                    .anyMatch(r -> r.reporterId().equals(reporterId)
-                            && r.reportedUserId().equals(reportedUserId));
-        }
-
-        @Override
-        public List<Report> getReportsAgainst(UUID userId) {
-            return reports.stream()
-                    .filter(r -> r.reportedUserId().equals(userId))
-                    .toList();
-        }
-
-        @Override
-        public int countReportsBy(UUID userId) {
-            return (int)
-                    reports.stream().filter(r -> r.reporterId().equals(userId)).count();
-        }
-
-        // ─── Block operations ───
-
-        @Override
-        public void save(Block block) {
-            blocks.add(block);
-        }
-
-        @Override
-        public boolean isBlocked(UUID userA, UUID userB) {
-            return blocks.stream()
-                    .anyMatch(b -> (b.blockerId().equals(userA) && b.blockedId().equals(userB))
-                            || (b.blockerId().equals(userB) && b.blockedId().equals(userA)));
-        }
-
-        @Override
-        public Set<UUID> getBlockedUserIds(UUID userId) {
-            Set<UUID> result = new HashSet<>();
-            for (Block block : blocks) {
-                if (block.blockerId().equals(userId)) {
-                    result.add(block.blockedId());
-                }
-                if (block.blockedId().equals(userId)) {
-                    result.add(block.blockerId());
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public List<Block> findByBlocker(UUID blockerId) {
-            return blocks.stream().filter(b -> b.blockerId().equals(blockerId)).toList();
-        }
-
-        @Override
-        public boolean deleteBlock(UUID blockerId, UUID blockedId) {
-            return blocks.removeIf(
-                    b -> b.blockerId().equals(blockerId) && b.blockedId().equals(blockedId));
-        }
-
-        @Override
-        public int countBlocksGiven(UUID userId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockerId().equals(userId)).count();
-        }
-
-        @Override
-        public int countBlocksReceived(UUID userId) {
-            return (int)
-                    blocks.stream().filter(b -> b.blockedId().equals(userId)).count();
-        }
-    }
 
     private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();

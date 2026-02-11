@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import datingapp.core.model.*;
 import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.*;
-import datingapp.core.storage.LikeStorage;
 import datingapp.core.testutil.TestClock;
+import datingapp.core.testutil.TestStorages;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.*;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class DailyLimitServiceTest {
 
-    private InMemoryLikeStorage likeStorage;
+    private TestStorages.Interactions interactionStorage;
     private AppConfig config;
     private DailyService service;
     private UUID userId;
@@ -25,13 +25,13 @@ class DailyLimitServiceTest {
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
-        likeStorage = new InMemoryLikeStorage();
+        interactionStorage = new TestStorages.Interactions();
         config = AppConfig.builder()
                 .dailyLikeLimit(3)
                 .dailyPassLimit(-1) // unlimited
                 .userTimeZone(ZoneId.of("UTC"))
                 .build();
-        service = new DailyService(likeStorage, config);
+        service = new DailyService(interactionStorage, config);
         userId = UUID.randomUUID();
     }
 
@@ -58,7 +58,7 @@ class DailyLimitServiceTest {
             Instant now = AppClock.now();
             for (int i = 0; i < 3; i++) {
                 Like like = new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now);
-                likeStorage.save(like);
+                interactionStorage.save(like);
             }
 
             assertFalse(service.canLike(userId));
@@ -70,7 +70,7 @@ class DailyLimitServiceTest {
             Instant now = AppClock.now();
             for (int i = 0; i < 2; i++) {
                 Like like = new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now);
-                likeStorage.save(like);
+                interactionStorage.save(like);
             }
 
             assertTrue(service.canLike(userId));
@@ -83,13 +83,13 @@ class DailyLimitServiceTest {
                     .dailyLikeLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService unlimitedService = new DailyService(likeStorage, unlimitedConfig);
+            DailyService unlimitedService = new DailyService(interactionStorage, unlimitedConfig);
 
             // Add many likes
             Instant now = AppClock.now();
             for (int i = 0; i < 100; i++) {
                 Like like = new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now);
-                likeStorage.save(like);
+                interactionStorage.save(like);
             }
 
             assertTrue(unlimitedService.canLike(userId));
@@ -110,7 +110,7 @@ class DailyLimitServiceTest {
             Instant now = AppClock.now();
             for (int i = 0; i < 100; i++) {
                 Like pass = new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now);
-                likeStorage.save(pass);
+                interactionStorage.save(pass);
             }
 
             assertTrue(service.canPass(userId));
@@ -124,13 +124,13 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(2)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService limitedPassService = new DailyService(likeStorage, limitedPassConfig);
+            DailyService limitedPassService = new DailyService(interactionStorage, limitedPassConfig);
 
             // Add 2 passes today (at limit)
             Instant now = AppClock.now();
             for (int i = 0; i < 2; i++) {
                 Like pass = new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now);
-                likeStorage.save(pass);
+                interactionStorage.save(pass);
             }
 
             assertFalse(limitedPassService.canPass(userId));
@@ -146,9 +146,9 @@ class DailyLimitServiceTest {
         void getStatus_returnsCorrectCounts() {
             Instant now = AppClock.now();
             // 2 likes, 1 pass
-            likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
-            likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
-            likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now));
+            interactionStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
+            interactionStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
+            interactionStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now));
 
             DailyService.DailyStatus status = service.getStatus(userId);
 
@@ -165,7 +165,7 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService unlimitedService = new DailyService(likeStorage, unlimitedConfig);
+            DailyService unlimitedService = new DailyService(interactionStorage, unlimitedConfig);
 
             DailyService.DailyStatus status = unlimitedService.getStatus(userId);
 
@@ -220,7 +220,7 @@ class DailyLimitServiceTest {
                     .dailyLikeLimit(0)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService zeroService = new DailyService(likeStorage, zeroConfig);
+            DailyService zeroService = new DailyService(interactionStorage, zeroConfig);
 
             assertFalse(zeroService.canLike(userId));
         }
@@ -231,7 +231,8 @@ class DailyLimitServiceTest {
             Instant now = AppClock.now();
             // 3 passes
             for (int i = 0; i < 3; i++) {
-                likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now));
+                interactionStorage.save(
+                        new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now));
             }
 
             // Should still be able to like
@@ -246,114 +247,17 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(2)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService limitedPassService = new DailyService(likeStorage, limitedPassConfig);
+            DailyService limitedPassService = new DailyService(interactionStorage, limitedPassConfig);
 
             Instant now = AppClock.now();
             // 5 likes
             for (int i = 0; i < 5; i++) {
-                likeStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
+                interactionStorage.save(
+                        new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
             }
 
             // Should still be able to pass
             assertTrue(limitedPassService.canPass(userId));
-        }
-    }
-
-    // === In-Memory Mock LikeStorage ===
-
-    private static class InMemoryLikeStorage implements LikeStorage {
-        private final Map<String, Like> likes = new HashMap<>();
-
-        @Override
-        public void save(Like like) {
-            likes.put(key(like.whoLikes(), like.whoGotLiked()), like);
-        }
-
-        @Override
-        public boolean exists(UUID from, UUID to) {
-            return likes.containsKey(key(from, to));
-        }
-
-        @Override
-        public boolean mutualLikeExists(UUID a, UUID b) {
-            Like likeA = likes.get(key(a, b));
-            Like likeB = likes.get(key(b, a));
-            return likeA != null
-                    && likeB != null
-                    && likeA.direction() == Like.Direction.LIKE
-                    && likeB.direction() == Like.Direction.LIKE;
-        }
-
-        @Override
-        public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-            return Set.of();
-        }
-
-        @Override
-        public Set<UUID> getUserIdsWhoLiked(UUID userId) {
-            return Set.of();
-        }
-
-        @Override
-        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
-            List<Map.Entry<UUID, Instant>> result = new ArrayList<>();
-            for (Like like : likes.values()) {
-                if (like.whoGotLiked().equals(userId) && like.direction() == Like.Direction.LIKE) {
-                    result.add(Map.entry(like.whoLikes(), like.createdAt()));
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public int countByDirection(UUID userId, Like.Direction direction) {
-            return (int) likes.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId) && l.direction() == direction)
-                    .count();
-        }
-
-        @Override
-        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
-            return (int) likes.values().stream()
-                    .filter(l -> l.whoGotLiked().equals(userId) && l.direction() == direction)
-                    .count();
-        }
-
-        @Override
-        public int countMutualLikes(UUID userId) {
-            return 0;
-        }
-
-        @Override
-        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
-            return Optional.ofNullable(likes.get(key(fromUserId, toUserId)));
-        }
-
-        @Override
-        public int countLikesToday(UUID userId, Instant startOfDay) {
-            return (int) likes.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.LIKE
-                            && !l.createdAt().isBefore(startOfDay))
-                    .count();
-        }
-
-        @Override
-        public int countPassesToday(UUID userId, Instant startOfDay) {
-            return (int) likes.values().stream()
-                    .filter(l -> l.whoLikes().equals(userId)
-                            && l.direction() == Like.Direction.PASS
-                            && !l.createdAt().isBefore(startOfDay))
-                    .count();
-        }
-
-        @Override
-        public void delete(UUID likeId) {
-            likes.values().removeIf(like -> like.id().equals(likeId));
-        }
-
-        private String key(UUID from, UUID to) {
-            return from + "->" + to;
         }
     }
 }

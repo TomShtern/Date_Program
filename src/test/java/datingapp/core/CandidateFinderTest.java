@@ -9,13 +9,10 @@ import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
 import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
 import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
 import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
-import datingapp.core.model.UserInteractions.Report;
 import datingapp.core.service.*;
 import datingapp.core.service.CandidateFinder.GeoUtils;
-import datingapp.core.storage.LikeStorage;
-import datingapp.core.storage.TrustSafetyStorage;
-import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
+import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
@@ -36,181 +33,11 @@ class CandidateFinderTest {
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
-        // CandidateFinder now requires storage dependencies, but tests only use findCandidates()
-        // which doesn't touch the storage fields, so we provide minimal stubs
-        UserStorage userStorage = new UserStorage() {
-            @Override
-            public void save(User user) {
-                // no-op for test
-            }
+        var userStorage = new TestStorages.Users();
+        var interactionStorage = new TestStorages.Interactions();
+        var trustSafetyStorage = new TestStorages.TrustSafety();
 
-            @Override
-            public User get(UUID id) {
-                return null;
-            }
-
-            @Override
-            public List<User> findAll() {
-                return List.of();
-            }
-
-            @Override
-            public List<User> findActive() {
-                return List.of();
-            }
-
-            @Override
-            public void delete(UUID id) {
-                // no-op for test
-            }
-
-            @Override
-            public void saveProfileNote(User.ProfileNote note) {
-                // no-op for test
-            }
-
-            @Override
-            public java.util.Optional<User.ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
-                return java.util.Optional.empty();
-            }
-
-            @Override
-            public List<User.ProfileNote> getProfileNotesByAuthor(UUID authorId) {
-                return List.of();
-            }
-
-            @Override
-            public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
-                return false;
-            }
-        };
-        LikeStorage likeStorage = new LikeStorage() {
-            @Override
-            public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-                return Set.of();
-            }
-
-            @Override
-            public void save(UserInteractions.Like like) {
-                // no-op for test
-            }
-
-            @Override
-            public boolean exists(UUID from, UUID to) {
-                return false;
-            }
-
-            @Override
-            public boolean mutualLikeExists(UUID a, UUID b) {
-                return false;
-            }
-
-            @Override
-            public Set<UUID> getUserIdsWhoLiked(UUID userId) {
-                return Set.of();
-            }
-
-            @Override
-            public List<java.util.Map.Entry<UUID, java.time.Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
-                return List.of();
-            }
-
-            @Override
-            public int countByDirection(UUID userId, UserInteractions.Like.Direction direction) {
-                return 0;
-            }
-
-            @Override
-            public int countReceivedByDirection(UUID userId, UserInteractions.Like.Direction direction) {
-                return 0;
-            }
-
-            @Override
-            public java.util.Optional<UserInteractions.Like> getLike(UUID fromUserId, UUID toUserId) {
-                return java.util.Optional.empty();
-            }
-
-            @Override
-            public int countLikesToday(UUID userId, java.time.Instant startOfDay) {
-                return 0;
-            }
-
-            @Override
-            public int countPassesToday(UUID userId, java.time.Instant startOfDay) {
-                return 0;
-            }
-
-            @Override
-            public int countMutualLikes(UUID userId) {
-                return 0;
-            }
-
-            @Override
-            public void delete(UUID likeId) {
-                // no-op for test
-            }
-        };
-        TrustSafetyStorage trustSafetyStorage = new TrustSafetyStorage() {
-            @Override
-            public Set<UUID> getBlockedUserIds(UUID userId) {
-                return Set.of();
-            }
-
-            @Override
-            public void save(UserInteractions.Block block) {
-                // no-op for test
-            }
-
-            @Override
-            public boolean isBlocked(UUID userA, UUID userB) {
-                return false;
-            }
-
-            @Override
-            public List<UserInteractions.Block> findByBlocker(UUID blockerId) {
-                return List.of();
-            }
-
-            @Override
-            public boolean deleteBlock(UUID blockerId, UUID blockedId) {
-                return false;
-            }
-
-            @Override
-            public int countBlocksGiven(UUID userId) {
-                return 0;
-            }
-
-            @Override
-            public int countBlocksReceived(UUID userId) {
-                return 0;
-            }
-
-            @Override
-            public void save(Report report) {}
-
-            @Override
-            public int countReportsAgainst(UUID userId) {
-                return 0;
-            }
-
-            @Override
-            public boolean hasReported(UUID reporterId, UUID reportedUserId) {
-                return false;
-            }
-
-            @Override
-            public List<Report> getReportsAgainst(UUID userId) {
-                return List.of();
-            }
-
-            @Override
-            public int countReportsBy(UUID userId) {
-                return 0;
-            }
-        };
-
-        finder = new CandidateFinder(userStorage, likeStorage, trustSafetyStorage, AppConfig.defaults());
+        finder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, AppConfig.defaults());
         seeker = createUser("Seeker", User.Gender.MALE, EnumSet.of(User.Gender.FEMALE), 30, 32.0853, 34.7818);
     }
 

@@ -27,7 +27,7 @@ class SafetyHandlerTest {
 
     private TestStorages.Users userStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
-    private TestStorages.Matches matchStorage;
+    private TestStorages.Interactions interactionStorage;
     private AppSession session;
     private User testUser;
 
@@ -35,7 +35,7 @@ class SafetyHandlerTest {
     void setUp() {
         userStorage = new TestStorages.Users();
         trustSafetyStorage = new TestStorages.TrustSafety();
-        matchStorage = new TestStorages.Matches();
+        interactionStorage = new TestStorages.Interactions();
 
         session = AppSession.getInstance();
         session.reset();
@@ -48,9 +48,8 @@ class SafetyHandlerTest {
     private SafetyHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         TrustSafetyService trustSafetyService =
-                new TrustSafetyService(trustSafetyStorage, userStorage, matchStorage, AppConfig.defaults());
-        return new SafetyHandler(
-                userStorage, trustSafetyStorage, matchStorage, trustSafetyService, session, inputReader);
+                new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, AppConfig.defaults());
+        return new SafetyHandler(userStorage, trustSafetyService, session, inputReader);
     }
 
     @SuppressWarnings("unused")
@@ -97,13 +96,13 @@ class SafetyHandlerTest {
             User otherUser = createActiveUser("OtherUser");
             userStorage.save(otherUser);
             Match match = Match.create(testUser.getId(), otherUser.getId());
-            matchStorage.save(match);
+            interactionStorage.save(match);
 
             SafetyHandler handler = createHandler("1\ny\n");
             handler.blockUser();
 
             assertTrue(trustSafetyStorage.isBlocked(testUser.getId(), otherUser.getId()));
-            Optional<Match> updatedMatch = matchStorage.get(match.getId());
+            Optional<Match> updatedMatch = interactionStorage.get(match.getId());
             assertTrue(updatedMatch.isPresent());
             assertEquals(Match.State.BLOCKED, updatedMatch.get().getState());
         }
@@ -133,7 +132,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\ny\n");
             handler.blockUser();
 
-            assertEquals(0, trustSafetyStorage.blockSize());
+            assertEquals(0, trustSafetyStorage.countBlocksGiven(testUser.getId()));
         }
 
         @Test
@@ -145,7 +144,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("0\n");
             handler.blockUser();
 
-            assertEquals(0, trustSafetyStorage.blockSize());
+            assertEquals(0, trustSafetyStorage.countBlocksGiven(testUser.getId()));
         }
     }
 
@@ -228,7 +227,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\n1\n\n");
             handler.reportUser();
 
-            assertEquals(0, trustSafetyStorage.reportSize());
+            assertEquals(0, trustSafetyStorage.countReportsBy(testUser.getId()));
         }
 
         @Test
@@ -238,7 +237,7 @@ class SafetyHandlerTest {
             SafetyHandler handler = createHandler("1\n1\n\n");
             handler.reportUser();
 
-            assertEquals(0, trustSafetyStorage.reportSize());
+            assertEquals(0, trustSafetyStorage.countReportsBy(testUser.getId()));
         }
     }
 

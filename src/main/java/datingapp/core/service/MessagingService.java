@@ -6,8 +6,8 @@ import datingapp.core.model.Match;
 import datingapp.core.model.Messaging.Conversation;
 import datingapp.core.model.Messaging.Message;
 import datingapp.core.model.User;
-import datingapp.core.storage.MatchStorage;
-import datingapp.core.storage.MessagingStorage;
+import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -29,13 +29,14 @@ public class MessagingService {
 
     private static final AppConfig CONFIG = AppConfig.defaults();
 
-    private final MessagingStorage messagingStorage;
-    private final MatchStorage matchStorage;
+    private final CommunicationStorage communicationStorage;
+    private final InteractionStorage interactionStorage;
     private final UserStorage userStorage;
 
-    public MessagingService(MessagingStorage messagingStorage, MatchStorage matchStorage, UserStorage userStorage) {
-        this.messagingStorage = Objects.requireNonNull(messagingStorage, "messagingStorage cannot be null");
-        this.matchStorage = Objects.requireNonNull(matchStorage, "matchStorage cannot be null");
+    public MessagingService(
+            CommunicationStorage communicationStorage, InteractionStorage interactionStorage, UserStorage userStorage) {
+        this.communicationStorage = Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
     }
 
@@ -62,7 +63,7 @@ public class MessagingService {
 
         // Verify active match exists
         String matchId = Match.generateId(senderId, recipientId);
-        Optional<Match> matchOpt = matchStorage.get(matchId);
+        Optional<Match> matchOpt = interactionStorage.get(matchId);
 
         if (matchOpt.isEmpty() || !matchOpt.get().canMessage()) {
             return SendResult.failure(NO_ACTIVE_MATCH, SendResult.ErrorCode.NO_ACTIVE_MATCH);
@@ -80,17 +81,17 @@ public class MessagingService {
 
         // Get or create conversation
         String conversationId = Conversation.generateId(senderId, recipientId);
-        if (messagingStorage.getConversation(conversationId).isEmpty()) {
+        if (communicationStorage.getConversation(conversationId).isEmpty()) {
             Conversation newConvo = Conversation.create(senderId, recipientId);
-            messagingStorage.saveConversation(newConvo);
+            communicationStorage.saveConversation(newConvo);
         }
 
         // Create and save message
         Message message = Message.create(conversationId, senderId, content);
-        messagingStorage.saveMessage(message);
+        communicationStorage.saveMessage(message);
 
         // Update conversation's last message timestamp
-        messagingStorage.updateConversationLastMessageAt(conversationId, message.createdAt());
+        communicationStorage.updateConversationLastMessageAt(conversationId, message.createdAt());
 
         return SendResult.success(message);
     }
@@ -115,12 +116,12 @@ public class MessagingService {
         String conversationId = Conversation.generateId(userId, otherUserId);
 
         // Verify user is part of conversation
-        Optional<Conversation> convoOpt = messagingStorage.getConversation(conversationId);
+        Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
         if (convoOpt.isEmpty() || !convoOpt.get().involves(userId)) {
             return List.of();
         }
 
-        return messagingStorage.getMessages(conversationId, limit, offset);
+        return communicationStorage.getMessages(conversationId, limit, offset);
     }
 
     /**
@@ -130,7 +131,7 @@ public class MessagingService {
      * @return List of conversation previews, sorted by most recent activity
      */
     public List<ConversationPreview> getConversations(UUID userId) {
-        List<Conversation> conversations = messagingStorage.getConversationsFor(userId);
+        List<Conversation> conversations = communicationStorage.getConversationsFor(userId);
 
         List<UUID> otherUserIds =
                 conversations.stream().map(c -> c.getOtherUser(userId)).toList();
@@ -146,7 +147,7 @@ public class MessagingService {
                 continue;
             }
 
-            Optional<Message> lastMessage = messagingStorage.getLatestMessage(convo.getId());
+            Optional<Message> lastMessage = communicationStorage.getLatestMessage(convo.getId());
             int unreadCount = calculateUnreadCount(userId, convo);
 
             previews.add(new ConversationPreview(convo, otherUser, lastMessage, unreadCount));
@@ -162,12 +163,12 @@ public class MessagingService {
      * @param conversationId The conversation to mark read
      */
     public void markAsRead(UUID userId, String conversationId) {
-        Optional<Conversation> convoOpt = messagingStorage.getConversation(conversationId);
+        Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
         if (convoOpt.isEmpty() || !convoOpt.get().involves(userId)) {
             return;
         }
 
-        messagingStorage.updateConversationReadTimestamp(conversationId, userId, AppClock.now());
+        communicationStorage.updateConversationReadTimestamp(conversationId, userId, AppClock.now());
     }
 
     /**
@@ -178,7 +179,7 @@ public class MessagingService {
      * @return Number of unread messages
      */
     public int getUnreadCount(UUID userId, String conversationId) {
-        Optional<Conversation> convoOpt = messagingStorage.getConversation(conversationId);
+        Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
         if (convoOpt.isEmpty()) {
             return 0;
         }
@@ -203,7 +204,7 @@ public class MessagingService {
         }
 
         // Count messages after last read, excluding user's own messages
-        return messagingStorage.countMessagesAfterNotFrom(convo.getId(), lastReadAt, userId);
+        return communicationStorage.countMessagesAfterNotFrom(convo.getId(), lastReadAt, userId);
     }
 
     /**
@@ -213,7 +214,7 @@ public class MessagingService {
      * @return Total unread messages
      */
     public int getTotalUnreadCount(UUID userId) {
-        List<Conversation> conversations = messagingStorage.getConversationsFor(userId);
+        List<Conversation> conversations = communicationStorage.getConversationsFor(userId);
         int total = 0;
         for (Conversation convo : conversations) {
             // Use calculateUnreadCount directly with already-loaded conversation
@@ -232,7 +233,7 @@ public class MessagingService {
      */
     public boolean canMessage(UUID userA, UUID userB) {
         String matchId = Match.generateId(userA, userB);
-        Optional<Match> matchOpt = matchStorage.get(matchId);
+        Optional<Match> matchOpt = interactionStorage.get(matchId);
         return matchOpt.isPresent() && matchOpt.get().canMessage();
     }
 
@@ -243,16 +244,16 @@ public class MessagingService {
      */
     public Conversation getOrCreateConversation(UUID userA, UUID userB) {
         String conversationId = Conversation.generateId(userA, userB);
-        return messagingStorage.getConversation(conversationId).orElseGet(() -> {
+        return communicationStorage.getConversation(conversationId).orElseGet(() -> {
             Conversation newConvo = Conversation.create(userA, userB);
-            messagingStorage.saveConversation(newConvo);
+            communicationStorage.saveConversation(newConvo);
             return newConvo;
         });
     }
 
     /** Counts messages not sent by the given user (for initial unread count). */
     private int countMessagesNotFromUser(String conversationId, UUID userId) {
-        return messagingStorage.countMessagesNotFromSender(conversationId, userId);
+        return communicationStorage.countMessagesNotFromSender(conversationId, userId);
     }
 
     // === Data Transfer Objects ===

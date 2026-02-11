@@ -30,8 +30,8 @@ class MessagingHandlerTest {
     private AppSession session;
     private User testUser;
     private UserStorage userStorage;
-    private MatchStorage matchStorage;
-    private MessagingStorage messagingStorage;
+    private InteractionStorage interactionStorage;
+    private CommunicationStorage communicationStorage;
 
     @BeforeAll
     static void setUpDatabase() {
@@ -52,8 +52,8 @@ class MessagingHandlerTest {
         session.reset();
 
         userStorage = registry.getUserStorage();
-        matchStorage = registry.getMatchStorage();
-        messagingStorage = registry.getMessagingStorage();
+        interactionStorage = registry.getInteractionStorage();
+        communicationStorage = registry.getCommunicationStorage();
 
         testUser = createActiveUser("TestUser");
         userStorage.save(testUser);
@@ -64,8 +64,8 @@ class MessagingHandlerTest {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         return new MessagingHandler(
                 registry.getMessagingService(),
-                registry.getMatchStorage(),
-                registry.getTrustSafetyStorage(),
+                registry.getInteractionStorage(),
+                registry.getTrustSafetyService(),
                 inputReader,
                 session);
     }
@@ -99,10 +99,10 @@ class MessagingHandlerTest {
             userStorage.save(otherUser);
 
             Match match = Match.create(testUser.getId(), otherUser.getId());
-            matchStorage.save(match);
+            interactionStorage.save(match);
 
             Conversation convo = Conversation.create(testUser.getId(), otherUser.getId());
-            messagingStorage.saveConversation(convo);
+            communicationStorage.saveConversation(convo);
 
             MessagingHandler handler = createHandler("1\n/back\nb\n");
 
@@ -130,10 +130,10 @@ class MessagingHandlerTest {
             userStorage.save(otherUser);
 
             Match match = Match.create(testUser.getId(), otherUser.getId());
-            matchStorage.save(match);
+            interactionStorage.save(match);
 
             Conversation convo = Conversation.create(testUser.getId(), otherUser.getId());
-            messagingStorage.saveConversation(convo);
+            communicationStorage.saveConversation(convo);
 
             MessagingHandler handler = createHandler("1\n/back\nb\n");
 
@@ -147,10 +147,10 @@ class MessagingHandlerTest {
             userStorage.save(otherUser);
 
             Match match = Match.create(testUser.getId(), otherUser.getId());
-            matchStorage.save(match);
+            interactionStorage.save(match);
 
             Conversation convo = Conversation.create(testUser.getId(), otherUser.getId());
-            messagingStorage.saveConversation(convo);
+            communicationStorage.saveConversation(convo);
 
             // Note: Skip saveMessage to avoid JDBI binding issue with saveMessage
             // The handler still exercises conversation display logic
