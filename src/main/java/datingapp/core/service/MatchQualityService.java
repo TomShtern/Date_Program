@@ -4,12 +4,12 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.EnumSetUtil;
 import datingapp.core.ScoringConstants;
+import datingapp.core.model.ConnectionModels.Like;
 import datingapp.core.model.Match;
-import datingapp.core.model.Preferences.Interest;
-import datingapp.core.model.Preferences.Lifestyle;
-import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.Interest;
+import datingapp.core.model.MatchPreferences.Lifestyle;
+import datingapp.core.model.MatchPreferences.PacePreferences;
 import datingapp.core.model.User;
-import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.CandidateFinder.GeoUtils;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
@@ -681,7 +681,7 @@ public class MatchQualityService {
     // === Pace Compatibility Methods (formerly PaceCompatibilityService) ===
 
     /**
-     * Calculates a compatibility score (0-100) between two users' pace preferences.
+     * Calculates a compatibility score (0-100) between two users' pace MatchPreferences.
      *
      * @param a first user's preferences
      * @param b second user's preferences

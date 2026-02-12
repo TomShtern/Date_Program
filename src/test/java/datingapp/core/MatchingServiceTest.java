@@ -3,7 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.*;
-import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.ConnectionModels.Like;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;

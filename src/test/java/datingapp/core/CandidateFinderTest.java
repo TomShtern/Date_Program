@@ -4,11 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Preferences.PacePreferences;
-import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.model.MatchPreferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.PacePreferences.CommunicationStyle;
+import datingapp.core.model.MatchPreferences.PacePreferences.DepthPreference;
+import datingapp.core.model.MatchPreferences.PacePreferences.MessagingFrequency;
+import datingapp.core.model.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.service.*;
 import datingapp.core.service.CandidateFinder.GeoUtils;
 import datingapp.core.testutil.TestClock;

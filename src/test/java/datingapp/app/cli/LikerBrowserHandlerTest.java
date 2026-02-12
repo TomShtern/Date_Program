@@ -5,10 +5,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.*;
 import datingapp.core.model.*;
-import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.model.MatchPreferences.PacePreferences;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.VerificationMethod;
-import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
@@ -60,26 +60,20 @@ class LikerBrowserHandlerTest {
         CandidateFinder candidateFinder =
                 new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
-        ProfileCompletionService profileCompletionService = new ProfileCompletionService(config);
+        ProfileService profileCompletionService = new ProfileService(config);
         MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
                 candidateFinder,
                 matchingService,
                 interactionStorage,
-                new DailyService(interactionStorage, config),
+                new RecommendationService(interactionStorage, config),
                 new UndoService(interactionStorage, new TestStorages.Undos(), config),
                 matchQualityService,
                 userStorage,
-                new AchievementService(
-                        analyticsStorage,
-                        interactionStorage,
-                        trustSafetyStorage,
-                        userStorage,
-                        profileCompletionService,
-                        config),
+                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage),
                 analyticsStorage,
                 trustSafetyService,
-                new RelationshipTransitionService(interactionStorage, communicationStorage),
-                new StandoutsService(
+                new ConnectionService(interactionStorage, communicationStorage),
+                new RecommendationService(
                         userStorage, new TestStorages.Standouts(), candidateFinder, profileCompletionService, config),
                 communicationStorage,
                 session,
@@ -200,7 +194,7 @@ class LikerBrowserHandlerTest {
 
             // But we blocked them
             trustSafetyStorage.save(
-                    datingapp.core.model.UserInteractions.Block.create(testUser.getId(), blockedLiker.getId()));
+                    datingapp.core.model.ConnectionModels.Block.create(testUser.getId(), blockedLiker.getId()));
 
             MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();

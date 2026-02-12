@@ -1,6 +1,6 @@
 package datingapp.ui;
 
-import datingapp.app.AppBootstrap;
+import datingapp.app.ApplicationStartup;
 import datingapp.core.ServiceRegistry;
 import javafx.application.Application;
 import javafx.stage.Stage;
@@ -23,7 +23,7 @@ public class DatingApp extends Application {
 
         // Initialize application with centralized bootstrap
         logger.info("[DEBUG] Initializing application services...");
-        ServiceRegistry serviceRegistry = AppBootstrap.initialize();
+        ServiceRegistry serviceRegistry = ApplicationStartup.initialize();
         logger.info("[DEBUG] ServiceRegistry initialized.");
 
         // Initialize UI framework components
@@ -67,7 +67,7 @@ public class DatingApp extends Application {
     @Override
     public void stop() {
         logger.info("Shutting down Dating App GUI...");
-        AppBootstrap.shutdown();
+        ApplicationStartup.shutdown();
     }
 
     public static void main(String[] args) {

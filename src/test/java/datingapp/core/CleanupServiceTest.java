@@ -3,6 +3,8 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.*;
+import datingapp.core.model.EngagementDomain.Achievement;
+import datingapp.core.model.SwipeState.Session;
 import datingapp.core.service.*;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.testutil.TestClock;
@@ -20,15 +22,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Tests for SessionService cleanup functionality (runCleanup + CleanupResult).
+ * Tests for ActivityMetricsService cleanup functionality (runCleanup + CleanupResult).
  */
 @Timeout(5)
 @SuppressWarnings("unused")
-@DisplayName("SessionService cleanup")
+@DisplayName("ActivityMetricsService cleanup")
 class CleanupServiceTest {
 
     private TestCleanupAnalytics analyticsStorage;
-    private SessionService service;
+    private ActivityMetricsService service;
     private AppConfig config;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
@@ -37,7 +39,7 @@ class CleanupServiceTest {
         TestClock.setFixed(FIXED_INSTANT);
         config = AppConfig.defaults();
         analyticsStorage = new TestCleanupAnalytics();
-        service = new SessionService(analyticsStorage, config);
+        service = new ActivityMetricsService(analyticsStorage, config);
     }
 
     @AfterEach
@@ -52,13 +54,13 @@ class CleanupServiceTest {
         @Test
         @DisplayName("Should require non-null analyticsStorage")
         void requiresAnalyticsStorage() {
-            assertThrows(NullPointerException.class, () -> new SessionService(null, config));
+            assertThrows(NullPointerException.class, () -> new ActivityMetricsService(null, config));
         }
 
         @Test
         @DisplayName("Should require non-null config")
         void requiresConfig() {
-            assertThrows(NullPointerException.class, () -> new SessionService(analyticsStorage, null));
+            assertThrows(NullPointerException.class, () -> new ActivityMetricsService(analyticsStorage, null));
         }
     }
 
@@ -72,7 +74,7 @@ class CleanupServiceTest {
             analyticsStorage.setDailyPickDeletedCount(5);
             analyticsStorage.setSessionDeletedCount(3);
 
-            SessionService.CleanupResult result = service.runCleanup();
+            ActivityMetricsService.CleanupResult result = service.runCleanup();
 
             assertEquals(5, result.dailyPicksDeleted());
             assertEquals(3, result.sessionsDeleted());
@@ -86,7 +88,7 @@ class CleanupServiceTest {
             analyticsStorage.setDailyPickDeletedCount(0);
             analyticsStorage.setSessionDeletedCount(0);
 
-            SessionService.CleanupResult result = service.runCleanup();
+            ActivityMetricsService.CleanupResult result = service.runCleanup();
 
             assertEquals(0, result.totalDeleted());
             assertFalse(result.hadWork());
@@ -111,14 +113,14 @@ class CleanupServiceTest {
         @Test
         @DisplayName("Should calculate total correctly")
         void calculatesTotal() {
-            var result = new SessionService.CleanupResult(10, 20);
+            var result = new ActivityMetricsService.CleanupResult(10, 20);
             assertEquals(30, result.totalDeleted());
         }
 
         @Test
         @DisplayName("Should format toString nicely")
         void formatsToString() {
-            var result = new SessionService.CleanupResult(5, 10);
+            var result = new ActivityMetricsService.CleanupResult(5, 10);
             String str = result.toString();
             assertTrue(str.contains("dailyPicks=5"));
             assertTrue(str.contains("sessions=10"));
@@ -128,14 +130,14 @@ class CleanupServiceTest {
         @Test
         @DisplayName("hadWork returns false for zero counts")
         void hadWorkFalseForZero() {
-            var result = new SessionService.CleanupResult(0, 0);
+            var result = new ActivityMetricsService.CleanupResult(0, 0);
             assertFalse(result.hadWork());
         }
 
         @Test
         @DisplayName("hadWork returns true when any count > 0")
         void hadWorkTrueForPositive() {
-            var result = new SessionService.CleanupResult(1, 0);
+            var result = new ActivityMetricsService.CleanupResult(1, 0);
             assertTrue(result.hadWork());
         }
     }
@@ -144,7 +146,7 @@ class CleanupServiceTest {
 
     /**
      * Analytics storage that tracks cleanup method calls for testing.
-     * Implements only behavior needed for SessionService cleanup tests.
+     * Implements only behavior needed for ActivityMetricsService cleanup tests.
      */
     private static class TestCleanupAnalytics implements AnalyticsStorage {
         int dailyPickDeletedCount = 0;
@@ -173,20 +175,20 @@ class CleanupServiceTest {
         }
 
         @Override
-        public void saveUserStats(Stats.UserStats stats) {}
+        public void saveUserStats(EngagementDomain.UserStats stats) {}
 
         @Override
-        public Optional<Stats.UserStats> getLatestUserStats(UUID userId) {
+        public Optional<EngagementDomain.UserStats> getLatestUserStats(UUID userId) {
             return Optional.empty();
         }
 
         @Override
-        public List<Stats.UserStats> getUserStatsHistory(UUID userId, int limit) {
+        public List<EngagementDomain.UserStats> getUserStatsHistory(UUID userId, int limit) {
             return List.of();
         }
 
         @Override
-        public List<Stats.UserStats> getAllLatestUserStats() {
+        public List<EngagementDomain.UserStats> getAllLatestUserStats() {
             return List.of();
         }
 
@@ -196,15 +198,15 @@ class CleanupServiceTest {
         }
 
         @Override
-        public void savePlatformStats(Stats.PlatformStats stats) {}
+        public void savePlatformStats(EngagementDomain.PlatformStats stats) {}
 
         @Override
-        public Optional<Stats.PlatformStats> getLatestPlatformStats() {
+        public Optional<EngagementDomain.PlatformStats> getLatestPlatformStats() {
             return Optional.empty();
         }
 
         @Override
-        public List<Stats.PlatformStats> getPlatformStatsHistory(int limit) {
+        public List<EngagementDomain.PlatformStats> getPlatformStatsHistory(int limit) {
             return List.of();
         }
 
@@ -263,25 +265,25 @@ class CleanupServiceTest {
         }
 
         @Override
-        public void saveSession(SwipeSession session) {}
+        public void saveSession(Session session) {}
 
         @Override
-        public Optional<SwipeSession> getSession(UUID sessionId) {
+        public Optional<Session> getSession(UUID sessionId) {
             return Optional.empty();
         }
 
         @Override
-        public Optional<SwipeSession> getActiveSession(UUID userId) {
+        public Optional<Session> getActiveSession(UUID userId) {
             return Optional.empty();
         }
 
         @Override
-        public List<SwipeSession> getSessionsFor(UUID userId, int limit) {
+        public List<Session> getSessionsFor(UUID userId, int limit) {
             return List.of();
         }
 
         @Override
-        public List<SwipeSession> getSessionsInRange(UUID userId, Instant start, Instant end) {
+        public List<Session> getSessionsInRange(UUID userId, Instant start, Instant end) {
             return List.of();
         }
 

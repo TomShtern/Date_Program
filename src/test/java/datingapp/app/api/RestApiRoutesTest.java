@@ -26,8 +26,8 @@ class RestApiRoutesTest {
         void createsFromMessage() {
             java.util.UUID senderId = java.util.UUID.randomUUID();
             String conversationId = "test-conversation";
-            datingapp.core.model.Messaging.Message message =
-                    datingapp.core.model.Messaging.Message.create(conversationId, senderId, "Hello!");
+            datingapp.core.model.ConnectionModels.Message message =
+                    datingapp.core.model.ConnectionModels.Message.create(conversationId, senderId, "Hello!");
 
             RestApiServer.MessageDto dto = RestApiServer.MessageDto.from(message);
 

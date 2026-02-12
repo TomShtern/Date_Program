@@ -1,9 +1,9 @@
 package datingapp.core.service;
 
 import datingapp.core.AppConfig;
+import datingapp.core.model.ConnectionModels.Like;
 import datingapp.core.model.Match;
-import datingapp.core.model.UndoState;
-import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.SwipeState.Undo;
 import datingapp.core.storage.InteractionStorage;
 import java.time.Clock;
 import java.time.Duration;
@@ -15,7 +15,7 @@ import java.util.UUID;
 public class UndoService {
 
     private final InteractionStorage interactionStorage;
-    private final UndoState.Storage undoStorage;
+    private final Undo.Storage undoStorage;
     private final AppConfig config;
     private final Clock clock;
 
@@ -26,12 +26,11 @@ public class UndoService {
      * @param undoStorage        Storage interface for persisting undo state
      * @param config             Application configuration with undo window setting
      */
-    public UndoService(InteractionStorage interactionStorage, UndoState.Storage undoStorage, AppConfig config) {
+    public UndoService(InteractionStorage interactionStorage, Undo.Storage undoStorage, AppConfig config) {
         this(interactionStorage, undoStorage, config, Clock.systemUTC());
     }
 
-    public UndoService(
-            InteractionStorage interactionStorage, UndoState.Storage undoStorage, AppConfig config, Clock clock) {
+    public UndoService(InteractionStorage interactionStorage, Undo.Storage undoStorage, AppConfig config, Clock clock) {
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.undoStorage = Objects.requireNonNull(undoStorage, "undoStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
@@ -50,7 +49,7 @@ public class UndoService {
         Instant expiresAt = Instant.now(clock).plusSeconds(config.undoWindowSeconds());
         String matchId = matchCreated != null ? matchCreated.getId() : null;
 
-        UndoState state = UndoState.create(userId, like, matchId, expiresAt);
+        Undo state = Undo.create(userId, like, matchId, expiresAt);
         undoStorage.save(state);
     }
 
@@ -62,13 +61,13 @@ public class UndoService {
      * @return true if undo is available and not expired
      */
     public boolean canUndo(UUID userId) {
-        Optional<UndoState> optState = undoStorage.findByUserId(userId);
+        Optional<Undo> optState = undoStorage.findByUserId(userId);
 
         if (optState.isEmpty()) {
             return false;
         }
 
-        UndoState state = optState.get();
+        Undo state = optState.get();
 
         // Check if window has expired
         if (state.isExpired(Instant.now(clock))) {
@@ -87,7 +86,7 @@ public class UndoService {
      * @return Seconds remaining (0 if expired or no state)
      */
     public int getSecondsRemaining(UUID userId) {
-        Optional<UndoState> optState = undoStorage.findByUserId(userId);
+        Optional<Undo> optState = undoStorage.findByUserId(userId);
 
         if (optState.isEmpty()) {
             return 0;
@@ -107,14 +106,14 @@ public class UndoService {
      * @return UndoResult with success status, message, and side effects
      */
     public UndoResult undo(UUID userId) {
-        Optional<UndoState> optState = undoStorage.findByUserId(userId);
+        Optional<Undo> optState = undoStorage.findByUserId(userId);
 
         // Validation: No undo state
         if (optState.isEmpty()) {
             return UndoResult.failure("No swipe to undo");
         }
 
-        UndoState state = optState.get();
+        Undo state = optState.get();
 
         // Validation: Window expired
         if (state.isExpired(Instant.now(clock))) {

@@ -1,12 +1,13 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.AppSession;
-import datingapp.core.model.Achievement;
-import datingapp.core.model.Achievement.UserAchievement;
-import datingapp.core.model.Stats.UserStats;
+import datingapp.core.model.EngagementDomain.Achievement;
+import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.EngagementDomain.UserStats;
 import datingapp.core.model.User;
-import datingapp.core.service.AchievementService;
-import datingapp.core.service.StatsService;
+import datingapp.core.service.ActivityMetricsService;
+import datingapp.core.service.ProfileService;
+import datingapp.ui.viewmodel.shared.ViewModelErrorSink;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,8 +29,8 @@ import org.slf4j.LoggerFactory;
 public class StatsViewModel {
     private static final Logger logger = LoggerFactory.getLogger(StatsViewModel.class);
 
-    private final AchievementService achievementService;
-    private final StatsService statsService;
+    private final ProfileService achievementService;
+    private final ActivityMetricsService statsService;
 
     private final ObservableList<Achievement> achievements = FXCollections.observableArrayList();
 
@@ -46,13 +47,13 @@ public class StatsViewModel {
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     /** Error handler for ViewModel→Controller error communication (M-22). */
-    private ErrorHandler errorHandler;
+    private ViewModelErrorSink errorHandler;
 
-    public void setErrorHandler(ErrorHandler handler) {
+    public void setErrorHandler(ViewModelErrorSink handler) {
         this.errorHandler = handler;
     }
 
-    public StatsViewModel(AchievementService achievementService, StatsService statsService) {
+    public StatsViewModel(ProfileService achievementService, ActivityMetricsService statsService) {
         this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
         this.statsService = Objects.requireNonNull(statsService, "statsService cannot be null");
     }

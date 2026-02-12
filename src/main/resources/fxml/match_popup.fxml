@@ -11,7 +11,7 @@
 
 <StackPane fx:id="rootPane" styleClass="match-popup-overlay"
     xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-    fx:controller="datingapp.ui.controller.MatchPopupController">
+    fx:controller="datingapp.ui.controller.MilestonePopupController">
   <!-- Confetti Canvas (background) -->
   <Canvas fx:id="confettiCanvas"/>
   <!-- Content -->
@@ -46,3 +46,4 @@
     </VBox>
   </VBox>
 </StackPane>
+

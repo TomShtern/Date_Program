@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Messaging.Conversation;
-import datingapp.core.model.Messaging.Message;
+import datingapp.core.model.ConnectionModels.Conversation;
+import datingapp.core.model.ConnectionModels.Message;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;

@@ -1,10 +1,10 @@
 package datingapp.core.storage;
 
-import datingapp.core.model.Achievement;
-import datingapp.core.model.Achievement.UserAchievement;
-import datingapp.core.model.Stats.PlatformStats;
-import datingapp.core.model.Stats.UserStats;
-import datingapp.core.model.SwipeSession;
+import datingapp.core.model.EngagementDomain.Achievement;
+import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.EngagementDomain.PlatformStats;
+import datingapp.core.model.EngagementDomain.UserStats;
+import datingapp.core.model.SwipeState.Session;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -72,15 +72,15 @@ public interface AnalyticsStorage {
 
     // ═══ Swipe Sessions ═══
 
-    void saveSession(SwipeSession session);
+    void saveSession(Session session);
 
-    Optional<SwipeSession> getSession(UUID sessionId);
+    Optional<Session> getSession(UUID sessionId);
 
-    Optional<SwipeSession> getActiveSession(UUID userId);
+    Optional<Session> getActiveSession(UUID userId);
 
-    List<SwipeSession> getSessionsFor(UUID userId, int limit);
+    List<Session> getSessionsFor(UUID userId, int limit);
 
-    List<SwipeSession> getSessionsInRange(UUID userId, Instant start, Instant end);
+    List<Session> getSessionsInRange(UUID userId, Instant start, Instant end);
 
     SessionAggregates getSessionAggregates(UUID userId);
 

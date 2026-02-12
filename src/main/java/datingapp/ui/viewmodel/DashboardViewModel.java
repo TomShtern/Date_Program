@@ -1,15 +1,15 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.AppSession;
-import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
-import datingapp.core.service.AchievementService;
-import datingapp.core.service.DailyService;
-import datingapp.core.service.DailyService.DailyPick;
-import datingapp.core.service.DailyService.DailyStatus;
-import datingapp.core.service.MessagingService;
-import datingapp.core.service.ProfileCompletionService;
+import datingapp.core.service.ConnectionService;
+import datingapp.core.service.ProfileService;
+import datingapp.core.service.RecommendationService;
+import datingapp.core.service.RecommendationService.DailyPick;
+import datingapp.core.service.RecommendationService.DailyStatus;
 import datingapp.ui.viewmodel.data.UiDataAdapters.UiMatchDataAccess;
+import datingapp.ui.viewmodel.shared.ViewModelErrorSink;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,11 +34,11 @@ import org.slf4j.LoggerFactory;
 public class DashboardViewModel {
     private static final Logger logger = LoggerFactory.getLogger(DashboardViewModel.class);
 
-    private final DailyService dailyService;
+    private final RecommendationService dailyService;
     private final UiMatchDataAccess matchData;
-    private final AchievementService achievementService;
-    private final MessagingService messagingService;
-    private final ProfileCompletionService profileCompletionService;
+    private final ProfileService achievementService;
+    private final ConnectionService messagingService;
+    private final ProfileService profileCompletionService;
 
     // Observable properties for data binding
     private final StringProperty userName = new SimpleStringProperty("Not Logged In");
@@ -52,7 +52,7 @@ public class DashboardViewModel {
 
     private final ObservableList<String> recentAchievements = FXCollections.observableArrayList();
 
-    private ErrorHandler errorHandler;
+    private ViewModelErrorSink errorHandler;
     private final AtomicInteger activeLoads = new AtomicInteger(0);
 
     /** Track background thread for cleanup on dispose. */
@@ -70,11 +70,11 @@ public class DashboardViewModel {
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public DashboardViewModel(
-            DailyService dailyService,
+            RecommendationService dailyService,
             UiMatchDataAccess matchData,
-            AchievementService achievementService,
-            MessagingService messagingService,
-            ProfileCompletionService profileCompletionService) {
+            ProfileService achievementService,
+            ConnectionService messagingService,
+            ProfileService profileCompletionService) {
         this.dailyService = dailyService;
         this.matchData = matchData;
         this.achievementService = achievementService;
@@ -122,7 +122,7 @@ public class DashboardViewModel {
         setLoadingState(false);
     }
 
-    public void setErrorHandler(ErrorHandler handler) {
+    public void setErrorHandler(ViewModelErrorSink handler) {
         this.errorHandler = handler;
     }
 

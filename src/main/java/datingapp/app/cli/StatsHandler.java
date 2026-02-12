@@ -3,11 +3,11 @@ package datingapp.app.cli;
 import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
-import datingapp.core.model.Achievement.UserAchievement;
-import datingapp.core.model.Stats.UserStats;
+import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.EngagementDomain.UserStats;
 import datingapp.core.model.User;
-import datingapp.core.service.AchievementService;
-import datingapp.core.service.StatsService;
+import datingapp.core.service.ActivityMetricsService;
+import datingapp.core.service.ProfileService;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,14 +16,14 @@ import org.slf4j.LoggerFactory;
 public class StatsHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(StatsHandler.class);
 
-    private final StatsService statsService;
-    private final AchievementService achievementService;
+    private final ActivityMetricsService statsService;
+    private final ProfileService achievementService;
     private final AppSession session;
     private final InputReader inputReader;
 
     public StatsHandler(
-            StatsService statsService,
-            AchievementService achievementService,
+            ActivityMetricsService statsService,
+            ProfileService achievementService,
             AppSession session,
             InputReader inputReader) {
         this.statsService = statsService;

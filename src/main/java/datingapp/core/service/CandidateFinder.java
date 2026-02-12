@@ -3,7 +3,7 @@ package datingapp.core.service;
 import datingapp.core.AppConfig;
 import datingapp.core.LoggingSupport;
 import datingapp.core.PerformanceMonitor;
-import datingapp.core.model.Dealbreakers;
+import datingapp.core.model.MatchPreferences.Dealbreakers;
 import datingapp.core.model.User;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;

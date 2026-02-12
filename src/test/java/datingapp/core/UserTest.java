@@ -7,12 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Preferences.Interest;
-import datingapp.core.model.Preferences.PacePreferences;
-import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.model.MatchPreferences.Interest;
+import datingapp.core.model.MatchPreferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.PacePreferences.CommunicationStyle;
+import datingapp.core.model.MatchPreferences.PacePreferences.DepthPreference;
+import datingapp.core.model.MatchPreferences.PacePreferences.MessagingFrequency;
+import datingapp.core.model.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.model.User.ProfileNote;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
@@ -384,11 +384,11 @@ class UserTest {
                     .state(User.UserState.ACTIVE)
                     .updatedAt(Instant.parse("2026-01-02T10:00:00Z"))
                     .interests(EnumSet.of(Interest.COFFEE))
-                    .smoking(Preferences.Lifestyle.Smoking.NEVER)
-                    .drinking(Preferences.Lifestyle.Drinking.SOCIALLY)
-                    .wantsKids(Preferences.Lifestyle.WantsKids.SOMEDAY)
-                    .lookingFor(Preferences.Lifestyle.LookingFor.LONG_TERM)
-                    .education(Preferences.Lifestyle.Education.BACHELORS)
+                    .smoking(MatchPreferences.Lifestyle.Smoking.NEVER)
+                    .drinking(MatchPreferences.Lifestyle.Drinking.SOCIALLY)
+                    .wantsKids(MatchPreferences.Lifestyle.WantsKids.SOMEDAY)
+                    .lookingFor(MatchPreferences.Lifestyle.LookingFor.LONG_TERM)
+                    .education(MatchPreferences.Lifestyle.Education.BACHELORS)
                     .heightCm(170)
                     .email("alice@example.com")
                     .phone("+123456789")
@@ -425,11 +425,11 @@ class UserTest {
             User user = buildUserFromStorage();
 
             assertEquals(EnumSet.of(Interest.COFFEE), user.getInterests());
-            assertEquals(Preferences.Lifestyle.Smoking.NEVER, user.getSmoking());
-            assertEquals(Preferences.Lifestyle.Drinking.SOCIALLY, user.getDrinking());
-            assertEquals(Preferences.Lifestyle.WantsKids.SOMEDAY, user.getWantsKids());
-            assertEquals(Preferences.Lifestyle.LookingFor.LONG_TERM, user.getLookingFor());
-            assertEquals(Preferences.Lifestyle.Education.BACHELORS, user.getEducation());
+            assertEquals(MatchPreferences.Lifestyle.Smoking.NEVER, user.getSmoking());
+            assertEquals(MatchPreferences.Lifestyle.Drinking.SOCIALLY, user.getDrinking());
+            assertEquals(MatchPreferences.Lifestyle.WantsKids.SOMEDAY, user.getWantsKids());
+            assertEquals(MatchPreferences.Lifestyle.LookingFor.LONG_TERM, user.getLookingFor());
+            assertEquals(MatchPreferences.Lifestyle.Education.BACHELORS, user.getEducation());
             assertTrue(user.isVerified());
             assertEquals(User.VerificationMethod.EMAIL, user.getVerificationMethod());
         }

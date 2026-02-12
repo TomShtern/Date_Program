@@ -5,11 +5,10 @@ import datingapp.core.AppConfig;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
-import datingapp.core.service.ProfileCompletionService;
+import datingapp.core.service.ProfileService;
 import datingapp.ui.NavigationService;
-import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
-import datingapp.ui.util.UiSupport;
+import datingapp.ui.util.UiFeedbackService;
 import datingapp.ui.viewmodel.LoginViewModel;
 import java.net.URL;
 import java.time.Instant;
@@ -118,17 +117,17 @@ public class LoginController extends BaseController implements Initializable {
     private TextField filterField;
 
     private final LoginViewModel viewModel;
-    private final ProfileCompletionService profileCompletionService;
+    private final ProfileService profileCompletionService;
     private final Label emptyListPlaceholder = new Label();
 
-    public LoginController(LoginViewModel viewModel, ProfileCompletionService profileCompletionService) {
+    public LoginController(LoginViewModel viewModel, ProfileService profileCompletionService) {
         this.viewModel = viewModel;
         this.profileCompletionService = profileCompletionService;
     }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        viewModel.setErrorHandler(Toast::showError);
+        viewModel.setErrorHandler(UiFeedbackService::showError);
 
         bindUserList();
         setupUserListInteractions();
@@ -492,7 +491,7 @@ public class LoginController extends BaseController implements Initializable {
         @SuppressWarnings("PMD.UnnecessaryConstructor")
         private UserListCellRenderer() {}
 
-        static ListCell<User> create(ProfileCompletionService profileCompletionService) {
+        static ListCell<User> create(ProfileService profileCompletionService) {
             return new UserListCell(profileCompletionService);
         }
 
@@ -500,7 +499,7 @@ public class LoginController extends BaseController implements Initializable {
             private static final double AVATAR_SIZE = 44;
             private static final double SELECT_SCALE = 1.03;
 
-            private final ProfileCompletionService profileCompletionService;
+            private final ProfileService profileCompletionService;
             private final HBox container = new HBox(15);
             private final StackPane avatarContainer = new StackPane();
             private final ImageView avatarView = new ImageView();
@@ -512,7 +511,7 @@ public class LoginController extends BaseController implements Initializable {
             private final Label completionBadge = new Label();
             private final Label activityBadge = new Label();
 
-            private UserListCell(ProfileCompletionService profileCompletionService) {
+            private UserListCell(ProfileService profileCompletionService) {
                 this.profileCompletionService = profileCompletionService;
                 avatarView.setFitWidth(AVATAR_SIZE);
                 avatarView.setFitHeight(AVATAR_SIZE);
@@ -561,14 +560,14 @@ public class LoginController extends BaseController implements Initializable {
 
                     updateCompletionBadge(user);
                     activityBadge.setText(formatActivity(user.getUpdatedAt()));
-                    avatarView.setImage(UiSupport.getAvatar(resolveAvatarPath(user), AVATAR_SIZE));
+                    avatarView.setImage(UiFeedbackService.getAvatar(resolveAvatarPath(user), AVATAR_SIZE));
 
                     setGraphic(container);
                 }
             }
 
             private void updateCompletionBadge(User user) {
-                ProfileCompletionService.CompletionResult result = profileCompletionService.calculate(user);
+                ProfileService.CompletionResult result = profileCompletionService.calculate(user);
                 int score = result.score();
                 completionBadge.setText(TEXT_PROFILE_PREFIX + score + TEXT_PERCENT_SUFFIX);
 

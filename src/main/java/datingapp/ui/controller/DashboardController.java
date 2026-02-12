@@ -2,9 +2,8 @@ package datingapp.ui.controller;
 
 import datingapp.core.AppSession;
 import datingapp.ui.NavigationService;
-import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
-import datingapp.ui.util.UiSupport;
+import datingapp.ui.util.UiFeedbackService;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -21,7 +20,8 @@ import org.slf4j.LoggerFactory;
  * Main hub for navigation to all app features.
  * Extends BaseController for automatic subscription cleanup.
  */
-public class DashboardController extends BaseController implements Initializable, UiSupport.ResponsiveController {
+public class DashboardController extends BaseController
+        implements Initializable, UiFeedbackService.ResponsiveController {
     private static final Logger logger = LoggerFactory.getLogger(DashboardController.class);
     private static final String STYLE_VIEWPORT_COMPACT = "viewport-compact";
 
@@ -75,7 +75,7 @@ public class DashboardController extends BaseController implements Initializable
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        viewModel.setErrorHandler(Toast::showError);
+        viewModel.setErrorHandler(UiFeedbackService::showError);
 
         // Use Subscription API for memory-safe listener management
         addSubscription(viewModel.userNameProperty().subscribe(userNameLabel::setText));
@@ -209,7 +209,7 @@ public class DashboardController extends BaseController implements Initializable
 
     @FXML
     private void handleLogout() {
-        boolean confirmed = UiSupport.showConfirmation(
+        boolean confirmed = UiFeedbackService.showConfirmation(
                 "Confirm Logout", "Are you sure you want to log out?", "You will need to log in again to continue.");
         if (confirmed) {
             logger.info("Logging out");

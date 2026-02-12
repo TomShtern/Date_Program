@@ -8,7 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.*;
-import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.model.SwipeState.Session;
 import datingapp.core.service.*;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.testutil.TestClock;
@@ -26,13 +27,13 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-/** Unit tests for SessionService logic. Uses a simple in-memory session storage for testing. */
+/** Unit tests for ActivityMetricsService session logic. */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class SessionServiceTest {
 
     private AnalyticsStorage analyticsStorage;
     private AppConfig config;
-    private SessionService service;
+    private ActivityMetricsService service;
     private UUID userId;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
@@ -45,7 +46,7 @@ class SessionServiceTest {
                 .maxSwipesPerSession(100)
                 .suspiciousSwipeVelocity(30.0)
                 .build();
-        service = new SessionService(analyticsStorage, config);
+        service = new ActivityMetricsService(analyticsStorage, config);
         userId = UUID.randomUUID();
     }
 
@@ -61,7 +62,7 @@ class SessionServiceTest {
         @Test
         @DisplayName("Creates new session when none exists")
         void createsNewSession() {
-            SwipeSession session = service.getOrCreateSession(userId);
+            Session session = service.getOrCreateSession(userId);
 
             assertNotNull(session);
             assertEquals(userId, session.getUserId());
@@ -71,8 +72,8 @@ class SessionServiceTest {
         @Test
         @DisplayName("Returns existing active session")
         void returnsExistingSession() {
-            SwipeSession first = service.getOrCreateSession(userId);
-            SwipeSession second = service.getOrCreateSession(userId);
+            Session first = service.getOrCreateSession(userId);
+            Session second = service.getOrCreateSession(userId);
 
             assertEquals(first.getId(), second.getId());
         }
@@ -81,16 +82,16 @@ class SessionServiceTest {
         @DisplayName("Creates new session after timeout")
         void createsNewAfterTimeout() {
             // Create initial session
-            SwipeSession initial = service.getOrCreateSession(userId);
+            Session initial = service.getOrCreateSession(userId);
 
             // Manually make it appear timed out by creating with old timestamp
-            SwipeSession oldSession = new SwipeSession(
+            Session oldSession = new Session(
                     initial.getId(),
                     userId,
                     AppClock.now().minus(Duration.ofMinutes(10)),
                     AppClock.now().minus(Duration.ofMinutes(10)),
                     null,
-                    SwipeSession.State.ACTIVE,
+                    Session.State.ACTIVE,
                     5,
                     3,
                     2,
@@ -98,7 +99,7 @@ class SessionServiceTest {
             analyticsStorage.saveSession(oldSession);
 
             // Now get session again - should create new one
-            SwipeSession newSession = service.getOrCreateSession(userId);
+            Session newSession = service.getOrCreateSession(userId);
 
             assertNotEquals(initial.getId(), newSession.getId());
             assertEquals(0, newSession.getSwipeCount());
@@ -112,7 +113,7 @@ class SessionServiceTest {
         @Test
         @DisplayName("Recording swipe returns success result")
         void recordSwipeSuccess() {
-            SessionService.SwipeResult result = service.recordSwipe(userId, Like.Direction.LIKE, false);
+            ActivityMetricsService.SwipeResult result = service.recordSwipe(userId, Like.Direction.LIKE, false);
 
             assertTrue(result.allowed());
             assertNull(result.blockedReason());
@@ -123,14 +124,14 @@ class SessionServiceTest {
         @DisplayName("Blocks swipe when session limit reached")
         void blocksAtLimit() {
             // Create session near limit
-            SwipeSession session = service.getOrCreateSession(userId);
+            Session session = service.getOrCreateSession(userId);
             for (int i = 0; i < 100; i++) {
                 session.recordSwipe(Like.Direction.LIKE, false);
             }
             analyticsStorage.saveSession(session);
 
             // Try one more
-            SessionService.SwipeResult result = service.recordSwipe(userId, Like.Direction.LIKE, false);
+            ActivityMetricsService.SwipeResult result = service.recordSwipe(userId, Like.Direction.LIKE, false);
 
             assertFalse(result.allowed());
             assertEquals("Session swipe limit reached. Take a break!", result.blockedReason());
@@ -139,7 +140,7 @@ class SessionServiceTest {
         @Test
         @DisplayName("Warns when swipe velocity is suspicious")
         void warnsOnSuspiciousVelocity() {
-            SessionService.SwipeResult result = null;
+            ActivityMetricsService.SwipeResult result = null;
             for (int i = 0; i < 31; i++) {
                 result = service.recordSwipe(userId, Like.Direction.LIKE, false);
             }
@@ -162,7 +163,7 @@ class SessionServiceTest {
 
             service.endSession(userId);
 
-            Optional<SwipeSession> active = service.getCurrentSession(userId);
+            Optional<Session> active = service.getCurrentSession(userId);
             assertTrue(active.isEmpty());
         }
     }
@@ -174,7 +175,7 @@ class SessionServiceTest {
         @Test
         @DisplayName("Returns empty list for user with no sessions")
         void emptyHistoryForNew() {
-            List<SwipeSession> history = service.getSessionHistory(userId, 10);
+            List<Session> history = service.getSessionHistory(userId, 10);
 
             assertTrue(history.isEmpty());
         }
@@ -183,7 +184,7 @@ class SessionServiceTest {
         @DisplayName("Returns aggregates for user")
         void returnsAggregates() {
             // Create a session with some swipes
-            SwipeSession session = service.getOrCreateSession(userId);
+            Session session = service.getOrCreateSession(userId);
             session.recordSwipe(Like.Direction.LIKE, true);
             session.recordSwipe(Like.Direction.PASS, false);
             analyticsStorage.saveSession(session);

@@ -90,7 +90,7 @@ public class ViewModelFactory {
         logDebug("Creating controller: {}", controllerClass.getSimpleName());
 
         if (controllerClass == LoginController.class) {
-            return new LoginController(getLoginViewModel(), services.getProfileCompletionService());
+            return new LoginController(getLoginViewModel(), services.getProfileService());
         }
 
         if (controllerClass == DashboardController.class) {
@@ -150,18 +150,18 @@ public class ViewModelFactory {
     public synchronized DashboardViewModel getDashboardViewModel() {
         if (dashboardViewModel == null) {
             dashboardViewModel = new DashboardViewModel(
-                    services.getDailyService(),
+                    services.getRecommendationService(),
                     createUiMatchDataAccess(),
-                    services.getAchievementService(),
-                    services.getMessagingService(),
-                    services.getProfileCompletionService());
+                    services.getProfileService(),
+                    services.getConnectionService(),
+                    services.getProfileService());
         }
         return dashboardViewModel;
     }
 
     public synchronized ProfileViewModel getProfileViewModel() {
         if (profileViewModel == null) {
-            profileViewModel = new ProfileViewModel(createUiUserStore(), services.getProfileCompletionService());
+            profileViewModel = new ProfileViewModel(createUiUserStore(), services.getProfileService());
         }
         return profileViewModel;
     }
@@ -180,22 +180,22 @@ public class ViewModelFactory {
                     createUiMatchDataAccess(),
                     createUiUserStore(),
                     services.getMatchingService(),
-                    services.getDailyService());
+                    services.getRecommendationService());
         }
         return matchesViewModel;
     }
 
     public synchronized ChatViewModel getChatViewModel() {
         if (chatViewModel == null) {
-            // ChatViewModel takes only MessagingService
-            chatViewModel = new ChatViewModel(services.getMessagingService());
+            // ChatViewModel takes only ConnectionService
+            chatViewModel = new ChatViewModel(services.getConnectionService());
         }
         return chatViewModel;
     }
 
     public synchronized StatsViewModel getStatsViewModel() {
         if (statsViewModel == null) {
-            statsViewModel = new StatsViewModel(services.getAchievementService(), services.getStatsService());
+            statsViewModel = new StatsViewModel(services.getProfileService(), services.getActivityMetricsService());
         }
         return statsViewModel;
     }

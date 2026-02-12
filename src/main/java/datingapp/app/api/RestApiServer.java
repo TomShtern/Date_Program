@@ -3,16 +3,16 @@ package datingapp.app.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import datingapp.app.AppBootstrap;
+import datingapp.app.ApplicationStartup;
 import datingapp.core.ServiceRegistry;
+import datingapp.core.model.ConnectionModels.Conversation;
+import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.model.ConnectionModels.Message;
 import datingapp.core.model.Match;
-import datingapp.core.model.Messaging.Conversation;
-import datingapp.core.model.Messaging.Message;
 import datingapp.core.model.User;
-import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.CandidateFinder;
+import datingapp.core.service.ConnectionService;
 import datingapp.core.service.MatchingService;
-import datingapp.core.service.MessagingService;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
@@ -59,7 +59,7 @@ public class RestApiServer {
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
     private final CommunicationStorage communicationStorage;
-    private final MessagingService messagingService;
+    private final ConnectionService messagingService;
     private final int port;
     private Javalin app;
 
@@ -75,7 +75,7 @@ public class RestApiServer {
         this.candidateFinder = services.getCandidateFinder();
         this.matchingService = services.getMatchingService();
         this.communicationStorage = services.getCommunicationStorage();
-        this.messagingService = services.getMessagingService();
+        this.messagingService = services.getConnectionService();
         this.port = port;
     }
 
@@ -413,7 +413,7 @@ public class RestApiServer {
 
     /** Main entry point for standalone REST API server. */
     public static void main(String[] args) {
-        ServiceRegistry services = AppBootstrap.initialize();
+        ServiceRegistry services = ApplicationStartup.initialize();
         int port = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
 
         RestApiServer server = new RestApiServer(services, port);

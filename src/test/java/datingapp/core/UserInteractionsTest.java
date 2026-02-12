@@ -7,9 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import datingapp.core.model.*;
-import datingapp.core.model.UserInteractions.Block;
-import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.model.UserInteractions.Report;
+import datingapp.core.model.ConnectionModels.Block;
+import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.model.ConnectionModels.Report;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;

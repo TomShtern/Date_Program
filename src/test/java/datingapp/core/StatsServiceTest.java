@@ -3,11 +3,11 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Stats.PlatformStats;
-import datingapp.core.model.Stats.UserStats;
-import datingapp.core.model.UserInteractions.Block;
-import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.model.UserInteractions.Report;
+import datingapp.core.model.ConnectionModels.Block;
+import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.model.ConnectionModels.Report;
+import datingapp.core.model.EngagementDomain.PlatformStats;
+import datingapp.core.model.EngagementDomain.UserStats;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestStorages;
 import java.util.*;
@@ -15,17 +15,17 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
 
 /**
- * Tests for StatsService - user and platform statistics computation.
+ * Tests for ActivityMetricsService - user and platform statistics computation.
  */
 @SuppressWarnings("unused")
-@DisplayName("StatsService")
+@DisplayName("ActivityMetricsService")
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class StatsServiceTest {
 
     private TestStorages.Interactions interactionStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
     private TestStorages.Analytics analyticsStorage;
-    private StatsService statsService;
+    private ActivityMetricsService statsService;
 
     private UUID userId;
     private UUID otherUserId;
@@ -36,7 +36,7 @@ class StatsServiceTest {
         trustSafetyStorage = new TestStorages.TrustSafety();
         analyticsStorage = new TestStorages.Analytics();
 
-        statsService = new StatsService(interactionStorage, trustSafetyStorage, analyticsStorage);
+        statsService = new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage);
 
         userId = UUID.randomUUID();
         otherUserId = UUID.randomUUID();

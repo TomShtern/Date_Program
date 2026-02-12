@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Messaging.Conversation;
-import datingapp.core.model.Messaging.Message;
+import datingapp.core.model.ConnectionModels.Conversation;
+import datingapp.core.model.ConnectionModels.Message;
 import datingapp.core.model.User.ProfileNote;
 import datingapp.core.service.*;
 import datingapp.core.storage.CommunicationStorage;
@@ -29,14 +29,14 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-@DisplayName("MessagingService Tests")
+@DisplayName("ConnectionService Tests")
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MessagingServiceTest {
 
     private CommunicationStorage messagingStorage;
     private InteractionStorage matchStorage;
     private InMemoryUserStorage userStorage;
-    private MessagingService messagingService;
+    private ConnectionService messagingService;
 
     private UUID userA;
     private UUID userB;
@@ -50,7 +50,7 @@ class MessagingServiceTest {
         messagingStorage = new TestStorages.Communications();
         matchStorage = new TestStorages.Interactions();
         userStorage = new InMemoryUserStorage();
-        messagingService = new MessagingService(messagingStorage, matchStorage, userStorage);
+        messagingService = new ConnectionService(messagingStorage, matchStorage, userStorage);
 
         // Create test users
         userA = UUID.randomUUID();
@@ -88,7 +88,7 @@ class MessagingServiceTest {
             Match match = Match.create(userA, userB);
             matchStorage.save(match);
 
-            MessagingService.SendResult result = messagingService.sendMessage(userA, userB, "Hello Bob!");
+            ConnectionService.SendResult result = messagingService.sendMessage(userA, userB, "Hello Bob!");
 
             assertTrue(result.success());
             assertNotNull(result.message());
@@ -113,10 +113,10 @@ class MessagingServiceTest {
         @Test
         @DisplayName("should fail without match")
         void failWithoutMatch() {
-            MessagingService.SendResult result = messagingService.sendMessage(userA, userB, "Hello!");
+            ConnectionService.SendResult result = messagingService.sendMessage(userA, userB, "Hello!");
 
             assertFalse(result.success());
-            assertEquals(MessagingService.SendResult.ErrorCode.NO_ACTIVE_MATCH, result.errorCode());
+            assertEquals(ConnectionService.SendResult.ErrorCode.NO_ACTIVE_MATCH, result.errorCode());
         }
 
         @Test
@@ -126,10 +126,10 @@ class MessagingServiceTest {
             match.unmatch(userA);
             matchStorage.save(match);
 
-            MessagingService.SendResult result = messagingService.sendMessage(userA, userB, "Hello!");
+            ConnectionService.SendResult result = messagingService.sendMessage(userA, userB, "Hello!");
 
             assertFalse(result.success());
-            assertEquals(MessagingService.SendResult.ErrorCode.NO_ACTIVE_MATCH, result.errorCode());
+            assertEquals(ConnectionService.SendResult.ErrorCode.NO_ACTIVE_MATCH, result.errorCode());
         }
 
         @Test
@@ -139,10 +139,10 @@ class MessagingServiceTest {
             match.block(userA);
             matchStorage.save(match);
 
-            MessagingService.SendResult result = messagingService.sendMessage(userA, userB, "Hello!");
+            ConnectionService.SendResult result = messagingService.sendMessage(userA, userB, "Hello!");
 
             assertFalse(result.success());
-            assertEquals(MessagingService.SendResult.ErrorCode.NO_ACTIVE_MATCH, result.errorCode());
+            assertEquals(ConnectionService.SendResult.ErrorCode.NO_ACTIVE_MATCH, result.errorCode());
         }
 
         @Test
@@ -151,10 +151,10 @@ class MessagingServiceTest {
             Match match = Match.create(userA, userB);
             matchStorage.save(match);
 
-            MessagingService.SendResult result = messagingService.sendMessage(userA, userB, "   ");
+            ConnectionService.SendResult result = messagingService.sendMessage(userA, userB, "   ");
 
             assertFalse(result.success());
-            assertEquals(MessagingService.SendResult.ErrorCode.EMPTY_MESSAGE, result.errorCode());
+            assertEquals(ConnectionService.SendResult.ErrorCode.EMPTY_MESSAGE, result.errorCode());
         }
 
         @Test
@@ -164,10 +164,10 @@ class MessagingServiceTest {
             matchStorage.save(match);
 
             String longContent = "a".repeat(Message.MAX_LENGTH + 1);
-            MessagingService.SendResult result = messagingService.sendMessage(userA, userB, longContent);
+            ConnectionService.SendResult result = messagingService.sendMessage(userA, userB, longContent);
 
             assertFalse(result.success());
-            assertEquals(MessagingService.SendResult.ErrorCode.MESSAGE_TOO_LONG, result.errorCode());
+            assertEquals(ConnectionService.SendResult.ErrorCode.MESSAGE_TOO_LONG, result.errorCode());
         }
 
         @Test
@@ -177,10 +177,10 @@ class MessagingServiceTest {
             Match match = Match.create(unknownUser, userB);
             matchStorage.save(match);
 
-            MessagingService.SendResult result = messagingService.sendMessage(unknownUser, userB, "Hello!");
+            ConnectionService.SendResult result = messagingService.sendMessage(unknownUser, userB, "Hello!");
 
             assertFalse(result.success());
-            assertEquals(MessagingService.SendResult.ErrorCode.USER_NOT_FOUND, result.errorCode());
+            assertEquals(ConnectionService.SendResult.ErrorCode.USER_NOT_FOUND, result.errorCode());
         }
 
         @Test
@@ -451,7 +451,7 @@ class MessagingServiceTest {
             messagingStorage.updateConversationLastMessageAt(convoIdAB, now);
             messagingStorage.updateConversationLastMessageAt(convoIdAC, now.plusSeconds(1));
 
-            List<MessagingService.ConversationPreview> previews = messagingService.getConversations(userA);
+            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA);
 
             assertEquals(2, previews.size());
             // C conversation should be first (more recent)
@@ -470,7 +470,7 @@ class MessagingServiceTest {
             messagingService.sendMessage(userB, userA, "2");
             messagingService.sendMessage(userB, userA, "3");
 
-            List<MessagingService.ConversationPreview> previews = messagingService.getConversations(userA);
+            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA);
 
             assertEquals(1, previews.size());
             assertEquals(3, previews.get(0).unreadCount());
@@ -489,7 +489,7 @@ class MessagingServiceTest {
             messagingStorage.saveMessage(lastMessage);
             messagingStorage.updateConversationLastMessageAt(conversationId, later);
 
-            List<MessagingService.ConversationPreview> previews = messagingService.getConversations(userA);
+            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA);
 
             assertEquals(1, previews.size());
             assertTrue(previews.get(0).lastMessage().isPresent());
@@ -499,7 +499,7 @@ class MessagingServiceTest {
         @Test
         @DisplayName("should return empty for user with no conversations")
         void returnEmptyForNoConversations() {
-            List<MessagingService.ConversationPreview> previews = messagingService.getConversations(userA);
+            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA);
 
             assertTrue(previews.isEmpty());
         }

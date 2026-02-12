@@ -3,64 +3,75 @@ package datingapp.app;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.AppConfig;
+import datingapp.core.AppSession;
+import datingapp.core.ServiceRegistry;
+import datingapp.storage.DatabaseManager;
+import datingapp.storage.StorageFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.ZoneId;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Loads AppConfig from external JSON file with environment variable overrides.
- *
- * <p>Configuration precedence (highest to lowest):
- * <ol>
- * <li>Environment variables (DATING_APP_* prefix)</li>
- * <li>JSON config file (./config/app-config.json)</li>
- * <li>Built-in defaults (AppConfig.defaults())</li>
- * </ol>
- *
- * <p>Example JSON:
- * <pre>{@code
- * {
- * "dailyLikeLimit": 50,
- * "autoBanThreshold": 5,
- * "maxDistanceKm": 100
- * }
- * }</pre>
- *
- * <p>Example environment override:
- * <pre>{@code
- * DATING_APP_DAILY_LIKE_LIMIT=50
- * }</pre>
- */
-public final class ConfigLoader {
-    private static final Logger logger = LoggerFactory.getLogger(ConfigLoader.class);
+/** Consolidated application startup and configuration loader entry point. */
+public final class ApplicationStartup {
+    private static final Logger logger = LoggerFactory.getLogger(ApplicationStartup.class);
+
     private static final String CONFIG_FILE = "./config/app-config.json";
     private static final String ENV_PREFIX = "DATING_APP_";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private ConfigLoader() {} // Utility class
+    private static volatile ServiceRegistry services;
+    private static volatile DatabaseManager dbManager;
+    private static volatile boolean initialized = false;
 
-    /**
-     * Loads configuration from file with environment overrides.
-     *
-     * @return Loaded AppConfig or defaults if file not found
-     */
+    private ApplicationStartup() {}
+
+    public static synchronized ServiceRegistry initialize() {
+        return initialize(load());
+    }
+
+    public static synchronized ServiceRegistry initialize(AppConfig config) {
+        Objects.requireNonNull(config, "config cannot be null");
+        if (!initialized) {
+            dbManager = DatabaseManager.getInstance();
+            services = StorageFactory.buildH2(dbManager, config);
+            initialized = true;
+        }
+        return services;
+    }
+
+    public static ServiceRegistry getServices() {
+        ServiceRegistry current = services;
+        if (!initialized || current == null) {
+            throw new IllegalStateException("ApplicationStartup.initialize() must be called first");
+        }
+        return current;
+    }
+
+    public static synchronized void shutdown() {
+        if (dbManager != null) {
+            dbManager.shutdown();
+        }
+        initialized = false;
+        services = null;
+        dbManager = null;
+    }
+
+    public static synchronized void reset() {
+        shutdown();
+        AppSession.getInstance().reset();
+    }
+
     public static AppConfig load() {
         return load(Path.of(CONFIG_FILE));
     }
 
-    /**
-     * Loads configuration from specified path with environment overrides.
-     *
-     * @param configPath Path to JSON config file
-     * @return Loaded AppConfig or defaults if file not found
-     */
     public static AppConfig load(Path configPath) {
         AppConfig.Builder builder = AppConfig.builder();
 
-        // Try loading from JSON file
         if (Files.exists(configPath)) {
             try {
                 String json = Files.readString(configPath);
@@ -73,18 +84,10 @@ public final class ConfigLoader {
             logInfo("Config file not found at {}, using defaults", configPath);
         }
 
-        // Apply environment variable overrides
         applyEnvironmentOverrides(builder);
-
         return builder.build();
     }
 
-    /**
-     * Loads configuration from JSON string.
-     *
-     * @param json JSON configuration string
-     * @return Loaded AppConfig
-     */
     public static AppConfig fromJson(String json) {
         AppConfig.Builder builder = AppConfig.builder();
         applyJsonConfig(builder, json);
@@ -96,7 +99,6 @@ public final class ConfigLoader {
         try {
             JsonNode root = MAPPER.readTree(json);
 
-            // Limits
             applyInt(root, "autoBanThreshold", builder::autoBanThreshold);
             applyInt(root, "dailyLikeLimit", builder::dailyLikeLimit);
             applyInt(root, "dailySuperLikeLimit", builder::dailySuperLikeLimit);
@@ -106,15 +108,11 @@ public final class ConfigLoader {
             applyInt(root, "maxBioLength", builder::maxBioLength);
             applyInt(root, "maxReportDescLength", builder::maxReportDescLength);
 
-            // Session
             applyInt(root, "sessionTimeoutMinutes", builder::sessionTimeoutMinutes);
             applyInt(root, "maxSwipesPerSession", builder::maxSwipesPerSession);
             applyDouble(root, "suspiciousSwipeVelocity", builder::suspiciousSwipeVelocity);
-
-            // Undo
             applyInt(root, "undoWindowSeconds", builder::undoWindowSeconds);
 
-            // Algorithm thresholds
             applyInt(root, "nearbyDistanceKm", builder::nearbyDistanceKm);
             applyInt(root, "closeDistanceKm", builder::closeDistanceKm);
             applyInt(root, "similarAgeDiff", builder::similarAgeDiff);
@@ -127,7 +125,6 @@ public final class ConfigLoader {
             applyInt(root, "responseTimeWeekHours", builder::responseTimeWeekHours);
             applyInt(root, "responseTimeMonthHours", builder::responseTimeMonthHours);
 
-            // Achievement tiers
             applyInt(root, "achievementMatchTier1", builder::achievementMatchTier1);
             applyInt(root, "achievementMatchTier2", builder::achievementMatchTier2);
             applyInt(root, "achievementMatchTier3", builder::achievementMatchTier3);
@@ -135,19 +132,16 @@ public final class ConfigLoader {
             applyInt(root, "achievementMatchTier5", builder::achievementMatchTier5);
             applyInt(root, "minSwipesForBehaviorAchievement", builder::minSwipesForBehaviorAchievement);
 
-            // Distance and age
             applyInt(root, "maxDistanceKm", builder::maxDistanceKm);
             applyInt(root, "maxAge", builder::maxAge);
             applyInt(root, "minAge", builder::minAge);
 
-            // Validation
             applyInt(root, "minHeightCm", builder::minHeightCm);
             applyInt(root, "maxHeightCm", builder::maxHeightCm);
             applyInt(root, "minDistanceKm", builder::minDistanceKm);
             applyInt(root, "maxNameLength", builder::maxNameLength);
             applyInt(root, "minAgeRangeSpan", builder::minAgeRangeSpan);
 
-            // Weights
             applyDouble(root, "distanceWeight", builder::distanceWeight);
             applyDouble(root, "ageWeight", builder::ageWeight);
             applyDouble(root, "interestWeight", builder::interestWeight);
@@ -155,13 +149,10 @@ public final class ConfigLoader {
             applyDouble(root, "paceWeight", builder::paceWeight);
             applyDouble(root, "responseWeight", builder::responseWeight);
 
-            // Cleanup
             applyInt(root, "cleanupRetentionDays", builder::cleanupRetentionDays);
 
-            // Timezone
             if (root.has("userTimeZone")) {
-                String tz = root.get("userTimeZone").asText();
-                builder.userTimeZone(ZoneId.of(tz));
+                builder.userTimeZone(ZoneId.of(root.get("userTimeZone").asText()));
             }
         } catch (IOException ex) {
             logWarn("Failed to parse JSON config", ex);
@@ -169,7 +160,6 @@ public final class ConfigLoader {
     }
 
     private static void applyEnvironmentOverrides(AppConfig.Builder builder) {
-        // Convert camelCase to UPPER_SNAKE_CASE for env vars
         applyEnvInt("DAILY_LIKE_LIMIT", builder::dailyLikeLimit);
         applyEnvInt("DAILY_SUPER_LIKE_LIMIT", builder::dailySuperLikeLimit);
         applyEnvInt("DAILY_PASS_LIMIT", builder::dailyPassLimit);
@@ -182,7 +172,6 @@ public final class ConfigLoader {
         applyEnvInt("MIN_AGE", builder::minAge);
         applyEnvInt("MAX_AGE", builder::maxAge);
 
-        // Timezone
         String tz = System.getenv(ENV_PREFIX + "USER_TIME_ZONE");
         if (tz != null && !tz.isBlank()) {
             try {

@@ -3,7 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.PacePreferences;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
@@ -25,18 +25,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Tests for StandoutsService.
+ * Tests for RecommendationService.
  */
 @Timeout(5)
 @SuppressWarnings("unused")
-@DisplayName("StandoutsService")
+@DisplayName("RecommendationService")
 class StandoutsServiceTest {
 
     private TestStorages.Users userStorage;
     private TestStandoutStorage standoutStorage;
     private CandidateFinder candidateFinder;
-    private ProfileCompletionService profileCompletionService;
-    private StandoutsService service;
+    private ProfileService profileCompletionService;
+    private RecommendationService service;
     private AppConfig config;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
@@ -49,8 +49,9 @@ class StandoutsServiceTest {
         TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
         standoutStorage = new TestStandoutStorage();
         candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
-        profileCompletionService = new ProfileCompletionService(config);
-        service = new StandoutsService(userStorage, standoutStorage, candidateFinder, profileCompletionService, config);
+        profileCompletionService = new ProfileService(config);
+        service = new RecommendationService(
+                userStorage, standoutStorage, candidateFinder, profileCompletionService, config);
     }
 
     @AfterEach
@@ -107,7 +108,7 @@ class StandoutsServiceTest {
         void requiresUserStorage() {
             assertThrows(
                     NullPointerException.class,
-                    () -> new StandoutsService(
+                    () -> new RecommendationService(
                             null, standoutStorage, candidateFinder, profileCompletionService, config));
         }
 
@@ -116,7 +117,8 @@ class StandoutsServiceTest {
         void requiresStandoutStorage() {
             assertThrows(
                     NullPointerException.class,
-                    () -> new StandoutsService(userStorage, null, candidateFinder, profileCompletionService, config));
+                    () -> new RecommendationService(
+                            userStorage, null, candidateFinder, profileCompletionService, config));
         }
 
         @Test
@@ -124,15 +126,16 @@ class StandoutsServiceTest {
         void requiresCandidateFinder() {
             assertThrows(
                     NullPointerException.class,
-                    () -> new StandoutsService(userStorage, standoutStorage, null, profileCompletionService, config));
+                    () -> new RecommendationService(
+                            userStorage, standoutStorage, null, profileCompletionService, config));
         }
 
         @Test
         @DisplayName("Should require non-null profileCompletionService")
-        void requiresProfileCompletionService() {
+        void requiresProfileService() {
             assertThrows(
                     NullPointerException.class,
-                    () -> new StandoutsService(userStorage, standoutStorage, candidateFinder, null, config));
+                    () -> new RecommendationService(userStorage, standoutStorage, candidateFinder, null, config));
         }
 
         @Test
@@ -140,7 +143,7 @@ class StandoutsServiceTest {
         void requiresConfig() {
             assertThrows(
                     NullPointerException.class,
-                    () -> new StandoutsService(
+                    () -> new RecommendationService(
                             userStorage, standoutStorage, candidateFinder, profileCompletionService, null));
         }
     }
@@ -155,7 +158,7 @@ class StandoutsServiceTest {
             User seeker = createCompleteActiveUser("Seeker");
             userStorage.save(seeker);
 
-            StandoutsService.Result result = service.getStandouts(seeker);
+            RecommendationService.Result result = service.getStandouts(seeker);
 
             assertTrue(result.isEmpty());
             assertEquals(0, result.count());
@@ -173,7 +176,7 @@ class StandoutsServiceTest {
             Standout cached = Standout.create(seeker.getId(), UUID.randomUUID(), today, 1, 90, "Test");
             standoutStorage.cachedStandouts.put(seeker.getId() + "_" + today, List.of(cached));
 
-            StandoutsService.Result result = service.getStandouts(seeker);
+            RecommendationService.Result result = service.getStandouts(seeker);
 
             assertTrue(result.fromCache());
             assertEquals(1, result.count());
@@ -190,7 +193,7 @@ class StandoutsServiceTest {
             userStorage.save(candidate1);
             userStorage.save(candidate2);
 
-            StandoutsService.Result result = service.getStandouts(seeker);
+            RecommendationService.Result result = service.getStandouts(seeker);
 
             assertFalse(result.isEmpty());
             assertFalse(result.fromCache());
@@ -208,7 +211,7 @@ class StandoutsServiceTest {
                 userStorage.save(candidate);
             }
 
-            StandoutsService.Result result = service.getStandouts(seeker);
+            RecommendationService.Result result = service.getStandouts(seeker);
 
             assertTrue(result.count() <= 10);
         }
@@ -278,7 +281,7 @@ class StandoutsServiceTest {
         @Test
         @DisplayName("empty() should create empty result with message")
         void emptyCreatesWithMessage() {
-            StandoutsService.Result result = StandoutsService.Result.empty("Test message");
+            RecommendationService.Result result = RecommendationService.Result.empty("Test message");
 
             assertTrue(result.isEmpty());
             assertEquals(0, result.count());
@@ -292,7 +295,7 @@ class StandoutsServiceTest {
             List<Standout> standouts =
                     List.of(Standout.create(UUID.randomUUID(), UUID.randomUUID(), AppClock.today(), 1, 90, "Test"));
 
-            StandoutsService.Result result = StandoutsService.Result.of(standouts, 5, true);
+            RecommendationService.Result result = RecommendationService.Result.of(standouts, 5, true);
 
             assertFalse(result.isEmpty());
             assertEquals(1, result.count());

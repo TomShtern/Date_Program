@@ -3,16 +3,16 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Preferences.PacePreferences;
-import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.model.ConnectionModels.Block;
+import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.model.MatchPreferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.PacePreferences.CommunicationStyle;
+import datingapp.core.model.MatchPreferences.PacePreferences.DepthPreference;
+import datingapp.core.model.MatchPreferences.PacePreferences.MessagingFrequency;
+import datingapp.core.model.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.model.User.ProfileNote;
-import datingapp.core.model.UserInteractions.Block;
-import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.*;
-import datingapp.core.service.DailyService.DailyPick;
+import datingapp.core.service.RecommendationService.DailyPick;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class DailyPickServiceTest {
 
-    private DailyService service;
+    private RecommendationService service;
     private InMemoryUserStorage userStorage;
     private TestStorages.Interactions interactionStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
@@ -49,7 +49,7 @@ class DailyPickServiceTest {
         config = AppConfig.defaults();
 
         candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
-        service = new DailyService(
+        service = new RecommendationService(
                 userStorage,
                 interactionStorage,
                 trustSafetyStorage,
@@ -247,7 +247,7 @@ class DailyPickServiceTest {
         LocalDate oldDate = AppClock.today(config.userTimeZone()).minusDays(10);
         ZoneId zone = config.userTimeZone();
         Clock oldClock = Clock.fixed(oldDate.atStartOfDay(zone).toInstant(), zone);
-        DailyService oldService = new DailyService(
+        RecommendationService oldService = new RecommendationService(
                 userStorage,
                 interactionStorage,
                 trustSafetyStorage,

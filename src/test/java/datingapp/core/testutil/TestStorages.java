@@ -2,23 +2,23 @@ package datingapp.core.testutil;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
-import datingapp.core.model.Achievement;
-import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.ConnectionModels.Block;
+import datingapp.core.model.ConnectionModels.Conversation;
+import datingapp.core.model.ConnectionModels.FriendRequest;
+import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.model.ConnectionModels.Message;
+import datingapp.core.model.ConnectionModels.Notification;
+import datingapp.core.model.ConnectionModels.Report;
+import datingapp.core.model.EngagementDomain.Achievement;
+import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.EngagementDomain.PlatformStats;
+import datingapp.core.model.EngagementDomain.UserStats;
 import datingapp.core.model.Match;
-import datingapp.core.model.Messaging.Conversation;
-import datingapp.core.model.Messaging.Message;
 import datingapp.core.model.Standout;
-import datingapp.core.model.Stats.PlatformStats;
-import datingapp.core.model.Stats.UserStats;
-import datingapp.core.model.SwipeSession;
-import datingapp.core.model.UndoState;
+import datingapp.core.model.SwipeState.Session;
+import datingapp.core.model.SwipeState.Undo;
 import datingapp.core.model.User;
 import datingapp.core.model.User.ProfileNote;
-import datingapp.core.model.UserInteractions.Block;
-import datingapp.core.model.UserInteractions.FriendRequest;
-import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.model.UserInteractions.Notification;
-import datingapp.core.model.UserInteractions.Report;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
@@ -575,7 +575,7 @@ public final class TestStorages {
         private final List<ProfileViewEvent> profileViews = new ArrayList<>();
         private final Map<UUID, List<UserAchievement>> achievements = new HashMap<>();
         private final Set<String> dailyPickViews = new HashSet<>();
-        private final Map<UUID, SwipeSession> sessions = new HashMap<>();
+        private final Map<UUID, Session> sessions = new HashMap<>();
 
         @Override
         public void saveUserStats(UserStats stats) {
@@ -751,48 +751,48 @@ public final class TestStorages {
         }
 
         @Override
-        public void saveSession(SwipeSession session) {
+        public void saveSession(Session session) {
             sessions.put(session.getId(), session);
         }
 
         @Override
-        public Optional<SwipeSession> getSession(UUID sessionId) {
+        public Optional<Session> getSession(UUID sessionId) {
             return Optional.ofNullable(sessions.get(sessionId));
         }
 
         @Override
-        public Optional<SwipeSession> getActiveSession(UUID userId) {
+        public Optional<Session> getActiveSession(UUID userId) {
             return sessions.values().stream()
                     .filter(session -> session.getUserId().equals(userId))
-                    .filter(SwipeSession::isActive)
-                    .max(Comparator.comparing(SwipeSession::getStartedAt));
+                    .filter(Session::isActive)
+                    .max(Comparator.comparing(Session::getStartedAt));
         }
 
         @Override
-        public List<SwipeSession> getSessionsFor(UUID userId, int limit) {
+        public List<Session> getSessionsFor(UUID userId, int limit) {
             if (limit <= 0) {
                 return List.of();
             }
             return sessions.values().stream()
                     .filter(session -> session.getUserId().equals(userId))
-                    .sorted(Comparator.comparing(SwipeSession::getStartedAt).reversed())
+                    .sorted(Comparator.comparing(Session::getStartedAt).reversed())
                     .limit(limit)
                     .toList();
         }
 
         @Override
-        public List<SwipeSession> getSessionsInRange(UUID userId, Instant start, Instant end) {
+        public List<Session> getSessionsInRange(UUID userId, Instant start, Instant end) {
             return sessions.values().stream()
                     .filter(session -> session.getUserId().equals(userId))
                     .filter(session -> !session.getStartedAt().isBefore(start))
                     .filter(session -> !session.getStartedAt().isAfter(end))
-                    .sorted(Comparator.comparing(SwipeSession::getStartedAt).reversed())
+                    .sorted(Comparator.comparing(Session::getStartedAt).reversed())
                     .toList();
         }
 
         @Override
         public SessionAggregates getSessionAggregates(UUID userId) {
-            List<SwipeSession> userSessions = sessions.values().stream()
+            List<Session> userSessions = sessions.values().stream()
                     .filter(session -> session.getUserId().equals(userId))
                     .toList();
             if (userSessions.isEmpty()) {
@@ -801,16 +801,15 @@ public final class TestStorages {
 
             int totalSessions = userSessions.size();
             int totalSwipes =
-                    userSessions.stream().mapToInt(SwipeSession::getSwipeCount).sum();
+                    userSessions.stream().mapToInt(Session::getSwipeCount).sum();
             int totalLikes =
-                    userSessions.stream().mapToInt(SwipeSession::getLikeCount).sum();
+                    userSessions.stream().mapToInt(Session::getLikeCount).sum();
             int totalPasses =
-                    userSessions.stream().mapToInt(SwipeSession::getPassCount).sum();
+                    userSessions.stream().mapToInt(Session::getPassCount).sum();
             int totalMatches =
-                    userSessions.stream().mapToInt(SwipeSession::getMatchCount).sum();
-            double totalDurationSeconds = userSessions.stream()
-                    .mapToLong(SwipeSession::getDurationSeconds)
-                    .sum();
+                    userSessions.stream().mapToInt(Session::getMatchCount).sum();
+            double totalDurationSeconds =
+                    userSessions.stream().mapToLong(Session::getDurationSeconds).sum();
             double avgSessionDurationSeconds = totalDurationSeconds / totalSessions;
             double avgSwipesPerSession = totalSwipes / (double) totalSessions;
             double avgSwipeVelocity = totalDurationSeconds == 0.0 ? 0.0 : totalSwipes / totalDurationSeconds;
@@ -829,7 +828,7 @@ public final class TestStorages {
         @Override
         public int endStaleSessions(Duration timeout) {
             int ended = 0;
-            for (SwipeSession session : sessions.values()) {
+            for (Session session : sessions.values()) {
                 if (session.isActive() && session.isTimedOut(timeout)) {
                     session.end();
                     ended++;
@@ -940,16 +939,16 @@ public final class TestStorages {
         }
     }
 
-    public static class Undos implements UndoState.Storage {
-        private final Map<UUID, UndoState> byUser = new HashMap<>();
+    public static class Undos implements Undo.Storage {
+        private final Map<UUID, Undo> byUser = new HashMap<>();
 
         @Override
-        public void save(UndoState state) {
+        public void save(Undo state) {
             byUser.put(state.userId(), state);
         }
 
         @Override
-        public Optional<UndoState> findByUserId(UUID userId) {
+        public Optional<Undo> findByUserId(UUID userId) {
             return Optional.ofNullable(byUser.get(userId));
         }
 
@@ -966,7 +965,7 @@ public final class TestStorages {
         }
 
         @Override
-        public List<UndoState> findAll() {
+        public List<Undo> findAll() {
             return new ArrayList<>(byUser.values());
         }
     }

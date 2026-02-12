@@ -6,15 +6,13 @@ import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.*;
-import datingapp.core.model.Achievement;
-import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.EngagementDomain.Achievement;
+import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.EngagementDomain.UserStats;
 import datingapp.core.model.Match;
-import datingapp.core.model.Stats.UserStats;
 import datingapp.core.model.User;
 import datingapp.core.service.*;
-import datingapp.core.service.AchievementService;
-import datingapp.core.service.ProfileCompletionService;
-import datingapp.core.service.StatsService;
+import datingapp.core.service.ActivityMetricsService;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.util.*;
@@ -51,15 +49,10 @@ class StatsHandlerTest {
 
     private StatsHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        StatsService statsService = new StatsService(interactionStorage, trustSafetyStorage, analyticsStorage);
-        ProfileCompletionService profileCompletionService = new ProfileCompletionService(AppConfig.defaults());
-        AchievementService achievementService = new AchievementService(
-                analyticsStorage,
-                interactionStorage,
-                trustSafetyStorage,
-                userStorage,
-                profileCompletionService,
-                AppConfig.defaults());
+        ActivityMetricsService statsService =
+                new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage);
+        ProfileService achievementService = new ProfileService(
+                AppConfig.defaults(), analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
         return new StatsHandler(statsService, achievementService, session, inputReader);
     }
 
@@ -183,11 +176,11 @@ class StatsHandlerTest {
         user.setGender(User.Gender.OTHER);
         user.setInterestedIn(EnumSet.of(User.Gender.OTHER));
         user.addPhotoUrl("https://example.com/photo.jpg");
-        user.setPacePreferences(new datingapp.core.model.Preferences.PacePreferences(
-                datingapp.core.model.Preferences.PacePreferences.MessagingFrequency.OFTEN,
-                datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
-                datingapp.core.model.Preferences.PacePreferences.CommunicationStyle.TEXT_ONLY,
-                datingapp.core.model.Preferences.PacePreferences.DepthPreference.SMALL_TALK));
+        user.setPacePreferences(new datingapp.core.model.MatchPreferences.PacePreferences(
+                datingapp.core.model.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
+                datingapp.core.model.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
+                datingapp.core.model.MatchPreferences.PacePreferences.CommunicationStyle.TEXT_ONLY,
+                datingapp.core.model.MatchPreferences.PacePreferences.DepthPreference.SMALL_TALK));
         user.activate();
         return user;
     }

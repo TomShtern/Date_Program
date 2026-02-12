@@ -2,15 +2,16 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppSession;
+import datingapp.core.model.ConnectionModels.Like;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
-import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.service.DailyService;
 import datingapp.core.service.MatchingService;
 import datingapp.core.service.MatchingService.PendingLiker;
+import datingapp.core.service.RecommendationService;
 import datingapp.ui.viewmodel.data.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.data.UiDataAdapters.UiUserStore;
+import datingapp.ui.viewmodel.shared.ViewModelErrorSink;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -41,7 +42,7 @@ public class MatchesViewModel {
     private final UiMatchDataAccess matchData;
     private final UiUserStore userStore;
     private final MatchingService matchingService;
-    private final DailyService dailyService;
+    private final RecommendationService dailyService;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesReceived = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesSent = FXCollections.observableArrayList();
@@ -50,7 +51,7 @@ public class MatchesViewModel {
     private final IntegerProperty likesReceivedCount = new SimpleIntegerProperty(0);
     private final IntegerProperty likesSentCount = new SimpleIntegerProperty(0);
 
-    private ErrorHandler errorHandler;
+    private ViewModelErrorSink errorHandler;
 
     private User currentUser;
 
@@ -58,7 +59,7 @@ public class MatchesViewModel {
             UiMatchDataAccess matchData,
             UiUserStore userStore,
             MatchingService matchingService,
-            DailyService dailyService) {
+            RecommendationService dailyService) {
         this.matchData = Objects.requireNonNull(matchData, "matchData cannot be null");
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
@@ -83,7 +84,7 @@ public class MatchesViewModel {
         likesSent.clear();
     }
 
-    public void setErrorHandler(ErrorHandler handler) {
+    public void setErrorHandler(ViewModelErrorSink handler) {
         this.errorHandler = handler;
     }
 

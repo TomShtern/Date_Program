@@ -3,7 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Preferences.Interest;
+import datingapp.core.model.MatchPreferences.Interest;
 import datingapp.core.service.*;
 import java.util.Collection;
 import java.util.EnumSet;

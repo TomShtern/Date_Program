@@ -175,7 +175,7 @@ public class PreferencesController extends BaseController implements Initializab
 
     @FXML
     private void handleSave() {
-        logInfo("Saving preferences...");
+        logInfo("Saving MatchPreferences...");
         viewModel.savePreferences();
         NavigationService.getInstance().goBack();
     }

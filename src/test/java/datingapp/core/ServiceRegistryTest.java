@@ -145,15 +145,15 @@ class ServiceRegistryTest {
         }
 
         @Test
-        @DisplayName("getProfileCompletionService returns non-null")
-        void getProfileCompletionService() {
-            assertNotNull(registry.getProfileCompletionService());
+        @DisplayName("getProfileService returns non-null")
+        void getProfileService() {
+            assertNotNull(registry.getProfileService());
         }
 
         @Test
-        @DisplayName("getDailyService returns non-null")
-        void getDailyService() {
-            assertNotNull(registry.getDailyService());
+        @DisplayName("getRecommendationService returns non-null")
+        void getRecommendationService() {
+            assertNotNull(registry.getRecommendationService());
         }
 
         @Test
@@ -163,21 +163,9 @@ class ServiceRegistryTest {
         }
 
         @Test
-        @DisplayName("getAchievementService returns non-null")
-        void getAchievementService() {
-            assertNotNull(registry.getAchievementService());
-        }
-
-        @Test
-        @DisplayName("getMessagingService returns non-null")
-        void getMessagingService() {
-            assertNotNull(registry.getMessagingService());
-        }
-
-        @Test
-        @DisplayName("getRelationshipTransitionService returns non-null")
-        void getRelationshipTransitionService() {
-            assertNotNull(registry.getRelationshipTransitionService());
+        @DisplayName("getConnectionService returns non-null")
+        void getConnectionService() {
+            assertNotNull(registry.getConnectionService());
         }
     }
 

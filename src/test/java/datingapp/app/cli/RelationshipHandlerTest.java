@@ -5,10 +5,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.*;
 import datingapp.core.model.*;
-import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.ConnectionModels.FriendRequest;
+import datingapp.core.model.ConnectionModels.Notification;
+import datingapp.core.model.MatchPreferences.PacePreferences;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.UserInteractions.FriendRequest;
-import datingapp.core.model.UserInteractions.Notification;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
@@ -57,31 +57,24 @@ class RelationshipHandlerTest {
                 .build();
         TrustSafetyService trustSafetyService =
                 new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
-        RelationshipTransitionService transitionService =
-                new RelationshipTransitionService(interactionStorage, communicationStorage);
+        ConnectionService transitionService = new ConnectionService(interactionStorage, communicationStorage);
         CandidateFinder candidateFinder =
                 new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
-        ProfileCompletionService profileCompletionService = new ProfileCompletionService(config);
+        ProfileService profileCompletionService = new ProfileService(config);
         MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
                 candidateFinder,
                 matchingService,
                 interactionStorage,
-                new DailyService(interactionStorage, config),
+                new RecommendationService(interactionStorage, config),
                 new UndoService(interactionStorage, new TestStorages.Undos(), config),
                 matchQualityService,
                 userStorage,
-                new AchievementService(
-                        analyticsStorage,
-                        interactionStorage,
-                        trustSafetyStorage,
-                        userStorage,
-                        profileCompletionService,
-                        config),
+                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage),
                 analyticsStorage,
                 trustSafetyService,
                 transitionService,
-                new StandoutsService(
+                new RecommendationService(
                         userStorage, new TestStorages.Standouts(), candidateFinder, profileCompletionService, config),
                 communicationStorage,
                 session,

@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.model.*;
-import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.PacePreferences;
 import datingapp.core.service.*;
 import datingapp.ui.util.UiAnimations;
 import java.lang.reflect.Modifier;
@@ -41,14 +41,14 @@ class NestedTypeVisibilityTest {
     @DisplayName("UserInteractions nested types must be static")
     void userInteractionsNestedTypesMustBeStatic() {
         assertTrue(
-                Modifier.isStatic(UserInteractions.Like.class.getModifiers()),
-                "UserInteractions.Like must be static to be accessible from other packages");
+                Modifier.isStatic(ConnectionModels.Like.class.getModifiers()),
+                "ConnectionModels.Like must be static to be accessible from other packages");
         assertTrue(
-                Modifier.isStatic(UserInteractions.Block.class.getModifiers()),
-                "UserInteractions.Block must be static to be accessible from other packages");
+                Modifier.isStatic(ConnectionModels.Block.class.getModifiers()),
+                "ConnectionModels.Block must be static to be accessible from other packages");
         assertTrue(
-                Modifier.isStatic(UserInteractions.Report.class.getModifiers()),
-                "UserInteractions.Report must be static to be accessible from other packages");
+                Modifier.isStatic(ConnectionModels.Report.class.getModifiers()),
+                "ConnectionModels.Report must be static to be accessible from other packages");
     }
 
     /**
@@ -67,8 +67,8 @@ class NestedTypeVisibilityTest {
                 Modifier.isStatic(MatchingService.SwipeResult.class.getModifiers()),
                 "MatchingService.SwipeResult must be static");
         assertTrue(
-                Modifier.isStatic(RelationshipTransitionService.TransitionValidationException.class.getModifiers()),
-                "RelationshipTransitionService.TransitionValidationException must be static");
+                Modifier.isStatic(ConnectionService.TransitionValidationException.class.getModifiers()),
+                "ConnectionService.TransitionValidationException must be static");
     }
 
     /**
@@ -83,7 +83,7 @@ class NestedTypeVisibilityTest {
                 Modifier.isPublic(User.VerificationMethod.class.getModifiers()),
                 "User.VerificationMethod must be public");
         assertTrue(Modifier.isPublic(PacePreferences.class.getModifiers()), "PacePreferences must be public");
-        assertTrue(Modifier.isPublic(DailyService.DailyPick.class.getModifiers()), "DailyPick must be public");
+        assertTrue(Modifier.isPublic(RecommendationService.DailyPick.class.getModifiers()), "DailyPick must be public");
         assertTrue(Modifier.isPublic(InputReader.class.getModifiers()), "InputReader must be public");
         assertTrue(
                 Modifier.isPublic(UiAnimations.ConfettiAnimation.class.getModifiers()),

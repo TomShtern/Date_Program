@@ -1,14 +1,13 @@
 package datingapp.ui.controller;
 
-import datingapp.core.model.Dealbreakers;
-import datingapp.core.model.Preferences.Interest;
-import datingapp.core.model.Preferences.Lifestyle;
+import datingapp.core.model.MatchPreferences.Dealbreakers;
+import datingapp.core.model.MatchPreferences.Interest;
+import datingapp.core.model.MatchPreferences.Lifestyle;
 import datingapp.core.model.User.Gender;
 import datingapp.ui.NavigationService;
 import datingapp.ui.util.ImageCache;
-import datingapp.ui.util.Toast;
 import datingapp.ui.util.UiAnimations;
-import datingapp.ui.util.UiSupport;
+import datingapp.ui.util.UiFeedbackService;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
 import java.net.URL;
@@ -180,7 +179,7 @@ public class ProfileController extends BaseController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        viewModel.setErrorHandler(Toast::showError);
+        viewModel.setErrorHandler(UiFeedbackService::showError);
 
         // Bind basic form fields to ViewModel properties
         if (nameLabel != null) {
@@ -479,7 +478,7 @@ public class ProfileController extends BaseController implements Initializable {
             if (height < minHeight || height > maxHeight) {
                 heightField.setText("");
                 viewModel.heightProperty().set(null);
-                Toast.showWarning("Please enter a height between " + minHeight + "-" + maxHeight + " cm");
+                UiFeedbackService.showWarning("Please enter a height between " + minHeight + "-" + maxHeight + " cm");
             }
         } catch (NumberFormatException _) {
             heightField.setText("");
@@ -718,11 +717,11 @@ public class ProfileController extends BaseController implements Initializable {
                     viewModel.savePhoto(selectedFile);
                 } else {
                     logWarn("Failed to load image: {}", selectedFile.getAbsolutePath());
-                    Toast.showError("Failed to load image");
+                    UiFeedbackService.showError("Failed to load image");
                 }
             } catch (Exception e) {
                 logError("Error loading profile photo", e);
-                Toast.showError("Error loading photo: " + e.getMessage());
+                UiFeedbackService.showError("Error loading photo: " + e.getMessage());
             }
         }
     }
@@ -801,7 +800,7 @@ public class ProfileController extends BaseController implements Initializable {
                 "-fx-background-color: #64748b; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 8 16;");
         clearAllBtn.setOnAction(event -> {
             event.consume();
-            boolean confirmed = UiSupport.showConfirmation(
+            boolean confirmed = UiFeedbackService.showConfirmation(
                     "Clear All Dealbreakers",
                     "Remove all dealbreaker preferences?",
                     "This will reset all your dealbreaker filters. You can set them again anytime.");
@@ -813,7 +812,7 @@ public class ProfileController extends BaseController implements Initializable {
             selectedKids.clear();
             selectedLookingFor.clear();
             // Rebuild dialog to show cleared state
-            Toast.showSuccess("All dealbreakers cleared");
+            UiFeedbackService.showSuccess("All dealbreakers cleared");
         });
         content.getChildren().add(clearAllBtn);
 

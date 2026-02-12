@@ -1,8 +1,8 @@
 package datingapp.core.service;
 
+import datingapp.core.model.ConnectionModels.Like;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
@@ -28,22 +28,22 @@ public class MatchingService {
     private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
     private final UserStorage userStorage;
-    private SessionService sessionService; // Optional (Phase 0.5b)
+    private ActivityMetricsService activityMetricsService; // Optional
     private UndoService undoService; // Optional
-    private DailyService dailyService; // Optional
+    private RecommendationService dailyService; // Optional
 
     /** Constructor with all dependencies (optional dependencies may be null). */
     public MatchingService(
             InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
             UserStorage userStorage,
-            SessionService sessionService,
+            ActivityMetricsService activityMetricsService,
             UndoService undoService,
-            DailyService dailyService) {
+            RecommendationService dailyService) {
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.userStorage = userStorage;
-        this.sessionService = sessionService;
+        this.activityMetricsService = activityMetricsService;
         this.undoService = undoService;
         this.dailyService = dailyService;
     }
@@ -56,9 +56,9 @@ public class MatchingService {
         private InteractionStorage interactionStorage;
         private TrustSafetyStorage trustSafetyStorage;
         private UserStorage userStorage;
-        private SessionService sessionService;
+        private ActivityMetricsService activityMetricsService;
         private UndoService undoService;
-        private DailyService dailyService;
+        private RecommendationService dailyService;
 
         public Builder interactionStorage(InteractionStorage storage) {
             this.interactionStorage = storage;
@@ -75,8 +75,8 @@ public class MatchingService {
             return this;
         }
 
-        public Builder sessionService(SessionService service) {
-            this.sessionService = service;
+        public Builder activityMetricsService(ActivityMetricsService service) {
+            this.activityMetricsService = service;
             return this;
         }
 
@@ -85,14 +85,19 @@ public class MatchingService {
             return this;
         }
 
-        public Builder dailyService(DailyService service) {
+        public Builder dailyService(RecommendationService service) {
             this.dailyService = service;
             return this;
         }
 
         public MatchingService build() {
             return new MatchingService(
-                    interactionStorage, trustSafetyStorage, userStorage, sessionService, undoService, dailyService);
+                    interactionStorage,
+                    trustSafetyStorage,
+                    userStorage,
+                    activityMetricsService,
+                    undoService,
+                    dailyService);
         }
     }
 
@@ -116,8 +121,8 @@ public class MatchingService {
 
         // If it's a PASS, no match possible
         if (like.direction() == Like.Direction.PASS) {
-            if (sessionService != null) {
-                sessionService.recordSwipe(like.whoLikes(), like.direction(), false);
+            if (activityMetricsService != null) {
+                activityMetricsService.recordSwipe(like.whoLikes(), like.direction(), false);
             }
             return Optional.empty();
         }
@@ -154,16 +159,16 @@ public class MatchingService {
             }
         }
 
-        if (sessionService != null) {
-            sessionService.recordSwipe(like.whoLikes(), like.direction(), matchResult.isPresent());
+        if (activityMetricsService != null) {
+            activityMetricsService.recordSwipe(like.whoLikes(), like.direction(), matchResult.isPresent());
         }
 
         return matchResult;
     }
 
     /** Get the session service (for UI access to session info). */
-    public Optional<SessionService> getSessionService() {
-        return Optional.ofNullable(sessionService);
+    public Optional<ActivityMetricsService> getActivityMetricsService() {
+        return Optional.ofNullable(activityMetricsService);
     }
 
     /**

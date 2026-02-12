@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.*;
 import datingapp.core.service.*;
-import datingapp.storage.jdbi.MapperHelper;
+import datingapp.storage.jdbi.JdbiTypeCodecs.SqlRowReaders;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -17,7 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-class MapperHelperTest {
+class SqlRowReadersTest {
 
     enum TestEnum {
         VAL1,
@@ -995,7 +995,7 @@ class MapperHelperTest {
         MockResultSet rs = new MockResultSet();
         rs.setValue("VAL1");
 
-        TestEnum result = MapperHelper.readEnum(rs, "col", TestEnum.class);
+        TestEnum result = SqlRowReaders.readEnum(rs, "col", TestEnum.class);
         assertEquals(TestEnum.VAL1, result);
     }
 
@@ -1004,7 +1004,7 @@ class MapperHelperTest {
         MockResultSet rs = new MockResultSet();
         rs.setValue("INVALID");
 
-        TestEnum result = MapperHelper.readEnum(rs, "col", TestEnum.class);
+        TestEnum result = SqlRowReaders.readEnum(rs, "col", TestEnum.class);
         assertNull(result);
     }
 
@@ -1013,7 +1013,7 @@ class MapperHelperTest {
         MockResultSet rs = new MockResultSet();
         rs.setValue(null);
 
-        TestEnum result = MapperHelper.readEnum(rs, "col", TestEnum.class);
+        TestEnum result = SqlRowReaders.readEnum(rs, "col", TestEnum.class);
         assertNull(result);
     }
 
@@ -1023,7 +1023,7 @@ class MapperHelperTest {
         MockResultSet rs = new MockResultSet();
         rs.setValue("A, B, , C ");
 
-        List<String> result = MapperHelper.readCsvAsList(rs, "col");
+        List<String> result = SqlRowReaders.readCsvAsList(rs, "col");
         assertEquals(List.of("A", "B", "C"), result);
 
         // Verify immutability (NS-002)
@@ -1036,7 +1036,7 @@ class MapperHelperTest {
         MockResultSet rs = new MockResultSet();
         rs.setValue("  ");
 
-        List<String> result = MapperHelper.readCsvAsList(rs, "col");
+        List<String> result = SqlRowReaders.readCsvAsList(rs, "col");
         assertTrue(result.isEmpty());
 
         // Verify immutability (NS-002)
@@ -1049,7 +1049,7 @@ class MapperHelperTest {
         MockResultSet rs = new MockResultSet();
         rs.setValue(null);
 
-        List<String> result = MapperHelper.readCsvAsList(rs, "col");
+        List<String> result = SqlRowReaders.readCsvAsList(rs, "col");
         assertTrue(result.isEmpty());
         assertThrows(UnsupportedOperationException.class, () -> result.add("A"));
     }
@@ -1064,7 +1064,7 @@ class MapperHelperTest {
             MockResultSet rs = new MockResultSet();
             rs.setValue("VAL1");
 
-            assertThrows(NullPointerException.class, () -> MapperHelper.readEnum(rs, "col", null));
+            assertThrows(NullPointerException.class, () -> SqlRowReaders.readEnum(rs, "col", null));
         }
 
         @Test
@@ -1073,7 +1073,7 @@ class MapperHelperTest {
             MockResultSet rs = new MockResultSet();
             rs.setValue("NONEXISTENT");
 
-            TestEnum result = MapperHelper.readEnum(rs, "col", TestEnum.class);
+            TestEnum result = SqlRowReaders.readEnum(rs, "col", TestEnum.class);
             assertNull(result, "Invalid enum values should return null");
         }
     }

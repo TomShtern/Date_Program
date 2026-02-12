@@ -1,6 +1,6 @@
 package datingapp.ui.controller;
 
-import datingapp.core.model.Achievement;
+import datingapp.core.model.EngagementDomain.Achievement;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.StatsViewModel;
 import java.net.URL;

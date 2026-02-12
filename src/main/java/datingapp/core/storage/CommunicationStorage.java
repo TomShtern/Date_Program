@@ -1,10 +1,10 @@
 package datingapp.core.storage;
 
+import datingapp.core.model.ConnectionModels.Conversation;
+import datingapp.core.model.ConnectionModels.FriendRequest;
+import datingapp.core.model.ConnectionModels.Message;
+import datingapp.core.model.ConnectionModels.Notification;
 import datingapp.core.model.Match;
-import datingapp.core.model.Messaging.Conversation;
-import datingapp.core.model.Messaging.Message;
-import datingapp.core.model.UserInteractions.FriendRequest;
-import datingapp.core.model.UserInteractions.Notification;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

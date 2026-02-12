@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Preferences screen.
- * Handles loading and saving user discovery preferences.
+ * Handles loading and saving user discovery MatchPreferences.
  */
 public class PreferencesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(PreferencesViewModel.class);

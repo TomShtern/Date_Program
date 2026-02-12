@@ -5,20 +5,19 @@ import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.EnumSetUtil;
 import datingapp.core.LoggingSupport;
-import datingapp.core.model.Achievement.UserAchievement;
-import datingapp.core.model.Dealbreakers;
-import datingapp.core.model.Preferences.Interest;
-import datingapp.core.model.Preferences.Lifestyle;
-import datingapp.core.model.Preferences.PacePreferences;
-import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.MatchPreferences.Dealbreakers;
+import datingapp.core.model.MatchPreferences.Interest;
+import datingapp.core.model.MatchPreferences.Lifestyle;
+import datingapp.core.model.MatchPreferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.PacePreferences.CommunicationStyle;
+import datingapp.core.model.MatchPreferences.PacePreferences.DepthPreference;
+import datingapp.core.model.MatchPreferences.PacePreferences.MessagingFrequency;
+import datingapp.core.model.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
-import datingapp.core.service.AchievementService;
-import datingapp.core.service.ProfileCompletionService;
+import datingapp.core.service.ProfileService;
 import datingapp.core.service.ValidationService;
 import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
@@ -46,8 +45,8 @@ public class ProfileHandler implements LoggingSupport {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final UserStorage userStorage;
-    private final ProfileCompletionService profileCompletionService;
-    private final AchievementService achievementService;
+    private final ProfileService profileCompletionService;
+    private final ProfileService achievementService;
     private final ValidationService validationService;
     private final AppSession session;
     private final InputReader inputReader;
@@ -56,8 +55,8 @@ public class ProfileHandler implements LoggingSupport {
 
     public ProfileHandler(
             UserStorage userStorage,
-            ProfileCompletionService profileCompletionService,
-            AchievementService achievementService,
+            ProfileService profileCompletionService,
+            ProfileService achievementService,
             ValidationService validationService,
             AppSession session,
             InputReader inputReader) {
@@ -119,7 +118,7 @@ public class ProfileHandler implements LoggingSupport {
     public void previewProfile() {
         CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
-            ProfileCompletionService.ProfilePreview preview = profileCompletionService.generatePreview(currentUser);
+            ProfileService.ProfilePreview preview = profileCompletionService.generatePreview(currentUser);
 
             logInfo("\n" + CliSupport.SEPARATOR_LINE);
             logInfo("      👤 YOUR PROFILE PREVIEW");
@@ -144,13 +143,13 @@ public class ProfileHandler implements LoggingSupport {
             logInfo(CliSupport.BOX_BOTTOM);
 
             // Completeness
-            ProfileCompletionService.ProfileCompleteness comp = preview.completeness();
+            ProfileService.ProfileCompleteness comp = preview.completeness();
             logInfo("");
             logInfo("  📊 PROFILE COMPLETENESS: {}%", comp.percentage());
 
             // Render progress bar when profile has some completeness
             if (comp.percentage() > 0 && logger.isInfoEnabled()) {
-                String progressBar = ProfileCompletionService.renderProgressBar(comp.percentage() / 100.0, 20);
+                String progressBar = ProfileService.renderProgressBar(comp.percentage() / 100.0, 20);
                 logInfo("  {}", progressBar);
             }
 
@@ -175,7 +174,7 @@ public class ProfileHandler implements LoggingSupport {
     /**
      * Allows the user to configure their dealbreakers - hard filters that exclude
      * potential matches
-     * based on lifestyle preferences.
+     * based on lifestyle MatchPreferences.
      */
     public void setDealbreakers() {
         CliSupport.requireLogin(() -> {
@@ -924,7 +923,7 @@ public class ProfileHandler implements LoggingSupport {
     public void viewProfileScore() {
         CliSupport.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
-            ProfileCompletionService.CompletionResult result = profileCompletionService.calculate(currentUser);
+            ProfileService.CompletionResult result = profileCompletionService.calculate(currentUser);
 
             logInfo("\n───────────────────────────────────────");
             logInfo("      📊 PROFILE COMPLETION SCORE");
@@ -932,16 +931,16 @@ public class ProfileHandler implements LoggingSupport {
 
             logInfo("  {} {}% {}", result.getTierEmoji(), result.score(), result.tier());
             if (logger.isInfoEnabled()) {
-                String overallBar = ProfileCompletionService.renderProgressBar(result.score(), 25);
+                String overallBar = ProfileService.renderProgressBar(result.score(), 25);
                 logInfo("  {}", overallBar);
             }
             logInfo("");
 
             // Category breakdown
-            for (ProfileCompletionService.CategoryBreakdown cat : result.breakdown()) {
+            for (ProfileService.CategoryBreakdown cat : result.breakdown()) {
                 logInfo("  {} - {}%", cat.category(), cat.score());
                 if (logger.isInfoEnabled()) {
-                    String categoryBar = ProfileCompletionService.renderProgressBar(cat.score(), 15);
+                    String categoryBar = ProfileService.renderProgressBar(cat.score(), 15);
                     logInfo(INDENTED_LINE, categoryBar);
                 }
                 if (!cat.missingItems().isEmpty()) {

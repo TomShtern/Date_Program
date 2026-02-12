@@ -2,10 +2,10 @@ package datingapp.core.service;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.model.ConnectionModels.Block;
+import datingapp.core.model.ConnectionModels.Report;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.UserInteractions.Block;
-import datingapp.core.model.UserInteractions.Report;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;

@@ -1,7 +1,7 @@
 package datingapp.ui;
 
 import datingapp.ui.controller.BaseController;
-import datingapp.ui.util.Toast;
+import datingapp.ui.util.UiFeedbackService;
 import java.io.IOException;
 import java.util.Deque;
 import java.util.Iterator;
@@ -60,7 +60,7 @@ public final class NavigationService {
         MATCHES("/fxml/matches.fxml"),
         CHAT("/fxml/chat.fxml"),
         STATS("/fxml/stats.fxml"),
-        PREFERENCES("/fxml/preferences.fxml");
+        PREFERENCES("/fxml/MatchPreferences.fxml");
 
         private final String fxmlPath;
 
@@ -111,7 +111,7 @@ public final class NavigationService {
                 Objects.requireNonNull(getClass().getResource("/css/theme.css")).toExternalForm();
         scene.getStylesheets().add(css);
 
-        Toast.setContainer(rootStack);
+        UiFeedbackService.setContainer(rootStack);
 
         primaryStage.setScene(scene);
     }
@@ -154,12 +154,12 @@ public final class NavigationService {
     private boolean navigateInternal(ViewType viewType, TransitionType type, boolean addToHistory) {
         if (rootLayout == null) {
             logError("NavigationService not initialized; cannot navigate to {}", viewType);
-            Toast.showError("Navigation not ready yet.");
+            UiFeedbackService.showError("Navigation not ready yet.");
             return false;
         }
         if (viewModelFactory == null) {
             logError("ViewModelFactory is null; cannot navigate to {}", viewType);
-            Toast.showError("Navigation unavailable. Please restart the app.");
+            UiFeedbackService.showError("Navigation unavailable. Please restart the app.");
             return false;
         }
 
@@ -168,7 +168,7 @@ public final class NavigationService {
         java.net.URL fxmlUrl = getClass().getResource(viewType.getFxmlPath());
         if (fxmlUrl == null) {
             logError("FXML resource not found for view: {}", viewType);
-            Toast.showError("Unable to load screen: " + viewType);
+            UiFeedbackService.showError("Unable to load screen: " + viewType);
             return false;
         }
 
@@ -180,7 +180,7 @@ public final class NavigationService {
             newView = loader.load();
         } catch (IOException | RuntimeException e) {
             logError("Failed to navigate to {}: {}", viewType, e.getMessage(), e);
-            Toast.showError("Failed to load screen. Please try again.");
+            UiFeedbackService.showError("Failed to load screen. Please try again.");
             return false;
         }
 

@@ -1,15 +1,20 @@
 package datingapp;
 
-import datingapp.app.AppBootstrap;
+import datingapp.app.ApplicationStartup;
 import datingapp.app.cli.CliSupport;
 import datingapp.app.cli.CliSupport.InputReader;
-import datingapp.app.cli.HandlerFactory;
+import datingapp.app.cli.MatchingHandler;
+import datingapp.app.cli.MessagingHandler;
+import datingapp.app.cli.ProfileHandler;
+import datingapp.app.cli.SafetyHandler;
+import datingapp.app.cli.StatsHandler;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.model.User;
-import datingapp.core.service.DailyService;
-import datingapp.core.service.SessionService;
+import datingapp.core.service.ActivityMetricsService;
+import datingapp.core.service.RecommendationService;
+import datingapp.core.service.ValidationService;
 import java.io.PrintStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -73,7 +78,11 @@ public final class Main {
 
     // CLI Components
     private static InputReader inputReader;
-    private static HandlerFactory handlers;
+    private static MatchingHandler matchingHandler;
+    private static ProfileHandler profileHandler;
+    private static SafetyHandler safetyHandler;
+    private static StatsHandler statsHandler;
+    private static MessagingHandler messagingHandler;
 
     public static void main(String[] args) {
         try (Scanner scanner = new Scanner(System.in)) {
@@ -87,26 +96,26 @@ public final class Main {
                 String choice = inputReader.readLine("Choose an option: ");
 
                 switch (choice) {
-                    case "1" -> safeExecute(() -> handlers.profile().createUser());
-                    case "2" -> safeExecute(() -> handlers.profile().selectUser());
-                    case "3" -> safeExecute(() -> handlers.profile().completeProfile());
-                    case "4" -> safeExecute(() -> handlers.matching().browseCandidates());
-                    case "5" -> safeExecute(() -> handlers.matching().viewMatches());
-                    case "6" -> safeExecute(() -> handlers.safety().blockUser());
-                    case "7" -> safeExecute(() -> handlers.safety().reportUser());
-                    case "8" -> safeExecute(() -> handlers.safety().manageBlockedUsers());
-                    case "9" -> safeExecute(() -> handlers.profile().setDealbreakers());
-                    case "10" -> safeExecute(() -> handlers.stats().viewStatistics());
-                    case "11" -> safeExecute(() -> handlers.profile().previewProfile());
-                    case "12" -> safeExecute(() -> handlers.stats().viewAchievements());
-                    case "13" -> safeExecute(() -> handlers.profile().viewAllNotes());
-                    case "14" -> safeExecute(() -> handlers.profile().viewProfileScore());
-                    case "15" -> safeExecute(() -> handlers.safety().verifyProfile());
-                    case "16" -> safeExecute(() -> handlers.matching().browseWhoLikedMe());
-                    case "17" -> safeExecute(() -> handlers.messaging().showConversations());
-                    case "18" -> safeExecute(() -> handlers.matching().viewNotifications());
-                    case "19" -> safeExecute(() -> handlers.matching().viewPendingRequests());
-                    case "20" -> safeExecute(() -> handlers.matching().viewStandouts());
+                    case "1" -> safeExecute(profileHandler::createUser);
+                    case "2" -> safeExecute(profileHandler::selectUser);
+                    case "3" -> safeExecute(profileHandler::completeProfile);
+                    case "4" -> safeExecute(matchingHandler::browseCandidates);
+                    case "5" -> safeExecute(matchingHandler::viewMatches);
+                    case "6" -> safeExecute(safetyHandler::blockUser);
+                    case "7" -> safeExecute(safetyHandler::reportUser);
+                    case "8" -> safeExecute(safetyHandler::manageBlockedUsers);
+                    case "9" -> safeExecute(profileHandler::setDealbreakers);
+                    case "10" -> safeExecute(statsHandler::viewStatistics);
+                    case "11" -> safeExecute(profileHandler::previewProfile);
+                    case "12" -> safeExecute(statsHandler::viewAchievements);
+                    case "13" -> safeExecute(profileHandler::viewAllNotes);
+                    case "14" -> safeExecute(profileHandler::viewProfileScore);
+                    case "15" -> safeExecute(safetyHandler::verifyProfile);
+                    case "16" -> safeExecute(matchingHandler::browseWhoLikedMe);
+                    case "17" -> safeExecute(messagingHandler::showConversations);
+                    case "18" -> safeExecute(matchingHandler::viewNotifications);
+                    case "19" -> safeExecute(matchingHandler::viewPendingRequests);
+                    case "20" -> safeExecute(matchingHandler::viewStandouts);
                     case "0" -> {
                         running = false;
                         logInfo("\n👋 Goodbye!\n");
@@ -121,13 +130,44 @@ public final class Main {
 
     private static void initializeApp(Scanner scanner) {
         // Initialize application with default configuration
-        services = AppBootstrap.initialize();
+        services = ApplicationStartup.initialize();
 
         // Initialize CLI Infrastructure
         inputReader = new InputReader(scanner);
 
-        // Initialize Handlers via factory
-        handlers = new HandlerFactory(services, AppSession.getInstance(), inputReader);
+        AppSession session = AppSession.getInstance();
+        matchingHandler = new MatchingHandler(new MatchingHandler.Dependencies(
+                services.getCandidateFinder(),
+                services.getMatchingService(),
+                services.getInteractionStorage(),
+                services.getRecommendationService(),
+                services.getUndoService(),
+                services.getMatchQualityService(),
+                services.getUserStorage(),
+                services.getProfileService(),
+                services.getAnalyticsStorage(),
+                services.getTrustSafetyService(),
+                services.getConnectionService(),
+                services.getRecommendationService(),
+                services.getCommunicationStorage(),
+                session,
+                inputReader));
+        profileHandler = new ProfileHandler(
+                services.getUserStorage(),
+                services.getProfileService(),
+                services.getProfileService(),
+                new ValidationService(services.getConfig()),
+                session,
+                inputReader);
+        safetyHandler =
+                new SafetyHandler(services.getUserStorage(), services.getTrustSafetyService(), session, inputReader);
+        statsHandler = new StatsHandler(services.getStatsService(), services.getProfileService(), session, inputReader);
+        messagingHandler = new MessagingHandler(
+                services.getConnectionService(),
+                services.getInteractionStorage(),
+                services.getTrustSafetyService(),
+                inputReader,
+                session);
     }
 
     private static void logInfo(String message, Object... args) {
@@ -154,7 +194,7 @@ public final class Main {
             logInfo("  Current User: {} ({})", currentUser.getName(), currentUser.getState());
 
             // Show active session info
-            SessionService sessionService = services.getSessionService();
+            ActivityMetricsService sessionService = services.getActivityMetricsService();
             sessionService
                     .getCurrentSession(currentUser.getId())
                     .ifPresent(session -> logInfo(
@@ -165,8 +205,8 @@ public final class Main {
                             session.getFormattedDuration()));
 
             // Show daily likes
-            DailyService dailyService = services.getDailyService();
-            DailyService.DailyStatus dailyStatus = dailyService.getStatus(currentUser.getId());
+            RecommendationService dailyService = services.getRecommendationService();
+            RecommendationService.DailyStatus dailyStatus = dailyService.getStatus(currentUser.getId());
             if (dailyStatus.hasUnlimitedLikes()) {
                 logInfo("  💝 Daily Likes: unlimited");
             } else {
@@ -196,7 +236,7 @@ public final class Main {
         logInfo("  14. 📊 Profile completion score");
         logInfo("  15. ✅ Verify my profile");
         logInfo("  16. 💌 Who liked me");
-        int unreadCount = handlers.messaging().getTotalUnreadCount();
+        int unreadCount = messagingHandler.getTotalUnreadCount();
         String unreadStr = unreadCount > 0 ? " (" + unreadCount + " new)" : "";
         logInfo("  17. 💬 Conversations{}", unreadStr);
         logInfo("  18. 🔔 Notifications");
@@ -207,6 +247,6 @@ public final class Main {
     }
 
     private static void shutdown() {
-        AppBootstrap.shutdown();
+        ApplicationStartup.shutdown();
     }
 }

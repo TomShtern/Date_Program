@@ -15,11 +15,11 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Tests for ConfigLoader.
+ * Tests for ApplicationStartup config loading helpers.
  */
 @Timeout(5)
 @SuppressWarnings("unused")
-@DisplayName("ConfigLoader")
+@DisplayName("ApplicationStartup Config Loading")
 class ConfigLoaderTest {
 
     @Nested
@@ -39,7 +39,7 @@ class ConfigLoaderTest {
                     """;
             Files.writeString(configFile, json);
 
-            AppConfig config = ConfigLoader.load(configFile);
+            AppConfig config = ApplicationStartup.load(configFile);
 
             assertEquals(25, config.dailyLikeLimit());
             assertEquals(75, config.maxDistanceKm());
@@ -51,7 +51,7 @@ class ConfigLoaderTest {
         void returnsDefaultsWhenFileNotFound(@TempDir Path tempDir) {
             Path nonExistent = tempDir.resolve("nonexistent.json");
 
-            AppConfig config = ConfigLoader.load(nonExistent);
+            AppConfig config = ApplicationStartup.load(nonExistent);
 
             // Should have default values
             assertEquals(AppConfig.defaults().dailyLikeLimit(), config.dailyLikeLimit());
@@ -64,7 +64,7 @@ class ConfigLoaderTest {
             Files.writeString(configFile, "{ invalid json }}}");
 
             // Should not throw, should return defaults
-            AppConfig config = ConfigLoader.load(configFile);
+            AppConfig config = ApplicationStartup.load(configFile);
             assertNotNull(config);
         }
     }
@@ -88,7 +88,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals(10, config.autoBanThreshold());
             assertEquals(50, config.dailyLikeLimit());
@@ -110,7 +110,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals(60, config.sessionTimeoutMinutes());
             assertEquals(200, config.maxSwipesPerSession());
@@ -130,7 +130,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals(10, config.nearbyDistanceKm());
             assertEquals(25, config.closeDistanceKm());
@@ -153,7 +153,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals(0.25, config.distanceWeight(), 0.01);
             assertEquals(0.15, config.ageWeight(), 0.01);
@@ -172,7 +172,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals(60, config.cleanupRetentionDays());
         }
@@ -186,7 +186,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals("America/New_York", config.userTimeZone().getId());
         }
@@ -196,7 +196,7 @@ class ConfigLoaderTest {
         void usesDefaultsForMissing() {
             String json = "{}";
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
             AppConfig defaults = AppConfig.defaults();
 
             assertEquals(defaults.dailyLikeLimit(), config.dailyLikeLimit());
@@ -207,7 +207,7 @@ class ConfigLoaderTest {
         @Test
         @DisplayName("Should handle empty JSON string")
         void handlesEmptyJson() {
-            AppConfig config = ConfigLoader.fromJson("{}");
+            AppConfig config = ApplicationStartup.fromJson("{}");
             assertNotNull(config);
         }
     }
@@ -225,7 +225,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals(60, config.undoWindowSeconds());
         }
@@ -243,7 +243,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals(2, config.achievementMatchTier1());
             assertEquals(10, config.achievementMatchTier2());
@@ -265,7 +265,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals(100, config.minHeightCm());
             assertEquals(250, config.maxHeightCm());
@@ -286,7 +286,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ConfigLoader.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals(2, config.responseTimeExcellentHours());
             assertEquals(6, config.responseTimeGreatHours());

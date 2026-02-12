@@ -1,5 +1,6 @@
 package datingapp.ui.controller;
 
+import datingapp.core.model.User;
 import datingapp.ui.util.UiAnimations.ConfettiAnimation;
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -11,6 +12,7 @@ import javafx.animation.ParallelTransition;
 import javafx.animation.PauseTransition;
 import javafx.animation.ScaleTransition;
 import javafx.animation.Timeline;
+import javafx.animation.TranslateTransition;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.canvas.Canvas;
@@ -23,17 +25,11 @@ import org.kordamp.ikonli.javafx.FontIcon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Controller for the Achievement Popup overlay.
- * Displays achievement unlocked notifications with animations and confetti.
- *
- * <p>
- * FXML controller reference:
- * {@code fx:controller="datingapp.ui.controller.AchievementPopupController"}
- */
-@SuppressWarnings("unused") // FXML-injected members and handlers are referenced from FXML.
-public class AchievementPopupController implements Initializable {
-    private static final Logger logger = LoggerFactory.getLogger(AchievementPopupController.class);
+/** Consolidated popup controller for achievement and match milestone popups. */
+@SuppressWarnings("unused")
+public class MilestonePopupController implements Initializable {
+
+    private static final Logger logger = LoggerFactory.getLogger(MilestonePopupController.class);
     private static final int AUTO_DISMISS_SECONDS = 5;
 
     @FXML
@@ -42,12 +38,9 @@ public class AchievementPopupController implements Initializable {
     @FXML
     private Canvas confettiCanvas;
 
+    // Achievement popup fields
     @FXML
     private FontIcon achievementIcon;
-
-    @FXML
-    @SuppressWarnings("unused")
-    private Label titleLabel; // Injected from FXML but not used in code
 
     @FXML
     private Label nameLabel;
@@ -58,38 +51,46 @@ public class AchievementPopupController implements Initializable {
     @FXML
     private Label xpLabel;
 
+    // Match popup fields
+    @FXML
+    private FontIcon leftAvatarIcon;
+
+    @FXML
+    private FontIcon rightAvatarIcon;
+
+    @FXML
+    private FontIcon heartIcon;
+
+    @FXML
+    private Label matchMessage;
+
     private ConfettiAnimation confetti;
     private Runnable onCloseCallback;
+    private Runnable onMessageCallback;
+    private Runnable onContinueCallback;
     private boolean autoDismiss = true;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        // Size canvas to parent
-        confettiCanvas.widthProperty().bind(rootPane.widthProperty());
-        confettiCanvas.heightProperty().bind(rootPane.heightProperty());
+        if (confettiCanvas != null && rootPane != null) {
+            confettiCanvas.widthProperty().bind(rootPane.widthProperty());
+            confettiCanvas.heightProperty().bind(rootPane.heightProperty());
+        }
     }
 
-    /**
-     * Shows the achievement with specified details and plays entrance animation.
-     *
-     * @param iconLiteral The Material Design icon literal (e.g., "mdi2t-trophy")
-     * @param name        The achievement name
-     * @param description The achievement description
-     * @param xpAmount    The XP/points earned
-     */
     public void showAchievement(String iconLiteral, String name, String description, int xpAmount) {
-        // Set content
+        if (achievementIcon == null || nameLabel == null || descriptionLabel == null || xpLabel == null) {
+            throw new IllegalStateException("Achievement popup fields are not configured");
+        }
+
         achievementIcon.setIconLiteral(iconLiteral);
         nameLabel.setText(name);
         descriptionLabel.setText(description);
         xpLabel.setText("+" + xpAmount + " XP");
 
         logger.info("Showing achievement: {} (+{} XP)", name, xpAmount);
+        playAchievementEntranceAnimation();
 
-        // Play entrance animation
-        playEntranceAnimation();
-
-        // Auto-dismiss after delay
         if (autoDismiss) {
             PauseTransition delay = new PauseTransition(Duration.seconds(AUTO_DISMISS_SECONDS));
             delay.setOnFinished(event -> close());
@@ -97,20 +98,28 @@ public class AchievementPopupController implements Initializable {
         }
     }
 
-    /** Convenience method for common achievement types. */
     public void showAchievement(AchievementType type) {
         showAchievement(type.iconLiteral, type.name, type.description, type.xp);
     }
 
-    private void playEntranceAnimation() {
-        // Initial state
+    public void setMatchedUser(User currentUser, User matchedUser) {
+        if (matchMessage == null) {
+            throw new IllegalStateException("Match popup fields are not configured");
+        }
+        matchMessage.setText("You and " + matchedUser.getName() + " liked each other!");
+        playMatchEntranceAnimation();
+    }
+
+    private void playAchievementEntranceAnimation() {
+        if (rootPane == null || achievementIcon == null) {
+            return;
+        }
+
         rootPane.setOpacity(0);
 
-        // Fade in overlay
         FadeTransition fadeIn = new FadeTransition(Duration.millis(300), rootPane);
         fadeIn.setToValue(1);
 
-        // Icon container scale animation
         StackPane iconContainer = (StackPane) achievementIcon.getParent();
         iconContainer.setScaleX(0);
         iconContainer.setScaleY(0);
@@ -128,24 +137,69 @@ public class AchievementPopupController implements Initializable {
             settle.play();
         });
 
-        // Add pulsing glow to icon
         addIconGlow();
-
-        // Start confetti
-        confetti = new ConfettiAnimation();
-        confetti.play(confettiCanvas);
+        startConfetti();
 
         new ParallelTransition(fadeIn, iconPop).play();
     }
 
+    private void playMatchEntranceAnimation() {
+        if (rootPane == null || leftAvatarIcon == null || rightAvatarIcon == null || heartIcon == null) {
+            return;
+        }
+
+        rootPane.setOpacity(0);
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(200), rootPane);
+        fadeIn.setToValue(1);
+
+        StackPane leftWrapper = (StackPane) leftAvatarIcon.getParent();
+        leftWrapper.setTranslateX(-200);
+        TranslateTransition leftFly = new TranslateTransition(Duration.millis(400), leftWrapper);
+        leftFly.setToX(0);
+        leftFly.setInterpolator(Interpolator.EASE_OUT);
+
+        StackPane rightWrapper = (StackPane) rightAvatarIcon.getParent();
+        rightWrapper.setTranslateX(200);
+        TranslateTransition rightFly = new TranslateTransition(Duration.millis(400), rightWrapper);
+        rightFly.setToX(0);
+        rightFly.setInterpolator(Interpolator.EASE_OUT);
+
+        heartIcon.setScaleX(0);
+        heartIcon.setScaleY(0);
+        ScaleTransition heartPop = new ScaleTransition(Duration.millis(300), heartIcon);
+        heartPop.setToX(1.2);
+        heartPop.setToY(1.2);
+        heartPop.setDelay(Duration.millis(300));
+        heartPop.setOnFinished(event -> {
+            ScaleTransition settle = new ScaleTransition(Duration.millis(150), heartIcon);
+            settle.setToX(1);
+            settle.setToY(1);
+            settle.play();
+        });
+
+        startConfetti();
+        new ParallelTransition(fadeIn, leftFly, rightFly, heartPop).play();
+    }
+
+    private void startConfetti() {
+        if (confettiCanvas == null) {
+            return;
+        }
+        confetti = new ConfettiAnimation();
+        confetti.play(confettiCanvas);
+    }
+
     private void addIconGlow() {
+        if (achievementIcon == null) {
+            return;
+        }
+
         DropShadow glow = new DropShadow();
         glow.setColor(Color.web("#fbbf24"));
         glow.setRadius(30);
         glow.setSpread(0.3);
         achievementIcon.setEffect(glow);
 
-        // Animate glow pulse
         Timeline glowPulse = new Timeline(
                 new KeyFrame(
                         Duration.ZERO,
@@ -161,14 +215,36 @@ public class AchievementPopupController implements Initializable {
     }
 
     @FXML
-    @SuppressWarnings("unused")
     private void handleClose() {
         close();
+    }
+
+    @FXML
+    private void handleMessage() {
+        close();
+        if (onMessageCallback != null) {
+            onMessageCallback.run();
+        }
+    }
+
+    @FXML
+    private void handleContinue() {
+        close();
+        if (onContinueCallback != null) {
+            onContinueCallback.run();
+        }
     }
 
     private void close() {
         if (confetti != null) {
             confetti.stop();
+        }
+
+        if (rootPane == null) {
+            if (onCloseCallback != null) {
+                onCloseCallback.run();
+            }
+            return;
         }
 
         FadeTransition fadeOut = new FadeTransition(Duration.millis(200), rootPane);
@@ -184,17 +260,22 @@ public class AchievementPopupController implements Initializable {
         fadeOut.play();
     }
 
-    /** Sets the callback to run when the popup is closed. */
     public void setOnClose(Runnable callback) {
         this.onCloseCallback = callback;
     }
 
-    /** Sets whether the popup should auto-dismiss. Default is true. */
+    public void setOnMessage(Runnable callback) {
+        this.onMessageCallback = callback;
+    }
+
+    public void setOnContinue(Runnable callback) {
+        this.onContinueCallback = callback;
+    }
+
     public void setAutoDismiss(boolean autoDismiss) {
         this.autoDismiss = autoDismiss;
     }
 
-    /** Predefined achievement types for common scenarios. */
     public enum AchievementType {
         FIRST_MATCH("mdi2h-heart-multiple", "First Match!", "You've made your first connection!", 50),
         PROFILE_COMPLETE("mdi2a-account-check", "Profile Complete", "Your profile is 100% complete!", 100),

@@ -7,9 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Achievement.UserAchievement;
-import datingapp.core.model.Stats.PlatformStats;
-import datingapp.core.model.Stats.UserStats;
+import datingapp.core.model.EngagementDomain.Achievement;
+import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.EngagementDomain.PlatformStats;
+import datingapp.core.model.EngagementDomain.UserStats;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;

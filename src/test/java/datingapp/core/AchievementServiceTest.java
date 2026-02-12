@@ -4,14 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.model.Achievement;
-import datingapp.core.model.Achievement.UserAchievement;
+import datingapp.core.model.ConnectionModels.Report;
+import datingapp.core.model.EngagementDomain.Achievement;
+import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.ProfileNote;
-import datingapp.core.model.UserInteractions.Report;
-import datingapp.core.service.AchievementService;
-import datingapp.core.service.ProfileCompletionService;
+import datingapp.core.service.ProfileService;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
@@ -38,7 +37,7 @@ class AchievementServiceTest {
     private TestStorages.Interactions interactionStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
     private InMemoryUserStorage userStorage;
-    private AchievementService service;
+    private ProfileService service;
     private AppConfig config;
     private UUID userId;
 
@@ -50,14 +49,7 @@ class AchievementServiceTest {
         trustSafetyStorage = new TestStorages.TrustSafety();
         userStorage = new InMemoryUserStorage();
         config = AppConfig.defaults();
-        ProfileCompletionService profileCompletionService = new ProfileCompletionService(config);
-        service = new AchievementService(
-                analyticsStorage,
-                interactionStorage,
-                trustSafetyStorage,
-                userStorage,
-                profileCompletionService,
-                config);
+        service = new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
         userId = UUID.randomUUID();
     }
 
@@ -97,9 +89,9 @@ class AchievementServiceTest {
         addMatches(config.achievementMatchTier1());
         service.checkAndUnlock(userId);
 
-        AchievementService.AchievementProgress firstSpark =
+        ProfileService.AchievementProgress firstSpark =
                 findProgress(service.getProgress(userId), Achievement.FIRST_SPARK);
-        AchievementService.AchievementProgress legend = findProgress(service.getProgress(userId), Achievement.LEGEND);
+        ProfileService.AchievementProgress legend = findProgress(service.getProgress(userId), Achievement.LEGEND);
 
         assertTrue(firstSpark.unlocked());
         assertEquals(100, firstSpark.getProgressPercent());
@@ -111,12 +103,12 @@ class AchievementServiceTest {
     void progressGroupedByCategoryContainsMatching() {
         createActiveUser(userId);
 
-        Map<Achievement.Category, List<AchievementService.AchievementProgress>> grouped =
+        Map<Achievement.Category, List<ProfileService.AchievementProgress>> grouped =
                 service.getProgressByCategory(userId);
 
         assertTrue(grouped.containsKey(Achievement.Category.MATCHING));
         assertTrue(grouped.get(Achievement.Category.MATCHING).stream()
-                .map(AchievementService.AchievementProgress::achievement)
+                .map(ProfileService.AchievementProgress::achievement)
                 .toList()
                 .contains(Achievement.FIRST_SPARK));
     }
@@ -131,8 +123,8 @@ class AchievementServiceTest {
         assertTrue(service.countUnlocked(userId) >= 2);
     }
 
-    private AchievementService.AchievementProgress findProgress(
-            List<AchievementService.AchievementProgress> progress, Achievement achievement) {
+    private ProfileService.AchievementProgress findProgress(
+            List<ProfileService.AchievementProgress> progress, Achievement achievement) {
         return progress.stream()
                 .filter(item -> item.achievement() == achievement)
                 .findFirst()

@@ -2,12 +2,12 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import datingapp.core.model.ConnectionModels.Block;
+import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.model.ConnectionModels.Report;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.ProfileNote;
-import datingapp.core.model.UserInteractions.Block;
-import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.model.UserInteractions.Report;
 import datingapp.core.service.MatchingService;
 import datingapp.core.service.MatchingService.PendingLiker;
 import datingapp.core.storage.InteractionStorage;

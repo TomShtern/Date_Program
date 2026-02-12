@@ -1,7 +1,7 @@
 package datingapp.ui.controller;
 
-import datingapp.core.model.Messaging.Message;
-import datingapp.core.service.MessagingService.ConversationPreview;
+import datingapp.core.model.ConnectionModels.Message;
+import datingapp.core.service.ConnectionService.ConversationPreview;
 import datingapp.ui.NavigationService;
 import datingapp.ui.util.UiAnimations;
 import datingapp.ui.viewmodel.ChatViewModel;

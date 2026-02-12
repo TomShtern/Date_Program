@@ -10,7 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.*;
-import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.model.SwipeState.Session;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import java.time.Duration;
@@ -24,7 +25,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-/** Unit tests for SwipeSession state machine and computed properties. */
+/** Unit tests for Session state machine and computed properties. */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class SwipeSessionTest {
 
@@ -41,15 +42,14 @@ class SwipeSessionTest {
     }
 
     @Test
-    @DisplayName("SwipeSession can be instantiated with all parameters")
+    @DisplayName("Session can be instantiated with all parameters")
     void canInstantiateWithAllParameters() {
         UUID id = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         Instant createdAt = AppClock.now();
         Instant lastActivityAt = AppClock.now();
 
-        SwipeSession session =
-                new SwipeSession(id, userId, createdAt, lastActivityAt, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
+        Session session = new Session(id, userId, createdAt, lastActivityAt, null, Session.State.ACTIVE, 0, 0, 0, 0);
 
         assertNotNull(session);
         assertEquals(id, session.getId());
@@ -64,11 +64,11 @@ class SwipeSessionTest {
         @DisplayName("Factory method creates active session with zero counts")
         void factoryCreatesActiveSession() {
             UUID userId = UUID.randomUUID();
-            SwipeSession session = SwipeSession.create(userId);
+            Session session = Session.create(userId);
 
             assertNotNull(session.getId());
             assertEquals(userId, session.getUserId());
-            assertEquals(SwipeSession.State.ACTIVE, session.getState());
+            assertEquals(Session.State.ACTIVE, session.getState());
             assertTrue(session.isActive());
             assertEquals(0, session.getSwipeCount());
             assertEquals(0, session.getLikeCount());
@@ -85,7 +85,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Recording LIKE increments swipe and like counts")
         void recordLikeIncrementsCounts() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             session.recordSwipe(Like.Direction.LIKE, false);
 
@@ -98,7 +98,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Recording PASS increments swipe and pass counts")
         void recordPassIncrementsCounts() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             session.recordSwipe(Like.Direction.PASS, false);
 
@@ -110,7 +110,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Recording LIKE with match increments match count")
         void recordLikeWithMatch() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             session.recordSwipe(Like.Direction.LIKE, true);
 
@@ -122,7 +122,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Cannot record swipe on completed session")
         void cannotRecordOnCompleted() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.end();
 
             var exception =
@@ -133,7 +133,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("incrementMatchCount updates match count")
         void incrementMatchCount() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.recordSwipe(Like.Direction.LIKE, false);
 
             session.incrementMatchCount();
@@ -144,7 +144,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("incrementMatchCount does nothing on completed session")
         void incrementMatchCountCompletedSession() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.end();
 
             session.incrementMatchCount();
@@ -160,11 +160,11 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Ending session changes state to COMPLETED")
         void endChangesState() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             session.end();
 
-            assertEquals(SwipeSession.State.COMPLETED, session.getState());
+            assertEquals(Session.State.COMPLETED, session.getState());
             assertFalse(session.isActive());
             assertNotNull(session.getEndedAt());
         }
@@ -172,7 +172,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Ending already-ended session is idempotent")
         void endIsIdempotent() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.end();
             Instant firstEndedAt = session.getEndedAt();
 
@@ -189,7 +189,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Session is not timed out when recently active")
         void notTimedOutWhenRecent() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             assertFalse(session.isTimedOut(Duration.ofMinutes(5)));
         }
@@ -199,13 +199,13 @@ class SwipeSessionTest {
         void completedNeverTimesOut() {
             UUID userId = UUID.randomUUID();
             // Create session with old activity time
-            SwipeSession session = new SwipeSession(
+            Session session = new Session(
                     UUID.randomUUID(),
                     userId,
                     AppClock.now().minus(Duration.ofHours(1)),
                     AppClock.now().minus(Duration.ofHours(1)),
                     AppClock.now().minus(Duration.ofMinutes(30)),
-                    SwipeSession.State.COMPLETED,
+                    Session.State.COMPLETED,
                     5,
                     3,
                     2,
@@ -219,13 +219,13 @@ class SwipeSessionTest {
         void timedOutWhenInactive() {
             UUID userId = UUID.randomUUID();
             // Create session with old activity time
-            SwipeSession session = new SwipeSession(
+            Session session = new Session(
                     UUID.randomUUID(),
                     userId,
                     AppClock.now().minus(Duration.ofMinutes(10)),
                     AppClock.now().minus(Duration.ofMinutes(10)), // 10 min ago
                     null,
-                    SwipeSession.State.ACTIVE,
+                    Session.State.ACTIVE,
                     5,
                     3,
                     2,
@@ -242,7 +242,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Like ratio is correctly calculated")
         void likeRatioCalculation() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             session.recordSwipe(Like.Direction.LIKE, false);
             session.recordSwipe(Like.Direction.LIKE, false);
@@ -255,7 +255,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Like ratio is zero when no swipes")
         void likeRatioZeroWhenEmpty() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             assertEquals(0.0, session.getLikeRatio());
         }
@@ -263,7 +263,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Match rate is correctly calculated")
         void matchRateCalculation() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             session.recordSwipe(Like.Direction.LIKE, true);
             session.recordSwipe(Like.Direction.LIKE, false);
@@ -274,7 +274,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Match rate is zero when no likes")
         void matchRateZeroWhenNoLikes() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             assertEquals(0.0, session.getMatchRate());
         }
@@ -285,13 +285,13 @@ class SwipeSessionTest {
             UUID userId = UUID.randomUUID();
             // Create session that started 5 minutes and 30 seconds ago
             Instant now = AppClock.now();
-            SwipeSession session = new SwipeSession(
+            Session session = new Session(
                     UUID.randomUUID(),
                     userId,
                     now.minus(Duration.ofMinutes(5).plusSeconds(30)),
                     now,
                     null,
-                    SwipeSession.State.ACTIVE,
+                    Session.State.ACTIVE,
                     0,
                     0,
                     0,
@@ -308,8 +308,8 @@ class SwipeSessionTest {
             UUID userId = UUID.randomUUID();
             Instant future = AppClock.now().plus(Duration.ofMinutes(5));
 
-            SwipeSession session = new SwipeSession(
-                    UUID.randomUUID(), userId, future, future, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
+            Session session =
+                    new Session(UUID.randomUUID(), userId, future, future, null, Session.State.ACTIVE, 0, 0, 0, 0);
 
             assertEquals(0, session.getDurationSeconds());
         }
@@ -318,13 +318,13 @@ class SwipeSessionTest {
         @DisplayName("Swipes per minute scales with session duration")
         void swipesPerMinuteScalesWithDuration() {
             Instant now = AppClock.now();
-            SwipeSession shortSession = new SwipeSession(
+            Session shortSession = new Session(
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     now.minusSeconds(10),
                     now,
                     null,
-                    SwipeSession.State.ACTIVE,
+                    Session.State.ACTIVE,
                     5,
                     3,
                     2,
@@ -332,13 +332,13 @@ class SwipeSessionTest {
 
             assertEquals(30.0, shortSession.getSwipesPerMinute(), 0.1);
 
-            SwipeSession oneMinuteSession = new SwipeSession(
+            Session oneMinuteSession = new Session(
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     now.minusSeconds(60),
                     now,
                     null,
-                    SwipeSession.State.ACTIVE,
+                    Session.State.ACTIVE,
                     60,
                     30,
                     30,
@@ -359,8 +359,8 @@ class SwipeSessionTest {
             UUID userId = UUID.randomUUID();
             Instant now = AppClock.now();
 
-            SwipeSession session1 = new SwipeSession(id, userId, now, now, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
-            SwipeSession session2 = new SwipeSession(id, userId, now, now, null, SwipeSession.State.ACTIVE, 5, 3, 2, 1);
+            Session session1 = new Session(id, userId, now, now, null, Session.State.ACTIVE, 0, 0, 0, 0);
+            Session session2 = new Session(id, userId, now, now, null, Session.State.ACTIVE, 5, 3, 2, 1);
 
             assertEquals(session1, session2);
             assertEquals(session1.hashCode(), session2.hashCode());
@@ -372,10 +372,8 @@ class SwipeSessionTest {
             UUID userId = UUID.randomUUID();
             Instant now = AppClock.now();
 
-            SwipeSession session1 =
-                    new SwipeSession(UUID.randomUUID(), userId, now, now, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
-            SwipeSession session2 =
-                    new SwipeSession(UUID.randomUUID(), userId, now, now, null, SwipeSession.State.ACTIVE, 0, 0, 0, 0);
+            Session session1 = new Session(UUID.randomUUID(), userId, now, now, null, Session.State.ACTIVE, 0, 0, 0, 0);
+            Session session2 = new Session(UUID.randomUUID(), userId, now, now, null, Session.State.ACTIVE, 0, 0, 0, 0);
 
             assertNotEquals(session1, session2);
         }
@@ -383,7 +381,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Session equals itself")
         void equalsItself() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             assertSame(session, session);
         }
@@ -391,7 +389,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Session not equal to null")
         void notEqualToNull() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             assertNotEquals(null, session);
         }
@@ -404,7 +402,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Recording only LIKE swipes results in 100% like ratio")
         void allLikesGives100PercentRatio() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             session.recordSwipe(Like.Direction.LIKE, false);
             session.recordSwipe(Like.Direction.LIKE, false);
@@ -419,7 +417,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Recording only PASS swipes results in 0% like ratio")
         void allPassesGivesZeroPercentRatio() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             session.recordSwipe(Like.Direction.PASS, false);
             session.recordSwipe(Like.Direction.PASS, false);
@@ -434,7 +432,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("All likes matching gives 100% match rate")
         void allLikesMatchingGives100PercentMatchRate() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             session.recordSwipe(Like.Direction.LIKE, true);
             session.recordSwipe(Like.Direction.LIKE, true);
@@ -448,7 +446,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("PASS with match flag true does not increment match count")
         void passWithMatchFlagDoesNotIncrementMatches() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             session.recordSwipe(Like.Direction.PASS, true);
 
@@ -460,7 +458,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Multiple sequential swipes are correctly counted")
         void multipleSequentialSwipes() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             for (int i = 0; i < 10; i++) {
                 session.recordSwipe(Like.Direction.LIKE, i % 2 == 0);
@@ -483,26 +481,26 @@ class SwipeSessionTest {
         @Test
         @DisplayName("isActive returns true for ACTIVE state")
         void isActiveTrueForActiveState() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             assertTrue(session.isActive());
-            assertEquals(SwipeSession.State.ACTIVE, session.getState());
+            assertEquals(Session.State.ACTIVE, session.getState());
         }
 
         @Test
         @DisplayName("isActive returns false for COMPLETED state")
         void isActiveFalseForCompletedState() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.end();
 
             assertFalse(session.isActive());
-            assertEquals(SwipeSession.State.COMPLETED, session.getState());
+            assertEquals(Session.State.COMPLETED, session.getState());
         }
 
         @Test
         @DisplayName("Cannot increment match count on completed session")
         void cannotIncrementMatchCountOnCompleted() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.recordSwipe(Like.Direction.LIKE, true);
             session.end();
             int matchCountBefore = session.getMatchCount();
@@ -515,7 +513,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Session preserves counts when ending")
         void preservesCountsWhenEnding() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.recordSwipe(Like.Direction.LIKE, true);
             session.recordSwipe(Like.Direction.LIKE, false);
             session.recordSwipe(Like.Direction.PASS, false);
@@ -536,7 +534,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Match rate with no likes but passes recorded is zero")
         void matchRateZeroWithOnlyPasses() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.recordSwipe(Like.Direction.PASS, false);
             session.recordSwipe(Like.Direction.PASS, false);
 
@@ -546,7 +544,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Like ratio with single like is 100%")
         void likeRatioWithSingleLike() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.recordSwipe(Like.Direction.LIKE, false);
 
             assertEquals(1.0, session.getLikeRatio(), 0.001);
@@ -555,7 +553,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Like ratio with single pass is 0%")
         void likeRatioWithSinglePass() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.recordSwipe(Like.Direction.PASS, false);
 
             assertEquals(0.0, session.getLikeRatio(), 0.001);
@@ -564,7 +562,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Match rate with single matching like is 100%")
         void matchRateWithSingleMatch() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.recordSwipe(Like.Direction.LIKE, true);
 
             assertEquals(1.0, session.getMatchRate(), 0.001);
@@ -573,7 +571,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Match rate with single non-matching like is 0%")
         void matchRateWithSingleNonMatch() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             session.recordSwipe(Like.Direction.LIKE, false);
 
             assertEquals(0.0, session.getMatchRate(), 0.001);
@@ -586,8 +584,8 @@ class SwipeSessionTest {
             Instant start = AppClock.now().minus(Duration.ofMinutes(10));
             Instant end = start.plus(Duration.ofMinutes(5));
 
-            SwipeSession session = new SwipeSession(
-                    UUID.randomUUID(), userId, start, end, end, SwipeSession.State.COMPLETED, 10, 5, 5, 2);
+            Session session =
+                    new Session(UUID.randomUUID(), userId, start, end, end, Session.State.COMPLETED, 10, 5, 5, 2);
 
             String formatted = session.getFormattedDuration();
             assertTrue(formatted.matches("\\d+:\\d{2}"));
@@ -604,13 +602,13 @@ class SwipeSessionTest {
             UUID userId = UUID.randomUUID();
             Duration timeout = Duration.ofMinutes(5);
 
-            SwipeSession session = new SwipeSession(
+            Session session = new Session(
                     UUID.randomUUID(),
                     userId,
                     AppClock.now().minus(timeout),
                     AppClock.now().minus(timeout),
                     null,
-                    SwipeSession.State.ACTIVE,
+                    Session.State.ACTIVE,
                     0,
                     0,
                     0,
@@ -625,13 +623,13 @@ class SwipeSessionTest {
             UUID userId = UUID.randomUUID();
             Duration timeout = Duration.ofMinutes(5);
 
-            SwipeSession session = new SwipeSession(
+            Session session = new Session(
                     UUID.randomUUID(),
                     userId,
                     AppClock.now().minus(timeout.minusSeconds(1)),
                     AppClock.now().minus(timeout.minusSeconds(1)),
                     null,
-                    SwipeSession.State.ACTIVE,
+                    Session.State.ACTIVE,
                     0,
                     0,
                     0,
@@ -643,7 +641,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Session timeout with zero duration always times out")
         void zeroTimeoutAlwaysTimesOut() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             assertTrue(session.isTimedOut(Duration.ZERO));
         }
@@ -662,15 +660,15 @@ class SwipeSessionTest {
             Instant lastActivityAt = AppClock.now().minus(Duration.ofMinutes(5));
             Instant endedAt = AppClock.now();
 
-            SwipeSession session = new SwipeSession(
-                    id, userId, createdAt, lastActivityAt, endedAt, SwipeSession.State.COMPLETED, 20, 12, 8, 5);
+            Session session =
+                    new Session(id, userId, createdAt, lastActivityAt, endedAt, Session.State.COMPLETED, 20, 12, 8, 5);
 
             assertEquals(id, session.getId());
             assertEquals(userId, session.getUserId());
             assertEquals(createdAt, session.getStartedAt());
             assertEquals(lastActivityAt, session.getLastActivityAt());
             assertEquals(endedAt, session.getEndedAt());
-            assertEquals(SwipeSession.State.COMPLETED, session.getState());
+            assertEquals(Session.State.COMPLETED, session.getState());
             assertEquals(20, session.getSwipeCount());
             assertEquals(12, session.getLikeCount());
             assertEquals(8, session.getPassCount());
@@ -680,7 +678,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Created session has null endedAt")
         void createdSessionHasNullEndedAt() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             assertNull(session.getEndedAt());
         }
@@ -689,7 +687,7 @@ class SwipeSessionTest {
         @DisplayName("Created session has timestamps set")
         void createdSessionHasTimestamps() {
             Instant before = AppClock.now();
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
             Instant after = AppClock.now();
 
             assertNotNull(session.getStartedAt());
@@ -708,7 +706,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Session handles large number of swipes correctly")
         void handlesManySwipes() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             for (int i = 0; i < 1000; i++) {
                 session.recordSwipe(i % 3 == 0 ? Like.Direction.LIKE : Like.Direction.PASS, i % 10 == 0);
@@ -723,7 +721,7 @@ class SwipeSessionTest {
         @Test
         @DisplayName("Computed ratios are accurate with large datasets")
         void ratiosAccurateWithLargeDataset() {
-            SwipeSession session = SwipeSession.create(UUID.randomUUID());
+            Session session = Session.create(UUID.randomUUID());
 
             // 600 likes, 400 passes
             for (int i = 0; i < 600; i++) {

@@ -2,9 +2,9 @@ package datingapp.core.model;
 
 import datingapp.core.AppClock;
 import datingapp.core.EnumSetUtil;
-import datingapp.core.model.Preferences.Interest;
-import datingapp.core.model.Preferences.Lifestyle;
-import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.Interest;
+import datingapp.core.model.MatchPreferences.Lifestyle;
+import datingapp.core.model.MatchPreferences.PacePreferences;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
@@ -79,7 +79,7 @@ public class User {
     private Integer heightCm;
 
     // Dealbreakers (Phase 0.5b)
-    private Dealbreakers dealbreakers;
+    private MatchPreferences.Dealbreakers dealbreakers;
 
     // Interests (Phase 1 feature)
     private Set<Interest> interests;
@@ -384,8 +384,8 @@ public class User {
     }
 
     /** Returns the user's dealbreakers, or Dealbreakers.none() if not set. */
-    public Dealbreakers getDealbreakers() {
-        return dealbreakers != null ? dealbreakers : Dealbreakers.none();
+    public MatchPreferences.Dealbreakers getDealbreakers() {
+        return dealbreakers != null ? dealbreakers : MatchPreferences.Dealbreakers.none();
     }
 
     /**
@@ -589,7 +589,7 @@ public class User {
         touch();
     }
 
-    public void setDealbreakers(Dealbreakers dealbreakers) {
+    public void setDealbreakers(MatchPreferences.Dealbreakers dealbreakers) {
         this.dealbreakers = dealbreakers;
         touch();
     }
@@ -684,7 +684,7 @@ public class User {
                 && hasCompletePace();
     }
 
-    /** Checks if the user has completed their pace preferences. */
+    /** Checks if the user has completed their pace MatchPreferences. */
     public boolean hasCompletePace() {
         return pacePreferences != null && pacePreferences.isComplete();
     }

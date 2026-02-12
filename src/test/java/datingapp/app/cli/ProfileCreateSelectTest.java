@@ -54,7 +54,7 @@ class ProfileCreateSelectTest {
 
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        // ProfileCompletionService and AchievementService can be null for create/select
+        // ProfileService and ProfileService can be null for create/select
         // tests
         // since they aren't used by these methods
         return new ProfileHandler(userStorage, null, null, new ValidationService(), userSession, inputReader);

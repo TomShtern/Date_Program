@@ -4,27 +4,26 @@ import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
-import datingapp.core.model.Achievement;
+import datingapp.core.model.ConnectionModels.FriendRequest;
+import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.model.ConnectionModels.Notification;
+import datingapp.core.model.EngagementDomain.Achievement;
 import datingapp.core.model.Match;
 import datingapp.core.model.Standout;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
-import datingapp.core.model.UserInteractions.FriendRequest;
-import datingapp.core.model.UserInteractions.Like;
-import datingapp.core.model.UserInteractions.Notification;
-import datingapp.core.service.AchievementService;
 import datingapp.core.service.CandidateFinder;
 import datingapp.core.service.CandidateFinder.GeoUtils;
-import datingapp.core.service.DailyService;
-import datingapp.core.service.DailyService.DailyPick;
+import datingapp.core.service.ConnectionService;
+import datingapp.core.service.ConnectionService.TransitionValidationException;
 import datingapp.core.service.MatchQualityService;
 import datingapp.core.service.MatchQualityService.InterestMatcher;
 import datingapp.core.service.MatchQualityService.MatchQuality;
 import datingapp.core.service.MatchingService;
 import datingapp.core.service.MatchingService.PendingLiker;
-import datingapp.core.service.RelationshipTransitionService;
-import datingapp.core.service.RelationshipTransitionService.TransitionValidationException;
-import datingapp.core.service.StandoutsService;
+import datingapp.core.service.ProfileService;
+import datingapp.core.service.RecommendationService;
+import datingapp.core.service.RecommendationService.DailyPick;
 import datingapp.core.service.TrustSafetyService;
 import datingapp.core.service.UndoService;
 import datingapp.core.storage.AnalyticsStorage;
@@ -52,15 +51,15 @@ public class MatchingHandler implements LoggingSupport {
     private final CandidateFinder candidateFinderService;
     private final MatchingService matchingService;
     private final InteractionStorage interactionStorage;
-    private final DailyService dailyService;
+    private final RecommendationService dailyService;
     private final UndoService undoService;
     private final MatchQualityService matchQualityService;
     private final UserStorage userStorage;
-    private final AchievementService achievementService;
+    private final ProfileService achievementService;
     private final AnalyticsStorage analyticsStorage;
     private final TrustSafetyService trustSafetyService;
-    private final RelationshipTransitionService transitionService;
-    private final StandoutsService standoutsService;
+    private final ConnectionService transitionService;
+    private final RecommendationService standoutsService;
     private final CommunicationStorage communicationStorage;
     private final AppSession session;
     private final InputReader inputReader;
@@ -92,15 +91,15 @@ public class MatchingHandler implements LoggingSupport {
             CandidateFinder candidateFinderService,
             MatchingService matchingService,
             InteractionStorage interactionStorage,
-            DailyService dailyService,
+            RecommendationService dailyService,
             UndoService undoService,
             MatchQualityService matchQualityService,
             UserStorage userStorage,
-            AchievementService achievementService,
+            ProfileService achievementService,
             AnalyticsStorage analyticsStorage,
             TrustSafetyService trustSafetyService,
-            RelationshipTransitionService transitionService,
-            StandoutsService standoutsService,
+            ConnectionService transitionService,
+            RecommendationService standoutsService,
             CommunicationStorage communicationStorage,
             AppSession userSession,
             InputReader inputReader) {
@@ -497,8 +496,8 @@ public class MatchingHandler implements LoggingSupport {
      * @param currentUser The user who reached the limit
      */
     private void showDailyLimitReached(User currentUser) {
-        DailyService.DailyStatus status = dailyService.getStatus(currentUser.getId());
-        String timeUntilReset = DailyService.formatDuration(dailyService.getTimeUntilReset());
+        RecommendationService.DailyStatus status = dailyService.getStatus(currentUser.getId());
+        String timeUntilReset = RecommendationService.formatDuration(dailyService.getTimeUntilReset());
 
         logInfo("\n" + CliSupport.SEPARATOR_LINE);
         logInfo("         💔 DAILY LIMIT REACHED");
@@ -659,7 +658,7 @@ public class MatchingHandler implements LoggingSupport {
 
             logInfo("\n🌟 === TODAY'S STANDOUTS === 🌟\n");
 
-            StandoutsService.Result result = standoutsService.getStandouts(currentUser);
+            RecommendationService.Result result = standoutsService.getStandouts(currentUser);
 
             if (result.isEmpty()) {
                 logInfo(result.message() != null ? result.message() : "No standouts available today.");

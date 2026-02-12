@@ -3,16 +3,17 @@ package datingapp.ui.viewmodel;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.model.Dealbreakers;
-import datingapp.core.model.Preferences.Interest;
-import datingapp.core.model.Preferences.Lifestyle;
+import datingapp.core.model.MatchPreferences.Dealbreakers;
+import datingapp.core.model.MatchPreferences.Interest;
+import datingapp.core.model.MatchPreferences.Lifestyle;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
-import datingapp.core.service.ProfileCompletionService;
-import datingapp.core.service.ProfileCompletionService.CompletionResult;
-import datingapp.ui.util.Toast;
+import datingapp.core.service.ProfileService;
+import datingapp.core.service.ProfileService.CompletionResult;
+import datingapp.ui.util.UiFeedbackService;
 import datingapp.ui.viewmodel.data.UiDataAdapters.UiUserStore;
+import datingapp.ui.viewmodel.shared.ViewModelErrorSink;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -48,7 +49,7 @@ public class ProfileViewModel {
     private static final String NONE_SET_LABEL = "None set";
 
     private final UiUserStore userStore;
-    private final ProfileCompletionService profileCompletionService;
+    private final ProfileService profileCompletionService;
 
     // Observable properties for form binding - Basic Info
     private final StringProperty name = new SimpleStringProperty("");
@@ -90,9 +91,9 @@ public class ProfileViewModel {
     /** Track background thread for cleanup on dispose. */
     private final AtomicReference<Thread> backgroundThread = new AtomicReference<>();
 
-    private ErrorHandler errorHandler;
+    private ViewModelErrorSink errorHandler;
 
-    public ProfileViewModel(UiUserStore userStore, ProfileCompletionService profileCompletionService) {
+    public ProfileViewModel(UiUserStore userStore, ProfileService profileCompletionService) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.profileCompletionService =
                 Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
@@ -111,7 +112,7 @@ public class ProfileViewModel {
         selectedInterests.clear();
     }
 
-    public void setErrorHandler(ErrorHandler handler) {
+    public void setErrorHandler(ViewModelErrorSink handler) {
         this.errorHandler = handler;
     }
 
@@ -386,7 +387,7 @@ public class ProfileViewModel {
                 user.activate();
                 userStore.save(user);
                 logInfo("User {} activated after profile completion", user.getName());
-                Toast.showSuccess("Profile complete! You're now active!");
+                UiFeedbackService.showSuccess("Profile complete! You're now active!");
             } catch (IllegalStateException e) {
                 logWarn("Could not activate user: {}", e.getMessage());
             }
@@ -582,7 +583,7 @@ public class ProfileViewModel {
                 updateInterestsDisplay();
                 return true;
             } else {
-                Toast.showWarning("Maximum " + Interest.MAX_PER_USER + " interests allowed");
+                UiFeedbackService.showWarning("Maximum " + Interest.MAX_PER_USER + " interests allowed");
                 return false;
             }
         }
@@ -621,7 +622,7 @@ public class ProfileViewModel {
         }
         if (photoFile == null || !photoFile.isFile()) {
             logWarn("Invalid photo file selected: {}", photoFile);
-            Toast.showError("Invalid photo file selected");
+            UiFeedbackService.showError("Invalid photo file selected");
             return;
         }
 
@@ -647,7 +648,7 @@ public class ProfileViewModel {
                 Platform.runLater(() -> {
                     primaryPhotoUrl.set(photoUrl);
                     updateCompletion(user);
-                    Toast.showSuccess("Photo saved!");
+                    UiFeedbackService.showSuccess("Photo saved!");
                     logInfo("Profile photo saved: {}", destination);
                 });
 
@@ -698,13 +699,13 @@ public class ProfileViewModel {
         LocalDate today = AppClock.today();
         if (selected.isAfter(today)) {
             logWarn("Birth date cannot be in the future: {}", selected);
-            Toast.showWarning("Birth date cannot be in the future");
+            UiFeedbackService.showWarning("Birth date cannot be in the future");
             return;
         }
         int age = Period.between(selected, today).getYears();
         if (age < CONFIG.minAge() || age > CONFIG.maxAge()) {
             logWarn("Birth date outside allowed age range: {}", selected);
-            Toast.showWarning("Birth date must be for ages " + CONFIG.minAge() + "-" + CONFIG.maxAge());
+            UiFeedbackService.showWarning("Birth date must be for ages " + CONFIG.minAge() + "-" + CONFIG.maxAge());
             return;
         }
         user.setBirthDate(selected);

@@ -1,16 +1,12 @@
 package datingapp.core;
 
-import datingapp.core.service.AchievementService;
+import datingapp.core.service.ActivityMetricsService;
 import datingapp.core.service.CandidateFinder;
-import datingapp.core.service.DailyService;
+import datingapp.core.service.ConnectionService;
 import datingapp.core.service.MatchQualityService;
 import datingapp.core.service.MatchingService;
-import datingapp.core.service.MessagingService;
-import datingapp.core.service.ProfileCompletionService;
-import datingapp.core.service.RelationshipTransitionService;
-import datingapp.core.service.SessionService;
-import datingapp.core.service.StandoutsService;
-import datingapp.core.service.StatsService;
+import datingapp.core.service.ProfileService;
+import datingapp.core.service.RecommendationService;
 import datingapp.core.service.TrustSafetyService;
 import datingapp.core.service.UndoService;
 import datingapp.core.storage.AnalyticsStorage;
@@ -23,54 +19,26 @@ import java.util.Objects;
 @SuppressWarnings("java:S6539")
 public class ServiceRegistry {
 
-    // ─────────────────────────────────────────────
-    // Configuration
-    // ─────────────────────────────────────────────
     private final AppConfig config;
 
-    // ─────────────────────────────────────────────
-    // Storage (4 consolidated interfaces)
-    // ─────────────────────────────────────────────
     private final UserStorage userStorage;
     private final InteractionStorage interactionStorage;
     private final CommunicationStorage communicationStorage;
     private final AnalyticsStorage analyticsStorage;
     private final TrustSafetyStorage trustSafetyStorage;
 
-    // ─────────────────────────────────────────────
-    // Core Services (Matching)
-    // ─────────────────────────────────────────────
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
-    private final SessionService sessionService;
+    private final ActivityMetricsService activityMetricsService;
     private final MatchQualityService matchQualityService;
-    private final DailyService dailyService;
+    private final RecommendationService recommendationService;
     private final UndoService undoService;
 
-    // ─────────────────────────────────────────────
-    // Trust & Safety Services
-    // ─────────────────────────────────────────────
     private final TrustSafetyService trustSafetyService;
+    private final ProfileService profileService;
 
-    // ─────────────────────────────────────────────
-    // Stats & Achievement Services
-    // ─────────────────────────────────────────────
-    private final StatsService statsService;
-    private final ProfileCompletionService profileCompletionService;
-    private final AchievementService achievementService;
+    private final ConnectionService connectionService;
 
-    // ─────────────────────────────────────────────
-    // Messaging & Relationship Services
-    // ─────────────────────────────────────────────
-    private final MessagingService messagingService; // Messaging
-    private final RelationshipTransitionService relationshipTransitionService;
-
-    // ─────────────────────────────────────────────
-    // Maintenance Services
-    // ─────────────────────────────────────────────
-    private final StandoutsService standoutsService;
-
-    /** Public constructor — use {@link datingapp.storage.StorageFactory} for convenient wiring. */
     @SuppressWarnings("java:S107")
     public ServiceRegistry(
             AppConfig config,
@@ -82,16 +50,12 @@ public class ServiceRegistry {
             CandidateFinder candidateFinder,
             MatchingService matchingService,
             TrustSafetyService trustSafetyService,
-            SessionService sessionService,
-            StatsService statsService,
+            ActivityMetricsService activityMetricsService,
             MatchQualityService matchQualityService,
-            ProfileCompletionService profileCompletionService,
-            DailyService dailyService,
+            ProfileService profileService,
+            RecommendationService recommendationService,
             UndoService undoService,
-            AchievementService achievementService,
-            MessagingService messagingService,
-            RelationshipTransitionService relationshipTransitionService,
-            StandoutsService standoutsService) {
+            ConnectionService connectionService) {
         this.config = Objects.requireNonNull(config);
         this.userStorage = Objects.requireNonNull(userStorage);
         this.interactionStorage = Objects.requireNonNull(interactionStorage);
@@ -101,25 +65,17 @@ public class ServiceRegistry {
         this.candidateFinder = Objects.requireNonNull(candidateFinder);
         this.matchingService = Objects.requireNonNull(matchingService);
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
-        this.sessionService = Objects.requireNonNull(sessionService);
-        this.statsService = Objects.requireNonNull(statsService);
+        this.activityMetricsService = Objects.requireNonNull(activityMetricsService);
         this.matchQualityService = Objects.requireNonNull(matchQualityService);
-        this.profileCompletionService = Objects.requireNonNull(profileCompletionService);
-        this.dailyService = Objects.requireNonNull(dailyService);
+        this.profileService = Objects.requireNonNull(profileService);
+        this.recommendationService = Objects.requireNonNull(recommendationService);
         this.undoService = Objects.requireNonNull(undoService);
-        this.achievementService = Objects.requireNonNull(achievementService);
-        this.messagingService = Objects.requireNonNull(messagingService);
-        this.relationshipTransitionService = Objects.requireNonNull(relationshipTransitionService);
-        this.standoutsService = Objects.requireNonNull(standoutsService);
+        this.connectionService = Objects.requireNonNull(connectionService);
     }
-
-    // === Configuration ===
 
     public AppConfig getConfig() {
         return config;
     }
-
-    // === Core Storage ===
 
     public UserStorage getUserStorage() {
         return userStorage;
@@ -141,8 +97,6 @@ public class ServiceRegistry {
         return trustSafetyStorage;
     }
 
-    // === Matching Services ===
-
     public CandidateFinder getCandidateFinder() {
         return candidateFinder;
     }
@@ -151,55 +105,39 @@ public class ServiceRegistry {
         return matchingService;
     }
 
-    public SessionService getSessionService() {
-        return sessionService;
+    public ActivityMetricsService getActivityMetricsService() {
+        return activityMetricsService;
+    }
+
+    public ActivityMetricsService getSessionService() {
+        return activityMetricsService;
+    }
+
+    public ActivityMetricsService getStatsService() {
+        return activityMetricsService;
     }
 
     public MatchQualityService getMatchQualityService() {
         return matchQualityService;
     }
 
-    public DailyService getDailyService() {
-        return dailyService;
+    public RecommendationService getRecommendationService() {
+        return recommendationService;
     }
 
     public UndoService getUndoService() {
         return undoService;
     }
 
-    // === Trust & Safety Services ===
-
     public TrustSafetyService getTrustSafetyService() {
         return trustSafetyService;
     }
 
-    // === Stats & Achievement Services ===
-
-    public StatsService getStatsService() {
-        return statsService;
+    public ProfileService getProfileService() {
+        return profileService;
     }
 
-    public ProfileCompletionService getProfileCompletionService() {
-        return profileCompletionService;
-    }
-
-    public AchievementService getAchievementService() {
-        return achievementService;
-    }
-
-    // === Messaging & Relationship Services ===
-
-    public MessagingService getMessagingService() {
-        return messagingService;
-    }
-
-    public RelationshipTransitionService getRelationshipTransitionService() {
-        return relationshipTransitionService;
-    }
-
-    // === Maintenance Services ===
-
-    public StandoutsService getStandoutsService() {
-        return standoutsService;
+    public ConnectionService getConnectionService() {
+        return connectionService;
     }
 }

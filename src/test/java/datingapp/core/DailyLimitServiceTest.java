@@ -3,7 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.*;
-import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.ConnectionModels.Like;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
@@ -12,13 +12,13 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
 
-/** Unit tests for DailyService daily limits. Uses in-memory mock storage for isolated testing. */
+/** Unit tests for RecommendationService daily limits. Uses in-memory mock storage for isolated testing. */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class DailyLimitServiceTest {
 
     private TestStorages.Interactions interactionStorage;
     private AppConfig config;
-    private DailyService service;
+    private RecommendationService service;
     private UUID userId;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
@@ -31,7 +31,7 @@ class DailyLimitServiceTest {
                 .dailyPassLimit(-1) // unlimited
                 .userTimeZone(ZoneId.of("UTC"))
                 .build();
-        service = new DailyService(interactionStorage, config);
+        service = new RecommendationService(interactionStorage, config);
         userId = UUID.randomUUID();
     }
 
@@ -83,7 +83,7 @@ class DailyLimitServiceTest {
                     .dailyLikeLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService unlimitedService = new DailyService(interactionStorage, unlimitedConfig);
+            RecommendationService unlimitedService = new RecommendationService(interactionStorage, unlimitedConfig);
 
             // Add many likes
             Instant now = AppClock.now();
@@ -124,7 +124,7 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(2)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService limitedPassService = new DailyService(interactionStorage, limitedPassConfig);
+            RecommendationService limitedPassService = new RecommendationService(interactionStorage, limitedPassConfig);
 
             // Add 2 passes today (at limit)
             Instant now = AppClock.now();
@@ -150,7 +150,7 @@ class DailyLimitServiceTest {
             interactionStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
             interactionStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now));
 
-            DailyService.DailyStatus status = service.getStatus(userId);
+            RecommendationService.DailyStatus status = service.getStatus(userId);
 
             assertEquals(2, status.likesUsed());
             assertEquals(1, status.likesRemaining()); // 3 - 2 = 1
@@ -165,9 +165,9 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService unlimitedService = new DailyService(interactionStorage, unlimitedConfig);
+            RecommendationService unlimitedService = new RecommendationService(interactionStorage, unlimitedConfig);
 
-            DailyService.DailyStatus status = unlimitedService.getStatus(userId);
+            RecommendationService.DailyStatus status = unlimitedService.getStatus(userId);
 
             assertTrue(status.hasUnlimitedLikes());
             assertTrue(status.hasUnlimitedPasses());
@@ -176,7 +176,7 @@ class DailyLimitServiceTest {
         @Test
         @DisplayName("Status returns correct date")
         void getStatus_returnsCorrectDate() {
-            DailyService.DailyStatus status = service.getStatus(userId);
+            RecommendationService.DailyStatus status = service.getStatus(userId);
             assertEquals(AppClock.today(ZoneOffset.UTC), status.date());
         }
     }
@@ -203,9 +203,10 @@ class DailyLimitServiceTest {
         @DisplayName("formatDuration works correctly")
         void formatDuration_formatsCorrectly() {
             assertEquals(
-                    "4h 30m", DailyService.formatDuration(Duration.ofHours(4).plusMinutes(30)));
-            assertEquals("5m", DailyService.formatDuration(Duration.ofMinutes(5)));
-            assertEquals("12h 00m", DailyService.formatDuration(Duration.ofHours(12)));
+                    "4h 30m",
+                    RecommendationService.formatDuration(Duration.ofHours(4).plusMinutes(30)));
+            assertEquals("5m", RecommendationService.formatDuration(Duration.ofMinutes(5)));
+            assertEquals("12h 00m", RecommendationService.formatDuration(Duration.ofHours(12)));
         }
     }
 
@@ -220,7 +221,7 @@ class DailyLimitServiceTest {
                     .dailyLikeLimit(0)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService zeroService = new DailyService(interactionStorage, zeroConfig);
+            RecommendationService zeroService = new RecommendationService(interactionStorage, zeroConfig);
 
             assertFalse(zeroService.canLike(userId));
         }
@@ -247,7 +248,7 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(2)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService limitedPassService = new DailyService(interactionStorage, limitedPassConfig);
+            RecommendationService limitedPassService = new RecommendationService(interactionStorage, limitedPassConfig);
 
             Instant now = AppClock.now();
             // 5 likes

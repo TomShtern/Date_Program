@@ -4,13 +4,13 @@ import datingapp.app.cli.CliSupport.InputReader;
 import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
+import datingapp.core.model.ConnectionModels.Conversation;
+import datingapp.core.model.ConnectionModels.Message;
 import datingapp.core.model.Match;
-import datingapp.core.model.Messaging.Conversation;
-import datingapp.core.model.Messaging.Message;
 import datingapp.core.model.User;
-import datingapp.core.service.MessagingService;
-import datingapp.core.service.MessagingService.ConversationPreview;
-import datingapp.core.service.MessagingService.SendResult;
+import datingapp.core.service.ConnectionService;
+import datingapp.core.service.ConnectionService.ConversationPreview;
+import datingapp.core.service.ConnectionService.SendResult;
 import datingapp.core.service.TrustSafetyService;
 import datingapp.core.storage.InteractionStorage;
 import java.time.Duration;
@@ -33,14 +33,14 @@ public class MessagingHandler implements LoggingSupport {
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
 
-    private final MessagingService messagingService;
+    private final ConnectionService messagingService;
     private final InteractionStorage interactionStorage;
     private final TrustSafetyService trustSafetyService;
     private final InputReader input;
     private final AppSession session;
 
     public MessagingHandler(
-            MessagingService messagingService,
+            ConnectionService messagingService,
             InteractionStorage interactionStorage,
             TrustSafetyService trustSafetyService,
             InputReader input,

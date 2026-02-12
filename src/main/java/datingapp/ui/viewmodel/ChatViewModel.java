@@ -1,11 +1,11 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.AppSession;
-import datingapp.core.model.Messaging.Conversation;
-import datingapp.core.model.Messaging.Message;
+import datingapp.core.model.ConnectionModels.Conversation;
+import datingapp.core.model.ConnectionModels.Message;
 import datingapp.core.model.User;
-import datingapp.core.service.MessagingService;
-import datingapp.core.service.MessagingService.ConversationPreview;
+import datingapp.core.service.ConnectionService;
+import datingapp.core.service.ConnectionService.ConversationPreview;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 public class ChatViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ChatViewModel.class);
 
-    private final MessagingService messagingService;
+    private final ConnectionService messagingService;
     private final ObservableList<ConversationPreview> conversations = FXCollections.observableArrayList();
     private final ObservableList<Message> activeMessages = FXCollections.observableArrayList();
 
@@ -50,7 +50,7 @@ public class ChatViewModel {
     /** Keep reference to listener for cleanup. */
     private final javafx.beans.value.ChangeListener<ConversationPreview> selectionListener;
 
-    public ChatViewModel(MessagingService messagingService) {
+    public ChatViewModel(ConnectionService messagingService) {
         this.messagingService = messagingService;
 
         // Listen for selection changes to load messages

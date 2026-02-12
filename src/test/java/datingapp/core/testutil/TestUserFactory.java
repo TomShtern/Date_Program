@@ -45,11 +45,11 @@ public final class TestUserFactory {
                 .photoUrls(java.util.List.of("http://example.com/photo.jpg"))
                 .location(32.0853, 34.7818)
                 .hasLocationSet(true)
-                .pacePreferences(new datingapp.core.model.Preferences.PacePreferences(
-                        datingapp.core.model.Preferences.PacePreferences.MessagingFrequency.OFTEN,
-                        datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
-                        datingapp.core.model.Preferences.PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
-                        datingapp.core.model.Preferences.PacePreferences.DepthPreference.DEEP_CHAT))
+                .pacePreferences(new datingapp.core.model.MatchPreferences.PacePreferences(
+                        datingapp.core.model.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
+                        datingapp.core.model.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
+                        datingapp.core.model.MatchPreferences.PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                        datingapp.core.model.MatchPreferences.PacePreferences.DepthPreference.DEEP_CHAT))
                 .build();
     }
 

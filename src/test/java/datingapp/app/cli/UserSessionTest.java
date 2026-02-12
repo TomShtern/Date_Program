@@ -7,11 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppSession;
 import datingapp.core.model.*;
-import datingapp.core.model.Preferences.PacePreferences;
-import datingapp.core.model.Preferences.PacePreferences.CommunicationStyle;
-import datingapp.core.model.Preferences.PacePreferences.DepthPreference;
-import datingapp.core.model.Preferences.PacePreferences.MessagingFrequency;
-import datingapp.core.model.Preferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.model.MatchPreferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.PacePreferences.CommunicationStyle;
+import datingapp.core.model.MatchPreferences.PacePreferences.DepthPreference;
+import datingapp.core.model.MatchPreferences.PacePreferences.MessagingFrequency;
+import datingapp.core.model.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;

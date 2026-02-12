@@ -2,9 +2,11 @@ package datingapp.core.service;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.model.ConnectionModels.Conversation;
+import datingapp.core.model.ConnectionModels.FriendRequest;
+import datingapp.core.model.ConnectionModels.Message;
+import datingapp.core.model.ConnectionModels.Notification;
 import datingapp.core.model.Match;
-import datingapp.core.model.Messaging.Conversation;
-import datingapp.core.model.Messaging.Message;
 import datingapp.core.model.User;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
@@ -18,9 +20,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-public class MessagingService {
+/** Consolidated messaging + relationship transition service. */
+public class ConnectionService {
 
-    // Error message constants (inlined from ErrorMessages.java)
     private static final String SENDER_NOT_FOUND = "Sender not found or inactive";
     private static final String RECIPIENT_NOT_FOUND = "Recipient not found or inactive";
     private static final String NO_ACTIVE_MATCH = "Cannot message: no active match";
@@ -33,43 +35,41 @@ public class MessagingService {
     private final InteractionStorage interactionStorage;
     private final UserStorage userStorage;
 
-    public MessagingService(
+    public ConnectionService(InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
+        this(communicationStorage, interactionStorage, null);
+    }
+
+    public ConnectionService(
             CommunicationStorage communicationStorage, InteractionStorage interactionStorage, UserStorage userStorage) {
         this.communicationStorage = Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
-        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+        this.userStorage = userStorage;
     }
 
-    /**
-     * Sends a message from one user to another.
-     *
-     * @param senderId    The user sending the message
-     * @param recipientId The user receiving the message
-     * @param content     The message content
-     * @return SendResult indicating success or failure with details
-     */
+    private void ensureMessagingDependencies() {
+        if (userStorage == null) {
+            throw new IllegalStateException("Messaging dependencies are not configured");
+        }
+    }
+
     public SendResult sendMessage(UUID senderId, UUID recipientId, String content) {
-        // Validate sender exists and is active
+        ensureMessagingDependencies();
         User sender = userStorage.get(senderId);
         if (sender == null || sender.getState() != User.UserState.ACTIVE) {
             return SendResult.failure(SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
-        // Validate recipient exists and is active
         User recipient = userStorage.get(recipientId);
         if (recipient == null || recipient.getState() != User.UserState.ACTIVE) {
             return SendResult.failure(RECIPIENT_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
-        // Verify active match exists
         String matchId = Match.generateId(senderId, recipientId);
         Optional<Match> matchOpt = interactionStorage.get(matchId);
-
         if (matchOpt.isEmpty() || !matchOpt.get().canMessage()) {
             return SendResult.failure(NO_ACTIVE_MATCH, SendResult.ErrorCode.NO_ACTIVE_MATCH);
         }
 
-        // Validate content
         if (content == null || content.isBlank()) {
             return SendResult.failure(EMPTY_MESSAGE, SendResult.ErrorCode.EMPTY_MESSAGE);
         }
@@ -79,32 +79,19 @@ public class MessagingService {
                     MESSAGE_TOO_LONG.formatted(Message.MAX_LENGTH), SendResult.ErrorCode.MESSAGE_TOO_LONG);
         }
 
-        // Get or create conversation
         String conversationId = Conversation.generateId(senderId, recipientId);
         if (communicationStorage.getConversation(conversationId).isEmpty()) {
             Conversation newConvo = Conversation.create(senderId, recipientId);
             communicationStorage.saveConversation(newConvo);
         }
 
-        // Create and save message
         Message message = Message.create(conversationId, senderId, content);
         communicationStorage.saveMessage(message);
-
-        // Update conversation's last message timestamp
         communicationStorage.updateConversationLastMessageAt(conversationId, message.createdAt());
 
         return SendResult.success(message);
     }
 
-    /**
-     * Gets messages for a conversation with pagination.
-     *
-     * @param userId      The requesting user (must be part of conversation)
-     * @param otherUserId The other user in the conversation
-     * @param limit       Maximum messages to return
-     * @param offset      Number of messages to skip
-     * @return List of messages, ordered oldest first
-     */
     public List<Message> getMessages(UUID userId, UUID otherUserId, int limit, int offset) {
         if (limit < 1 || limit > CONFIG.messageMaxPageSize()) {
             return List.of();
@@ -114,8 +101,6 @@ public class MessagingService {
         }
 
         String conversationId = Conversation.generateId(userId, otherUserId);
-
-        // Verify user is part of conversation
         Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
         if (convoOpt.isEmpty() || !convoOpt.get().involves(userId)) {
             return List.of();
@@ -124,13 +109,8 @@ public class MessagingService {
         return communicationStorage.getMessages(conversationId, limit, offset);
     }
 
-    /**
-     * Gets all conversations for a user with preview information.
-     *
-     * @param userId The user to get conversations for
-     * @return List of conversation previews, sorted by most recent activity
-     */
     public List<ConversationPreview> getConversations(UUID userId) {
+        ensureMessagingDependencies();
         List<Conversation> conversations = communicationStorage.getConversationsFor(userId);
 
         List<UUID> otherUserIds =
@@ -142,26 +122,18 @@ public class MessagingService {
             UUID otherUserId = convo.getOtherUser(userId);
             User otherUser = otherUsers.get(otherUserId);
 
-            // Skip if other user doesn't exist
             if (otherUser == null) {
                 continue;
             }
 
             Optional<Message> lastMessage = communicationStorage.getLatestMessage(convo.getId());
             int unreadCount = calculateUnreadCount(userId, convo);
-
             previews.add(new ConversationPreview(convo, otherUser, lastMessage, unreadCount));
         }
 
         return previews;
     }
 
-    /**
-     * Marks a conversation as read for a user.
-     *
-     * @param userId         The user marking as read
-     * @param conversationId The conversation to mark read
-     */
     public void markAsRead(UUID userId, String conversationId) {
         Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
         if (convoOpt.isEmpty() || !convoOpt.get().involves(userId)) {
@@ -171,27 +143,14 @@ public class MessagingService {
         communicationStorage.updateConversationReadTimestamp(conversationId, userId, AppClock.now());
     }
 
-    /**
-     * Gets unread message count for a user in a conversation.
-     *
-     * @param userId         The user to count unread for
-     * @param conversationId The conversation to count
-     * @return Number of unread messages
-     */
     public int getUnreadCount(UUID userId, String conversationId) {
         Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
         if (convoOpt.isEmpty()) {
             return 0;
         }
-
-        Conversation convo = convoOpt.get();
-        return calculateUnreadCount(userId, convo);
+        return calculateUnreadCount(userId, convoOpt.get());
     }
 
-    /**
-     * Calculate unread count using an already-loaded conversation object.
-     * Avoids redudant lookups when mapping.
-     */
     private int calculateUnreadCount(UUID userId, Conversation convo) {
         if (!convo.involves(userId)) {
             return 0;
@@ -199,49 +158,27 @@ public class MessagingService {
 
         Instant lastReadAt = convo.getLastReadAt(userId);
         if (lastReadAt == null) {
-            // Never read - count all messages not from this user
-            return countMessagesNotFromUser(convo.getId(), userId);
+            return communicationStorage.countMessagesNotFromSender(convo.getId(), userId);
         }
 
-        // Count messages after last read, excluding user's own messages
         return communicationStorage.countMessagesAfterNotFrom(convo.getId(), lastReadAt, userId);
     }
 
-    /**
-     * Gets total unread message count across all conversations.
-     *
-     * @param userId The user to count unread for
-     * @return Total unread messages
-     */
     public int getTotalUnreadCount(UUID userId) {
         List<Conversation> conversations = communicationStorage.getConversationsFor(userId);
         int total = 0;
         for (Conversation convo : conversations) {
-            // Use calculateUnreadCount directly with already-loaded conversation
-            // to avoid redundant getConversation() calls in getUnreadCount()
             total += calculateUnreadCount(userId, convo);
         }
         return total;
     }
 
-    /**
-     * Checks if messaging is allowed between two users.
-     *
-     * @param userA First user
-     * @param userB Second user
-     * @return true if there's an active match between them
-     */
     public boolean canMessage(UUID userA, UUID userB) {
         String matchId = Match.generateId(userA, userB);
         Optional<Match> matchOpt = interactionStorage.get(matchId);
         return matchOpt.isPresent() && matchOpt.get().canMessage();
     }
 
-    /**
-     * Gets or creates a conversation between two users. Does not check for match -
-     * caller should
-     * verify.
-     */
     public Conversation getOrCreateConversation(UUID userA, UUID userB) {
         String conversationId = Conversation.generateId(userA, userB);
         return communicationStorage.getConversation(conversationId).orElseGet(() -> {
@@ -251,12 +188,132 @@ public class MessagingService {
         });
     }
 
-    /** Counts messages not sent by the given user (for initial unread count). */
-    private int countMessagesNotFromUser(String conversationId, UUID userId) {
-        return communicationStorage.countMessagesNotFromSender(conversationId, userId);
+    public FriendRequest requestFriendZone(UUID fromUserId, UUID targetUserId) {
+        String matchId = Match.generateId(fromUserId, targetUserId);
+        Optional<Match> matchOpt = interactionStorage.get(matchId);
+
+        if (matchOpt.isEmpty() || !matchOpt.get().isActive()) {
+            throw new TransitionValidationException("An active match is required to request the Friend Zone.");
+        }
+
+        Optional<FriendRequest> existing =
+                communicationStorage.getPendingFriendRequestBetween(fromUserId, targetUserId);
+        if (existing.isPresent()) {
+            throw new TransitionValidationException("A friend zone request is already pending between these users.");
+        }
+
+        FriendRequest request = FriendRequest.create(fromUserId, targetUserId);
+        communicationStorage.saveFriendRequest(request);
+
+        communicationStorage.saveNotification(Notification.create(
+                targetUserId,
+                Notification.Type.FRIEND_REQUEST,
+                "New Friend Request",
+                "Someone wants to move your match to the Friend Zone.",
+                Map.of("fromUserId", fromUserId.toString())));
+
+        return request;
     }
 
-    // === Data Transfer Objects ===
+    public void acceptFriendZone(UUID requestId, UUID responderId) {
+        FriendRequest request = communicationStorage
+                .getFriendRequest(requestId)
+                .orElseThrow(() -> new TransitionValidationException("Friend request not found."));
+
+        if (!request.toUserId().equals(responderId)) {
+            throw new TransitionValidationException("Only the recipient can accept a friend request.");
+        }
+
+        if (!request.isPending()) {
+            throw new TransitionValidationException("Request is no longer pending.");
+        }
+
+        String matchId = Match.generateId(request.fromUserId(), request.toUserId());
+        Match match = interactionStorage
+                .get(matchId)
+                .orElseThrow(() -> new IllegalStateException("Match disappeared from storage."));
+
+        match.transitionToFriends(request.fromUserId());
+        interactionStorage.update(match);
+
+        FriendRequest updated = new FriendRequest(
+                request.id(),
+                request.fromUserId(),
+                request.toUserId(),
+                request.createdAt(),
+                FriendRequest.Status.ACCEPTED,
+                AppClock.now());
+        communicationStorage.updateFriendRequest(updated);
+
+        communicationStorage.saveNotification(Notification.create(
+                request.fromUserId(),
+                Notification.Type.FRIEND_REQUEST_ACCEPTED,
+                "Friend Request Accepted",
+                "Your match with the other user has successfully transitioned to the Friend Zone.",
+                Map.of("responderId", responderId.toString())));
+    }
+
+    public void declineFriendZone(UUID requestId, UUID responderId) {
+        FriendRequest request = communicationStorage
+                .getFriendRequest(requestId)
+                .orElseThrow(() -> new TransitionValidationException("Friend request not found."));
+
+        if (!request.toUserId().equals(responderId)) {
+            throw new TransitionValidationException("Only the recipient can decline a friend request.");
+        }
+
+        if (!request.isPending()) {
+            throw new TransitionValidationException("Request is no longer pending.");
+        }
+
+        FriendRequest updated = new FriendRequest(
+                request.id(),
+                request.fromUserId(),
+                request.toUserId(),
+                request.createdAt(),
+                FriendRequest.Status.DECLINED,
+                AppClock.now());
+        communicationStorage.updateFriendRequest(updated);
+    }
+
+    public void gracefulExit(UUID initiatorId, UUID targetUserId) {
+        String matchId = Match.generateId(initiatorId, targetUserId);
+        Match match = interactionStorage
+                .get(matchId)
+                .orElseThrow(
+                        () -> new TransitionValidationException("No active relationship found between these users."));
+
+        if (!match.isActive() && match.getState() != Match.State.FRIENDS) {
+            throw new TransitionValidationException("Relationship has already ended.");
+        }
+
+        match.gracefulExit(initiatorId);
+        interactionStorage.update(match);
+
+        Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetUserId);
+        convoOpt.ifPresent(convo -> {
+            convo.archive(Match.ArchiveReason.GRACEFUL_EXIT);
+            communicationStorage.archiveConversation(convo.getId(), Match.ArchiveReason.GRACEFUL_EXIT);
+        });
+
+        communicationStorage.saveNotification(Notification.create(
+                targetUserId,
+                Notification.Type.GRACEFUL_EXIT,
+                "Relationship Ended",
+                "The other user has gracefully moved on from this relationship.",
+                Map.of("initiatorId", initiatorId.toString())));
+    }
+
+    public List<FriendRequest> getPendingRequestsFor(UUID userId) {
+        return communicationStorage.getPendingFriendRequestsForUser(userId);
+    }
+
+    /** Exception thrown when a relationship transition is invalid. */
+    public static class TransitionValidationException extends RuntimeException {
+        public TransitionValidationException(String message) {
+            super(message);
+        }
+    }
 
     /** Result of sending a message. */
     public record SendResult(boolean success, Message message, String errorMessage, ErrorCode errorCode) {

@@ -2,15 +2,18 @@ package datingapp.core.model;
 
 import datingapp.core.AppClock;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Container for messaging domain models (message + conversation). */
-public final class Messaging {
+/** Consolidated connection domain models (messaging + interactions). */
+public final class ConnectionModels {
 
     private static final String CONVERSATION_ID_SEPARATOR = "_";
+    public static final String ID_REQUIRED = "id cannot be null";
+    public static final String CREATED_AT_REQUIRED = "createdAt cannot be null";
 
-    private Messaging() {
+    private ConnectionModels() {
         // Utility class
     }
 
@@ -19,17 +22,16 @@ public final class Messaging {
         return Conversation.generateId(a, b);
     }
 
-    /**
-     * Represents a single message within a conversation. Immutable after creation.
-     *
-     * <p>Messages are validated on construction: content cannot be empty or exceed 1000
-     * characters.
-     */
+    /** Returns true if a friend request status is terminal. */
+    public static boolean isTerminalStatus(FriendRequest.Status status) {
+        return status == FriendRequest.Status.DECLINED || status == FriendRequest.Status.EXPIRED;
+    }
+
+    /** Represents a single message within a conversation. Immutable after creation. */
     public record Message(UUID id, String conversationId, UUID senderId, String content, Instant createdAt) {
 
         public static final int MAX_LENGTH = 1000;
 
-        // Compact constructor - validates parameters
         public Message {
             Objects.requireNonNull(id, "id cannot be null");
             Objects.requireNonNull(conversationId, "conversationId cannot be null");
@@ -45,30 +47,17 @@ public final class Messaging {
             }
         }
 
-        /**
-         * Creates a new message with auto-generated ID and current timestamp.
-         *
-         * @param conversationId The conversation this message belongs to
-         * @param senderId The user sending the message
-         * @param content The message content
-         * @return A new Message instance
-         */
         public static Message create(String conversationId, UUID senderId, String content) {
             return new Message(UUID.randomUUID(), conversationId, senderId, content, AppClock.now());
         }
     }
 
-    /**
-     * Represents a conversation between two matched users. Mutable - timestamps can be updated.
-     *
-     * <p>The ID is deterministic: sorted concatenation of both user UUIDs. userA is always the
-     * lexicographically smaller UUID. This mirrors the Match ID pattern.
-     */
+    /** Represents a conversation between two matched users. */
     public static class Conversation {
 
         private final String id;
-        private final UUID userA; // Lexicographically smaller
-        private final UUID userB; // Lexicographically larger
+        private final UUID userA;
+        private final UUID userB;
         private final Instant createdAt;
         private Instant lastMessageAt;
         private Instant userAReadAt;
@@ -100,7 +89,6 @@ public final class Messaging {
                 throw new IllegalArgumentException("Cannot have conversation with yourself");
             }
 
-            // Validate ordering
             if (userA.toString().compareTo(userB.toString()) > 0) {
                 throw new IllegalArgumentException("userA must be lexicographically smaller than userB");
             }
@@ -118,13 +106,6 @@ public final class Messaging {
             this.visibleToUserB = visibleToUserB;
         }
 
-        /**
-         * Creates a new Conversation with deterministic ID based on sorted user UUIDs.
-         *
-         * @param a First user UUID
-         * @param b Second user UUID
-         * @return A new Conversation with proper ordering and deterministic ID
-         */
         public static Conversation create(UUID a, UUID b) {
             Objects.requireNonNull(a, "a cannot be null");
             Objects.requireNonNull(b, "b cannot be null");
@@ -136,60 +117,50 @@ public final class Messaging {
             String userAString = a.toString();
             String userBString = b.toString();
 
-            UUID userA;
-            UUID userB;
+            UUID normalizedA;
+            UUID normalizedB;
             if (userAString.compareTo(userBString) < 0) {
-                userA = a;
-                userB = b;
+                normalizedA = a;
+                normalizedB = b;
             } else {
-                userA = b;
-                userB = a;
+                normalizedA = b;
+                normalizedB = a;
             }
 
-            String id = userA + CONVERSATION_ID_SEPARATOR + userB;
+            String id = normalizedA + CONVERSATION_ID_SEPARATOR + normalizedB;
             Instant now = AppClock.now();
-            return new Conversation(id, userA, userB, now, null, null, null, null, null, true, true);
+            return new Conversation(id, normalizedA, normalizedB, now, null, null, null, null, null, true, true);
         }
 
-        /** Generates the deterministic conversation ID for two user UUIDs. */
         public static String generateId(UUID a, UUID b) {
             String userAString = a.toString();
             String userBString = b.toString();
 
             if (userAString.compareTo(userBString) < 0) {
                 return userAString + CONVERSATION_ID_SEPARATOR + userBString;
-            } else {
-                return userBString + CONVERSATION_ID_SEPARATOR + userAString;
             }
+            return userBString + CONVERSATION_ID_SEPARATOR + userAString;
         }
 
-        /** Checks if this conversation involves the given user. */
         public boolean involves(UUID userId) {
             return userA.equals(userId) || userB.equals(userId);
         }
 
-        /** Gets the other user in this conversation. */
         public UUID getOtherUser(UUID userId) {
             if (userA.equals(userId)) {
                 return userB;
-            } else if (userB.equals(userId)) {
+            }
+            if (userB.equals(userId)) {
                 return userA;
             }
             throw new IllegalArgumentException("User is not part of this conversation");
         }
 
-        /** Updates the last message timestamp. */
         public void updateLastMessageAt(Instant timestamp) {
             Objects.requireNonNull(timestamp, "timestamp cannot be null");
             this.lastMessageAt = timestamp;
         }
 
-        /**
-         * Updates the read timestamp for a specific user.
-         *
-         * @param userId The user who read the conversation
-         * @param timestamp When they last read it
-         */
         public void updateReadTimestamp(UUID userId, Instant timestamp) {
             Objects.requireNonNull(userId, "userId cannot be null");
             Objects.requireNonNull(timestamp, "timestamp cannot be null");
@@ -203,22 +174,16 @@ public final class Messaging {
             }
         }
 
-        /**
-         * Gets the last read timestamp for a specific user.
-         *
-         * @param userId The user to get the read timestamp for
-         * @return The last read timestamp, or null if never read
-         */
         public Instant getLastReadAt(UUID userId) {
             if (userA.equals(userId)) {
                 return userAReadAt;
-            } else if (userB.equals(userId)) {
+            }
+            if (userB.equals(userId)) {
                 return userBReadAt;
             }
             throw new IllegalArgumentException("User is not part of this conversation");
         }
 
-        // Getters
         public String getId() {
             return id;
         }
@@ -263,22 +228,11 @@ public final class Messaging {
             return visibleToUserB;
         }
 
-        /**
-         * Archives the conversation for both users.
-         *
-         * @param reason The reason for archiving
-         */
         public void archive(Match.ArchiveReason reason) {
             this.archivedAt = AppClock.now();
             this.archiveReason = reason;
         }
 
-        /**
-         * Sets the visibility for a specific user.
-         *
-         * @param userId The user to set visibility for
-         * @param visible Whether it should be visible
-         */
         public void setVisibility(UUID userId, boolean visible) {
             if (userA.equals(userId)) {
                 this.visibleToUserA = visible;
@@ -289,14 +243,11 @@ public final class Messaging {
             }
         }
 
-        /** Checks if the conversation is visible to the given user. */
         public boolean isVisibleTo(UUID userId) {
             if (userA.equals(userId)) {
                 return visibleToUserA;
-            } else if (userB.equals(userId)) {
-                return visibleToUserB;
             }
-            return false;
+            return userB.equals(userId) && visibleToUserB;
         }
 
         @Override
@@ -319,6 +270,160 @@ public final class Messaging {
         @Override
         public String toString() {
             return "Conversation{id='" + id + "', lastMessageAt=" + lastMessageAt + "}";
+        }
+    }
+
+    /** Represents a like or pass action from one user to another. */
+    public record Like(UUID id, UUID whoLikes, UUID whoGotLiked, Direction direction, Instant createdAt) {
+
+        public enum Direction {
+            LIKE,
+            PASS
+        }
+
+        public Like {
+            Objects.requireNonNull(id, ID_REQUIRED);
+            Objects.requireNonNull(whoLikes, "whoLikes cannot be null");
+            Objects.requireNonNull(whoGotLiked, "whoGotLiked cannot be null");
+            Objects.requireNonNull(direction, "direction cannot be null");
+            Objects.requireNonNull(createdAt, CREATED_AT_REQUIRED);
+
+            if (whoLikes.equals(whoGotLiked)) {
+                throw new IllegalArgumentException("Cannot like yourself");
+            }
+        }
+
+        public static Like create(UUID whoLikes, UUID whoGotLiked, Direction direction) {
+            return new Like(UUID.randomUUID(), whoLikes, whoGotLiked, direction, AppClock.now());
+        }
+    }
+
+    /** Represents a block between two users. */
+    public record Block(UUID id, UUID blockerId, UUID blockedId, Instant createdAt) {
+
+        public Block {
+            Objects.requireNonNull(id, ID_REQUIRED);
+            Objects.requireNonNull(blockerId, "blockerId cannot be null");
+            Objects.requireNonNull(blockedId, "blockedId cannot be null");
+            Objects.requireNonNull(createdAt, CREATED_AT_REQUIRED);
+
+            if (blockerId.equals(blockedId)) {
+                throw new IllegalArgumentException("Cannot block yourself");
+            }
+        }
+
+        public static Block create(UUID blockerId, UUID blockedId) {
+            Objects.requireNonNull(blockerId, "blockerId cannot be null");
+            Objects.requireNonNull(blockedId, "blockedId cannot be null");
+            return new Block(UUID.randomUUID(), blockerId, blockedId, AppClock.now());
+        }
+    }
+
+    /** Represents a report filed against a user. */
+    public record Report(
+            UUID id, UUID reporterId, UUID reportedUserId, Reason reason, String description, Instant createdAt) {
+
+        public enum Reason {
+            SPAM,
+            INAPPROPRIATE_CONTENT,
+            HARASSMENT,
+            FAKE_PROFILE,
+            UNDERAGE,
+            OTHER
+        }
+
+        public Report {
+            Objects.requireNonNull(id, ID_REQUIRED);
+            Objects.requireNonNull(reporterId, "reporterId cannot be null");
+            Objects.requireNonNull(reportedUserId, "reportedUserId cannot be null");
+            Objects.requireNonNull(reason, "reason cannot be null");
+            Objects.requireNonNull(createdAt, CREATED_AT_REQUIRED);
+
+            if (reporterId.equals(reportedUserId)) {
+                throw new IllegalArgumentException("Cannot report yourself");
+            }
+            if (description != null && description.length() > 500) {
+                throw new IllegalArgumentException("Description too long (max 500)");
+            }
+        }
+
+        public static Report create(UUID reporterId, UUID reportedUserId, Reason reason, String description) {
+            return new Report(UUID.randomUUID(), reporterId, reportedUserId, reason, description, AppClock.now());
+        }
+    }
+
+    /** Represents a request to transition a match to friendship. */
+    public record FriendRequest(
+            UUID id, UUID fromUserId, UUID toUserId, Instant createdAt, Status status, Instant respondedAt) {
+
+        public enum Status {
+            PENDING,
+            ACCEPTED,
+            DECLINED,
+            EXPIRED
+        }
+
+        public FriendRequest {
+            Objects.requireNonNull(id, ID_REQUIRED);
+            Objects.requireNonNull(fromUserId, "fromUserId cannot be null");
+            Objects.requireNonNull(toUserId, "toUserId cannot be null");
+            Objects.requireNonNull(createdAt, CREATED_AT_REQUIRED);
+            Objects.requireNonNull(status, "status cannot be null");
+            if (fromUserId.equals(toUserId)) {
+                throw new IllegalArgumentException("fromUserId cannot equal toUserId");
+            }
+            if (status == Status.PENDING && respondedAt != null) {
+                throw new IllegalArgumentException("respondedAt must be null for pending requests");
+            }
+        }
+
+        public static FriendRequest create(UUID fromUserId, UUID toUserId) {
+            return new FriendRequest(UUID.randomUUID(), fromUserId, toUserId, AppClock.now(), Status.PENDING, null);
+        }
+
+        public boolean isPending() {
+            return status == Status.PENDING;
+        }
+    }
+
+    /** Represents a system notification for a user. */
+    public record Notification(
+            UUID id,
+            UUID userId,
+            Type type,
+            String title,
+            String message,
+            Instant createdAt,
+            boolean isRead,
+            Map<String, String> data) {
+
+        public enum Type {
+            MATCH_FOUND,
+            NEW_MESSAGE,
+            FRIEND_REQUEST,
+            FRIEND_REQUEST_ACCEPTED,
+            GRACEFUL_EXIT
+        }
+
+        public Notification {
+            Objects.requireNonNull(id, ID_REQUIRED);
+            Objects.requireNonNull(userId, "userId cannot be null");
+            Objects.requireNonNull(type, "type cannot be null");
+            Objects.requireNonNull(title, "title cannot be null");
+            Objects.requireNonNull(message, "message cannot be null");
+            Objects.requireNonNull(createdAt, CREATED_AT_REQUIRED);
+            if (title.isBlank()) {
+                throw new IllegalArgumentException("title cannot be blank");
+            }
+            if (message.isBlank()) {
+                throw new IllegalArgumentException("message cannot be blank");
+            }
+            data = data != null ? Map.copyOf(data) : Map.of();
+        }
+
+        public static Notification create(
+                UUID userId, Type type, String title, String message, Map<String, String> data) {
+            return new Notification(UUID.randomUUID(), userId, type, title, message, AppClock.now(), false, data);
         }
     }
 }

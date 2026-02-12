@@ -6,8 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Preferences.Interest;
-import datingapp.core.model.Preferences.Lifestyle;
+import datingapp.core.model.MatchPreferences.Dealbreakers;
+import datingapp.core.model.MatchPreferences.Interest;
+import datingapp.core.model.MatchPreferences.Lifestyle;
 import datingapp.core.service.*;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
@@ -26,18 +27,18 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-@DisplayName("ProfileCompletionService")
+@DisplayName("ProfileService")
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class ProfileCompletionServiceTest {
 
-    private ProfileCompletionService service;
+    private ProfileService service;
     private User user;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
-        service = new ProfileCompletionService(AppConfig.defaults());
+        service = new ProfileService(AppConfig.defaults());
         user = new User(UUID.randomUUID(), "TestUser");
     }
 
@@ -53,7 +54,7 @@ class ProfileCompletionServiceTest {
         @Test
         @DisplayName("returns Starter tier for empty profile")
         void returnsStarterTierForEmptyProfile() {
-            ProfileCompletionService.CompletionResult result = service.calculate(user);
+            ProfileService.CompletionResult result = service.calculate(user);
 
             assertEquals("Starter", result.tier());
             assertTrue(result.score() < 25);
@@ -69,7 +70,7 @@ class ProfileCompletionServiceTest {
             user.setInterestedIn(Set.of(User.Gender.MALE));
             user.addPhotoUrl("https://example.com/photo.jpg");
 
-            ProfileCompletionService.CompletionResult result = service.calculate(user);
+            ProfileService.CompletionResult result = service.calculate(user);
 
             assertTrue(result.score() > 30);
             assertTrue(result.tier().equals("Bronze") || result.tier().equals("Silver"));
@@ -103,7 +104,7 @@ class ProfileCompletionServiceTest {
                     .acceptSmoking(Lifestyle.Smoking.NEVER)
                     .build());
 
-            ProfileCompletionService.CompletionResult result = service.calculate(user);
+            ProfileService.CompletionResult result = service.calculate(user);
 
             assertTrue(result.score() >= 90);
             assertEquals("Diamond", result.tier());
@@ -113,13 +114,13 @@ class ProfileCompletionServiceTest {
         @Test
         @DisplayName("includes all category breakdowns")
         void includesAllCategoryBreakdowns() {
-            ProfileCompletionService.CompletionResult result = service.calculate(user);
+            ProfileService.CompletionResult result = service.calculate(user);
 
-            List<ProfileCompletionService.CategoryBreakdown> breakdown = result.breakdown();
+            List<ProfileService.CategoryBreakdown> breakdown = result.breakdown();
             assertEquals(4, breakdown.size());
 
             List<String> categories = breakdown.stream()
-                    .map(ProfileCompletionService.CategoryBreakdown::category)
+                    .map(ProfileService.CategoryBreakdown::category)
                     .toList();
             assertTrue(categories.contains("Basic Info"));
             assertTrue(categories.contains("Interests"));
@@ -130,7 +131,7 @@ class ProfileCompletionServiceTest {
         @Test
         @DisplayName("provides actionable next steps")
         void providesActionableNextSteps() {
-            ProfileCompletionService.CompletionResult result = service.calculate(user);
+            ProfileService.CompletionResult result = service.calculate(user);
 
             assertFalse(result.nextSteps().isEmpty());
             // Should suggest adding bio and photo at minimum
@@ -144,7 +145,7 @@ class ProfileCompletionServiceTest {
         @Test
         @DisplayName("interests score scales with count")
         void interestsScoreScalesWithCount() {
-            ProfileCompletionService.CompletionResult noInterests = service.calculate(user);
+            ProfileService.CompletionResult noInterests = service.calculate(user);
             int interestsScoreEmpty = noInterests.breakdown().stream()
                     .filter(b -> b.category().equals("Interests"))
                     .findFirst()
@@ -152,7 +153,7 @@ class ProfileCompletionServiceTest {
                     .score();
 
             user.setInterests(EnumSet.of(Interest.HIKING, Interest.COOKING));
-            ProfileCompletionService.CompletionResult someInterests = service.calculate(user);
+            ProfileService.CompletionResult someInterests = service.calculate(user);
             int interestsScoreSome = someInterests.breakdown().stream()
                     .filter(b -> b.category().equals("Interests"))
                     .findFirst()
@@ -161,7 +162,7 @@ class ProfileCompletionServiceTest {
 
             user.setInterests(
                     EnumSet.of(Interest.HIKING, Interest.COOKING, Interest.READING, Interest.MOVIES, Interest.MUSIC));
-            ProfileCompletionService.CompletionResult fullInterests = service.calculate(user);
+            ProfileService.CompletionResult fullInterests = service.calculate(user);
             int interestsScoreFull = fullInterests.breakdown().stream()
                     .filter(b -> b.category().equals("Interests"))
                     .findFirst()
@@ -181,7 +182,7 @@ class ProfileCompletionServiceTest {
         @Test
         @DisplayName("getDisplayString formats correctly")
         void getDisplayStringFormatsCorrectly() {
-            ProfileCompletionService.CompletionResult result = service.calculate(user);
+            ProfileService.CompletionResult result = service.calculate(user);
 
             String display = result.getDisplayString();
             assertTrue(display.contains("%"));
@@ -195,24 +196,18 @@ class ProfileCompletionServiceTest {
             // 95+=Diamond
             assertEquals(
                     "🌱",
-                    new ProfileCompletionService.CompletionResult(10, "Starter", 1, 10, List.of(), List.of())
-                            .getTierEmoji());
+                    new ProfileService.CompletionResult(10, "Starter", 1, 10, List.of(), List.of()).getTierEmoji());
             assertEquals(
                     "🥉",
-                    new ProfileCompletionService.CompletionResult(50, "Bronze", 5, 10, List.of(), List.of())
-                            .getTierEmoji());
+                    new ProfileService.CompletionResult(50, "Bronze", 5, 10, List.of(), List.of()).getTierEmoji());
             assertEquals(
                     "🥈",
-                    new ProfileCompletionService.CompletionResult(70, "Silver", 7, 10, List.of(), List.of())
-                            .getTierEmoji());
+                    new ProfileService.CompletionResult(70, "Silver", 7, 10, List.of(), List.of()).getTierEmoji());
             assertEquals(
-                    "🥇",
-                    new ProfileCompletionService.CompletionResult(85, "Gold", 8, 10, List.of(), List.of())
-                            .getTierEmoji());
+                    "🥇", new ProfileService.CompletionResult(85, "Gold", 8, 10, List.of(), List.of()).getTierEmoji());
             assertEquals(
                     "💎",
-                    new ProfileCompletionService.CompletionResult(95, "Diamond", 9, 10, List.of(), List.of())
-                            .getTierEmoji());
+                    new ProfileService.CompletionResult(95, "Diamond", 9, 10, List.of(), List.of()).getTierEmoji());
         }
     }
 
@@ -223,30 +218,30 @@ class ProfileCompletionServiceTest {
         @Test
         @DisplayName("renders empty bar for 0%")
         void rendersEmptyBarForZero() {
-            String bar = ProfileCompletionService.renderProgressBar(0, 10);
+            String bar = ProfileService.renderProgressBar(0, 10);
             assertEquals("[----------] 0%", bar);
         }
 
         @Test
         @DisplayName("renders full bar for 100%")
         void rendersFullBarFor100() {
-            String bar = ProfileCompletionService.renderProgressBar(100, 10);
+            String bar = ProfileService.renderProgressBar(100, 10);
             assertEquals("[##########] 100%", bar);
         }
 
         @Test
         @DisplayName("renders partial bar for 50%")
         void rendersPartialBarFor50() {
-            String bar = ProfileCompletionService.renderProgressBar(50, 10);
+            String bar = ProfileService.renderProgressBar(50, 10);
             assertEquals("[#####-----] 50%", bar);
         }
 
         @Test
         @DisplayName("renders Unicode progress bar correctly")
         void rendersUnicodeProgressBar() {
-            assertEquals("█████", ProfileCompletionService.renderProgressBar(1.0, 5));
-            assertEquals("░░░░░", ProfileCompletionService.renderProgressBar(0.0, 5));
-            assertEquals("██░░░", ProfileCompletionService.renderProgressBar(0.4, 5));
+            assertEquals("█████", ProfileService.renderProgressBar(1.0, 5));
+            assertEquals("░░░░░", ProfileService.renderProgressBar(0.0, 5));
+            assertEquals("██░░░", ProfileService.renderProgressBar(0.4, 5));
         }
     }
 
@@ -258,7 +253,7 @@ class ProfileCompletionServiceTest {
         @DisplayName("returns 100% for fully complete user")
         void returns100PercentForFullUser() {
             User fullUser = createFullUser();
-            ProfileCompletionService.ProfileCompleteness result = service.calculateCompleteness(fullUser);
+            ProfileService.ProfileCompleteness result = service.calculateCompleteness(fullUser);
 
             assertEquals(100, result.percentage(), "Full user should be 100% complete");
             assertTrue(result.missingFields().isEmpty(), "Full user should have no missing fields");
@@ -293,7 +288,7 @@ class ProfileCompletionServiceTest {
         @DisplayName("returns valid preview structure")
         void returnsValidPreviewStructure() {
             User fullUser = createFullUser();
-            ProfileCompletionService.ProfilePreview preview = service.generatePreview(fullUser);
+            ProfileService.ProfilePreview preview = service.generatePreview(fullUser);
 
             assertEquals(fullUser, preview.user());
             assertNotNull(preview.completeness());

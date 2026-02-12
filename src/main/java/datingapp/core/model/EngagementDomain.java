@@ -5,10 +5,10 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Container for statistics domain models. */
-public final class Stats {
+/** Consolidated engagement domain models (achievements + stats). */
+public final class EngagementDomain {
 
-    private Stats() {
+    private EngagementDomain() {
         // Utility class
     }
 
@@ -17,52 +17,125 @@ public final class Stats {
         return new UserStats.StatsBuilder();
     }
 
-    /**
-     * Immutable snapshot of user engagement statistics. Stored periodically for
-     * historical trends
-     * and faster reads.
-     */
-    public static record UserStats(
+    /** Achievement catalog. */
+    public enum Achievement {
+        FIRST_SPARK("First Spark", "Get your first match", "💫", Category.MATCHING, 1),
+        SOCIAL_BUTTERFLY("Social Butterfly", "Get 5 matches", "🦋", Category.MATCHING, 5),
+        POPULAR("Popular", "Get 10 matches", "⭐", Category.MATCHING, 10),
+        SUPERSTAR("Superstar", "Get 25 matches", "🌟", Category.MATCHING, 25),
+        LEGEND("Legend", "Get 50 matches", "👑", Category.MATCHING, 50),
+        SELECTIVE("Selective", "Like ratio < 20% (50+ swipes)", "🎯", Category.BEHAVIOR, 50),
+        OPEN_MINDED("Open-Minded", "Like ratio > 60% (50+ swipes)", "💝", Category.BEHAVIOR, 50),
+        COMPLETE_PACKAGE("Complete Package", "100% profile completion", "✅", Category.PROFILE, 100),
+        STORYTELLER("Storyteller", "Bio over 100 characters", "📖", Category.PROFILE, 100),
+        LIFESTYLE_GURU("Lifestyle Guru", "All lifestyle fields filled", "🧘", Category.PROFILE, 5),
+        GUARDIAN("Guardian", "Report a fake profile", "🛡️", Category.SAFETY, 1);
+
+        /** Achievement categories for grouping in UI. */
+        public enum Category {
+            MATCHING("Matching Milestones"),
+            BEHAVIOR("Swiping Behavior"),
+            PROFILE("Profile Excellence"),
+            SAFETY("Safety & Community");
+
+            private final String displayName;
+
+            Category(String displayName) {
+                this.displayName = displayName;
+            }
+
+            public String getDisplayName() {
+                return displayName;
+            }
+        }
+
+        private final String displayName;
+        private final String description;
+        private final String icon;
+        private final Category category;
+        private final int threshold;
+
+        Achievement(String displayName, String description, String icon, Category category, int threshold) {
+            this.displayName = displayName;
+            this.description = description;
+            this.icon = icon;
+            this.category = category;
+            this.threshold = threshold;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public String getIcon() {
+            return icon;
+        }
+
+        public Category getCategory() {
+            return category;
+        }
+
+        public int getThreshold() {
+            return threshold;
+        }
+
+        public String getFormattedDisplay() {
+            return icon + " " + displayName;
+        }
+
+        /** Persisted unlocked achievement for a user. */
+        public record UserAchievement(UUID id, UUID userId, Achievement achievement, Instant unlockedAt) {
+
+            public UserAchievement {
+                Objects.requireNonNull(id, "id cannot be null");
+                Objects.requireNonNull(userId, "userId cannot be null");
+                Objects.requireNonNull(achievement, "achievement cannot be null");
+                Objects.requireNonNull(unlockedAt, "unlockedAt cannot be null");
+            }
+
+            public static UserAchievement create(UUID userId, Achievement achievement) {
+                return new UserAchievement(UUID.randomUUID(), userId, achievement, AppClock.now());
+            }
+
+            public static UserAchievement of(UUID id, UUID userId, Achievement achievement, Instant unlockedAt) {
+                return new UserAchievement(id, userId, achievement, unlockedAt);
+            }
+        }
+    }
+
+    /** Immutable snapshot of user engagement statistics. */
+    public record UserStats(
             UUID id,
             UUID userId,
             Instant computedAt,
-
-            // === Outgoing Activity ===
-            int totalSwipesGiven, // likes + passes given
+            int totalSwipesGiven,
             int likesGiven,
             int passesGiven,
-            double likeRatio, // likesGiven / totalSwipesGiven (0.0-1.0)
-
-            // === Incoming Activity ===
-            int totalSwipesReceived, // likes + passes received
+            double likeRatio,
+            int totalSwipesReceived,
             int likesReceived,
             int passesReceived,
-            double incomingLikeRatio, // likesReceived / totalSwipesReceived
-
-            // === Matches ===
-            int totalMatches, // all-time matches created
-            int activeMatches, // currently active
-            double matchRate, // totalMatches / likesGiven (0.0-1.0)
-
-            // === Safety ===
-            int blocksGiven, // users you blocked
-            int blocksReceived, // users who blocked you
+            double incomingLikeRatio,
+            int totalMatches,
+            int activeMatches,
+            double matchRate,
+            int blocksGiven,
+            int blocksReceived,
             int reportsGiven,
             int reportsReceived,
+            double reciprocityScore,
+            double selectivenessScore,
+            double attractivenessScore) {
 
-            // === Derived Scores (0.0-1.0) ===
-            double reciprocityScore, // % of your likes that liked you back
-            double selectivenessScore, // how picky vs platform average
-            double attractivenessScore // likes received vs platform average
-            ) {
-
-        // Compact constructor - validates parameters
         public UserStats {
             Objects.requireNonNull(id);
             Objects.requireNonNull(userId);
             Objects.requireNonNull(computedAt);
 
-            // Validate counts are non-negative
             validateNonNegative(totalSwipesGiven, "totalSwipesGiven");
             validateNonNegative(likesGiven, "likesGiven");
             validateNonNegative(passesGiven, "passesGiven");
@@ -76,7 +149,6 @@ public final class Stats {
             validateNonNegative(reportsGiven, "reportsGiven");
             validateNonNegative(reportsReceived, "reportsReceived");
 
-            // Validate ratios are 0.0-1.0
             validateRatio(likeRatio, "likeRatio");
             validateRatio(incomingLikeRatio, "incomingLikeRatio");
             validateRatio(matchRate, "matchRate");
@@ -97,7 +169,6 @@ public final class Stats {
             }
         }
 
-        /** Factory for creating a new snapshot. */
         public static UserStats create(UUID userId, StatsBuilder builder) {
             return new UserStats(
                     UUID.randomUUID(),
@@ -123,12 +194,7 @@ public final class Stats {
                     builder.attractivenessScore);
         }
 
-        /**
-         * Builder for constructing stats during computation. Fields are public for
-         * direct assignment
-         * during computation.
-         */
-        @SuppressWarnings("java:S1104") // Public fields are intentional for builder pattern
+        @SuppressWarnings("java:S1104")
         public static class StatsBuilder {
             public int totalSwipesGiven = 0;
             public int likesGiven = 0;
@@ -146,34 +212,27 @@ public final class Stats {
             public int reportsGiven = 0;
             public int reportsReceived = 0;
             public double reciprocityScore = 0.0;
-            public double selectivenessScore = 0.5; // 0.5 = average
+            public double selectivenessScore = 0.5;
             public double attractivenessScore = 0.5;
         }
 
         private static final String PERCENT_FORMAT = "%.1f%%";
 
-        /** Get a display-friendly like ratio string. */
         public String getLikeRatioDisplay() {
             return String.format(PERCENT_FORMAT, likeRatio * 100);
         }
 
-        /** Get a display-friendly match rate string. */
         public String getMatchRateDisplay() {
             return String.format(PERCENT_FORMAT, matchRate * 100);
         }
 
-        /** Get a display-friendly reciprocity string. */
         public String getReciprocityDisplay() {
             return String.format(PERCENT_FORMAT, reciprocityScore * 100);
         }
     }
 
-    /**
-     * Platform-wide statistics for computing relative scores. Used to determine if
-     * a user is
-     * "above average" or "below average".
-     */
-    public static record PlatformStats(
+    /** Platform-wide statistics for computing relative scores. */
+    public record PlatformStats(
             UUID id,
             Instant computedAt,
             int totalActiveUsers,
@@ -181,6 +240,7 @@ public final class Stats {
             double avgLikesGiven,
             double avgMatchRate,
             double avgLikeRatio) {
+
         public PlatformStats {
             Objects.requireNonNull(id, "id cannot be null");
             Objects.requireNonNull(computedAt, "computedAt cannot be null");
@@ -214,7 +274,6 @@ public final class Stats {
                     avgLikeRatio);
         }
 
-        /** Empty platform stats for new platforms with no users. */
         public static PlatformStats empty() {
             return new PlatformStats(UUID.randomUUID(), AppClock.now(), 0, 0.0, 0.0, 0.0, 0.5);
         }

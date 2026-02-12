@@ -6,11 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.*;
-import datingapp.core.model.Messaging.Conversation;
-import datingapp.core.model.UserInteractions.FriendRequest;
-import datingapp.core.model.UserInteractions.Notification;
+import datingapp.core.model.ConnectionModels.Conversation;
+import datingapp.core.model.ConnectionModels.FriendRequest;
+import datingapp.core.model.ConnectionModels.Notification;
 import datingapp.core.service.*;
-import datingapp.core.service.RelationshipTransitionService.TransitionValidationException;
+import datingapp.core.service.ConnectionService.TransitionValidationException;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.testutil.TestStorages;
@@ -27,7 +27,7 @@ class RelationshipTransitionServiceTest {
 
     private InteractionStorage interactionStorage;
     private CommunicationStorage communicationStorage;
-    private RelationshipTransitionService service;
+    private ConnectionService service;
 
     private final UUID aliceId = UUID.randomUUID();
     private final UUID bobId = UUID.randomUUID();
@@ -37,7 +37,7 @@ class RelationshipTransitionServiceTest {
     void setUp() {
         interactionStorage = new TestStorages.Interactions();
         communicationStorage = new TestStorages.Communications();
-        service = new RelationshipTransitionService(interactionStorage, communicationStorage);
+        service = new ConnectionService(interactionStorage, communicationStorage);
 
         // Create a match between Alice and Bob
         Match match = Match.create(aliceId, bobId);

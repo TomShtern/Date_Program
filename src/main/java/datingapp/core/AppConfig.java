@@ -64,7 +64,7 @@ public record AppConfig(
         double standoutLifestyleWeight, // Weight for lifestyle in standouts (0.20 default)
         double standoutCompletenessWeight, // Weight for profile completeness (0.10 default)
         double standoutActivityWeight, // Weight for activity recency (0.10 default)
-        // Achievement thresholds (centralized from AchievementService)
+        // Achievement thresholds (centralized from ProfileService)
         double selectiveThreshold, // Like ratio below which behavior is "selective" (0.20)
         double openMindedThreshold, // Like ratio above which behavior is "open-minded" (0.60)
         int bioAchievementLength, // Min bio length for detailed writer achievement (100)

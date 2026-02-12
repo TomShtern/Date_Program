@@ -8,15 +8,15 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.*;
+import datingapp.core.model.ConnectionModels.Like;
 import datingapp.core.model.Match;
-import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.PacePreferences;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
-import datingapp.core.model.UserInteractions.Like;
 import datingapp.core.service.*;
-import datingapp.core.service.DailyService;
 import datingapp.core.service.MatchingService;
+import datingapp.core.service.RecommendationService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.viewmodel.data.UiDataAdapters.StorageUiMatchDataAccess;
@@ -43,7 +43,7 @@ class MatchesViewModelTest {
     private UiMatchDataAccess matchData;
     private UiUserStore userStore;
     private MatchingService matchingService;
-    private DailyService dailyService;
+    private RecommendationService dailyService;
     private MatchesViewModel viewModel;
     private User currentUser;
 
@@ -57,7 +57,7 @@ class MatchesViewModelTest {
         TestClock.setFixed(FIXED_INSTANT);
 
         AppConfig config = AppConfig.defaults();
-        dailyService = new DailyService(interactions, config);
+        dailyService = new RecommendationService(interactions, config);
 
         matchData = new StorageUiMatchDataAccess(interactions, trustSafetyStorage);
         userStore = new StorageUiUserStore(users);
@@ -84,12 +84,12 @@ class MatchesViewModelTest {
     @DisplayName("likeBack does not create like when daily limit reached")
     void likeBackRespectsDailyLimit() {
         AppConfig zeroLimitConfig = AppConfig.builder().dailyLikeLimit(0).build();
-        DailyService zeroLimitDailyService = new DailyService(interactions, zeroLimitConfig);
+        RecommendationService zeroLimitRecommendationService = new RecommendationService(interactions, zeroLimitConfig);
 
         User user = createActiveUser("Current");
         users.save(user);
         MatchesViewModel limitViewModel =
-                new MatchesViewModel(matchData, userStore, matchingService, zeroLimitDailyService);
+                new MatchesViewModel(matchData, userStore, matchingService, zeroLimitRecommendationService);
 
         User otherUser = createActiveUser("Other");
         users.save(otherUser);

@@ -3,12 +3,13 @@ package datingapp.ui.viewmodel;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.model.Dealbreakers;
-import datingapp.core.model.Preferences.PacePreferences;
+import datingapp.core.model.MatchPreferences.Dealbreakers;
+import datingapp.core.model.MatchPreferences.PacePreferences;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.ui.viewmodel.data.UiDataAdapters.UiUserStore;
+import datingapp.ui.viewmodel.shared.ViewModelErrorSink;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
@@ -46,7 +47,7 @@ public class LoginViewModel {
     private final StringProperty newUserAge = new SimpleStringProperty("");
     private final StringProperty errorMessage = new SimpleStringProperty("");
 
-    private ErrorHandler errorHandler;
+    private ViewModelErrorSink errorHandler;
 
     private User selectedUser;
 
@@ -69,7 +70,7 @@ public class LoginViewModel {
         filteredUsers.clear();
     }
 
-    public void setErrorHandler(ErrorHandler handler) {
+    public void setErrorHandler(ViewModelErrorSink handler) {
         this.errorHandler = handler;
     }
 

@@ -1,8 +1,8 @@
 package datingapp.storage.jdbi;
 
-import datingapp.core.model.UserInteractions.Block;
-import datingapp.core.model.UserInteractions.Report;
-import datingapp.core.model.UserInteractions.Report.Reason;
+import datingapp.core.model.ConnectionModels.Block;
+import datingapp.core.model.ConnectionModels.Report;
+import datingapp.core.model.ConnectionModels.Report.Reason;
 import datingapp.core.storage.TrustSafetyStorage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -124,10 +124,10 @@ public interface JdbiTrustSafetyStorage extends TrustSafetyStorage {
         @Override
         public Block map(ResultSet rs, StatementContext ctx) throws SQLException {
             return new Block(
-                    MapperHelper.readUuid(rs, "id"),
-                    MapperHelper.readUuid(rs, "blocker_id"),
-                    MapperHelper.readUuid(rs, "blocked_id"),
-                    MapperHelper.readInstant(rs, "created_at"));
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "blocker_id"),
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "blocked_id"),
+                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at"));
         }
     }
 
@@ -136,12 +136,12 @@ public interface JdbiTrustSafetyStorage extends TrustSafetyStorage {
         @Override
         public Report map(ResultSet rs, StatementContext ctx) throws SQLException {
             return new Report(
-                    MapperHelper.readUuid(rs, "id"),
-                    MapperHelper.readUuid(rs, "reporter_id"),
-                    MapperHelper.readUuid(rs, "reported_user_id"),
-                    MapperHelper.readEnum(rs, "reason", Reason.class),
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "reporter_id"),
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "reported_user_id"),
+                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "reason", Reason.class),
                     rs.getString("description"),
-                    MapperHelper.readInstant(rs, "created_at"));
+                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at"));
         }
     }
 }

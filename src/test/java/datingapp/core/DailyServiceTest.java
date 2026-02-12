@@ -3,9 +3,9 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.*;
-import datingapp.core.model.UserInteractions.Like;
+import datingapp.core.model.ConnectionModels.Like;
 import datingapp.core.service.*;
-import datingapp.core.service.DailyService.DailyPick;
+import datingapp.core.service.RecommendationService.DailyPick;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import java.time.Clock;
@@ -31,7 +31,7 @@ class DailyServiceTest {
     private TestStorages.Analytics analyticsStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
     private CandidateFinder candidateFinder;
-    private DailyService service;
+    private RecommendationService service;
     private AppConfig config;
     private Clock fixedClock;
     private Instant todayStart;
@@ -53,7 +53,7 @@ class DailyServiceTest {
         fixedClock = Clock.fixed(todayStart.plus(Duration.ofHours(12)), ZoneId.of("UTC")); // Noon UTC
 
         candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
-        service = new DailyService(
+        service = new RecommendationService(
                 userStorage,
                 interactionStorage,
                 trustSafetyStorage,
@@ -99,7 +99,7 @@ class DailyServiceTest {
                     .dailyLikeLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService unlimitedService = new DailyService(
+            RecommendationService unlimitedService = new RecommendationService(
                     userStorage,
                     interactionStorage,
                     trustSafetyStorage,
@@ -126,7 +126,7 @@ class DailyServiceTest {
             interactionStorage.save(new Like(
                     UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, todayStart.plusSeconds(2)));
 
-            DailyService.DailyStatus status = service.getStatus(userId);
+            RecommendationService.DailyStatus status = service.getStatus(userId);
             assertEquals(2, status.likesUsed());
             assertEquals(3, status.likesRemaining());
         }
@@ -138,7 +138,7 @@ class DailyServiceTest {
                     .dailyLikeLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            DailyService unlimitedService = new DailyService(
+            RecommendationService unlimitedService = new RecommendationService(
                     userStorage,
                     interactionStorage,
                     trustSafetyStorage,
@@ -147,7 +147,7 @@ class DailyServiceTest {
                     unlimitedConfig,
                     fixedClock);
 
-            DailyService.DailyStatus status = unlimitedService.getStatus(UUID.randomUUID());
+            RecommendationService.DailyStatus status = unlimitedService.getStatus(UUID.randomUUID());
             assertEquals(-1, status.likesRemaining());
             assertTrue(status.hasUnlimitedLikes());
         }
@@ -231,7 +231,7 @@ class DailyServiceTest {
         @Test
         @DisplayName("ensureDailyPickDependencies throws if missing")
         void ensureDailyPickDependencies_throws() {
-            DailyService incompleteService = new DailyService(interactionStorage, config);
+            RecommendationService incompleteService = new RecommendationService(interactionStorage, config);
             assertThrows(IllegalStateException.class, () -> incompleteService.getDailyPick(null));
         }
     }
@@ -249,14 +249,15 @@ class DailyServiceTest {
         @Test
         @DisplayName("DailyStatus edge cases")
         void dailyStatus_edgeCases() {
-            DailyService.DailyStatus status =
-                    new DailyService.DailyStatus(0, 5, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now());
+            RecommendationService.DailyStatus status = new RecommendationService.DailyStatus(
+                    0, 5, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now());
             assertFalse(status.hasUnlimitedLikes());
             assertFalse(status.hasUnlimitedPasses());
 
             assertThrows(
                     IllegalArgumentException.class,
-                    () -> new DailyService.DailyStatus(-1, 5, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now()));
+                    () -> new RecommendationService.DailyStatus(
+                            -1, 5, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now()));
         }
     }
 
@@ -274,9 +275,9 @@ class DailyServiceTest {
         @Test
         @DisplayName("formatDuration formats correctly")
         void formatDuration() {
-            assertEquals("12h 00m", DailyService.formatDuration(Duration.ofHours(12)));
-            assertEquals("30m", DailyService.formatDuration(Duration.ofMinutes(30)));
-            assertEquals("45m", DailyService.formatDuration(Duration.ofMinutes(45)));
+            assertEquals("12h 00m", RecommendationService.formatDuration(Duration.ofHours(12)));
+            assertEquals("30m", RecommendationService.formatDuration(Duration.ofMinutes(30)));
+            assertEquals("45m", RecommendationService.formatDuration(Duration.ofMinutes(45)));
         }
     }
 }
