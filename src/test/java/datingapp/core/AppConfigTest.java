@@ -5,8 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import datingapp.core.connection.*;
+import datingapp.core.matching.*;
+import datingapp.core.metrics.*;
 import datingapp.core.model.*;
-import datingapp.core.service.*;
+import datingapp.core.profile.*;
+import datingapp.core.recommendation.*;
+import datingapp.core.safety.*;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

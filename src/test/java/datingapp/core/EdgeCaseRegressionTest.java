@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.matching.MatchingService;
 import datingapp.core.model.Match;
-import datingapp.core.service.MatchingService;
-import datingapp.core.service.ValidationService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
 import java.util.Optional;
 import java.util.UUID;

@@ -21,7 +21,7 @@
 
 <BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="700.0"
     xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-    fx:controller="datingapp.ui.controller.ProfileController">
+    fx:controller="datingapp.ui.screen.ProfileController">
   <!-- Top Header -->
   <top>
     <HBox alignment="CENTER_LEFT" spacing="16" styleClass="header-bar">
@@ -29,7 +29,9 @@
         <graphic>
           <FontIcon iconLiteral="mdi2c-chevron-left" iconSize="28" iconColor="white"/>
         </graphic>
-        <tooltip><Tooltip text="Go back to Dashboard"/></tooltip>
+        <tooltip>
+          <Tooltip text="Go back to Dashboard"/>
+        </tooltip>
       </Button>
       <Label styleClass="subheading" text="Edit Profile"/>
       <Region HBox.hgrow="ALWAYS"/>
@@ -38,7 +40,7 @@
         <Label fx:id="completionLabel" styleClass="notification-badge profile-completion-percent" text="20%"/>
         <Label styleClass="profile-completion-text" text="complete"/>
         <Label fx:id="completionDetailsLabel" maxWidth="180" styleClass="text-secondary" text="Missing: --"
-               wrapText="true"/>
+                       wrapText="true"/>
       </VBox>
     </HBox>
   </top>
@@ -75,7 +77,9 @@
                 <graphic>
                   <FontIcon iconLiteral="mdi2c-camera" iconSize="18" iconColor="white"/>
                 </graphic>
-                <tooltip><Tooltip text="Upload a profile photo"/></tooltip>
+                <tooltip>
+                  <Tooltip text="Upload a profile photo"/>
+                </tooltip>
               </Button>
             </VBox>
           </StackPane>
@@ -95,7 +99,7 @@
             <Label fx:id="charCountLabel" styleClass="char-counter" text="0/500"/>
           </HBox>
           <TextArea fx:id="bioArea" prefHeight="100" promptText="Tell others about yourself..."
-                                                      wrapText="true" styleClass="bio-textarea"/>
+                                                                wrapText="true" styleClass="bio-textarea"/>
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Birth date:" prefWidth="120"/>
             <DatePicker fx:id="birthDatePicker" promptText="YYYY-MM-DD" prefWidth="180"/>
@@ -112,10 +116,9 @@
           <HBox spacing="12" alignment="CENTER_LEFT">
             <FontIcon iconLiteral="mdi2m-map-marker-outline" iconSize="20" iconColor="#64748b"/>
             <TextField fx:id="locationField" promptText="e.g. 40.7128, -74.0060"
-                                                                HBox.hgrow="ALWAYS"/>
+                                                                            HBox.hgrow="ALWAYS"/>
           </HBox>
         </VBox>
-
         <!-- Gender &amp; Preferences Section - CRITICAL for matching -->
         <VBox styleClass="section-glass-card" spacing="16">
           <HBox styleClass="section-header" alignment="CENTER_LEFT">
@@ -126,13 +129,11 @@
             <Region HBox.hgrow="ALWAYS"/>
             <Label styleClass="text-secondary" text="Required for matching"/>
           </HBox>
-
           <!-- Gender -->
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="I am:" prefWidth="120"/>
             <ComboBox fx:id="genderCombo" promptText="Select your gender..." prefWidth="180"/>
           </HBox>
-
           <!-- Interested In (multi-select) -->
           <VBox spacing="8">
             <HBox spacing="12" alignment="CENTER_LEFT">
@@ -144,7 +145,6 @@
             </FlowPane>
           </VBox>
         </VBox>
-
         <!-- Interests Section - Editable -->
         <VBox styleClass="section-glass-card" spacing="12">
           <HBox styleClass="section-header" alignment="CENTER_LEFT">
@@ -167,7 +167,6 @@
             </graphic>
           </Button>
         </VBox>
-
         <!-- Lifestyle Section -->
         <VBox styleClass="section-glass-card" spacing="16">
           <HBox styleClass="section-header" alignment="CENTER_LEFT">
@@ -178,38 +177,32 @@
             <Region HBox.hgrow="ALWAYS"/>
             <Label styleClass="text-secondary" text="Helps find compatible matches"/>
           </HBox>
-
           <!-- Height -->
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Height (cm):" prefWidth="120"/>
             <TextField fx:id="heightField" promptText="e.g. 175" prefWidth="100"/>
           </HBox>
-
           <!-- Smoking -->
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Smoking:" prefWidth="120"/>
             <ComboBox fx:id="smokingCombo" promptText="Select..." prefWidth="180"/>
           </HBox>
-
           <!-- Drinking -->
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Drinking:" prefWidth="120"/>
             <ComboBox fx:id="drinkingCombo" promptText="Select..." prefWidth="180"/>
           </HBox>
-
           <!-- Wants Kids -->
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Kids:" prefWidth="120"/>
             <ComboBox fx:id="wantsKidsCombo" promptText="Select..." prefWidth="180"/>
           </HBox>
-
           <!-- Looking For -->
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Looking for:" prefWidth="120"/>
             <ComboBox fx:id="lookingForCombo" promptText="Select..." prefWidth="180"/>
           </HBox>
         </VBox>
-
         <!-- Search Preferences Section -->
         <VBox styleClass="section-glass-card" spacing="16">
           <HBox styleClass="section-header" alignment="CENTER_LEFT">
@@ -218,7 +211,6 @@
             </StackPane>
             <Label styleClass="section-title" text="Search Preferences"/>
           </HBox>
-
           <!-- Age Range -->
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Age range:" prefWidth="120"/>
@@ -227,7 +219,6 @@
             <TextField fx:id="maxAgeField" promptText="99" prefWidth="60"/>
             <Label styleClass="text-secondary" text="years"/>
           </HBox>
-
           <!-- Max Distance -->
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Max distance:" prefWidth="120"/>
@@ -235,7 +226,6 @@
             <Label styleClass="text-secondary" text="km"/>
           </HBox>
         </VBox>
-
         <!-- Dealbreakers Section (Optional) -->
         <VBox styleClass="section-glass-card" spacing="16">
           <HBox styleClass="section-header" alignment="CENTER_LEFT">
@@ -253,7 +243,6 @@
             </graphic>
           </Button>
         </VBox>
-
         <!-- Spacer to ensure scroll content doesn't overlap with sticky footer -->
         <Region prefHeight="80"/>
       </VBox>

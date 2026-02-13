@@ -2,14 +2,20 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.app.cli.CliSupport.InputReader;
+import datingapp.app.cli.matching.MatchingHandler;
+import datingapp.app.cli.shared.CliSupport.InputReader;
 import datingapp.core.*;
+import datingapp.core.connection.*;
+import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.matching.*;
+import datingapp.core.metrics.*;
 import datingapp.core.model.*;
-import datingapp.core.model.ConnectionModels.Like;
-import datingapp.core.model.MatchPreferences.PacePreferences;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.VerificationMethod;
-import datingapp.core.service.*;
+import datingapp.core.profile.*;
+import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.recommendation.*;
+import datingapp.core.safety.*;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.time.LocalDate;
@@ -194,7 +200,7 @@ class LikerBrowserHandlerTest {
 
             // But we blocked them
             trustSafetyStorage.save(
-                    datingapp.core.model.ConnectionModels.Block.create(testUser.getId(), blockedLiker.getId()));
+                    datingapp.core.connection.ConnectionModels.Block.create(testUser.getId(), blockedLiker.getId()));
 
             MatchingHandler handler = createHandler("0\n");
             handler.browseWhoLikedMe();

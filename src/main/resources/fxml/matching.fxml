@@ -12,7 +12,7 @@
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21"
-    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.MatchingController">
+    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.screen.MatchingController">
   <top>
     <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="header-surface">
       <Button onAction="#handleBack" styleClass="button-transparent" text="← Back"/>
@@ -28,21 +28,21 @@
       <VBox styleClass="card card-stack-2" visible="false" managed="false" maxWidth="400.0"/>
       <!-- Candidate Card (front) -->
       <VBox fx:id="candidateCard" alignment="TOP_CENTER" maxWidth="400.0" spacing="0.0"
-                                              styleClass="card card-stack-1">
+                                                    styleClass="card card-stack-1">
         <!-- Swipe Overlays -->
         <StackPane>
           <!-- LIKE Overlay -->
           <Label fx:id="likeOverlay" text="LIKE" visible="false" managed="false"
-                                     styleClass="swipe-overlay swipe-like-overlay swipe-overlay-text"
-                                     StackPane.alignment="TOP_LEFT">
+                                               styleClass="swipe-overlay swipe-like-overlay swipe-overlay-text"
+                                               StackPane.alignment="TOP_LEFT">
             <StackPane.margin>
               <javafx.geometry.Insets top="20" left="20"/>
             </StackPane.margin>
           </Label>
           <!-- PASS Overlay -->
           <Label fx:id="passOverlay" text="NOPE" visible="false" managed="false"
-                                     styleClass="swipe-overlay swipe-pass-overlay swipe-overlay-text"
-                                     StackPane.alignment="TOP_RIGHT">
+                                               styleClass="swipe-overlay swipe-pass-overlay swipe-overlay-text"
+                                               StackPane.alignment="TOP_RIGHT">
             <StackPane.margin>
               <javafx.geometry.Insets top="20" right="20"/>
             </StackPane.margin>
@@ -61,12 +61,12 @@
           </HBox>
           <Label fx:id="distanceLabel" styleClass="card-distance" text="📍 3km away"/>
           <Label fx:id="bioLabel" prefHeight="80.0" wrapText="true"
-                                                                          text="Lover of hiking, coding and good coffee. Always looking for the next adventure!" />
+                                                                                    text="Lover of hiking, coding and good coffee. Always looking for the next adventure!" />
         </VBox>
       </VBox>
       <!-- Empty State: No More Candidates (Enhanced) -->
       <VBox fx:id="noCandidatesContainer" alignment="CENTER" spacing="24" visible="false"
-                                    styleClass="matches-empty-container" maxWidth="450">
+                                          styleClass="matches-empty-container" maxWidth="450">
         <padding>
           <Insets top="40" right="48" bottom="40" left="48"/>
         </padding>
@@ -76,7 +76,7 @@
         </StackPane>
         <Label styleClass="empty-state-heading" text="No more people around you!"/>
         <Label styleClass="empty-state-body" wrapText="true" maxWidth="350"
-                                       text="You've seen everyone nearby. Try expanding your search or check back later!"/>
+                                               text="You've seen everyone nearby. Try expanding your search or check back later!"/>
         <!-- Separator -->
         <Region styleClass="matches-separator" prefHeight="1" prefWidth="200">
           <VBox.margin>
@@ -128,25 +128,33 @@
         <graphic>
           <FontIcon iconLiteral="mdi2u-undo" iconSize="24" iconColor="white"/>
         </graphic>
-        <tooltip><Tooltip text="Undo last action (Ctrl+Z)"/></tooltip>
+        <tooltip>
+          <Tooltip text="Undo last action (Ctrl+Z)"/>
+        </tooltip>
       </Button>
       <Button onAction="#handlePass" styleClass="action-button-round action-btn-pass">
         <graphic>
           <FontIcon iconLiteral="mdi2c-close" iconSize="32" iconColor="white"/>
         </graphic>
-        <tooltip><Tooltip text="Pass on this person (←)"/></tooltip>
+        <tooltip>
+          <Tooltip text="Pass on this person (←)"/>
+        </tooltip>
       </Button>
       <Button onAction="#handleLike" styleClass="action-button-round action-btn-like">
         <graphic>
           <FontIcon iconLiteral="mdi2h-heart" iconSize="32" iconColor="white"/>
         </graphic>
-        <tooltip><Tooltip text="Like this person (→)"/></tooltip>
+        <tooltip>
+          <Tooltip text="Like this person (→)"/>
+        </tooltip>
       </Button>
       <Button styleClass="action-button-round action-btn-neutral" onAction="#handleSuperLike">
         <graphic>
           <FontIcon iconLiteral="mdi2s-star" iconSize="24" iconColor="#f59e0b"/>
         </graphic>
-        <tooltip><Tooltip text="Super Like (↑)"/></tooltip>
+        <tooltip>
+          <Tooltip text="Super Like (↑)"/>
+        </tooltip>
       </Button>
     </HBox>
   </bottom>

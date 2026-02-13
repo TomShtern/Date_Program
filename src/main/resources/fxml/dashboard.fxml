@@ -15,7 +15,7 @@
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21"
-    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.DashboardController">
+    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.screen.DashboardController">
   <!-- Top Header -->
   <top>
     <HBox alignment="CENTER_LEFT" spacing="16" styleClass="header-bar">
@@ -31,7 +31,9 @@
         <Label fx:id="statusLabel" styleClass="likes-counter-text" text="0/50"/>
       </HBox>
       <Button fx:id="logoutButton" onAction="#handleLogout" styleClass="button-danger" text="Logout">
-        <tooltip><Tooltip text="Sign out of your account"/></tooltip>
+        <tooltip>
+          <Tooltip text="Sign out of your account"/>
+        </tooltip>
       </Button>
     </HBox>
   </top>
@@ -51,8 +53,8 @@
         </columnConstraints>
         <!-- Browse Card - Amber -->
         <Button fx:id="browseButton" onAction="#handleBrowse" maxHeight="160" maxWidth="Infinity"
-                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
-                                                            GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                                                    prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
+                                                                    GridPane.columnIndex="0" GridPane.rowIndex="0">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -64,8 +66,8 @@
         </Button>
         <!-- Matches Card - Rose -->
         <Button fx:id="matchesButton" onAction="#handleMatches" maxHeight="160" maxWidth="Infinity"
-                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-matches"
-                                                            GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                                                    prefHeight="160" styleClass="dashboard-card dashboard-card-matches"
+                                                                    GridPane.columnIndex="1" GridPane.rowIndex="0">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -77,8 +79,8 @@
         </Button>
         <!-- Chat Card - Blue -->
         <Button fx:id="chatButton" onAction="#handleChat" maxHeight="160" maxWidth="Infinity"
-                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-chat"
-                                                            GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                                                    prefHeight="160" styleClass="dashboard-card dashboard-card-chat"
+                                                                    GridPane.columnIndex="0" GridPane.rowIndex="1">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -90,8 +92,8 @@
         </Button>
         <!-- Profile Card - Purple -->
         <Button fx:id="profileButton" onAction="#handleProfile" maxHeight="160" maxWidth="Infinity"
-                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
-                                                            GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                                                    prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
+                                                                    GridPane.columnIndex="1" GridPane.rowIndex="1">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -109,7 +111,7 @@
           <Label text="DAILY PICK" styleClass="daily-pick-title"/>
         </HBox>
         <Label fx:id="dailyPickLabel" styleClass="text-secondary"
-                                                            text="Loading your daily pick..."/>
+                                                                    text="Loading your daily pick..."/>
         <Button fx:id="dailyPickButton" onAction="#handleViewDailyPick" styleClass="matches-browse-btn" text="View Profile">
           <graphic>
             <FontIcon iconLiteral="mdi2e-eye" iconSize="16" iconColor="white"/>

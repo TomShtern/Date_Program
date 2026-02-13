@@ -1,6 +1,6 @@
 package datingapp.ui.viewmodel.data;
 
-import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.storage.InteractionStorage;

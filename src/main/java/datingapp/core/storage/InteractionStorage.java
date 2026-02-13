@@ -1,6 +1,6 @@
 package datingapp.core.storage;
 
-import datingapp.core.model.ConnectionModels.Like;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.model.Match;
 import java.time.Instant;
 import java.util.List;

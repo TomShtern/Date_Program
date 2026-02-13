@@ -2,13 +2,19 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.app.cli.CliSupport.InputReader;
+import datingapp.app.cli.connection.MessagingHandler;
+import datingapp.app.cli.shared.CliSupport.InputReader;
 import datingapp.core.*;
+import datingapp.core.connection.*;
+import datingapp.core.connection.ConnectionModels.Conversation;
+import datingapp.core.matching.*;
+import datingapp.core.metrics.*;
 import datingapp.core.model.*;
-import datingapp.core.model.ConnectionModels.Conversation;
-import datingapp.core.model.MatchPreferences.PacePreferences;
 import datingapp.core.model.User.Gender;
-import datingapp.core.service.*;
+import datingapp.core.profile.*;
+import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.recommendation.*;
+import datingapp.core.safety.*;
 import datingapp.core.storage.*;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.StorageFactory;

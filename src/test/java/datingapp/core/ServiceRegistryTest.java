@@ -3,8 +3,13 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import datingapp.core.connection.*;
+import datingapp.core.matching.*;
+import datingapp.core.metrics.*;
 import datingapp.core.model.*;
-import datingapp.core.service.*;
+import datingapp.core.profile.*;
+import datingapp.core.recommendation.*;
+import datingapp.core.safety.*;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.StorageFactory;
 import java.util.UUID;

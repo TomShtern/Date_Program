@@ -1,7 +1,7 @@
 package datingapp.core.storage;
 
-import datingapp.core.model.ConnectionModels.Block;
-import datingapp.core.model.ConnectionModels.Report;
+import datingapp.core.connection.ConnectionModels.Block;
+import datingapp.core.connection.ConnectionModels.Report;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;

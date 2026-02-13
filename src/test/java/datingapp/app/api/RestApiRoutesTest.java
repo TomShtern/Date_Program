@@ -2,8 +2,13 @@ package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.connection.*;
+import datingapp.core.matching.*;
+import datingapp.core.metrics.*;
 import datingapp.core.model.*;
-import datingapp.core.service.*;
+import datingapp.core.profile.*;
+import datingapp.core.recommendation.*;
+import datingapp.core.safety.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -26,8 +31,8 @@ class RestApiRoutesTest {
         void createsFromMessage() {
             java.util.UUID senderId = java.util.UUID.randomUUID();
             String conversationId = "test-conversation";
-            datingapp.core.model.ConnectionModels.Message message =
-                    datingapp.core.model.ConnectionModels.Message.create(conversationId, senderId, "Hello!");
+            datingapp.core.connection.ConnectionModels.Message message =
+                    datingapp.core.connection.ConnectionModels.Message.create(conversationId, senderId, "Hello!");
 
             RestApiServer.MessageDto dto = RestApiServer.MessageDto.from(message);
 

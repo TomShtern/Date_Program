@@ -16,7 +16,7 @@
 
 <BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="900.0"
     xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-    fx:controller="datingapp.ui.controller.MatchesController">
+    fx:controller="datingapp.ui.screen.MatchesController">
   <!-- Header with Heart Icon and Section Tabs -->
   <top>
     <VBox spacing="12">
@@ -27,7 +27,7 @@
           </graphic>
         </Button>
         <FontIcon fx:id="headerIcon" iconLiteral="mdi2h-heart-multiple" iconSize="26" iconColor="#f43f5e"
-                  styleClass="matches-header-icon"/>
+                          styleClass="matches-header-icon"/>
         <Label fx:id="headerTitleLabel" styleClass="subheading" text="Your Matches"/>
         <Region HBox.hgrow="ALWAYS"/>
         <!-- Section Count Badge -->
@@ -88,11 +88,11 @@
         <FlowPane fx:id="matchesFlow" hgap="24" vgap="24" alignment="CENTER" styleClass="matches-flow"/>
         <!-- Enhanced Empty State Container -->
         <VBox fx:id="emptyStateContainer" alignment="CENTER" spacing="20" styleClass="matches-empty-container"
-                              visible="false" managed="false">
+                                      visible="false" managed="false">
           <!-- Glowing Heart Icon -->
           <StackPane>
             <FontIcon fx:id="emptyStateIcon" iconLiteral="mdi2h-heart-broken" iconSize="80" iconColor="#64748b"
-                      styleClass="matches-empty-icon"/>
+                                  styleClass="matches-empty-icon"/>
           </StackPane>
           <!-- Title -->
           <Label fx:id="emptyTitleLabel" text="No matches yet" styleClass="matches-empty-title">
@@ -102,11 +102,11 @@
           </Label>
           <!-- Subtitle -->
           <Label fx:id="emptySubtitleLabel"
-                 text="Your perfect match is waiting! Start browsing to connect with amazing people."
-                 styleClass="matches-empty-subtitle" wrapText="true" maxWidth="300" alignment="CENTER"/>
+                           text="Your perfect match is waiting! Start browsing to connect with amazing people."
+                           styleClass="matches-empty-subtitle" wrapText="true" maxWidth="300" alignment="CENTER"/>
           <!-- Premium Browse Button -->
           <Button fx:id="emptyActionButton" text="Start Browsing" onAction="#handleBrowse"
-                  styleClass="matches-browse-btn">
+                            styleClass="matches-browse-btn">
             <graphic>
               <FontIcon iconLiteral="mdi2c-compass" iconSize="18" iconColor="white"/>
             </graphic>
@@ -116,7 +116,7 @@
           </Button>
           <!-- Hint text -->
           <Label fx:id="emptyHintLabel" text="Like someone and if they like you back, it's a match!"
-                                     styleClass="match-timestamp">
+                                               styleClass="match-timestamp">
             <VBox.margin>
               <Insets top="8"/>
             </VBox.margin>

@@ -4,13 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.model.ConnectionModels.Report;
-import datingapp.core.model.EngagementDomain.Achievement;
-import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.connection.ConnectionModels.Report;
+import datingapp.core.metrics.EngagementDomain.Achievement;
+import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.ProfileNote;
-import datingapp.core.service.ProfileService;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;

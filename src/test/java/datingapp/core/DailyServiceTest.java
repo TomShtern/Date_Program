@@ -2,10 +2,15 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import datingapp.core.connection.*;
+import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.matching.*;
+import datingapp.core.metrics.*;
 import datingapp.core.model.*;
-import datingapp.core.model.ConnectionModels.Like;
-import datingapp.core.service.*;
-import datingapp.core.service.RecommendationService.DailyPick;
+import datingapp.core.profile.*;
+import datingapp.core.recommendation.*;
+import datingapp.core.recommendation.RecommendationService.DailyPick;
+import datingapp.core.safety.*;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import java.time.Clock;

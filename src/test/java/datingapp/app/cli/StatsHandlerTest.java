@@ -2,17 +2,23 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.app.cli.CliSupport.InputReader;
+import datingapp.app.cli.metrics.StatsHandler;
+import datingapp.app.cli.shared.CliSupport.InputReader;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.connection.*;
+import datingapp.core.matching.*;
+import datingapp.core.metrics.*;
+import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.metrics.EngagementDomain.Achievement;
+import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.*;
-import datingapp.core.model.EngagementDomain.Achievement;
-import datingapp.core.model.EngagementDomain.Achievement.UserAchievement;
-import datingapp.core.model.EngagementDomain.UserStats;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.service.*;
-import datingapp.core.service.ActivityMetricsService;
+import datingapp.core.profile.*;
+import datingapp.core.recommendation.*;
+import datingapp.core.safety.*;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.util.*;
@@ -176,11 +182,11 @@ class StatsHandlerTest {
         user.setGender(User.Gender.OTHER);
         user.setInterestedIn(EnumSet.of(User.Gender.OTHER));
         user.addPhotoUrl("https://example.com/photo.jpg");
-        user.setPacePreferences(new datingapp.core.model.MatchPreferences.PacePreferences(
-                datingapp.core.model.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
-                datingapp.core.model.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
-                datingapp.core.model.MatchPreferences.PacePreferences.CommunicationStyle.TEXT_ONLY,
-                datingapp.core.model.MatchPreferences.PacePreferences.DepthPreference.SMALL_TALK));
+        user.setPacePreferences(new datingapp.core.profile.MatchPreferences.PacePreferences(
+                datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
+                datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
+                datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle.TEXT_ONLY,
+                datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference.SMALL_TALK));
         user.activate();
         return user;
     }

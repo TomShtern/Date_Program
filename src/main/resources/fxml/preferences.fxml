@@ -14,7 +14,7 @@
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="450.0" xmlns="http://javafx.com/javafx/21"
-    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.controller.PreferencesController">
+    xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.screen.PreferencesController">
   <top>
     <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="header-surface">
       <Button fx:id="backButton" onAction="#handleBack" styleClass="icon-button">
@@ -46,7 +46,7 @@
           <Label text="Age Preference" styleClass="preference-label"/>
           <Region HBox.hgrow="ALWAYS"/>
           <Label fx:id="ageStartLabel" text="18"/>
-          <Label text=" - "/>
+          <Label text=""/>
           <Label fx:id="ageEndLabel" text="35"/>
         </HBox>
         <Label text="Min Age" styleClass="preference-hint"/>
@@ -63,11 +63,11 @@
             <ToggleGroup fx:id="genderGroup"/>
           </fx:define>
           <ToggleButton fx:id="menToggle" text="Men" toggleGroup="$genderGroup"
-                                                                maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
+                                                                          maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
           <ToggleButton fx:id="womenToggle" text="Women" toggleGroup="$genderGroup"
-                                                                maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
+                                                                          maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
           <ToggleButton fx:id="everyoneToggle" text="Everyone" toggleGroup="$genderGroup"
-                                                                maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
+                                                                          maxWidth="Infinity" alignment="CENTER_LEFT" styleClass="settings-toggle"/>
         </VBox>
       </VBox>
       <Separator/>
@@ -80,7 +80,7 @@
             <Label text="Use dark theme for the app" styleClass="preference-hint"/>
           </VBox>
           <ToggleButton fx:id="themeToggle" onAction="#handleThemeToggle"
-                                  styleClass="theme-toggle-button"/>
+                                            styleClass="theme-toggle-button"/>
         </HBox>
       </VBox>
     </VBox>

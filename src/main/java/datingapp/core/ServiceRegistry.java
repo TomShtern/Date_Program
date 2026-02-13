@@ -1,14 +1,14 @@
 package datingapp.core;
 
-import datingapp.core.service.ActivityMetricsService;
-import datingapp.core.service.CandidateFinder;
-import datingapp.core.service.ConnectionService;
-import datingapp.core.service.MatchQualityService;
-import datingapp.core.service.MatchingService;
-import datingapp.core.service.ProfileService;
-import datingapp.core.service.RecommendationService;
-import datingapp.core.service.TrustSafetyService;
-import datingapp.core.service.UndoService;
+import datingapp.core.connection.ConnectionService;
+import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.MatchQualityService;
+import datingapp.core.matching.MatchingService;
+import datingapp.core.matching.UndoService;
+import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.profile.ProfileService;
+import datingapp.core.recommendation.RecommendationService;
+import datingapp.core.safety.TrustSafetyService;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;

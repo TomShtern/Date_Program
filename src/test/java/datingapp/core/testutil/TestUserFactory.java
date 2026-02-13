@@ -1,10 +1,15 @@
 package datingapp.core.testutil;
 
 import datingapp.core.AppClock;
+import datingapp.core.connection.*;
+import datingapp.core.matching.*;
+import datingapp.core.metrics.*;
 import datingapp.core.model.*;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.service.*;
+import datingapp.core.profile.*;
+import datingapp.core.recommendation.*;
+import datingapp.core.safety.*;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -45,11 +50,11 @@ public final class TestUserFactory {
                 .photoUrls(java.util.List.of("http://example.com/photo.jpg"))
                 .location(32.0853, 34.7818)
                 .hasLocationSet(true)
-                .pacePreferences(new datingapp.core.model.MatchPreferences.PacePreferences(
-                        datingapp.core.model.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
-                        datingapp.core.model.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
-                        datingapp.core.model.MatchPreferences.PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
-                        datingapp.core.model.MatchPreferences.PacePreferences.DepthPreference.DEEP_CHAT))
+                .pacePreferences(new datingapp.core.profile.MatchPreferences.PacePreferences(
+                        datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference.DEEP_CHAT))
                 .build();
     }
 

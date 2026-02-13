@@ -2,9 +2,10 @@ package datingapp.core.model;
 
 import datingapp.core.AppClock;
 import datingapp.core.EnumSetUtil;
-import datingapp.core.model.MatchPreferences.Interest;
-import datingapp.core.model.MatchPreferences.Lifestyle;
-import datingapp.core.model.MatchPreferences.PacePreferences;
+import datingapp.core.profile.MatchPreferences;
+import datingapp.core.profile.MatchPreferences.Interest;
+import datingapp.core.profile.MatchPreferences.Lifestyle;
+import datingapp.core.profile.MatchPreferences.PacePreferences;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
