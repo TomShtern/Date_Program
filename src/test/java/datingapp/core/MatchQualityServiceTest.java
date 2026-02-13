@@ -2,14 +2,11 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.connection.*;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
 import datingapp.core.matching.MatchQualityService.InterestMatcher;
 import datingapp.core.matching.MatchQualityService.MatchQuality;
-import datingapp.core.metrics.*;
 import datingapp.core.model.*;
-import datingapp.core.profile.*;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
@@ -17,8 +14,6 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyl
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;
 import datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency;
 import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Duration;

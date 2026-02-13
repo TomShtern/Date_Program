@@ -1,15 +1,8 @@
 package datingapp.core.testutil;
 
 import datingapp.core.AppClock;
-import datingapp.core.connection.*;
-import datingapp.core.matching.*;
-import datingapp.core.metrics.*;
-import datingapp.core.model.*;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.profile.*;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
 import java.time.LocalDate;
 import java.util.UUID;
 

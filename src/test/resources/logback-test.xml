@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n%ex</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Keep normal test runs quiet while retaining warnings/errors. -->
+    <logger name="datingapp" level="WARN" />
+    <logger name="org.jdbi" level="WARN" />
+    <logger name="com.zaxxer.hikari" level="WARN" />
+    <logger name="io.javalin" level="WARN" />
+    <logger name="org.eclipse.jetty" level="WARN" />
+
+    <root level="WARN">
+        <appender-ref ref="STDERR" />
+    </root>
+</configuration>

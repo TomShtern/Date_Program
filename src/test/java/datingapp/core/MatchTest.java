@@ -2,13 +2,7 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.connection.*;
-import datingapp.core.matching.*;
-import datingapp.core.metrics.*;
-import datingapp.core.model.*;
-import datingapp.core.profile.*;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
+import datingapp.core.model.Match;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;

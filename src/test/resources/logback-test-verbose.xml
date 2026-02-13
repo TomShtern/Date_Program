@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{40} - %msg%n%ex</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Verbose profile: richer diagnostics for local debugging. -->
+    <logger name="datingapp" level="DEBUG" />
+    <logger name="org.jdbi" level="INFO" />
+    <logger name="com.zaxxer.hikari" level="INFO" />
+    <logger name="io.javalin" level="INFO" />
+    <logger name="org.eclipse.jetty" level="INFO" />
+
+    <root level="INFO">
+        <appender-ref ref="STDERR" />
+    </root>
+</configuration>

@@ -2,13 +2,6 @@ package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.connection.*;
-import datingapp.core.matching.*;
-import datingapp.core.metrics.*;
-import datingapp.core.model.*;
-import datingapp.core.profile.*;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

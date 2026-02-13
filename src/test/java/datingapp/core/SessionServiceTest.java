@@ -7,15 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.connection.*;
 import datingapp.core.connection.ConnectionModels.Like;
-import datingapp.core.matching.*;
 import datingapp.core.metrics.*;
 import datingapp.core.metrics.SwipeState.Session;
-import datingapp.core.model.*;
-import datingapp.core.profile.*;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;

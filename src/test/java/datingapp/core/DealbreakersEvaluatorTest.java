@@ -4,15 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.connection.*;
-import datingapp.core.matching.*;
-import datingapp.core.metrics.*;
 import datingapp.core.model.*;
-import datingapp.core.profile.*;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.EnumSet;

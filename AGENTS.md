@@ -62,6 +62,7 @@ These tools are installed on the development machine and can be leveraged:
 
 ## Essential Commands
 
+<!--ARCHIVE:62:agent:github_copilot:scope:test-output-workflow-->
 ```bash
 # Build & Run
 mvn compile                          # Compile source
@@ -84,6 +85,32 @@ mvn verify                           # Full build + all quality checks
 rm ./data/dating.mv.db               # Reset database (delete all data)
 mvn clean                            # Clean build artifacts
 ```
+<!--/ARCHIVE-->
+
+```bash
+# Build & Run
+mvn compile                          # Compile source
+mvn compile && mvn exec:exec         # Compile + Run CLI (forked JVM with --enable-preview)
+mvn javafx:run                       # Run JavaFX GUI app
+
+# Testing (run default first; if it fails and you need more data, rerun with verbose profile)
+mvn test                             # All tests (default concise output)
+mvn -Ptest-output-verbose test       # All tests (verbose diagnostics)
+mvn -Ptest-output-verbose -Dtest=StatsHandlerTest test
+mvn -Ptest-output-verbose -Dtest="StatsHandlerTest#displaysUnlockedAchievements" test
+
+# Code Quality
+mvn spotless:apply                   # Format code (REQUIRED before commit)
+mvn spotless:check                   # Check formatting
+mvn checkstyle:check                 # Run Checkstyle
+mvn pmd:check                        # Run PMD analysis
+mvn verify                           # Full build + all quality checks
+
+# Database Management (H2)
+rm ./data/dating.mv.db               # Reset database (delete all data)
+mvn clean                            # Clean build artifacts
+```
+62|2026-02-13 10:15:00|agent:github_copilot|scope:test-output-workflow|Document regular-first test flow and verbose rerun commands|AGENTS.md
 
 ### Build Command Discipline
 
@@ -797,4 +824,5 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 59|2026-02-12 22:28:00|agent:github_copilot|scope:test-import-migration|Finalize test package migration updates for consolidated core packages and nested types; verify with compile and test runs|src/test/java/datingapp/ui/viewmodel/MatchesViewModelTest.java;src/test/java/datingapp/core/AchievementServiceTest.java;src/test/java/datingapp/core/CandidateFinderTest.java;src/test/java/datingapp/core/CoreUtilitiesTest.java;src/test/java/datingapp/core/EdgeCaseRegressionTest.java;src/test/java/datingapp/core/MatchQualityTest.java;src/test/java/datingapp/core/MatchQualityServiceTest.java;src/test/java/datingapp/core/UndoServiceTest.java;src/test/java/datingapp/core/DailyServiceTest.java;src/test/java/datingapp/core/DailyPickServiceTest.java;src/test/java/datingapp/app/cli/ProfileCreateSelectTest.java;src/test/java/datingapp/app/cli/StatsHandlerTest.java;src/test/java/datingapp/core/LikerBrowserServiceTest.java;src/test/java/datingapp/core/RelationshipTransitionServiceTest.java;src/test/java/datingapp/core/ValidationServiceTest.java;src/test/java/datingapp/storage/mapper/SqlRowReadersTest.java;AGENTS.md
 60|2026-02-12 23:16:00|agent:github_copilot|scope:ui-viewmodel-package-reorg|Move screen ViewModels and related UI/test imports to datingapp.ui.viewmodel.screen as Phase 5 package reorganization slice|src/main/java/datingapp/ui/viewmodel/screen/LoginViewModel.java;src/main/java/datingapp/ui/viewmodel/screen/DashboardViewModel.java;src/main/java/datingapp/ui/viewmodel/screen/MatchingViewModel.java;src/main/java/datingapp/ui/viewmodel/screen/MatchesViewModel.java;src/main/java/datingapp/ui/viewmodel/screen/ChatViewModel.java;src/main/java/datingapp/ui/viewmodel/screen/PreferencesViewModel.java;src/main/java/datingapp/ui/viewmodel/screen/ProfileViewModel.java;src/main/java/datingapp/ui/viewmodel/screen/StatsViewModel.java;src/main/java/datingapp/ui/ViewModelFactory.java;src/main/java/datingapp/ui/controller/LoginController.java;src/main/java/datingapp/ui/controller/DashboardController.java;src/main/java/datingapp/ui/controller/ProfileController.java;src/main/java/datingapp/ui/controller/MatchingController.java;src/main/java/datingapp/ui/controller/MatchesController.java;src/main/java/datingapp/ui/controller/ChatController.java;src/main/java/datingapp/ui/controller/PreferencesController.java;src/main/java/datingapp/ui/controller/StatsController.java;src/test/java/datingapp/ui/viewmodel/screen/MatchesViewModelTest.java;AGENTS.md
 61|2026-02-12 23:42:35|agent:github_copilot|scope:phase5-package-slice2|Move ApplicationStartup/CliSupport/UI screen controllers to bootstrap/shared/screen packages, update JavaFX FXML bindings, remove legacy duplicates, and verify full build|src/main/java/datingapp/app/bootstrap/ApplicationStartup.java;src/main/java/datingapp/app/cli/shared/CliSupport.java;src/main/java/datingapp/ui/screen/BaseController.java;src/main/java/datingapp/ui/screen/ChatController.java;src/main/java/datingapp/ui/screen/DashboardController.java;src/main/java/datingapp/ui/screen/LoginController.java;src/main/java/datingapp/ui/screen/MatchesController.java;src/main/java/datingapp/ui/screen/MatchingController.java;src/main/java/datingapp/ui/screen/PreferencesController.java;src/main/java/datingapp/ui/screen/ProfileController.java;src/main/java/datingapp/ui/screen/StatsController.java;src/main/resources/fxml/login.fxml;src/main/resources/fxml/dashboard.fxml;src/main/resources/fxml/profile.fxml;src/main/resources/fxml/matching.fxml;src/main/resources/fxml/matches.fxml;src/main/resources/fxml/chat.fxml;src/main/resources/fxml/preferences.fxml;src/main/resources/fxml/stats.fxml;src/main/java/datingapp/Main.java;src/main/java/datingapp/ui/DatingApp.java;src/main/java/datingapp/app/api/RestApiServer.java;src/main/java/datingapp/ui/ViewModelFactory.java;src/main/java/datingapp/ui/NavigationService.java;src/main/java/datingapp/app/cli/MatchingHandler.java;src/main/java/datingapp/app/cli/MessagingHandler.java;src/main/java/datingapp/app/cli/ProfileHandler.java;src/main/java/datingapp/app/cli/SafetyHandler.java;src/main/java/datingapp/app/cli/StatsHandler.java;src/test/java/datingapp/app/ConfigLoaderTest.java;src/test/java/datingapp/app/cli/EnumMenuTest.java;src/test/java/datingapp/app/cli/LikerBrowserHandlerTest.java;src/test/java/datingapp/app/cli/MessagingHandlerTest.java;src/test/java/datingapp/app/cli/ProfileCreateSelectTest.java;src/test/java/datingapp/app/cli/ProfileNotesHandlerTest.java;src/test/java/datingapp/app/cli/RelationshipHandlerTest.java;src/test/java/datingapp/app/cli/SafetyHandlerTest.java;src/test/java/datingapp/app/cli/StatsHandlerTest.java;src/test/java/datingapp/core/NestedTypeVisibilityTest.java;docs/plans/2026-02-12-source-consolidation-implementation-plan.md;AGENTS.md
+62|2026-02-13 10:15:00|agent:github_copilot|scope:test-output-workflow|Document regular-first test flow and verbose rerun commands|AGENTS.md;CLAUDE.md;.github/copilot-instructions.md
 ---AGENT-LOG-END---

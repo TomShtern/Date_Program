@@ -4,14 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.connection.*;
-import datingapp.core.matching.*;
-import datingapp.core.metrics.*;
-import datingapp.core.model.*;
 import datingapp.core.profile.*;
 import datingapp.core.profile.ValidationService.ValidationResult;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

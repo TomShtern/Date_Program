@@ -2,15 +2,9 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.connection.*;
-import datingapp.core.matching.*;
 import datingapp.core.metrics.*;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.SwipeState.Session;
-import datingapp.core.model.*;
-import datingapp.core.profile.*;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.testutil.TestClock;
 import java.time.Duration;

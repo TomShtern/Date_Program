@@ -6,15 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.connection.*;
-import datingapp.core.matching.*;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
-import datingapp.core.metrics.*;
-import datingapp.core.model.*;
-import datingapp.core.profile.*;
+import datingapp.core.model.Match;
 import datingapp.core.profile.MatchPreferences.Interest;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;

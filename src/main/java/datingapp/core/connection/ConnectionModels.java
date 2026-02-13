@@ -34,10 +34,10 @@ public final class ConnectionModels {
         public static final int MAX_LENGTH = 1000;
 
         public Message {
-            Objects.requireNonNull(id, "id cannot be null");
+            Objects.requireNonNull(id, ID_REQUIRED);
             Objects.requireNonNull(conversationId, "conversationId cannot be null");
             Objects.requireNonNull(senderId, "senderId cannot be null");
-            Objects.requireNonNull(createdAt, "createdAt cannot be null");
+            Objects.requireNonNull(createdAt, CREATED_AT_REQUIRED);
 
             if (content == null || content.isBlank()) {
                 throw new IllegalArgumentException("Message cannot be empty");

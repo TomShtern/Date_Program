@@ -212,8 +212,11 @@ boolean confirmed = UiSupport.showConfirmation(
 ```bash
 mvn compile && mvn exec:exec              # Compile + Run CLI (forked JVM with --enable-preview)
 mvn javafx:run                            # Run JavaFX GUI
-mvn test                                  # All tests (802+)
-mvn test -Dtest=MatchingServiceTest#mutualLikesCreateMatch  # Single method
+# Testing workflow: run default first; if it fails and you need more diagnostics, rerun with verbose profile
+mvn test                                  # All tests (default concise output)
+mvn -Ptest-output-verbose test            # All tests (verbose diagnostics)
+mvn -Ptest-output-verbose -Dtest=StatsHandlerTest test  # Single test class (verbose)
+mvn -Ptest-output-verbose -Dtest="StatsHandlerTest#displaysUnlockedAchievements" test  # Single test method (verbose, quoted for PowerShell)
 mvn spotless:apply && mvn verify          # Format + full quality checks (REQUIRED before commit)
 ```
 

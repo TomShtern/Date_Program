@@ -4,13 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.app.bootstrap.ApplicationStartup;
 import datingapp.core.AppConfig;
-import datingapp.core.connection.*;
-import datingapp.core.matching.*;
-import datingapp.core.metrics.*;
-import datingapp.core.model.*;
-import datingapp.core.profile.*;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

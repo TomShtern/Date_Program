@@ -81,6 +81,7 @@ These are the **top errors** that cause compilation/runtime failures:
 
 ## Quick Commands
 
+<!--ARCHIVE:19:agent:github_copilot:scope:test-output-workflow-->
 ```bash
 # Build & Run
 mvn compile && mvn exec:exec          # Compile + Run CLI (dev/debug, forked JVM)
@@ -90,6 +91,21 @@ mvn javafx:run                         # Run JavaFX GUI
 mvn test                               # All tests
 mvn spotless:apply && mvn verify       # Format + full quality checks
 ```
+<!--/ARCHIVE-->
+
+```bash
+# Build & Run
+mvn compile && mvn exec:exec          # Compile + Run CLI (dev/debug, forked JVM)
+mvn javafx:run                         # Run JavaFX GUI
+
+# Testing & Quality (REQUIRED before commit)
+mvn test                               # Run this first (default concise output)
+mvn -Ptest-output-verbose test         # If failures need more detail, rerun verbose
+mvn -Ptest-output-verbose -Dtest=StatsHandlerTest test
+mvn -Ptest-output-verbose -Dtest="StatsHandlerTest#displaysUnlockedAchievements" test
+mvn spotless:apply && mvn verify       # Format + full quality checks
+```
+19|2026-02-13 10:15:00|agent:github_copilot|scope:test-output-workflow|Document regular-first test flow and verbose rerun commands|CLAUDE.md
 
 ### Build Command Discipline (Agents: READ THIS)
 
@@ -481,4 +497,5 @@ public interface JdbiUserStorage extends UserStorage {
 16|2026-02-10 00:00:00|agent:claude_code|docs-major-refactor|Updated stats 189/48K, added nested enums/UI adapters/StorageFactory/constants/soft-delete/schema patterns; updated package structure table (13 packages); added 3 new gotchas; 3 new NEVER rules|CLAUDE.md
 17|2026-02-11 12:00:00|agent:github_copilot|scope:codebase-consolidation|Consolidated 189→160 files: models→core/model, services→core/service, merged 3 storage interfaces into TrustSafetyStorage, merged CleanupService→SessionService, consolidated UiDataAdapters/UiConstants/EnumSetJdbiSupport, updated all 3 doc files|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
 18|2026-02-11 22:52:00|agent:codex|scope:docs-stats-sync|Synced docs to latest verified baseline (802 tests) and refreshed storage-consolidation documentation consistency|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
+19|2026-02-13 10:15:00|agent:github_copilot|scope:test-output-workflow|Document regular-first test flow and verbose rerun commands|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
 ---AGENT-LOG-END---

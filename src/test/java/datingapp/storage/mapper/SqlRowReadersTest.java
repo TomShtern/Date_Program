@@ -2,13 +2,6 @@ package datingapp.storage.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.connection.*;
-import datingapp.core.matching.*;
-import datingapp.core.metrics.*;
-import datingapp.core.model.*;
-import datingapp.core.profile.*;
-import datingapp.core.recommendation.*;
-import datingapp.core.safety.*;
 import datingapp.storage.jdbi.shared.JdbiTypeCodecs.SqlRowReaders;
 import java.io.InputStream;
 import java.io.Reader;
