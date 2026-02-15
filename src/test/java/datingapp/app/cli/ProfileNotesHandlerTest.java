@@ -3,7 +3,7 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.app.cli.profile.ProfileHandler;
-import datingapp.app.cli.shared.CliSupport.InputReader;
+import datingapp.app.cli.shared.CliTextAndInput.InputReader;
 import datingapp.core.*;
 import datingapp.core.model.*;
 import datingapp.core.model.User.Gender;

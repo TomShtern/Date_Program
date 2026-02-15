@@ -52,7 +52,7 @@ public final class NavigationService {
     private static final int MAX_HISTORY_SIZE = 20;
 
     /** Enum defining available views and their FXML resource paths. */
-    public enum ViewType {
+    public static enum ViewType {
         LOGIN("/fxml/login.fxml"),
         DASHBOARD("/fxml/dashboard.fxml"),
         PROFILE("/fxml/profile.fxml"),
@@ -74,7 +74,7 @@ public final class NavigationService {
     }
 
     /** Types of screen transition animations. */
-    public enum TransitionType {
+    public static enum TransitionType {
         /** Fade out old screen, fade in new screen */
         FADE,
         /** Slide new screen in from right, old screen slides left */

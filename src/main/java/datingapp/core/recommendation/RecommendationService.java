@@ -204,9 +204,9 @@ public class RecommendationService {
         String cacheKey = seeker.getId() + "_" + today;
 
         // Use computeIfAbsent for atomic check-and-populate (eliminates race condition)
-        UUID pickedId = cachedDailyPicks.computeIfAbsent(
-                cacheKey,
-                _ -> candidates.get(pickRandom.nextInt(candidates.size())).getId());
+        UUID pickedId = cachedDailyPicks.computeIfAbsent(cacheKey, ignoredKey -> candidates
+                .get(pickRandom.nextInt(candidates.size()))
+                .getId());
 
         // Find the cached user in current candidates (may have been filtered out since
         // caching)
@@ -624,7 +624,7 @@ public class RecommendationService {
     }
 
     /** Status snapshot for daily limits. */
-    public record DailyStatus(
+    public static record DailyStatus(
             int likesUsed, int likesRemaining, int passesUsed, int passesRemaining, LocalDate date, Instant resetsAt) {
 
         public DailyStatus {

@@ -2,7 +2,7 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.app.cli.shared.CliSupport.InputReader;
+import datingapp.app.cli.shared.CliTextAndInput.InputReader;
 import datingapp.core.connection.ConnectionModels;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.MatchQualityService;

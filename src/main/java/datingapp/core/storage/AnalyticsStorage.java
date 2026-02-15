@@ -89,7 +89,7 @@ public interface AnalyticsStorage {
     int deleteExpiredSessions(Instant cutoff);
 
     /** Aggregated statistics for a user's swipe sessions. */
-    public record SessionAggregates(
+    public static record SessionAggregates(
             int totalSessions,
             int totalSwipes,
             int totalLikes,

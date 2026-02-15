@@ -81,10 +81,10 @@ public final class ConnectionModels {
                 Match.ArchiveReason archiveReason,
                 boolean visibleToUserA,
                 boolean visibleToUserB) {
-            Objects.requireNonNull(id, "id cannot be null");
+            Objects.requireNonNull(id, ID_REQUIRED);
             Objects.requireNonNull(userA, "userA cannot be null");
             Objects.requireNonNull(userB, "userB cannot be null");
-            Objects.requireNonNull(createdAt, "createdAt cannot be null");
+            Objects.requireNonNull(createdAt, CREATED_AT_REQUIRED);
 
             if (userA.equals(userB)) {
                 throw new IllegalArgumentException("Cannot have conversation with yourself");

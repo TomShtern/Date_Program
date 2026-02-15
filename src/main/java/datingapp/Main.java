@@ -6,8 +6,8 @@ import datingapp.app.cli.matching.MatchingHandler;
 import datingapp.app.cli.metrics.StatsHandler;
 import datingapp.app.cli.profile.ProfileHandler;
 import datingapp.app.cli.safety.SafetyHandler;
-import datingapp.app.cli.shared.CliSupport;
-import datingapp.app.cli.shared.CliSupport.InputReader;
+import datingapp.app.cli.shared.CliTextAndInput;
+import datingapp.app.cli.shared.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
@@ -46,32 +46,26 @@ public final class Main {
                         .invoke(65001);
                 linker.downcallHandle(kernel32.find("SetConsoleCP").orElseThrow(), sig)
                         .invoke(65001);
-            } catch (
-                    Throwable
-                            ignored) { // NOPMD AvoidCatchingThrowable - MethodHandle.invoke() declares throws Throwable
+            } catch (Throwable throwable) { // NOPMD AvoidCatchingThrowable - MethodHandle.invoke() declares throws
+                // Throwable
                 // FFM unavailable — try subprocess fallback
                 try {
                     new ProcessBuilder("cmd", "/c", "chcp 65001 >nul")
                             .inheritIO()
                             .start()
                             .waitFor();
-                } catch (InterruptedException ie) {
+                } catch (InterruptedException interruptedException) {
                     Thread.currentThread().interrupt(); // Restore interrupt flag
-                } catch (Exception alsoIgnored) {
+                } catch (Exception exception) {
                     // Best-effort: console codepage not critical for app functionality
                     assert true; // PMD: non-empty catch block
                 }
             }
         }
         System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
-        System.setErr(new PrintStream(System.err, true, StandardCharsets.UTF_8));
     }
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
-
-    private Main() {
-        /* Utility class with only static methods */
-    }
 
     // Application context
     private static ServiceRegistry services;
@@ -83,6 +77,10 @@ public final class Main {
     private static SafetyHandler safetyHandler;
     private static StatsHandler statsHandler;
     private static MessagingHandler messagingHandler;
+
+    private Main() {
+        /* Utility class with only static methods */
+    }
 
     public static void main(String[] args) {
         try (Scanner scanner = new Scanner(System.in)) {
@@ -120,7 +118,7 @@ public final class Main {
                         running = false;
                         logInfo("\n👋 Goodbye!\n");
                     }
-                    default -> logInfo(CliSupport.INVALID_SELECTION);
+                    default -> logInfo(CliTextAndInput.INVALID_SELECTION);
                 }
             }
 
@@ -184,9 +182,9 @@ public final class Main {
     }
 
     private static void printMenu() {
-        logInfo(CliSupport.SEPARATOR_LINE);
+        logInfo(CliTextAndInput.SEPARATOR_LINE);
         logInfo("         DATING APP - PHASE 0.5");
-        logInfo(CliSupport.SEPARATOR_LINE);
+        logInfo(CliTextAndInput.SEPARATOR_LINE);
 
         User currentUser = AppSession.getInstance().getCurrentUser();
 
@@ -243,7 +241,7 @@ public final class Main {
         logInfo("  19. 🤝 Friend Requests");
         logInfo("  20. 🌟 View Standouts");
         logInfo("  0. Exit");
-        logInfo(CliSupport.SEPARATOR_LINE + "\n");
+        logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
     }
 
     private static void shutdown() {

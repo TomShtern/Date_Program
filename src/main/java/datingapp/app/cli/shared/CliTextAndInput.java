@@ -13,11 +13,9 @@ import org.slf4j.LoggerFactory;
  * Shared CLI constants and utility methods.
  * Merged from CliConstants + CliUtilities (R-010).
  */
-public final class CliSupport {
+public final class CliTextAndInput {
 
-    private CliSupport() {} // Utility class
-
-    private static final Logger logger = LoggerFactory.getLogger(CliSupport.class);
+    private static final Logger logger = LoggerFactory.getLogger(CliTextAndInput.class);
 
     // ═══ Display Constants ═══
 
@@ -70,6 +68,8 @@ public final class CliSupport {
     public static final String STATS_MATCHES = "  💕 MATCHES";
     public static final String STATS_SCORES = "  🎯 YOUR SCORES";
     public static final String STATS_SAFETY = "  ⚠️  SAFETY";
+
+    private CliTextAndInput() {} // Utility class
 
     // ═══ Utility Methods ═══
 

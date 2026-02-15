@@ -295,7 +295,7 @@ public final class UiComponents {
                         fade.setToValue(1.0);
                         fade.play();
                     });
-                } catch (Exception _) {
+                } catch (Exception ignored) {
                     Platform.runLater(() -> {
                         skeletonLoader.stop();
                         // Show error state or placeholder

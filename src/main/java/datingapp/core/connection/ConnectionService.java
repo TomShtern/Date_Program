@@ -316,7 +316,7 @@ public class ConnectionService {
     }
 
     /** Result of sending a message. */
-    public record SendResult(boolean success, Message message, String errorMessage, ErrorCode errorCode) {
+    public static record SendResult(boolean success, Message message, String errorMessage, ErrorCode errorCode) {
 
         public SendResult {
             if (success) {
@@ -331,7 +331,7 @@ public class ConnectionService {
         }
 
         /** Error codes for message sending failures. */
-        public enum ErrorCode {
+        public static enum ErrorCode {
             NO_ACTIVE_MATCH,
             USER_NOT_FOUND,
             EMPTY_MESSAGE,
@@ -348,7 +348,7 @@ public class ConnectionService {
     }
 
     /** Preview of a conversation for list display. */
-    public record ConversationPreview(
+    public static record ConversationPreview(
             Conversation conversation, User otherUser, Optional<Message> lastMessage, int unreadCount) {
 
         public ConversationPreview {

@@ -48,7 +48,7 @@ public final class ProfileService {
     // ========================================================================
 
     /** Result of detailed completion analysis with category breakdowns. */
-    public record CompletionResult(
+    public static record CompletionResult(
             int score,
             String tier,
             int filledFields,
@@ -86,7 +86,8 @@ public final class ProfileService {
     }
 
     /** Breakdown of completion by category. */
-    public record CategoryBreakdown(String category, int score, List<String> filledItems, List<String> missingItems) {
+    public static record CategoryBreakdown(
+            String category, int score, List<String> filledItems, List<String> missingItems) {
 
         public CategoryBreakdown {
             Objects.requireNonNull(category, "category cannot be null");
@@ -99,7 +100,7 @@ public final class ProfileService {
     }
 
     /** Result of simple profile completeness calculation. */
-    public record ProfileCompleteness(int percentage, List<String> filledFields, List<String> missingFields) {
+    public static record ProfileCompleteness(int percentage, List<String> filledFields, List<String> missingFields) {
 
         public ProfileCompleteness {
             if (percentage < 0 || percentage > 100) {
@@ -111,7 +112,7 @@ public final class ProfileService {
     }
 
     /** Full profile preview result. */
-    public record ProfilePreview(
+    public static record ProfilePreview(
             User user,
             ProfileCompleteness completeness,
             List<String> improvementTips,
@@ -127,7 +128,7 @@ public final class ProfileService {
         }
     }
 
-    private record CategoryResult(
+    private static record CategoryResult(
             int earnedPoints,
             int totalPoints,
             int filledCount,
@@ -600,7 +601,7 @@ public final class ProfileService {
     }
 
     /** Progress towards an achievement. */
-    public record AchievementProgress(Achievement achievement, int current, int target, boolean unlocked) {
+    public static record AchievementProgress(Achievement achievement, int current, int target, boolean unlocked) {
 
         public AchievementProgress {
             Objects.requireNonNull(achievement, "achievement cannot be null");

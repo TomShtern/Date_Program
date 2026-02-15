@@ -1,7 +1,7 @@
 package datingapp.app.cli.connection;
 
-import datingapp.app.cli.shared.CliSupport;
-import datingapp.app.cli.shared.CliSupport.InputReader;
+import datingapp.app.cli.shared.CliTextAndInput;
+import datingapp.app.cli.shared.CliTextAndInput.InputReader;
 import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
@@ -62,7 +62,7 @@ public class MessagingHandler implements LoggingSupport {
     public void showConversations() {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) {
-            logInfo(CliSupport.PLEASE_SELECT_USER);
+            logInfo(CliTextAndInput.PLEASE_SELECT_USER);
             return;
         }
 
@@ -89,16 +89,16 @@ public class MessagingHandler implements LoggingSupport {
 
     /** Prints the header for the conversation list. */
     private void printConversationListHeader() {
-        logInfo("\n{}", CliSupport.SEPARATOR_LINE);
+        logInfo("\n{}", CliTextAndInput.SEPARATOR_LINE);
         logInfo("       💬 YOUR CONVERSATIONS");
-        logInfo("{}", CliSupport.SEPARATOR_LINE);
+        logInfo("{}", CliTextAndInput.SEPARATOR_LINE);
     }
 
     /** Prints a message when there are no conversations. */
     private void printEmptyConversations() {
         logInfo("\n  No conversations yet.");
         logInfo("  Start by matching with someone and send a message!\n");
-        logInfo("{}", CliSupport.MENU_DIVIDER);
+        logInfo("{}", CliTextAndInput.MENU_DIVIDER);
         logInfo("[B] Back");
         input.readLine("> ");
     }
@@ -119,7 +119,7 @@ public class MessagingHandler implements LoggingSupport {
             logInfo("\nTotal unread: {} message(s)", totalUnread);
         }
 
-        logInfo("{}", CliSupport.MENU_DIVIDER);
+        logInfo("{}", CliTextAndInput.MENU_DIVIDER);
         logInfo("[#] Select conversation  [B] Back");
     }
 
@@ -139,10 +139,10 @@ public class MessagingHandler implements LoggingSupport {
                 showConversation(currentUser, previews.get(idx));
                 return messagingService.getConversations(currentUser.getId());
             } else {
-                logInfo(CliSupport.INVALID_SELECTION);
+                logInfo(CliTextAndInput.INVALID_SELECTION);
             }
-        } catch (NumberFormatException _) {
-            logInfo(CliSupport.INVALID_INPUT);
+        } catch (NumberFormatException ignored) {
+            logInfo(CliTextAndInput.INVALID_INPUT);
         }
         return previews;
     }
@@ -191,24 +191,17 @@ public class MessagingHandler implements LoggingSupport {
             }
 
             ConversationAction action = processConversationInput(userInput, canMessage, currentUser, otherUser);
-            switch (action) {
-                case EXIT -> {
-                    return;
-                }
-                case SHOW_OLDER -> {
-                    offset += MESSAGES_PER_PAGE;
-                    showOlder = true;
-                }
-                case REFRESH -> {
-                    offset = 0;
-                    showOlder = false;
-                }
-                case CONTINUE -> {
-                    /* No action needed, continue conversation loop */
-                }
-                default -> {
-                    /* Unknown action - do nothing */
-                }
+            if (action == ConversationAction.EXIT) {
+                return;
+            }
+            if (action == ConversationAction.SHOW_OLDER) {
+                offset += MESSAGES_PER_PAGE;
+                showOlder = true;
+                continue;
+            }
+            if (action == ConversationAction.REFRESH) {
+                offset = 0;
+                showOlder = false;
             }
         }
     }
@@ -227,12 +220,12 @@ public class MessagingHandler implements LoggingSupport {
      * @param canMessage Whether the user can send messages in this conversation
      */
     private void printConversationHeader(String otherUserName, boolean canMessage) {
-        logInfo("\n{}", CliSupport.SEPARATOR_LINE);
+        logInfo("\n{}", CliTextAndInput.SEPARATOR_LINE);
         logInfo("       💬 Conversation with {}", otherUserName);
         if (!canMessage) {
             logInfo("       ⚠️  Match ended - read only");
         }
-        logInfo("{}", CliSupport.SEPARATOR_LINE);
+        logInfo("{}", CliTextAndInput.SEPARATOR_LINE);
     }
 
     /**
@@ -264,7 +257,7 @@ public class MessagingHandler implements LoggingSupport {
             logInfo("\n  [Type /older to see older messages]");
         }
 
-        logInfo("{}", CliSupport.MENU_DIVIDER);
+        logInfo("{}", CliTextAndInput.MENU_DIVIDER);
         if (canMessage) {
             logInfo("Commands: /back  /older  /block  /unmatch");
             logInfo("\nType your message:");
@@ -284,12 +277,11 @@ public class MessagingHandler implements LoggingSupport {
      */
     private ConversationAction processConversationInput(
             String userInput, boolean canMessage, User currentUser, User otherUser) {
-
-        if ("/back".equalsIgnoreCase(userInput) || "b".equalsIgnoreCase(userInput)) {
+        if (isBackCommand(userInput)) {
             return ConversationAction.EXIT;
         }
 
-        if ("/older".equalsIgnoreCase(userInput)) {
+        if (isOlderCommand(userInput)) {
             return ConversationAction.SHOW_OLDER;
         }
 
@@ -298,32 +290,63 @@ public class MessagingHandler implements LoggingSupport {
             return ConversationAction.CONTINUE;
         }
 
-        if ("/block".equalsIgnoreCase(userInput)) {
-            if (confirmAction("Block " + otherUser.getName())) {
-                blockUser(currentUser, otherUser);
-                return ConversationAction.EXIT;
-            }
-            return ConversationAction.CONTINUE;
+        return handleSendOrRelationshipCommand(userInput, currentUser, otherUser);
+    }
+
+    private ConversationAction handleSendOrRelationshipCommand(String userInput, User currentUser, User otherUser) {
+        if (isBlockCommand(userInput)) {
+            return handleBlockCommand(currentUser, otherUser);
         }
 
-        if ("/unmatch".equalsIgnoreCase(userInput)) {
-            if (confirmAction("Unmatch from " + otherUser.getName())) {
-                unmatchUser(currentUser, otherUser);
-                return ConversationAction.EXIT;
-            }
-            return ConversationAction.CONTINUE;
+        if (isUnmatchCommand(userInput)) {
+            return handleUnmatchCommand(currentUser, otherUser);
         }
 
-        // Send message
+        return sendConversationMessage(currentUser, otherUser, userInput);
+    }
+
+    private ConversationAction handleBlockCommand(User currentUser, User otherUser) {
+        if (confirmAction("Block " + otherUser.getName())) {
+            blockUser(currentUser, otherUser);
+            return ConversationAction.EXIT;
+        }
+        return ConversationAction.CONTINUE;
+    }
+
+    private ConversationAction handleUnmatchCommand(User currentUser, User otherUser) {
+        if (confirmAction("Unmatch from " + otherUser.getName())) {
+            unmatchUser(currentUser, otherUser);
+            return ConversationAction.EXIT;
+        }
+        return ConversationAction.CONTINUE;
+    }
+
+    private ConversationAction sendConversationMessage(User currentUser, User otherUser, String userInput) {
         SendResult result = messagingService.sendMessage(currentUser.getId(), otherUser.getId(), userInput);
 
         if (result.success()) {
             logInfo("\n✓ Message sent");
             return ConversationAction.REFRESH;
-        } else {
-            logInfo("\n❌ {}", result.errorMessage());
-            return ConversationAction.CONTINUE;
         }
+
+        logInfo("\n❌ {}", result.errorMessage());
+        return ConversationAction.CONTINUE;
+    }
+
+    private boolean isBackCommand(String userInput) {
+        return "/back".equalsIgnoreCase(userInput) || "b".equalsIgnoreCase(userInput);
+    }
+
+    private boolean isOlderCommand(String userInput) {
+        return "/older".equalsIgnoreCase(userInput);
+    }
+
+    private boolean isBlockCommand(String userInput) {
+        return "/block".equalsIgnoreCase(userInput);
+    }
+
+    private boolean isUnmatchCommand(String userInput) {
+        return "/unmatch".equalsIgnoreCase(userInput);
     }
 
     /** Displays a single message. */
@@ -362,11 +385,11 @@ public class MessagingHandler implements LoggingSupport {
         if (message == null) {
             return "";
         }
-        message = message.replace('\n', ' ').replace('\r', ' ');
-        if (message.length() <= maxLen) {
-            return message;
+        String sanitizedMessage = message.replace('\n', ' ').replace('\r', ' ');
+        if (sanitizedMessage.length() <= maxLen) {
+            return sanitizedMessage;
         }
-        return message.substring(0, maxLen - 3) + "...";
+        return sanitizedMessage.substring(0, maxLen - 3) + "...";
     }
 
     /** Asks for confirmation of an action. */

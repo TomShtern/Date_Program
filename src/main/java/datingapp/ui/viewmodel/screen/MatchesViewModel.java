@@ -150,7 +150,7 @@ public class MatchesViewModel {
         try {
             return javafx.application.Platform.isFxApplicationThread()
                     || com.sun.javafx.application.PlatformImpl.isFxApplicationThread();
-        } catch (IllegalStateException | NoClassDefFoundError _) {
+        } catch (IllegalStateException | NoClassDefFoundError ignored) {
             return false;
         }
     }
@@ -491,11 +491,11 @@ public class MatchesViewModel {
     }
 
     /** Data class for a match card display. */
-    public record MatchCardData(
+    public static record MatchCardData(
             String matchId, UUID userId, String userName, String matchedTimeAgo, Instant matchedAt) {}
 
     /** Data class for a like card display. */
-    public record LikeCardData(
+    public static record LikeCardData(
             UUID userId,
             UUID likeId,
             String userName,

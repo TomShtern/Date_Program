@@ -28,7 +28,7 @@ public class PreferencesViewModel {
     private User currentUser;
 
     // UI-specific enum for single-selection preference
-    public enum GenderPreference {
+    public static enum GenderPreference {
         MEN,
         WOMEN,
         EVERYONE

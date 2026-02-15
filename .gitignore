@@ -132,3 +132,7 @@ cUserstom7sAppDataLocalTempclaude-*
 /.ai/mcp/mcp.json
 /.output.txt
 .claude/settings.local.json
+
+
+#Ignore insiders AI rules
+.github\instructions\codacy.instructions.md

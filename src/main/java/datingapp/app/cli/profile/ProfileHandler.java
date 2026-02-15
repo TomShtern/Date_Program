@@ -1,8 +1,8 @@
 package datingapp.app.cli.profile;
 
-import datingapp.app.cli.shared.CliSupport;
-import datingapp.app.cli.shared.CliSupport.EnumMenu;
-import datingapp.app.cli.shared.CliSupport.InputReader;
+import datingapp.app.cli.shared.CliTextAndInput;
+import datingapp.app.cli.shared.CliTextAndInput.EnumMenu;
+import datingapp.app.cli.shared.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.EnumSetUtil;
 import datingapp.core.LoggingSupport;
@@ -43,6 +43,7 @@ public class ProfileHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(ProfileHandler.class);
     private static final String INDENTED_LINE = "    {}";
     private static final String INDENTED_BULLET = "    - {}";
+    private static final String ERROR_MESSAGE_FORMAT = "❌ {}\n";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final UserStorage userStorage;
@@ -81,7 +82,7 @@ public class ProfileHandler implements LoggingSupport {
      * to activate the profile if complete.
      */
     public void completeProfile() {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             logInfo("\n--- Complete Profile for {} ---\n", currentUser.getName());
 
@@ -117,19 +118,19 @@ public class ProfileHandler implements LoggingSupport {
      * percentage and improvement tips.
      */
     public void previewProfile() {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             ProfileService.ProfilePreview preview = profileCompletionService.generatePreview(currentUser);
 
-            logInfo("\n" + CliSupport.SEPARATOR_LINE);
+            logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
             logInfo("      👤 YOUR PROFILE PREVIEW");
-            logInfo(CliSupport.SEPARATOR_LINE);
+            logInfo(CliTextAndInput.SEPARATOR_LINE);
             logInfo("");
             logInfo("  This is how others see you:");
             logInfo("");
 
             // Card display
-            logInfo(CliSupport.BOX_TOP);
+            logInfo(CliTextAndInput.BOX_TOP);
             String verifiedBadge = currentUser.isVerified() ? " ✅ Verified" : "";
             logInfo("│ 💝 {}, {} years old{}", currentUser.getName(), currentUser.getAge(), verifiedBadge);
             logInfo("│ 📍 Location: {}, {}", currentUser.getLat(), currentUser.getLon());
@@ -137,11 +138,11 @@ public class ProfileHandler implements LoggingSupport {
             if (bio.length() > 50) {
                 bio = bio.substring(0, 47) + "...";
             }
-            logInfo(CliSupport.PROFILE_BIO_FORMAT, bio);
+            logInfo(CliTextAndInput.PROFILE_BIO_FORMAT, bio);
             if (preview.displayLookingFor() != null) {
                 logInfo("│ 💭 {}", preview.displayLookingFor());
             }
-            logInfo(CliSupport.BOX_BOTTOM);
+            logInfo(CliTextAndInput.BOX_BOTTOM);
 
             // Completeness
             ProfileService.ProfileCompleteness comp = preview.completeness();
@@ -178,7 +179,7 @@ public class ProfileHandler implements LoggingSupport {
      * based on lifestyle MatchPreferences.
      */
     public void setDealbreakers() {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             boolean editing = true;
             while (editing) {
@@ -187,7 +188,7 @@ public class ProfileHandler implements LoggingSupport {
 
                 String choice = inputReader.readLine(PROMPT_CHOICE).trim();
                 if ("0".equals(choice)) {
-                    logInfo(CliSupport.CANCELLED);
+                    logInfo(CliTextAndInput.CANCELLED);
                     editing = false;
                     continue;
                 }
@@ -236,7 +237,7 @@ public class ProfileHandler implements LoggingSupport {
         try {
             LocalDate birthDate = LocalDate.parse(birthStr, DATE_FORMAT);
             currentUser.setBirthDate(birthDate);
-        } catch (DateTimeParseException _) {
+        } catch (DateTimeParseException ignored) {
             logInfo("⚠️  Invalid date format, skipping.");
         }
     }
@@ -247,7 +248,7 @@ public class ProfileHandler implements LoggingSupport {
      * @param currentUser The user whose gender is being set
      */
     private void promptGender(User currentUser) {
-        logInfo("\n" + CliSupport.GENDER_OPTIONS);
+        logInfo("\n" + CliTextAndInput.GENDER_OPTIONS);
         String genderChoice = inputReader.readLine("Your gender (1/2/3): ");
         Gender gender =
                 switch (genderChoice) {
@@ -262,7 +263,7 @@ public class ProfileHandler implements LoggingSupport {
     }
 
     private void promptInterestedIn(User currentUser) {
-        logInfo("\n" + CliSupport.INTERESTED_IN_PROMPT);
+        logInfo("\n" + CliTextAndInput.INTERESTED_IN_PROMPT);
         String interestedStr = inputReader.readLine("Your preferences: ");
         Set<Gender> interestedIn = parseGenderSet(interestedStr);
         if (!interestedIn.isEmpty()) {
@@ -308,10 +309,8 @@ public class ProfileHandler implements LoggingSupport {
                     currentUser.setInterests(interestSet);
                     logInfo("✅ Interests cleared.\n");
                 }
-                case "0" -> {
-                    editing = false;
-                } // NOPMD AssignmentInOperand
-                default -> logInfo(CliSupport.INVALID_SELECTION);
+                case "0" -> editing = false; // NOPMD AssignmentInOperand
+                default -> logInfo(CliTextAndInput.INVALID_SELECTION);
             }
         }
 
@@ -461,7 +460,7 @@ public class ProfileHandler implements LoggingSupport {
             } else {
                 currentUser.setAgeRange(minAge, maxAge);
             }
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignored) {
             logInfo("⚠️  Invalid age range, using defaults.");
         }
     }
@@ -480,7 +479,7 @@ public class ProfileHandler implements LoggingSupport {
      * @param currentUser The user whose lifestyle preferences are being set
      */
     private void promptLifestyle(User currentUser) {
-        logInfo("\n" + CliSupport.HEADER_LIFESTYLE + "\n");
+        logInfo("\n" + CliTextAndInput.HEADER_LIFESTYLE + "\n");
 
         String heightStr = inputReader.readLine("Height in cm (e.g., 175, or Enter to skip): ");
         if (!heightStr.isBlank()) {
@@ -493,7 +492,7 @@ public class ProfileHandler implements LoggingSupport {
                 } else {
                     currentUser.setHeightCm(height);
                 }
-            } catch (NumberFormatException _) {
+            } catch (NumberFormatException ignored) {
                 logInfo("⚠️  Invalid height, skipping.");
             }
         }
@@ -541,9 +540,9 @@ public class ProfileHandler implements LoggingSupport {
     // --- Dealbreaker Helpers ---
 
     private void displayCurrentDealbreakers(User currentUser) {
-        logInfo("\n" + CliSupport.SEPARATOR_LINE);
+        logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
         logInfo("         SET YOUR DEALBREAKERS");
-        logInfo(CliSupport.SEPARATOR_LINE + "\n");
+        logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
         logInfo("Dealbreakers are HARD filters.\n");
 
         Dealbreakers current = currentUser.getDealbreakers();
@@ -574,7 +573,7 @@ public class ProfileHandler implements LoggingSupport {
     }
 
     private void displayDealbreakerMenu() {
-        logInfo(CliSupport.MENU_DIVIDER);
+        logInfo(CliTextAndInput.MENU_DIVIDER);
         logInfo("  1. Set smoking dealbreaker");
         logInfo("  2. Set drinking dealbreaker");
         logInfo("  3. Set kids stance dealbreaker");
@@ -583,7 +582,7 @@ public class ProfileHandler implements LoggingSupport {
         logInfo("  6. Set max age difference");
         logInfo("  7. Clear all dealbreakers");
         logInfo("  0. Cancel");
-        logInfo(CliSupport.MENU_DIVIDER + "\n");
+        logInfo(CliTextAndInput.MENU_DIVIDER + "\n");
     }
 
     // Note: I am copying the logic from Main.java for dealbreakers
@@ -637,8 +636,8 @@ public class ProfileHandler implements LoggingSupport {
                 currentUser.setDealbreakers(Dealbreakers.none());
                 logInfo("✅ All dealbreakers cleared.\n");
             }
-            case "0" -> logInfo(CliSupport.CANCELLED);
-            default -> logInfo(CliSupport.INVALID_SELECTION);
+            case "0" -> logInfo(CliTextAndInput.CANCELLED);
+            default -> logInfo(CliTextAndInput.INVALID_SELECTION);
         }
     }
 
@@ -672,10 +671,10 @@ public class ProfileHandler implements LoggingSupport {
             }
             currentUser.setDealbreakers(builder.build());
             logInfo("✅ Height dealbreaker updated.\n");
-        } catch (NumberFormatException _) {
-            logInfo(CliSupport.INVALID_INPUT);
+        } catch (NumberFormatException ignored) {
+            logInfo(CliTextAndInput.INVALID_INPUT);
         } catch (IllegalArgumentException e) {
-            logInfo("❌ {}\n", e.getMessage());
+            logInfo(ERROR_MESSAGE_FORMAT, e.getMessage());
         }
     }
 
@@ -688,8 +687,8 @@ public class ProfileHandler implements LoggingSupport {
                 builder.maxAgeDifference(Integer.parseInt(input));
                 currentUser.setDealbreakers(builder.build());
                 logInfo("✅ Age dealbreaker updated.\n");
-            } catch (NumberFormatException _) {
-                logInfo(CliSupport.INVALID_INPUT);
+            } catch (NumberFormatException ignored) {
+                logInfo(CliTextAndInput.INVALID_INPUT);
             }
         } else {
             currentUser.setDealbreakers(builder.build());
@@ -706,12 +705,12 @@ public class ProfileHandler implements LoggingSupport {
      * @param subjectName the name of the user (for display)
      */
     public void manageNoteFor(UUID subjectId, String subjectName) {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
 
-            logInfo("\n" + CliSupport.MENU_DIVIDER);
+            logInfo("\n" + CliTextAndInput.MENU_DIVIDER);
             logInfo("       📝 NOTES ABOUT {}", subjectName.toUpperCase(Locale.ROOT));
-            logInfo(CliSupport.MENU_DIVIDER);
+            logInfo(CliTextAndInput.MENU_DIVIDER);
 
             Optional<User.ProfileNote> existingNote = userStorage.getProfileNote(currentUser.getId(), subjectId);
 
@@ -744,12 +743,12 @@ public class ProfileHandler implements LoggingSupport {
 
     /** Views all notes the current user has created. */
     public void viewAllNotes() {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
 
-            logInfo("\n" + CliSupport.MENU_DIVIDER);
+            logInfo("\n" + CliTextAndInput.MENU_DIVIDER);
             logInfo("         📝 MY PROFILE NOTES");
-            logInfo(CliSupport.MENU_DIVIDER + "\n");
+            logInfo(CliTextAndInput.MENU_DIVIDER + "\n");
 
             List<User.ProfileNote> notes = userStorage.getProfileNotesByAuthor(currentUser.getId());
 
@@ -826,7 +825,7 @@ public class ProfileHandler implements LoggingSupport {
             userStorage.saveProfileNote(note);
             logInfo("✅ Note saved!\n");
         } catch (IllegalArgumentException e) {
-            logInfo("❌ {}\n", e.getMessage());
+            logInfo(ERROR_MESSAGE_FORMAT, e.getMessage());
         }
     }
 
@@ -850,7 +849,7 @@ public class ProfileHandler implements LoggingSupport {
             userStorage.saveProfileNote(updated);
             logInfo("✅ Note updated!\n");
         } catch (IllegalArgumentException e) {
-            logInfo("❌ {}\n", e.getMessage());
+            logInfo(ERROR_MESSAGE_FORMAT, e.getMessage());
         }
     }
 
@@ -913,7 +912,7 @@ public class ProfileHandler implements LoggingSupport {
             }
             session.setCurrentUser(users.get(idx));
             logInfo("\n✅ Selected: {}\n", session.getCurrentUser().getName());
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignored) {
             logInfo("❌ Invalid input.\n");
         }
     }
@@ -922,7 +921,7 @@ public class ProfileHandler implements LoggingSupport {
      * Displays the profile completion score and breakdown for the current user.
      */
     public void viewProfileScore() {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             ProfileService.CompletionResult result = profileCompletionService.calculate(currentUser);
 

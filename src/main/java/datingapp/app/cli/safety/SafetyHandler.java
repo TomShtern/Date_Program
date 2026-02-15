@@ -1,7 +1,7 @@
 package datingapp.app.cli.safety;
 
-import datingapp.app.cli.shared.CliSupport;
-import datingapp.app.cli.shared.CliSupport.InputReader;
+import datingapp.app.cli.shared.CliTextAndInput;
+import datingapp.app.cli.shared.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.connection.ConnectionModels.Report;
@@ -49,8 +49,8 @@ public class SafetyHandler implements LoggingSupport {
 
     /** Allows the current user to block another user. */
     public void blockUser() {
-        CliSupport.requireLogin(() -> {
-            logInfo(CliSupport.HEADER_BLOCK_USER);
+        CliTextAndInput.requireLogin(() -> {
+            logInfo(CliTextAndInput.HEADER_BLOCK_USER);
 
             User currentUser = session.getCurrentUser();
             List<User> blockableUsers = getBlockableUsers(currentUser);
@@ -64,8 +64,8 @@ public class SafetyHandler implements LoggingSupport {
                 return;
             }
 
-            String confirm =
-                    inputReader.readLine(CliSupport.BLOCK_PREFIX + toBlock.getName() + CliSupport.CONFIRM_SUFFIX);
+            String confirm = inputReader.readLine(
+                    CliTextAndInput.BLOCK_PREFIX + toBlock.getName() + CliTextAndInput.CONFIRM_SUFFIX);
             if ("y".equalsIgnoreCase(confirm)) {
                 TrustSafetyService.BlockResult result = trustSafetyService.block(currentUser.getId(), toBlock.getId());
                 if (result.success()) {
@@ -74,21 +74,21 @@ public class SafetyHandler implements LoggingSupport {
                     logInfo("❌ {}\n", result.errorMessage());
                 }
             } else {
-                logInfo(CliSupport.CANCELLED);
+                logInfo(CliTextAndInput.CANCELLED);
             }
         });
     }
 
     /** Allows the current user to report another user for violations. */
     public void reportUser() {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             if (currentUser.getState() != UserState.ACTIVE) {
                 logInfo("\n⚠️  You must be ACTIVE to report users.\n");
                 return;
             }
 
-            logInfo(CliSupport.HEADER_REPORT_USER);
+            logInfo(CliTextAndInput.HEADER_REPORT_USER);
 
             List<User> reportableUsers = getReportableUsers(currentUser);
 
@@ -138,7 +138,7 @@ public class SafetyHandler implements LoggingSupport {
                 return null;
             }
             return reasons[reasonIdx];
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignored) {
             logInfo("❌ Invalid input.\n");
             return null;
         }
@@ -148,7 +148,7 @@ public class SafetyHandler implements LoggingSupport {
      * Displays blocked users and allows the current user to unblock them.
      */
     public void manageBlockedUsers() {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
             List<User> blockedUsers = trustSafetyService.getBlockedUsers(currentUser.getId());
 
@@ -157,13 +157,13 @@ public class SafetyHandler implements LoggingSupport {
                 return;
             }
 
-            logInfo(CliSupport.HEADER_BLOCKED_USERS);
+            logInfo(CliTextAndInput.HEADER_BLOCKED_USERS);
             User toUnblock = selectUserFromList(blockedUsers, "\nEnter number to unblock (or 0 to go back): ", true);
             if (toUnblock == null) {
                 return;
             }
 
-            String confirm = inputReader.readLine("Unblock " + toUnblock.getName() + CliSupport.CONFIRM_SUFFIX);
+            String confirm = inputReader.readLine("Unblock " + toUnblock.getName() + CliTextAndInput.CONFIRM_SUFFIX);
             if ("y".equalsIgnoreCase(confirm)) {
                 boolean success = trustSafetyService.unblock(currentUser.getId(), toUnblock.getId());
 
@@ -173,7 +173,7 @@ public class SafetyHandler implements LoggingSupport {
                     logInfo("❌ Failed to unblock user.\n");
                 }
             } else {
-                logInfo(CliSupport.CANCELLED);
+                logInfo(CliTextAndInput.CANCELLED);
             }
         });
     }
@@ -232,13 +232,13 @@ public class SafetyHandler implements LoggingSupport {
             int idx = Integer.parseInt(input) - 1;
             if (idx < 0 || idx >= users.size()) {
                 if (idx != -1) {
-                    logInfo(CliSupport.INVALID_INPUT);
+                    logInfo(CliTextAndInput.INVALID_INPUT);
                 }
                 return null;
             }
             return users.get(idx);
-        } catch (NumberFormatException _) {
-            logInfo(CliSupport.INVALID_INPUT);
+        } catch (NumberFormatException ignored) {
+            logInfo(CliTextAndInput.INVALID_INPUT);
             return null;
         }
     }
@@ -249,7 +249,7 @@ public class SafetyHandler implements LoggingSupport {
 
     /** Starts the profile verification flow for the current user. */
     public void verifyProfile() {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
 
             if (currentUser.isVerified()) {
@@ -268,7 +268,7 @@ public class SafetyHandler implements LoggingSupport {
                     /* cancelled */ }
                 case "1" -> startVerification(currentUser, VerificationMethod.EMAIL);
                 case "2" -> startVerification(currentUser, VerificationMethod.PHONE);
-                default -> logInfo(CliSupport.INVALID_SELECTION);
+                default -> logInfo(CliTextAndInput.INVALID_SELECTION);
             }
         });
     }

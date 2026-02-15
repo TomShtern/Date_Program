@@ -1,7 +1,7 @@
 package datingapp.app.cli.metrics;
 
-import datingapp.app.cli.shared.CliSupport;
-import datingapp.app.cli.shared.CliSupport.InputReader;
+import datingapp.app.cli.shared.CliTextAndInput;
+import datingapp.app.cli.shared.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.metrics.ActivityMetricsService;
@@ -43,19 +43,19 @@ public class StatsHandler implements LoggingSupport {
      * scores.
      */
     public void viewStatistics() {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             User currentUser = session.getCurrentUser();
-            logInfo("\n" + CliSupport.SEPARATOR_LINE);
-            logInfo(CliSupport.HEADER_YOUR_STATISTICS);
-            logInfo(CliSupport.SEPARATOR_LINE + "\n");
+            logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
+            logInfo(CliTextAndInput.HEADER_YOUR_STATISTICS);
+            logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
 
             UserStats stats = statsService.getOrComputeStats(currentUser.getId());
             String computedAt = stats.computedAt().toString().substring(0, 16).replace("T", " ");
             logInfo("  Last updated: {}\n", computedAt);
 
             // Activity section
-            logInfo(CliSupport.STATS_ACTIVITY);
-            logInfo(CliSupport.SECTION_LINE);
+            logInfo(CliTextAndInput.STATS_ACTIVITY);
+            logInfo(CliTextAndInput.SECTION_LINE);
             logInfo(
                     "  Swipes given:     {} ({} likes, {} passes)",
                     stats.totalSwipesGiven(),
@@ -77,8 +77,8 @@ public class StatsHandler implements LoggingSupport {
                     stats.passesReceived());
 
             // Matches section
-            logInfo(CliSupport.STATS_MATCHES);
-            logInfo(CliSupport.SECTION_LINE);
+            logInfo(CliTextAndInput.STATS_MATCHES);
+            logInfo(CliTextAndInput.SECTION_LINE);
             logInfo("  Total matches:    {}", stats.totalMatches());
             logInfo("  Active matches:   {}", stats.activeMatches());
 
@@ -92,8 +92,8 @@ public class StatsHandler implements LoggingSupport {
             logInfo("  Match rate:       {} {}\n", stats.getMatchRateDisplay(), matchRateDesc);
 
             // Scores section
-            logInfo(CliSupport.STATS_SCORES);
-            logInfo(CliSupport.SECTION_LINE);
+            logInfo(CliTextAndInput.STATS_SCORES);
+            logInfo(CliTextAndInput.SECTION_LINE);
             logInfo("  Reciprocity:      {} (of your likes, liked you back)", stats.getReciprocityDisplay());
 
             String selectivenessDesc = "Average";
@@ -119,8 +119,8 @@ public class StatsHandler implements LoggingSupport {
                     || stats.blocksReceived() > 0
                     || stats.reportsGiven() > 0
                     || stats.reportsReceived() > 0) {
-                logInfo(CliSupport.STATS_SAFETY);
-                logInfo(CliSupport.SECTION_LINE);
+                logInfo(CliTextAndInput.STATS_SAFETY);
+                logInfo(CliTextAndInput.SECTION_LINE);
                 logInfo("  Blocks: {} given | {} received", stats.blocksGiven(), stats.blocksReceived());
                 logInfo("  Reports: {} given | {} received\n", stats.reportsGiven(), stats.reportsReceived());
             }
@@ -131,16 +131,16 @@ public class StatsHandler implements LoggingSupport {
 
     /** Displays all unlocked achievements for the current user. */
     public void viewAchievements() {
-        CliSupport.requireLogin(() -> {
+        CliTextAndInput.requireLogin(() -> {
             // Check for any new achievements first
             checkAndDisplayNewAchievements(session.getCurrentUser());
 
             User currentUser = session.getCurrentUser();
             final List<UserAchievement> unlocked = achievementService.getUnlocked(currentUser.getId());
 
-            logInfo("\n" + CliSupport.SEPARATOR_LINE);
-            logInfo(CliSupport.HEADER_YOUR_ACHIEVEMENTS);
-            logInfo(CliSupport.SEPARATOR_LINE + "\n");
+            logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
+            logInfo(CliTextAndInput.HEADER_YOUR_ACHIEVEMENTS);
+            logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
 
             if (unlocked.isEmpty()) {
                 logInfo("  No achievements yet. Keep swiping!\n");

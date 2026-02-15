@@ -456,7 +456,7 @@ public class ProfileController extends BaseController implements Initializable {
             try {
                 int height = Integer.parseInt(newVal.trim());
                 viewModel.heightProperty().set(height);
-            } catch (NumberFormatException _) {
+            } catch (NumberFormatException ignored) {
                 assert true; // Non-numeric input ignored; user is still typing
             }
         }));
@@ -480,7 +480,7 @@ public class ProfileController extends BaseController implements Initializable {
                 viewModel.heightProperty().set(null);
                 UiFeedbackService.showWarning("Please enter a height between " + minHeight + "-" + maxHeight + " cm");
             }
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignored) {
             heightField.setText("");
             viewModel.heightProperty().set(null);
         }

@@ -1,38 +1,214 @@
 graph TD
     %% Styling
-    classDef core fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    classDef storage fill:#fff3e0,stroke:#e65100,stroke-width:2px;
-    classDef ui fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
-    classDef config fill:#e0f2f1,stroke:#00695c,stroke-width:2px;
+    classDef core fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef storage fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef ui fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef cli fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef bootstrap fill:#e0f2f1,stroke:#00695c,stroke-width:2px
 
-    subgraph "Presentation Layer (UI)"
-        direction TB
-        UI_App[DatingApp] --> NavService[NavigationService]
-        NavService --> ViewModelFactory
-        ViewModelFactory --> UI_VM[ViewModels]
-        UI_VM --> UI_Controller[Controllers]
+    %% ═══════════════════════════════════════
+    %% Entry Points & Bootstrap
+    %% ═══════════════════════════════════════
+    subgraph "Bootstrap"
+        ApplicationStartup["ApplicationStartup<br/><i>Synchronized init + config</i>"]
+        StorageFactory["StorageFactory<br/><i>Wires JDBI → services → registry</i>"]
+        ServiceRegistry["ServiceRegistry<br/><i>DI container (15 components)</i>"]
+        AppConfig["AppConfig<br/><i>57-parameter record</i>"]
     end
 
-    subgraph "Domain Layer (Core)"
-        direction TB
-        ServiceRegistry --> |Injects| Services
-        Services[Domain Services]
-        Entities[Entities & Records]
-        Interfaces[Storage Interfaces]
-        Services --> Entities
-        Services --> Interfaces
+    subgraph "Entry Points"
+        Main["Main.java<br/><i>CLI menu loop</i>"]
+        DatingApp["DatingApp.java<br/><i>JavaFX Application</i>"]
+        RestApi["RestApiServer<br/><i>Javalin HTTP</i>"]
     end
 
-    subgraph "Infrastructure Layer (Storage)"
-        direction TB
-        DBManager[DatabaseManager] --> H2Impl[H2 Implementations]
-        H2Impl -.-> |Implements| Interfaces
+    %% ═══════════════════════════════════════
+    %% Presentation: CLI Layer
+    %% ═══════════════════════════════════════
+    subgraph "CLI Layer (app/cli/)"
+        CliTextAndInput["CliTextAndInput<br/><i>Constants + InputReader + EnumMenu</i>"]
+        MatchingHandler["MatchingHandler<br/><i>Browse, matches, standouts</i>"]
+        ProfileHandler["ProfileHandler<br/><i>Create/select/complete profile</i>"]
+        MessagingHandler["MessagingHandler<br/><i>Conversations, messages</i>"]
+        SafetyHandler["SafetyHandler<br/><i>Block, report, verify</i>"]
+        StatsHandler["StatsHandler<br/><i>Statistics, achievements</i>"]
     end
 
-    class Services,Entities,Interfaces,ServiceRegistry core
-    class DBManager,H2Impl storage
-    class UI_App,NavService,ViewModelFactory,UI_VM,UI_Controller ui
+    %% ═══════════════════════════════════════
+    %% Presentation: JavaFX MVVM
+    %% ═══════════════════════════════════════
+    subgraph "JavaFX UI Layer (ui/)"
+        NavigationService["NavigationService<br/><i>Scene transitions + history</i>"]
+        ViewModelFactory["ViewModelFactory<br/><i>Lazy VM creation + adapters</i>"]
 
-    %% Dependencies
-    UI_VM --> |Uses| Services
-    ServiceRegistry --> |Wires| H2Impl
+        subgraph "Controllers (ui/screen/)"
+            BaseController["BaseController"]
+            LoginCtrl["LoginController"]
+            DashboardCtrl["DashboardController"]
+            MatchingCtrl["MatchingController"]
+            MatchesCtrl["MatchesController"]
+            ProfileCtrl["ProfileController"]
+            ChatCtrl["ChatController"]
+            StatsCtrl["StatsController"]
+            PrefsCtrl["PreferencesController"]
+        end
+
+        subgraph "ViewModels (ui/viewmodel/screen/)"
+            LoginVM["LoginViewModel"]
+            DashboardVM["DashboardViewModel"]
+            MatchingVM["MatchingViewModel"]
+            MatchesVM["MatchesViewModel"]
+            ProfileVM["ProfileViewModel"]
+            ChatVM["ChatViewModel"]
+            StatsVM["StatsViewModel"]
+            PrefsVM["PreferencesViewModel"]
+        end
+
+        subgraph "UI Support"
+            UiFeedback["UiFeedbackService<br/><i>Toasts + dialogs</i>"]
+            UiAdapters["UiDataAdapters<br/><i>UiUserStore + UiMatchDataAccess</i>"]
+            UiComponents["UiComponents<br/><i>Reusable factories</i>"]
+            ErrorSink["ViewModelErrorSink<br/><i>@FunctionalInterface</i>"]
+        end
+    end
+
+    %% ═══════════════════════════════════════
+    %% Domain Layer (core/)
+    %% ═══════════════════════════════════════
+    subgraph "Domain Layer (core/)"
+        subgraph "Domain Models"
+            User["User<br/><i>INCOMPLETE→ACTIVE↔PAUSED→BANNED</i>"]
+            Match["Match<br/><i>ACTIVE→FRIENDS|UNMATCHED|BLOCKED</i>"]
+            ConnModels["ConnectionModels<br/><i>Message, Conversation, Like,<br/>Block, Report, FriendRequest</i>"]
+            EngageDomain["EngagementDomain<br/><i>UserStats, Achievement</i>"]
+            MatchPrefs["MatchPreferences<br/><i>Dealbreakers, PacePreferences</i>"]
+        end
+
+        subgraph "Services"
+            CandidateFinder["CandidateFinder<br/><i>7-stage filter pipeline</i>"]
+            MatchingService["MatchingService<br/><i>Like/pass/unmatch (builder)</i>"]
+            MatchQuality["MatchQualityService<br/><i>6-factor scoring</i>"]
+            UndoService["UndoService<br/><i>30s undo window</i>"]
+            ProfileService["ProfileService<br/><i>Completion + achievements</i>"]
+            ValidationService["ValidationService<br/><i>Field validation</i>"]
+            ConnectionService["ConnectionService<br/><i>Messaging + transitions</i>"]
+            MetricsService["ActivityMetricsService<br/><i>Sessions + stats</i>"]
+            RecommendService["RecommendationService<br/><i>Daily limits + picks</i>"]
+            TrustSafety["TrustSafetyService<br/><i>Block/report + auto-ban</i>"]
+        end
+
+        subgraph "Storage Interfaces (core/storage/)"
+            UserStorage["UserStorage"]
+            InteractionStorage["InteractionStorage<br/><i>Likes + Matches + undo</i>"]
+            CommStorage["CommunicationStorage<br/><i>Conversations + Messages +<br/>FriendRequests + Notifications</i>"]
+            AnalyticsStorage["AnalyticsStorage<br/><i>Stats + Achievements +<br/>Sessions + DailyPicks</i>"]
+            TrustSafetyStorage["TrustSafetyStorage<br/><i>Blocks + Reports</i>"]
+        end
+    end
+
+    %% ═══════════════════════════════════════
+    %% Storage Layer
+    %% ═══════════════════════════════════════
+    subgraph "Infrastructure Layer (storage/)"
+        DatabaseManager["DatabaseManager<br/><i>HikariCP + H2</i>"]
+        SchemaInit["SchemaInitializer<br/><i>14 tables + indexes</i>"]
+
+        subgraph "JDBI Implementations (storage/jdbi/)"
+            JdbiUser["JdbiUserStorage<br/><i>profile/</i>"]
+            JdbiMatch["JdbiMatchmakingStorage<br/><i>matching/</i>"]
+            JdbiConn["JdbiConnectionStorage<br/><i>connection/</i>"]
+            JdbiMetrics["JdbiMetricsStorage<br/><i>metrics/</i>"]
+            JdbiSafety["JdbiTrustSafetyStorage<br/><i>safety/</i>"]
+            JdbiCodecs["JdbiTypeCodecs<br/><i>shared/</i>"]
+        end
+    end
+
+    subgraph "Database"
+        H2[("H2 Database<br/>14 tables")]
+    end
+
+    %% ═══════════════════════════════════════
+    %% Relationships
+    %% ═══════════════════════════════════════
+
+    %% Bootstrap flow
+    Main --> ApplicationStartup
+    DatingApp --> ApplicationStartup
+    RestApi --> ApplicationStartup
+    ApplicationStartup --> StorageFactory
+    StorageFactory --> ServiceRegistry
+
+    %% CLI wiring
+    Main --> MatchingHandler
+    Main --> ProfileHandler
+    Main --> MessagingHandler
+    Main --> SafetyHandler
+    Main --> StatsHandler
+    Main --> CliTextAndInput
+
+    %% JavaFX wiring
+    DatingApp --> NavigationService
+    DatingApp --> ViewModelFactory
+    ViewModelFactory --> UiAdapters
+    NavigationService --> LoginCtrl
+    NavigationService --> DashboardCtrl
+
+    %% Controller → ViewModel
+    LoginCtrl --> LoginVM
+    DashboardCtrl --> DashboardVM
+    MatchingCtrl --> MatchingVM
+    MatchesCtrl --> MatchesVM
+    ProfileCtrl --> ProfileVM
+    ChatCtrl --> ChatVM
+    StatsCtrl --> StatsVM
+    PrefsCtrl --> PrefsVM
+
+    %% All controllers inherit BaseController
+    LoginCtrl --> BaseController
+    DashboardCtrl --> BaseController
+
+    %% ViewModel → UI Support
+    LoginVM --> ErrorSink
+    MatchingVM --> UiAdapters
+
+    %% Services → Storage Interfaces
+    CandidateFinder --> UserStorage
+    CandidateFinder --> InteractionStorage
+    CandidateFinder --> TrustSafetyStorage
+    MatchingService --> InteractionStorage
+    MatchingService --> TrustSafetyStorage
+    ConnectionService --> CommStorage
+    ConnectionService --> InteractionStorage
+    MetricsService --> AnalyticsStorage
+    MetricsService --> InteractionStorage
+    TrustSafety --> TrustSafetyStorage
+    ProfileService --> AnalyticsStorage
+    RecommendService --> UserStorage
+
+    %% JDBI implements interfaces
+    JdbiUser -.->|implements| UserStorage
+    JdbiMatch -.->|implements| InteractionStorage
+    JdbiConn -.->|implements| CommStorage
+    JdbiMetrics -.->|implements| AnalyticsStorage
+    JdbiSafety -.->|implements| TrustSafetyStorage
+
+    %% Storage → Database
+    DatabaseManager --> H2
+    SchemaInit --> DatabaseManager
+    JdbiUser --> DatabaseManager
+    JdbiMatch --> DatabaseManager
+    JdbiConn --> DatabaseManager
+
+    %% Apply styles
+    class User,Match,ConnModels,EngageDomain,MatchPrefs core
+    class CandidateFinder,MatchingService,MatchQuality,UndoService core
+    class ProfileService,ValidationService,ConnectionService core
+    class MetricsService,RecommendService,TrustSafety core
+    class UserStorage,InteractionStorage,CommStorage,AnalyticsStorage,TrustSafetyStorage core
+    class ServiceRegistry,AppConfig,ApplicationStartup,StorageFactory bootstrap
+    class DatabaseManager,SchemaInit,JdbiUser,JdbiMatch,JdbiConn,JdbiMetrics,JdbiSafety,JdbiCodecs storage
+    class NavigationService,ViewModelFactory,BaseController,UiFeedback,UiAdapters,UiComponents,ErrorSink ui
+    class LoginCtrl,DashboardCtrl,MatchingCtrl,MatchesCtrl,ProfileCtrl,ChatCtrl,StatsCtrl,PrefsCtrl ui
+    class LoginVM,DashboardVM,MatchingVM,MatchesVM,ProfileVM,ChatVM,StatsVM,PrefsVM ui
+    class Main,DatingApp,RestApi cli
+    class MatchingHandler,ProfileHandler,MessagingHandler,SafetyHandler,StatsHandler,CliTextAndInput cli

@@ -208,7 +208,7 @@ public class TrustSafetyService {
     }
 
     /** Result of a block action. */
-    public record BlockResult(boolean success, String errorMessage) {
+    public static record BlockResult(boolean success, String errorMessage) {
         public BlockResult {
             if (success && errorMessage != null) {
                 throw new IllegalArgumentException("errorMessage must be null on success");
@@ -263,7 +263,7 @@ public class TrustSafetyService {
     }
 
     /** Result of a report action, including moderation outcome. */
-    public record ReportResult(boolean success, boolean userWasBanned, String errorMessage) {
+    public static record ReportResult(boolean success, boolean userWasBanned, String errorMessage) {
 
         public ReportResult {
             if (success && errorMessage != null) {

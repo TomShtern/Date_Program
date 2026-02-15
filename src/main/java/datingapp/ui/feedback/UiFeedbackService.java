@@ -316,7 +316,7 @@ public final class UiFeedbackService {
     }
 
     /** Toast notification levels with associated icons. */
-    public enum ToastLevel {
+    public static enum ToastLevel {
         SUCCESS("mdi2c-check-circle"),
         ERROR("mdi2a-alert-circle"),
         WARNING("mdi2a-alert"),

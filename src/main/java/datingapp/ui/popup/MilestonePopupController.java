@@ -276,7 +276,7 @@ public class MilestonePopupController implements Initializable {
         this.autoDismiss = autoDismiss;
     }
 
-    public enum AchievementType {
+    public static enum AchievementType {
         FIRST_MATCH("mdi2h-heart-multiple", "First Match!", "You've made your first connection!", 50),
         PROFILE_COMPLETE("mdi2a-account-check", "Profile Complete", "Your profile is 100% complete!", 100),
         FIRST_MESSAGE("mdi2m-message-text", "First Message", "You sent your first message!", 25),
