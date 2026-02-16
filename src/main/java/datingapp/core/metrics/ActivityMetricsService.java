@@ -18,7 +18,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Consolidated service for session tracking and metrics/statistics computation. */
+/**
+ * Consolidated service for session tracking and metrics/statistics computation.
+ */
 public class ActivityMetricsService {
 
     private static final int LOCK_STRIPE_COUNT = 256;
@@ -29,35 +31,19 @@ public class ActivityMetricsService {
     private final AppConfig config;
     private final Object[] lockStripes;
 
-    public ActivityMetricsService(AnalyticsStorage analyticsStorage, AppConfig config) {
-        this(null, null, analyticsStorage, config);
-    }
-
-    public ActivityMetricsService(
-            InteractionStorage interactionStorage,
-            TrustSafetyStorage trustSafetyStorage,
-            AnalyticsStorage analyticsStorage) {
-        this(interactionStorage, trustSafetyStorage, analyticsStorage, AppConfig.defaults());
-    }
-
+    /** Canonical constructor — all dependencies are required. */
     public ActivityMetricsService(
             InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
             AnalyticsStorage analyticsStorage,
             AppConfig config) {
-        this.interactionStorage = interactionStorage;
-        this.trustSafetyStorage = trustSafetyStorage;
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+        this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.analyticsStorage = Objects.requireNonNull(analyticsStorage, "analyticsStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.lockStripes = new Object[LOCK_STRIPE_COUNT];
         for (int i = 0; i < LOCK_STRIPE_COUNT; i++) {
             lockStripes[i] = new Object();
-        }
-    }
-
-    private void ensureStatsDependencies() {
-        if (interactionStorage == null || trustSafetyStorage == null) {
-            throw new IllegalStateException("Stats dependencies are not configured");
         }
     }
 
@@ -153,7 +139,6 @@ public class ActivityMetricsService {
     }
 
     public UserStats computeAndSaveStats(UUID userId) {
-        ensureStatsDependencies();
         UserStats.StatsBuilder builder = new UserStats.StatsBuilder();
 
         builder.likesGiven = interactionStorage.countByDirection(userId, Like.Direction.LIKE);
@@ -202,7 +187,6 @@ public class ActivityMetricsService {
     }
 
     public UserStats getOrComputeStats(UUID userId) {
-        ensureStatsDependencies();
         Optional<UserStats> existing = analyticsStorage.getLatestUserStats(userId);
         if (existing.isPresent()) {
             Duration age = Duration.between(existing.get().computedAt(), AppClock.now());
@@ -218,7 +202,6 @@ public class ActivityMetricsService {
     }
 
     public PlatformStats computeAndSavePlatformStats() {
-        ensureStatsDependencies();
         List<UserStats> allStats = analyticsStorage.getAllLatestUserStats();
 
         if (allStats.isEmpty()) {

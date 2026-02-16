@@ -70,16 +70,17 @@ public final class StorageFactory {
                 new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
         ProfileService profileService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
-        RecommendationService recommendationService = new RecommendationService(
-                userStorage,
-                interactionStorage,
-                trustSafetyStorage,
-                analyticsStorage,
-                candidateFinder,
-                standoutStorage,
-                profileService,
-                config,
-                null);
+        RecommendationService recommendationService = RecommendationService.builder()
+                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(standoutStorage)
+                .profileService(profileService)
+                .config(config)
+                .clock(java.time.Clock.systemUTC())
+                .build();
         UndoService undoService = new UndoService(interactionStorage, undoStorage, config);
         ActivityMetricsService activityMetricsService =
                 new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
@@ -95,7 +96,7 @@ public final class StorageFactory {
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
 
         ConnectionService connectionService =
-                new ConnectionService(communicationStorage, interactionStorage, userStorage);
+                new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
 
         TrustSafetyService trustSafetyService =
                 new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);

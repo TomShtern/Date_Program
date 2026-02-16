@@ -218,50 +218,50 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     private interface LikeDao {
 
         @SqlQuery("""
-      SELECT id, who_likes, who_got_liked, direction, created_at
-      FROM likes
-      WHERE who_likes = :fromUserId AND who_got_liked = :toUserId
-      """)
+                SELECT id, who_likes, who_got_liked, direction, created_at
+                FROM likes
+                WHERE who_likes = :fromUserId AND who_got_liked = :toUserId
+                """)
         Optional<Like> getLike(@Bind("fromUserId") UUID fromUserId, @Bind("toUserId") UUID toUserId);
 
         @SqlUpdate("""
-      INSERT INTO likes (id, who_likes, who_got_liked, direction, created_at)
-      VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt)
-      """)
+                INSERT INTO likes (id, who_likes, who_got_liked, direction, created_at)
+                VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt)
+                """)
         void save(@BindBean Like like);
 
         @SqlQuery("""
-      SELECT EXISTS (
-          SELECT 1 FROM likes
-          WHERE who_likes = :from AND who_got_liked = :to
-      )
-      """)
+                SELECT EXISTS (
+                    SELECT 1 FROM likes
+                    WHERE who_likes = :from AND who_got_liked = :to
+                )
+                """)
         boolean exists(@Bind("from") UUID from, @Bind("to") UUID to);
 
         @SqlQuery("""
-      SELECT EXISTS (
-          SELECT 1 FROM likes l1
-          JOIN likes l2 ON l1.who_likes = l2.who_got_liked
-                       AND l1.who_got_liked = l2.who_likes
-          WHERE l1.who_likes = :a AND l1.who_got_liked = :b
-            AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
-      )
-      """)
+                SELECT EXISTS (
+                    SELECT 1 FROM likes l1
+                    JOIN likes l2 ON l1.who_likes = l2.who_got_liked
+                                 AND l1.who_got_liked = l2.who_likes
+                    WHERE l1.who_likes = :a AND l1.who_got_liked = :b
+                      AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
+                )
+                """)
         boolean mutualLikeExists(@Bind("a") UUID a, @Bind("b") UUID b);
 
         @SqlQuery("SELECT who_got_liked FROM likes WHERE who_likes = :userId")
         Set<UUID> getLikedOrPassedUserIds(@Bind("userId") UUID userId);
 
         @SqlQuery("""
-      SELECT who_likes FROM likes
-      WHERE who_got_liked = :userId AND direction = 'LIKE'
-      """)
+                SELECT who_likes FROM likes
+                WHERE who_got_liked = :userId AND direction = 'LIKE'
+                """)
         Set<UUID> getUserIdsWhoLiked(@Bind("userId") UUID userId);
 
         @SqlQuery("""
-      SELECT who_likes, created_at FROM likes
-      WHERE who_got_liked = :userId AND direction = 'LIKE'
-      """)
+                SELECT who_likes, created_at FROM likes
+                WHERE who_got_liked = :userId AND direction = 'LIKE'
+                """)
         List<LikeTimeEntry> getLikeTimesInternal(@Bind("userId") UUID userId);
 
         default List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
@@ -271,40 +271,40 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         }
 
         @SqlQuery("""
-      SELECT COUNT(*) FROM likes
-      WHERE who_likes = :userId AND direction = :direction
-      """)
+                SELECT COUNT(*) FROM likes
+                WHERE who_likes = :userId AND direction = :direction
+                """)
         int countByDirection(@Bind("userId") UUID userId, @Bind("direction") Like.Direction direction);
 
         @SqlQuery("""
-      SELECT COUNT(*) FROM likes
-      WHERE who_got_liked = :userId AND direction = :direction
-      """)
+                SELECT COUNT(*) FROM likes
+                WHERE who_got_liked = :userId AND direction = :direction
+                """)
         int countReceivedByDirection(@Bind("userId") UUID userId, @Bind("direction") Like.Direction direction);
 
         @SqlQuery("""
-      SELECT COUNT(*) FROM likes l1
-      JOIN likes l2 ON l1.who_likes = l2.who_got_liked
-                   AND l1.who_got_liked = l2.who_likes
-      WHERE l1.who_likes = :userId
-        AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
-      """)
+                SELECT COUNT(*) FROM likes l1
+                JOIN likes l2 ON l1.who_likes = l2.who_got_liked
+                             AND l1.who_got_liked = l2.who_likes
+                WHERE l1.who_likes = :userId
+                  AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
+                """)
         int countMutualLikes(@Bind("userId") UUID userId);
 
         @SqlQuery("""
-      SELECT COUNT(*) FROM likes
-      WHERE who_likes = :userId
-        AND direction = 'LIKE'
-        AND created_at >= :startOfDay
-      """)
+                SELECT COUNT(*) FROM likes
+                WHERE who_likes = :userId
+                  AND direction = 'LIKE'
+                  AND created_at >= :startOfDay
+                """)
         int countLikesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
         @SqlQuery("""
-      SELECT COUNT(*) FROM likes
-      WHERE who_likes = :userId
-        AND direction = 'PASS'
-        AND created_at >= :startOfDay
-      """)
+                SELECT COUNT(*) FROM likes
+                WHERE who_likes = :userId
+                  AND direction = 'PASS'
+                  AND created_at >= :startOfDay
+                """)
         int countPassesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
         @SqlUpdate("DELETE FROM likes WHERE id = :likeId")
@@ -316,24 +316,24 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         String MATCH_COLUMNS = "id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at";
 
         @SqlUpdate("""
-            MERGE INTO matches (
-                id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
-            ) KEY (id)
-            VALUES (
-                :id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
-            )
-            """)
+                MERGE INTO matches (
+                    id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
+                ) KEY (id)
+                VALUES (
+                    :id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
+                )
+                """)
         void save(@BindBean Match match);
 
         @SqlUpdate("""
-            UPDATE matches
-            SET state = :state,
-                ended_at = :endedAt,
-                ended_by = :endedBy,
-                end_reason = :endReason,
-                deleted_at = :deletedAt
-            WHERE id = :id
-            """)
+                UPDATE matches
+                SET state = :state,
+                    ended_at = :endedAt,
+                    ended_by = :endedBy,
+                    end_reason = :endReason,
+                    deleted_at = :deletedAt
+                WHERE id = :id
+                """)
         void update(@BindBean Match match);
 
         @SqlQuery("SELECT " + MATCH_COLUMNS + " FROM matches WHERE id = :matchId AND deleted_at IS NULL")
@@ -433,7 +433,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "ended_by"),
                     JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "end_reason", Match.ArchiveReason.class));
-            match.setDeletedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "deleted_at"));
+            match.restoreDeletedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "deleted_at"));
             return match;
         }
     }

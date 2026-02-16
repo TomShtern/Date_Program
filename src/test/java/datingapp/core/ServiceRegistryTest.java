@@ -125,15 +125,9 @@ class ServiceRegistryTest {
         }
 
         @Test
-        @DisplayName("getSessionService returns non-null")
-        void getSessionService() {
-            assertNotNull(registry.getSessionService());
-        }
-
-        @Test
-        @DisplayName("getStatsService returns non-null")
-        void getStatsService() {
-            assertNotNull(registry.getStatsService());
+        @DisplayName("getActivityMetricsService returns non-null")
+        void getActivityMetricsService() {
+            assertNotNull(registry.getActivityMetricsService());
         }
 
         @Test

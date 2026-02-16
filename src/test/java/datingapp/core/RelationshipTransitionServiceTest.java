@@ -37,7 +37,8 @@ class RelationshipTransitionServiceTest {
     void setUp() {
         interactionStorage = new TestStorages.Interactions();
         communicationStorage = new TestStorages.Communications();
-        service = new ConnectionService(interactionStorage, communicationStorage);
+        service = new ConnectionService(
+                AppConfig.defaults(), communicationStorage, interactionStorage, new TestStorages.Users());
 
         // Create a match between Alice and Bob
         Match match = Match.create(aliceId, bobId);

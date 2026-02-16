@@ -303,7 +303,7 @@ public final class TestStorages {
         public void delete(String matchId) {
             Match match = matches.get(matchId);
             if (match != null) {
-                match.setDeletedAt(AppClock.now());
+                match.restoreDeletedAt(AppClock.now());
             }
         }
 

@@ -1,6 +1,7 @@
 package datingapp.core.model;
 
 import datingapp.core.AppClock;
+import datingapp.core.AppConfig;
 import datingapp.core.EnumSetUtil;
 import datingapp.core.profile.MatchPreferences;
 import datingapp.core.profile.MatchPreferences.Interest;
@@ -532,8 +533,12 @@ public class User {
     }
 
     public void setAgeRange(int minAge, int maxAge) {
-        if (minAge <= 0) {
-            throw new IllegalArgumentException("minAge must be positive");
+        AppConfig config = AppConfig.defaults();
+        if (minAge < config.minAge()) {
+            throw new IllegalArgumentException("minAge must be at least " + config.minAge());
+        }
+        if (maxAge > config.maxAge()) {
+            throw new IllegalArgumentException("maxAge cannot exceed " + config.maxAge());
         }
         if (maxAge < minAge) {
             throw new IllegalArgumentException("maxAge cannot be less than minAge");

@@ -28,7 +28,9 @@ public final class ConnectionModels {
         return status == FriendRequest.Status.DECLINED || status == FriendRequest.Status.EXPIRED;
     }
 
-    /** Represents a single message within a conversation. Immutable after creation. */
+    /**
+     * Represents a single message within a conversation. Immutable after creation.
+     */
     public static record Message(UUID id, String conversationId, UUID senderId, String content, Instant createdAt) {
 
         public static final int MAX_LENGTH = 1000;
@@ -343,9 +345,8 @@ public final class ConnectionModels {
             if (reporterId.equals(reportedUserId)) {
                 throw new IllegalArgumentException("Cannot report yourself");
             }
-            if (description != null && description.length() > 500) {
-                throw new IllegalArgumentException("Description too long (max 500)");
-            }
+            // Description length validation is handled by TrustSafetyService using
+            // AppConfig
         }
 
         public static Report create(UUID reporterId, UUID reportedUserId, Reason reason, String description) {

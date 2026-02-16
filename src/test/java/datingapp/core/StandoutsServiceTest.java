@@ -9,6 +9,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.recommendation.*;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -47,13 +48,23 @@ class StandoutsServiceTest {
         TestClock.setFixed(FIXED_INSTANT);
         config = AppConfig.defaults();
         userStorage = new TestStorages.Users();
-        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        var interactionStorage = new TestStorages.Interactions();
+        var trustSafetyStorage = new TestStorages.TrustSafety();
+        var analyticsStorage = new TestStorages.Analytics();
         standoutStorage = new TestStandoutStorage();
         candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
-        profileCompletionService = new ProfileService(config);
-        service = new RecommendationService(
-                userStorage, standoutStorage, candidateFinder, profileCompletionService, config);
+        profileCompletionService =
+                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        service = RecommendationService.builder()
+                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(standoutStorage)
+                .profileService(profileCompletionService)
+                .config(config)
+                .build();
     }
 
     @AfterEach
@@ -108,45 +119,57 @@ class StandoutsServiceTest {
         @Test
         @DisplayName("Should require non-null userStorage")
         void requiresUserStorage() {
-            assertThrows(
-                    NullPointerException.class,
-                    () -> new RecommendationService(
-                            null, standoutStorage, candidateFinder, profileCompletionService, config));
+            var builder = baseBuilder();
+            // userStorage missing
+            assertThrows(NullPointerException.class, builder::build);
         }
 
         @Test
         @DisplayName("Should require non-null standoutStorage")
         void requiresStandoutStorage() {
-            assertThrows(
-                    NullPointerException.class,
-                    () -> new RecommendationService(
-                            userStorage, null, candidateFinder, profileCompletionService, config));
+            var builder = baseBuilder().userStorage(userStorage);
+            // standoutStorage missing
+            assertThrows(NullPointerException.class, builder::build);
         }
 
         @Test
         @DisplayName("Should require non-null candidateFinder")
         void requiresCandidateFinder() {
-            assertThrows(
-                    NullPointerException.class,
-                    () -> new RecommendationService(
-                            userStorage, standoutStorage, null, profileCompletionService, config));
+            var builder = baseBuilder().userStorage(userStorage).standoutStorage(standoutStorage);
+            // candidateFinder missing
+            assertThrows(NullPointerException.class, builder::build);
         }
 
         @Test
         @DisplayName("Should require non-null profileCompletionService")
         void requiresProfileService() {
-            assertThrows(
-                    NullPointerException.class,
-                    () -> new RecommendationService(userStorage, standoutStorage, candidateFinder, null, config));
+            var builder = baseBuilder()
+                    .userStorage(userStorage)
+                    .standoutStorage(standoutStorage)
+                    .candidateFinder(candidateFinder);
+            // profileService missing
+            assertThrows(NullPointerException.class, builder::build);
         }
 
         @Test
         @DisplayName("Should require non-null config")
         void requiresConfig() {
-            assertThrows(
-                    NullPointerException.class,
-                    () -> new RecommendationService(
-                            userStorage, standoutStorage, candidateFinder, profileCompletionService, null));
+            var builder = baseBuilder()
+                    .userStorage(userStorage)
+                    .standoutStorage(standoutStorage)
+                    .candidateFinder(candidateFinder)
+                    .profileService(profileCompletionService);
+            // config missing
+            assertThrows(NullPointerException.class, builder::build);
+        }
+
+        private RecommendationService.Builder baseBuilder() {
+            return RecommendationService.builder()
+                    .interactionStorage(new TestStorages.Interactions())
+                    .trustSafetyStorage(new TestStorages.TrustSafety())
+                    .analyticsStorage(new TestStorages.Analytics())
+                    // Config usually last
+                    .clock(Clock.systemUTC());
         }
     }
 

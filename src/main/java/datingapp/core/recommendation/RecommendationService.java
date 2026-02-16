@@ -30,7 +30,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class RecommendationService {
+public final class RecommendationService {
 
     private static final int MAX_STANDOUTS = 10;
     private static final int DIVERSITY_DAYS = 3;
@@ -47,81 +47,88 @@ public class RecommendationService {
 
     private final Map<String, UUID> cachedDailyPicks = new ConcurrentHashMap<>();
 
-    public RecommendationService(InteractionStorage interactionStorage, AppConfig config) {
-        this(null, interactionStorage, null, null, null, null, null, config, null);
+    public static Builder builder() {
+        return new Builder();
     }
 
-    public RecommendationService(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
-            AnalyticsStorage analyticsStorage,
-            CandidateFinder candidateFinder,
-            AppConfig config) {
-        this(userStorage, interactionStorage, null, analyticsStorage, candidateFinder, null, null, config, null);
+    public static class Builder {
+        private UserStorage userStorage;
+        private InteractionStorage interactionStorage;
+        private TrustSafetyStorage trustSafetyStorage;
+        private AnalyticsStorage analyticsStorage;
+        private CandidateFinder candidateFinder;
+        private Standout.Storage standoutStorage;
+        private ProfileService profileService;
+        private AppConfig config;
+        private Clock clock;
+
+        public Builder userStorage(UserStorage userStorage) {
+            this.userStorage = userStorage;
+            return this;
+        }
+
+        public Builder interactionStorage(InteractionStorage interactionStorage) {
+            this.interactionStorage = interactionStorage;
+            return this;
+        }
+
+        public Builder trustSafetyStorage(TrustSafetyStorage trustSafetyStorage) {
+            this.trustSafetyStorage = trustSafetyStorage;
+            return this;
+        }
+
+        public Builder analyticsStorage(AnalyticsStorage analyticsStorage) {
+            this.analyticsStorage = analyticsStorage;
+            return this;
+        }
+
+        public Builder candidateFinder(CandidateFinder candidateFinder) {
+            this.candidateFinder = candidateFinder;
+            return this;
+        }
+
+        public Builder standoutStorage(Standout.Storage standoutStorage) {
+            this.standoutStorage = standoutStorage;
+            return this;
+        }
+
+        public Builder profileService(ProfileService profileService) {
+            this.profileService = profileService;
+            return this;
+        }
+
+        public Builder config(AppConfig config) {
+            this.config = config;
+            return this;
+        }
+
+        public Builder clock(Clock clock) {
+            this.clock = clock;
+            return this;
+        }
+
+        public RecommendationService build() {
+            return new RecommendationService(this);
+        }
     }
 
-    public RecommendationService(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
-            TrustSafetyStorage trustSafetyStorage,
-            AnalyticsStorage analyticsStorage,
-            CandidateFinder candidateFinder,
-            AppConfig config,
-            Clock clock) {
-        this(
-                userStorage,
-                interactionStorage,
-                trustSafetyStorage,
-                analyticsStorage,
-                candidateFinder,
-                null,
-                null,
-                config,
-                clock);
-    }
-
-    public RecommendationService(
-            UserStorage userStorage,
-            Standout.Storage standoutStorage,
-            CandidateFinder candidateFinder,
-            ProfileService profileService,
-            AppConfig config) {
-        this(
-                Objects.requireNonNull(userStorage, "userStorage cannot be null"),
-                null,
-                null,
-                null,
-                Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null"),
-                Objects.requireNonNull(standoutStorage, "standoutStorage cannot be null"),
-                Objects.requireNonNull(profileService, "profileService cannot be null"),
-                Objects.requireNonNull(config, "config cannot be null"),
-                null);
-    }
-
-    public RecommendationService(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
-            TrustSafetyStorage trustSafetyStorage,
-            AnalyticsStorage analyticsStorage,
-            CandidateFinder candidateFinder,
-            Standout.Storage standoutStorage,
-            ProfileService profileService,
-            AppConfig config,
-            Clock clock) {
-        this.userStorage = userStorage;
-        this.interactionStorage = interactionStorage;
-        this.trustSafetyStorage = trustSafetyStorage;
-        this.analyticsStorage = analyticsStorage;
-        this.candidateFinder = candidateFinder;
-        this.standoutStorage = standoutStorage;
-        this.profileService = profileService;
-        this.config = Objects.requireNonNull(config, "config cannot be null");
-        this.clock = clock != null ? clock : AppClock.clock();
+    private RecommendationService(Builder builder) {
+        this.config = Objects.requireNonNull(builder.config, "config cannot be null");
+        this.clock = builder.clock != null ? builder.clock : AppClock.clock();
+        this.userStorage = Objects.requireNonNull(builder.userStorage, "userStorage cannot be null");
+        this.interactionStorage =
+                Objects.requireNonNull(builder.interactionStorage, "interactionStorage cannot be null");
+        this.trustSafetyStorage =
+                Objects.requireNonNull(builder.trustSafetyStorage, "trustSafetyStorage cannot be null");
+        this.analyticsStorage = Objects.requireNonNull(builder.analyticsStorage, "analyticsStorage cannot be null");
+        this.candidateFinder = Objects.requireNonNull(builder.candidateFinder, "candidateFinder cannot be null");
+        this.standoutStorage = Objects.requireNonNull(builder.standoutStorage, "standoutStorage cannot be null");
+        this.profileService = Objects.requireNonNull(builder.profileService, "profileService cannot be null");
     }
 
     /** Whether the user can perform a like action today. */
     public boolean canLike(UUID userId) {
-        ensureDailyLimitDependencies();
+
         Instant startOfDay = getStartOfToday();
         int likesUsed = interactionStorage.countLikesToday(userId, startOfDay);
         return canPerform(config.hasUnlimitedLikes(), config.dailyLikeLimit(), likesUsed);
@@ -129,7 +136,7 @@ public class RecommendationService {
 
     /** Whether the user can perform a pass action today. */
     public boolean canPass(UUID userId) {
-        ensureDailyLimitDependencies();
+
         Instant startOfDay = getStartOfToday();
         int passesUsed = interactionStorage.countPassesToday(userId, startOfDay);
         return canPerform(config.hasUnlimitedPasses(), config.dailyPassLimit(), passesUsed);
@@ -137,7 +144,7 @@ public class RecommendationService {
 
     /** Current daily status including counts and time to reset. */
     public DailyStatus getStatus(UUID userId) {
-        ensureDailyLimitDependencies();
+
         Instant startOfDay = getStartOfToday();
         Instant resetTime = getResetTime();
         LocalDate today = getToday();
@@ -171,7 +178,7 @@ public class RecommendationService {
 
     /** Get the daily pick for a user if available. */
     public Optional<DailyPick> getDailyPick(User seeker) {
-        ensureDailyPickDependencies();
+
         LocalDate today = getToday();
 
         // Use CandidateFinder to get filtered candidates
@@ -234,13 +241,13 @@ public class RecommendationService {
 
     /** Check whether user has viewed today's daily pick. */
     public boolean hasViewedDailyPick(UUID userId) {
-        ensureDailyPickDependencies();
+
         return hasViewedDailyPick(userId, getToday());
     }
 
     /** Mark today's daily pick as viewed for a user. */
     public void markDailyPickViewed(UUID userId) {
-        ensureDailyPickDependencies();
+
         markDailyPickViewed(userId, getToday());
     }
 
@@ -265,18 +272,6 @@ public class RecommendationService {
         String todaySuffix = "_" + LocalDate.now(clock);
         cachedDailyPicks.entrySet().removeIf(entry -> !entry.getKey().endsWith(todaySuffix));
         return removed;
-    }
-
-    private void ensureDailyPickDependencies() {
-        if (userStorage == null || analyticsStorage == null || interactionStorage == null) {
-            throw new IllegalStateException("Daily pick dependencies are not configured");
-        }
-    }
-
-    private void ensureDailyLimitDependencies() {
-        if (interactionStorage == null) {
-            throw new IllegalStateException("Daily limit dependencies are not configured");
-        }
     }
 
     private String generateReason(User seeker, User picked, Random random) {
@@ -366,7 +361,7 @@ public class RecommendationService {
 
     /** Get today's standouts for a user. Returns cached if available. */
     public Result getStandouts(User seeker) {
-        ensureStandoutDependencies();
+
         LocalDate today = AppClock.today(config.userTimeZone());
 
         List<Standout> cached = standoutStorage.getStandouts(seeker.getId(), today);
@@ -379,14 +374,14 @@ public class RecommendationService {
 
     /** Mark a standout as interacted after like/pass. */
     public void markInteracted(UUID seekerId, UUID standoutUserId) {
-        ensureStandoutDependencies();
+
         LocalDate today = AppClock.today(config.userTimeZone());
         standoutStorage.markInteracted(seekerId, standoutUserId, today);
     }
 
     /** Resolve standout user IDs to User objects. */
     public Map<UUID, User> resolveUsers(List<Standout> standouts) {
-        ensureStandoutDependencies();
+
         List<UUID> ids = standouts.stream().map(Standout::standoutUserId).toList();
         return userStorage.findByIds(new HashSet<>(ids));
     }
@@ -602,12 +597,6 @@ public class RecommendationService {
             }
         }
         return recent;
-    }
-
-    private void ensureStandoutDependencies() {
-        if (userStorage == null || standoutStorage == null || candidateFinder == null || profileService == null) {
-            throw new IllegalStateException("Standout dependencies are not configured");
-        }
     }
 
     /** Daily pick payload. */

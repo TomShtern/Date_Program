@@ -36,7 +36,8 @@ class StatsServiceTest {
         trustSafetyStorage = new TestStorages.TrustSafety();
         analyticsStorage = new TestStorages.Analytics();
 
-        statsService = new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage);
+        statsService = new ActivityMetricsService(
+                interactionStorage, trustSafetyStorage, analyticsStorage, AppConfig.defaults());
 
         userId = UUID.randomUUID();
         otherUserId = UUID.randomUUID();

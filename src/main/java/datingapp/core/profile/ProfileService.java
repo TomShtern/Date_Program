@@ -1,7 +1,6 @@
 package datingapp.core.profile;
 
 import datingapp.core.AppConfig;
-import datingapp.core.ScoringConstants;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
@@ -26,10 +25,43 @@ public final class ProfileService {
     private final TrustSafetyStorage trustSafetyStorage;
     private final UserStorage userStorage;
 
-    public ProfileService(AppConfig config) {
-        this(config, null, null, null, null);
-    }
+    // ── Profile completion thresholds (inlined from deleted ScoringConstants) ──
+    private static final int BIO_TIP_MIN_LENGTH = 50;
+    private static final int BIO_TIP_BOOST_LENGTH = 100;
+    private static final int PHOTO_TIP_MIN_COUNT = 2;
+    private static final int LIFESTYLE_FIELDS_MIN = 3;
+    private static final int DISTANCE_TIP_MAX_KM = 10;
+    private static final int AGE_RANGE_TIP_MIN_YEARS = 5;
+    private static final int NEXT_STEPS_MAX = 3;
+    private static final int BASIC_NAME_POINTS = 5;
+    private static final int BASIC_BIO_POINTS = 10;
+    private static final int BASIC_BIRTHDATE_POINTS = 5;
+    private static final int BASIC_GENDER_POINTS = 5;
+    private static final int BASIC_INTERESTED_POINTS = 5;
+    private static final int BASIC_PHOTO_POINTS = 10;
+    private static final int INTERESTS_TOTAL_POINTS = 20;
+    private static final int INTERESTS_FULL_COUNT = 5;
+    private static final int INTERESTS_PARTIAL_HIGH_COUNT = 3;
+    private static final int INTERESTS_PARTIAL_HIGH_POINTS = 15;
+    private static final int INTERESTS_PARTIAL_LOW_POINTS = 10;
+    private static final int LIFESTYLE_FIELD_POINTS = 5;
+    private static final int PREFERENCES_FIELD_POINTS = 5;
+    private static final int TIER_DIAMOND_THRESHOLD = 95;
+    private static final int TIER_GOLD_THRESHOLD = 85;
+    private static final int TIER_SILVER_THRESHOLD = 70;
+    private static final int TIER_BRONZE_THRESHOLD = 50;
+    private static final String TIER_DIAMOND = "Diamond";
+    private static final String TIER_GOLD = "Gold";
+    private static final String TIER_SILVER = "Silver";
+    private static final String TIER_BRONZE = "Bronze";
+    private static final String TIER_STARTER = "Starter";
+    private static final String TIER_DIAMOND_EMOJI = "💎";
+    private static final String TIER_GOLD_EMOJI = "🥇";
+    private static final String TIER_SILVER_EMOJI = "🥈";
+    private static final String TIER_BRONZE_EMOJI = "🥉";
+    private static final String TIER_STARTER_EMOJI = "🌱";
 
+    /** Canonical constructor — all dependencies are required. */
     public ProfileService(
             AppConfig config,
             AnalyticsStorage analyticsStorage,
@@ -37,10 +69,10 @@ public final class ProfileService {
             TrustSafetyStorage trustSafetyStorage,
             UserStorage userStorage) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
-        this.analyticsStorage = analyticsStorage;
-        this.interactionStorage = interactionStorage;
-        this.trustSafetyStorage = trustSafetyStorage;
-        this.userStorage = userStorage;
+        this.analyticsStorage = Objects.requireNonNull(analyticsStorage, "analyticsStorage cannot be null");
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+        this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
+        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
     }
 
     // ========================================================================
@@ -140,7 +172,9 @@ public final class ProfileService {
     // Detailed completion analysis (category-based scoring)
     // ========================================================================
 
-    /** Calculate the detailed completion result for a user with category breakdowns. */
+    /**
+     * Calculate the detailed completion result for a user with category breakdowns.
+     */
     public CompletionResult calculate(User user) {
         Objects.requireNonNull(user, "user cannot be null");
 
@@ -230,16 +264,14 @@ public final class ProfileService {
         // Bio tips
         if (user.getBio() == null || user.getBio().isBlank()) {
             tips.add("📝 Add a bio to tell others about yourself");
-        } else if (user.getBio().length() < ScoringConstants.ProfileCompletion.BIO_TIP_MIN_LENGTH) {
-            tips.add("💡 Expand your bio - profiles with "
-                    + ScoringConstants.ProfileCompletion.BIO_TIP_BOOST_LENGTH
-                    + "+ chars get 2x more likes");
+        } else if (user.getBio().length() < BIO_TIP_MIN_LENGTH) {
+            tips.add("💡 Expand your bio - profiles with " + BIO_TIP_BOOST_LENGTH + "+ chars get 2x more likes");
         }
 
         // Photo tips
         if (user.getPhotoUrls().isEmpty()) {
             tips.add("📸 Add a photo - it's required for browsing");
-        } else if (user.getPhotoUrls().size() < ScoringConstants.ProfileCompletion.PHOTO_TIP_MIN_COUNT) {
+        } else if (user.getPhotoUrls().size() < PHOTO_TIP_MIN_COUNT) {
             tips.add("📸 Add a second photo - users with 2 photos get 40% more matches");
         }
 
@@ -250,17 +282,17 @@ public final class ProfileService {
         if (user.getHeightCm() == null) {
             tips.add("📏 Add your height - many users filter by height");
         }
-        if (countLifestyleFields(user) < ScoringConstants.ProfileCompletion.LIFESTYLE_FIELDS_MIN) {
+        if (countLifestyleFields(user) < LIFESTYLE_FIELDS_MIN) {
             tips.add("🧘 Complete more lifestyle fields for better match quality");
         }
 
         // Distance tips
-        if (user.getMaxDistanceKm() < ScoringConstants.ProfileCompletion.DISTANCE_TIP_MAX_KM) {
+        if (user.getMaxDistanceKm() < DISTANCE_TIP_MAX_KM) {
             tips.add("📍 Consider expanding your distance for more options");
         }
 
         // Age range tips
-        if (user.getMaxAge() - user.getMinAge() < ScoringConstants.ProfileCompletion.AGE_RANGE_TIP_MIN_YEARS) {
+        if (user.getMaxAge() - user.getMinAge() < AGE_RANGE_TIP_MIN_YEARS) {
             tips.add("🎂 A wider age range gives you more potential matches");
         }
 
@@ -303,24 +335,6 @@ public final class ProfileService {
     // Progress bars
     // ========================================================================
 
-    /** Render a simple ASCII progress bar with percentage (e.g. {@code [####------] 40%}). */
-    public static String renderProgressBar(int percentage, int width) {
-        int filled = percentage * width / 100;
-        StringBuilder bar = new StringBuilder("[");
-        for (int i = 0; i < width; i++) {
-            bar.append(i < filled ? "#" : "-");
-        }
-        bar.append("] ").append(percentage).append("%");
-        return bar.toString();
-    }
-
-    /** Render a Unicode block progress bar (e.g. {@code ████░░░░}). */
-    public static String renderProgressBar(double fraction, int width) {
-        int filled = (int) (fraction * width);
-        int empty = width - filled;
-        return "█".repeat(Math.max(0, filled)) + "░".repeat(Math.max(0, empty));
-    }
-
     // ========================================================================
     // Private helpers
     // ========================================================================
@@ -332,51 +346,51 @@ public final class ProfileService {
         List<String> basicMissing = new ArrayList<>();
         List<String> nextSteps = new ArrayList<>();
 
-        totalPoints += ScoringConstants.ProfileCompletion.BASIC_NAME_POINTS;
+        totalPoints += BASIC_NAME_POINTS;
         if (user.getName() != null && !user.getName().isBlank()) {
-            earnedPoints += ScoringConstants.ProfileCompletion.BASIC_NAME_POINTS;
+            earnedPoints += BASIC_NAME_POINTS;
             basicFilled.add("Name");
         } else {
             basicMissing.add("Name");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.BASIC_BIO_POINTS;
+        totalPoints += BASIC_BIO_POINTS;
         if (user.getBio() != null && !user.getBio().isBlank()) {
-            earnedPoints += ScoringConstants.ProfileCompletion.BASIC_BIO_POINTS;
+            earnedPoints += BASIC_BIO_POINTS;
             basicFilled.add("Bio");
         } else {
             basicMissing.add("Bio");
             nextSteps.add("📝 Add a bio to tell others about yourself");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.BASIC_BIRTHDATE_POINTS;
+        totalPoints += BASIC_BIRTHDATE_POINTS;
         if (user.getBirthDate() != null) {
-            earnedPoints += ScoringConstants.ProfileCompletion.BASIC_BIRTHDATE_POINTS;
+            earnedPoints += BASIC_BIRTHDATE_POINTS;
             basicFilled.add("Birth date");
         } else {
             basicMissing.add("Birth date");
             nextSteps.add("Add your birth date to complete your profile");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.BASIC_GENDER_POINTS;
+        totalPoints += BASIC_GENDER_POINTS;
         if (user.getGender() != null) {
-            earnedPoints += ScoringConstants.ProfileCompletion.BASIC_GENDER_POINTS;
+            earnedPoints += BASIC_GENDER_POINTS;
             basicFilled.add("Gender");
         } else {
             basicMissing.add("Gender");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.BASIC_INTERESTED_POINTS;
+        totalPoints += BASIC_INTERESTED_POINTS;
         if (user.getInterestedIn() != null && !user.getInterestedIn().isEmpty()) {
-            earnedPoints += ScoringConstants.ProfileCompletion.BASIC_INTERESTED_POINTS;
+            earnedPoints += BASIC_INTERESTED_POINTS;
             basicFilled.add("Interested in");
         } else {
             basicMissing.add("Interested in");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.BASIC_PHOTO_POINTS;
+        totalPoints += BASIC_PHOTO_POINTS;
         if (user.getPhotoUrls() != null && !user.getPhotoUrls().isEmpty()) {
-            earnedPoints += ScoringConstants.ProfileCompletion.BASIC_PHOTO_POINTS;
+            earnedPoints += BASIC_PHOTO_POINTS;
             basicFilled.add("Photo");
         } else {
             basicMissing.add("Photo");
@@ -397,38 +411,33 @@ public final class ProfileService {
     }
 
     private CategoryResult scoreInterests(User user) {
-        int totalPoints = ScoringConstants.ProfileCompletion.INTERESTS_TOTAL_POINTS;
+        int totalPoints = INTERESTS_TOTAL_POINTS;
         int earnedPoints = 0;
         List<String> interestsFilled = new ArrayList<>();
         List<String> interestsMissing = new ArrayList<>();
         List<String> nextSteps = new ArrayList<>();
 
         int interestCount = user.getInterests() != null ? user.getInterests().size() : 0;
-        if (interestCount >= ScoringConstants.ProfileCompletion.INTERESTS_FULL_COUNT) {
-            earnedPoints += ScoringConstants.ProfileCompletion.INTERESTS_TOTAL_POINTS;
-            interestsFilled.add(ScoringConstants.ProfileCompletion.INTERESTS_FULL_COUNT + "+ interests selected");
-        } else if (interestCount >= ScoringConstants.ProfileCompletion.INTERESTS_PARTIAL_HIGH_COUNT) {
-            earnedPoints += ScoringConstants.ProfileCompletion.INTERESTS_PARTIAL_HIGH_POINTS;
+        if (interestCount >= INTERESTS_FULL_COUNT) {
+            earnedPoints += INTERESTS_TOTAL_POINTS;
+            interestsFilled.add(INTERESTS_FULL_COUNT + "+ interests selected");
+        } else if (interestCount >= INTERESTS_PARTIAL_HIGH_COUNT) {
+            earnedPoints += INTERESTS_PARTIAL_HIGH_POINTS;
             interestsFilled.add(interestCount + " interests selected");
-            interestsMissing.add("Add "
-                    + (ScoringConstants.ProfileCompletion.INTERESTS_FULL_COUNT - interestCount)
-                    + " more interests for full score");
+            interestsMissing.add("Add " + (INTERESTS_FULL_COUNT - interestCount) + " more interests for full score");
             nextSteps.add("🎯 Add more interests to improve match quality");
         } else if (interestCount >= 1) {
-            earnedPoints += ScoringConstants.ProfileCompletion.INTERESTS_PARTIAL_LOW_POINTS;
+            earnedPoints += INTERESTS_PARTIAL_LOW_POINTS;
             interestsFilled.add(interestCount + " interest(s) selected");
-            interestsMissing.add("Add "
-                    + (ScoringConstants.ProfileCompletion.INTERESTS_FULL_COUNT - interestCount)
-                    + " more interests for full score");
+            interestsMissing.add("Add " + (INTERESTS_FULL_COUNT - interestCount) + " more interests for full score");
             nextSteps.add("🎯 Add more interests to improve match quality");
         } else {
             interestsMissing.add("No interests selected");
             nextSteps.add("🎯 Add your interests to find compatible matches");
         }
 
-        int interestsScore = (interestCount >= ScoringConstants.ProfileCompletion.INTERESTS_FULL_COUNT)
-                ? 100
-                : (interestCount * 100 / ScoringConstants.ProfileCompletion.INTERESTS_FULL_COUNT);
+        int interestsScore =
+                (interestCount >= INTERESTS_FULL_COUNT) ? 100 : (interestCount * 100 / INTERESTS_FULL_COUNT);
         CategoryBreakdown breakdown =
                 new CategoryBreakdown("Interests", interestsScore, interestsFilled, interestsMissing);
 
@@ -443,41 +452,41 @@ public final class ProfileService {
         List<String> lifestyleMissing = new ArrayList<>();
         List<String> nextSteps = new ArrayList<>();
 
-        totalPoints += ScoringConstants.ProfileCompletion.LIFESTYLE_FIELD_POINTS;
+        totalPoints += LIFESTYLE_FIELD_POINTS;
         if (user.getHeightCm() != null) {
-            earnedPoints += ScoringConstants.ProfileCompletion.LIFESTYLE_FIELD_POINTS;
+            earnedPoints += LIFESTYLE_FIELD_POINTS;
             lifestyleFilled.add("Height");
         } else {
             lifestyleMissing.add("Height");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.LIFESTYLE_FIELD_POINTS;
+        totalPoints += LIFESTYLE_FIELD_POINTS;
         if (user.getSmoking() != null) {
-            earnedPoints += ScoringConstants.ProfileCompletion.LIFESTYLE_FIELD_POINTS;
+            earnedPoints += LIFESTYLE_FIELD_POINTS;
             lifestyleFilled.add("Smoking");
         } else {
             lifestyleMissing.add("Smoking");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.LIFESTYLE_FIELD_POINTS;
+        totalPoints += LIFESTYLE_FIELD_POINTS;
         if (user.getDrinking() != null) {
-            earnedPoints += ScoringConstants.ProfileCompletion.LIFESTYLE_FIELD_POINTS;
+            earnedPoints += LIFESTYLE_FIELD_POINTS;
             lifestyleFilled.add("Drinking");
         } else {
             lifestyleMissing.add("Drinking");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.LIFESTYLE_FIELD_POINTS;
+        totalPoints += LIFESTYLE_FIELD_POINTS;
         if (user.getWantsKids() != null) {
-            earnedPoints += ScoringConstants.ProfileCompletion.LIFESTYLE_FIELD_POINTS;
+            earnedPoints += LIFESTYLE_FIELD_POINTS;
             lifestyleFilled.add("Kids preference");
         } else {
             lifestyleMissing.add("Kids preference");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.LIFESTYLE_FIELD_POINTS;
+        totalPoints += LIFESTYLE_FIELD_POINTS;
         if (user.getLookingFor() != null) {
-            earnedPoints += ScoringConstants.ProfileCompletion.LIFESTYLE_FIELD_POINTS;
+            earnedPoints += LIFESTYLE_FIELD_POINTS;
             lifestyleFilled.add("Looking for");
         } else {
             lifestyleMissing.add("Looking for");
@@ -508,27 +517,27 @@ public final class ProfileService {
         List<String> prefsFilled = new ArrayList<>();
         List<String> prefsMissing = new ArrayList<>();
 
-        totalPoints += ScoringConstants.ProfileCompletion.PREFERENCES_FIELD_POINTS;
+        totalPoints += PREFERENCES_FIELD_POINTS;
         if (user.getLat() != 0.0 || user.getLon() != 0.0) {
-            earnedPoints += ScoringConstants.ProfileCompletion.PREFERENCES_FIELD_POINTS;
+            earnedPoints += PREFERENCES_FIELD_POINTS;
             prefsFilled.add("Location");
         } else {
             prefsMissing.add("Location");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.PREFERENCES_FIELD_POINTS;
+        totalPoints += PREFERENCES_FIELD_POINTS;
         if (user.getMinAge() >= config.minAge()
                 && user.getMaxAge() <= config.maxAge()
                 && user.getMinAge() <= user.getMaxAge()) {
-            earnedPoints += ScoringConstants.ProfileCompletion.PREFERENCES_FIELD_POINTS;
+            earnedPoints += PREFERENCES_FIELD_POINTS;
             prefsFilled.add("Age preferences");
         } else {
             prefsMissing.add("Age preferences (invalid range)");
         }
 
-        totalPoints += ScoringConstants.ProfileCompletion.PREFERENCES_FIELD_POINTS;
+        totalPoints += PREFERENCES_FIELD_POINTS;
         if (user.getDealbreakers() != null) {
-            earnedPoints += ScoringConstants.ProfileCompletion.PREFERENCES_FIELD_POINTS;
+            earnedPoints += PREFERENCES_FIELD_POINTS;
             if (user.getDealbreakers().hasAnyDealbreaker()) {
                 prefsFilled.add("Dealbreakers configured");
             } else {
@@ -553,7 +562,7 @@ public final class ProfileService {
 
     private static void appendSteps(List<String> nextSteps, List<String> additions) {
         for (String step : additions) {
-            if (nextSteps.size() >= ScoringConstants.ProfileCompletion.NEXT_STEPS_MAX) {
+            if (nextSteps.size() >= NEXT_STEPS_MAX) {
                 return;
             }
             nextSteps.add(step);
@@ -561,35 +570,35 @@ public final class ProfileService {
     }
 
     private static String calculateTier(int score) {
-        if (score >= ScoringConstants.ProfileCompletion.TIER_DIAMOND_THRESHOLD) {
-            return ScoringConstants.ProfileCompletion.TIER_DIAMOND;
+        if (score >= TIER_DIAMOND_THRESHOLD) {
+            return TIER_DIAMOND;
         }
-        if (score >= ScoringConstants.ProfileCompletion.TIER_GOLD_THRESHOLD) {
-            return ScoringConstants.ProfileCompletion.TIER_GOLD;
+        if (score >= TIER_GOLD_THRESHOLD) {
+            return TIER_GOLD;
         }
-        if (score >= ScoringConstants.ProfileCompletion.TIER_SILVER_THRESHOLD) {
-            return ScoringConstants.ProfileCompletion.TIER_SILVER;
+        if (score >= TIER_SILVER_THRESHOLD) {
+            return TIER_SILVER;
         }
-        if (score >= ScoringConstants.ProfileCompletion.TIER_BRONZE_THRESHOLD) {
-            return ScoringConstants.ProfileCompletion.TIER_BRONZE;
+        if (score >= TIER_BRONZE_THRESHOLD) {
+            return TIER_BRONZE;
         }
-        return ScoringConstants.ProfileCompletion.TIER_STARTER;
+        return TIER_STARTER;
     }
 
     private static String tierEmojiForScore(int score) {
-        if (score >= ScoringConstants.ProfileCompletion.TIER_DIAMOND_THRESHOLD) {
-            return ScoringConstants.ProfileCompletion.TIER_DIAMOND_EMOJI;
+        if (score >= TIER_DIAMOND_THRESHOLD) {
+            return TIER_DIAMOND_EMOJI;
         }
-        if (score >= ScoringConstants.ProfileCompletion.TIER_GOLD_THRESHOLD) {
-            return ScoringConstants.ProfileCompletion.TIER_GOLD_EMOJI;
+        if (score >= TIER_GOLD_THRESHOLD) {
+            return TIER_GOLD_EMOJI;
         }
-        if (score >= ScoringConstants.ProfileCompletion.TIER_SILVER_THRESHOLD) {
-            return ScoringConstants.ProfileCompletion.TIER_SILVER_EMOJI;
+        if (score >= TIER_SILVER_THRESHOLD) {
+            return TIER_SILVER_EMOJI;
         }
-        if (score >= ScoringConstants.ProfileCompletion.TIER_BRONZE_THRESHOLD) {
-            return ScoringConstants.ProfileCompletion.TIER_BRONZE_EMOJI;
+        if (score >= TIER_BRONZE_THRESHOLD) {
+            return TIER_BRONZE_EMOJI;
         }
-        return ScoringConstants.ProfileCompletion.TIER_STARTER_EMOJI;
+        return TIER_STARTER_EMOJI;
     }
 
     private static void checkField(String fieldName, boolean isFilled, List<String> filled, List<String> missing) {
@@ -631,7 +640,6 @@ public final class ProfileService {
 
     /** Check all achievements for a user and unlock any newly earned ones. */
     public List<UserAchievement> checkAndUnlock(UUID userId) {
-        ensureAchievementDependencies();
         List<UserAchievement> newlyUnlocked = new ArrayList<>();
         User user = userStorage.get(userId);
         if (user == null) {
@@ -651,13 +659,11 @@ public final class ProfileService {
 
     /** Get all unlocked achievements for a user. */
     public List<UserAchievement> getUnlocked(UUID userId) {
-        ensureAchievementDependencies();
         return analyticsStorage.getUnlockedAchievements(userId);
     }
 
     /** Get progress for all achievements (both locked and unlocked). */
     public List<AchievementProgress> getProgress(UUID userId) {
-        ensureAchievementDependencies();
         List<AchievementProgress> progress = new ArrayList<>();
         User user = userStorage.get(userId);
         if (user == null) {
@@ -691,17 +697,7 @@ public final class ProfileService {
 
     /** Count total unlocked achievements. */
     public int countUnlocked(UUID userId) {
-        ensureAchievementDependencies();
         return analyticsStorage.countUnlockedAchievements(userId);
-    }
-
-    private void ensureAchievementDependencies() {
-        if (analyticsStorage == null
-                || interactionStorage == null
-                || trustSafetyStorage == null
-                || userStorage == null) {
-            throw new IllegalStateException("Achievement dependencies are not configured");
-        }
     }
 
     private boolean isEarned(UUID userId, User user, Achievement achievement) {

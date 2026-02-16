@@ -7,6 +7,7 @@ import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.testutil.TestClock;
+import datingapp.core.testutil.TestStorages;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -21,7 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Tests for ActivityMetricsService cleanup functionality (runCleanup + CleanupResult).
+ * Tests for ActivityMetricsService cleanup functionality (runCleanup +
+ * CleanupResult).
  */
 @Timeout(5)
 @SuppressWarnings("unused")
@@ -38,7 +40,8 @@ class CleanupServiceTest {
         TestClock.setFixed(FIXED_INSTANT);
         config = AppConfig.defaults();
         analyticsStorage = new TestCleanupAnalytics();
-        service = new ActivityMetricsService(analyticsStorage, config);
+        service = new ActivityMetricsService(
+                new TestStorages.Interactions(), new TestStorages.TrustSafety(), analyticsStorage, config);
     }
 
     @AfterEach
@@ -53,13 +56,19 @@ class CleanupServiceTest {
         @Test
         @DisplayName("Should require non-null analyticsStorage")
         void requiresAnalyticsStorage() {
-            assertThrows(NullPointerException.class, () -> new ActivityMetricsService(null, config));
+            assertThrows(
+                    NullPointerException.class,
+                    () -> new ActivityMetricsService(
+                            new TestStorages.Interactions(), new TestStorages.TrustSafety(), null, config));
         }
 
         @Test
         @DisplayName("Should require non-null config")
         void requiresConfig() {
-            assertThrows(NullPointerException.class, () -> new ActivityMetricsService(analyticsStorage, null));
+            assertThrows(
+                    NullPointerException.class,
+                    () -> new ActivityMetricsService(
+                            new TestStorages.Interactions(), new TestStorages.TrustSafety(), analyticsStorage, null));
         }
     }
 

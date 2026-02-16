@@ -5,6 +5,7 @@ import datingapp.app.cli.shared.CliTextAndInput.InputReader;
 import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
+import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
@@ -351,12 +352,13 @@ public class MatchingHandler implements LoggingSupport {
             return;
         }
 
-        String distanceBar = MatchQualityService.renderProgressBar(quality.distanceScore(), 12);
-        String ageBar = MatchQualityService.renderProgressBar(quality.ageScore(), 12);
-        String interestBar = MatchQualityService.renderProgressBar(quality.interestScore(), 12);
-        String lifestyleBar = MatchQualityService.renderProgressBar(quality.lifestyleScore(), 12);
-        String paceBar = MatchQualityService.renderProgressBar(quality.paceScore(), 12);
-        String responseBar = MatchQualityService.renderProgressBar(quality.responseScore(), 12);
+        // Use TextUtil for consistent progress bar rendering
+        String distanceBar = TextUtil.renderProgressBar(quality.distanceScore(), 12);
+        String ageBar = TextUtil.renderProgressBar(quality.ageScore(), 12);
+        String interestBar = TextUtil.renderProgressBar(quality.interestScore(), 12);
+        String lifestyleBar = TextUtil.renderProgressBar(quality.lifestyleScore(), 12);
+        String paceBar = TextUtil.renderProgressBar(quality.paceScore(), 12);
+        String responseBar = TextUtil.renderProgressBar(quality.responseScore(), 12);
 
         logInfo("\n  📊 SCORE BREAKDOWN");
         logInfo(CliTextAndInput.SECTION_LINE);

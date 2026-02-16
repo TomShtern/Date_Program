@@ -103,7 +103,12 @@ public class TrustSafetyService {
 
     /** Report a user for inappropriate behavior and return moderation action. */
     public ReportResult report(UUID reporterId, UUID reportedUserId, Report.Reason reason, String description) {
-        ensureReportDependencies();
+
+        // Validate description length against configured maximum
+        if (description != null && description.length() > config.maxReportDescLength()) {
+            return new ReportResult(
+                    false, false, "Description too long (max " + config.maxReportDescLength() + " characters)");
+        }
 
         User reporter = userStorage.get(reporterId);
         if (reporter == null || reporter.getState() != User.UserState.ACTIVE) {
@@ -137,12 +142,6 @@ public class TrustSafetyService {
         }
 
         return new ReportResult(true, autoBanned, null);
-    }
-
-    private void ensureReportDependencies() {
-        if (trustSafetyStorage == null || userStorage == null || config == null) {
-            throw new IllegalStateException("Report dependencies are not configured");
-        }
     }
 
     /**

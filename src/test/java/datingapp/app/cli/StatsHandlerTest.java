@@ -20,7 +20,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
 
 /**
- * Unit tests for StatsHandler CLI commands: viewStatistics() and viewAchievements().
+ * Unit tests for StatsHandler CLI commands: viewStatistics() and
+ * viewAchievements().
  */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class StatsHandlerTest {
@@ -49,8 +50,8 @@ class StatsHandlerTest {
 
     private StatsHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        ActivityMetricsService statsService =
-                new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage);
+        ActivityMetricsService statsService = new ActivityMetricsService(
+                interactionStorage, trustSafetyStorage, analyticsStorage, AppConfig.defaults());
         ProfileService achievementService = new ProfileService(
                 AppConfig.defaults(), analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
         return new StatsHandler(statsService, achievementService, session, inputReader);

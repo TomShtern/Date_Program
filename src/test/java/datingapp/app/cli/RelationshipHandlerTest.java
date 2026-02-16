@@ -23,7 +23,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
 
 /**
- * Unit tests for relationship CLI commands: viewPendingRequests(), viewNotifications().
+ * Unit tests for relationship CLI commands: viewPendingRequests(),
+ * viewNotifications().
  */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class RelationshipHandlerTest {
@@ -62,25 +63,48 @@ class RelationshipHandlerTest {
                 .build();
         TrustSafetyService trustSafetyService =
                 new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
-        ConnectionService transitionService = new ConnectionService(interactionStorage, communicationStorage);
+        ConnectionService transitionService =
+                new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
         CandidateFinder candidateFinder =
                 new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
-        ProfileService profileCompletionService = new ProfileService(config);
+        ProfileService profileCompletionService =
+                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        RecommendationService dailyService = RecommendationService.builder()
+                .interactionStorage(interactionStorage)
+                .userStorage(userStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(new TestStorages.Standouts())
+                .profileService(profileCompletionService)
+                .config(config)
+                .build();
+
+        RecommendationService recService = RecommendationService.builder()
+                .interactionStorage(interactionStorage)
+                .userStorage(userStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(new TestStorages.Standouts())
+                .profileService(profileCompletionService)
+                .config(config)
+                .build();
+
         MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
                 candidateFinder,
                 matchingService,
                 interactionStorage,
-                new RecommendationService(interactionStorage, config),
+                dailyService,
                 new UndoService(interactionStorage, new TestStorages.Undos(), config),
                 matchQualityService,
                 userStorage,
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage),
+                profileCompletionService,
                 analyticsStorage,
                 trustSafetyService,
                 transitionService,
-                new RecommendationService(
-                        userStorage, new TestStorages.Standouts(), candidateFinder, profileCompletionService, config),
+                recService,
                 communicationStorage,
                 session,
                 inputReader);

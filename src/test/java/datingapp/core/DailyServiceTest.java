@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
 import datingapp.core.model.User;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.recommendation.*;
 import datingapp.core.recommendation.RecommendationService.DailyPick;
 import datingapp.core.testutil.TestStorages;
@@ -54,14 +55,7 @@ class DailyServiceTest {
         fixedClock = Clock.fixed(todayStart.plus(Duration.ofHours(12)), ZoneId.of("UTC")); // Noon UTC
 
         candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
-        service = new RecommendationService(
-                userStorage,
-                interactionStorage,
-                trustSafetyStorage,
-                analyticsStorage,
-                candidateFinder,
-                config,
-                fixedClock);
+        service = createService(config, fixedClock);
     }
 
     @Nested
@@ -100,14 +94,7 @@ class DailyServiceTest {
                     .dailyLikeLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            RecommendationService unlimitedService = new RecommendationService(
-                    userStorage,
-                    interactionStorage,
-                    trustSafetyStorage,
-                    analyticsStorage,
-                    candidateFinder,
-                    unlimitedConfig,
-                    fixedClock);
+            RecommendationService unlimitedService = createService(unlimitedConfig, fixedClock);
 
             UUID userId = UUID.randomUUID();
             for (int i = 0; i < 100; i++) {
@@ -139,14 +126,7 @@ class DailyServiceTest {
                     .dailyLikeLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            RecommendationService unlimitedService = new RecommendationService(
-                    userStorage,
-                    interactionStorage,
-                    trustSafetyStorage,
-                    analyticsStorage,
-                    candidateFinder,
-                    unlimitedConfig,
-                    fixedClock);
+            RecommendationService unlimitedService = createService(unlimitedConfig, fixedClock);
 
             RecommendationService.DailyStatus status = unlimitedService.getStatus(UUID.randomUUID());
             assertEquals(-1, status.likesRemaining());
@@ -228,13 +208,6 @@ class DailyServiceTest {
             // Verify it doesn't crash and returns 0 for mock
             assertEquals(0, service.cleanupOldDailyPickViews(today));
         }
-
-        @Test
-        @DisplayName("ensureDailyPickDependencies throws if missing")
-        void ensureDailyPickDependencies_throws() {
-            RecommendationService incompleteService = new RecommendationService(interactionStorage, config);
-            assertThrows(IllegalStateException.class, () -> incompleteService.getDailyPick(null));
-        }
     }
 
     @Nested
@@ -280,5 +253,23 @@ class DailyServiceTest {
             assertEquals("30m", RecommendationService.formatDuration(Duration.ofMinutes(30)));
             assertEquals("45m", RecommendationService.formatDuration(Duration.ofMinutes(45)));
         }
+    }
+
+    private RecommendationService createService(AppConfig config, Clock clock) {
+        var standoutStorage = new TestStorages.Standouts();
+        var profileService =
+                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+
+        return RecommendationService.builder()
+                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(standoutStorage)
+                .profileService(profileService)
+                .config(config)
+                .clock(clock)
+                .build();
     }
 }

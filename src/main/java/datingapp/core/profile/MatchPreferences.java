@@ -1,6 +1,7 @@
 package datingapp.core.profile;
 
 import datingapp.core.AppConfig;
+import datingapp.core.matching.LifestyleMatcher;
 import datingapp.core.model.User;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -8,7 +9,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Container for user match preferences, interests, lifestyle choices, and dealbreakers. */
+/**
+ * Container for user match preferences, interests, lifestyle choices, and
+ * dealbreakers.
+ */
 public final class MatchPreferences {
 
     private MatchPreferences() {
@@ -597,17 +601,6 @@ public final class MatchPreferences {
                 // Prevent instantiation - all methods are static
             }
 
-            /**
-             * Check if candidate passes all of seeker's dealbreakers.
-             *
-             * @param seeker    The user looking for matches
-             * @param candidate The potential match
-             * @return true if candidate passes all dealbreakers, false if any fails
-             */
-            public static boolean passes(User seeker, User candidate) {
-                return passes(seeker, candidate, AppConfig.defaults());
-            }
-
             public static boolean passes(User seeker, User candidate, AppConfig config) {
                 Objects.requireNonNull(config, "config cannot be null");
                 Dealbreakers db = seeker.getDealbreakers();
@@ -629,7 +622,8 @@ public final class MatchPreferences {
              * @param candidate The potential match
              * @return List of human-readable failure descriptions
              */
-            public static List<String> getFailedDealbreakers(User seeker, User candidate) {
+            public static List<String> getFailedDealbreakers(User seeker, User candidate, AppConfig config) {
+                Objects.requireNonNull(config, "config cannot be null");
                 List<String> failures = new java.util.ArrayList<>();
                 Dealbreakers db = seeker.getDealbreakers();
 
@@ -645,43 +639,28 @@ public final class MatchPreferences {
             }
 
             private static boolean passesSmoking(Dealbreakers db, User candidate) {
-                if (!db.hasSmokingDealbreaker()) {
-                    return true;
-                }
-                Lifestyle.Smoking smoking = candidate.getSmoking();
-                return smoking != null && db.acceptableSmoking().contains(smoking);
+                return !db.hasSmokingDealbreaker()
+                        || LifestyleMatcher.isAcceptable(candidate.getSmoking(), db.acceptableSmoking());
             }
 
             private static boolean passesDrinking(Dealbreakers db, User candidate) {
-                if (!db.hasDrinkingDealbreaker()) {
-                    return true;
-                }
-                Lifestyle.Drinking drinking = candidate.getDrinking();
-                return drinking != null && db.acceptableDrinking().contains(drinking);
+                return !db.hasDrinkingDealbreaker()
+                        || LifestyleMatcher.isAcceptable(candidate.getDrinking(), db.acceptableDrinking());
             }
 
             private static boolean passesKids(Dealbreakers db, User candidate) {
-                if (!db.hasKidsDealbreaker()) {
-                    return true;
-                }
-                Lifestyle.WantsKids wantsKids = candidate.getWantsKids();
-                return wantsKids != null && db.acceptableKidsStance().contains(wantsKids);
+                return !db.hasKidsDealbreaker()
+                        || LifestyleMatcher.isAcceptable(candidate.getWantsKids(), db.acceptableKidsStance());
             }
 
             private static boolean passesLookingFor(Dealbreakers db, User candidate) {
-                if (!db.hasLookingForDealbreaker()) {
-                    return true;
-                }
-                Lifestyle.LookingFor lookingFor = candidate.getLookingFor();
-                return lookingFor != null && db.acceptableLookingFor().contains(lookingFor);
+                return !db.hasLookingForDealbreaker()
+                        || LifestyleMatcher.isAcceptable(candidate.getLookingFor(), db.acceptableLookingFor());
             }
 
             private static boolean passesEducation(Dealbreakers db, User candidate) {
-                if (!db.hasEducationDealbreaker()) {
-                    return true;
-                }
-                Lifestyle.Education education = candidate.getEducation();
-                return education != null && db.acceptableEducation().contains(education);
+                return !db.hasEducationDealbreaker()
+                        || LifestyleMatcher.isAcceptable(candidate.getEducation(), db.acceptableEducation());
             }
 
             private static boolean passesHeight(Dealbreakers db, User candidate) {

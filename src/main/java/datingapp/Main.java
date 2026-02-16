@@ -159,7 +159,8 @@ public final class Main {
                 inputReader);
         safetyHandler =
                 new SafetyHandler(services.getUserStorage(), services.getTrustSafetyService(), session, inputReader);
-        statsHandler = new StatsHandler(services.getStatsService(), services.getProfileService(), session, inputReader);
+        statsHandler = new StatsHandler(
+                services.getActivityMetricsService(), services.getProfileService(), session, inputReader);
         messagingHandler = new MessagingHandler(
                 services.getConnectionService(),
                 services.getInteractionStorage(),

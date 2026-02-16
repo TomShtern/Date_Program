@@ -3,6 +3,8 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.matching.CandidateFinder;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.recommendation.*;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
@@ -11,7 +13,10 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
 
-/** Unit tests for RecommendationService daily limits. Uses in-memory mock storage for isolated testing. */
+/**
+ * Unit tests for RecommendationService daily limits. Uses in-memory mock
+ * storage for isolated testing.
+ */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class DailyLimitServiceTest {
 
@@ -30,7 +35,7 @@ class DailyLimitServiceTest {
                 .dailyPassLimit(-1) // unlimited
                 .userTimeZone(ZoneId.of("UTC"))
                 .build();
-        service = new RecommendationService(interactionStorage, config);
+        service = createService(config);
         userId = UUID.randomUUID();
     }
 
@@ -82,7 +87,7 @@ class DailyLimitServiceTest {
                     .dailyLikeLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            RecommendationService unlimitedService = new RecommendationService(interactionStorage, unlimitedConfig);
+            RecommendationService unlimitedService = createService(unlimitedConfig);
 
             // Add many likes
             Instant now = AppClock.now();
@@ -123,7 +128,7 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(2)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            RecommendationService limitedPassService = new RecommendationService(interactionStorage, limitedPassConfig);
+            RecommendationService limitedPassService = createService(limitedPassConfig);
 
             // Add 2 passes today (at limit)
             Instant now = AppClock.now();
@@ -164,7 +169,7 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(-1)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            RecommendationService unlimitedService = new RecommendationService(interactionStorage, unlimitedConfig);
+            RecommendationService unlimitedService = createService(unlimitedConfig);
 
             RecommendationService.DailyStatus status = unlimitedService.getStatus(userId);
 
@@ -220,7 +225,7 @@ class DailyLimitServiceTest {
                     .dailyLikeLimit(0)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            RecommendationService zeroService = new RecommendationService(interactionStorage, zeroConfig);
+            RecommendationService zeroService = createService(zeroConfig);
 
             assertFalse(zeroService.canLike(userId));
         }
@@ -247,7 +252,7 @@ class DailyLimitServiceTest {
                     .dailyPassLimit(2)
                     .userTimeZone(ZoneId.of("UTC"))
                     .build();
-            RecommendationService limitedPassService = new RecommendationService(interactionStorage, limitedPassConfig);
+            RecommendationService limitedPassService = createService(limitedPassConfig);
 
             Instant now = AppClock.now();
             // 5 likes
@@ -259,5 +264,26 @@ class DailyLimitServiceTest {
             // Should still be able to pass
             assertTrue(limitedPassService.canPass(userId));
         }
+    }
+
+    private RecommendationService createService(AppConfig config) {
+        var userStorage = new TestStorages.Users();
+        var analyticsStorage = new TestStorages.Analytics();
+        var trustSafetyStorage = new TestStorages.TrustSafety();
+        var standoutStorage = new TestStorages.Standouts();
+        var candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
+        var profileService =
+                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+
+        return RecommendationService.builder()
+                .interactionStorage(interactionStorage)
+                .userStorage(userStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(standoutStorage)
+                .profileService(profileService)
+                .config(config)
+                .build();
     }
 }

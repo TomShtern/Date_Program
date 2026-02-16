@@ -8,12 +8,14 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.recommendation.RecommendationService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
@@ -55,7 +57,23 @@ class MatchesViewModelTest {
         TestClock.setFixed(FIXED_INSTANT);
 
         AppConfig config = AppConfig.defaults();
-        dailyService = new RecommendationService(interactions, config);
+
+        // Create dependencies for RecommendationService
+        var analyticsStorage = new TestStorages.Analytics();
+        var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage, config);
+        var standoutStorage = new TestStorages.Standouts();
+        var profileService = new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
+
+        dailyService = RecommendationService.builder()
+                .interactionStorage(interactions)
+                .userStorage(users)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(standoutStorage)
+                .profileService(profileService)
+                .config(config)
+                .build();
 
         matchData = new StorageUiMatchDataAccess(interactions, trustSafetyStorage);
         userStore = new StorageUiUserStore(users);
@@ -82,7 +100,25 @@ class MatchesViewModelTest {
     @DisplayName("likeBack does not create like when daily limit reached")
     void likeBackRespectsDailyLimit() {
         AppConfig zeroLimitConfig = AppConfig.builder().dailyLikeLimit(0).build();
-        RecommendationService zeroLimitRecommendationService = new RecommendationService(interactions, zeroLimitConfig);
+
+        // Re-create dependencies or reuse? Reusing mostly fine since they are
+        // mocks/stubs.
+        var analyticsStorage = new TestStorages.Analytics();
+        var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage, zeroLimitConfig);
+        var standoutStorage = new TestStorages.Standouts();
+        var profileService =
+                new ProfileService(zeroLimitConfig, analyticsStorage, interactions, trustSafetyStorage, users);
+
+        RecommendationService zeroLimitRecommendationService = RecommendationService.builder()
+                .interactionStorage(interactions)
+                .userStorage(users)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(standoutStorage)
+                .profileService(profileService)
+                .config(zeroLimitConfig)
+                .build();
 
         User user = createActiveUser("Current");
         users.save(user);

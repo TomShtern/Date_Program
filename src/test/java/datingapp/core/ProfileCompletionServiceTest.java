@@ -11,6 +11,7 @@ import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.testutil.TestClock;
+import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -38,7 +39,12 @@ class ProfileCompletionServiceTest {
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
-        service = new ProfileService(AppConfig.defaults());
+        service = new ProfileService(
+                AppConfig.defaults(),
+                new TestStorages.Analytics(),
+                new TestStorages.Interactions(),
+                new TestStorages.TrustSafety(),
+                new TestStorages.Users());
         user = new User(UUID.randomUUID(), "TestUser");
     }
 
@@ -208,40 +214,6 @@ class ProfileCompletionServiceTest {
             assertEquals(
                     "💎",
                     new ProfileService.CompletionResult(95, "Diamond", 9, 10, List.of(), List.of()).getTierEmoji());
-        }
-    }
-
-    @Nested
-    @DisplayName("renderProgressBar()")
-    class RenderProgressBar {
-
-        @Test
-        @DisplayName("renders empty bar for 0%")
-        void rendersEmptyBarForZero() {
-            String bar = ProfileService.renderProgressBar(0, 10);
-            assertEquals("[----------] 0%", bar);
-        }
-
-        @Test
-        @DisplayName("renders full bar for 100%")
-        void rendersFullBarFor100() {
-            String bar = ProfileService.renderProgressBar(100, 10);
-            assertEquals("[##########] 100%", bar);
-        }
-
-        @Test
-        @DisplayName("renders partial bar for 50%")
-        void rendersPartialBarFor50() {
-            String bar = ProfileService.renderProgressBar(50, 10);
-            assertEquals("[#####-----] 50%", bar);
-        }
-
-        @Test
-        @DisplayName("renders Unicode progress bar correctly")
-        void rendersUnicodeProgressBar() {
-            assertEquals("█████", ProfileService.renderProgressBar(1.0, 5));
-            assertEquals("░░░░░", ProfileService.renderProgressBar(0.0, 5));
-            assertEquals("██░░░", ProfileService.renderProgressBar(0.4, 5));
         }
     }
 

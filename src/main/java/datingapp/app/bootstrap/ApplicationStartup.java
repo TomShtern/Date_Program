@@ -78,7 +78,9 @@ public final class ApplicationStartup {
                 applyJsonConfig(builder, json);
                 logInfo("Loaded configuration from: {}", configPath);
             } catch (IOException ex) {
-                logWarn("Failed to load config file {}", configPath, ex);
+                // File exists but failed to read/parse — this is a configuration error, not
+                // ignorable
+                throw new IllegalStateException("Config file exists but failed to load: " + configPath, ex);
             }
         } else {
             logInfo("Config file not found at {}, using defaults", configPath);

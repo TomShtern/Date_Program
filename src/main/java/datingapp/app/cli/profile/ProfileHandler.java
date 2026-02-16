@@ -6,6 +6,7 @@ import datingapp.app.cli.shared.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.EnumSetUtil;
 import datingapp.core.LoggingSupport;
+import datingapp.core.TextUtil;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
@@ -151,7 +152,7 @@ public class ProfileHandler implements LoggingSupport {
 
             // Render progress bar when profile has some completeness
             if (comp.percentage() > 0 && logger.isInfoEnabled()) {
-                String progressBar = ProfileService.renderProgressBar(comp.percentage() / 100.0, 20);
+                String progressBar = TextUtil.renderProgressBar(comp.percentage() / 100.0, 20);
                 logInfo("  {}", progressBar);
             }
 
@@ -931,7 +932,7 @@ public class ProfileHandler implements LoggingSupport {
 
             logInfo("  {} {}% {}", result.getTierEmoji(), result.score(), result.tier());
             if (logger.isInfoEnabled()) {
-                String overallBar = ProfileService.renderProgressBar(result.score(), 25);
+                String overallBar = TextUtil.renderProgressBar(result.score(), 25);
                 logInfo("  {}", overallBar);
             }
             logInfo("");
@@ -940,7 +941,7 @@ public class ProfileHandler implements LoggingSupport {
             for (ProfileService.CategoryBreakdown cat : result.breakdown()) {
                 logInfo("  {} - {}%", cat.category(), cat.score());
                 if (logger.isInfoEnabled()) {
-                    String categoryBar = ProfileService.renderProgressBar(cat.score(), 15);
+                    String categoryBar = TextUtil.renderProgressBar(cat.score(), 15);
                     logInfo(INDENTED_LINE, categoryBar);
                 }
                 if (!cat.missingItems().isEmpty()) {

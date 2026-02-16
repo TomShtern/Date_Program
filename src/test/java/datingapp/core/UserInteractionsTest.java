@@ -344,17 +344,19 @@ class UserInteractionsTest {
         }
 
         @Test
-        @DisplayName("Description exceeding 500 characters throws")
-        void descriptionTooLongThrows() {
+        @DisplayName("Description exceeding 500 characters is accepted at model level (validated by service)")
+        void descriptionLongerThan500AcceptedAtModelLevel() {
             UUID reporterId = UUID.randomUUID();
             UUID reportedId = UUID.randomUUID();
+            // Description length validation is now handled by TrustSafetyService using
+            // AppConfig,
+            // not at the model level. The model should accept any length.
             String longDescription = "x".repeat(501);
 
-            IllegalArgumentException ex = assertThrows(
-                    IllegalArgumentException.class,
-                    () -> Report.create(reporterId, reportedId, Report.Reason.OTHER, longDescription),
-                    "Should throw when description exceeds 500 characters");
-            assertNotNull(ex);
+            Report report = Report.create(reporterId, reportedId, Report.Reason.OTHER, longDescription);
+
+            assertNotNull(report);
+            assertEquals(501, report.description().length());
         }
 
         @Test

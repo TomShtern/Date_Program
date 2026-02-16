@@ -213,7 +213,7 @@ class MatchQualityServiceTest {
 
             MatchQuality quality = service.computeQuality(match, alice.getId());
 
-            assertEquals(ScoringConstants.MatchQuality.INTEREST_MISSING_SCORE, quality.interestScore());
+            assertEquals(0.3, quality.interestScore()); // INTEREST_MISSING_SCORE
         }
 
         @Test
@@ -237,7 +237,7 @@ class MatchQualityServiceTest {
 
             MatchQuality quality = service.computeQuality(match, alice.getId());
 
-            assertEquals(ScoringConstants.MatchQuality.NEUTRAL_SCORE, quality.distanceScore());
+            assertEquals(0.5, quality.distanceScore()); // NEUTRAL_SCORE
             assertEquals(-1, quality.distanceKm());
         }
     }
@@ -327,7 +327,7 @@ class MatchQualityServiceTest {
             MatchQuality quality = service.computeQuality(match, alice.getId());
 
             assertEquals(
-                    ScoringConstants.MatchQuality.HIGHLIGHT_MAX_COUNT,
+                    5, // HIGHLIGHT_MAX_COUNT
                     quality.highlights().size());
         }
     }
@@ -337,24 +337,11 @@ class MatchQualityServiceTest {
     class ProgressBarTests {
 
         @Test
-        @DisplayName("Full score renders all filled")
-        void fullScoreRendersAllFilled() {
-            String bar = MatchQualityService.renderProgressBar(1.0, 10);
-            assertEquals("██████████", bar);
-        }
-
-        @Test
-        @DisplayName("Empty score renders all empty")
-        void emptyScoreRendersAllEmpty() {
-            String bar = MatchQualityService.renderProgressBar(0.0, 10);
-            assertEquals("░░░░░░░░░░", bar);
-        }
-
-        @Test
-        @DisplayName("Half score renders half filled")
-        void halfScoreRendersHalfFilled() {
-            String bar = MatchQualityService.renderProgressBar(0.5, 10);
-            assertEquals("█████░░░░░", bar);
+        @DisplayName("should render progress bars correctly")
+        void rendersProgressBars() {
+            assertEquals("░░░░░░░░░░", TextUtil.renderProgressBar(0.0, 10));
+            assertEquals("█████░░░░░", TextUtil.renderProgressBar(0.5, 10));
+            assertEquals("██████████", TextUtil.renderProgressBar(1.0, 10));
         }
     }
 

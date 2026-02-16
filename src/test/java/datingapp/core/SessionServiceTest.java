@@ -45,7 +45,8 @@ class SessionServiceTest {
                 .maxSwipesPerSession(100)
                 .suspiciousSwipeVelocity(30.0)
                 .build();
-        service = new ActivityMetricsService(analyticsStorage, config);
+        service = new ActivityMetricsService(
+                new TestStorages.Interactions(), new TestStorages.TrustSafety(), analyticsStorage, config);
         userId = UUID.randomUUID();
     }
 

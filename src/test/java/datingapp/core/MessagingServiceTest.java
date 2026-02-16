@@ -50,7 +50,7 @@ class MessagingServiceTest {
         messagingStorage = new TestStorages.Communications();
         matchStorage = new TestStorages.Interactions();
         userStorage = new InMemoryUserStorage();
-        messagingService = new ConnectionService(messagingStorage, matchStorage, userStorage);
+        messagingService = new ConnectionService(AppConfig.defaults(), messagingStorage, matchStorage, userStorage);
 
         // Create test users
         userA = UUID.randomUUID();

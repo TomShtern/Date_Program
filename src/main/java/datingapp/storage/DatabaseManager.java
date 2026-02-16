@@ -9,8 +9,10 @@ import java.sql.Statement;
 import java.util.Objects;
 
 /**
- * Manages H2 database connection pooling and lifecycle. Schema creation is delegated to {@link
- * datingapp.storage.schema.SchemaInitializer} and migrations to {@link MigrationRunner}.
+ * Manages H2 database connection pooling and lifecycle. Schema creation is
+ * delegated to {@link
+ * datingapp.storage.schema.SchemaInitializer} and migrations to
+ * {@link MigrationRunner}.
  */
 public final class DatabaseManager {
 
@@ -59,8 +61,11 @@ public final class DatabaseManager {
         dataSource = new HikariDataSource(config);
     }
 
-    /** Gets a new database connection. Initializes the schema on first call. */
-    public Connection getConnection() throws SQLException {
+    /**
+     * Gets a new database connection. Initializes the schema on first call.
+     * Thread-safe.
+     */
+    public synchronized Connection getConnection() throws SQLException {
         if (!initialized) {
             initializeSchema();
         }
@@ -82,7 +87,10 @@ public final class DatabaseManager {
     // Schema initialization (delegates to extracted classes)
     // ═══════════════════════════════════════════════════════════════
 
-    /** Initializes the database schema — delegates to SchemaInitializer and MigrationRunner. */
+    /**
+     * Initializes the database schema — delegates to SchemaInitializer and
+     * MigrationRunner.
+     */
     private synchronized void initializeSchema() {
         if (initialized) {
             return;

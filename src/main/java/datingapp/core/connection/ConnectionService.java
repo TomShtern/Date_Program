@@ -29,31 +29,24 @@ public class ConnectionService {
     private static final String EMPTY_MESSAGE = "Message cannot be empty";
     private static final String MESSAGE_TOO_LONG = "Message too long (max %d characters)";
 
-    private static final AppConfig CONFIG = AppConfig.defaults();
-
+    private final AppConfig config;
     private final CommunicationStorage communicationStorage;
     private final InteractionStorage interactionStorage;
     private final UserStorage userStorage;
 
-    public ConnectionService(InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
-        this(communicationStorage, interactionStorage, null);
-    }
-
+    /** Full constructor — all dependencies are required. */
     public ConnectionService(
-            CommunicationStorage communicationStorage, InteractionStorage interactionStorage, UserStorage userStorage) {
+            AppConfig config,
+            CommunicationStorage communicationStorage,
+            InteractionStorage interactionStorage,
+            UserStorage userStorage) {
+        this.config = Objects.requireNonNull(config, "config cannot be null");
         this.communicationStorage = Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
-        this.userStorage = userStorage;
-    }
-
-    private void ensureMessagingDependencies() {
-        if (userStorage == null) {
-            throw new IllegalStateException("Messaging dependencies are not configured");
-        }
+        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
     }
 
     public SendResult sendMessage(UUID senderId, UUID recipientId, String content) {
-        ensureMessagingDependencies();
         User sender = userStorage.get(senderId);
         if (sender == null || sender.getState() != User.UserState.ACTIVE) {
             return SendResult.failure(SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
@@ -93,7 +86,7 @@ public class ConnectionService {
     }
 
     public List<Message> getMessages(UUID userId, UUID otherUserId, int limit, int offset) {
-        if (limit < 1 || limit > CONFIG.messageMaxPageSize()) {
+        if (limit < 1 || limit > config.messageMaxPageSize()) {
             return List.of();
         }
         if (offset < 0) {
@@ -110,7 +103,6 @@ public class ConnectionService {
     }
 
     public List<ConversationPreview> getConversations(UUID userId) {
-        ensureMessagingDependencies();
         List<Conversation> conversations = communicationStorage.getConversationsFor(userId);
 
         List<UUID> otherUserIds =

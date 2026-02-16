@@ -127,26 +127,26 @@ class SoftDeletableTest {
         }
 
         @Test
-        @DisplayName("setDeletedAt allows null for storage reconstitution")
-        void setDeletedAtAllowsNull() {
+        @DisplayName("restoreDeletedAt allows null for storage reconstitution")
+        void restoreDeletedAtAllowsNull() {
             UUID a = UUID.randomUUID();
             UUID b = UUID.randomUUID();
             Match match = Match.create(a, b);
 
-            match.setDeletedAt(null);
+            match.restoreDeletedAt(null);
             assertNull(match.getDeletedAt());
             assertFalse(match.isDeleted());
         }
 
         @Test
-        @DisplayName("setDeletedAt round-trips from storage")
-        void setDeletedAtRoundTrips() {
+        @DisplayName("restoreDeletedAt round-trips from storage")
+        void restoreDeletedAtRoundTrips() {
             Instant ts = Instant.parse("2026-03-01T08:00:00Z");
             UUID a = UUID.randomUUID();
             UUID b = UUID.randomUUID();
             Match match = Match.create(a, b);
 
-            match.setDeletedAt(ts);
+            match.restoreDeletedAt(ts);
 
             assertEquals(ts, match.getDeletedAt());
             assertTrue(match.isDeleted());

@@ -12,6 +12,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyl
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;
 import datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency;
 import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.recommendation.*;
 import datingapp.core.recommendation.RecommendationService.DailyPick;
 import datingapp.core.storage.UserStorage;
@@ -50,14 +51,22 @@ class DailyPickServiceTest {
         config = AppConfig.defaults();
 
         candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
-        service = new RecommendationService(
-                userStorage,
-                interactionStorage,
-                trustSafetyStorage,
-                analyticsStorage,
-                candidateFinder,
-                config,
-                AppClock.clock());
+        // Create dummies for missing dependencies
+        var standoutStorage = new TestStorages.Standouts();
+        var profileService =
+                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+
+        service = RecommendationService.builder()
+                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(standoutStorage)
+                .profileService(profileService)
+                .config(config)
+                .clock(AppClock.clock())
+                .build();
     }
 
     @AfterEach
@@ -248,14 +257,18 @@ class DailyPickServiceTest {
         LocalDate oldDate = AppClock.today(config.userTimeZone()).minusDays(10);
         ZoneId zone = config.userTimeZone();
         Clock oldClock = Clock.fixed(oldDate.atStartOfDay(zone).toInstant(), zone);
-        RecommendationService oldService = new RecommendationService(
-                userStorage,
-                interactionStorage,
-                trustSafetyStorage,
-                analyticsStorage,
-                candidateFinder,
-                config,
-                oldClock);
+        RecommendationService oldService = RecommendationService.builder()
+                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(new TestStorages.Standouts())
+                .profileService(new ProfileService(
+                        config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage))
+                .config(config)
+                .clock(oldClock)
+                .build();
 
         User seeker = createActiveUser("Alice", 25);
         userStorage.save(seeker);
@@ -304,7 +317,8 @@ class DailyPickServiceTest {
         user.setBio("Test bio for " + name);
         user.setBirthDate(AppClock.today().minusYears(age));
         user.setGender(gender);
-        // Set mutual interest - everyone interested in everyone for simple test matching
+        // Set mutual interest - everyone interested in everyone for simple test
+        // matching
         user.setInterestedIn(EnumSet.of(User.Gender.MALE, User.Gender.FEMALE, User.Gender.OTHER));
         user.setLocation(40.7128, -74.0060); // NYC
         user.addPhotoUrl("http://example.com/" + name + ".jpg");

@@ -65,21 +65,43 @@ class LikerBrowserHandlerTest {
         CandidateFinder candidateFinder =
                 new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
-        ProfileService profileCompletionService = new ProfileService(config);
+        ProfileService profileCompletionService =
+                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        RecommendationService dailyService = RecommendationService.builder()
+                .interactionStorage(interactionStorage)
+                .userStorage(userStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(new TestStorages.Standouts())
+                .profileService(profileCompletionService)
+                .config(config)
+                .build();
+
+        RecommendationService recService = RecommendationService.builder()
+                .interactionStorage(interactionStorage)
+                .userStorage(userStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(new TestStorages.Standouts())
+                .profileService(profileCompletionService)
+                .config(config)
+                .build();
+
         MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
                 candidateFinder,
                 matchingService,
                 interactionStorage,
-                new RecommendationService(interactionStorage, config),
+                dailyService,
                 new UndoService(interactionStorage, new TestStorages.Undos(), config),
                 matchQualityService,
                 userStorage,
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage),
+                profileCompletionService,
                 analyticsStorage,
                 trustSafetyService,
-                new ConnectionService(interactionStorage, communicationStorage),
-                new RecommendationService(
-                        userStorage, new TestStorages.Standouts(), candidateFinder, profileCompletionService, config),
+                new ConnectionService(config, communicationStorage, interactionStorage, userStorage),
+                recService,
                 communicationStorage,
                 session,
                 inputReader);

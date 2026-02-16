@@ -109,14 +109,6 @@ public class ServiceRegistry {
         return activityMetricsService;
     }
 
-    public ActivityMetricsService getSessionService() {
-        return activityMetricsService;
-    }
-
-    public ActivityMetricsService getStatsService() {
-        return activityMetricsService;
-    }
-
     public MatchQualityService getMatchQualityService() {
         return matchQualityService;
     }

@@ -30,7 +30,9 @@ public class Match {
     /**
      * Reasons why a relationship/match was archived or ended.
      *
-     * <p>Note: Some reasons overlap with terminal {@link State} values. We keep both for
+     * <p>
+     * Note: Some reasons overlap with terminal {@link State} values. We keep both
+     * for
      * analytics/history without changing the state machine.
      */
     public static enum ArchiveReason {
@@ -276,8 +278,13 @@ public class Match {
         return deletedAt != null;
     }
 
-    /** Sets the deleted-at timestamp; used when reconstructing from storage. */
-    public void setDeletedAt(Instant deletedAt) {
+    /**
+     * Restores the deleted-at timestamp from storage. This method is for storage
+     * layer
+     * reconstitution only — production code should use
+     * {@link #markDeleted(Instant)}.
+     */
+    public void restoreDeletedAt(Instant deletedAt) {
         this.deletedAt = deletedAt;
     }
 

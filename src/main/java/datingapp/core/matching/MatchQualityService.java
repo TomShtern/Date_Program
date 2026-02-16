@@ -3,7 +3,6 @@ package datingapp.core.matching;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.EnumSetUtil;
-import datingapp.core.ScoringConstants;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.model.Match;
@@ -29,6 +28,42 @@ public class MatchQualityService {
     private final UserStorage userStorage;
     private final InteractionStorage interactionStorage;
     private final AppConfig config;
+
+    // ── Match quality thresholds (inlined from deleted ScoringConstants) ──
+    private static final int STAR_EXCELLENT_THRESHOLD = 90;
+    private static final int STAR_GREAT_THRESHOLD = 75;
+    private static final int STAR_GOOD_THRESHOLD = 60;
+    private static final int STAR_FAIR_THRESHOLD = 40;
+    private static final String LABEL_EXCELLENT = "Excellent Match";
+    private static final String LABEL_GREAT = "Great Match";
+    private static final String LABEL_GOOD = "Good Match";
+    private static final String LABEL_FAIR = "Fair Match";
+    private static final String LABEL_LOW = "Low Compatibility";
+    private static final int SUMMARY_MAX_LENGTH = 40;
+    private static final int SUMMARY_TRUNCATE_LENGTH = 37;
+    private static final int HIGHLIGHT_MAX_COUNT = 5;
+    private static final int SHARED_INTERESTS_PREVIEW_COUNT = 3;
+    private static final int VERY_CLOSE_DISTANCE_KM = 1;
+    private static final int NEARBY_DISTANCE_KM = 5;
+    private static final int MID_DISTANCE_KM = 15;
+    private static final int AGE_SIMILAR_YEARS = 2;
+    private static final int QUICK_MUTUAL_INTEREST_HOURS = 24;
+    private static final double NEUTRAL_SCORE = 0.5;
+    private static final double INTEREST_MISSING_SCORE = 0.3;
+    private static final double PACE_SYNC_PERFECT = 0.95;
+    private static final double PACE_SYNC_GOOD = 0.8;
+    private static final double PACE_SYNC_FAIR = 0.6;
+    private static final double PACE_SYNC_LAG = 0.4;
+    private static final double RESPONSE_SCORE_EXCELLENT = 1.0;
+    private static final double RESPONSE_SCORE_GREAT = 0.9;
+    private static final double RESPONSE_SCORE_GOOD = 0.7;
+    private static final double RESPONSE_SCORE_OK = 0.5;
+    private static final double RESPONSE_SCORE_LOW = 0.3;
+    private static final double RESPONSE_SCORE_VERY_LOW = 0.1;
+    private static final int WILDCARD_SCORE = 20;
+    private static final int PACE_SCORE_EXACT = 25;
+    private static final int PACE_SCORE_CLOSE = 15;
+    private static final int PACE_SCORE_FAR = 5;
 
     /**
      * Immutable record representing the quality/compatibility of a match. Computed
@@ -103,16 +138,16 @@ public class MatchQualityService {
 
         /** Get star rating (1-5 stars based on compatibility). */
         public int getStarRating() {
-            if (compatibilityScore >= ScoringConstants.MatchQuality.STAR_EXCELLENT_THRESHOLD) {
+            if (compatibilityScore >= STAR_EXCELLENT_THRESHOLD) {
                 return 5;
             }
-            if (compatibilityScore >= ScoringConstants.MatchQuality.STAR_GREAT_THRESHOLD) {
+            if (compatibilityScore >= STAR_GREAT_THRESHOLD) {
                 return 4;
             }
-            if (compatibilityScore >= ScoringConstants.MatchQuality.STAR_GOOD_THRESHOLD) {
+            if (compatibilityScore >= STAR_GOOD_THRESHOLD) {
                 return 3;
             }
-            if (compatibilityScore >= ScoringConstants.MatchQuality.STAR_FAIR_THRESHOLD) {
+            if (compatibilityScore >= STAR_FAIR_THRESHOLD) {
                 return 2;
             }
             return 1;
@@ -120,19 +155,19 @@ public class MatchQualityService {
 
         /** Get compatibility label. */
         public String getCompatibilityLabel() {
-            if (compatibilityScore >= ScoringConstants.MatchQuality.STAR_EXCELLENT_THRESHOLD) {
-                return ScoringConstants.MatchQuality.LABEL_EXCELLENT;
+            if (compatibilityScore >= STAR_EXCELLENT_THRESHOLD) {
+                return LABEL_EXCELLENT;
             }
-            if (compatibilityScore >= ScoringConstants.MatchQuality.STAR_GREAT_THRESHOLD) {
-                return ScoringConstants.MatchQuality.LABEL_GREAT;
+            if (compatibilityScore >= STAR_GREAT_THRESHOLD) {
+                return LABEL_GREAT;
             }
-            if (compatibilityScore >= ScoringConstants.MatchQuality.STAR_GOOD_THRESHOLD) {
-                return ScoringConstants.MatchQuality.LABEL_GOOD;
+            if (compatibilityScore >= STAR_GOOD_THRESHOLD) {
+                return LABEL_GOOD;
             }
-            if (compatibilityScore >= ScoringConstants.MatchQuality.STAR_FAIR_THRESHOLD) {
-                return ScoringConstants.MatchQuality.LABEL_FAIR;
+            if (compatibilityScore >= STAR_FAIR_THRESHOLD) {
+                return LABEL_FAIR;
             }
-            return ScoringConstants.MatchQuality.LABEL_LOW;
+            return LABEL_LOW;
         }
 
         /** Render star icons for display. */
@@ -149,8 +184,8 @@ public class MatchQualityService {
         public String getShortSummary() {
             if (!highlights.isEmpty()) {
                 String first = highlights.getFirst();
-                return first.length() > ScoringConstants.MatchQuality.SUMMARY_MAX_LENGTH
-                        ? first.substring(0, ScoringConstants.MatchQuality.SUMMARY_TRUNCATE_LENGTH) + "..."
+                return first.length() > SUMMARY_MAX_LENGTH
+                        ? first.substring(0, SUMMARY_TRUNCATE_LENGTH) + "..."
                         : first;
             }
             return getCompatibilityLabel();
@@ -259,11 +294,11 @@ public class MatchQualityService {
             }
 
             List<String> names = shared.stream()
-                    .limit(ScoringConstants.MatchQuality.SHARED_INTERESTS_PREVIEW_COUNT)
+                    .limit(SHARED_INTERESTS_PREVIEW_COUNT)
                     .map(Interest::getDisplayName)
                     .toList();
 
-            int remaining = shared.size() - ScoringConstants.MatchQuality.SHARED_INTERESTS_PREVIEW_COUNT;
+            int remaining = shared.size() - SHARED_INTERESTS_PREVIEW_COUNT;
 
             if (remaining > 0) {
                 return String.join(", ", names) + ", and " + remaining + " more";
@@ -326,9 +361,8 @@ public class MatchQualityService {
         } else {
             distanceKm = -1;
         }
-        double distanceScore = distanceKm >= 0
-                ? calculateDistanceScore(distanceKm, me.getMaxDistanceKm())
-                : ScoringConstants.MatchQuality.NEUTRAL_SCORE;
+        double distanceScore =
+                distanceKm >= 0 ? calculateDistanceScore(distanceKm, me.getMaxDistanceKm()) : NEUTRAL_SCORE;
 
         // Age Score
         int ageDiff = Math.abs(me.getAge() - them.getAge());
@@ -389,7 +423,7 @@ public class MatchQualityService {
     // === Score Calculation Methods ===
 
     private double calculateDistanceScore(double distanceKm, int maxDistanceKm) {
-        if (distanceKm <= ScoringConstants.MatchQuality.VERY_CLOSE_DISTANCE_KM) {
+        if (distanceKm <= VERY_CLOSE_DISTANCE_KM) {
             return 1.0; // Very close
         }
         if (distanceKm >= maxDistanceKm) {
@@ -402,7 +436,7 @@ public class MatchQualityService {
 
     private double calculateAgeScore(int ageDiff, User me, User them) {
         // Perfect score if within 2 years
-        if (ageDiff <= ScoringConstants.MatchQuality.AGE_SIMILAR_YEARS) {
+        if (ageDiff <= AGE_SIMILAR_YEARS) {
             return 1.0;
         }
 
@@ -423,11 +457,11 @@ public class MatchQualityService {
     private double calculateInterestScore(InterestMatcher.MatchResult match, User me, User them) {
         // If neither has interests, neutral score
         if (me.getInterests().isEmpty() && them.getInterests().isEmpty()) {
-            return ScoringConstants.MatchQuality.NEUTRAL_SCORE; // Unknown = neutral
+            return NEUTRAL_SCORE; // Unknown = neutral
         }
 
         if (me.getInterests().isEmpty() || them.getInterests().isEmpty()) {
-            return ScoringConstants.MatchQuality.INTEREST_MISSING_SCORE; // One has interests, other doesn't
+            return INTEREST_MISSING_SCORE; // One has interests, other doesn't
         }
 
         return match.overlapRatio();
@@ -436,7 +470,7 @@ public class MatchQualityService {
     private double calculateLifestyleScore(User me, User them) {
         int total = countLifestyleFactors(me, them);
         if (total == 0) {
-            return ScoringConstants.MatchQuality.NEUTRAL_SCORE;
+            return NEUTRAL_SCORE;
         }
 
         int matches = countLifestyleMatches(me, them);
@@ -462,10 +496,10 @@ public class MatchQualityService {
 
     private int countLifestyleMatches(User me, User them) {
         int matches = 0;
-        if (me.getSmoking() != null && them.getSmoking() != null && me.getSmoking() == them.getSmoking()) {
+        if (LifestyleMatcher.isMatch(me.getSmoking(), them.getSmoking())) {
             matches++;
         }
-        if (me.getDrinking() != null && them.getDrinking() != null && me.getDrinking() == them.getDrinking()) {
+        if (LifestyleMatcher.isMatch(me.getDrinking(), them.getDrinking())) {
             matches++;
         }
         if (me.getWantsKids() != null
@@ -473,37 +507,27 @@ public class MatchQualityService {
                 && areKidsStancesCompatible(me.getWantsKids(), them.getWantsKids())) {
             matches++;
         }
-        if (me.getLookingFor() != null && them.getLookingFor() != null && me.getLookingFor() == them.getLookingFor()) {
+        if (LifestyleMatcher.isMatch(me.getLookingFor(), them.getLookingFor())) {
             matches++;
         }
         return matches;
     }
 
     private boolean areKidsStancesCompatible(Lifestyle.WantsKids a, Lifestyle.WantsKids b) {
-        // Compatible if same
-        if (a == b) {
-            return true;
-        }
-        // OPEN is compatible with everything
-        if (a == Lifestyle.WantsKids.OPEN || b == Lifestyle.WantsKids.OPEN) {
-            return true;
-        }
-        // SOMEDAY and HAS_KIDS are compatible
-        return (a == Lifestyle.WantsKids.SOMEDAY && b == Lifestyle.WantsKids.HAS_KIDS)
-                || (a == Lifestyle.WantsKids.HAS_KIDS && b == Lifestyle.WantsKids.SOMEDAY);
+        return LifestyleMatcher.areKidsStancesCompatible(a, b);
     }
 
     private String getPaceSyncLevel(double score) {
-        if (score >= ScoringConstants.MatchQuality.PACE_SYNC_PERFECT) {
+        if (score >= PACE_SYNC_PERFECT) {
             return "Perfect Sync";
         }
-        if (score >= ScoringConstants.MatchQuality.PACE_SYNC_GOOD) {
+        if (score >= PACE_SYNC_GOOD) {
             return "Good Sync";
         }
-        if (score >= ScoringConstants.MatchQuality.PACE_SYNC_FAIR) {
+        if (score >= PACE_SYNC_FAIR) {
             return "Fair Sync";
         }
-        if (score >= ScoringConstants.MatchQuality.PACE_SYNC_LAG) {
+        if (score >= PACE_SYNC_LAG) {
             return "Pace Lag";
         }
         return "Mismatched Pace";
@@ -579,33 +603,33 @@ public class MatchQualityService {
 
     private double calculateResponseScore(Duration timeBetween) {
         if (timeBetween == null || timeBetween.isZero()) {
-            return ScoringConstants.MatchQuality.NEUTRAL_SCORE; // Unknown
+            return NEUTRAL_SCORE; // Unknown
         }
 
         long hours = timeBetween.toHours();
 
         // Within excellent threshold = excellent
         if (hours < config.responseTimeExcellentHours()) {
-            return ScoringConstants.MatchQuality.RESPONSE_SCORE_EXCELLENT;
+            return RESPONSE_SCORE_EXCELLENT;
         }
         // Within great threshold = great
         if (hours < config.responseTimeGreatHours()) {
-            return ScoringConstants.MatchQuality.RESPONSE_SCORE_GREAT;
+            return RESPONSE_SCORE_GREAT;
         }
         // Within good threshold = good
         if (hours < config.responseTimeGoodHours()) {
-            return ScoringConstants.MatchQuality.RESPONSE_SCORE_GOOD;
+            return RESPONSE_SCORE_GOOD;
         }
         // Within a week = okay
         if (hours < config.responseTimeWeekHours()) {
-            return ScoringConstants.MatchQuality.RESPONSE_SCORE_OK;
+            return RESPONSE_SCORE_OK;
         }
         // Within a month = low
         if (hours < config.responseTimeMonthHours()) {
-            return ScoringConstants.MatchQuality.RESPONSE_SCORE_LOW;
+            return RESPONSE_SCORE_LOW;
         }
         // Longer = very low
-        return ScoringConstants.MatchQuality.RESPONSE_SCORE_VERY_LOW;
+        return RESPONSE_SCORE_VERY_LOW;
     }
 
     // === Highlight Generation ===
@@ -621,9 +645,9 @@ public class MatchQualityService {
         List<String> highlights = new ArrayList<>();
 
         // Distance highlight
-        if (distanceKm >= 0 && distanceKm < ScoringConstants.MatchQuality.NEARBY_DISTANCE_KM) {
+        if (distanceKm >= 0 && distanceKm < NEARBY_DISTANCE_KM) {
             highlights.add(String.format("Lives nearby (%.1f km away)", distanceKm));
-        } else if (distanceKm >= 0 && distanceKm < ScoringConstants.MatchQuality.MID_DISTANCE_KM) {
+        } else if (distanceKm >= 0 && distanceKm < MID_DISTANCE_KM) {
             highlights.add(String.format("%.0f km away", distanceKm));
         }
 
@@ -644,44 +668,36 @@ public class MatchQualityService {
         highlights.addAll(lifestyleMatches);
 
         // Pace highlights
-        if (paceScore >= ScoringConstants.MatchQuality.PACE_SYNC_PERFECT) {
+        if (paceScore >= PACE_SYNC_PERFECT) {
             highlights.add("Total Pace Sync! ⚡");
-        } else if (paceScore >= ScoringConstants.MatchQuality.PACE_SYNC_GOOD) {
+        } else if (paceScore >= PACE_SYNC_GOOD) {
             highlights.add("Great communication sync");
         }
 
         // Response time highlight
-        if (timeBetween != null
-                && !timeBetween.isZero()
-                && timeBetween.toHours() < ScoringConstants.MatchQuality.QUICK_MUTUAL_INTEREST_HOURS) {
+        if (timeBetween != null && !timeBetween.isZero() && timeBetween.toHours() < QUICK_MUTUAL_INTEREST_HOURS) {
             highlights.add("Quick mutual interest!");
         }
 
         // Age highlight
         int ageDiff = Math.abs(me.getAge() - them.getAge());
-        if (ageDiff <= ScoringConstants.MatchQuality.AGE_SIMILAR_YEARS) {
+        if (ageDiff <= AGE_SIMILAR_YEARS) {
             highlights.add("Similar age");
         }
 
         // Limit to top 5 highlights
-        if (highlights.size() > ScoringConstants.MatchQuality.HIGHLIGHT_MAX_COUNT) {
-            highlights = new ArrayList<>(highlights.subList(0, ScoringConstants.MatchQuality.HIGHLIGHT_MAX_COUNT));
+        if (highlights.size() > HIGHLIGHT_MAX_COUNT) {
+            highlights = new ArrayList<>(highlights.subList(0, HIGHLIGHT_MAX_COUNT));
         }
 
         return highlights;
     }
 
-    /** Render a progress bar for display. */
-    public static String renderProgressBar(double score, int width) {
-        int filled = (int) Math.round(score * width);
-        int empty = width - filled;
-        return "█".repeat(Math.max(0, filled)) + "░".repeat(Math.max(0, empty));
-    }
-
     // === Pace Compatibility Methods (formerly PaceCompatibilityService) ===
 
     /**
-     * Calculates a compatibility score (0-100) between two users' pace MatchPreferences.
+     * Calculates a compatibility score (0-100) between two users' pace
+     * MatchPreferences.
      *
      * @param a first user's preferences
      * @param b second user's preferences
@@ -723,21 +739,21 @@ public class MatchQualityService {
     public double calculatePaceScore(PacePreferences a, PacePreferences b) {
         int comp = calculatePaceCompatibility(a, b);
         if (comp == -1) {
-            return ScoringConstants.MatchQuality.NEUTRAL_SCORE; // Neutral
+            return NEUTRAL_SCORE; // Neutral
         }
         return comp / 100.0;
     }
 
     private int dimensionScore(Enum<?> a, Enum<?> b, boolean hasWildcard) {
         if (hasWildcard) {
-            return ScoringConstants.MatchQuality.WILDCARD_SCORE;
+            return WILDCARD_SCORE;
         }
 
         int distance = Math.abs(a.ordinal() - b.ordinal());
         return switch (distance) {
-            case 0 -> ScoringConstants.MatchQuality.PACE_SCORE_EXACT; // Perfect match
-            case 1 -> ScoringConstants.MatchQuality.PACE_SCORE_CLOSE; // Close enough
-            default -> ScoringConstants.MatchQuality.PACE_SCORE_FAR; // Quite different
+            case 0 -> PACE_SCORE_EXACT; // Perfect match
+            case 1 -> PACE_SCORE_CLOSE; // Close enough
+            default -> PACE_SCORE_FAR; // Quite different
         };
     }
 
