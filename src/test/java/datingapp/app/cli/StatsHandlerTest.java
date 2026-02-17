@@ -2,8 +2,7 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.app.cli.metrics.StatsHandler;
-import datingapp.app.cli.shared.CliTextAndInput.InputReader;
+import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.metrics.ActivityMetricsService;

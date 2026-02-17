@@ -1,8 +1,8 @@
 package datingapp.ui.screen;
 
 import datingapp.core.metrics.EngagementDomain.Achievement;
-import datingapp.ui.animation.UiAnimations;
-import datingapp.ui.viewmodel.screen.StatsViewModel;
+import datingapp.ui.UiAnimations;
+import datingapp.ui.viewmodel.StatsViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.fxml.FXML;

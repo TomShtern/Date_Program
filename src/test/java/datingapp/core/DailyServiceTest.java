@@ -4,10 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
+import datingapp.core.matching.RecommendationService.DailyPick;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
-import datingapp.core.recommendation.*;
-import datingapp.core.recommendation.RecommendationService.DailyPick;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import java.time.Clock;

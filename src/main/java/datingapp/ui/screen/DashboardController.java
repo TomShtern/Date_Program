@@ -2,9 +2,9 @@ package datingapp.ui.screen;
 
 import datingapp.core.AppSession;
 import datingapp.ui.NavigationService;
-import datingapp.ui.animation.UiAnimations;
-import datingapp.ui.feedback.UiFeedbackService;
-import datingapp.ui.viewmodel.screen.DashboardViewModel;
+import datingapp.ui.UiAnimations;
+import datingapp.ui.UiFeedbackService;
+import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.fxml.FXML;

@@ -3,9 +3,9 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.matching.*;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.profile.ProfileService;
-import datingapp.core.recommendation.*;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.*;

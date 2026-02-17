@@ -2,15 +2,15 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.app.cli.shared.CliTextAndInput.InputReader;
+import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.connection.ConnectionModels;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
+import datingapp.core.matching.RecommendationService;
 import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
-import datingapp.core.recommendation.RecommendationService;
-import datingapp.ui.animation.UiAnimations;
+import datingapp.ui.UiAnimations;
 import java.lang.reflect.Modifier;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;

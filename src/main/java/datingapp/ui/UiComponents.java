@@ -1,6 +1,5 @@
 package datingapp.ui;
 
-import datingapp.ui.constants.UiConstants;
 import java.util.function.Supplier;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;

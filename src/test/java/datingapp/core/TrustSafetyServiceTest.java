@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Report;
+import datingapp.core.matching.*;
 import datingapp.core.model.*;
 import datingapp.core.model.User.ProfileNote;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
@@ -14,7 +15,6 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyl
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;
 import datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency;
 import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
-import datingapp.core.safety.*;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;

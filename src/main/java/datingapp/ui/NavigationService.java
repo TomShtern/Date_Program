@@ -1,7 +1,7 @@
 package datingapp.ui;
 
-import datingapp.ui.feedback.UiFeedbackService;
 import datingapp.ui.screen.BaseController;
+import datingapp.ui.viewmodel.ViewModelFactory;
 import java.io.IOException;
 import java.util.Deque;
 import java.util.Iterator;

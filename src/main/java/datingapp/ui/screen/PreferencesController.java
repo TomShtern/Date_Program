@@ -1,9 +1,9 @@
 package datingapp.ui.screen;
 
 import datingapp.ui.NavigationService;
-import datingapp.ui.animation.UiAnimations;
-import datingapp.ui.viewmodel.screen.PreferencesViewModel;
-import datingapp.ui.viewmodel.screen.PreferencesViewModel.GenderPreference;
+import datingapp.ui.UiAnimations;
+import datingapp.ui.viewmodel.PreferencesViewModel;
+import datingapp.ui.viewmodel.PreferencesViewModel.GenderPreference;
 import java.net.URL;
 import java.util.Objects;
 import java.util.ResourceBundle;

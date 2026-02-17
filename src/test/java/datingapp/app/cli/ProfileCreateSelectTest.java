@@ -4,8 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import datingapp.app.cli.profile.ProfileHandler;
-import datingapp.app.cli.shared.CliTextAndInput.InputReader;
+import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;

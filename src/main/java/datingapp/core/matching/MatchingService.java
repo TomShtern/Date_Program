@@ -4,7 +4,6 @@ import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.recommendation.RecommendationService;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;

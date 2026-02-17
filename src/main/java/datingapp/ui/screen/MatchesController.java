@@ -2,11 +2,11 @@ package datingapp.ui.screen;
 
 import datingapp.core.AppClock;
 import datingapp.ui.NavigationService;
-import datingapp.ui.animation.UiAnimations;
-import datingapp.ui.feedback.UiFeedbackService;
-import datingapp.ui.viewmodel.screen.MatchesViewModel;
-import datingapp.ui.viewmodel.screen.MatchesViewModel.LikeCardData;
-import datingapp.ui.viewmodel.screen.MatchesViewModel.MatchCardData;
+import datingapp.ui.UiAnimations;
+import datingapp.ui.UiFeedbackService;
+import datingapp.ui.viewmodel.MatchesViewModel;
+import datingapp.ui.viewmodel.MatchesViewModel.LikeCardData;
+import datingapp.ui.viewmodel.MatchesViewModel.MatchCardData;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
