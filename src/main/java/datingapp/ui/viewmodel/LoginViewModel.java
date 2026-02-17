@@ -3,9 +3,9 @@ package datingapp.ui.viewmodel;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.model.Gender;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
@@ -302,10 +302,10 @@ public class LoginViewModel {
             // Now attempt to activate the user since profile is complete
             if (newUser.isComplete()) {
                 newUser.activate();
-                logInfo("User {} is complete and activated. State: {}", newUser.getName(), newUser.getState());
+                logInfo("User {} is complete and activated. MatchState: {}", newUser.getName(), newUser.getState());
             } else {
                 logWarn(
-                        "User {} created but not complete. State: {} (isComplete={})",
+                        "User {} created but not complete. MatchState: {} (isComplete={})",
                         newUser.getName(),
                         newUser.getState(),
                         newUser.isComplete());
@@ -316,7 +316,7 @@ public class LoginViewModel {
             refreshUsers();
 
             logInfo(
-                    "Created new user: {} with ID {}, State: {}",
+                    "Created new user: {} with ID {}, MatchState: {}",
                     newUser.getName(),
                     newUser.getId(),
                     newUser.getState());

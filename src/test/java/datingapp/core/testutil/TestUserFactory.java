@@ -1,13 +1,15 @@
 package datingapp.core.testutil;
 
 import datingapp.core.AppClock;
+import datingapp.core.model.Gender;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
+import datingapp.core.model.UserState;
 import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * Factory for creating test users with sensible defaults. Simplifies test setup and reduces
+ * Factory for creating test users with sensible defaults. Simplifies test setup
+ * and reduces
  * boilerplate code.
  */
 public final class TestUserFactory {
@@ -17,7 +19,8 @@ public final class TestUserFactory {
     }
 
     /**
-     * Creates an ACTIVE user with minimal required fields. Uses default coordinates (Tel Aviv).
+     * Creates an ACTIVE user with minimal required fields. Uses default coordinates
+     * (Tel Aviv).
      *
      * @param name the user's name
      * @return a new active user
@@ -29,13 +32,13 @@ public final class TestUserFactory {
     /**
      * Creates an ACTIVE user with specified ID.
      *
-     * @param id the user's ID
+     * @param id   the user's ID
      * @param name the user's name
      * @return a new active user
      */
     public static User createActiveUser(UUID id, String name) {
         return User.StorageBuilder.create(id, name, AppClock.now())
-                .state(User.UserState.ACTIVE)
+                .state(UserState.ACTIVE)
                 .bio("Test bio")
                 .birthDate(AppClock.today().minusYears(25))
                 .gender(Gender.MALE)
@@ -52,7 +55,8 @@ public final class TestUserFactory {
     }
 
     /**
-     * Creates a complete user with all essential fields populated. Profile is ACTIVE and ready for
+     * Creates a complete user with all essential fields populated. Profile is
+     * ACTIVE and ready for
      * matching.
      *
      * @param name the user's name
@@ -80,7 +84,7 @@ public final class TestUserFactory {
     /**
      * Creates a user with specified ID.
      *
-     * @param id the user's ID
+     * @param id   the user's ID
      * @param name the user's name
      * @return a new incomplete user
      */
@@ -91,10 +95,10 @@ public final class TestUserFactory {
     /**
      * Creates a user with specified ID, name, and birthdate.
      *
-     * @param id the user's ID
-     * @param name the user's name
+     * @param id        the user's ID
+     * @param name      the user's name
      * @param birthDate the user's birthdate
-     * @param gender the user's gender
+     * @param gender    the user's gender
      * @return a new incomplete user with birthdate
      */
     public static User createUser(UUID id, String name, LocalDate birthDate, Gender gender) {

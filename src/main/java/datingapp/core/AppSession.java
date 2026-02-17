@@ -1,6 +1,7 @@
 package datingapp.core;
 
 import datingapp.core.model.User;
+import datingapp.core.model.UserState;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -37,7 +38,7 @@ public final class AppSession {
     }
 
     public synchronized boolean isActive() {
-        return currentUser != null && currentUser.getState() == User.UserState.ACTIVE;
+        return currentUser != null && currentUser.getState() == UserState.ACTIVE;
     }
 
     public void logout() {

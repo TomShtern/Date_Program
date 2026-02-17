@@ -7,9 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.Gender;
 import datingapp.core.model.Match;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
@@ -135,12 +137,12 @@ class AchievementServiceTest {
         User user = User.StorageBuilder.create(id, "Test User", FIXED_INSTANT)
                 .bio("A complete-enough test profile bio")
                 .birthDate(LocalDate.of(1999, 1, 1))
-                .gender(User.Gender.MALE)
-                .interestedIn(EnumSet.of(User.Gender.FEMALE))
+                .gender(Gender.MALE)
+                .interestedIn(EnumSet.of(Gender.FEMALE))
                 .maxDistanceKm(50)
                 .ageRange(20, 30)
                 .photoUrls(List.of("http://example.com/photo.jpg"))
-                .state(User.UserState.ACTIVE)
+                .state(UserState.ACTIVE)
                 .updatedAt(FIXED_INSTANT)
                 .build();
         userStorage.save(user);
@@ -174,7 +176,7 @@ class AchievementServiceTest {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(user -> user.getState() == User.UserState.ACTIVE)
+                    .filter(user -> user.getState() == UserState.ACTIVE)
                     .toList();
         }
 

@@ -83,7 +83,7 @@ class RelationshipTransitionServiceTest {
         service.acceptFriendZone(request.id(), bobId);
 
         Match match = interactionStorage.get(Match.generateId(aliceId, bobId)).orElseThrow();
-        assertEquals(Match.State.FRIENDS, match.getState());
+        assertEquals(MatchState.FRIENDS, match.getState());
 
         FriendRequest updated =
                 communicationStorage.getFriendRequest(request.id()).orElseThrow();
@@ -114,7 +114,7 @@ class RelationshipTransitionServiceTest {
 
         // Match should still be ACTIVE
         Match match = interactionStorage.get(Match.generateId(aliceId, bobId)).orElseThrow();
-        assertEquals(Match.State.ACTIVE, match.getState());
+        assertEquals(MatchState.ACTIVE, match.getState());
     }
 
     @Test
@@ -127,15 +127,15 @@ class RelationshipTransitionServiceTest {
         service.gracefulExit(aliceId, bobId);
 
         Match match = interactionStorage.get(Match.generateId(aliceId, bobId)).orElseThrow();
-        assertEquals(Match.State.GRACEFUL_EXIT, match.getState());
-        assertEquals(Match.ArchiveReason.GRACEFUL_EXIT, match.getEndReason());
+        assertEquals(MatchState.GRACEFUL_EXIT, match.getState());
+        assertEquals(MatchArchiveReason.GRACEFUL_EXIT, match.getEndReason());
         assertEquals(aliceId, match.getEndedBy());
 
         // Check conversation archive
         Conversation archived =
                 communicationStorage.getConversation(convo.getId()).orElseThrow();
         assertNotNull(archived.getArchivedAt());
-        assertEquals(Match.ArchiveReason.GRACEFUL_EXIT, archived.getArchiveReason());
+        assertEquals(MatchArchiveReason.GRACEFUL_EXIT, archived.getArchiveReason());
 
         // Check notification
         List<Notification> notifications = communicationStorage.getNotificationsForUser(bobId, true);
@@ -153,6 +153,6 @@ class RelationshipTransitionServiceTest {
         service.gracefulExit(bobId, aliceId);
 
         Match updated = interactionStorage.get(Match.generateId(aliceId, bobId)).orElseThrow();
-        assertEquals(Match.State.GRACEFUL_EXIT, updated.getState());
+        assertEquals(MatchState.GRACEFUL_EXIT, updated.getState());
     }
 }

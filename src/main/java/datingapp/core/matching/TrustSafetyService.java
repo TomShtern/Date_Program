@@ -4,8 +4,9 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.core.model.Match;
+import datingapp.core.model.MatchState;
 import datingapp.core.model.User;
+import datingapp.core.model.UserState;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
@@ -111,7 +112,7 @@ public class TrustSafetyService {
         }
 
         User reporter = userStorage.get(reporterId);
-        if (reporter == null || reporter.getState() != User.UserState.ACTIVE) {
+        if (reporter == null || reporter.getState() != UserState.ACTIVE) {
             return new ReportResult(false, false, "Reporter must be active user");
         }
 
@@ -135,7 +136,7 @@ public class TrustSafetyService {
 
         int reportCount = trustSafetyStorage.countReportsAgainst(reportedUserId);
         boolean autoBanned = false;
-        if (reportCount >= config.autoBanThreshold() && reported.getState() != User.UserState.BANNED) {
+        if (reportCount >= config.autoBanThreshold() && reported.getState() != UserState.BANNED) {
             reported.ban();
             userStorage.save(reported);
             autoBanned = true;
@@ -154,7 +155,7 @@ public class TrustSafetyService {
             return;
         }
         interactionStorage.getByUsers(blockerId, blockedId).ifPresent(match -> {
-            if (match.getState() != Match.State.BLOCKED) {
+            if (match.getState() != MatchState.BLOCKED) {
                 match.block(blockerId);
                 interactionStorage.update(match);
                 if (logger.isInfoEnabled()) {
@@ -185,7 +186,7 @@ public class TrustSafetyService {
         }
 
         User blocker = userStorage.get(blockerId);
-        if (blocker == null || blocker.getState() != User.UserState.ACTIVE) {
+        if (blocker == null || blocker.getState() != UserState.ACTIVE) {
             return new BlockResult(false, "Blocker must be an active user");
         }
 

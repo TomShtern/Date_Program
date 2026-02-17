@@ -8,7 +8,10 @@ import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
-import datingapp.core.model.User;
+import datingapp.core.model.Gender;
+import datingapp.core.model.ProfileNote;
+import datingapp.core.model.UserState;
+import datingapp.core.model.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.ui.UiAnimations;
 import java.lang.reflect.Modifier;
@@ -25,18 +28,6 @@ import org.junit.jupiter.api.Timeout;
  */
 @Timeout(value = 10, unit = TimeUnit.SECONDS)
 class NestedTypeVisibilityTest {
-
-    /**
-     * Specific test for User nested types since they are frequently accessed from CLI
-     * package.
-     */
-    @Test
-    @DisplayName("User nested types must be static")
-    void userNestedTypesMustBeStatic() {
-        assertTrue(
-                Modifier.isStatic(User.ProfileNote.class.getModifiers()),
-                "User.ProfileNote must be static to be accessible from other packages");
-    }
 
     /**
      * Specific test for UserInteractions nested types accessed from CLI.
@@ -81,11 +72,10 @@ class NestedTypeVisibilityTest {
     @Test
     @DisplayName("Top-level types used across packages are public")
     void topLevelTypesArePublic() {
-        assertTrue(Modifier.isPublic(User.Gender.class.getModifiers()), "User.Gender must be public");
-        assertTrue(Modifier.isPublic(User.UserState.class.getModifiers()), "User.UserState must be public");
-        assertTrue(
-                Modifier.isPublic(User.VerificationMethod.class.getModifiers()),
-                "User.VerificationMethod must be public");
+        assertTrue(Modifier.isPublic(Gender.class.getModifiers()), "Gender must be public");
+        assertTrue(Modifier.isPublic(UserState.class.getModifiers()), "UserState must be public");
+        assertTrue(Modifier.isPublic(ProfileNote.class.getModifiers()), "ProfileNote must be public");
+        assertTrue(Modifier.isPublic(VerificationMethod.class.getModifiers()), "VerificationMethod must be public");
         assertTrue(Modifier.isPublic(PacePreferences.class.getModifiers()), "PacePreferences must be public");
         assertTrue(Modifier.isPublic(RecommendationService.DailyPick.class.getModifiers()), "DailyPick must be public");
         assertTrue(Modifier.isPublic(InputReader.class.getModifiers()), "InputReader must be public");

@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.*;
 import datingapp.core.model.*;
-import datingapp.core.model.User.Gender;
+import datingapp.core.model.Gender;
 import datingapp.core.profile.*;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;
@@ -43,7 +43,7 @@ class ProfileNotesHandlerTest {
     }
 
     private void saveNote(UUID authorId, UUID subjectId, String content) {
-        User.ProfileNote note = User.ProfileNote.create(authorId, subjectId, content);
+        ProfileNote note = ProfileNote.create(authorId, subjectId, content);
         userStorage.saveProfileNote(note);
     }
 
@@ -102,7 +102,7 @@ class ProfileNotesHandlerTest {
             handler.manageNoteFor(target.getId(), target.getName());
 
             // Verify note was added via storage
-            Optional<User.ProfileNote> note = userStorage.getProfileNote(testUser.getId(), target.getId());
+            Optional<ProfileNote> note = userStorage.getProfileNote(testUser.getId(), target.getId());
             assertTrue(note.isPresent());
             assertEquals("Really nice person!", note.get().content());
         }
@@ -119,7 +119,7 @@ class ProfileNotesHandlerTest {
             ProfileHandler handler = createHandler("1\nUpdated note!\n");
             handler.manageNoteFor(target.getId(), target.getName());
 
-            Optional<User.ProfileNote> note = userStorage.getProfileNote(testUser.getId(), target.getId());
+            Optional<ProfileNote> note = userStorage.getProfileNote(testUser.getId(), target.getId());
             assertTrue(note.isPresent());
             assertEquals("Updated note!", note.get().content());
         }

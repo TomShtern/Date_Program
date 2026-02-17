@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
 import datingapp.core.matching.RecommendationService.DailyPick;
+import datingapp.core.model.Gender;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
@@ -144,12 +145,12 @@ class DailyServiceTest {
             User candidate2 = TestUserFactory.createActiveUser("Candidate2");
 
             // Ensure mutual interest
-            seeker.setGender(User.Gender.MALE);
-            seeker.setInterestedIn(Set.of(User.Gender.FEMALE));
-            candidate1.setGender(User.Gender.FEMALE);
-            candidate1.setInterestedIn(Set.of(User.Gender.MALE));
-            candidate2.setGender(User.Gender.FEMALE);
-            candidate2.setInterestedIn(Set.of(User.Gender.MALE));
+            seeker.setGender(Gender.MALE);
+            seeker.setInterestedIn(Set.of(Gender.FEMALE));
+            candidate1.setGender(Gender.FEMALE);
+            candidate1.setInterestedIn(Set.of(Gender.MALE));
+            candidate2.setGender(Gender.FEMALE);
+            candidate2.setInterestedIn(Set.of(Gender.MALE));
 
             userStorage.save(seeker);
             userStorage.save(candidate1);
@@ -168,13 +169,13 @@ class DailyServiceTest {
         @DisplayName("getDailyPick is deterministic for same user/date")
         void getDailyPick_deterministic() {
             User seeker = TestUserFactory.createActiveUser("Seeker");
-            seeker.setGender(User.Gender.MALE);
-            seeker.setInterestedIn(Set.of(User.Gender.FEMALE));
+            seeker.setGender(Gender.MALE);
+            seeker.setInterestedIn(Set.of(Gender.FEMALE));
 
             for (int i = 0; i < 10; i++) {
                 User candidate = TestUserFactory.createActiveUser("Candidate" + i);
-                candidate.setGender(User.Gender.FEMALE);
-                candidate.setInterestedIn(Set.of(User.Gender.MALE));
+                candidate.setGender(Gender.FEMALE);
+                candidate.setInterestedIn(Set.of(Gender.MALE));
                 userStorage.save(candidate);
             }
             userStorage.save(seeker);

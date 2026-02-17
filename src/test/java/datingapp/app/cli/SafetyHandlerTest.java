@@ -8,8 +8,8 @@ import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.matching.*;
 import datingapp.core.model.*;
-import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.VerificationMethod;
+import datingapp.core.model.Gender;
+import datingapp.core.model.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
@@ -104,7 +104,7 @@ class SafetyHandlerTest {
             assertTrue(trustSafetyStorage.isBlocked(testUser.getId(), otherUser.getId()));
             Optional<Match> updatedMatch = interactionStorage.get(match.getId());
             assertTrue(updatedMatch.isPresent());
-            assertEquals(Match.State.BLOCKED, updatedMatch.get().getState());
+            assertEquals(MatchState.BLOCKED, updatedMatch.get().getState());
         }
 
         @Test

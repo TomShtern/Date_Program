@@ -6,7 +6,7 @@ import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.*;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.model.*;
-import datingapp.core.model.User.Gender;
+import datingapp.core.model.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.storage.*;
 import datingapp.storage.DatabaseManager;

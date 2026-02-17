@@ -76,8 +76,8 @@ class StandoutsServiceTest {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio for " + name);
         user.setBirthDate(AppClock.today().minusYears(25)); // 25 years old
-        user.setGender(User.Gender.OTHER);
-        user.setInterestedIn(EnumSet.allOf(User.Gender.class));
+        user.setGender(Gender.OTHER);
+        user.setInterestedIn(EnumSet.allOf(Gender.class));
         user.setLocation(32.0853, 34.7818); // Tel Aviv
         user.setMaxDistanceKm(50);
         user.setAgeRange(18, 99);
@@ -92,7 +92,7 @@ class StandoutsServiceTest {
     }
 
     /** Creates a user with specific gender preferences for matching tests. */
-    private User createUserWithGender(String name, User.Gender myGender, User.Gender interestedIn) {
+    private User createUserWithGender(String name, Gender myGender, Gender interestedIn) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio for " + name);
         user.setBirthDate(AppClock.today().minusYears(25));
@@ -209,9 +209,9 @@ class StandoutsServiceTest {
         @Test
         @DisplayName("Should generate standouts when not cached")
         void generatesWhenNotCached() {
-            User seeker = createUserWithGender("Seeker", User.Gender.FEMALE, User.Gender.MALE);
-            User candidate1 = createUserWithGender("Bob", User.Gender.MALE, User.Gender.FEMALE);
-            User candidate2 = createUserWithGender("Charlie", User.Gender.MALE, User.Gender.FEMALE);
+            User seeker = createUserWithGender("Seeker", Gender.FEMALE, Gender.MALE);
+            User candidate1 = createUserWithGender("Bob", Gender.MALE, Gender.FEMALE);
+            User candidate2 = createUserWithGender("Charlie", Gender.MALE, Gender.FEMALE);
 
             userStorage.save(seeker);
             userStorage.save(candidate1);
@@ -226,12 +226,12 @@ class StandoutsServiceTest {
         @Test
         @DisplayName("Should limit to 10 standouts")
         void limitsToTen() {
-            User seeker = createUserWithGender("Seeker", User.Gender.FEMALE, User.Gender.MALE);
+            User seeker = createUserWithGender("Seeker", Gender.FEMALE, Gender.MALE);
             userStorage.save(seeker);
 
             // Create 15 candidates
             for (int i = 0; i < 15; i++) {
-                User candidate = createUserWithGender("Candidate" + i, User.Gender.MALE, User.Gender.FEMALE);
+                User candidate = createUserWithGender("Candidate" + i, Gender.MALE, Gender.FEMALE);
                 userStorage.save(candidate);
             }
 

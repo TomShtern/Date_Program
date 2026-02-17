@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppSession;
+import datingapp.core.model.Gender;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserState;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;
@@ -39,7 +39,7 @@ class UserSessionTest {
 
     @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
-    @DisplayName("Session State Management")
+    @DisplayName("Session MatchState Management")
     class SessionState {
 
         @Test
@@ -75,7 +75,7 @@ class UserSessionTest {
 
     @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
-    @DisplayName("Login State Checks")
+    @DisplayName("Login MatchState Checks")
     class LoginState {
 
         @Test
@@ -104,7 +104,7 @@ class UserSessionTest {
         @DisplayName("isActive returns true for ACTIVE user")
         void activeUserIsActive() {
             User user = createCompleteUser("Eve");
-            user.activate(); // State becomes ACTIVE
+            user.activate(); // MatchState becomes ACTIVE
             assertEquals(UserState.ACTIVE, user.getState());
 
             userSession.setCurrentUser(user);
@@ -117,7 +117,7 @@ class UserSessionTest {
         void pausedUserNotActive() {
             User user = createCompleteUser("Frank");
             user.activate();
-            user.pause(); // State becomes PAUSED
+            user.pause(); // MatchState becomes PAUSED
             assertEquals(UserState.PAUSED, user.getState());
 
             userSession.setCurrentUser(user);
@@ -130,7 +130,7 @@ class UserSessionTest {
         void bannedUserNotActive() {
             User user = createCompleteUser("Grace");
             user.activate();
-            user.ban(); // State becomes BANNED
+            user.ban(); // MatchState becomes BANNED
             assertEquals(UserState.BANNED, user.getState());
 
             userSession.setCurrentUser(user);

@@ -8,7 +8,7 @@ import datingapp.core.matching.MatchingService.PendingLiker;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserState;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.Instant;

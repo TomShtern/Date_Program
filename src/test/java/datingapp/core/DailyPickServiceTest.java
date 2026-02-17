@@ -7,7 +7,7 @@ import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
 import datingapp.core.matching.RecommendationService.DailyPick;
 import datingapp.core.model.*;
-import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;
@@ -308,17 +308,17 @@ class DailyPickServiceTest {
     // Helper methods
 
     private User createActiveUser(String name, int age) {
-        return createActiveUser(name, age, User.Gender.FEMALE);
+        return createActiveUser(name, age, Gender.FEMALE);
     }
 
-    private User createActiveUser(String name, int age, User.Gender gender) {
+    private User createActiveUser(String name, int age, Gender gender) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio for " + name);
         user.setBirthDate(AppClock.today().minusYears(age));
         user.setGender(gender);
         // Set mutual interest - everyone interested in everyone for simple test
         // matching
-        user.setInterestedIn(EnumSet.of(User.Gender.MALE, User.Gender.FEMALE, User.Gender.OTHER));
+        user.setInterestedIn(EnumSet.of(Gender.MALE, Gender.FEMALE, Gender.OTHER));
         user.setLocation(40.7128, -74.0060); // NYC
         user.addPhotoUrl("http://example.com/" + name + ".jpg");
         user.setPacePreferences(new PacePreferences(
@@ -354,9 +354,7 @@ class DailyPickServiceTest {
 
         @Override
         public List<User> findActive() {
-            return users.stream()
-                    .filter(u -> u.getState() == User.UserState.ACTIVE)
-                    .toList();
+            return users.stream().filter(u -> u.getState() == UserState.ACTIVE).toList();
         }
 
         @Override

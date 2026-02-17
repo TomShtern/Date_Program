@@ -10,7 +10,7 @@ import datingapp.core.connection.ConnectionModels.FriendRequest.Status;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Notification.Type;
-import datingapp.core.model.Match;
+import datingapp.core.model.MatchArchiveReason;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.storage.DatabaseManager.StorageException;
 import java.sql.ResultSet;
@@ -73,7 +73,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     }
 
     @Override
-    public void archiveConversation(String conversationId, Match.ArchiveReason reason) {
+    public void archiveConversation(String conversationId, MatchArchiveReason reason) {
         messagingDao.archiveConversation(conversationId, reason);
     }
 
@@ -240,7 +240,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 @Bind("userId") UUID userId,
                 @Bind("timestamp") Instant timestamp);
 
-        default void archiveConversation(String conversationId, Match.ArchiveReason reason) {
+        default void archiveConversation(String conversationId, MatchArchiveReason reason) {
             archiveConversationInternal(conversationId, AppClock.now(), reason);
         }
 
@@ -249,7 +249,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         void archiveConversationInternal(
                 @Bind("conversationId") String conversationId,
                 @Bind("archivedAt") Instant archivedAt,
-                @Bind("reason") Match.ArchiveReason reason);
+                @Bind("reason") MatchArchiveReason reason);
 
         @SqlUpdate("""
             UPDATE conversations
@@ -431,8 +431,8 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
             Instant userAReadAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "user_a_last_read_at");
             Instant userBReadAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "user_b_last_read_at");
             Instant archivedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "archived_at");
-            Match.ArchiveReason archiveReason =
-                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "archive_reason", Match.ArchiveReason.class);
+            MatchArchiveReason archiveReason =
+                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "archive_reason", MatchArchiveReason.class);
             boolean visibleToUserA = rs.getBoolean("visible_to_user_a");
             boolean visibleToUserB = rs.getBoolean("visible_to_user_b");
 

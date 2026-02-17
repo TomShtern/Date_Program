@@ -1,10 +1,10 @@
 package datingapp.storage.jdbi;
 
+import datingapp.core.model.Gender;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
-import datingapp.core.model.User.UserState;
-import datingapp.core.model.User.VerificationMethod;
+import datingapp.core.model.UserState;
+import datingapp.core.model.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;

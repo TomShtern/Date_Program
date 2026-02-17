@@ -6,8 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserState;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.UserStorage;
 import java.io.StringReader;
@@ -183,7 +184,7 @@ class ProfileCreateSelectTest {
 
     private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new LinkedHashMap<>();
-        private final Map<String, User.ProfileNote> profileNotes = new ConcurrentHashMap<>();
+        private final Map<String, ProfileNote> profileNotes = new ConcurrentHashMap<>();
 
         @Override
         public void save(User user) {
@@ -217,17 +218,17 @@ class ProfileCreateSelectTest {
         }
 
         @Override
-        public void saveProfileNote(User.ProfileNote note) {
+        public void saveProfileNote(ProfileNote note) {
             profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
         }
 
         @Override
-        public Optional<User.ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
             return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
         }
 
         @Override
-        public List<User.ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
             return profileNotes.values().stream()
                     .filter(note -> note.authorId().equals(authorId))
                     .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))

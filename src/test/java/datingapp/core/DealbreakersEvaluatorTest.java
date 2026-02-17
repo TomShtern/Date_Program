@@ -35,14 +35,14 @@ class DealbreakersEvaluatorTest {
         // Create seeker (30 years old)
         seeker = new User(UUID.randomUUID(), "Seeker");
         seeker.setBirthDate(AppClock.today().minusYears(30));
-        seeker.setGender(User.Gender.FEMALE);
-        seeker.setInterestedIn(EnumSet.of(User.Gender.MALE));
+        seeker.setGender(Gender.FEMALE);
+        seeker.setInterestedIn(EnumSet.of(Gender.MALE));
 
         // Create candidate (28 years old)
         candidate = new User(UUID.randomUUID(), "Candidate");
         candidate.setBirthDate(AppClock.today().minusYears(28));
-        candidate.setGender(User.Gender.MALE);
-        candidate.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
+        candidate.setGender(Gender.MALE);
+        candidate.setInterestedIn(EnumSet.of(Gender.FEMALE));
     }
 
     @AfterEach

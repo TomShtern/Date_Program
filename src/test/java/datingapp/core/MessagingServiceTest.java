@@ -9,7 +9,7 @@ import datingapp.core.connection.*;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.model.*;
-import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
@@ -71,7 +71,7 @@ class MessagingServiceTest {
         Instant now = AppClock.now();
         return User.StorageBuilder.create(id, name, now)
                 .bio("Test bio")
-                .state(User.UserState.ACTIVE)
+                .state(UserState.ACTIVE)
                 .updatedAt(now)
                 .build();
     }
@@ -565,7 +565,7 @@ class MessagingServiceTest {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(u -> u.getState() == User.UserState.ACTIVE)
+                    .filter(u -> u.getState() == UserState.ACTIVE)
                     .toList();
         }
 

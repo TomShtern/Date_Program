@@ -221,13 +221,13 @@ class MatchQualityServiceTest {
         void missingLocationGivesNeutralDistanceScore() {
             User alice = new User(UUID.randomUUID(), "Alice");
             alice.setBirthDate(AppClock.today().minusYears(25));
-            alice.setGender(User.Gender.OTHER);
-            alice.setInterestedIn(EnumSet.of(User.Gender.OTHER));
+            alice.setGender(Gender.OTHER);
+            alice.setInterestedIn(EnumSet.of(Gender.OTHER));
 
             User bob = new User(UUID.randomUUID(), "Bob");
             bob.setBirthDate(AppClock.today().minusYears(26));
-            bob.setGender(User.Gender.OTHER);
-            bob.setInterestedIn(EnumSet.of(User.Gender.OTHER));
+            bob.setGender(Gender.OTHER);
+            bob.setInterestedIn(EnumSet.of(Gender.OTHER));
 
             userStorage.save(alice);
             userStorage.save(bob);
@@ -554,8 +554,8 @@ class MatchQualityServiceTest {
     private User createUser(String name, int age, double lat, double lon) {
         User user = new User(UUID.randomUUID(), name);
         user.setBirthDate(AppClock.today().minusYears(age));
-        user.setGender(User.Gender.OTHER);
-        user.setInterestedIn(EnumSet.of(User.Gender.OTHER));
+        user.setGender(Gender.OTHER);
+        user.setInterestedIn(EnumSet.of(Gender.OTHER));
         user.setLocation(lat, lon);
         user.setMaxDistanceKm(50);
         user.setAgeRange(18, 60);

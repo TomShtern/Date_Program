@@ -72,8 +72,8 @@ class ProfileCompletionServiceTest {
         void returnsHigherScoreWithBasicInfo() {
             user.setBio("I love hiking and coffee");
             user.setBirthDate(LocalDate.of(1990, 5, 15));
-            user.setGender(User.Gender.FEMALE);
-            user.setInterestedIn(Set.of(User.Gender.MALE));
+            user.setGender(Gender.FEMALE);
+            user.setInterestedIn(Set.of(Gender.MALE));
             user.addPhotoUrl("https://example.com/photo.jpg");
 
             ProfileService.CompletionResult result = service.calculate(user);
@@ -88,8 +88,8 @@ class ProfileCompletionServiceTest {
             // Fill all fields
             user.setBio("Complete bio");
             user.setBirthDate(LocalDate.of(1990, 5, 15));
-            user.setGender(User.Gender.MALE);
-            user.setInterestedIn(Set.of(User.Gender.FEMALE));
+            user.setGender(Gender.MALE);
+            user.setInterestedIn(Set.of(Gender.FEMALE));
             user.addPhotoUrl("https://example.com/photo.jpg");
             user.setLocation(32.0, 34.0);
             user.setAgeRange(25, 35);
@@ -341,8 +341,8 @@ class ProfileCompletionServiceTest {
         User full = new User(UUID.randomUUID(), "Complete Alice");
         full.setBio("Detailed bio with more than 50 characters to pass the tip check. Located in New York.");
         full.setBirthDate(AppClock.today().minusYears(25));
-        full.setGender(User.Gender.FEMALE);
-        full.setInterestedIn(Set.of(User.Gender.MALE));
+        full.setGender(Gender.FEMALE);
+        full.setInterestedIn(Set.of(Gender.MALE));
         full.setMaxDistanceKm(50);
         full.setAgeRange(20, 30);
         full.addPhotoUrl("http://example.com/photo1.jpg");

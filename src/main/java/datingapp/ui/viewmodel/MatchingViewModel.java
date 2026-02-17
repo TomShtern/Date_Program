@@ -9,7 +9,7 @@ import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserState;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;

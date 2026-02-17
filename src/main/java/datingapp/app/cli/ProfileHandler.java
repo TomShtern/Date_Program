@@ -7,9 +7,10 @@ import datingapp.core.EnumSetUtil;
 import datingapp.core.LoggingSupport;
 import datingapp.core.TextUtil;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.Gender;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -712,7 +713,7 @@ public class ProfileHandler implements LoggingSupport {
             logInfo("       📝 NOTES ABOUT {}", subjectName.toUpperCase(Locale.ROOT));
             logInfo(CliTextAndInput.MENU_DIVIDER);
 
-            Optional<User.ProfileNote> existingNote = userStorage.getProfileNote(currentUser.getId(), subjectId);
+            Optional<ProfileNote> existingNote = userStorage.getProfileNote(currentUser.getId(), subjectId);
 
             if (existingNote.isPresent()) {
                 logInfo("\nCurrent note:");
@@ -750,7 +751,7 @@ public class ProfileHandler implements LoggingSupport {
             logInfo("         📝 MY PROFILE NOTES");
             logInfo(CliTextAndInput.MENU_DIVIDER + "\n");
 
-            List<User.ProfileNote> notes = userStorage.getProfileNotesByAuthor(currentUser.getId());
+            List<ProfileNote> notes = userStorage.getProfileNotesByAuthor(currentUser.getId());
 
             if (notes.isEmpty()) {
                 logInfo("You haven't added any notes yet.");
@@ -761,7 +762,7 @@ public class ProfileHandler implements LoggingSupport {
             logInfo("You have {} note(s):\n", notes.size());
 
             for (int i = 0; i < notes.size(); i++) {
-                User.ProfileNote note = notes.get(i);
+                ProfileNote note = notes.get(i);
                 User subject = userStorage.get(note.subjectId());
                 String subjectName = subject != null ? subject.getName() : "(deleted user)";
 
@@ -774,7 +775,7 @@ public class ProfileHandler implements LoggingSupport {
             try {
                 int idx = Integer.parseInt(input) - 1;
                 if (idx >= 0 && idx < notes.size()) {
-                    User.ProfileNote note = notes.get(idx);
+                    ProfileNote note = notes.get(idx);
                     User subject = userStorage.get(note.subjectId());
                     String subjectName = subject != null ? subject.getName() : "this user";
                     manageNoteFor(note.subjectId(), subjectName);
@@ -806,7 +807,7 @@ public class ProfileHandler implements LoggingSupport {
     }
 
     private void addNote(UUID authorId, UUID subjectId, String subjectName) {
-        logInfo("\nEnter your note about {} (max {} chars):", subjectName, User.ProfileNote.MAX_LENGTH);
+        logInfo("\nEnter your note about {} (max {} chars):", subjectName, ProfileNote.MAX_LENGTH);
         logInfo("Examples: \"Met at coffee shop\", \"Loves hiking\", \"Dinner Thursday 7pm\"");
         String content = inputReader.readLine("\nNote: ");
 
@@ -815,13 +816,13 @@ public class ProfileHandler implements LoggingSupport {
             return;
         }
 
-        if (content.length() > User.ProfileNote.MAX_LENGTH) {
-            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), User.ProfileNote.MAX_LENGTH);
+        if (content.length() > ProfileNote.MAX_LENGTH) {
+            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), ProfileNote.MAX_LENGTH);
             return;
         }
 
         try {
-            User.ProfileNote note = User.ProfileNote.create(authorId, subjectId, content);
+            ProfileNote note = ProfileNote.create(authorId, subjectId, content);
             userStorage.saveProfileNote(note);
             logInfo("✅ Note saved!\n");
         } catch (IllegalArgumentException e) {
@@ -829,7 +830,7 @@ public class ProfileHandler implements LoggingSupport {
         }
     }
 
-    private void editNote(User.ProfileNote existing) {
+    private void editNote(ProfileNote existing) {
         logInfo("\nCurrent note: \"{}\"\n", existing.content());
         logInfo("Enter new note (or press Enter to keep current):");
         String content = inputReader.readLine("Note: ");
@@ -839,13 +840,13 @@ public class ProfileHandler implements LoggingSupport {
             return;
         }
 
-        if (content.length() > User.ProfileNote.MAX_LENGTH) {
-            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), User.ProfileNote.MAX_LENGTH);
+        if (content.length() > ProfileNote.MAX_LENGTH) {
+            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), ProfileNote.MAX_LENGTH);
             return;
         }
 
         try {
-            User.ProfileNote updated = existing.withContent(content);
+            ProfileNote updated = existing.withContent(content);
             userStorage.saveProfileNote(updated);
             logInfo("✅ Note updated!\n");
         } catch (IllegalArgumentException e) {

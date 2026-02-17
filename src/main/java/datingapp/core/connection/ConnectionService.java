@@ -7,7 +7,10 @@ import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.model.Match;
+import datingapp.core.model.MatchArchiveReason;
+import datingapp.core.model.MatchState;
 import datingapp.core.model.User;
+import datingapp.core.model.UserState;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
@@ -48,12 +51,12 @@ public class ConnectionService {
 
     public SendResult sendMessage(UUID senderId, UUID recipientId, String content) {
         User sender = userStorage.get(senderId);
-        if (sender == null || sender.getState() != User.UserState.ACTIVE) {
+        if (sender == null || sender.getState() != UserState.ACTIVE) {
             return SendResult.failure(SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
         User recipient = userStorage.get(recipientId);
-        if (recipient == null || recipient.getState() != User.UserState.ACTIVE) {
+        if (recipient == null || recipient.getState() != UserState.ACTIVE) {
             return SendResult.failure(RECIPIENT_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
@@ -275,7 +278,7 @@ public class ConnectionService {
                 .orElseThrow(
                         () -> new TransitionValidationException("No active relationship found between these users."));
 
-        if (!match.isActive() && match.getState() != Match.State.FRIENDS) {
+        if (!match.isActive() && match.getState() != MatchState.FRIENDS) {
             throw new TransitionValidationException("Relationship has already ended.");
         }
 
@@ -284,8 +287,8 @@ public class ConnectionService {
 
         Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetUserId);
         convoOpt.ifPresent(convo -> {
-            convo.archive(Match.ArchiveReason.GRACEFUL_EXIT);
-            communicationStorage.archiveConversation(convo.getId(), Match.ArchiveReason.GRACEFUL_EXIT);
+            convo.archive(MatchArchiveReason.GRACEFUL_EXIT);
+            communicationStorage.archiveConversation(convo.getId(), MatchArchiveReason.GRACEFUL_EXIT);
         });
 
         communicationStorage.saveNotification(Notification.create(

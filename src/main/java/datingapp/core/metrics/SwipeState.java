@@ -28,7 +28,7 @@ public final class SwipeState {
     public static class Session {
 
         /** Session state. */
-        public static enum State {
+        public static enum MatchState {
             ACTIVE,
             COMPLETED
         }
@@ -38,7 +38,7 @@ public final class SwipeState {
         private final Instant startedAt;
         private Instant lastActivityAt;
         private Instant endedAt;
-        private State state;
+        private MatchState state;
 
         private int swipeCount;
         private int likeCount;
@@ -50,7 +50,7 @@ public final class SwipeState {
             this.userId = Objects.requireNonNull(userId, "userId cannot be null");
             this.startedAt = Objects.requireNonNull(startedAt, "startedAt cannot be null");
             this.lastActivityAt = startedAt;
-            this.state = State.ACTIVE;
+            this.state = MatchState.ACTIVE;
             this.swipeCount = 0;
             this.likeCount = 0;
             this.passCount = 0;
@@ -64,7 +64,7 @@ public final class SwipeState {
                 Instant startedAt,
                 Instant lastActivityAt,
                 Instant endedAt,
-                State state,
+                MatchState state,
                 int swipeCount,
                 int likeCount,
                 int passCount,
@@ -95,7 +95,7 @@ public final class SwipeState {
         }
 
         public void recordSwipe(ConnectionModels.Like.Direction direction, boolean matched) {
-            if (state != State.ACTIVE) {
+            if (state != MatchState.ACTIVE) {
                 throw new IllegalStateException("Cannot record swipe on completed session");
             }
 
@@ -113,7 +113,7 @@ public final class SwipeState {
         }
 
         public void incrementMatchCount() {
-            if (state == State.ACTIVE) {
+            if (state == MatchState.ACTIVE) {
                 if (matchCount >= likeCount) {
                     throw new IllegalStateException("matchCount cannot exceed likeCount");
                 }
@@ -122,15 +122,15 @@ public final class SwipeState {
         }
 
         public void end() {
-            if (state == State.COMPLETED) {
+            if (state == MatchState.COMPLETED) {
                 return;
             }
-            this.state = State.COMPLETED;
+            this.state = MatchState.COMPLETED;
             this.endedAt = AppClock.now();
         }
 
         public boolean isTimedOut(Duration timeout) {
-            if (state == State.COMPLETED) {
+            if (state == MatchState.COMPLETED) {
                 return false;
             }
             Duration inactivity = Duration.between(lastActivityAt, AppClock.now());
@@ -191,7 +191,7 @@ public final class SwipeState {
             return endedAt;
         }
 
-        public State getState() {
+        public MatchState getState() {
             return state;
         }
 
@@ -212,7 +212,7 @@ public final class SwipeState {
         }
 
         public boolean isActive() {
-            return state == State.ACTIVE;
+            return state == MatchState.ACTIVE;
         }
 
         @Override

@@ -6,6 +6,7 @@ import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
+import datingapp.core.model.UserState;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
@@ -176,10 +177,10 @@ class MatchingServiceTest {
         void processSwipeReturnsConfigErrorWithoutServices() {
             // Builder without dailyService/undoService
             User user = User.StorageBuilder.create(UUID.randomUUID(), "Alice", AppClock.now())
-                    .state(User.UserState.ACTIVE)
+                    .state(UserState.ACTIVE)
                     .build();
             User candidate = User.StorageBuilder.create(UUID.randomUUID(), "Bob", AppClock.now())
-                    .state(User.UserState.ACTIVE)
+                    .state(UserState.ACTIVE)
                     .build();
 
             MatchingService.SwipeResult result = matchingService.processSwipe(user, candidate, true);

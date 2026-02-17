@@ -7,9 +7,11 @@ import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.MatchingService.PendingLiker;
+import datingapp.core.model.Gender;
 import datingapp.core.model.Match;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.UserState;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
@@ -30,7 +32,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Tests for the liker browser functionality in MatchingService. These methods allow users to see
+ * Tests for the liker browser functionality in MatchingService. These methods
+ * allow users to see
  * who has liked them.
  */
 @SuppressWarnings("unused")
@@ -111,18 +114,18 @@ class LikerBrowserServiceTest {
     }
 
     private static User activeUser(UUID id, String name) {
-        return baseUser(id, name, User.UserState.ACTIVE);
+        return baseUser(id, name, UserState.ACTIVE);
     }
 
     private static User incompleteUser(UUID id, String name) {
-        return baseUser(id, name, User.UserState.INCOMPLETE);
+        return baseUser(id, name, UserState.INCOMPLETE);
     }
 
-    private static User baseUser(UUID id, String name, User.UserState state) {
+    private static User baseUser(UUID id, String name, UserState state) {
         return User.StorageBuilder.create(id, name, Instant.EPOCH)
                 .birthDate(LocalDate.of(1990, 1, 1))
-                .gender(User.Gender.OTHER)
-                .interestedIn(EnumSet.of(User.Gender.OTHER))
+                .gender(Gender.OTHER)
+                .interestedIn(EnumSet.of(Gender.OTHER))
                 .state(state)
                 .updatedAt(Instant.EPOCH)
                 .verified(false)
@@ -369,7 +372,7 @@ class LikerBrowserServiceTest {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(user -> user.getState() == User.UserState.ACTIVE)
+                    .filter(user -> user.getState() == UserState.ACTIVE)
                     .toList();
         }
 

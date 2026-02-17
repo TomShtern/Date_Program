@@ -3,7 +3,9 @@ package datingapp.core.matching;
 import datingapp.core.AppConfig;
 import datingapp.core.LoggingSupport;
 import datingapp.core.PerformanceMonitor;
+import datingapp.core.model.Gender;
 import datingapp.core.model.User;
+import datingapp.core.model.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
@@ -96,7 +98,7 @@ public class CandidateFinder implements LoggingSupport {
      * Results are sorted by distance (closest first).
      */
     public List<User> findCandidates(User seeker, List<User> allActive, Set<UUID> alreadyInteracted) {
-        Set<User.Gender> seekerInterestedIn = seeker.getInterestedIn();
+        Set<Gender> seekerInterestedIn = seeker.getInterestedIn();
         logDebug(
                 "Finding candidates for {} (state={}, gender={}, interestedIn={}, age={}, minAge={}, maxAge={})",
                 seeker.getName(),
@@ -166,7 +168,7 @@ public class CandidateFinder implements LoggingSupport {
     }
 
     private boolean isActiveCandidate(User candidate) {
-        boolean isActive = candidate.getState() == User.UserState.ACTIVE;
+        boolean isActive = candidate.getState() == UserState.ACTIVE;
         if (!isActive) {
             logDebug(
                     "Rejecting {} ({}): NOT ACTIVE (state={})",
@@ -185,7 +187,7 @@ public class CandidateFinder implements LoggingSupport {
         return notInteracted;
     }
 
-    private boolean matchesGenderPreferences(User seeker, User candidate, Set<User.Gender> seekerInterestedIn) {
+    private boolean matchesGenderPreferences(User seeker, User candidate, Set<Gender> seekerInterestedIn) {
         boolean genderMatch = hasMatchingGenderPreferences(seeker, candidate, seekerInterestedIn);
         if (!genderMatch) {
             logDebug(
@@ -244,7 +246,7 @@ public class CandidateFinder implements LoggingSupport {
      * candidate's gender -
      * Candidate is interested in seeker's gender.
      */
-    private boolean hasMatchingGenderPreferences(User seeker, User candidate, Set<User.Gender> seekerInterestedIn) {
+    private boolean hasMatchingGenderPreferences(User seeker, User candidate, Set<Gender> seekerInterestedIn) {
         if (seeker.getGender() == null || candidate.getGender() == null) {
             return false;
         }

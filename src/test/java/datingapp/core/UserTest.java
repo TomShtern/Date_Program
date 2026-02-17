@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.*;
-import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.profile.MatchPreferences;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
@@ -50,7 +50,7 @@ class UserTest {
     @DisplayName("New user starts as INCOMPLETE")
     void newUserStartsAsIncomplete() {
         User user = new User(UUID.randomUUID(), "John");
-        assertEquals(User.UserState.INCOMPLETE, user.getState());
+        assertEquals(UserState.INCOMPLETE, user.getState());
     }
 
     @Test
@@ -59,10 +59,10 @@ class UserTest {
         User user = createCompleteUser("Alice");
 
         assertTrue(user.isComplete());
-        assertEquals(User.UserState.INCOMPLETE, user.getState());
+        assertEquals(UserState.INCOMPLETE, user.getState());
 
         user.activate();
-        assertEquals(User.UserState.ACTIVE, user.getState());
+        assertEquals(UserState.ACTIVE, user.getState());
     }
 
     @Test
@@ -90,10 +90,10 @@ class UserTest {
         user.activate();
 
         user.pause();
-        assertEquals(User.UserState.PAUSED, user.getState());
+        assertEquals(UserState.PAUSED, user.getState());
 
         user.activate();
-        assertEquals(User.UserState.ACTIVE, user.getState());
+        assertEquals(UserState.ACTIVE, user.getState());
     }
 
     @Test
@@ -103,7 +103,7 @@ class UserTest {
         user.activate();
         user.ban();
 
-        assertEquals(User.UserState.BANNED, user.getState());
+        assertEquals(UserState.BANNED, user.getState());
         assertThrows(IllegalStateException.class, user::activate);
     }
 
@@ -219,8 +219,8 @@ class UserTest {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("A great person");
         user.setBirthDate(LocalDate.of(1990, 1, 1));
-        user.setGender(User.Gender.MALE);
-        user.setInterestedIn(EnumSet.of(User.Gender.FEMALE));
+        user.setGender(Gender.MALE);
+        user.setInterestedIn(EnumSet.of(Gender.FEMALE));
         user.setLocation(32.0, 34.0);
         user.setMaxDistanceKm(50);
         user.setAgeRange(20, 40);
@@ -375,13 +375,13 @@ class UserTest {
             return User.StorageBuilder.create(UUID.randomUUID(), "Alice", Instant.parse("2026-01-01T10:00:00Z"))
                     .bio("Bio")
                     .birthDate(LocalDate.of(1990, 1, 1))
-                    .gender(User.Gender.FEMALE)
-                    .interestedIn(EnumSet.of(User.Gender.MALE))
+                    .gender(Gender.FEMALE)
+                    .interestedIn(EnumSet.of(Gender.MALE))
                     .location(32.1, 34.8)
                     .maxDistanceKm(50)
                     .ageRange(20, 30)
                     .photoUrls(List.of("a.jpg", "b.jpg"))
-                    .state(User.UserState.ACTIVE)
+                    .state(UserState.ACTIVE)
                     .updatedAt(Instant.parse("2026-01-02T10:00:00Z"))
                     .interests(EnumSet.of(Interest.COFFEE))
                     .smoking(MatchPreferences.Lifestyle.Smoking.NEVER)
@@ -393,7 +393,7 @@ class UserTest {
                     .email("alice@example.com")
                     .phone("+123456789")
                     .verified(true)
-                    .verificationMethod(User.VerificationMethod.EMAIL)
+                    .verificationMethod(VerificationMethod.EMAIL)
                     .verificationCode("123456")
                     .verificationSentAt(Instant.parse("2026-01-01T10:00:00Z"))
                     .verifiedAt(Instant.parse("2026-01-02T10:00:00Z"))
@@ -408,15 +408,15 @@ class UserTest {
 
             assertEquals("Alice", user.getName());
             assertEquals(LocalDate.of(1990, 1, 1), user.getBirthDate());
-            assertEquals(User.Gender.FEMALE, user.getGender());
-            assertEquals(EnumSet.of(User.Gender.MALE), user.getInterestedIn());
+            assertEquals(Gender.FEMALE, user.getGender());
+            assertEquals(EnumSet.of(Gender.MALE), user.getInterestedIn());
             assertEquals(32.1, user.getLat());
             assertEquals(34.8, user.getLon());
             assertEquals(50, user.getMaxDistanceKm());
             assertEquals(20, user.getMinAge());
             assertEquals(30, user.getMaxAge());
             assertEquals(List.of("a.jpg", "b.jpg"), user.getPhotoUrls());
-            assertEquals(User.UserState.ACTIVE, user.getState());
+            assertEquals(UserState.ACTIVE, user.getState());
         }
 
         @Test
@@ -431,7 +431,7 @@ class UserTest {
             assertEquals(MatchPreferences.Lifestyle.LookingFor.LONG_TERM, user.getLookingFor());
             assertEquals(MatchPreferences.Lifestyle.Education.BACHELORS, user.getEducation());
             assertTrue(user.isVerified());
-            assertEquals(User.VerificationMethod.EMAIL, user.getVerificationMethod());
+            assertEquals(VerificationMethod.EMAIL, user.getVerificationMethod());
         }
     }
 }

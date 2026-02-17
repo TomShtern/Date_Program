@@ -2,9 +2,9 @@ package datingapp.ui.screen;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.model.Gender;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;

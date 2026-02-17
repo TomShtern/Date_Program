@@ -4,7 +4,7 @@ import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
-import datingapp.core.model.Match;
+import datingapp.core.model.MatchArchiveReason;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -30,7 +30,7 @@ public interface CommunicationStorage {
 
     void updateConversationReadTimestamp(String conversationId, UUID userId, Instant timestamp);
 
-    void archiveConversation(String conversationId, Match.ArchiveReason reason);
+    void archiveConversation(String conversationId, MatchArchiveReason reason);
 
     void setConversationVisibility(String conversationId, UUID userId, boolean visible);
 

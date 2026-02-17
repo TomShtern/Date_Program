@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.Match;
+import datingapp.core.model.MatchArchiveReason;
+import datingapp.core.model.MatchState;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.UUID;
@@ -38,7 +40,7 @@ class MatchStateTest {
     }
 
     @Nested
-    @DisplayName("Match State Transitions")
+    @DisplayName("Match MatchState Transitions")
     class StateTransitions {
 
         @Test
@@ -49,7 +51,7 @@ class MatchStateTest {
 
             Match match = Match.create(a, b);
 
-            assertEquals(Match.State.ACTIVE, match.getState(), "New match should be ACTIVE");
+            assertEquals(MatchState.ACTIVE, match.getState(), "New match should be ACTIVE");
             assertTrue(match.isActive(), "isActive should return true for new match");
             assertNull(match.getEndedAt(), "endedAt should be null for active match");
             assertNull(match.getEndedBy(), "endedBy should be null for active match");
@@ -64,7 +66,7 @@ class MatchStateTest {
 
             match.unmatch(a);
 
-            assertEquals(Match.State.UNMATCHED, match.getState(), "State should be UNMATCHED");
+            assertEquals(MatchState.UNMATCHED, match.getState(), "MatchState should be UNMATCHED");
             assertFalse(match.isActive(), "isActive should return false after unmatch");
             assertNotNull(match.getEndedAt(), "endedAt should be set");
             assertEquals(a, match.getEndedBy(), "endedBy should be the user who unmatched");
@@ -79,11 +81,11 @@ class MatchStateTest {
 
             match.block(b);
 
-            assertEquals(Match.State.BLOCKED, match.getState(), "State should be BLOCKED");
+            assertEquals(MatchState.BLOCKED, match.getState(), "MatchState should be BLOCKED");
             assertFalse(match.isActive(), "isActive should return false after block");
             assertNotNull(match.getEndedAt(), "endedAt should be set");
             assertEquals(b, match.getEndedBy(), "endedBy should be the user who blocked");
-            assertEquals(Match.ArchiveReason.BLOCK, match.getEndReason(), "endReason should be BLOCK");
+            assertEquals(MatchArchiveReason.BLOCK, match.getEndReason(), "endReason should be BLOCK");
         }
 
         @Test
@@ -95,7 +97,7 @@ class MatchStateTest {
 
             match.transitionToFriends(a);
 
-            assertEquals(Match.State.FRIENDS, match.getState());
+            assertEquals(MatchState.FRIENDS, match.getState());
             assertTrue(match.canMessage());
             assertNull(match.getEndedAt());
         }
@@ -110,9 +112,9 @@ class MatchStateTest {
 
             match.gracefulExit(b);
 
-            assertEquals(Match.State.GRACEFUL_EXIT, match.getState());
+            assertEquals(MatchState.GRACEFUL_EXIT, match.getState());
             assertFalse(match.canMessage());
-            assertEquals(Match.ArchiveReason.GRACEFUL_EXIT, match.getEndReason());
+            assertEquals(MatchArchiveReason.GRACEFUL_EXIT, match.getEndReason());
             assertEquals(b, match.getEndedBy());
         }
 
@@ -126,8 +128,8 @@ class MatchStateTest {
 
             match.unmatch(a);
 
-            assertEquals(Match.State.UNMATCHED, match.getState());
-            assertEquals(Match.ArchiveReason.UNMATCH, match.getEndReason());
+            assertEquals(MatchState.UNMATCHED, match.getState());
+            assertEquals(MatchArchiveReason.UNMATCH, match.getEndReason());
         }
 
         @Test
@@ -140,8 +142,8 @@ class MatchStateTest {
 
             match.block(b);
 
-            assertEquals(Match.State.BLOCKED, match.getState());
-            assertEquals(Match.ArchiveReason.BLOCK, match.getEndReason());
+            assertEquals(MatchState.BLOCKED, match.getState());
+            assertEquals(MatchArchiveReason.BLOCK, match.getEndReason());
         }
 
         @Test
@@ -241,14 +243,13 @@ class MatchStateTest {
             Instant createdAt = AppClock.now().minusSeconds(3600);
             Instant endedAt = AppClock.now();
 
-            Match match =
-                    new Match(id, a, b, createdAt, Match.State.UNMATCHED, endedAt, a, Match.ArchiveReason.UNMATCH);
+            Match match = new Match(id, a, b, createdAt, MatchState.UNMATCHED, endedAt, a, MatchArchiveReason.UNMATCH);
 
             assertEquals(id, match.getId());
             assertEquals(a, match.getUserA());
             assertEquals(b, match.getUserB());
             assertEquals(createdAt, match.getCreatedAt());
-            assertEquals(Match.State.UNMATCHED, match.getState());
+            assertEquals(MatchState.UNMATCHED, match.getState());
             assertEquals(endedAt, match.getEndedAt());
             assertEquals(a, match.getEndedBy());
         }
@@ -264,7 +265,7 @@ class MatchStateTest {
             Instant now = AppClock.now();
             IllegalArgumentException ex = assertThrows(
                     IllegalArgumentException.class,
-                    () -> new Match(id, a, b, now, Match.State.ACTIVE, null, null, null),
+                    () -> new Match(id, a, b, now, MatchState.ACTIVE, null, null, null),
                     "Should throw when userA is not lexicographically smaller");
             assertNotNull(ex);
         }

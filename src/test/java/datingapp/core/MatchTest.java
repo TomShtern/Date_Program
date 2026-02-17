@@ -3,6 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.Match;
+import datingapp.core.model.MatchState;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
@@ -39,7 +40,7 @@ class MatchTest {
 
             Match match = Match.create(userA, userB);
             assertDoesNotThrow(() -> match.gracefulExit(userA));
-            assertEquals(Match.State.GRACEFUL_EXIT, match.getState());
+            assertEquals(MatchState.GRACEFUL_EXIT, match.getState());
         }
     }
 
@@ -63,7 +64,7 @@ class MatchTest {
         @DisplayName("should start in ACTIVE state")
         void startsActive() {
             Match match = Match.create(UUID.randomUUID(), UUID.randomUUID());
-            assertEquals(Match.State.ACTIVE, match.getState());
+            assertEquals(MatchState.ACTIVE, match.getState());
         }
     }
 }

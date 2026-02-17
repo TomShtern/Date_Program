@@ -25,7 +25,7 @@ import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.User.UserState;
+import datingapp.core.model.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;

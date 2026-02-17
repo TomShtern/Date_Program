@@ -17,8 +17,11 @@ import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.Match;
+import datingapp.core.model.MatchArchiveReason;
+import datingapp.core.model.MatchState;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.UserState;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
@@ -78,7 +81,7 @@ public final class TestStorages {
         @Override
         public List<User> findActive() {
             return users.values().stream()
-                    .filter(user -> user.getState() == User.UserState.ACTIVE)
+                    .filter(user -> user.getState() == UserState.ACTIVE)
                     .toList();
         }
 
@@ -286,7 +289,7 @@ public final class TestStorages {
         public List<Match> getActiveMatchesFor(UUID userId) {
             return matches.values().stream()
                     .filter(match -> match.getDeletedAt() == null)
-                    .filter(match -> match.getState() == Match.State.ACTIVE)
+                    .filter(match -> match.getState() == MatchState.ACTIVE)
                     .filter(match -> match.involves(userId))
                     .toList();
         }
@@ -397,7 +400,7 @@ public final class TestStorages {
         }
 
         @Override
-        public void archiveConversation(String conversationId, Match.ArchiveReason reason) {
+        public void archiveConversation(String conversationId, MatchArchiveReason reason) {
             Conversation conversation = conversations.get(conversationId);
             if (conversation != null) {
                 conversation.archive(reason);

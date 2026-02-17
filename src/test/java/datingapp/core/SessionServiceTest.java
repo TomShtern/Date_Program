@@ -91,7 +91,7 @@ class SessionServiceTest {
                     AppClock.now().minus(Duration.ofMinutes(10)),
                     AppClock.now().minus(Duration.ofMinutes(10)),
                     null,
-                    Session.State.ACTIVE,
+                    Session.MatchState.ACTIVE,
                     5,
                     3,
                     2,

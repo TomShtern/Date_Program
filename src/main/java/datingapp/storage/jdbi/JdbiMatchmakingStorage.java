@@ -4,6 +4,8 @@ import datingapp.core.connection.ConnectionModels;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.Match;
+import datingapp.core.model.MatchArchiveReason;
+import datingapp.core.model.MatchState;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.storage.DatabaseManager.StorageException;
 import java.sql.ResultSet;
@@ -428,10 +430,10 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_a"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_b"),
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at"),
-                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "state", Match.State.class),
+                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "state", MatchState.class),
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "ended_by"),
-                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "end_reason", Match.ArchiveReason.class));
+                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "end_reason", MatchArchiveReason.class));
             match.restoreDeletedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "deleted_at"));
             return match;
         }

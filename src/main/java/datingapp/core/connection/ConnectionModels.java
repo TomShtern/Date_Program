@@ -1,7 +1,7 @@
 package datingapp.core.connection;
 
 import datingapp.core.AppClock;
-import datingapp.core.model.Match;
+import datingapp.core.model.MatchArchiveReason;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
@@ -66,7 +66,7 @@ public final class ConnectionModels {
         private Instant userAReadAt;
         private Instant userBReadAt;
         private Instant archivedAt;
-        private Match.ArchiveReason archiveReason;
+        private MatchArchiveReason archiveReason;
         private boolean visibleToUserA;
         private boolean visibleToUserB;
 
@@ -80,7 +80,7 @@ public final class ConnectionModels {
                 Instant userAReadAt,
                 Instant userBReadAt,
                 Instant archivedAt,
-                Match.ArchiveReason archiveReason,
+                MatchArchiveReason archiveReason,
                 boolean visibleToUserA,
                 boolean visibleToUserB) {
             Objects.requireNonNull(id, ID_REQUIRED);
@@ -219,7 +219,7 @@ public final class ConnectionModels {
             return archivedAt;
         }
 
-        public Match.ArchiveReason getArchiveReason() {
+        public MatchArchiveReason getArchiveReason() {
             return archiveReason;
         }
 
@@ -231,7 +231,7 @@ public final class ConnectionModels {
             return visibleToUserB;
         }
 
-        public void archive(Match.ArchiveReason reason) {
+        public void archive(MatchArchiveReason reason) {
             this.archivedAt = AppClock.now();
             this.archiveReason = reason;
         }

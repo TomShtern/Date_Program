@@ -9,6 +9,7 @@ import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
+import datingapp.core.model.Gender; // Added this import
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
@@ -173,8 +174,8 @@ class StatsHandlerTest {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test bio for " + name);
         user.setBirthDate(java.time.LocalDate.of(1990, 1, 1));
-        user.setGender(User.Gender.OTHER);
-        user.setInterestedIn(EnumSet.of(User.Gender.OTHER));
+        user.setGender(Gender.OTHER);
+        user.setInterestedIn(EnumSet.of(Gender.OTHER));
         user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new datingapp.core.profile.MatchPreferences.PacePreferences(
                 datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,

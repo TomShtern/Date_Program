@@ -2,8 +2,8 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.model.Gender;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.util.EnumSet;
 import java.util.Objects;

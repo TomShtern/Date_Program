@@ -3,7 +3,9 @@ package datingapp.core.matching;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.Match;
+import datingapp.core.model.MatchState;
 import datingapp.core.model.User;
+import datingapp.core.model.UserState;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
@@ -150,7 +152,7 @@ public class MatchingService {
                 try {
                     matchResult = interactionStorage
                             .get(match.getId())
-                            .filter(existing -> existing.getState() == Match.State.ACTIVE);
+                            .filter(existing -> existing.getState() == MatchState.ACTIVE);
                 } catch (RuntimeException fallbackEx) {
                     if (logger.isErrorEnabled()) {
                         logger.error("Fallback match lookup also failed for {}", match.getId(), fallbackEx);
@@ -255,7 +257,7 @@ public class MatchingService {
         for (var entry : likeTimes) {
             UUID likerId = entry.getKey();
             User liker = likerUsers.get(likerId);
-            if (liker == null || liker.getState() != User.UserState.ACTIVE) {
+            if (liker == null || liker.getState() != UserState.ACTIVE) {
                 continue;
             }
 

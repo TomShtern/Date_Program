@@ -580,7 +580,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
             var startedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "started_at");
             var lastActivityAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "last_activity_at");
             var endedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at");
-            Session.State state = Session.State.valueOf(rs.getString("state"));
+            Session.MatchState state = Session.MatchState.valueOf(rs.getString("state"));
             int swipeCount = rs.getInt("swipe_count");
             int likeCount = rs.getInt("like_count");
             int passCount = rs.getInt("pass_count");
