@@ -66,6 +66,7 @@ These are the **top errors** that cause compilation/runtime failures:
 | Gotcha                   | Wrong                                        | Correct                                                                          |
 |--------------------------|----------------------------------------------|----------------------------------------------------------------------------------|
 | Non-static nested types  | `public class X { public record Y() {} }`    | `public class X { public static record Y() {} }`                                 |
+| Externally-used nested type | `class User { enum Gender {...} }` used by other files | Extract to own file: `Gender.java` in same package (JLS/jdt.ls breaks on cross-file nested refs) |
 | EnumSet null crash       | `EnumSet.copyOf(interests)`                  | `interests != null ? EnumSet.copyOf(interests) : EnumSet.noneOf(Interest.class)` |
 | Exposed mutable field    | `return interests;`                          | `return EnumSet.copyOf(interests);`                                              |
 | Missing touch()          | `this.name = name;`                          | `this.name = name; touch();`                                                     |
@@ -75,8 +76,9 @@ These are the **top errors** that cause compilation/runtime failures:
 | Raw `Instant.now()`      | `this.updatedAt = Instant.now()`             | `this.updatedAt = AppClock.now()` (enables TestClock in tests)                   |
 | Java version mismatch    | `mvn test` fails: "release 25 not supported" | Install JDK 25+ or change `maven.compiler.release` in pom.xml                    |
 | PMD + Spotless conflict  | Add `// NOPMD` then `mvn verify` fails       | Run `spotless:apply` after adding NOPMD comments, then re-verify with `verify`   |
-| ViewModel storage import | `import datingapp.core.storage.UserStorage`  | Use adapter: `import datingapp.ui.viewmodel.data.UiDataAdapters.UiUserStore`     |
-| Standalone Gender enum   | `import datingapp.core.Gender`               | Use nested: `User.Gender` (Gender.java was deleted)                              |
+| ViewModel storage import | `import datingapp.core.storage.UserStorage`  | Use adapter: `import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore`          |
+| Nested `User.Gender` ref | `import datingapp.core.model.User.Gender`    | Use standalone: `import datingapp.core.model.Gender` (extracted to own file)     |
+| Nested Match.State ref   | `Match.State.ACTIVE`                         | Use standalone: `MatchState.ACTIVE` (extracted to `core/model/MatchState`)       |
 
 **Access config via:** `private static final AppConfig CONFIG = AppConfig.defaults();`
 
@@ -137,37 +139,28 @@ This applies to **any** long-running command (`mvn`, `docker build`, `npm run bu
 
 **Phase 2.1** console dating app: **Java 25** + Maven + H2 + JDBI. Features: matching, messaging, relationship transitions, pace compatibility, achievements.
 
-**Stats (2026-02-14):** 135 Java files (77 main + 58 test), ~43K lines (~33K code), 802 tests, 60% coverage min.
+**Stats (2026-02-18):** 143 Java files (84 main + 59 test), ~43K lines (~33K code), 60% coverage min.
 
 ### Package Structure
 
 | Package               | Purpose                                                              | Rule                                   |
 |-----------------------|----------------------------------------------------------------------|----------------------------------------|
-| `core/`               | Utilities + config: AppClock, AppConfig, AppSession, EnumSetUtil...  | **ZERO** framework/DB imports          |
-| `core/model/`         | Primary entities: User, Match                                        | Pure data + state machines             |
-| `core/connection/`    | ConnectionModels (Message, Conversation, FriendRequest...), ConnectionService | Domain-organized models + services |
-| `core/matching/`      | CandidateFinder, MatchingService, MatchQualityService, UndoService   | Matching business logic                |
+| `core/`               | Utilities + config (8 files): AppClock, AppConfig, AppSession, EnumSetUtil, LoggingSupport, PerformanceMonitor, ServiceRegistry, TextUtil | **ZERO** framework/DB imports |
+| `core/model/`         | Entities + standalone enums (8 files): User, Match, Gender, UserState, VerificationMethod, MatchState, MatchArchiveReason, ProfileNote | Pure data + state machines |
+| `core/connection/`    | ConnectionModels + ConnectionService                                 | Messaging + relationships              |
+| `core/matching/`      | CandidateFinder, MatchingService, MatchQualityService, UndoService, RecommendationService, TrustSafetyService, Standout, LifestyleMatcher | All matching + trust + recommendations |
 | `core/metrics/`       | ActivityMetricsService, EngagementDomain, SwipeState                 | Analytics + engagement tracking        |
 | `core/profile/`       | ProfileService, ValidationService, MatchPreferences                  | Profile management                     |
-| `core/recommendation/`| RecommendationService, Standout                                      | Discovery + recommendations            |
-| `core/safety/`        | TrustSafetyService                                                   | Trust & safety                         |
 | `core/storage/`       | 5 storage interfaces                                                 | Contracts only, no implementations     |
 | `app/bootstrap/`      | `ApplicationStartup` (consolidated init + config loading)            | Initialization + infrastructure        |
-| `app/cli/`            | 5 CLI handlers (domain subpackages) + `shared/CliTextAndInput`       | Thin layer over services               |
+| `app/cli/`            | 6 files flat: CliTextAndInput + 5 handlers (Matching, Messaging, Profile, Safety, Stats) | Thin layer over services |
 | `app/api/`            | `RestApiServer` (routes inlined)                                     | Javalin-based HTTP endpoints           |
 | `storage/`            | `DatabaseManager`, `StorageFactory`                                  | DB connection + wiring                 |
-| `storage/jdbi/`       | 6 JDBI implementations (domain subpackages)                          | Implements `core/storage/*`            |
+| `storage/jdbi/`       | 6 files flat: JdbiUserStorage, JdbiMatchmakingStorage, JdbiConnectionStorage, JdbiMetricsStorage, JdbiTrustSafetyStorage, JdbiTypeCodecs | Implements `core/storage/*` |
 | `storage/schema/`     | `SchemaInitializer`, `MigrationRunner`                               | DDL + schema evolution                 |
-| `ui/`                 | `DatingApp`, `NavigationService`, `UiComponents`, `ViewModelFactory` | JavaFX entry + navigation              |
-| `ui/viewmodel/screen/`| 8 ViewModels                                                         | Owns observable properties             |
-| `ui/viewmodel/shared/`| `ViewModelErrorSink` (`@FunctionalInterface`)                        | Error callback contract                |
-| `ui/viewmodel/data/`  | `UiDataAdapters` (consolidated)                                      | Adapter interfaces + impls             |
-| `ui/screen/`          | 9 controllers (extend `BaseController`)                              | FXML controllers                       |
-| `ui/popup/`           | `MilestonePopupController`                                           | Popup overlays                         |
-| `ui/constants/`       | `UiConstants`                                                        | Centralized UI timing/sizing           |
-| `ui/animation/`       | `UiAnimations`                                                       | Animation utilities                    |
-| `ui/feedback/`        | `UiFeedbackService`                                                  | Toast/feedback system                  |
-| `ui/util/`            | `ImageCache`                                                         | Static UI utilities                    |
+| `ui/`                 | 7 files: DatingApp, NavigationService, UiComponents, UiFeedbackService, ImageCache, UiAnimations, UiConstants | JavaFX entry + utilities |
+| `ui/viewmodel/`       | 11 files: 8 ViewModels + ViewModelErrorSink + UiDataAdapters + ViewModelFactory | MVVM + adapters + factory |
+| `ui/screen/`          | 10 controllers: Base + 8 screen + MilestonePopupController           | FXML controllers                       |
 
 ### Bootstrap (Entry Points)
 
@@ -190,32 +183,44 @@ nav.setViewModelFactory(vmFactory);
 
 ### Domain Models
 
+**No externally-used nested types.** Any enum, record, or class referenced by other files MUST be its own top-level `.java` file. The Java Language Server (jdt.ls) cannot reliably resolve cross-file nested type references — auto-import fails, refactoring misses usages, and false compile errors appear. Nested types are only acceptable when they are **private** or used exclusively within the declaring file (e.g., inner `Dao` interfaces in JDBI storage classes).
+
 | Model                      | Location                | Key Info                                                              |
 |----------------------------|-------------------------|-----------------------------------------------------------------------|
-| `User`                     | `core/model/`           | Mutable; `INCOMPLETE→ACTIVE↔PAUSED→BANNED`; has `StorageBuilder`      |
-| `User.Gender`              | nested in User          | `MALE`, `FEMALE`, `OTHER` (`public static enum`)                      |
-| `User.UserState`           | nested in User          | `INCOMPLETE`, `ACTIVE`, `PAUSED`, `BANNED`                            |
-| `User.VerificationMethod`  | nested in User          | `EMAIL`, `PHONE`                                                      |
-| `Match`                    | `core/model/`           | Mutable; `ACTIVE→FRIENDS\|UNMATCHED\|GRACEFUL_EXIT\|BLOCKED`; deterministic ID |
-| `ConnectionModels.*`       | `core/connection/`      | `Message` (record), `Conversation` (class), `FriendRequest`; deterministic IDs |
-| `EngagementDomain`         | `core/metrics/`         | Engagement tracking domain types                                      |
-| `SwipeState`               | `core/metrics/`         | Swipe session state                                                   |
-| `MatchPreferences`         | `core/profile/`         | Preference/dealbreaker domain types                                   |
-| `Standout`                 | `core/recommendation/`  | Standout candidate data                                               |
+| `User`                     | `core/model/`           | Mutable; uses `UserState` for lifecycle; has `StorageBuilder`         |
+| `Gender`                   | `core/model/`           | Standalone enum: `MALE`, `FEMALE`, `OTHER`                            |
+| `UserState`                | `core/model/`           | Standalone enum: `INCOMPLETE`, `ACTIVE`, `PAUSED`, `BANNED`           |
+| `MatchState`               | `core/model/`           | Standalone enum: `ACTIVE`, `FRIENDS`, `UNMATCHED`, `GRACEFUL_EXIT`, `BLOCKED` |
+| `MatchArchiveReason`       | `core/model/`           | Standalone enum: `FRIEND_ZONE`, `GRACEFUL_EXIT`, `UNMATCH`, `BLOCK`   |
+| `VerificationMethod`       | `core/model/`           | Standalone enum: `EMAIL`, `PHONE`                                     |
+| `ProfileNote`              | `core/model/`           | Record: private notes on profiles; uses `AppClock.now()`              |
+| `Match`                    | `core/model/`           | Mutable; uses `MatchState` + `MatchArchiveReason`; deterministic ID   |
+| `ConnectionModels.*`       | `core/connection/`      | `Message` (record), `Conversation`, `FriendRequest`, `Like`, `Block`, `Report`, `Notification` |
+| `EngagementDomain`         | `core/metrics/`         | `Achievement`, `UserAchievement`, `UserStats`, `PlatformStats`        |
+| `SwipeState`               | `core/metrics/`         | `Session`, `Undo` (swipe session + undo state)                        |
+| `MatchPreferences`         | `core/profile/`         | `Interest`, `Lifestyle`, `Dealbreakers`, `PacePreferences`            |
+| `Standout`                 | `core/matching/`        | Standout candidate data + `Standout.Storage` interface                |
 
 ### Core Utilities (in `core/` root)
 
-`AppClock`, `AppConfig`, `AppSession`, `EnumSetUtil`, `LoggingSupport`, `PerformanceMonitor`, `ScoringConstants`, `ServiceRegistry`
+`AppClock`, `AppConfig`, `AppSession`, `EnumSetUtil`, `LoggingSupport`, `PerformanceMonitor`, `ServiceRegistry`, `TextUtil`
 
-**ServiceRegistry aliases:** `getSessionService()` and `getStatsService()` both return `ActivityMetricsService` — there is no separate StatsService or SessionService class.
+**ServiceRegistry:** Constructor-injected with 15 params (config + 5 storages + 9 services). Direct getters only — no aliases.
 
 ### Storage Interfaces (`core/storage/`)
 
 5 interfaces: `UserStorage`, `InteractionStorage`, `CommunicationStorage`, `AnalyticsStorage`, `TrustSafetyStorage`
 
-Implementations in `storage/jdbi/` (6 files in domain subpackages: `profile/`, `matching/`, `connection/`, `metrics/`, `safety/`, `shared/`). Each wraps an inner `Dao` interface with `@SqlQuery`/`@SqlUpdate` annotations. Null-safe RS reading via `JdbiTypeCodecs.SqlRowReaders`.
+Implementations in `storage/jdbi/` (6 files, flat — no subpackages):
 
-**Note:** `JdbiTrustSafetyStorage` is wired differently — `jdbi.onDemand(JdbiTrustSafetyStorage.class)` directly (SqlObject interface), while the other 4 use `new JdbiXxxStorage(jdbi)` (outer class wrapping inner Dao).
+| JDBI Implementation        | Implements               | Notes                                             |
+|----------------------------|--------------------------|---------------------------------------------------|
+| `JdbiUserStorage`          | `UserStorage`            | `new JdbiUserStorage(jdbi)` — outer class + Dao   |
+| `JdbiMatchmakingStorage`   | `InteractionStorage`     | `new JdbiMatchmakingStorage(jdbi)` + `undoStorage()` accessor |
+| `JdbiConnectionStorage`    | `CommunicationStorage`   | `new JdbiConnectionStorage(jdbi)`                 |
+| `JdbiMetricsStorage`       | `AnalyticsStorage`       | `new JdbiMetricsStorage(jdbi)` — also implements `Standout.Storage` |
+| `JdbiTrustSafetyStorage`   | `TrustSafetyStorage`     | `jdbi.onDemand(...)` directly (SqlObject)         |
+| `JdbiTypeCodecs`           | (utility)                | SqlRowReaders, EnumSet codecs, column mappers      |
 
 ## Key Patterns
 
@@ -250,10 +255,10 @@ public static String generateId(UUID a, UUID b) {
 ### State Transitions with Validation
 ```java
 public void unmatch(UUID userId) {
-    if (isInvalidTransition(this.state, State.UNMATCHED)) {
+    if (isInvalidTransition(this.state, MatchState.UNMATCHED)) {
         throw new IllegalStateException("Cannot unmatch from " + this.state);
     }
-    this.state = State.UNMATCHED;
+    this.state = MatchState.UNMATCHED;
     this.endedAt = AppClock.now();
     this.endedBy = userId;
 }
@@ -303,7 +308,7 @@ public void setBio(String bio) { this.bio = bio; touch(); }  // EVERY setter cal
 
 ### Handler Dependencies (CLI)
 ```java
-// Handlers live in domain subpackages: app/cli/matching/, app/cli/connection/, etc.
+// All handlers flat in app/cli/ (no subpackages)
 // Each handler declares a Dependencies record; instantiated directly in Main.java (no HandlerFactory)
 public class MatchingHandler {
     public static record Dependencies(CandidateFinder candidateFinderService, MatchingService matchingService,
@@ -316,7 +321,7 @@ public class MatchingHandler {
 
 ### ViewModel Error Handling (JavaFX)
 ```java
-// ViewModelErrorSink.java (ui/viewmodel/shared/) - functional interface for ViewModel→Controller errors
+// ViewModelErrorSink.java (ui/viewmodel/) - functional interface for ViewModel→Controller errors
 @FunctionalInterface
 public interface ViewModelErrorSink {
     void onError(String message);
@@ -371,26 +376,29 @@ public boolean isDeleted() { return deletedAt != null; }
 
 ### UI Data Access Adapters (ViewModel Layer)
 ```java
-// All adapter interfaces + impls consolidated in UiDataAdapters.java
-import datingapp.ui.viewmodel.data.UiDataAdapters.UiUserStore;
-import datingapp.ui.viewmodel.data.UiDataAdapters.UiMatchDataAccess;
+// All adapter interfaces + impls consolidated in UiDataAdapters.java (ui/viewmodel/)
+import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
+import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 
 // ViewModelFactory wires the adapters
 UiUserStore userStore = new UiDataAdapters.StorageUiUserStore(services.getUserStorage());
-UiMatchDataAccess matchData = new UiDataAdapters.StorageUiMatchDataAccess(matchStorage, likeStorage, blockStorage);
+UiMatchDataAccess matchData = new UiDataAdapters.StorageUiMatchDataAccess(
+    services.getInteractionStorage(), services.getTrustSafetyStorage());
 
 // ViewModel constructor uses interface only
-public MatchesViewModel(UiUserStore userStore, UiMatchDataAccess matchData) { ... }
+public MatchesViewModel(UiMatchDataAccess matchData, UiUserStore userStore, ...) { ... }
 ```
 
 ### Constants Pattern (No Magic Numbers)
 ```java
 // Use centralized constants instead of hardcoded values
-import datingapp.core.ScoringConstants;
-if (score >= ScoringConstants.MatchQuality.STAR_EXCELLENT_THRESHOLD) { ... }  // 90
-
-import datingapp.ui.constants.UiConstants;
+import datingapp.ui.UiConstants;
 Duration duration = UiConstants.TOAST_ERROR_DURATION;  // 5 seconds
+
+// Scoring constants are inlined in ProfileService (ScoringConstants was deleted)
+// Use AppConfig for configurable thresholds
+private static final AppConfig CONFIG = AppConfig.defaults();
+if (age < CONFIG.minAge()) { ... }
 ```
 
 ## Testing
@@ -411,8 +419,8 @@ var trustSafetyStorage = new TestStorages.TrustSafety();  // implements TrustSaf
 private User createActiveUser(UUID id, String name) {
     User u = new User(id, name);
     u.setBirthDate(LocalDate.now().minusYears(25));
-    u.setGender(User.Gender.MALE);
-    u.setInterestedIn(Set.of(User.Gender.FEMALE));
+    u.setGender(Gender.MALE);           // standalone enum in core/model/
+    u.setInterestedIn(Set.of(Gender.FEMALE));
     u.setMaxDistanceKm(50);
     u.setMinAge(20); u.setMaxAge(30);
     u.addPhotoUrl("http://example.com/photo.jpg");
@@ -487,18 +495,20 @@ public final class JdbiUserStorage implements UserStorage {
 - ❌ Skip `Objects.requireNonNull()` in constructors
 - ❌ Return mutable collections directly
 - ❌ Forget `static` on nested types (enums, records, classes)
+- ❌ Define externally-used types as nested (JLS/jdt.ls can't resolve cross-file nested refs — extract to own file in same package)
 - ❌ Use Mockito (use `TestStorages.*` instead)
 - ❌ Throw from services (return `*Result` records)
-- ❌ Hardcode thresholds (use `AppConfig.defaults()` or `ScoringConstants`)
+- ❌ Hardcode thresholds (use `AppConfig.defaults()`)
 - ❌ Call `new User(...)` in mappers (use `StorageBuilder`)
 - ❌ Use `HashSet` for enums (use `EnumSet`)
 - ❌ Forget `touch()` in setters
 - ❌ Use `Instant.now()` directly (use `AppClock.now()` for testability with TestClock)
-- ❌ Import `core/storage/*` in ViewModels (use `UiDataAdapters` adapters)
-- ❌ Use standalone `Gender`/`UserState` (use `User.Gender`, `User.UserState` nested enums)
-- ❌ Hardcode animation timings (use `UiConstants.*`)
-- ❌ Reference `Toast`/`UiSupport` (deleted; use `UiFeedbackService`)
-- ❌ Reference `AppBootstrap`/`HandlerFactory`/`CliSupport` (deleted; see current equivalents below)
+- ❌ Import `core/storage/*` in ViewModels (use `UiDataAdapters` adapters in `ui/viewmodel/`)
+- ❌ Use `User.Gender`/`User.UserState` nested refs (extracted to standalone `Gender`, `UserState` in `core/model/`)
+- ❌ Use `Match.State` (extracted to standalone `MatchState` in `core/model/`)
+- ❌ Hardcode animation timings (use `UiConstants.*` in `ui/`)
+- ❌ Reference `Toast`/`UiSupport`/`ScoringConstants` (deleted)
+- ❌ Reference `AppBootstrap`/`HandlerFactory`/`CliSupport` (deleted; use `ApplicationStartup`/`CliTextAndInput`)
 
 ## Key Data Flows
 
@@ -521,14 +531,11 @@ public final class JdbiUserStorage implements UserStorage {
 
 ## Recent Updates (2026-02)
 
-- **02-14**: Domain-driven package reorganization: services+models co-located in domain subpackages (`core/connection/`, `core/matching/`, `core/metrics/`, `core/profile/`, `core/recommendation/`, `core/safety/`). `AppBootstrap+ConfigLoader→ApplicationStartup` in `app/bootstrap/`. `CliSupport→CliTextAndInput` with nested `InputReader`+`EnumMenu`. `HandlerFactory` deleted (handlers instantiated directly in Main.java). `ErrorHandler→ViewModelErrorSink`. `Toast+UiSupport→UiFeedbackService`. Controllers moved to `ui/screen/`. Legacy directory (22 files) deleted. 160→135 files, 47K→43K lines.
-- **02-13**: Test output workflow: default concise test output with verbose profile rerun (`-Ptest-output-verbose`)
-- **02-11**: Codebase consolidation: 189→160 files, storage interfaces 11→5, UiDataAdapters/UiConstants/EnumSetJdbiSupport consolidated
-- **02-10**: Nested enums in User, UI data access adapters, StorageFactory, soft-delete as direct fields, LoggingSupport
-- **02-08**: Project config audit: enforced Checkstyle+PMD (custom pmd-rules.xml), Build Command Discipline rule
-- **02-05**: Enhanced UI/UX: ErrorHandler pattern in ViewModels, navigation context, loading overlays
-- **02-03**: Fixed 25+ nested types to `public static`; added `NestedTypeVisibilityTest`
-- **01-29**: JDBI migration complete; deleted 12 H2*Storage classes
+- **02-18**: Docs sync — CLAUDE.md fully reconciled with actual source code. Major corrections: enums extracted from User to standalone files (Gender, UserState, VerificationMethod, MatchState, MatchArchiveReason, ProfileNote), `core/safety/` + `core/recommendation/` merged into `core/matching/`, ScoringConstants deleted (inlined in ProfileService), TextUtil+LifestyleMatcher added, all subpackages flattened (CLI handlers, JDBI storage, UI utilities), JDBI storage renamed (JdbiMatchmakingStorage, JdbiConnectionStorage, JdbiMetricsStorage), ViewModelFactory moved to `ui/viewmodel/`. 143 files (84 main + 59 test).
+- **02-14**: Domain-driven package reorganization. `ApplicationStartup` in `app/bootstrap/`. `CliTextAndInput`. `ViewModelErrorSink`. `UiFeedbackService`. Controllers in `ui/screen/`.
+- **02-13**: Test output workflow: default concise output + verbose profile rerun
+- **02-11**: Codebase consolidation: storage interfaces 11→5, UiDataAdapters/UiConstants consolidated
+- **02-08**: Enforced Checkstyle+PMD, Build Command Discipline rule
 
 ## Agent Changelog (append-only, trimmed to recent)
 ---AGENT-LOG-START---
@@ -545,4 +552,5 @@ public final class JdbiUserStorage implements UserStorage {
 18|2026-02-11 22:52:00|agent:codex|scope:docs-stats-sync|Synced docs to latest verified baseline (802 tests) and refreshed storage-consolidation documentation consistency|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
 19|2026-02-13 10:15:00|agent:github_copilot|scope:test-output-workflow|Document regular-first test flow and verbose rerun commands|CLAUDE.md;AGENTS.md;.github/copilot-instructions.md
 20|2026-02-14 00:00:00|agent:claude_code|scope:docs-domain-reorg|Domain-driven reorg: updated stats 135/43K, package table to domain subpackages, ApplicationStartup/CliTextAndInput/ViewModelErrorSink/UiFeedbackService, fixed touch()+factory to AppClock.now(), updated TestStorages/ErrorHandler/adapter patterns, removed stale Toast/UiSupport/HandlerFactory/AppBootstrap refs|CLAUDE.md
+21|2026-02-18 00:00:00|agent:claude_code|scope:docs-full-sync|Full code-verified sync: 143 files (84+59), extracted enums (Gender/UserState/VerificationMethod/MatchState/MatchArchiveReason/ProfileNote standalone), merged safety+recommendation into matching, deleted ScoringConstants, added TextUtil+LifestyleMatcher, flattened all subpackages (CLI/JDBI/UI), renamed JDBI impls, fixed all import paths, reversed Gender gotcha, updated ServiceRegistry docs|CLAUDE.md
 ---AGENT-LOG-END---

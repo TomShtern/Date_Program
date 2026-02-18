@@ -54,7 +54,7 @@ class DailyServiceTest {
         todayStart = LocalDate.of(2026, 2, 6).atStartOfDay(ZoneId.of("UTC")).toInstant();
         fixedClock = Clock.fixed(todayStart.plus(Duration.ofHours(12)), ZoneId.of("UTC")); // Noon UTC
 
-        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
+        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
         service = createService(config, fixedClock);
     }
 

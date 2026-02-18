@@ -62,8 +62,7 @@ class RelationshipHandlerTest {
                 new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
         ConnectionService transitionService =
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
-        CandidateFinder candidateFinder =
-                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
+        CandidateFinder candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
         ProfileService profileCompletionService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);

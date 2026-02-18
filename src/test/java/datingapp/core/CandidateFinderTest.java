@@ -37,7 +37,7 @@ class CandidateFinderTest {
         var interactionStorage = new TestStorages.Interactions();
         var trustSafetyStorage = new TestStorages.TrustSafety();
 
-        finder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, AppConfig.defaults());
+        finder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
         seeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.0853, 34.7818);
     }
 

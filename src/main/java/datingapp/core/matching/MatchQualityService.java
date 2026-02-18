@@ -22,8 +22,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MatchQualityService {
+
+    private static final Logger logger = LoggerFactory.getLogger(MatchQualityService.class);
 
     private final UserStorage userStorage;
     private final InteractionStorage interactionStorage;
@@ -339,17 +343,15 @@ public class MatchQualityService {
      * @param perspectiveUserId The user whose perspective we're computing from
      * @return Computed match quality
      */
-    public MatchQuality computeQuality(Match match, UUID perspectiveUserId) {
+    public Optional<MatchQuality> computeQuality(Match match, UUID perspectiveUserId) {
         UUID otherUserId = match.getOtherUser(perspectiveUserId);
 
         User me = userStorage.get(perspectiveUserId);
         User them = userStorage.get(otherUserId);
 
-        if (me == null) {
-            throw new IllegalArgumentException("User not found: " + perspectiveUserId);
-        }
-        if (them == null) {
-            throw new IllegalArgumentException("User not found: " + otherUserId);
+        if (me == null || them == null) {
+            logger.warn("computeQuality: user not found — perspective={} other={}", perspectiveUserId, otherUserId);
+            return Optional.empty();
         }
 
         // === Calculate Individual Scores ===
@@ -399,7 +401,7 @@ public class MatchQualityService {
         List<String> highlights = generateHighlights(
                 me, them, distanceKm, sharedInterests, lifestyleMatches, paceScore, timeBetweenLikes);
 
-        return new MatchQuality(
+        return Optional.of(new MatchQuality(
                 match.getId(),
                 perspectiveUserId,
                 otherUserId,
@@ -417,7 +419,7 @@ public class MatchQualityService {
                 timeBetweenLikes,
                 paceSyncLevel,
                 compatibilityScore,
-                highlights);
+                highlights));
     }
 
     // === Score Calculation Methods ===
@@ -643,54 +645,59 @@ public class MatchQualityService {
             double paceScore,
             Duration timeBetween) {
         List<String> highlights = new ArrayList<>();
+        addDistanceHighlight(highlights, distanceKm);
+        addInterestHighlight(highlights, me, them, sharedInterests);
+        highlights.addAll(lifestyleMatches);
+        addPaceHighlight(highlights, paceScore);
+        addResponseHighlight(highlights, timeBetween);
+        addAgeHighlight(highlights, Math.abs(me.getAge() - them.getAge()));
+        if (highlights.size() > HIGHLIGHT_MAX_COUNT) {
+            highlights = new ArrayList<>(highlights.subList(0, HIGHLIGHT_MAX_COUNT));
+        }
+        return highlights;
+    }
 
-        // Distance highlight
+    private void addDistanceHighlight(List<String> highlights, double distanceKm) {
         if (distanceKm >= 0 && distanceKm < NEARBY_DISTANCE_KM) {
             highlights.add(String.format("Lives nearby (%.1f km away)", distanceKm));
         } else if (distanceKm >= 0 && distanceKm < MID_DISTANCE_KM) {
             highlights.add(String.format("%.0f km away", distanceKm));
         }
+    }
 
-        // Interest highlights
-        if (!sharedInterests.isEmpty()) {
-            if (sharedInterests.size() == 1) {
-                highlights.add("You both enjoy " + sharedInterests.getFirst());
-            } else {
-                InterestMatcher.MatchResult result = InterestMatcher.compare(me.getInterests(), them.getInterests());
-                highlights.add("You share "
-                        + sharedInterests.size()
-                        + " interests: "
-                        + InterestMatcher.formatSharedInterests(result.shared()));
-            }
+    private void addInterestHighlight(List<String> highlights, User me, User them, List<String> sharedInterests) {
+        if (sharedInterests.isEmpty()) {
+            return;
         }
+        if (sharedInterests.size() == 1) {
+            highlights.add("You both enjoy " + sharedInterests.getFirst());
+        } else {
+            InterestMatcher.MatchResult result = InterestMatcher.compare(me.getInterests(), them.getInterests());
+            highlights.add("You share "
+                    + sharedInterests.size()
+                    + " interests: "
+                    + InterestMatcher.formatSharedInterests(result.shared()));
+        }
+    }
 
-        // Lifestyle highlights
-        highlights.addAll(lifestyleMatches);
-
-        // Pace highlights
+    private void addPaceHighlight(List<String> highlights, double paceScore) {
         if (paceScore >= PACE_SYNC_PERFECT) {
             highlights.add("Total Pace Sync! ⚡");
         } else if (paceScore >= PACE_SYNC_GOOD) {
             highlights.add("Great communication sync");
         }
+    }
 
-        // Response time highlight
+    private void addResponseHighlight(List<String> highlights, Duration timeBetween) {
         if (timeBetween != null && !timeBetween.isZero() && timeBetween.toHours() < QUICK_MUTUAL_INTEREST_HOURS) {
             highlights.add("Quick mutual interest!");
         }
+    }
 
-        // Age highlight
-        int ageDiff = Math.abs(me.getAge() - them.getAge());
+    private void addAgeHighlight(List<String> highlights, int ageDiff) {
         if (ageDiff <= AGE_SIMILAR_YEARS) {
             highlights.add("Similar age");
         }
-
-        // Limit to top 5 highlights
-        if (highlights.size() > HIGHLIGHT_MAX_COUNT) {
-            highlights = new ArrayList<>(highlights.subList(0, HIGHLIGHT_MAX_COUNT));
-        }
-
-        return highlights;
     }
 
     // === Pace Compatibility Methods (formerly PaceCompatibilityService) ===

@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ProfileViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
-    private static final AppConfig CONFIG = AppConfig.defaults();
+    private final AppConfig config;
     private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
     private static final String NONE_SET_LABEL = "None set";
 
@@ -92,10 +92,11 @@ public class ProfileViewModel {
 
     private ViewModelErrorSink errorHandler;
 
-    public ProfileViewModel(UiUserStore userStore, ProfileService profileCompletionService) {
+    public ProfileViewModel(UiUserStore userStore, ProfileService profileCompletionService, AppConfig config) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.profileCompletionService =
                 Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
     }
 
     /**
@@ -353,7 +354,7 @@ public class ProfileViewModel {
         try {
             int min = Integer.parseInt(minAge.get());
             int max = Integer.parseInt(maxAge.get());
-            if (min >= CONFIG.minAge() && max <= CONFIG.maxAge() && min <= max) {
+            if (min >= config.minAge() && max <= config.maxAge() && min <= max) {
                 user.setAgeRange(min, max);
             }
         } catch (NumberFormatException e) {
@@ -396,6 +397,16 @@ public class ProfileViewModel {
     private void updateSessionAndCompletion(User user) {
         AppSession.getInstance().setCurrentUser(user);
         updateCompletion(user);
+    }
+
+    /** Returns configured minimum height in cm (for controllers to use instead of AppConfig.defaults()). */
+    public int getMinHeightCm() {
+        return config.minHeightCm();
+    }
+
+    /** Returns configured maximum height in cm (for controllers to use instead of AppConfig.defaults()). */
+    public int getMaxHeightCm() {
+        return config.maxHeightCm();
     }
 
     private void logInfo(String message, Object... args) {
@@ -702,9 +713,9 @@ public class ProfileViewModel {
             return;
         }
         int age = Period.between(selected, today).getYears();
-        if (age < CONFIG.minAge() || age > CONFIG.maxAge()) {
+        if (age < config.minAge() || age > config.maxAge()) {
             logWarn("Birth date outside allowed age range: {}", selected);
-            UiFeedbackService.showWarning("Birth date must be for ages " + CONFIG.minAge() + "-" + CONFIG.maxAge());
+            UiFeedbackService.showWarning("Birth date must be for ages " + config.minAge() + "-" + config.maxAge());
             return;
         }
         user.setBirthDate(selected);

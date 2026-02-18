@@ -31,16 +31,6 @@ public class TrustSafetyService {
     private final Duration verificationTtl;
     private final Random random;
 
-    /** Public: testing only. Core dependencies are null. */
-    public TrustSafetyService() {
-        this(DEFAULT_VERIFICATION_TTL, new Random());
-    }
-
-    /** Public: testing only. Core dependencies are null. */
-    public TrustSafetyService(Duration verificationTtl, Random random) {
-        this(null, null, null, null, verificationTtl, random);
-    }
-
     public TrustSafetyService(
             TrustSafetyStorage trustSafetyStorage,
             InteractionStorage interactionStorage,

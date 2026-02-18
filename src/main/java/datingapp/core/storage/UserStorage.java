@@ -1,5 +1,6 @@
 package datingapp.core.storage;
 
+import datingapp.core.model.Gender;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import java.util.List;
@@ -27,6 +28,43 @@ public interface UserStorage {
 
     /** Finds all active users. */
     List<User> findActive();
+
+    /**
+     * Pre-filtered candidate query for a given seeker's basic criteria.
+     * Filters applied in SQL: active state, gender, age range, and optional bounding-box distance.
+     * Remaining filters (interaction exclusions, dealbreakers, mutual preferences) are applied
+     * in-memory by {@code CandidateFinder}.
+     *
+     * <p>The default implementation falls back to {@link #findActive()} filtered in-memory,
+     * which is correct but unoptimized. Storage implementations should override this to push
+     * the filters to the database.
+     *
+     * @param excludeId     the seeker's own UUID (excluded from results)
+     * @param genders       candidate genders the seeker is interested in
+     * @param minAge        minimum acceptable candidate age (years)
+     * @param maxAge        maximum acceptable candidate age (years)
+     * @param seekerLat     seeker's latitude (degrees); use 0 when location not set
+     * @param seekerLon     seeker's longitude (degrees); use 0 when location not set
+     * @param maxDistanceKm bounding-box radius in km; use large value (e.g. 50000) to skip distance filter
+     * @return active users matching base criteria, unsorted
+     */
+    default List<User> findCandidates(
+            UUID excludeId,
+            Set<Gender> genders,
+            int minAge,
+            int maxAge,
+            double seekerLat,
+            double seekerLon,
+            int maxDistanceKm) {
+        if (genders == null || genders.isEmpty()) {
+            return List.of();
+        }
+        return findActive().stream()
+                .filter(u -> !u.getId().equals(excludeId))
+                .filter(u -> genders.contains(u.getGender()))
+                .filter(u -> u.getAge() >= minAge && u.getAge() <= maxAge)
+                .toList();
+    }
 
     /** Finds all users regardless of state. */
     List<User> findAll();

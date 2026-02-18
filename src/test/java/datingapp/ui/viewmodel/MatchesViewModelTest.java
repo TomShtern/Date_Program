@@ -60,7 +60,7 @@ class MatchesViewModelTest {
 
         // Create dependencies for RecommendationService
         var analyticsStorage = new TestStorages.Analytics();
-        var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage, config);
+        var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage);
         var standoutStorage = new TestStorages.Standouts();
         var profileService = new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
 
@@ -104,7 +104,7 @@ class MatchesViewModelTest {
         // Re-create dependencies or reuse? Reusing mostly fine since they are
         // mocks/stubs.
         var analyticsStorage = new TestStorages.Analytics();
-        var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage, zeroLimitConfig);
+        var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage);
         var standoutStorage = new TestStorages.Standouts();
         var profileService =
                 new ProfileService(zeroLimitConfig, analyticsStorage, interactions, trustSafetyStorage, users);

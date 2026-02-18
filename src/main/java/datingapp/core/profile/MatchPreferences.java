@@ -3,8 +3,10 @@ package datingapp.core.profile;
 import datingapp.core.AppConfig;
 import datingapp.core.matching.LifestyleMatcher;
 import datingapp.core.model.User;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -387,21 +389,37 @@ public final class MatchPreferences {
             Integer maxAgeDifference // null = use standard age preference
             ) {
 
+        private static final AppConfig CONFIG = AppConfig.defaults();
+
         // Compact constructor - validates and creates defensive copies
         public Dealbreakers {
             // Defensive copies - null becomes empty set
-            acceptableSmoking = acceptableSmoking == null ? Set.of() : Set.copyOf(acceptableSmoking);
-            acceptableDrinking = acceptableDrinking == null ? Set.of() : Set.copyOf(acceptableDrinking);
-            acceptableKidsStance = acceptableKidsStance == null ? Set.of() : Set.copyOf(acceptableKidsStance);
-            acceptableLookingFor = acceptableLookingFor == null ? Set.of() : Set.copyOf(acceptableLookingFor);
-            acceptableEducation = acceptableEducation == null ? Set.of() : Set.copyOf(acceptableEducation);
+            acceptableSmoking = Collections.unmodifiableSet(
+                    acceptableSmoking != null && !acceptableSmoking.isEmpty()
+                            ? EnumSet.copyOf(acceptableSmoking)
+                            : EnumSet.noneOf(Lifestyle.Smoking.class));
+            acceptableDrinking = Collections.unmodifiableSet(
+                    acceptableDrinking != null && !acceptableDrinking.isEmpty()
+                            ? EnumSet.copyOf(acceptableDrinking)
+                            : EnumSet.noneOf(Lifestyle.Drinking.class));
+            acceptableKidsStance = Collections.unmodifiableSet(
+                    acceptableKidsStance != null && !acceptableKidsStance.isEmpty()
+                            ? EnumSet.copyOf(acceptableKidsStance)
+                            : EnumSet.noneOf(Lifestyle.WantsKids.class));
+            acceptableLookingFor = Collections.unmodifiableSet(
+                    acceptableLookingFor != null && !acceptableLookingFor.isEmpty()
+                            ? EnumSet.copyOf(acceptableLookingFor)
+                            : EnumSet.noneOf(Lifestyle.LookingFor.class));
+            acceptableEducation = Collections.unmodifiableSet(
+                    acceptableEducation != null && !acceptableEducation.isEmpty()
+                            ? EnumSet.copyOf(acceptableEducation)
+                            : EnumSet.noneOf(Lifestyle.Education.class));
 
             // Validate height range using configured bounds
-            AppConfig heightConfig = AppConfig.defaults();
-            if (minHeightCm != null && minHeightCm < heightConfig.minHeightCm()) {
+            if (minHeightCm != null && minHeightCm < CONFIG.minHeightCm()) {
                 throw new IllegalArgumentException("minHeightCm too low: " + minHeightCm);
             }
-            if (maxHeightCm != null && maxHeightCm > heightConfig.maxHeightCm()) {
+            if (maxHeightCm != null && maxHeightCm > CONFIG.maxHeightCm()) {
                 throw new IllegalArgumentException("maxHeightCm too high: " + maxHeightCm);
             }
             if (minHeightCm != null && maxHeightCm != null && minHeightCm > maxHeightCm) {
@@ -487,11 +505,11 @@ public final class MatchPreferences {
 
         /** Builder for fluent construction of Dealbreakers. */
         public static class Builder {
-            private final Set<Lifestyle.Smoking> smoking = new HashSet<>();
-            private final Set<Lifestyle.Drinking> drinking = new HashSet<>();
-            private final Set<Lifestyle.WantsKids> kids = new HashSet<>();
-            private final Set<Lifestyle.LookingFor> lookingFor = new HashSet<>();
-            private final Set<Lifestyle.Education> education = new HashSet<>();
+            private final Set<Lifestyle.Smoking> smoking = EnumSet.noneOf(Lifestyle.Smoking.class);
+            private final Set<Lifestyle.Drinking> drinking = EnumSet.noneOf(Lifestyle.Drinking.class);
+            private final Set<Lifestyle.WantsKids> kids = EnumSet.noneOf(Lifestyle.WantsKids.class);
+            private final Set<Lifestyle.LookingFor> lookingFor = EnumSet.noneOf(Lifestyle.LookingFor.class);
+            private final Set<Lifestyle.Education> education = EnumSet.noneOf(Lifestyle.Education.class);
             private Integer minHeight = null;
             private Integer maxHeight = null;
             private Integer maxAgeDiff = null;
@@ -601,8 +619,7 @@ public final class MatchPreferences {
                 // Prevent instantiation - all methods are static
             }
 
-            public static boolean passes(User seeker, User candidate, AppConfig config) {
-                Objects.requireNonNull(config, "config cannot be null");
+            public static boolean passes(User seeker, User candidate) {
                 Dealbreakers db = seeker.getDealbreakers();
 
                 return !db.hasAnyDealbreaker()
@@ -622,9 +639,8 @@ public final class MatchPreferences {
              * @param candidate The potential match
              * @return List of human-readable failure descriptions
              */
-            public static List<String> getFailedDealbreakers(User seeker, User candidate, AppConfig config) {
-                Objects.requireNonNull(config, "config cannot be null");
-                List<String> failures = new java.util.ArrayList<>();
+            public static List<String> getFailedDealbreakers(User seeker, User candidate) {
+                List<String> failures = new ArrayList<>();
                 Dealbreakers db = seeker.getDealbreakers();
 
                 addSmokingFailure(db, candidate, failures);

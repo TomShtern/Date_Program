@@ -473,8 +473,8 @@ public class ProfileController extends BaseController implements Initializable {
         try {
             int height = Integer.parseInt(heightText);
             // Use centralized config bounds for validation
-            int minHeight = datingapp.core.AppConfig.defaults().minHeightCm();
-            int maxHeight = datingapp.core.AppConfig.defaults().maxHeightCm();
+            int minHeight = viewModel.getMinHeightCm();
+            int maxHeight = viewModel.getMaxHeightCm();
             if (height < minHeight || height > maxHeight) {
                 heightField.setText("");
                 viewModel.heightProperty().set(null);

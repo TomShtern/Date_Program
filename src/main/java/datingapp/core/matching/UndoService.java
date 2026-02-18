@@ -1,5 +1,6 @@
 package datingapp.core.matching;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.SwipeState.Undo;
@@ -27,7 +28,7 @@ public class UndoService {
      * @param config             Application configuration with undo window setting
      */
     public UndoService(InteractionStorage interactionStorage, Undo.Storage undoStorage, AppConfig config) {
-        this(interactionStorage, undoStorage, config, Clock.systemUTC());
+        this(interactionStorage, undoStorage, config, AppClock.clock());
     }
 
     public UndoService(InteractionStorage interactionStorage, Undo.Storage undoStorage, AppConfig config, Clock clock) {

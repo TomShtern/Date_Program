@@ -45,7 +45,7 @@ public class MatchingService {
             RecommendationService dailyService) {
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
-        this.userStorage = userStorage;
+        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.activityMetricsService = activityMetricsService;
         this.undoService = undoService;
         this.dailyService = dailyService;
@@ -224,10 +224,6 @@ public class MatchingService {
      */
     public List<PendingLiker> findPendingLikersWithTimes(UUID currentUserId) {
         Objects.requireNonNull(currentUserId, "currentUserId cannot be null");
-
-        if (userStorage == null) {
-            throw new IllegalStateException("userStorage required for liker browsing. Use full constructor.");
-        }
 
         Set<UUID> alreadyInteracted = interactionStorage.getLikedOrPassedUserIds(currentUserId);
         Set<UUID> blocked = trustSafetyStorage.getBlockedUserIds(currentUserId);

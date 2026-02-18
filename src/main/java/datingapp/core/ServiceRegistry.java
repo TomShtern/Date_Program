@@ -9,6 +9,7 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
@@ -36,6 +37,7 @@ public class ServiceRegistry {
 
     private final TrustSafetyService trustSafetyService;
     private final ProfileService profileService;
+    private final ValidationService validationService;
 
     private final ConnectionService connectionService;
 
@@ -55,7 +57,8 @@ public class ServiceRegistry {
             ProfileService profileService,
             RecommendationService recommendationService,
             UndoService undoService,
-            ConnectionService connectionService) {
+            ConnectionService connectionService,
+            ValidationService validationService) {
         this.config = Objects.requireNonNull(config);
         this.userStorage = Objects.requireNonNull(userStorage);
         this.interactionStorage = Objects.requireNonNull(interactionStorage);
@@ -71,6 +74,7 @@ public class ServiceRegistry {
         this.recommendationService = Objects.requireNonNull(recommendationService);
         this.undoService = Objects.requireNonNull(undoService);
         this.connectionService = Objects.requireNonNull(connectionService);
+        this.validationService = Objects.requireNonNull(validationService);
     }
 
     public AppConfig getConfig() {
@@ -131,5 +135,9 @@ public class ServiceRegistry {
 
     public ConnectionService getConnectionService() {
         return connectionService;
+    }
+
+    public ValidationService getValidationService() {
+        return validationService;
     }
 }

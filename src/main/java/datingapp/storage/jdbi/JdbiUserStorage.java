@@ -74,6 +74,63 @@ public final class JdbiUserStorage implements UserStorage {
     }
 
     @Override
+    public List<User> findCandidates(
+            UUID excludeId,
+            Set<Gender> genders,
+            int minAge,
+            int maxAge,
+            double seekerLat,
+            double seekerLon,
+            int maxDistanceKm) {
+        if (genders == null || genders.isEmpty()) {
+            return List.of();
+        }
+        List<String> genderNames = genders.stream().map(Enum::name).toList();
+
+        return jdbi.withHandle(handle -> {
+            StringBuilder sql = new StringBuilder("SELECT ")
+                    .append(ALL_COLUMNS)
+                    .append(" FROM users WHERE id <> :excludeId")
+                    .append(" AND state = 'ACTIVE'")
+                    .append(" AND deleted_at IS NULL")
+                    .append(" AND gender IN (<genders>)")
+                    .append(" AND DATEDIFF('YEAR', birth_date, CURRENT_DATE) BETWEEN :minAge AND :maxAge");
+
+            // Approximate bounding-box pre-filter when seeker has a location.
+            // Exact great-circle distance is enforced in-memory by CandidateFinder.
+            boolean applyBbox = maxDistanceKm < 50_000;
+            if (applyBbox) {
+                double latDelta = maxDistanceKm / 111.0;
+                double cosLat = Math.max(Math.cos(Math.toRadians(Math.abs(seekerLat))), 0.0001);
+                double lonDelta = maxDistanceKm / (111.0 * cosLat);
+                sql.append(" AND has_location_set = TRUE")
+                        .append(" AND lat BETWEEN :latMin AND :latMax")
+                        .append(" AND lon BETWEEN :lonMin AND :lonMax");
+
+                return handle.createQuery(sql.toString())
+                        .defineList("genders", genderNames)
+                        .bind("excludeId", excludeId)
+                        .bind("minAge", minAge)
+                        .bind("maxAge", maxAge)
+                        .bind("latMin", seekerLat - latDelta)
+                        .bind("latMax", seekerLat + latDelta)
+                        .bind("lonMin", seekerLon - lonDelta)
+                        .bind("lonMax", seekerLon + lonDelta)
+                        .map(new Mapper())
+                        .list();
+            } else {
+                return handle.createQuery(sql.toString())
+                        .defineList("genders", genderNames)
+                        .bind("excludeId", excludeId)
+                        .bind("minAge", minAge)
+                        .bind("maxAge", maxAge)
+                        .map(new Mapper())
+                        .list();
+            }
+        });
+    }
+
+    @Override
     public List<User> findAll() {
         return dao.findAll();
     }

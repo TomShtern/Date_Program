@@ -34,6 +34,7 @@ class EdgeCaseRegressionTest {
         MatchingService service = MatchingService.builder()
                 .interactionStorage(interactionStorage)
                 .trustSafetyStorage(new TestStorages.TrustSafety())
+                .userStorage(new TestStorages.Users())
                 .build();
 
         UUID userA = UUID.randomUUID();

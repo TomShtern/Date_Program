@@ -13,6 +13,7 @@ import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
@@ -66,8 +67,7 @@ public final class StorageFactory {
         Undo.Storage undoStorage = matchmakingStorage.undoStorage();
         Standout.Storage standoutStorage = metricsStorage;
 
-        CandidateFinder candidateFinder =
-                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
+        CandidateFinder candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
         ProfileService profileService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
         RecommendationService recommendationService = RecommendationService.builder()
@@ -101,6 +101,8 @@ public final class StorageFactory {
         TrustSafetyService trustSafetyService =
                 new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
 
+        ValidationService validationService = new ValidationService(config);
+
         return new ServiceRegistry(
                 config,
                 userStorage,
@@ -116,7 +118,8 @@ public final class StorageFactory {
                 profileService,
                 recommendationService,
                 undoService,
-                connectionService);
+                connectionService,
+                validationService);
     }
 
     public static ServiceRegistry buildH2(DatabaseManager dbManager) {

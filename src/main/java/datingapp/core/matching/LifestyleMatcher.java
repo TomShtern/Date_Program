@@ -17,42 +17,10 @@ public final class LifestyleMatcher {
     // Dealbreaker Checks (Set Containment)
     // ========================================================================
 
-    /** Check if a smoking habit is acceptable given a set of allowed values. */
-    public static boolean isAcceptable(Lifestyle.Smoking value, Set<Lifestyle.Smoking> allowed) {
+    /** Check if a lifestyle value is acceptable given a set of allowed values. */
+    public static <E extends Enum<E>> boolean isAcceptable(E value, Set<E> allowed) {
         if (allowed == null || allowed.isEmpty()) {
             return true; // No dealbreaker set
-        }
-        return value != null && allowed.contains(value);
-    }
-
-    /** Check if a drinking habit is acceptable given a set of allowed values. */
-    public static boolean isAcceptable(Lifestyle.Drinking value, Set<Lifestyle.Drinking> allowed) {
-        if (allowed == null || allowed.isEmpty()) {
-            return true;
-        }
-        return value != null && allowed.contains(value);
-    }
-
-    /** Check if a kids stance is acceptable given a set of allowed values. */
-    public static boolean isAcceptable(Lifestyle.WantsKids value, Set<Lifestyle.WantsKids> allowed) {
-        if (allowed == null || allowed.isEmpty()) {
-            return true;
-        }
-        return value != null && allowed.contains(value);
-    }
-
-    /** Check if a relationship goal is acceptable given a set of allowed values. */
-    public static boolean isAcceptable(Lifestyle.LookingFor value, Set<Lifestyle.LookingFor> allowed) {
-        if (allowed == null || allowed.isEmpty()) {
-            return true;
-        }
-        return value != null && allowed.contains(value);
-    }
-
-    /** Check if an education level is acceptable given a set of allowed values. */
-    public static boolean isAcceptable(Lifestyle.Education value, Set<Lifestyle.Education> allowed) {
-        if (allowed == null || allowed.isEmpty()) {
-            return true;
         }
         return value != null && allowed.contains(value);
     }

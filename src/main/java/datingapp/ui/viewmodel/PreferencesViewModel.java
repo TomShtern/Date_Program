@@ -22,8 +22,8 @@ import org.slf4j.LoggerFactory;
  */
 public class PreferencesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(PreferencesViewModel.class);
-    private static final AppConfig CONFIG = AppConfig.defaults();
 
+    private final AppConfig config;
     private final UiUserStore userStore;
     private User currentUser;
 
@@ -43,8 +43,9 @@ public class PreferencesViewModel {
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
-    public PreferencesViewModel(UiUserStore userStore) {
+    public PreferencesViewModel(UiUserStore userStore, AppConfig config) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
     }
 
     public void initialize() {
@@ -96,15 +97,15 @@ public class PreferencesViewModel {
                 interestedIn.get());
 
         // M-17: Validate input ranges before saving using centralized config bounds
-        int minAgeVal = Math.clamp(minAge.get(), CONFIG.minAge(), CONFIG.maxAge());
-        int maxAgeVal = Math.clamp(maxAge.get(), CONFIG.minAge(), CONFIG.maxAge());
+        int minAgeVal = Math.clamp(minAge.get(), config.minAge(), config.maxAge());
+        int maxAgeVal = Math.clamp(maxAge.get(), config.minAge(), config.maxAge());
         if (minAgeVal > maxAgeVal) {
             logWarn("Invalid age range: {}>{}, swapping values", minAgeVal, maxAgeVal);
             int temp = minAgeVal;
             minAgeVal = maxAgeVal;
             maxAgeVal = temp;
         }
-        int maxDistVal = Math.clamp(maxDistance.get(), 1, CONFIG.maxDistanceKm());
+        int maxDistVal = Math.clamp(maxDistance.get(), 1, config.maxDistanceKm());
 
         currentUser.setAgeRange(minAgeVal, maxAgeVal);
         currentUser.setMaxDistanceKm(maxDistVal);

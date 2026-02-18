@@ -1,6 +1,5 @@
 package datingapp.core.matching;
 
-import datingapp.core.AppConfig;
 import datingapp.core.LoggingSupport;
 import datingapp.core.PerformanceMonitor;
 import datingapp.core.model.Gender;
@@ -26,7 +25,6 @@ public class CandidateFinder implements LoggingSupport {
     private final UserStorage userStorage;
     private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
-    private final AppConfig config;
 
     /**
      * Constructs a CandidateFinder with the required storage dependencies.
@@ -37,14 +35,10 @@ public class CandidateFinder implements LoggingSupport {
      * @throws NullPointerException if any parameter is null
      */
     public CandidateFinder(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
-            TrustSafetyStorage trustSafetyStorage,
-            AppConfig config) {
+            UserStorage userStorage, InteractionStorage interactionStorage, TrustSafetyStorage trustSafetyStorage) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
-        this.config = Objects.requireNonNull(config, "config cannot be null");
     }
 
     /** Geographic utility functions. Pure Java - no external dependencies. */
@@ -147,10 +141,22 @@ public class CandidateFinder implements LoggingSupport {
      */
     public List<User> findCandidatesForUser(User currentUser) {
         try (PerformanceMonitor.Timer timer = PerformanceMonitor.startTimer("CandidateFinder.findCandidatesForUser")) {
-            List<User> activeUsers = userStorage.findActive();
             Set<UUID> excluded = new HashSet<>(interactionStorage.getLikedOrPassedUserIds(currentUser.getId()));
             excluded.addAll(trustSafetyStorage.getBlockedUserIds(currentUser.getId()));
-            List<User> candidates = findCandidates(currentUser, activeUsers, excluded);
+
+            // Use SQL pre-filtering for primary criteria to reduce the candidate set
+            // before the more-expensive in-memory filters run.
+            int distanceKm = currentUser.hasLocationSet() ? currentUser.getMaxDistanceKm() : 50_000;
+            List<User> preFiltered = userStorage.findCandidates(
+                    currentUser.getId(),
+                    currentUser.getInterestedIn(),
+                    currentUser.getMinAge(),
+                    currentUser.getMaxAge(),
+                    currentUser.getLat(),
+                    currentUser.getLon(),
+                    distanceKm);
+
+            List<User> candidates = findCandidates(currentUser, preFiltered, excluded);
             if (logger.isTraceEnabled()) {
                 logger.trace("CandidateFinder.findCandidatesForUser completed in {}ms", timer.elapsedMs());
             }
@@ -234,7 +240,7 @@ public class CandidateFinder implements LoggingSupport {
     }
 
     private boolean passesDealbreakers(User seeker, User candidate) {
-        boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate, config);
+        boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate);
         if (!passesDb) {
             logDebug("Rejecting {} ({}): DEALBREAKER HIT", candidate.getName(), candidate.getId());
         }

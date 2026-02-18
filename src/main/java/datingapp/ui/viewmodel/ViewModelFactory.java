@@ -16,6 +16,11 @@ import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -49,9 +54,11 @@ public class ViewModelFactory {
     private ChatViewModel chatViewModel;
     private StatsViewModel statsViewModel;
     private PreferencesViewModel preferencesViewModel;
+    private final Map<Class<?>, Supplier<Object>> controllerFactories;
 
     public ViewModelFactory(ServiceRegistry services) {
         this.services = services;
+        this.controllerFactories = buildControllerFactories();
         initializeSessionBinding();
     }
 
@@ -78,43 +85,23 @@ public class ViewModelFactory {
      * Creates controllers for FXML loading.
      * Maps controller classes to their initialized instances with ViewModels.
      */
+    private Map<Class<?>, Supplier<Object>> buildControllerFactories() {
+        Map<Class<?>, Supplier<Object>> map = new HashMap<>();
+        map.put(LoginController.class, () -> new LoginController(getLoginViewModel(), services.getProfileService()));
+        map.put(DashboardController.class, () -> new DashboardController(getDashboardViewModel()));
+        map.put(ProfileController.class, () -> new ProfileController(getProfileViewModel()));
+        map.put(MatchingController.class, () -> new MatchingController(getMatchingViewModel()));
+        map.put(MatchesController.class, () -> new MatchesController(getMatchesViewModel()));
+        map.put(ChatController.class, () -> new ChatController(getChatViewModel()));
+        map.put(StatsController.class, () -> new StatsController(getStatsViewModel()));
+        map.put(PreferencesController.class, () -> new PreferencesController(getPreferencesViewModel()));
+        return Collections.unmodifiableMap(map);
+    }
+
     public Object createController(Class<?> controllerClass) {
         logDebug("Creating controller: {}", controllerClass.getSimpleName());
-
-        if (controllerClass == LoginController.class) {
-            return new LoginController(getLoginViewModel(), services.getProfileService());
-        }
-
-        if (controllerClass == DashboardController.class) {
-            return new DashboardController(getDashboardViewModel());
-        }
-
-        if (controllerClass == ProfileController.class) {
-            return new ProfileController(getProfileViewModel());
-        }
-
-        if (controllerClass == MatchingController.class) {
-            return new MatchingController(getMatchingViewModel());
-        }
-
-        if (controllerClass == MatchesController.class) {
-            return new MatchesController(getMatchesViewModel());
-        }
-
-        if (controllerClass == ChatController.class) {
-            return new ChatController(getChatViewModel());
-        }
-
-        if (controllerClass == StatsController.class) {
-            return new StatsController(getStatsViewModel());
-        }
-
-        if (controllerClass == PreferencesController.class) {
-            return new PreferencesController(getPreferencesViewModel());
-        }
-
-        // Fallback for controllers that don't need DI or are not yet mapped
-        return createFallbackController(controllerClass);
+        Supplier<Object> factory = controllerFactories.get(controllerClass);
+        return factory != null ? factory.get() : createFallbackController(controllerClass);
     }
 
     private Object createFallbackController(Class<?> controllerClass) {
@@ -134,7 +121,7 @@ public class ViewModelFactory {
 
     public synchronized LoginViewModel getLoginViewModel() {
         if (loginViewModel == null) {
-            loginViewModel = new LoginViewModel(createUiUserStore());
+            loginViewModel = new LoginViewModel(createUiUserStore(), services.getConfig());
         }
         return loginViewModel;
     }
@@ -153,7 +140,8 @@ public class ViewModelFactory {
 
     public synchronized ProfileViewModel getProfileViewModel() {
         if (profileViewModel == null) {
-            profileViewModel = new ProfileViewModel(createUiUserStore(), services.getProfileService());
+            profileViewModel =
+                    new ProfileViewModel(createUiUserStore(), services.getProfileService(), services.getConfig());
         }
         return profileViewModel;
     }
@@ -194,7 +182,7 @@ public class ViewModelFactory {
 
     public synchronized PreferencesViewModel getPreferencesViewModel() {
         if (preferencesViewModel == null) {
-            preferencesViewModel = new PreferencesViewModel(createUiUserStore());
+            preferencesViewModel = new PreferencesViewModel(createUiUserStore(), services.getConfig());
         }
         return preferencesViewModel;
     }
@@ -203,40 +191,22 @@ public class ViewModelFactory {
      * Resets all cached ViewModels. Useful when logging out.
      * Disposes each ViewModel before clearing to prevent memory leaks (UI-04).
      */
+    private static <T> T quietly(T vm, Consumer<T> disposer) {
+        if (vm != null) {
+            disposer.accept(vm);
+        }
+        return null;
+    }
+
     public synchronized void reset() {
-        // Dispose ViewModels that have dispose() method before nulling references
-        if (loginViewModel != null) {
-            loginViewModel.dispose();
-            loginViewModel = null;
-        }
-        if (dashboardViewModel != null) {
-            dashboardViewModel.dispose();
-            dashboardViewModel = null;
-        }
-        if (profileViewModel != null) {
-            profileViewModel.dispose();
-            profileViewModel = null;
-        }
-        if (matchingViewModel != null) {
-            matchingViewModel.dispose();
-            matchingViewModel = null;
-        }
-        if (matchesViewModel != null) {
-            matchesViewModel.dispose();
-            matchesViewModel = null;
-        }
-        if (chatViewModel != null) {
-            chatViewModel.dispose();
-            chatViewModel = null;
-        }
-        if (statsViewModel != null) {
-            statsViewModel.dispose();
-            statsViewModel = null;
-        }
-        if (preferencesViewModel != null) {
-            preferencesViewModel.dispose();
-            preferencesViewModel = null;
-        }
+        loginViewModel = quietly(loginViewModel, LoginViewModel::dispose);
+        dashboardViewModel = quietly(dashboardViewModel, DashboardViewModel::dispose);
+        profileViewModel = quietly(profileViewModel, ProfileViewModel::dispose);
+        matchingViewModel = quietly(matchingViewModel, MatchingViewModel::dispose);
+        matchesViewModel = quietly(matchesViewModel, MatchesViewModel::dispose);
+        chatViewModel = quietly(chatViewModel, ChatViewModel::dispose);
+        statsViewModel = quietly(statsViewModel, StatsViewModel::dispose);
+        preferencesViewModel = quietly(preferencesViewModel, PreferencesViewModel::dispose);
         logDebug("All ViewModels disposed and reset");
     }
 

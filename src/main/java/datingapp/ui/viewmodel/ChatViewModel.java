@@ -5,6 +5,7 @@ import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
+import datingapp.core.connection.ConnectionService.SendResult;
 import datingapp.core.model.User;
 import java.util.List;
 import java.util.UUID;
@@ -43,6 +44,13 @@ public class ChatViewModel {
     private final AtomicLong messageLoadToken = new AtomicLong(0);
 
     private User currentUser;
+
+    private ViewModelErrorSink errorHandler;
+
+    /** Set the error handler for send failures. */
+    public void setErrorHandler(ViewModelErrorSink handler) {
+        this.errorHandler = handler;
+    }
 
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
@@ -255,17 +263,28 @@ public class ChatViewModel {
         endLoading();
     }
 
-    public void sendMessage(String text) {
+    public boolean sendMessage(String text) {
         if (currentUser == null || selectedConversation.get() == null || text == null || text.isBlank()) {
-            return;
+            return false;
         }
 
         logInfo("Sending message to: {}", selectedConversation.get().otherUser().getName());
-        messagingService.sendMessage(
+        SendResult result = messagingService.sendMessage(
                 currentUser.getId(), selectedConversation.get().otherUser().getId(), text.trim());
 
-        // Refresh local messages
+        if (!result.success()) {
+            String msg = "Failed to send message: " + result.errorMessage();
+            if (errorHandler != null) {
+                Platform.runLater(() -> errorHandler.onError(msg));
+            } else {
+                logger.warn(msg);
+            }
+            return false;
+        }
+
+        // Refresh local messages after successful send
         loadMessages(selectedConversation.get());
+        return true;
     }
 
     /**

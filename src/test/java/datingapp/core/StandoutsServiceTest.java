@@ -51,7 +51,7 @@ class StandoutsServiceTest {
         var trustSafetyStorage = new TestStorages.TrustSafety();
         var analyticsStorage = new TestStorages.Analytics();
         standoutStorage = new TestStandoutStorage();
-        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config);
+        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
         profileCompletionService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
         service = RecommendationService.builder()

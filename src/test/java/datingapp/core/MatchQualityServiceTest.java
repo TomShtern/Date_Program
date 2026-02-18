@@ -64,7 +64,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertTrue(quality.distanceScore() > 0.9);
             assertTrue(quality.distanceKm() < 5);
@@ -82,7 +82,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertEquals(1.0, quality.ageScore());
             assertEquals(0, quality.ageDifference());
@@ -110,7 +110,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertEquals(1.0, quality.lifestyleScore());
         }
@@ -128,7 +128,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertEquals(0.5, quality.lifestyleScore());
         }
@@ -148,7 +148,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertEquals(1.0, quality.interestScore());
             assertTrue(quality.highlights().stream().anyMatch(h -> h.contains("You share 2 interests")));
@@ -169,7 +169,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             // 2 shared / 3 min = 0.666
             assertEquals(0.666, quality.interestScore(), 0.001);
@@ -191,7 +191,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertEquals(0.0, quality.interestScore());
         }
@@ -211,7 +211,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertEquals(0.3, quality.interestScore()); // INTEREST_MISSING_SCORE
         }
@@ -235,7 +235,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertEquals(0.5, quality.distanceScore()); // NEUTRAL_SCORE
             assertEquals(-1, quality.distanceKm());
@@ -260,7 +260,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertTrue(quality.highlights().stream().anyMatch(h -> h.contains("km away") || h.contains("nearby")));
         }
@@ -279,7 +279,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertTrue(quality.lifestyleMatches().stream().anyMatch(h -> h.contains("long-term")));
         }
@@ -296,7 +296,7 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertTrue(quality.highlights().stream().anyMatch(h -> h.contains("Similar age")));
         }
@@ -324,7 +324,7 @@ class MatchQualityServiceTest {
             likeStorage.save(
                     new Like(UUID.randomUUID(), bob.getId(), alice.getId(), Like.Direction.LIKE, secondLikeAt));
 
-            MatchQuality quality = service.computeQuality(match, alice.getId());
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
 
             assertEquals(
                     5, // HIGHLIGHT_MAX_COUNT
@@ -412,7 +412,8 @@ class MatchQualityServiceTest {
             Match match = Match.create(alice.getId(), bob.getId());
             addMutualLikes(alice.getId(), bob.getId());
 
-            MatchQuality quality = customService.computeQuality(match, alice.getId());
+            MatchQuality quality =
+                    customService.computeQuality(match, alice.getId()).orElseThrow();
 
             // Score should be very high since distance is the only factor
             assertTrue(quality.compatibilityScore() > 90);

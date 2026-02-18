@@ -25,7 +25,7 @@ import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.HashSet;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -274,7 +274,7 @@ public class ProfileHandler implements LoggingSupport {
 
     private Set<Gender> parseGenderSet(String input) {
         String normalized = input == null ? "" : input.trim().toUpperCase(Locale.ROOT);
-        Set<Gender> result = new HashSet<>();
+        Set<Gender> result = EnumSet.noneOf(Gender.class);
 
         for (String token : normalized.split("[,\\s]+")) {
             if (token.isBlank()) {

@@ -9,6 +9,20 @@ public final class UiConstants {
         // Utility class
     }
 
+    // ── Window dimensions ─────────────────────────────────────────────────────
+
+    public static final double WINDOW_MIN_WIDTH = 800;
+    public static final double WINDOW_MIN_HEIGHT = 600;
+    public static final double WINDOW_MAX_WIDTH = 1600;
+    public static final double WINDOW_MAX_HEIGHT = 1000;
+    public static final double WINDOW_PREF_WIDTH = 1000;
+    public static final double WINDOW_PREF_HEIGHT = 760;
+
+    // ── Text truncation limits ───────────────────────────────────────────────
+
+    public static final int NAME_FORMAT_MAX_CHARS = 24;
+    public static final int CONVERSATION_PREVIEW_CHARS = 35;
+
     // ── Cache & resources ───────────────────────────────────────────────────
 
     /** Maximum number of images to cache before eviction. */

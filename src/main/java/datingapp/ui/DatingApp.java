@@ -23,19 +23,19 @@ public class DatingApp extends Application {
         logger.info("Initializing Dating App GUI...");
 
         // Initialize application with centralized bootstrap
-        logger.info("[DEBUG] Initializing application services...");
+        logger.debug("Initializing application services...");
         ServiceRegistry serviceRegistry = ApplicationStartup.initialize();
-        logger.info("[DEBUG] ServiceRegistry initialized.");
+        logger.debug("ServiceRegistry initialized.");
 
         // Initialize UI framework components
-        logger.info("[DEBUG] Creating ViewModelFactory...");
+        logger.debug("Creating ViewModelFactory...");
         ViewModelFactory viewModelFactory = new ViewModelFactory(serviceRegistry);
-        logger.info("[DEBUG] ViewModelFactory created.");
+        logger.debug("ViewModelFactory created.");
 
-        logger.info("[DEBUG] Setting up NavigationService...");
+        logger.debug("Setting up NavigationService...");
         this.navigationService = NavigationService.getInstance();
         this.navigationService.setViewModelFactory(viewModelFactory);
-        logger.info("[DEBUG] NavigationService ready.");
+        logger.debug("NavigationService ready.");
 
         logger.info("Application services and UI foundation initialized.");
     }
@@ -48,14 +48,14 @@ public class DatingApp extends Application {
         navigationService.initialize(primaryStage);
 
         // Set window constraints
-        primaryStage.setMinWidth(800);
-        primaryStage.setMinHeight(600);
-        primaryStage.setMaxWidth(1600);
-        primaryStage.setMaxHeight(1000);
+        primaryStage.setMinWidth(UiConstants.WINDOW_MIN_WIDTH);
+        primaryStage.setMinHeight(UiConstants.WINDOW_MIN_HEIGHT);
+        primaryStage.setMaxWidth(UiConstants.WINDOW_MAX_WIDTH);
+        primaryStage.setMaxHeight(UiConstants.WINDOW_MAX_HEIGHT);
 
         // Default size
-        primaryStage.setWidth(1000);
-        primaryStage.setHeight(760);
+        primaryStage.setWidth(UiConstants.WINDOW_PREF_WIDTH);
+        primaryStage.setHeight(UiConstants.WINDOW_PREF_HEIGHT);
 
         // Show the initial screen (Login)
         navigationService.navigateTo(NavigationService.ViewType.LOGIN);

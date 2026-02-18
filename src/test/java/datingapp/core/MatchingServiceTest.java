@@ -26,6 +26,7 @@ class MatchingServiceTest {
 
     private TestStorages.Interactions interactionStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
+    private TestStorages.Users userStorage;
     private MatchingService matchingService;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
@@ -34,9 +35,11 @@ class MatchingServiceTest {
         TestClock.setFixed(FIXED_INSTANT);
         interactionStorage = new TestStorages.Interactions();
         trustSafetyStorage = new TestStorages.TrustSafety();
+        userStorage = new TestStorages.Users();
         matchingService = MatchingService.builder()
                 .interactionStorage(interactionStorage)
                 .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
                 .build();
     }
 

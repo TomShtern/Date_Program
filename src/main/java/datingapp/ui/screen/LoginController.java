@@ -8,6 +8,7 @@ import datingapp.core.model.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiConstants;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.LoginViewModel;
 import java.net.URL;
@@ -266,10 +267,10 @@ public class LoginController extends BaseController implements Initializable {
 
     private String formatFilter(String filter) {
         String trimmed = filter.trim();
-        if (trimmed.length() <= 24) {
+        if (trimmed.length() <= UiConstants.NAME_FORMAT_MAX_CHARS) {
             return trimmed;
         }
-        return trimmed.substring(0, 21) + "...";
+        return trimmed.substring(0, UiConstants.NAME_FORMAT_MAX_CHARS - 3) + "...";
     }
 
     private void moveSelection(int delta) {

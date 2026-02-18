@@ -34,6 +34,22 @@ public final class RecommendationService {
     private static final int MAX_STANDOUTS = 10;
     private static final int DIVERSITY_DAYS = 3;
 
+    // ══════ ACTIVITY SCORE THRESHOLDS (hours since last active) ══════
+    private static final long ACTIVITY_VERY_RECENT_HOURS = 1;
+    private static final long ACTIVITY_RECENT_HOURS = 24;
+    private static final long ACTIVITY_MODERATE_HOURS = 72;
+    private static final long ACTIVITY_WEEKLY_HOURS = 168;
+    private static final long ACTIVITY_MONTHLY_HOURS = 720;
+
+    // ══════ ACTIVITY SCORE VALUES ══════
+    private static final double ACTIVITY_SCORE_VERY_RECENT = 1.0;
+    private static final double ACTIVITY_SCORE_RECENT = 0.9;
+    private static final double ACTIVITY_SCORE_MODERATE = 0.7;
+    private static final double ACTIVITY_SCORE_WEEKLY = 0.5;
+    private static final double ACTIVITY_SCORE_MONTHLY = 0.3;
+    private static final double ACTIVITY_SCORE_INACTIVE = 0.1;
+    private static final double ACTIVITY_SCORE_UNKNOWN = 0.5;
+
     private final UserStorage userStorage;
     private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
@@ -190,7 +206,7 @@ public final class RecommendationService {
         } else {
             // Fallback for tests/configurations without CandidateFinder
             List<User> allActive = userStorage.findActive();
-            Set<UUID> alreadyInteracted = new HashSet<>(interactionStorage.getLikedOrPassedUserIds(seeker.getId()));
+            Set<UUID> alreadyInteracted = Set.copyOf(interactionStorage.getLikedOrPassedUserIds(seeker.getId()));
             candidates = allActive.stream()
                     .filter(u -> !u.getId().equals(seeker.getId()))
                     .filter(u -> !isBlockedFallback(seeker.getId(), u.getId()))
@@ -275,39 +291,57 @@ public final class RecommendationService {
 
     private String generateReason(User seeker, User picked, Random random) {
         List<String> reasons = new ArrayList<>();
-
-        if (seeker.hasLocationSet() && picked.hasLocationSet()) {
-            double distance = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), picked.getLat(), picked.getLon());
-            if (distance < config.nearbyDistanceKm()) {
-                reasons.add("Lives nearby!");
-            } else if (distance < config.closeDistanceKm()) {
-                reasons.add("Close enough for coffee!");
-            }
+        addLocationReasons(reasons, seeker, picked);
+        addAgeReasons(reasons, seeker, picked);
+        addCompatibilityReasons(reasons, seeker, picked);
+        addInterestReasons(reasons, seeker, picked);
+        if (reasons.isEmpty()) {
+            reasons.add("Our algorithm thinks you might click!");
+            reasons.add("Something different today!");
+            reasons.add("Expand your horizons!");
+            reasons.add("Why not give them a chance?");
+            reasons.add("Could be a pleasant surprise!");
         }
+        return reasons.get(random.nextInt(reasons.size()));
+    }
 
+    private void addLocationReasons(List<String> reasons, User seeker, User picked) {
+        if (!seeker.hasLocationSet() || !picked.hasLocationSet()) {
+            return;
+        }
+        double distance = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), picked.getLat(), picked.getLon());
+        if (distance < config.nearbyDistanceKm()) {
+            reasons.add("Lives nearby!");
+        } else if (distance < config.closeDistanceKm()) {
+            reasons.add("Close enough for coffee!");
+        }
+    }
+
+    private void addAgeReasons(List<String> reasons, User seeker, User picked) {
         int ageDiff = Math.abs(seeker.getAge() - picked.getAge());
         if (ageDiff <= config.similarAgeDiff()) {
             reasons.add("Similar age");
         } else if (ageDiff <= config.compatibleAgeDiff()) {
             reasons.add("Age-appropriate match");
         }
+    }
 
+    private void addCompatibilityReasons(List<String> reasons, User seeker, User picked) {
         if (sameNonNull(seeker.getLookingFor(), picked.getLookingFor())) {
             reasons.add("Looking for the same thing");
         }
-
         if (sameNonNull(seeker.getWantsKids(), picked.getWantsKids())) {
             reasons.add("Same stance on kids");
         }
-
         if (sameNonNull(seeker.getDrinking(), picked.getDrinking())) {
             reasons.add("Compatible drinking habits");
         }
-
         if (sameNonNull(seeker.getSmoking(), picked.getSmoking())) {
             reasons.add("Compatible smoking habits");
         }
+    }
 
+    private void addInterestReasons(List<String> reasons, User seeker, User picked) {
         long sharedInterests = seeker.getInterests().stream()
                 .filter(picked.getInterests()::contains)
                 .count();
@@ -316,16 +350,6 @@ public final class RecommendationService {
         } else if (sharedInterests >= 1) {
             reasons.add("Some shared interests");
         }
-
-        if (reasons.isEmpty()) {
-            reasons.add("Our algorithm thinks you might click!");
-            reasons.add("Something different today!");
-            reasons.add("Expand your horizons!");
-            reasons.add("Why not give them a chance?");
-            reasons.add("Could be a pleasant surprise!");
-        }
-
-        return reasons.get(random.nextInt(reasons.size()));
     }
 
     private int remainingFor(boolean unlimited, int limit, int used) {
@@ -361,7 +385,7 @@ public final class RecommendationService {
     /** Get today's standouts for a user. Returns cached if available. */
     public Result getStandouts(User seeker) {
 
-        LocalDate today = AppClock.today(config.userTimeZone());
+        LocalDate today = LocalDate.now(clock.withZone(config.userTimeZone()));
 
         List<Standout> cached = standoutStorage.getStandouts(seeker.getId(), today);
         if (!cached.isEmpty()) {
@@ -374,7 +398,7 @@ public final class RecommendationService {
     /** Mark a standout as interacted after like/pass. */
     public void markInteracted(UUID seekerId, UUID standoutUserId) {
 
-        LocalDate today = AppClock.today(config.userTimeZone());
+        LocalDate today = LocalDate.now(clock.withZone(config.userTimeZone()));
         standoutStorage.markInteracted(seekerId, standoutUserId, today);
     }
 
@@ -382,7 +406,7 @@ public final class RecommendationService {
     public Map<UUID, User> resolveUsers(List<Standout> standouts) {
 
         List<UUID> ids = standouts.stream().map(Standout::standoutUserId).toList();
-        return userStorage.findByIds(new HashSet<>(ids));
+        return userStorage.findByIds(Set.copyOf(ids));
     }
 
     private Result generateStandouts(User seeker, LocalDate date) {
@@ -503,14 +527,10 @@ public final class RecommendationService {
 
     private int countLifestyleMatches(User seeker, User candidate) {
         int matches = 0;
-        if (seeker.getSmoking() != null
-                && candidate.getSmoking() != null
-                && seeker.getSmoking() == candidate.getSmoking()) {
+        if (sameNonNull(seeker.getSmoking(), candidate.getSmoking())) {
             matches++;
         }
-        if (seeker.getDrinking() != null
-                && candidate.getDrinking() != null
-                && seeker.getDrinking() == candidate.getDrinking()) {
+        if (sameNonNull(seeker.getDrinking(), candidate.getDrinking())) {
             matches++;
         }
         if (seeker.getWantsKids() != null
@@ -518,9 +538,7 @@ public final class RecommendationService {
                 && areKidsCompatible(seeker.getWantsKids(), candidate.getWantsKids())) {
             matches++;
         }
-        if (seeker.getLookingFor() != null
-                && candidate.getLookingFor() != null
-                && seeker.getLookingFor() == candidate.getLookingFor()) {
+        if (sameNonNull(seeker.getLookingFor(), candidate.getLookingFor())) {
             matches++;
         }
         return matches;
@@ -539,27 +557,27 @@ public final class RecommendationService {
 
     private double calculateActivityScore(User candidate) {
         if (candidate.getUpdatedAt() == null) {
-            return 0.5;
+            return ACTIVITY_SCORE_UNKNOWN;
         }
-        Duration sinceUpdate = Duration.between(candidate.getUpdatedAt(), AppClock.now());
+        Duration sinceUpdate = Duration.between(candidate.getUpdatedAt(), clock.instant());
         long hours = sinceUpdate.toHours();
 
-        if (hours < 1) {
-            return 1.0;
+        if (hours < ACTIVITY_VERY_RECENT_HOURS) {
+            return ACTIVITY_SCORE_VERY_RECENT;
         }
-        if (hours < 24) {
-            return 0.9;
+        if (hours < ACTIVITY_RECENT_HOURS) {
+            return ACTIVITY_SCORE_RECENT;
         }
-        if (hours < 72) {
-            return 0.7;
+        if (hours < ACTIVITY_MODERATE_HOURS) {
+            return ACTIVITY_SCORE_MODERATE;
         }
-        if (hours < 168) {
-            return 0.5;
+        if (hours < ACTIVITY_WEEKLY_HOURS) {
+            return ACTIVITY_SCORE_WEEKLY;
         }
-        if (hours < 720) {
-            return 0.3;
+        if (hours < ACTIVITY_MONTHLY_HOURS) {
+            return ACTIVITY_SCORE_MONTHLY;
         }
-        return 0.1;
+        return ACTIVITY_SCORE_INACTIVE;
     }
 
     private String generateStandoutReason(
@@ -590,12 +608,11 @@ public final class RecommendationService {
     private Set<UUID> getRecentStandoutIds(UUID seekerId, LocalDate today) {
         Set<UUID> recent = new HashSet<>();
         for (int i = 1; i <= DIVERSITY_DAYS; i++) {
-            List<Standout> past = standoutStorage.getStandouts(seekerId, today.minusDays(i));
-            for (Standout standout : past) {
-                recent.add(standout.standoutUserId());
-            }
+            standoutStorage.getStandouts(seekerId, today.minusDays(i)).stream()
+                    .map(Standout::standoutUserId)
+                    .forEach(recent::add);
         }
-        return recent;
+        return Set.copyOf(recent);
     }
 
     /** Daily pick payload. */

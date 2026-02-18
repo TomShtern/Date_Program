@@ -183,23 +183,25 @@ public class ConnectionService {
         });
     }
 
-    public FriendRequest requestFriendZone(UUID fromUserId, UUID targetUserId) {
+    public TransitionResult requestFriendZone(UUID fromUserId, UUID targetUserId) {
         String matchId = Match.generateId(fromUserId, targetUserId);
         Optional<Match> matchOpt = interactionStorage.get(matchId);
 
         if (matchOpt.isEmpty() || !matchOpt.get().isActive()) {
-            throw new TransitionValidationException("An active match is required to request the Friend Zone.");
+            return TransitionResult.failure("An active match is required to request the Friend Zone.");
         }
 
         Optional<FriendRequest> existing =
                 communicationStorage.getPendingFriendRequestBetween(fromUserId, targetUserId);
         if (existing.isPresent()) {
-            throw new TransitionValidationException("A friend zone request is already pending between these users.");
+            return TransitionResult.failure("A friend zone request is already pending between these users.");
         }
 
         FriendRequest request = FriendRequest.create(fromUserId, targetUserId);
         communicationStorage.saveFriendRequest(request);
-
+        // KNOWN LIMITATION: saveFriendRequest and saveNotification are not atomic.
+        // If the notification write fails, the friend request still exists (expected behavior —
+        // requests persist; notifications are informational only).
         communicationStorage.saveNotification(Notification.create(
                 targetUserId,
                 Notification.Type.FRIEND_REQUEST,
@@ -207,26 +209,30 @@ public class ConnectionService {
                 "Someone wants to move your match to the Friend Zone.",
                 Map.of("fromUserId", fromUserId.toString())));
 
-        return request;
+        return TransitionResult.okWithRequest(request);
     }
 
-    public void acceptFriendZone(UUID requestId, UUID responderId) {
-        FriendRequest request = communicationStorage
-                .getFriendRequest(requestId)
-                .orElseThrow(() -> new TransitionValidationException("Friend request not found."));
+    public TransitionResult acceptFriendZone(UUID requestId, UUID responderId) {
+        Optional<FriendRequest> requestOpt = communicationStorage.getFriendRequest(requestId);
+        if (requestOpt.isEmpty()) {
+            return TransitionResult.failure("Friend request not found.");
+        }
+        FriendRequest request = requestOpt.get();
 
         if (!request.toUserId().equals(responderId)) {
-            throw new TransitionValidationException("Only the recipient can accept a friend request.");
+            return TransitionResult.failure("Only the recipient can accept a friend request.");
         }
 
         if (!request.isPending()) {
-            throw new TransitionValidationException("Request is no longer pending.");
+            return TransitionResult.failure("Request is no longer pending.");
         }
 
         String matchId = Match.generateId(request.fromUserId(), request.toUserId());
-        Match match = interactionStorage
-                .get(matchId)
-                .orElseThrow(() -> new IllegalStateException("Match disappeared from storage."));
+        Optional<Match> matchOpt = interactionStorage.get(matchId);
+        if (matchOpt.isEmpty()) {
+            return TransitionResult.failure("Could not find the associated match.");
+        }
+        Match match = matchOpt.get();
 
         match.transitionToFriends(request.fromUserId());
         interactionStorage.update(match);
@@ -238,27 +244,40 @@ public class ConnectionService {
                 request.createdAt(),
                 FriendRequest.Status.ACCEPTED,
                 AppClock.now());
-        communicationStorage.updateFriendRequest(updated);
-
+        try {
+            communicationStorage.updateFriendRequest(updated);
+        } catch (Exception e) {
+            // Compensating write: revert match state to keep data consistent.
+            // KNOWN LIMITATION: this revert is itself not atomic; a second failure here
+            // would leave the match in FRIENDS state with a still-pending request.
+            // A proper fix requires cross-storage transaction support.
+            match.revertToActive();
+            interactionStorage.update(match);
+            return TransitionResult.failure("Failed to update friend request status: " + e.getMessage());
+        }
+        // Notifications are informational-only — best-effort, not reverted on failure.
         communicationStorage.saveNotification(Notification.create(
                 request.fromUserId(),
                 Notification.Type.FRIEND_REQUEST_ACCEPTED,
                 "Friend Request Accepted",
                 "Your match with the other user has successfully transitioned to the Friend Zone.",
                 Map.of("responderId", responderId.toString())));
+        return TransitionResult.ok();
     }
 
-    public void declineFriendZone(UUID requestId, UUID responderId) {
-        FriendRequest request = communicationStorage
-                .getFriendRequest(requestId)
-                .orElseThrow(() -> new TransitionValidationException("Friend request not found."));
+    public TransitionResult declineFriendZone(UUID requestId, UUID responderId) {
+        Optional<FriendRequest> requestOpt = communicationStorage.getFriendRequest(requestId);
+        if (requestOpt.isEmpty()) {
+            return TransitionResult.failure("Friend request not found.");
+        }
+        FriendRequest request = requestOpt.get();
 
         if (!request.toUserId().equals(responderId)) {
-            throw new TransitionValidationException("Only the recipient can decline a friend request.");
+            return TransitionResult.failure("Only the recipient can decline a friend request.");
         }
 
         if (!request.isPending()) {
-            throw new TransitionValidationException("Request is no longer pending.");
+            return TransitionResult.failure("Request is no longer pending.");
         }
 
         FriendRequest updated = new FriendRequest(
@@ -269,34 +288,39 @@ public class ConnectionService {
                 FriendRequest.Status.DECLINED,
                 AppClock.now());
         communicationStorage.updateFriendRequest(updated);
+        return TransitionResult.ok();
     }
 
-    public void gracefulExit(UUID initiatorId, UUID targetUserId) {
+    public TransitionResult gracefulExit(UUID initiatorId, UUID targetUserId) {
         String matchId = Match.generateId(initiatorId, targetUserId);
-        Match match = interactionStorage
-                .get(matchId)
-                .orElseThrow(
-                        () -> new TransitionValidationException("No active relationship found between these users."));
+        Optional<Match> matchOpt = interactionStorage.get(matchId);
+        if (matchOpt.isEmpty()) {
+            return TransitionResult.failure("No active relationship found between these users.");
+        }
+        Match match = matchOpt.get();
 
         if (!match.isActive() && match.getState() != MatchState.FRIENDS) {
-            throw new TransitionValidationException("Relationship has already ended.");
+            return TransitionResult.failure("Relationship has already ended.");
         }
 
         match.gracefulExit(initiatorId);
         interactionStorage.update(match);
-
+        // KNOWN LIMITATION: the match state update and conversation archive are not atomic.
+        // If archiveConversation fails, the match is already GRACEFUL_EXIT but the conversation
+        // remains unarchived. Proper fix requires cross-storage transaction support.
         Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetUserId);
         convoOpt.ifPresent(convo -> {
             convo.archive(MatchArchiveReason.GRACEFUL_EXIT);
             communicationStorage.archiveConversation(convo.getId(), MatchArchiveReason.GRACEFUL_EXIT);
         });
-
+        // Notification is informational-only — best-effort, not reverted on failure.
         communicationStorage.saveNotification(Notification.create(
                 targetUserId,
                 Notification.Type.GRACEFUL_EXIT,
                 "Relationship Ended",
                 "The other user has gracefully moved on from this relationship.",
                 Map.of("initiatorId", initiatorId.toString())));
+        return TransitionResult.ok();
     }
 
     public List<FriendRequest> getPendingRequestsFor(UUID userId) {
@@ -307,6 +331,27 @@ public class ConnectionService {
     public static class TransitionValidationException extends RuntimeException {
         public TransitionValidationException(String message) {
             super(message);
+        }
+    }
+
+    /** Result of a relationship transition operation. */
+    public static record TransitionResult(boolean success, FriendRequest friendRequest, String errorMessage) {
+        public TransitionResult {
+            if (!success) {
+                Objects.requireNonNull(errorMessage, "errorMessage required on failure");
+            }
+        }
+
+        public static TransitionResult ok() {
+            return new TransitionResult(true, null, null);
+        }
+
+        public static TransitionResult okWithRequest(FriendRequest req) {
+            return new TransitionResult(true, Objects.requireNonNull(req), null);
+        }
+
+        public static TransitionResult failure(String error) {
+            return new TransitionResult(false, null, Objects.requireNonNull(error));
         }
     }
 

@@ -9,7 +9,6 @@ import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionService;
-import datingapp.core.connection.ConnectionService.TransitionValidationException;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.matching.MatchQualityService;
@@ -35,6 +34,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +48,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MatchingHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(MatchingHandler.class);
+    private static final String ERR_FAILED = "❌ Failed: {}\n";
 
     private final CandidateFinder candidateFinderService;
     private final MatchingService matchingService;
@@ -162,13 +163,34 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private boolean processCandidateInteraction(User candidate, User currentUser) {
-        // Record this profile view
         analyticsStorage.recordProfileView(currentUser.getId(), candidate.getId());
-
         double distance = GeoUtils.distanceKm(
                 currentUser.getLat(), currentUser.getLon(),
                 candidate.getLat(), candidate.getLon());
+        displayCandidateProfile(candidate, currentUser, distance);
 
+        String action = readValidatedChoice(
+                CliTextAndInput.PROMPT_LIKE_PASS_QUIT,
+                "❌ Invalid choice. Please enter L (like), P (pass), or Q (quit).",
+                "l",
+                "p",
+                "q");
+        if ("q".equals(action)) {
+            logInfo(CliTextAndInput.MSG_STOPPING_BROWSE);
+            return false;
+        }
+
+        MatchingService.SwipeResult result = matchingService.processSwipe(currentUser, candidate, "l".equals(action));
+        if (!result.success()) {
+            showDailyLimitReached(currentUser);
+            return false;
+        }
+        displaySwipeResult(result, candidate, currentUser);
+        promptUndo(candidate.getName(), currentUser);
+        return true;
+    }
+
+    private void displayCandidateProfile(User candidate, User currentUser, double distance) {
         logInfo(CliTextAndInput.BOX_TOP);
         boolean verified = candidate.isVerified();
         logInfo(
@@ -181,35 +203,11 @@ public class MatchingHandler implements LoggingSupport {
             logInfo("│ 📍 {} km away", String.format("%.1f", distance));
         }
         logInfo(CliTextAndInput.PROFILE_BIO_FORMAT, candidate.getBio() != null ? candidate.getBio() : "(no bio)");
-
         logSharedInterests(currentUser, candidate);
-
         logInfo(CliTextAndInput.BOX_BOTTOM);
+    }
 
-        // Validate input and re-prompt until valid choice is entered
-        String action = null;
-        while (action == null) {
-            String input = inputReader.readLine(CliTextAndInput.PROMPT_LIKE_PASS_QUIT);
-            Optional<String> validated = CliTextAndInput.validateChoice(input, "l", "p", "q");
-            if (validated.isEmpty()) {
-                logInfo("❌ Invalid choice. Please enter L (like), P (pass), or Q (quit).");
-            } else {
-                action = validated.get();
-            }
-        }
-
-        if ("q".equals(action)) {
-            logInfo(CliTextAndInput.MSG_STOPPING_BROWSE);
-            return false;
-        }
-
-        MatchingService.SwipeResult result = matchingService.processSwipe(currentUser, candidate, "l".equals(action));
-
-        if (!result.success()) {
-            showDailyLimitReached(currentUser);
-            return false;
-        }
-
+    private void displaySwipeResult(MatchingService.SwipeResult result, User candidate, User currentUser) {
         if (result.matched()) {
             logInfo("\n🎉🎉🎉 IT'S A MATCH! 🎉🎉🎉");
             logInfo("You and {} like each other!\n", candidate.getName());
@@ -219,9 +217,17 @@ public class MatchingHandler implements LoggingSupport {
         } else {
             logInfo("👋 Passed.\n");
         }
-        promptUndo(candidate.getName(), currentUser);
+    }
 
-        return true;
+    private String readValidatedChoice(String prompt, String errorMsg, String... valid) {
+        while (true) {
+            String input = inputReader.readLine(prompt);
+            Optional<String> validated = CliTextAndInput.validateChoice(input, valid);
+            if (validated.isPresent()) {
+                return validated.get();
+            }
+            logInfo(errorMsg);
+        }
     }
 
     /**
@@ -249,20 +255,27 @@ public class MatchingHandler implements LoggingSupport {
                 Match match = matches.get(i);
                 UUID otherUserId = match.getOtherUser(currentUser.getId());
                 User otherUser = userStorage.get(otherUserId);
+                final int displayIndex = i + 1;
 
                 if (otherUser != null && logger.isInfoEnabled()) {
-                    MatchQuality quality = matchQualityService.computeQuality(match, currentUser.getId());
-                    String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
-                    logInfo(
-                            "  {}. {} {}{}, {}         {} {}%",
-                            i + 1,
-                            quality.getStarDisplay(),
-                            otherUser.getName(),
-                            verifiedBadge,
-                            otherUser.getAge(),
-                            " ".repeat(Math.max(0, 10 - otherUser.getName().length())),
-                            quality.compatibilityScore());
-                    logInfo("     \"{}\"", quality.getShortSummary());
+                    matchQualityService
+                            .computeQuality(match, currentUser.getId())
+                            .ifPresent(quality -> {
+                                String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
+                                logInfo(
+                                        "  {}. {} {}{}, {}         {} {}%",
+                                        displayIndex,
+                                        quality.getStarDisplay(),
+                                        otherUser.getName(),
+                                        verifiedBadge,
+                                        otherUser.getAge(),
+                                        " "
+                                                .repeat(Math.max(
+                                                        0,
+                                                        10 - otherUser.getName().length())),
+                                        quality.compatibilityScore());
+                                logInfo("     \"{}\"", quality.getShortSummary());
+                            });
                 }
             }
 
@@ -293,7 +306,13 @@ public class MatchingHandler implements LoggingSupport {
             Match match = matches.get(idx);
             UUID otherUserId = match.getOtherUser(currentUser.getId());
             User otherUser = userStorage.get(otherUserId);
-            MatchQuality quality = matchQualityService.computeQuality(match, currentUser.getId());
+            MatchQuality quality = matchQualityService
+                    .computeQuality(match, currentUser.getId())
+                    .orElse(null);
+            if (quality == null) {
+                logInfo("  Match quality unavailable — user may have been removed.");
+                return;
+            }
 
             displayMatchQuality(otherUser, quality);
 
@@ -411,26 +430,28 @@ public class MatchingHandler implements LoggingSupport {
             }
             case "f" -> {
                 logInfo("\nSending Friend Zone request to {}...", otherUser.getName());
-                try {
-                    transitionService.requestFriendZone(currentUser.getId(), otherUserId);
-                    logInfo("✅ Friend request sent!\n");
-                } catch (TransitionValidationException e) {
-                    logInfo("❌ Failed: {}\n", e.getMessage());
-                }
+                logTransitionResult(
+                        transitionService.requestFriendZone(currentUser.getId(), otherUserId),
+                        "✅ Friend request sent!\n");
             }
             case "g" -> {
                 String confirm = inputReader.readLine("Are you sure you want to exit gracefully? (y/n): ");
                 if ("y".equalsIgnoreCase(confirm)) {
-                    try {
-                        transitionService.gracefulExit(currentUser.getId(), otherUserId);
-                        logInfo("🕊️ Graceful exit successful. Match ended.\n");
-                    } catch (TransitionValidationException e) {
-                        logInfo("❌ Failed: {}\n", e.getMessage());
-                    }
+                    logTransitionResult(
+                            transitionService.gracefulExit(currentUser.getId(), otherUserId),
+                            "🕊️ Graceful exit successful. Match ended.\n");
                 }
             }
             default -> {
                 /* No action for unrecognized input */ }
+        }
+    }
+
+    private void logTransitionResult(ConnectionService.TransitionResult result, String successMessage) {
+        if (result.success()) {
+            logInfo(successMessage);
+        } else {
+            logInfo(ERR_FAILED, result.errorMessage());
         }
     }
 
@@ -519,64 +540,58 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private void showDailyPick(DailyPick pick, User currentUser) {
+        User candidate = pick.user();
+        double distance = GeoUtils.distanceKm(
+                currentUser.getLat(), currentUser.getLon(),
+                candidate.getLat(), candidate.getLon());
+        displayDailyPickProfile(pick, currentUser, distance);
+
+        String action = readValidatedChoice(
+                CliTextAndInput.PROMPT_LIKE_PASS_SKIP,
+                "❌ Invalid choice. Please enter L (like), P (pass), or S (skip).",
+                "l",
+                "p",
+                "s");
+        if ("s".equals(action)) {
+            logInfo("  👋 You can see this pick again later today.\n");
+            return;
+        }
+        processDailyPickSwipe(pick, currentUser, action);
+    }
+
+    private void displayDailyPickProfile(DailyPick pick, User currentUser, double distance) {
         logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
         logInfo("       🎲 YOUR DAILY PICK 🎲");
         logInfo(CliTextAndInput.SEPARATOR_LINE);
         logInfo("");
         logInfo("  ✨ {}", pick.reason());
         logInfo("");
-
         User candidate = pick.user();
-        double distance = GeoUtils.distanceKm(
-                currentUser.getLat(), currentUser.getLon(),
-                candidate.getLat(), candidate.getLon());
-
         logInfo(CliTextAndInput.BOX_TOP);
         logInfo("│ 🎁 {}, {} years old", candidate.getName(), candidate.getAge());
         if (logger.isInfoEnabled()) {
             logInfo("│ 📍 {} km away", String.format("%.1f", distance));
         }
         logInfo(CliTextAndInput.PROFILE_BIO_FORMAT, candidate.getBio() != null ? candidate.getBio() : "(no bio)");
-
         InterestMatcher.MatchResult matchResult =
                 InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
         if (!matchResult.shared().isEmpty() && logger.isInfoEnabled()) {
-            String sharedInterests = InterestMatcher.formatSharedInterests(matchResult.shared());
-            logInfo("│ ✨ You both like: {}", sharedInterests);
+            logInfo("│ ✨ You both like: {}", InterestMatcher.formatSharedInterests(matchResult.shared()));
         }
-
         logInfo(CliTextAndInput.BOX_BOTTOM);
         logInfo("");
         logInfo("  This pick resets tomorrow at midnight!");
         logInfo("");
+    }
 
-        // Validate input and re-prompt until valid choice is entered
-        String action = null;
-        while (action == null) {
-            String input = inputReader.readLine(CliTextAndInput.PROMPT_LIKE_PASS_SKIP);
-            Optional<String> validated = CliTextAndInput.validateChoice(input, "l", "p", "s");
-            if (validated.isEmpty()) {
-                logInfo("❌ Invalid choice. Please enter L (like), P (pass), or S (skip).");
-            } else {
-                action = validated.get();
-            }
-        }
-
-        if ("s".equals(action)) {
-            logInfo("  👋 You can see this pick again later today.\n");
-            return;
-        }
-
-        // Only mark as viewed after valid action (not on skip)
+    private void processDailyPickSwipe(DailyPick pick, User currentUser, String action) {
         dailyService.markDailyPickViewed(currentUser.getId());
-
+        User candidate = pick.user();
         MatchingService.SwipeResult result = matchingService.processSwipe(currentUser, candidate, "l".equals(action));
-
         if (!result.success()) {
             showDailyLimitReached(currentUser);
             return;
         }
-
         if (result.matched()) {
             logInfo("\n🎉🎉🎉 IT'S A MATCH WITH YOUR DAILY PICK! 🎉🎉🎉\n");
         } else if (result.like().direction() == Like.Direction.LIKE) {
@@ -657,63 +672,61 @@ public class MatchingHandler implements LoggingSupport {
                 logInfo("\n⚠️  You must be ACTIVE to view standouts. Complete your profile first.\n");
                 return;
             }
-
             logInfo("\n🌟 === TODAY'S STANDOUTS === 🌟\n");
-
             RecommendationService.Result result = standoutsService.getStandouts(currentUser);
-
             if (result.isEmpty()) {
                 logInfo(result.message() != null ? result.message() : "No standouts available today.");
                 logInfo("\n");
                 return;
             }
-
             if (result.fromCache()) {
                 logInfo("(Cached from earlier today - refreshes at midnight)\n");
             }
-
             List<Standout> standouts = result.standouts();
-            java.util.Map<UUID, User> users = standoutsService.resolveUsers(standouts);
-
-            logInfo("Your top {} matches from {} candidates:\n", standouts.size(), result.totalCandidates());
-
-            for (Standout s : standouts) {
-                User candidate = users.get(s.standoutUserId());
-
-                if (candidate == null) {
-                    continue;
-                }
-
-                String interacted = s.hasInteracted() ? " ✓" : "";
-                logInfo(
-                        "{}. {} {} (Score: {}%){}",
-                        s.rank(), getStandoutEmoji(s.rank()), candidate.getName(), s.score(), interacted);
-                logInfo("   {} - {}", s.reason(), candidate.getAge() + "yo");
-            }
-
+            Map<UUID, User> users = standoutsService.resolveUsers(standouts);
+            displayStandoutCandidates(standouts, users, result.totalCandidates());
             logInfo("\n[L] Like a standout  [P] Pass  [B] Back to menu");
             String input = inputReader.readLine("\nYour choice: ").toUpperCase(Locale.ROOT);
-
-            if ("L".equals(input) || "P".equals(input)) {
-                logInfo("Enter standout number (1-{}):", standouts.size());
-                String numStr = inputReader.readLine("Selection: ");
-                try {
-                    int num = Integer.parseInt(numStr);
-                    if (num >= 1 && num <= standouts.size()) {
-                        Standout selected = standouts.get(num - 1);
-                        User candidate = users.get(selected.standoutUserId());
-                        if (candidate != null) {
-                            boolean isLike = "L".equals(input);
-                            processStandoutInteraction(currentUser, candidate, isLike);
-                        }
-                    } else {
-                        logInfo("Invalid number.\n");
-                    }
-                } catch (NumberFormatException ignored) {
-                    logInfo("Invalid input.\n");
-                }
-            }
+            handleStandoutSelection(input, standouts, users, currentUser);
         });
+    }
+
+    private void displayStandoutCandidates(List<Standout> standouts, Map<UUID, User> users, int totalCandidates) {
+        logInfo("Your top {} matches from {} candidates:\n", standouts.size(), totalCandidates);
+        for (Standout s : standouts) {
+            User candidate = users.get(s.standoutUserId());
+            if (candidate == null) {
+                continue;
+            }
+            String interacted = s.hasInteracted() ? " ✓" : "";
+            logInfo(
+                    "{}. {} {} (Score: {}%){}",
+                    s.rank(), getStandoutEmoji(s.rank()), candidate.getName(), s.score(), interacted);
+            logInfo("   {} - {}", s.reason(), candidate.getAge() + "yo");
+        }
+    }
+
+    private void handleStandoutSelection(
+            String input, List<Standout> standouts, Map<UUID, User> users, User currentUser) {
+        if (!"L".equals(input) && !"P".equals(input)) {
+            return;
+        }
+        logInfo("Enter standout number (1-{}):", standouts.size());
+        String numStr = inputReader.readLine("Selection: ");
+        try {
+            int num = Integer.parseInt(numStr);
+            if (num >= 1 && num <= standouts.size()) {
+                Standout selected = standouts.get(num - 1);
+                User candidate = users.get(selected.standoutUserId());
+                if (candidate != null) {
+                    processStandoutInteraction(currentUser, candidate, "L".equals(input));
+                }
+            } else {
+                logInfo("Invalid number.\n");
+            }
+        } catch (NumberFormatException _) {
+            logInfo("Invalid input.\n");
+        }
     }
 
     private void processStandoutInteraction(User currentUser, User candidate, boolean isLike) {
@@ -796,13 +809,15 @@ public class MatchingHandler implements LoggingSupport {
             User currentUser = session.getCurrentUser();
 
             if ("a".equals(action)) {
-                transitionService.acceptFriendZone(req.id(), currentUser.getId());
-                logInfo("✅ You are now friends with {}! You can find them in your matches.\n", fromName);
+                logTransitionResult(
+                        transitionService.acceptFriendZone(req.id(), currentUser.getId()),
+                        "✅ You are now friends with " + fromName + "! You can find them in your matches.\n");
             } else if ("d".equals(action)) {
-                transitionService.declineFriendZone(req.id(), currentUser.getId());
-                logInfo("Declined friend request from {}.\n", fromName);
+                logTransitionResult(
+                        transitionService.declineFriendZone(req.id(), currentUser.getId()),
+                        "Declined friend request from " + fromName + ".\n");
             }
-        } catch (NumberFormatException | TransitionValidationException e) {
+        } catch (NumberFormatException e) {
             logInfo("Error processing request: {}\n", e.getMessage());
         }
     }

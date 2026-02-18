@@ -113,6 +113,13 @@ public class RestApiServer {
     // ── Route Registration ──────────────────────────────────────────────
 
     private void registerRoutes() {
+        // ────────────────────────────────────────────────────────────────────
+        // AUTHENTICATION NOTE: This REST API is intentionally unauthenticated.
+        // It is designed for local IPC use only (CLI tools, local admin scripts).
+        // Do NOT expose these endpoints over a public network without adding
+        // authentication middleware (e.g., app.before() with a shared secret).
+        // All routes below operate without any identity verification.
+        // ────────────────────────────────────────────────────────────────────
         // Health check
         app.get("/api/health", ctx -> ctx.json(new HealthResponse("ok", System.currentTimeMillis())));
 

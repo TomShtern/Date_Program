@@ -4,6 +4,7 @@ import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiConstants;
 import datingapp.ui.viewmodel.ChatViewModel;
 import java.net.URL;
 import java.time.ZoneId;
@@ -179,7 +180,9 @@ public class ChatController extends BaseController implements Initializable {
 
                 String snippet = item.lastMessage()
                         .map(Message::content)
-                        .map(s -> s.length() > 35 ? s.substring(0, 35) + "..." : s)
+                        .map(s -> s.length() > UiConstants.CONVERSATION_PREVIEW_CHARS
+                                ? s.substring(0, UiConstants.CONVERSATION_PREVIEW_CHARS) + "..."
+                                : s)
                         .orElse("No messages yet");
                 snippetLabel.setText(snippet);
 
@@ -249,12 +252,14 @@ public class ChatController extends BaseController implements Initializable {
     private void handleSendMessage() {
         String text = messageArea.getText();
         if (text != null && !text.isBlank()) {
-            viewModel.sendMessage(text);
-            messageArea.clear();
+            boolean sent = viewModel.sendMessage(text);
+            if (sent) {
+                messageArea.clear();
 
-            // Scroll to bottom
-            if (!viewModel.getActiveMessages().isEmpty()) {
-                messageListView.scrollTo(viewModel.getActiveMessages().size() - 1);
+                // Scroll to bottom
+                if (!viewModel.getActiveMessages().isEmpty()) {
+                    messageListView.scrollTo(viewModel.getActiveMessages().size() - 1);
+                }
             }
         }
     }

@@ -24,6 +24,8 @@ import java.util.UUID;
  */
 public class User {
 
+    private static final AppConfig CONFIG = AppConfig.defaults();
+
     private final UUID id;
     private String name;
     private String bio;
@@ -502,12 +504,11 @@ public class User {
     }
 
     public void setAgeRange(int minAge, int maxAge) {
-        AppConfig config = AppConfig.defaults();
-        if (minAge < config.minAge()) {
-            throw new IllegalArgumentException("minAge must be at least " + config.minAge());
+        if (minAge < CONFIG.minAge()) {
+            throw new IllegalArgumentException("minAge must be at least " + CONFIG.minAge());
         }
-        if (maxAge > config.maxAge()) {
-            throw new IllegalArgumentException("maxAge cannot exceed " + config.maxAge());
+        if (maxAge > CONFIG.maxAge()) {
+            throw new IllegalArgumentException("maxAge cannot exceed " + CONFIG.maxAge());
         }
         if (maxAge < minAge) {
             throw new IllegalArgumentException("maxAge cannot be less than minAge");

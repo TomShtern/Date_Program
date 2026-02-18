@@ -76,7 +76,7 @@ public final class DatabaseManager {
     }
 
     /** Shuts down the database gracefully. */
-    public void shutdown() {
+    public synchronized void shutdown() {
         if (dataSource != null) {
             dataSource.close();
             dataSource = null;

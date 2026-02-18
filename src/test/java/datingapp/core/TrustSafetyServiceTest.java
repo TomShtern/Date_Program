@@ -300,7 +300,11 @@ class TrustSafetyServiceTest {
         @Test
         @DisplayName("Returns false when code expired")
         void returnsFalseWhenCodeExpired() {
-            TrustSafetyService trustSafetyService = new TrustSafetyService(Duration.ofMinutes(15), new Random(123));
+            var tss = new TestStorages.TrustSafety();
+            var iss = new TestStorages.Interactions();
+            var us = new TestStorages.Users();
+            TrustSafetyService trustSafetyService =
+                    new TrustSafetyService(tss, iss, us, AppConfig.defaults(), Duration.ofMinutes(15), new Random(123));
 
             User user = createActiveUser("ExpiredVerify");
             user.startVerification(VerificationMethod.EMAIL, "123456");
@@ -319,7 +323,11 @@ class TrustSafetyServiceTest {
         @Test
         @DisplayName("Returns false when code mismatches")
         void returnsFalseWhenCodeMismatches() {
-            TrustSafetyService trustSafetyService = new TrustSafetyService();
+            TrustSafetyService trustSafetyService = new TrustSafetyService(
+                    new TestStorages.TrustSafety(),
+                    new TestStorages.Interactions(),
+                    new TestStorages.Users(),
+                    AppConfig.defaults());
 
             User user = createActiveUser("MismatchVerify");
             user.startVerification(VerificationMethod.PHONE, "123456");

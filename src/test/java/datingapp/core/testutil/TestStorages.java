@@ -16,6 +16,7 @@ import datingapp.core.metrics.EngagementDomain.PlatformStats;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.metrics.SwipeState.Undo;
+import datingapp.core.model.Gender;
 import datingapp.core.model.Match;
 import datingapp.core.model.MatchArchiveReason;
 import datingapp.core.model.MatchState;
@@ -82,6 +83,25 @@ public final class TestStorages {
         public List<User> findActive() {
             return users.values().stream()
                     .filter(user -> user.getState() == UserState.ACTIVE)
+                    .toList();
+        }
+
+        @Override
+        public List<User> findCandidates(
+                UUID excludeId,
+                Set<Gender> genders,
+                int minAge,
+                int maxAge,
+                double seekerLat,
+                double seekerLon,
+                int maxDistanceKm) {
+            // In-memory pre-filter: only active-state and gender checks.
+            // Age is approximate; exact checks remain in CandidateFinder.
+            return users.values().stream()
+                    .filter(u -> !u.getId().equals(excludeId))
+                    .filter(u -> u.getState() == UserState.ACTIVE)
+                    .filter(u -> genders == null || genders.isEmpty() || genders.contains(u.getGender()))
+                    .filter(u -> u.getAge() >= minAge && u.getAge() <= maxAge)
                     .toList();
         }
 

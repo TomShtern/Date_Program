@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.application.Platform;
@@ -32,8 +33,8 @@ import org.slf4j.LoggerFactory;
  */
 public class LoginViewModel {
     private static final Logger logger = LoggerFactory.getLogger(LoginViewModel.class);
-    private static final AppConfig CONFIG = AppConfig.defaults();
 
+    private final AppConfig config;
     private final UiUserStore userStore;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final ObservableList<User> filteredUsers = FXCollections.observableArrayList();
@@ -53,8 +54,9 @@ public class LoginViewModel {
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
-    public LoginViewModel(UiUserStore userStore) {
-        this.userStore = userStore;
+    public LoginViewModel(UiUserStore userStore, AppConfig config) {
+        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
         this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
         loadUsers();
     }
@@ -256,8 +258,8 @@ public class LoginViewModel {
             return null;
         }
 
-        if (age < CONFIG.minAge() || age > CONFIG.maxAge()) {
-            errorMessage.set("Age must be between " + CONFIG.minAge() + " and " + CONFIG.maxAge());
+        if (age < config.minAge() || age > config.maxAge()) {
+            errorMessage.set("Age must be between " + config.minAge() + " and " + config.maxAge());
             return null;
         }
 

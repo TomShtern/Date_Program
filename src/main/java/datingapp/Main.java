@@ -14,7 +14,6 @@ import datingapp.core.ServiceRegistry;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.User;
-import datingapp.core.profile.ValidationService;
 import java.io.PrintStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -67,31 +66,65 @@ public final class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
-    // Application context
-    private static ServiceRegistry services;
-
-    // CLI Components
-    private static InputReader inputReader;
-    private static MatchingHandler matchingHandler;
-    private static ProfileHandler profileHandler;
-    private static SafetyHandler safetyHandler;
-    private static StatsHandler statsHandler;
-    private static MessagingHandler messagingHandler;
-
     private Main() {
         /* Utility class with only static methods */
     }
 
     public static void main(String[] args) {
         try (Scanner scanner = new Scanner(System.in)) {
-            initializeApp(scanner);
+            ServiceRegistry services = ApplicationStartup.initialize();
+            InputReader inputReader = new InputReader(scanner);
+            AppSession session = AppSession.getInstance();
+
+            MatchingHandler matchingHandler = new MatchingHandler(new MatchingHandler.Dependencies(
+                    services.getCandidateFinder(),
+                    services.getMatchingService(),
+                    services.getInteractionStorage(),
+                    services.getRecommendationService(),
+                    services.getUndoService(),
+                    services.getMatchQualityService(),
+                    services.getUserStorage(),
+                    services.getProfileService(),
+                    services.getAnalyticsStorage(),
+                    services.getTrustSafetyService(),
+                    services.getConnectionService(),
+                    services.getRecommendationService(),
+                    services.getCommunicationStorage(),
+                    session,
+                    inputReader));
+            ProfileHandler profileHandler = new ProfileHandler(
+                    services.getUserStorage(),
+                    services.getProfileService(),
+                    services.getProfileService(),
+                    services.getValidationService(),
+                    session,
+                    inputReader);
+            SafetyHandler safetyHandler = new SafetyHandler(
+                    services.getUserStorage(), services.getTrustSafetyService(), session, inputReader);
+            StatsHandler statsHandler = new StatsHandler(
+                    services.getActivityMetricsService(), services.getProfileService(), session, inputReader);
+            MessagingHandler messagingHandler = new MessagingHandler(
+                    services.getConnectionService(),
+                    services.getInteractionStorage(),
+                    services.getTrustSafetyService(),
+                    inputReader,
+                    session);
 
             logInfo("\n🌹 Welcome to Dating App 🌹\n");
 
             boolean running = true;
             while (running) {
-                printMenu();
+                printMenu(services, messagingHandler);
                 String choice = inputReader.readLine("Choose an option: ");
+
+                // Guard: options 3–20 require a logged-in user
+                if (!"0".equals(choice)
+                        && !"1".equals(choice)
+                        && !"2".equals(choice)
+                        && session.getCurrentUser() == null) {
+                    logInfo("Please select a user first (option 1 or 2).");
+                    continue;
+                }
 
                 switch (choice) {
                     case "1" -> safeExecute(profileHandler::createUser);
@@ -122,51 +155,8 @@ public final class Main {
                 }
             }
 
-            shutdown();
+            ApplicationStartup.shutdown();
         }
-    }
-
-    private static void initializeApp(Scanner scanner) {
-        // Initialize application with default configuration
-        services = ApplicationStartup.initialize();
-
-        // Initialize CLI Infrastructure
-        inputReader = new InputReader(scanner);
-
-        AppSession session = AppSession.getInstance();
-        matchingHandler = new MatchingHandler(new MatchingHandler.Dependencies(
-                services.getCandidateFinder(),
-                services.getMatchingService(),
-                services.getInteractionStorage(),
-                services.getRecommendationService(),
-                services.getUndoService(),
-                services.getMatchQualityService(),
-                services.getUserStorage(),
-                services.getProfileService(),
-                services.getAnalyticsStorage(),
-                services.getTrustSafetyService(),
-                services.getConnectionService(),
-                services.getRecommendationService(),
-                services.getCommunicationStorage(),
-                session,
-                inputReader));
-        profileHandler = new ProfileHandler(
-                services.getUserStorage(),
-                services.getProfileService(),
-                services.getProfileService(),
-                new ValidationService(services.getConfig()),
-                session,
-                inputReader);
-        safetyHandler =
-                new SafetyHandler(services.getUserStorage(), services.getTrustSafetyService(), session, inputReader);
-        statsHandler = new StatsHandler(
-                services.getActivityMetricsService(), services.getProfileService(), session, inputReader);
-        messagingHandler = new MessagingHandler(
-                services.getConnectionService(),
-                services.getInteractionStorage(),
-                services.getTrustSafetyService(),
-                inputReader,
-                session);
     }
 
     private static void logInfo(String message, Object... args) {
@@ -182,7 +172,7 @@ public final class Main {
         }
     }
 
-    private static void printMenu() {
+    private static void printMenu(ServiceRegistry services, MessagingHandler messagingHandler) {
         logInfo(CliTextAndInput.SEPARATOR_LINE);
         logInfo("         DATING APP - PHASE 0.5");
         logInfo(CliTextAndInput.SEPARATOR_LINE);
@@ -243,9 +233,5 @@ public final class Main {
         logInfo("  20. 🌟 View Standouts");
         logInfo("  0. Exit");
         logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
-    }
-
-    private static void shutdown() {
-        ApplicationStartup.shutdown();
     }
 }
