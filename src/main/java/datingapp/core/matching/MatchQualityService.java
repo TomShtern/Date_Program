@@ -330,11 +330,15 @@ public class MatchQualityService {
         }
     }
 
+    // === Constructor ===
+
     public MatchQualityService(UserStorage userStorage, InteractionStorage interactionStorage, AppConfig config) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
     }
+
+    // === Public API ===
 
     /**
      * Compute match quality from one user's perspective.

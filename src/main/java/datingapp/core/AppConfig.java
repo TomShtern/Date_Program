@@ -4,146 +4,465 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Objects;
 
+/**
+ * Application configuration. Decomposed into four logical sub-records for readability; all original
+ * component-level accessors are preserved as delegating methods for backward compatibility.
+ *
+ * <p>Use {@link #defaults()} for the default configuration, or {@link #builder()} for a custom one.
+ */
 public record AppConfig(
-        int autoBanThreshold, // Number of reports before auto-ban
-        int dailyLikeLimit, // Max likes per day (-1 = unlimited)
-        int dailySuperLikeLimit, // Max super likes per day
-        int dailyPassLimit, // Max passes per day (-1 = unlimited)
-        ZoneId userTimeZone, // Timezone for daily limit reset at midnight
-        int maxInterests, // Max interests per user
-        int maxPhotos, // Max photos per user
-        int maxBioLength, // Max bio length
-        int maxReportDescLength, // Max report description length
-        // Session tracking (Phase 0.5b)
-        int sessionTimeoutMinutes, // Minutes of inactivity before session ends
-        int maxSwipesPerSession, // Anti-bot: max swipes in single session
-        double suspiciousSwipeVelocity, // Anti-bot: swipes/min threshold for warning
-        // Undo feature (Phase 1)
-        int undoWindowSeconds, // Time window for undo in seconds (30)
-        // Algorithm thresholds (MED-01: centralized from hardcoded values)
-        int nearbyDistanceKm, // Distance considered "nearby" (5km default)
-        int closeDistanceKm, // Distance considered "close" (10km default)
-        int similarAgeDiff, // Age difference considered "similar" (2 years)
-        int compatibleAgeDiff, // Age difference considered "compatible" (5 years)
-        int minSharedInterests, // Min shared interests for "many" (3)
-        int paceCompatibilityThreshold, // Min pace score for compatibility (50)
-        int responseTimeExcellentHours, // Response time for "excellent" (1)
-        int responseTimeGreatHours, // Response time for "great" (24)
-        int responseTimeGoodHours, // Response time for "good" (72)
-        int responseTimeWeekHours, // Response time threshold for "okay" (168)
-        int responseTimeMonthHours, // Response time threshold for "low" (720)
-        int achievementMatchTier1, // First match milestone (1)
-        int achievementMatchTier2, // Second match milestone (5)
-        int achievementMatchTier3, // Third match milestone (10)
-        int achievementMatchTier4, // Fourth match milestone (25)
-        int achievementMatchTier5, // Fifth match milestone (50)
-        int minSwipesForBehaviorAchievement, // Min swipes to evaluate behavior (50)
-        int maxDistanceKm, // Max allowed search distance (500km)
-        int maxAge, // Max valid age (120)
-        // Validation bounds (FI-CONS-010: consolidated from User.java and
-        // ValidationService)
-        int minAge, // Min legal age (18)
-        int minHeightCm, // Min valid height (50cm)
-        int maxHeightCm, // Max valid height (300cm)
-        int minDistanceKm, // Min search distance (1km)
-        int maxNameLength, // Max name length (100 chars)
-        int minAgeRangeSpan, // Min age range span (5 years)
-        // Match quality weights (MED-01: consolidated from MatchQualityConfig)
-        double distanceWeight, // Weight for distance score (0.15 default)
-        double ageWeight, // Weight for age score (0.10 default)
-        double interestWeight, // Weight for interest score (0.25 default)
-        double lifestyleWeight, // Weight for lifestyle score (0.25 default)
-        double paceWeight, // Weight for pace score (0.15 default)
-        double responseWeight, // Weight for response time score (0.10 default)
-        // Cleanup configuration
-        int cleanupRetentionDays, // Days to retain expired data before cleanup (30 default)
-        // Standout scoring weights (separate from match quality for different use case)
-        double standoutDistanceWeight, // Weight for distance in standouts (0.20 default)
-        double standoutAgeWeight, // Weight for age in standouts (0.15 default)
-        double standoutInterestWeight, // Weight for interests in standouts (0.25 default)
-        double standoutLifestyleWeight, // Weight for lifestyle in standouts (0.20 default)
-        double standoutCompletenessWeight, // Weight for profile completeness (0.10 default)
-        double standoutActivityWeight, // Weight for activity recency (0.10 default)
-        // Achievement thresholds (centralized from ProfileService)
-        double selectiveThreshold, // Like ratio below which behavior is "selective" (0.20)
-        double openMindedThreshold, // Like ratio above which behavior is "open-minded" (0.60)
-        int bioAchievementLength, // Min bio length for detailed writer achievement (100)
-        int lifestyleFieldTarget, // Lifestyle fields needed for guru achievement (5)
-        // Pagination & data retention
-        int messageMaxPageSize, // Max messages per page query (100)
-        int softDeleteRetentionDays // Days before purging soft-deleted rows (90)
-        ) {
-    public AppConfig {
-        Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
+        MatchingConfig matching, ValidationConfig validation, AlgorithmConfig algorithm, SafetyConfig safety) {
 
-        requireNonNegative("autoBanThreshold", autoBanThreshold);
-        // dailyLikeLimit allows -1 for unlimited
-        if (dailyLikeLimit < -1) {
-            throw new IllegalArgumentException("dailyLikeLimit must be >= -1 (use -1 for unlimited)");
-        }
-        requireNonNegative("dailySuperLikeLimit", dailySuperLikeLimit);
-        // dailyPassLimit allows -1 for unlimited - validate separately
-        if (dailyPassLimit < -1) {
-            throw new IllegalArgumentException("dailyPassLimit must be >= -1 (use -1 for unlimited)");
-        }
-        requireNonNegative("maxInterests", maxInterests);
-        requireNonNegative("maxPhotos", maxPhotos);
-        requireNonNegative("maxBioLength", maxBioLength);
-        requireNonNegative("maxReportDescLength", maxReportDescLength);
-        requireNonNegative("sessionTimeoutMinutes", sessionTimeoutMinutes);
-        requireNonNegative("maxSwipesPerSession", maxSwipesPerSession);
-        requireNonNegative("suspiciousSwipeVelocity", suspiciousSwipeVelocity);
-        requireNonNegative("undoWindowSeconds", undoWindowSeconds);
-        requireNonNegative("nearbyDistanceKm", nearbyDistanceKm);
-        requireNonNegative("closeDistanceKm", closeDistanceKm);
-        requireNonNegative("similarAgeDiff", similarAgeDiff);
-        requireNonNegative("compatibleAgeDiff", compatibleAgeDiff);
-        requireNonNegative("minSharedInterests", minSharedInterests);
-        requireNonNegative("paceCompatibilityThreshold", paceCompatibilityThreshold);
-        requireNonNegative("responseTimeExcellentHours", responseTimeExcellentHours);
-        requireNonNegative("responseTimeGreatHours", responseTimeGreatHours);
-        requireNonNegative("responseTimeGoodHours", responseTimeGoodHours);
-        requireNonNegative("responseTimeWeekHours", responseTimeWeekHours);
-        requireNonNegative("responseTimeMonthHours", responseTimeMonthHours);
-        requireNonNegative("achievementMatchTier1", achievementMatchTier1);
-        requireNonNegative("achievementMatchTier2", achievementMatchTier2);
-        requireNonNegative("achievementMatchTier3", achievementMatchTier3);
-        requireNonNegative("achievementMatchTier4", achievementMatchTier4);
-        requireNonNegative("achievementMatchTier5", achievementMatchTier5);
-        requireNonNegative("minSwipesForBehaviorAchievement", minSwipesForBehaviorAchievement);
-        requireNonNegative("maxDistanceKm", maxDistanceKm);
-        requireNonNegative("maxAge", maxAge);
-        requireNonNegative("minAge", minAge);
-        requireNonNegative("minHeightCm", minHeightCm);
-        requireNonNegative("maxHeightCm", maxHeightCm);
-        requireNonNegative("minDistanceKm", minDistanceKm);
-        requireNonNegative("maxNameLength", maxNameLength);
-        requireNonNegative("minAgeRangeSpan", minAgeRangeSpan);
-        requireNonNegative("distanceWeight", distanceWeight);
-        requireNonNegative("ageWeight", ageWeight);
-        requireNonNegative("interestWeight", interestWeight);
-        requireNonNegative("lifestyleWeight", lifestyleWeight);
-        requireNonNegative("paceWeight", paceWeight);
-        requireNonNegative("responseWeight", responseWeight);
-        requireNonNegative("cleanupRetentionDays", cleanupRetentionDays);
-        requireNonNegative("standoutDistanceWeight", standoutDistanceWeight);
-        requireNonNegative("standoutAgeWeight", standoutAgeWeight);
-        requireNonNegative("standoutInterestWeight", standoutInterestWeight);
-        requireNonNegative("standoutLifestyleWeight", standoutLifestyleWeight);
-        requireNonNegative("standoutCompletenessWeight", standoutCompletenessWeight);
-        requireNonNegative("standoutActivityWeight", standoutActivityWeight);
-        requireNonNegative("selectiveThreshold", selectiveThreshold);
-        requireNonNegative("openMindedThreshold", openMindedThreshold);
-        requireNonNegative("bioAchievementLength", bioAchievementLength);
-        requireNonNegative("lifestyleFieldTarget", lifestyleFieldTarget);
-        requireNonNegative("messageMaxPageSize", messageMaxPageSize);
-        requireNonNegative("softDeleteRetentionDays", softDeleteRetentionDays);
+    // ========================================================================
+    // Sub-record: MatchingConfig
+    // ========================================================================
 
-        double weightSum = distanceWeight + ageWeight + interestWeight + lifestyleWeight + paceWeight + responseWeight;
-        if (Math.abs(weightSum - 1.0) > 0.01) {
-            throw new IllegalArgumentException("Config weights must sum to 1.0, got: " + weightSum);
+    public static record MatchingConfig(
+            int dailyLikeLimit,
+            int dailySuperLikeLimit,
+            int dailyPassLimit,
+            int maxSwipesPerSession,
+            double suspiciousSwipeVelocity,
+            double distanceWeight,
+            double ageWeight,
+            double interestWeight,
+            double lifestyleWeight,
+            double paceWeight,
+            double responseWeight,
+            int minSharedInterests,
+            int maxDistanceKm) {
+        public MatchingConfig {
+            if (dailyLikeLimit < -1) {
+                throw new IllegalArgumentException("dailyLikeLimit must be >= -1");
+            }
+            if (dailyPassLimit < -1) {
+                throw new IllegalArgumentException("dailyPassLimit must be >= -1");
+            }
+            requireNonNegative("dailySuperLikeLimit", dailySuperLikeLimit);
+            requireNonNegative("maxSwipesPerSession", maxSwipesPerSession);
+            requireNonNegative("suspiciousSwipeVelocity", suspiciousSwipeVelocity);
+            requireNonNegative("distanceWeight", distanceWeight);
+            requireNonNegative("ageWeight", ageWeight);
+            requireNonNegative("interestWeight", interestWeight);
+            requireNonNegative("lifestyleWeight", lifestyleWeight);
+            requireNonNegative("paceWeight", paceWeight);
+            requireNonNegative("responseWeight", responseWeight);
+            requireNonNegative("minSharedInterests", minSharedInterests);
+            requireNonNegative("maxDistanceKm", maxDistanceKm);
+            double weightSum =
+                    distanceWeight + ageWeight + interestWeight + lifestyleWeight + paceWeight + responseWeight;
+            if (Math.abs(weightSum - 1.0) > 0.01) {
+                throw new IllegalArgumentException("Match-quality weights must sum to 1.0, got: " + weightSum);
+            }
         }
     }
+
+    // ========================================================================
+    // Sub-record: ValidationConfig
+    // ========================================================================
+
+    public static record ValidationConfig(
+            int minAge,
+            int maxAge,
+            int minHeightCm,
+            int maxHeightCm,
+            int maxBioLength,
+            int maxReportDescLength,
+            int maxNameLength,
+            int minAgeRangeSpan,
+            int minDistanceKm,
+            int maxInterests,
+            int maxPhotos,
+            int messageMaxPageSize) {
+        public ValidationConfig {
+            requireNonNegative("minAge", minAge);
+            requireNonNegative("maxAge", maxAge);
+            requireNonNegative("minHeightCm", minHeightCm);
+            requireNonNegative("maxHeightCm", maxHeightCm);
+            requireNonNegative("maxBioLength", maxBioLength);
+            requireNonNegative("maxReportDescLength", maxReportDescLength);
+            requireNonNegative("maxNameLength", maxNameLength);
+            requireNonNegative("minAgeRangeSpan", minAgeRangeSpan);
+            requireNonNegative("minDistanceKm", minDistanceKm);
+            requireNonNegative("maxInterests", maxInterests);
+            requireNonNegative("maxPhotos", maxPhotos);
+            requireNonNegative("messageMaxPageSize", messageMaxPageSize);
+        }
+    }
+
+    // ========================================================================
+    // Sub-record: AlgorithmConfig
+    // ========================================================================
+
+    public static record AlgorithmConfig(
+            int nearbyDistanceKm,
+            int closeDistanceKm,
+            int similarAgeDiff,
+            int compatibleAgeDiff,
+            int paceCompatibilityThreshold,
+            int responseTimeExcellentHours,
+            int responseTimeGreatHours,
+            int responseTimeGoodHours,
+            int responseTimeWeekHours,
+            int responseTimeMonthHours,
+            double standoutDistanceWeight,
+            double standoutAgeWeight,
+            double standoutInterestWeight,
+            double standoutLifestyleWeight,
+            double standoutCompletenessWeight,
+            double standoutActivityWeight) {
+        public AlgorithmConfig {
+            requireNonNegative("nearbyDistanceKm", nearbyDistanceKm);
+            requireNonNegative("closeDistanceKm", closeDistanceKm);
+            requireNonNegative("similarAgeDiff", similarAgeDiff);
+            requireNonNegative("compatibleAgeDiff", compatibleAgeDiff);
+            requireNonNegative("paceCompatibilityThreshold", paceCompatibilityThreshold);
+            requireNonNegative("responseTimeExcellentHours", responseTimeExcellentHours);
+            requireNonNegative("responseTimeGreatHours", responseTimeGreatHours);
+            requireNonNegative("responseTimeGoodHours", responseTimeGoodHours);
+            requireNonNegative("responseTimeWeekHours", responseTimeWeekHours);
+            requireNonNegative("responseTimeMonthHours", responseTimeMonthHours);
+            requireNonNegative("standoutDistanceWeight", standoutDistanceWeight);
+            requireNonNegative("standoutAgeWeight", standoutAgeWeight);
+            requireNonNegative("standoutInterestWeight", standoutInterestWeight);
+            requireNonNegative("standoutLifestyleWeight", standoutLifestyleWeight);
+            requireNonNegative("standoutCompletenessWeight", standoutCompletenessWeight);
+            requireNonNegative("standoutActivityWeight", standoutActivityWeight);
+        }
+    }
+
+    // ========================================================================
+    // Sub-record: SafetyConfig
+    // ========================================================================
+
+    public static record SafetyConfig(
+            int autoBanThreshold,
+            ZoneId userTimeZone,
+            int sessionTimeoutMinutes,
+            int undoWindowSeconds,
+            int achievementMatchTier1,
+            int achievementMatchTier2,
+            int achievementMatchTier3,
+            int achievementMatchTier4,
+            int achievementMatchTier5,
+            int minSwipesForBehaviorAchievement,
+            double selectiveThreshold,
+            double openMindedThreshold,
+            int bioAchievementLength,
+            int lifestyleFieldTarget,
+            int cleanupRetentionDays,
+            int softDeleteRetentionDays) {
+        public SafetyConfig {
+            Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
+            requireNonNegative("autoBanThreshold", autoBanThreshold);
+            requireNonNegative("sessionTimeoutMinutes", sessionTimeoutMinutes);
+            requireNonNegative("undoWindowSeconds", undoWindowSeconds);
+            requireNonNegative("achievementMatchTier1", achievementMatchTier1);
+            requireNonNegative("achievementMatchTier2", achievementMatchTier2);
+            requireNonNegative("achievementMatchTier3", achievementMatchTier3);
+            requireNonNegative("achievementMatchTier4", achievementMatchTier4);
+            requireNonNegative("achievementMatchTier5", achievementMatchTier5);
+            requireNonNegative("minSwipesForBehaviorAchievement", minSwipesForBehaviorAchievement);
+            requireNonNegative("selectiveThreshold", selectiveThreshold);
+            requireNonNegative("openMindedThreshold", openMindedThreshold);
+            requireNonNegative("bioAchievementLength", bioAchievementLength);
+            requireNonNegative("lifestyleFieldTarget", lifestyleFieldTarget);
+            requireNonNegative("cleanupRetentionDays", cleanupRetentionDays);
+            requireNonNegative("softDeleteRetentionDays", softDeleteRetentionDays);
+        }
+    }
+
+    // ========================================================================
+    // Compact constructor
+    // ========================================================================
+
+    public AppConfig {
+        Objects.requireNonNull(matching, "matching cannot be null");
+        Objects.requireNonNull(validation, "validation cannot be null");
+        Objects.requireNonNull(algorithm, "algorithm cannot be null");
+        Objects.requireNonNull(safety, "safety cannot be null");
+    }
+
+    // ========================================================================
+    // Backward-compatible delegate accessors — matching sub-record
+    // ========================================================================
+
+    public int dailyLikeLimit() {
+        return matching.dailyLikeLimit();
+    }
+
+    public int dailySuperLikeLimit() {
+        return matching.dailySuperLikeLimit();
+    }
+
+    public int dailyPassLimit() {
+        return matching.dailyPassLimit();
+    }
+
+    public int maxSwipesPerSession() {
+        return matching.maxSwipesPerSession();
+    }
+
+    public double suspiciousSwipeVelocity() {
+        return matching.suspiciousSwipeVelocity();
+    }
+
+    public double distanceWeight() {
+        return matching.distanceWeight();
+    }
+
+    public double ageWeight() {
+        return matching.ageWeight();
+    }
+
+    public double interestWeight() {
+        return matching.interestWeight();
+    }
+
+    public double lifestyleWeight() {
+        return matching.lifestyleWeight();
+    }
+
+    public double paceWeight() {
+        return matching.paceWeight();
+    }
+
+    public double responseWeight() {
+        return matching.responseWeight();
+    }
+
+    public int minSharedInterests() {
+        return matching.minSharedInterests();
+    }
+
+    public int maxDistanceKm() {
+        return matching.maxDistanceKm();
+    }
+
+    // ========================================================================
+    // Backward-compatible delegate accessors — validation sub-record
+    // ========================================================================
+
+    public int minAge() {
+        return validation.minAge();
+    }
+
+    public int maxAge() {
+        return validation.maxAge();
+    }
+
+    public int minHeightCm() {
+        return validation.minHeightCm();
+    }
+
+    public int maxHeightCm() {
+        return validation.maxHeightCm();
+    }
+
+    public int maxBioLength() {
+        return validation.maxBioLength();
+    }
+
+    public int maxReportDescLength() {
+        return validation.maxReportDescLength();
+    }
+
+    public int maxNameLength() {
+        return validation.maxNameLength();
+    }
+
+    public int minAgeRangeSpan() {
+        return validation.minAgeRangeSpan();
+    }
+
+    public int minDistanceKm() {
+        return validation.minDistanceKm();
+    }
+
+    public int maxInterests() {
+        return validation.maxInterests();
+    }
+
+    public int maxPhotos() {
+        return validation.maxPhotos();
+    }
+
+    public int messageMaxPageSize() {
+        return validation.messageMaxPageSize();
+    }
+
+    // ========================================================================
+    // Backward-compatible delegate accessors — algorithm sub-record
+    // ========================================================================
+
+    public int nearbyDistanceKm() {
+        return algorithm.nearbyDistanceKm();
+    }
+
+    public int closeDistanceKm() {
+        return algorithm.closeDistanceKm();
+    }
+
+    public int similarAgeDiff() {
+        return algorithm.similarAgeDiff();
+    }
+
+    public int compatibleAgeDiff() {
+        return algorithm.compatibleAgeDiff();
+    }
+
+    public int paceCompatibilityThreshold() {
+        return algorithm.paceCompatibilityThreshold();
+    }
+
+    public int responseTimeExcellentHours() {
+        return algorithm.responseTimeExcellentHours();
+    }
+
+    public int responseTimeGreatHours() {
+        return algorithm.responseTimeGreatHours();
+    }
+
+    public int responseTimeGoodHours() {
+        return algorithm.responseTimeGoodHours();
+    }
+
+    public int responseTimeWeekHours() {
+        return algorithm.responseTimeWeekHours();
+    }
+
+    public int responseTimeMonthHours() {
+        return algorithm.responseTimeMonthHours();
+    }
+
+    public double standoutDistanceWeight() {
+        return algorithm.standoutDistanceWeight();
+    }
+
+    public double standoutAgeWeight() {
+        return algorithm.standoutAgeWeight();
+    }
+
+    public double standoutInterestWeight() {
+        return algorithm.standoutInterestWeight();
+    }
+
+    public double standoutLifestyleWeight() {
+        return algorithm.standoutLifestyleWeight();
+    }
+
+    public double standoutCompletenessWeight() {
+        return algorithm.standoutCompletenessWeight();
+    }
+
+    public double standoutActivityWeight() {
+        return algorithm.standoutActivityWeight();
+    }
+
+    // ========================================================================
+    // Backward-compatible delegate accessors — safety sub-record
+    // ========================================================================
+
+    public int autoBanThreshold() {
+        return safety.autoBanThreshold();
+    }
+
+    public ZoneId userTimeZone() {
+        return safety.userTimeZone();
+    }
+
+    public int sessionTimeoutMinutes() {
+        return safety.sessionTimeoutMinutes();
+    }
+
+    public int undoWindowSeconds() {
+        return safety.undoWindowSeconds();
+    }
+
+    public int achievementMatchTier1() {
+        return safety.achievementMatchTier1();
+    }
+
+    public int achievementMatchTier2() {
+        return safety.achievementMatchTier2();
+    }
+
+    public int achievementMatchTier3() {
+        return safety.achievementMatchTier3();
+    }
+
+    public int achievementMatchTier4() {
+        return safety.achievementMatchTier4();
+    }
+
+    public int achievementMatchTier5() {
+        return safety.achievementMatchTier5();
+    }
+
+    public int minSwipesForBehaviorAchievement() {
+        return safety.minSwipesForBehaviorAchievement();
+    }
+
+    public double selectiveThreshold() {
+        return safety.selectiveThreshold();
+    }
+
+    public double openMindedThreshold() {
+        return safety.openMindedThreshold();
+    }
+
+    public int bioAchievementLength() {
+        return safety.bioAchievementLength();
+    }
+
+    public int lifestyleFieldTarget() {
+        return safety.lifestyleFieldTarget();
+    }
+
+    public int cleanupRetentionDays() {
+        return safety.cleanupRetentionDays();
+    }
+
+    public int softDeleteRetentionDays() {
+        return safety.softDeleteRetentionDays();
+    }
+
+    // ========================================================================
+    // Utility methods
+    // ========================================================================
+
+    /** Returns true when passes are unlimited. */
+    public boolean hasUnlimitedPasses() {
+        return matching.dailyPassLimit() < 0;
+    }
+
+    /** Returns true when likes are unlimited. */
+    public boolean hasUnlimitedLikes() {
+        return matching.dailyLikeLimit() < 0;
+    }
+
+    /** Session timeout as a {@link Duration}. */
+    public Duration getSessionTimeout() {
+        return Duration.ofMinutes(safety.sessionTimeoutMinutes());
+    }
+
+    // ========================================================================
+    // Factory methods
+    // ========================================================================
+
+    /** Default application configuration. */
+    public static AppConfig defaults() {
+        return builder().build();
+    }
+
+    /** Builder for creating custom {@link AppConfig} instances. */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    // ========================================================================
+    // Shared validation helpers (accessible from sub-record compact constructors)
+    // ========================================================================
 
     private static void requireNonNegative(String name, int value) {
         if (value < 0) {
@@ -157,161 +476,72 @@ public record AppConfig(
         }
     }
 
-    /** Default configuration values. */
-    public static AppConfig defaults() {
-        return new AppConfig(
-                3, // autoBanThreshold
-                100, // dailyLikeLimit
-                1, // dailySuperLikeLimit
-                -1, // dailyPassLimit (-1 = unlimited)
-                ZoneId.systemDefault(), // userTimeZone
-                10, // maxInterests
-                2, // maxPhotos
-                500, // maxBioLength
-                500, // maxReportDescLength
-                5, // sessionTimeoutMinutes
-                500, // maxSwipesPerSession
-                30.0, // suspiciousSwipeVelocity
-                30, // undoWindowSeconds
-                // Algorithm thresholds
-                5, // nearbyDistanceKm
-                10, // closeDistanceKm
-                2, // similarAgeDiff
-                5, // compatibleAgeDiff
-                3, // minSharedInterests
-                50, // paceCompatibilityThreshold
-                1, // responseTimeExcellentHours
-                24, // responseTimeGreatHours
-                72, // responseTimeGoodHours
-                168, // responseTimeWeekHours
-                720, // responseTimeMonthHours
-                1, // achievementMatchTier1
-                5, // achievementMatchTier2
-                10, // achievementMatchTier3
-                25, // achievementMatchTier4
-                50, // achievementMatchTier5
-                50, // minSwipesForBehaviorAchievement
-                500, // maxDistanceKm
-                120, // maxAge
-                // Validation bounds
-                18, // minAge
-                50, // minHeightCm
-                300, // maxHeightCm
-                1, // minDistanceKm
-                100, // maxNameLength
-                5, // minAgeRangeSpan
-                // Match quality weights
-                0.15, // distanceWeight
-                0.10, // ageWeight
-                0.25, // interestWeight
-                0.25, // lifestyleWeight
-                0.15, // paceWeight
-                0.10, // responseWeight
-                // Cleanup configuration
-                30, // cleanupRetentionDays
-                // Standout scoring weights
-                0.20, // standoutDistanceWeight
-                0.15, // standoutAgeWeight
-                0.25, // standoutInterestWeight
-                0.20, // standoutLifestyleWeight
-                0.10, // standoutCompletenessWeight
-                0.10, // standoutActivityWeight
-                // Achievement thresholds
-                0.20, // selectiveThreshold
-                0.60, // openMindedThreshold
-                100, // bioAchievementLength
-                5, // lifestyleFieldTarget
-                // Pagination & data retention
-                100, // messageMaxPageSize
-                90 // softDeleteRetentionDays
-                );
-    }
+    // ========================================================================
+    // Builder — flat setters for backward compatibility with existing call sites.
+    // build() assembles the four sub-records internally.
+    // ========================================================================
 
-    /** Check if passes are unlimited. */
-    public boolean hasUnlimitedPasses() {
-        return dailyPassLimit < 0;
-    }
-
-    /** Check if likes are unlimited. */
-    public boolean hasUnlimitedLikes() {
-        return dailyLikeLimit < 0;
-    }
-
-    /** Get session timeout as Duration. */
-    public Duration getSessionTimeout() {
-        return Duration.ofMinutes(sessionTimeoutMinutes);
-    }
-
-    /** Builder for creating custom configurations. */
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    /** Builder for creating AppConfig instances with custom values. */
     public static class Builder {
-        private int autoBanThreshold = 3;
+        // MatchingConfig fields
         private int dailyLikeLimit = 100;
         private int dailySuperLikeLimit = 1;
         private int dailyPassLimit = -1;
-        private ZoneId userTimeZone = ZoneId.systemDefault();
-        private int maxInterests = 10;
-        private int maxPhotos = 2;
-        private int maxBioLength = 500;
-        private int maxReportDescLength = 500;
-        private int sessionTimeoutMinutes = 5;
         private int maxSwipesPerSession = 500;
         private double suspiciousSwipeVelocity = 30.0;
-        private int undoWindowSeconds = 30;
-        // Algorithm thresholds
-        private int nearbyDistanceKm = 5;
-        private int closeDistanceKm = 10;
-        private int similarAgeDiff = 2;
-        private int compatibleAgeDiff = 5;
-        private int minSharedInterests = 3;
-        private int paceCompatibilityThreshold = 50;
-        private int responseTimeExcellentHours = 1;
-        private int responseTimeGreatHours = 24;
-        private int responseTimeGoodHours = 72;
-        private int responseTimeWeekHours = 168;
-        private int responseTimeMonthHours = 720;
-        private int achievementMatchTier1 = 1;
-        private int achievementMatchTier2 = 5;
-        private int achievementMatchTier3 = 10;
-        private int achievementMatchTier4 = 25;
-        private int achievementMatchTier5 = 50;
-        private int minSwipesForBehaviorAchievement = 50;
-        private int maxDistanceKm = 500;
-        private int maxAge = 120;
-        // Validation bounds
-        private int minAge = 18;
-        private int minHeightCm = 50;
-        private int maxHeightCm = 300;
-        private int minDistanceKm = 1;
-        private int maxNameLength = 100;
-        private int minAgeRangeSpan = 5;
-        // Match quality weights
         private double distanceWeight = 0.15;
         private double ageWeight = 0.10;
         private double interestWeight = 0.25;
         private double lifestyleWeight = 0.25;
         private double paceWeight = 0.15;
         private double responseWeight = 0.10;
-        // Cleanup configuration
-        private int cleanupRetentionDays = 30;
-        // Standout scoring weights
+        private int minSharedInterests = 3;
+        private int maxDistanceKm = 500;
+        // ValidationConfig fields
+        private int minAge = 18;
+        private int maxAge = 120;
+        private int minHeightCm = 50;
+        private int maxHeightCm = 300;
+        private int maxBioLength = 500;
+        private int maxReportDescLength = 500;
+        private int maxNameLength = 100;
+        private int minAgeRangeSpan = 5;
+        private int minDistanceKm = 1;
+        private int maxInterests = 10;
+        private int maxPhotos = 2;
+        private int messageMaxPageSize = 100;
+        // AlgorithmConfig fields
+        private int nearbyDistanceKm = 5;
+        private int closeDistanceKm = 10;
+        private int similarAgeDiff = 2;
+        private int compatibleAgeDiff = 5;
+        private int paceCompatibilityThreshold = 50;
+        private int responseTimeExcellentHours = 1;
+        private int responseTimeGreatHours = 24;
+        private int responseTimeGoodHours = 72;
+        private int responseTimeWeekHours = 168;
+        private int responseTimeMonthHours = 720;
         private double standoutDistanceWeight = 0.20;
         private double standoutAgeWeight = 0.15;
         private double standoutInterestWeight = 0.25;
         private double standoutLifestyleWeight = 0.20;
         private double standoutCompletenessWeight = 0.10;
         private double standoutActivityWeight = 0.10;
-        // Achievement thresholds
+        // SafetyConfig fields
+        private int autoBanThreshold = 3;
+        private ZoneId userTimeZone = ZoneId.systemDefault();
+        private int sessionTimeoutMinutes = 5;
+        private int undoWindowSeconds = 30;
+        private int achievementMatchTier1 = 1;
+        private int achievementMatchTier2 = 5;
+        private int achievementMatchTier3 = 10;
+        private int achievementMatchTier4 = 25;
+        private int achievementMatchTier5 = 50;
+        private int minSwipesForBehaviorAchievement = 50;
         private double selectiveThreshold = 0.20;
         private double openMindedThreshold = 0.60;
         private int bioAchievementLength = 100;
         private int lifestyleFieldTarget = 5;
-        // Pagination & data retention
-        private int messageMaxPageSize = 100;
+        private int cleanupRetentionDays = 30;
         private int softDeleteRetentionDays = 90;
 
         public Builder autoBanThreshold(int v) {
@@ -600,64 +830,68 @@ public record AppConfig(
         }
 
         public AppConfig build() {
-            return new AppConfig(
-                    autoBanThreshold,
+            MatchingConfig matchingConfig = new MatchingConfig(
                     dailyLikeLimit,
                     dailySuperLikeLimit,
                     dailyPassLimit,
-                    userTimeZone,
-                    maxInterests,
-                    maxPhotos,
-                    maxBioLength,
-                    maxReportDescLength,
-                    sessionTimeoutMinutes,
                     maxSwipesPerSession,
                     suspiciousSwipeVelocity,
-                    undoWindowSeconds,
-                    nearbyDistanceKm,
-                    closeDistanceKm,
-                    similarAgeDiff,
-                    compatibleAgeDiff,
-                    minSharedInterests,
-                    paceCompatibilityThreshold,
-                    responseTimeExcellentHours,
-                    responseTimeGreatHours,
-                    responseTimeGoodHours,
-                    responseTimeWeekHours,
-                    responseTimeMonthHours,
-                    achievementMatchTier1,
-                    achievementMatchTier2,
-                    achievementMatchTier3,
-                    achievementMatchTier4,
-                    achievementMatchTier5,
-                    minSwipesForBehaviorAchievement,
-                    maxDistanceKm,
-                    maxAge,
-                    minAge,
-                    minHeightCm,
-                    maxHeightCm,
-                    minDistanceKm,
-                    maxNameLength,
-                    minAgeRangeSpan,
                     distanceWeight,
                     ageWeight,
                     interestWeight,
                     lifestyleWeight,
                     paceWeight,
                     responseWeight,
-                    cleanupRetentionDays,
+                    minSharedInterests,
+                    maxDistanceKm);
+            ValidationConfig validationConfig = new ValidationConfig(
+                    minAge,
+                    maxAge,
+                    minHeightCm,
+                    maxHeightCm,
+                    maxBioLength,
+                    maxReportDescLength,
+                    maxNameLength,
+                    minAgeRangeSpan,
+                    minDistanceKm,
+                    maxInterests,
+                    maxPhotos,
+                    messageMaxPageSize);
+            AlgorithmConfig algorithmConfig = new AlgorithmConfig(
+                    nearbyDistanceKm,
+                    closeDistanceKm,
+                    similarAgeDiff,
+                    compatibleAgeDiff,
+                    paceCompatibilityThreshold,
+                    responseTimeExcellentHours,
+                    responseTimeGreatHours,
+                    responseTimeGoodHours,
+                    responseTimeWeekHours,
+                    responseTimeMonthHours,
                     standoutDistanceWeight,
                     standoutAgeWeight,
                     standoutInterestWeight,
                     standoutLifestyleWeight,
                     standoutCompletenessWeight,
-                    standoutActivityWeight,
+                    standoutActivityWeight);
+            SafetyConfig safetyConfig = new SafetyConfig(
+                    autoBanThreshold,
+                    userTimeZone,
+                    sessionTimeoutMinutes,
+                    undoWindowSeconds,
+                    achievementMatchTier1,
+                    achievementMatchTier2,
+                    achievementMatchTier3,
+                    achievementMatchTier4,
+                    achievementMatchTier5,
+                    minSwipesForBehaviorAchievement,
                     selectiveThreshold,
                     openMindedThreshold,
                     bioAchievementLength,
                     lifestyleFieldTarget,
-                    messageMaxPageSize,
+                    cleanupRetentionDays,
                     softDeleteRetentionDays);
+            return new AppConfig(matchingConfig, validationConfig, algorithmConfig, safetyConfig);
         }
     }
 }

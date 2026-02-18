@@ -509,7 +509,8 @@ public class MatchesController extends BaseController implements Initializable {
         avatarIcon.setIconColor(Color.web("#10b981"));
         avatarIcon.getStyleClass().add("match-avatar-icon");
 
-        // TODO: Replace with real presence status when user presence tracking is implemented
+        // FUTURE(presence-tracking): Replace with live status once UserPresenceService is implemented.
+        // Currently always shows "Offline". Tracked in: VALID_ISSUES_2026-02-18.md#ORG-05
         Region statusDot = new Region();
         statusDot.getStyleClass().add("status-dot");
         statusDot.getStyleClass().add("status-offline");

@@ -609,6 +609,10 @@ public final class ProfileService {
         }
     }
 
+    // ========================================================================
+    // Achievement tracking
+    // ========================================================================
+
     /** Progress towards an achievement. */
     public static record AchievementProgress(Achievement achievement, int current, int target, boolean unlocked) {
 

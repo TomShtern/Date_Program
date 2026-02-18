@@ -24,6 +24,10 @@ public final class PerformanceMonitor {
      * @return A Timer that records duration when closed
      */
     public static Timer startTimer(String operationName) {
+        // NOTE: Uses AppClock.now() instead of System.nanoTime() to maintain testability
+        // consistency across the codebase. Trade-off: in tests with a frozen TestClock,
+        // all timers will report 0ms elapsed. This is acceptable because PerformanceMonitor
+        // output is informational only and is not asserted in tests.
         return new Timer(operationName, AppClock.now());
     }
 

@@ -44,6 +44,16 @@ public final class LifestyleMatcher {
         return a != null && b != null && a == b;
     }
 
+    /** Check if two users have the same kids stance (exact equality only; use areKidsStancesCompatible for fuzzy). */
+    public static boolean isMatch(Lifestyle.WantsKids a, Lifestyle.WantsKids b) {
+        return a != null && b != null && a == b;
+    }
+
+    /** Check if two users have the same education level. */
+    public static boolean isMatch(Lifestyle.Education a, Lifestyle.Education b) {
+        return a != null && b != null && a == b;
+    }
+
     // ========================================================================
     // Compatibility Checks (Business Logic)
     // ========================================================================
