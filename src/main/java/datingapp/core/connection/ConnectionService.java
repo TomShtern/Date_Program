@@ -105,6 +105,29 @@ public class ConnectionService {
         return communicationStorage.getMessages(conversationId, limit, offset);
     }
 
+    public List<Message> getMessages(String conversationId, int limit, int offset) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return List.of();
+        }
+        if (limit < 1 || limit > config.messageMaxPageSize()) {
+            return List.of();
+        }
+        if (offset < 0) {
+            return List.of();
+        }
+        if (communicationStorage.getConversation(conversationId).isEmpty()) {
+            return List.of();
+        }
+        return communicationStorage.getMessages(conversationId, limit, offset);
+    }
+
+    public int countMessages(String conversationId) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return 0;
+        }
+        return communicationStorage.countMessages(conversationId);
+    }
+
     public List<ConversationPreview> getConversations(UUID userId) {
         List<Conversation> conversations = communicationStorage.getConversationsFor(userId);
 
@@ -198,16 +221,18 @@ public class ConnectionService {
         }
 
         FriendRequest request = FriendRequest.create(fromUserId, targetUserId);
-        communicationStorage.saveFriendRequest(request);
-        // KNOWN LIMITATION: saveFriendRequest and saveNotification are not atomic.
-        // If the notification write fails, the friend request still exists (expected behavior —
-        // requests persist; notifications are informational only).
-        communicationStorage.saveNotification(Notification.create(
+        Notification notification = Notification.create(
                 targetUserId,
                 Notification.Type.FRIEND_REQUEST,
                 "New Friend Request",
                 "Someone wants to move your match to the Friend Zone.",
-                Map.of("fromUserId", fromUserId.toString())));
+                Map.of("fromUserId", fromUserId.toString()));
+
+        try {
+            communicationStorage.saveFriendRequestWithNotification(request, notification);
+        } catch (Exception e) {
+            return TransitionResult.failure("Failed to save friend request: " + e.getMessage());
+        }
 
         return TransitionResult.okWithRequest(request);
     }
@@ -244,6 +269,27 @@ public class ConnectionService {
                 request.createdAt(),
                 FriendRequest.Status.ACCEPTED,
                 AppClock.now());
+
+        Notification acceptedNotification = Notification.create(
+                request.fromUserId(),
+                Notification.Type.FRIEND_REQUEST_ACCEPTED,
+                "Friend Request Accepted",
+                "Your match with the other user has successfully transitioned to the Friend Zone.",
+                Map.of("responderId", responderId.toString()));
+
+        if (interactionStorage.supportsAtomicRelationshipTransitions()) {
+            try {
+                boolean transitioned =
+                        interactionStorage.acceptFriendZoneTransition(match, updated, acceptedNotification);
+                if (!transitioned) {
+                    return TransitionResult.failure("Failed to persist friend-zone acceptance.");
+                }
+                return TransitionResult.ok();
+            } catch (Exception e) {
+                return TransitionResult.failure("Failed to persist friend-zone acceptance: " + e.getMessage());
+            }
+        }
+
         try {
             communicationStorage.updateFriendRequest(updated);
         } catch (Exception e) {
@@ -255,13 +301,8 @@ public class ConnectionService {
             interactionStorage.update(match);
             return TransitionResult.failure("Failed to update friend request status: " + e.getMessage());
         }
-        // Notifications are informational-only — best-effort, not reverted on failure.
-        communicationStorage.saveNotification(Notification.create(
-                request.fromUserId(),
-                Notification.Type.FRIEND_REQUEST_ACCEPTED,
-                "Friend Request Accepted",
-                "Your match with the other user has successfully transitioned to the Friend Zone.",
-                Map.of("responderId", responderId.toString())));
+        // Notifications are informational-only for non-transactional storages.
+        communicationStorage.saveNotification(acceptedNotification);
         return TransitionResult.ok();
     }
 
@@ -304,22 +345,38 @@ public class ConnectionService {
         }
 
         match.gracefulExit(initiatorId);
-        interactionStorage.update(match);
-        // KNOWN LIMITATION: the match state update and conversation archive are not atomic.
-        // If archiveConversation fails, the match is already GRACEFUL_EXIT but the conversation
-        // remains unarchived. Proper fix requires cross-storage transaction support.
+
         Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetUserId);
-        convoOpt.ifPresent(convo -> {
-            convo.archive(MatchArchiveReason.GRACEFUL_EXIT);
-            communicationStorage.archiveConversation(convo.getId(), MatchArchiveReason.GRACEFUL_EXIT);
-        });
-        // Notification is informational-only — best-effort, not reverted on failure.
-        communicationStorage.saveNotification(Notification.create(
+        convoOpt.ifPresent(convo -> convo.archive(MatchArchiveReason.GRACEFUL_EXIT));
+
+        Notification gracefulExitNotification = Notification.create(
                 targetUserId,
                 Notification.Type.GRACEFUL_EXIT,
                 "Relationship Ended",
                 "The other user has gracefully moved on from this relationship.",
-                Map.of("initiatorId", initiatorId.toString())));
+                Map.of("initiatorId", initiatorId.toString()));
+
+        if (interactionStorage.supportsAtomicRelationshipTransitions()) {
+            try {
+                boolean transitioned =
+                        interactionStorage.gracefulExitTransition(match, convoOpt, gracefulExitNotification);
+                if (!transitioned) {
+                    return TransitionResult.failure("Failed to persist graceful exit transition.");
+                }
+                return TransitionResult.ok();
+            } catch (Exception e) {
+                return TransitionResult.failure("Failed to persist graceful exit transition: " + e.getMessage());
+            }
+        }
+
+        interactionStorage.update(match);
+        // KNOWN LIMITATION: the match state update and conversation archive are not atomic.
+        // If archiveConversation fails, the match is already GRACEFUL_EXIT but the conversation
+        // remains unarchived. Proper fix requires cross-storage transaction support.
+        convoOpt.ifPresent(
+                convo -> communicationStorage.archiveConversation(convo.getId(), MatchArchiveReason.GRACEFUL_EXIT));
+        // Notification is informational-only — best-effort, not reverted on failure.
+        communicationStorage.saveNotification(gracefulExitNotification);
         return TransitionResult.ok();
     }
 

@@ -32,6 +32,7 @@ public class StatsViewModel {
 
     private final ProfileService achievementService;
     private final ActivityMetricsService statsService;
+    private final AppSession session;
 
     private final ObservableList<Achievement> achievements = FXCollections.observableArrayList();
 
@@ -54,9 +55,10 @@ public class StatsViewModel {
         this.errorHandler.set(handler);
     }
 
-    public StatsViewModel(ProfileService achievementService, ActivityMetricsService statsService) {
+    public StatsViewModel(ProfileService achievementService, ActivityMetricsService statsService, AppSession session) {
         this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
         this.statsService = Objects.requireNonNull(statsService, "statsService cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
     /**
@@ -65,7 +67,7 @@ public class StatsViewModel {
     private User ensureCurrentUser() {
         User user = currentUser.get();
         if (user == null) {
-            user = AppSession.getInstance().getCurrentUser();
+            user = session.getCurrentUser();
             if (user != null) {
                 currentUser.set(user);
             }

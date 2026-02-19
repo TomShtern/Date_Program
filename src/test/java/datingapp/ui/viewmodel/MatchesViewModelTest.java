@@ -84,7 +84,7 @@ class MatchesViewModelTest {
                 .userStorage(users)
                 .build();
 
-        viewModel = new MatchesViewModel(matchData, userStore, matchingService, dailyService);
+        viewModel = new MatchesViewModel(matchData, userStore, matchingService, dailyService, AppSession.getInstance());
         currentUser = createActiveUser("Current");
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
@@ -120,8 +120,8 @@ class MatchesViewModelTest {
                 .config(zeroLimitConfig)
                 .build();
 
-        MatchesViewModel limitViewModel =
-                new MatchesViewModel(matchData, userStore, matchingService, zeroLimitRecommendationService);
+        MatchesViewModel limitViewModel = new MatchesViewModel(
+                matchData, userStore, matchingService, zeroLimitRecommendationService, AppSession.getInstance());
 
         User otherUser = createActiveUser("Other");
         users.save(otherUser);

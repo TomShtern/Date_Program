@@ -49,6 +49,7 @@ public class ProfileViewModel {
 
     private final UiUserStore userStore;
     private final ProfileService profileCompletionService;
+    private final AppSession session;
 
     // Observable properties for form binding - Basic Info
     private final StringProperty name = new SimpleStringProperty("");
@@ -92,11 +93,13 @@ public class ProfileViewModel {
 
     private ViewModelErrorSink errorHandler;
 
-    public ProfileViewModel(UiUserStore userStore, ProfileService profileCompletionService, AppConfig config) {
+    public ProfileViewModel(
+            UiUserStore userStore, ProfileService profileCompletionService, AppConfig config, AppSession session) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.profileCompletionService =
                 Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
     /**
@@ -122,7 +125,7 @@ public class ProfileViewModel {
      * Loads the current user's data into the form properties.
      */
     public void loadCurrentUser() {
-        User user = AppSession.getInstance().getCurrentUser();
+        User user = session.getCurrentUser();
         if (user == null) {
             logWarn("No current user to load");
             return;
@@ -274,7 +277,7 @@ public class ProfileViewModel {
             return;
         }
 
-        User user = AppSession.getInstance().getCurrentUser();
+        User user = session.getCurrentUser();
         if (user == null) {
             logWarn("No current user to save");
             return;
@@ -428,7 +431,7 @@ public class ProfileViewModel {
     }
 
     private void updateSessionAndCompletion(User user) {
-        AppSession.getInstance().setCurrentUser(user);
+        session.setCurrentUser(user);
         updateCompletion(user);
     }
 
@@ -658,7 +661,7 @@ public class ProfileViewModel {
         if (disposed.get()) {
             return;
         }
-        User user = AppSession.getInstance().getCurrentUser();
+        User user = session.getCurrentUser();
         if (user == null) {
             logWarn("No current user for photo save");
             return;

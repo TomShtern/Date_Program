@@ -87,15 +87,14 @@ public class ChatController extends BaseController implements Initializable {
         // Initialize ViewModel with current user from UISession
         viewModel.initialize();
 
-        Object context = NavigationService.getInstance().consumeNavigationContext();
-        if (context instanceof UUID userId) {
-            viewModel.openConversationWithUser(userId, preview -> {
-                if (preview != null) {
-                    conversationListView.getSelectionModel().select(preview);
-                    conversationListView.scrollTo(preview);
-                }
-            });
-        }
+        NavigationService.getInstance()
+                .consumeNavigationContext(NavigationService.ViewType.CHAT, UUID.class)
+                .ifPresent(userId -> viewModel.openConversationWithUser(userId, preview -> {
+                    if (preview != null) {
+                        conversationListView.getSelectionModel().select(preview);
+                        conversationListView.scrollTo(preview);
+                    }
+                }));
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);

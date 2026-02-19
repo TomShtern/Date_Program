@@ -410,7 +410,7 @@ public class MatchingController extends BaseController implements Initializable 
                 // Navigate to chat with this match
                 NavigationService navigationService = NavigationService.getInstance();
                 if (matchedUser != null) {
-                    navigationService.setNavigationContext(matchedUser.getId());
+                    navigationService.setNavigationContext(NavigationService.ViewType.CHAT, matchedUser.getId());
                 }
                 navigationService.navigateTo(NavigationService.ViewType.CHAT);
             }

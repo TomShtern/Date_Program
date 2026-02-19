@@ -325,24 +325,7 @@ public final class JdbiUserStorage implements UserStorage {
         }
 
         private Set<Gender> readGenderSet(ResultSet rs, String column) throws SQLException {
-            String csv = rs.getString(column);
-            if (csv == null || csv.isBlank()) {
-                return EnumSet.noneOf(Gender.class);
-            }
-            Set<Gender> result = EnumSet.noneOf(Gender.class);
-            for (String s : csv.split(",")) {
-                String trimmed = s.trim();
-                if (!trimmed.isEmpty()) {
-                    try {
-                        result.add(Gender.valueOf(trimmed));
-                    } catch (IllegalArgumentException e) {
-                        if (logger.isDebugEnabled()) {
-                            logger.debug("Skipping invalid Gender value '{}' from database", trimmed, e);
-                        }
-                    }
-                }
-            }
-            return result;
+            return readEnumSet(rs, column, Gender.class);
         }
 
         private List<String> readPhotoUrls(ResultSet rs, String column) throws SQLException {
@@ -381,24 +364,7 @@ public final class JdbiUserStorage implements UserStorage {
         }
 
         private Set<Interest> readInterestSet(ResultSet rs, String column) throws SQLException {
-            String csv = rs.getString(column);
-            if (csv == null || csv.isBlank()) {
-                return EnumSet.noneOf(Interest.class);
-            }
-            Set<Interest> result = EnumSet.noneOf(Interest.class);
-            for (String s : csv.split(",")) {
-                String trimmed = s.trim();
-                if (!trimmed.isEmpty()) {
-                    try {
-                        result.add(Interest.valueOf(trimmed));
-                    } catch (IllegalArgumentException e) {
-                        if (logger.isDebugEnabled()) {
-                            logger.debug("Skipping invalid interest value '{}' from database", trimmed, e);
-                        }
-                    }
-                }
-            }
-            return result;
+            return readEnumSet(rs, column, Interest.class);
         }
 
         private PacePreferences readPacePreferences(ResultSet rs) throws SQLException {
@@ -438,13 +404,13 @@ public final class JdbiUserStorage implements UserStorage {
 
         private <E extends Enum<E>> Set<E> readEnumSet(ResultSet rs, String column, Class<E> enumClass)
                 throws SQLException {
-            String csv = rs.getString(column);
-            if (csv == null || csv.isBlank()) {
+            String serialized = rs.getString(column);
+            if (serialized == null || serialized.isBlank()) {
                 return EnumSet.noneOf(enumClass);
             }
             Set<E> result = EnumSet.noneOf(enumClass);
-            for (String s : csv.split(",")) {
-                String trimmed = s.trim();
+            for (String token : parseMultiValueTokens(serialized)) {
+                String trimmed = token.trim();
                 if (!trimmed.isEmpty()) {
                     try {
                         result.add(Enum.valueOf(enumClass, trimmed));
@@ -460,6 +426,35 @@ public final class JdbiUserStorage implements UserStorage {
                 }
             }
             return result;
+        }
+
+        private List<String> parseMultiValueTokens(String serialized) {
+            if (serialized == null || serialized.isBlank()) {
+                return List.of();
+            }
+
+            String trimmed = serialized.trim();
+            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                try {
+                    return OBJECT_MAPPER.readValue(trimmed, STRING_LIST_TYPE).stream()
+                            .filter(Objects::nonNull)
+                            .map(String::trim)
+                            .filter(token -> !token.isBlank())
+                            .toList();
+                } catch (JsonProcessingException _) {
+                    if (logger.isWarnEnabled()) {
+                        logger.warn("Invalid JSON enum set in column; falling back to CSV parser");
+                    }
+                }
+            }
+
+            List<String> tokens = new ArrayList<>();
+            for (String token : trimmed.split(",")) {
+                if (token != null && !token.isBlank()) {
+                    tokens.add(token.trim());
+                }
+            }
+            return tokens;
         }
     }
 
@@ -511,10 +506,7 @@ public final class JdbiUserStorage implements UserStorage {
         }
 
         public String getInterestedInCsv() {
-            if (user.getInterestedIn() == null || user.getInterestedIn().isEmpty()) {
-                return null;
-            }
-            return user.getInterestedIn().stream().map(Enum::name).collect(Collectors.joining(","));
+            return serializeEnumSet(user.getInterestedIn());
         }
 
         public double getLat() {
@@ -599,10 +591,7 @@ public final class JdbiUserStorage implements UserStorage {
         }
 
         public String getInterestsCsv() {
-            if (user.getInterests() == null || user.getInterests().isEmpty()) {
-                return null;
-            }
-            return user.getInterests().stream().map(Enum::name).collect(Collectors.joining(","));
+            return serializeEnumSet(user.getInterests());
         }
 
         public String getEmail() {
@@ -723,7 +712,13 @@ public final class JdbiUserStorage implements UserStorage {
             if (values == null || values.isEmpty()) {
                 return null;
             }
-            return values.stream().map(Enum::name).collect(Collectors.joining(","));
+
+            List<String> enumNames = values.stream().map(Enum::name).toList();
+            try {
+                return OBJECT_MAPPER.writeValueAsString(enumNames);
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("Failed to serialize enum set", e);
+            }
         }
     }
 }

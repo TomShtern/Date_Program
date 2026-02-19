@@ -1,9 +1,10 @@
 package datingapp.app.cli;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
-import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
+import datingapp.core.ServiceRegistry;
+import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
@@ -13,8 +14,6 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.storage.InteractionStorage;
-import java.time.Duration;
-import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -50,6 +49,16 @@ public class MessagingHandler implements LoggingSupport {
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
         this.input = Objects.requireNonNull(input, "input cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
+    }
+
+    public static MessagingHandler fromServices(ServiceRegistry services, AppSession session, InputReader input) {
+        Objects.requireNonNull(services, "services cannot be null");
+        return new MessagingHandler(
+                services.getConnectionService(),
+                services.getInteractionStorage(),
+                services.getTrustSafetyService(),
+                input,
+                session);
     }
 
     @Override
@@ -140,7 +149,7 @@ public class MessagingHandler implements LoggingSupport {
             } else {
                 logInfo(CliTextAndInput.INVALID_SELECTION);
             }
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logInfo(CliTextAndInput.INVALID_INPUT);
         }
         return previews;
@@ -150,7 +159,7 @@ public class MessagingHandler implements LoggingSupport {
     private void displayConversationPreview(int index, ConversationPreview preview) {
         String name = preview.otherUser().getName();
         String unreadStr = preview.unreadCount() > 0 ? " (" + preview.unreadCount() + " new)" : "";
-        String timeAgo = formatTimeAgo(preview.conversation().getLastMessageAt());
+        String timeAgo = TextUtil.formatTimeAgo(preview.conversation().getLastMessageAt());
 
         logInfo("{}. {}{} · {}", index, name, unreadStr, timeAgo);
 
@@ -358,30 +367,6 @@ public class MessagingHandler implements LoggingSupport {
         logInfo("   {}", message.content());
     }
 
-    /** Formats a timestamp as relative time (e.g., "5m ago"). */
-    private String formatTimeAgo(Instant timestamp) {
-        if (timestamp == null) {
-            return "never";
-        }
-
-        Duration duration = Duration.between(timestamp, AppClock.now());
-        if (duration.isNegative() || duration.toMinutes() == 0) {
-            return "just now";
-        }
-
-        if (duration.toMinutes() < 60) {
-            return duration.toMinutes() + "m ago";
-        } else if (duration.toHours() < 24) {
-            return duration.toHours() + "h ago";
-        } else if (duration.toDays() < 7) {
-            return duration.toDays() + "d ago";
-        } else {
-            return DateTimeFormatter.ofPattern("MMM d")
-                    .withZone(ZoneId.systemDefault())
-                    .format(timestamp);
-        }
-    }
-
     /** Truncates a message for preview. */
     private String truncateMessage(String message, int maxLen) {
         if (message == null) {
@@ -425,20 +410,27 @@ public class MessagingHandler implements LoggingSupport {
                 logInfo("\n⚠️  Match is already ended.");
             }
         } else {
-            logInfo("\n⚠️  No match found.");
+            logInfo("\n❌ No active match found.");
         }
     }
 
-    /**
-     * Returns the total unread count for menu display.
-     *
-     * @return The number of unread messages across all conversations
-     */
     public int getTotalUnreadCount() {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) {
             return 0;
         }
-        return messagingService.getTotalUnreadCount(currentUser.getId());
+        return getTotalUnreadCount(currentUser);
+    }
+
+    private int getTotalUnreadCount(User currentUser) {
+        int totalUnread = 0;
+        List<ConversationPreview> conversations = messagingService.getConversations(currentUser.getId());
+
+        for (ConversationPreview conversation : conversations) {
+            totalUnread += messagingService.getUnreadCount(
+                    currentUser.getId(), conversation.conversation().getId());
+        }
+
+        return totalUnread;
     }
 }

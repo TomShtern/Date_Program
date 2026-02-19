@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Manages H2 database connection pooling and lifecycle. Schema creation is
@@ -21,7 +22,7 @@ public final class DatabaseManager {
     private static final String USER = "sa";
 
     private static DatabaseManager instance;
-    private volatile HikariDataSource dataSource;
+    private final AtomicReference<HikariDataSource> dataSource = new AtomicReference<>();
     private volatile boolean initialized = false;
 
     public static void setJdbcUrl(String url) {
@@ -48,7 +49,7 @@ public final class DatabaseManager {
     // ═══════════════════════════════════════════════════════════════
 
     private synchronized void initializePool() {
-        if (dataSource != null) {
+        if (dataSource.get() != null) {
             return;
         }
         HikariConfig config = new HikariConfig();
@@ -58,28 +59,34 @@ public final class DatabaseManager {
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(2);
         config.setConnectionTimeout(5000);
-        dataSource = new HikariDataSource(config);
+        dataSource.set(new HikariDataSource(config));
     }
 
     /**
      * Gets a new database connection. Initializes the schema on first call.
      * Thread-safe.
      */
-    public synchronized Connection getConnection() throws SQLException {
+    @SuppressWarnings("PMD.CloseResource")
+    public Connection getConnection() throws SQLException {
         if (!initialized) {
             initializeSchema();
-        }
-        if (dataSource == null) {
+        } else if (dataSource.get() == null) {
             initializePool();
         }
-        return dataSource.getConnection();
+
+        HikariDataSource localDataSource = dataSource.get();
+        if (localDataSource == null) {
+            throw new StorageException("Connection pool is not initialized");
+        }
+        return localDataSource.getConnection();
     }
 
     /** Shuts down the database gracefully. */
+    @SuppressWarnings("PMD.CloseResource")
     public synchronized void shutdown() {
-        if (dataSource != null) {
-            dataSource.close();
-            dataSource = null;
+        HikariDataSource existingDataSource = dataSource.getAndSet(null);
+        if (existingDataSource != null) {
+            existingDataSource.close();
         }
     }
 
@@ -91,16 +98,22 @@ public final class DatabaseManager {
      * Initializes the database schema — delegates to SchemaInitializer and
      * MigrationRunner.
      */
+    @SuppressWarnings("PMD.CloseResource")
     private synchronized void initializeSchema() {
         if (initialized) {
             return;
         }
 
-        if (dataSource == null) {
+        if (dataSource.get() == null) {
             initializePool();
         }
 
-        try (Connection conn = dataSource.getConnection();
+        HikariDataSource localDataSource = dataSource.get();
+        if (localDataSource == null) {
+            throw new StorageException("Connection pool is not initialized");
+        }
+
+        try (Connection conn = localDataSource.getConnection();
                 Statement stmt = conn.createStatement()) {
 
             MigrationRunner.migrateV1(stmt);

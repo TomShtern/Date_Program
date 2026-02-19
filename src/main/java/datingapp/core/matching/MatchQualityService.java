@@ -441,82 +441,16 @@ public class MatchQualityService {
     }
 
     private double calculateAgeScore(int ageDiff, User me, User them) {
-        // Perfect score if within 2 years
-        if (ageDiff <= AGE_SIMILAR_YEARS) {
-            return 1.0;
-        }
-
-        // Calculate how well they fit in each other's ranges
-        int myRange = me.getMaxAge() - me.getMinAge();
-        int theirRange = them.getMaxAge() - them.getMinAge();
-        int avgRange = (myRange + theirRange) / 2;
-
-        if (avgRange == 0) {
-            return 1.0; // No range = no penalty
-        }
-
-        // Score based on how close to ideal vs range
-        double normalizedDiff = (double) ageDiff / avgRange;
-        return Math.max(0.0, 1.0 - normalizedDiff);
+        return CompatibilityScoring.ageScore(ageDiff, me, them, AGE_SIMILAR_YEARS);
     }
 
     private double calculateInterestScore(InterestMatcher.MatchResult match, User me, User them) {
-        // If neither has interests, neutral score
-        if (me.getInterests().isEmpty() && them.getInterests().isEmpty()) {
-            return NEUTRAL_SCORE; // Unknown = neutral
-        }
-
-        if (me.getInterests().isEmpty() || them.getInterests().isEmpty()) {
-            return INTEREST_MISSING_SCORE; // One has interests, other doesn't
-        }
-
-        return match.overlapRatio();
+        return CompatibilityScoring.interestScore(
+                me.getInterests(), them.getInterests(), match.overlapRatio(), NEUTRAL_SCORE, INTEREST_MISSING_SCORE);
     }
 
     private double calculateLifestyleScore(User me, User them) {
-        int total = countLifestyleFactors(me, them);
-        if (total == 0) {
-            return NEUTRAL_SCORE;
-        }
-
-        int matches = countLifestyleMatches(me, them);
-        return (double) matches / total;
-    }
-
-    private int countLifestyleFactors(User me, User them) {
-        int total = 0;
-        if (me.getSmoking() != null && them.getSmoking() != null) {
-            total++;
-        }
-        if (me.getDrinking() != null && them.getDrinking() != null) {
-            total++;
-        }
-        if (me.getWantsKids() != null && them.getWantsKids() != null) {
-            total++;
-        }
-        if (me.getLookingFor() != null && them.getLookingFor() != null) {
-            total++;
-        }
-        return total;
-    }
-
-    private int countLifestyleMatches(User me, User them) {
-        int matches = 0;
-        if (LifestyleMatcher.isMatch(me.getSmoking(), them.getSmoking())) {
-            matches++;
-        }
-        if (LifestyleMatcher.isMatch(me.getDrinking(), them.getDrinking())) {
-            matches++;
-        }
-        if (me.getWantsKids() != null
-                && them.getWantsKids() != null
-                && areKidsStancesCompatible(me.getWantsKids(), them.getWantsKids())) {
-            matches++;
-        }
-        if (LifestyleMatcher.isMatch(me.getLookingFor(), them.getLookingFor())) {
-            matches++;
-        }
-        return matches;
+        return CompatibilityScoring.lifestyleScore(me, them, NEUTRAL_SCORE);
     }
 
     private boolean areKidsStancesCompatible(Lifestyle.WantsKids a, Lifestyle.WantsKids b) {

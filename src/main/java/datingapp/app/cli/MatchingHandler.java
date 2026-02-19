@@ -1,9 +1,9 @@
 package datingapp.app.cli;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
-import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
+import datingapp.core.ServiceRegistry;
 import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
@@ -30,8 +30,6 @@ import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -123,6 +121,26 @@ public class MatchingHandler implements LoggingSupport {
             Objects.requireNonNull(userSession);
             Objects.requireNonNull(inputReader);
         }
+
+        public static Dependencies fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
+            Objects.requireNonNull(services);
+            return new Dependencies(
+                    services.getCandidateFinder(),
+                    services.getMatchingService(),
+                    services.getInteractionStorage(),
+                    services.getRecommendationService(),
+                    services.getUndoService(),
+                    services.getMatchQualityService(),
+                    services.getUserStorage(),
+                    services.getProfileService(),
+                    services.getAnalyticsStorage(),
+                    services.getTrustSafetyService(),
+                    services.getConnectionService(),
+                    services.getRecommendationService(),
+                    services.getCommunicationStorage(),
+                    session,
+                    inputReader);
+        }
     }
 
     /**
@@ -131,7 +149,7 @@ public class MatchingHandler implements LoggingSupport {
      * picks, candidate filtering, and user interactions (like/pass).
      */
     public void browseCandidates() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             if (currentUser.getState() != UserState.ACTIVE) {
                 logInfo("\n⚠️  You must be ACTIVE to browse candidates. Complete your profile first.\n");
@@ -241,7 +259,7 @@ public class MatchingHandler implements LoggingSupport {
      * unmatch, or block matches.
      */
     public void viewMatches() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
             logInfo("         YOUR MATCHES");
@@ -331,7 +349,7 @@ public class MatchingHandler implements LoggingSupport {
 
             handleMatchDetailAction(action, match, otherUser, otherUserId, currentUser);
 
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logInfo(CliTextAndInput.INVALID_INPUT);
         }
     }
@@ -489,7 +507,7 @@ public class MatchingHandler implements LoggingSupport {
             } else {
                 logInfo(CliTextAndInput.CANCELLED);
             }
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logInfo(CliTextAndInput.INVALID_INPUT);
         }
     }
@@ -523,7 +541,7 @@ public class MatchingHandler implements LoggingSupport {
             } else {
                 logInfo(CliTextAndInput.CANCELLED);
             }
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logInfo(CliTextAndInput.INVALID_INPUT);
         }
     }
@@ -683,7 +701,7 @@ public class MatchingHandler implements LoggingSupport {
      * Displays today's standout profiles - the top 10 high-quality matches.
      */
     public void viewStandouts() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             if (currentUser.getState() != UserState.ACTIVE) {
                 logInfo("\n⚠️  You must be ACTIVE to view standouts. Complete your profile first.\n");
@@ -870,7 +888,7 @@ public class MatchingHandler implements LoggingSupport {
 
     /** Browse pending likers who have liked the current user. */
     public void browseWhoLikedMe() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             List<PendingLiker> likers = matchingService.findPendingLikersWithTimes(currentUser.getId());
 
@@ -904,7 +922,7 @@ public class MatchingHandler implements LoggingSupport {
     private void showLikerCard(PendingLiker pending) {
         User user = pending.user();
         String verifiedBadge = user.isVerified() ? " ✅ Verified" : "";
-        String likedAgo = formatTimeAgo(pending.likedAt());
+        String likedAgo = TextUtil.formatTimeAgo(pending.likedAt());
 
         logInfo(CliTextAndInput.BOX_TOP);
         logInfo("│ 💝 {}, {} years old{}", user.getName(), user.getAge(), verifiedBadge);
@@ -923,34 +941,5 @@ public class MatchingHandler implements LoggingSupport {
     private void recordLikerSwipe(User currentUser, User other, Like.Direction direction) {
         matchingService.recordLike(Like.create(currentUser.getId(), other.getId(), direction));
         logInfo("✅ Saved.\n");
-    }
-
-    private String formatTimeAgo(Instant likedAt) {
-        if (likedAt == null) {
-            return "(unknown)";
-        }
-
-        Duration duration = Duration.between(likedAt, AppClock.now());
-        if (duration.isNegative()) {
-            duration = Duration.ZERO;
-        }
-
-        long seconds = duration.getSeconds();
-        if (seconds < 60) {
-            return seconds + "s ago";
-        }
-
-        long minutes = seconds / 60;
-        if (minutes < 60) {
-            return minutes + "m ago";
-        }
-
-        long hours = minutes / 60;
-        if (hours < 24) {
-            return hours + "h ago";
-        }
-
-        long days = hours / 24;
-        return days + "d ago";
     }
 }

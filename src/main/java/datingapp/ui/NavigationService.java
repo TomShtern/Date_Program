@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
@@ -39,8 +40,18 @@ public final class NavigationService {
     private StackPane rootStack;
     private ViewModelFactory viewModelFactory;
 
-    private final java.util.concurrent.atomic.AtomicReference<Object> navigationContext =
+    private final java.util.concurrent.atomic.AtomicReference<NavigationContextEnvelope> navigationContext =
             new java.util.concurrent.atomic.AtomicReference<>();
+
+    private static final class NavigationContextEnvelope {
+        private final ViewType targetView;
+        private final Object payload;
+
+        private NavigationContextEnvelope(ViewType targetView, Object payload) {
+            this.targetView = targetView;
+            this.payload = payload;
+        }
+    }
 
     /** Navigation history stack for back navigation. */
     private final Deque<ViewType> navigationHistory = new ConcurrentLinkedDeque<>();
@@ -122,9 +133,12 @@ public final class NavigationService {
      */
     public void navigateTo(ViewType viewType) {
         // UI-03: Warn if navigation context was set but never consumed (debugging aid)
-        Object unconsumed = navigationContext.get();
+        NavigationContextEnvelope unconsumed = navigationContext.get();
         if (unconsumed != null && logger.isDebugEnabled()) {
-            logger.debug("Navigation context {} was not consumed before navigating to {}", unconsumed, viewType);
+            logger.debug(
+                    "Navigation context for {} was not consumed before navigating to {}",
+                    unconsumed.targetView,
+                    viewType);
         }
         navigateWithTransition(viewType, TransitionType.NONE);
     }
@@ -330,12 +344,58 @@ public final class NavigationService {
         return rootStack;
     }
 
+    /**
+     * @deprecated Prefer {@link #setNavigationContext(ViewType, Object)} to scope context by target
+     *     view and prevent accidental cross-screen consumption.
+     */
+    @SuppressWarnings("java:S1133")
+    @Deprecated(forRemoval = false)
     public void setNavigationContext(Object context) {
-        this.navigationContext.set(context);
+        setNavigationContext(null, context);
     }
 
+    public void setNavigationContext(ViewType targetView, Object context) {
+        this.navigationContext.set(new NavigationContextEnvelope(targetView, context));
+    }
+
+    /**
+     * @deprecated Prefer {@link #consumeNavigationContext(ViewType, Class)} for type-safe,
+     *     target-scoped context consumption.
+     */
+    @SuppressWarnings("java:S1133")
+    @Deprecated(forRemoval = false)
     public Object consumeNavigationContext() {
-        return navigationContext.getAndSet(null);
+        NavigationContextEnvelope envelope = navigationContext.getAndSet(null);
+        return envelope != null ? envelope.payload : null;
+    }
+
+    public <T> Optional<T> consumeNavigationContext(ViewType consumerView, Class<T> expectedType) {
+        Objects.requireNonNull(consumerView, "consumerView cannot be null");
+        Objects.requireNonNull(expectedType, "expectedType cannot be null");
+
+        NavigationContextEnvelope envelope = navigationContext.getAndSet(null);
+        if (envelope == null) {
+            return Optional.empty();
+        }
+        if (envelope.targetView != null && envelope.targetView != consumerView) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("Discarding navigation context for {} consumed by {}", envelope.targetView, consumerView);
+            }
+            return Optional.empty();
+        }
+        if (!expectedType.isInstance(envelope.payload)) {
+            if (logger.isWarnEnabled()) {
+                logger.warn(
+                        "Navigation context type mismatch for {}: expected {}, actual {}",
+                        consumerView,
+                        expectedType.getName(),
+                        envelope.payload == null
+                                ? "null"
+                                : envelope.payload.getClass().getName());
+            }
+            return Optional.empty();
+        }
+        return Optional.of(expectedType.cast(envelope.payload));
     }
 
     private void runOnFx(Runnable action) {

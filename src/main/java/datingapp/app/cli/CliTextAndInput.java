@@ -3,6 +3,7 @@ package datingapp.app.cli;
 import datingapp.core.AppSession;
 import java.util.EnumSet;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
@@ -14,6 +15,8 @@ import org.slf4j.LoggerFactory;
  * Merged from CliConstants + CliUtilities (R-010).
  */
 public final class CliTextAndInput {
+
+    private static final Logger log = LoggerFactory.getLogger(CliTextAndInput.class);
 
     // ═══ Display Constants ═══
 
@@ -98,9 +101,12 @@ public final class CliTextAndInput {
      * @param action The action to execute if logged in
      * @return true if action was executed, false if not logged in
      */
-    public static boolean requireLogin(Runnable action) {
-        if (!AppSession.getInstance().isLoggedIn()) {
-            System.out.print(PLEASE_SELECT_USER);
+    public static boolean requireLogin(AppSession session, Runnable action) {
+        Objects.requireNonNull(session, "session cannot be null");
+        Objects.requireNonNull(action, "action cannot be null");
+
+        if (!session.isLoggedIn()) {
+            log.info(PLEASE_SELECT_USER);
             return false;
         }
         action.run();
@@ -202,7 +208,7 @@ public final class CliTextAndInput {
             try {
                 var method = value.getClass().getMethod("getDisplayName");
                 return (String) method.invoke(value);
-            } catch (ReflectiveOperationException ignored) {
+            } catch (ReflectiveOperationException _) {
                 String name = value.name().replace("_", " ").toLowerCase(Locale.ROOT);
                 return Character.toUpperCase(name.charAt(0)) + name.substring(1);
             }

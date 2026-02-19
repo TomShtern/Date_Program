@@ -1,7 +1,7 @@
 package datingapp.ui.viewmodel;
 
-import datingapp.core.AppClock;
 import datingapp.core.AppSession;
+import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.MatchingService.PendingLiker;
@@ -12,7 +12,6 @@ import datingapp.core.model.User.UserState;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -43,6 +42,7 @@ public class MatchesViewModel {
     private final UiUserStore userStore;
     private final MatchingService matchingService;
     private final RecommendationService dailyService;
+    private final AppSession session;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesReceived = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesSent = FXCollections.observableArrayList();
@@ -59,16 +59,18 @@ public class MatchesViewModel {
             UiMatchDataAccess matchData,
             UiUserStore userStore,
             MatchingService matchingService,
-            RecommendationService dailyService) {
+            RecommendationService dailyService,
+            AppSession session) {
         this.matchData = Objects.requireNonNull(matchData, "matchData cannot be null");
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
         this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
     /** Initialize and load matches for current user. */
     public void initialize() {
-        currentUser.set(AppSession.getInstance().getCurrentUser());
+        currentUser.set(session.getCurrentUser());
         if (currentUser.get() != null) {
             refreshAll();
         }
@@ -77,7 +79,7 @@ public class MatchesViewModel {
     private User resolveCurrentUser() {
         User user = currentUser.get();
         if (user == null) {
-            user = AppSession.getInstance().getCurrentUser();
+            user = session.getCurrentUser();
             if (user != null) {
                 currentUser.set(user);
             }
@@ -207,7 +209,7 @@ public class MatchesViewModel {
                         match.getId(),
                         otherUser.getId(),
                         otherUser.getName(),
-                        formatTimeAgo(match.getCreatedAt()),
+                        TextUtil.formatTimeAgo(match.getCreatedAt()),
                         match.getCreatedAt()));
             }
         }
@@ -229,7 +231,7 @@ public class MatchesViewModel {
                             liker.getName(),
                             liker.getAge(),
                             summarizeBio(liker),
-                            formatTimeAgo(pending.likedAt()),
+                            TextUtil.formatTimeAgo(pending.likedAt()),
                             pending.likedAt()));
                 }
             }
@@ -261,7 +263,7 @@ public class MatchesViewModel {
                             otherUser.getName(),
                             otherUser.getAge(),
                             summarizeBio(otherUser),
-                            formatTimeAgo(like.createdAt()),
+                            TextUtil.formatTimeAgo(like.createdAt()),
                             like.createdAt()));
                 }
             }
@@ -405,33 +407,6 @@ public class MatchesViewModel {
         String detail = e.getMessage();
         String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
         errorHandler.onError(message);
-    }
-
-    /** Format a timestamp as "X days ago" or similar. */
-    private String formatTimeAgo(Instant matchedAt) {
-        if (matchedAt == null) {
-            return "Unknown";
-        }
-        Instant now = AppClock.now();
-        long days = ChronoUnit.DAYS.between(matchedAt, now);
-
-        if (days == 0) {
-            long hours = ChronoUnit.HOURS.between(matchedAt, now);
-            if (hours == 0) {
-                return "Just now";
-            }
-            return hours + (hours == 1 ? " hour ago" : " hours ago");
-        } else if (days == 1) {
-            return "Yesterday";
-        } else if (days < 7) {
-            return days + " days ago";
-        } else if (days < 30) {
-            long weeks = days / 7;
-            return weeks + (weeks == 1 ? " week ago" : " weeks ago");
-        } else {
-            long months = days / 30;
-            return months + (months == 1 ? " month ago" : " months ago");
-        }
     }
 
     private static String summarizeBio(User user) {

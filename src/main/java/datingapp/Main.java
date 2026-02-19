@@ -45,7 +45,7 @@ public final class Main {
                         .invoke(65001);
                 linker.downcallHandle(kernel32.find("SetConsoleCP").orElseThrow(), sig)
                         .invoke(65001);
-            } catch (Throwable throwable) { // NOPMD AvoidCatchingThrowable - MethodHandle.invoke() declares throws
+            } catch (Throwable _) { // NOPMD AvoidCatchingThrowable - MethodHandle.invoke() declares throws
                 // Throwable
                 // FFM unavailable — try subprocess fallback
                 try {
@@ -53,9 +53,9 @@ public final class Main {
                             .inheritIO()
                             .start()
                             .waitFor();
-                } catch (InterruptedException interruptedException) {
+                } catch (InterruptedException _) {
                     Thread.currentThread().interrupt(); // Restore interrupt flag
-                } catch (Exception exception) {
+                } catch (Exception _) {
                     // Best-effort: console codepage not critical for app functionality
                     assert true; // PMD: non-empty catch block
                 }
@@ -76,45 +76,18 @@ public final class Main {
             InputReader inputReader = new InputReader(scanner);
             AppSession session = AppSession.getInstance();
 
-            MatchingHandler matchingHandler = new MatchingHandler(new MatchingHandler.Dependencies(
-                    services.getCandidateFinder(),
-                    services.getMatchingService(),
-                    services.getInteractionStorage(),
-                    services.getRecommendationService(),
-                    services.getUndoService(),
-                    services.getMatchQualityService(),
-                    services.getUserStorage(),
-                    services.getProfileService(),
-                    services.getAnalyticsStorage(),
-                    services.getTrustSafetyService(),
-                    services.getConnectionService(),
-                    services.getRecommendationService(),
-                    services.getCommunicationStorage(),
-                    session,
-                    inputReader));
-            ProfileHandler profileHandler = new ProfileHandler(
-                    services.getUserStorage(),
-                    services.getProfileService(),
-                    services.getProfileService(),
-                    services.getValidationService(),
-                    session,
-                    inputReader);
-            SafetyHandler safetyHandler = new SafetyHandler(
-                    services.getUserStorage(), services.getTrustSafetyService(), session, inputReader);
-            StatsHandler statsHandler = new StatsHandler(
-                    services.getActivityMetricsService(), services.getProfileService(), session, inputReader);
-            MessagingHandler messagingHandler = new MessagingHandler(
-                    services.getConnectionService(),
-                    services.getInteractionStorage(),
-                    services.getTrustSafetyService(),
-                    inputReader,
-                    session);
+            MatchingHandler matchingHandler =
+                    new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
+            ProfileHandler profileHandler = ProfileHandler.fromServices(services, session, inputReader);
+            SafetyHandler safetyHandler = SafetyHandler.fromServices(services, session, inputReader);
+            StatsHandler statsHandler = StatsHandler.fromServices(services, session, inputReader);
+            MessagingHandler messagingHandler = MessagingHandler.fromServices(services, session, inputReader);
 
             logInfo("\n🌹 Welcome to Dating App 🌹\n");
 
             boolean running = true;
             while (running) {
-                printMenu(services, messagingHandler);
+                printMenu(services, messagingHandler, session);
                 String choice = inputReader.readLine("Choose an option: ");
 
                 // Guard: options 3–20 require a logged-in user
@@ -172,12 +145,12 @@ public final class Main {
         }
     }
 
-    private static void printMenu(ServiceRegistry services, MessagingHandler messagingHandler) {
+    private static void printMenu(ServiceRegistry services, MessagingHandler messagingHandler, AppSession session) {
         logInfo(CliTextAndInput.SEPARATOR_LINE);
         logInfo("         DATING APP - PHASE 0.5");
         logInfo(CliTextAndInput.SEPARATOR_LINE);
 
-        User currentUser = AppSession.getInstance().getCurrentUser();
+        User currentUser = session.getCurrentUser();
 
         if (currentUser != null) {
             logInfo("  Current User: {} ({})", currentUser.getName(), currentUser.getState());
@@ -186,12 +159,12 @@ public final class Main {
             ActivityMetricsService sessionService = services.getActivityMetricsService();
             sessionService
                     .getCurrentSession(currentUser.getId())
-                    .ifPresent(session -> logInfo(
+                    .ifPresent(sessionInfo -> logInfo(
                             "  Session: {} swipes ({} likes, {} passes) | {} elapsed",
-                            session.getSwipeCount(),
-                            session.getLikeCount(),
-                            session.getPassCount(),
-                            session.getFormattedDuration()));
+                            sessionInfo.getSwipeCount(),
+                            sessionInfo.getLikeCount(),
+                            sessionInfo.getPassCount(),
+                            sessionInfo.getFormattedDuration()));
 
             // Show daily likes
             RecommendationService dailyService = services.getRecommendationService();

@@ -3,6 +3,7 @@ package datingapp.app.cli;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
+import datingapp.core.ServiceRegistry;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
@@ -38,6 +39,12 @@ public class StatsHandler implements LoggingSupport {
         this.inputReader = inputReader;
     }
 
+    public static StatsHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
+        java.util.Objects.requireNonNull(services, "services cannot be null");
+        return new StatsHandler(
+                services.getActivityMetricsService(), services.getProfileService(), session, inputReader);
+    }
+
     @Override
     public Logger logger() {
         return logger;
@@ -48,7 +55,7 @@ public class StatsHandler implements LoggingSupport {
      * scores.
      */
     public void viewStatistics() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
             logInfo(CliTextAndInput.HEADER_YOUR_STATISTICS);
@@ -136,7 +143,7 @@ public class StatsHandler implements LoggingSupport {
 
     /** Displays all unlocked achievements for the current user. */
     public void viewAchievements() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             // Check for any new achievements first
             checkAndDisplayNewAchievements(session.getCurrentUser());
 

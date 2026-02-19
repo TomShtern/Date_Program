@@ -15,6 +15,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -74,6 +75,15 @@ public final class ProfileService {
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+    }
+
+    public List<User> listUsers() {
+        return userStorage.findAll();
+    }
+
+    public Optional<User> getUserById(UUID userId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        return Optional.ofNullable(userStorage.get(userId));
     }
 
     // ========================================================================

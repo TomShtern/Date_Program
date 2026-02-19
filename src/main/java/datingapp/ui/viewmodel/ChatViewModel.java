@@ -8,6 +8,7 @@ import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.connection.ConnectionService.SendResult;
 import datingapp.core.model.User;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,6 +36,7 @@ public class ChatViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ChatViewModel.class);
 
     private final ConnectionService messagingService;
+    private final AppSession session;
     private final ObservableList<ConversationPreview> conversations = FXCollections.observableArrayList();
     private final ObservableList<Message> activeMessages = FXCollections.observableArrayList();
 
@@ -59,8 +61,9 @@ public class ChatViewModel {
     /** Keep reference to listener for cleanup. */
     private final javafx.beans.value.ChangeListener<ConversationPreview> selectionListener;
 
-    public ChatViewModel(ConnectionService messagingService) {
-        this.messagingService = messagingService;
+    public ChatViewModel(ConnectionService messagingService, AppSession session) {
+        this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
 
         // Listen for selection changes to load messages
         selectionListener = (obs, oldVal, newVal) -> {
@@ -92,7 +95,7 @@ public class ChatViewModel {
     @Nullable
     private User ensureCurrentUser() {
         if (currentUser == null) {
-            currentUser = AppSession.getInstance().getCurrentUser();
+            currentUser = session.getCurrentUser();
         }
         return currentUser;
     }

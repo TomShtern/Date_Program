@@ -33,11 +33,12 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 /** Consolidated JDBI storage for conversations, messages, friend requests, and notifications. */
 public final class JdbiConnectionStorage implements CommunicationStorage {
 
+    private final Jdbi jdbi;
     private final MessagingDao messagingDao;
     private final SocialDao socialDao;
 
     public JdbiConnectionStorage(Jdbi jdbi) {
-        Objects.requireNonNull(jdbi, "jdbi cannot be null");
+        this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
         this.messagingDao = jdbi.onDemand(MessagingDao.class);
         this.socialDao = jdbi.onDemand(SocialDao.class);
     }
@@ -130,6 +131,18 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     @Override
     public void saveFriendRequest(FriendRequest request) {
         socialDao.saveFriendRequest(request);
+    }
+
+    @Override
+    public void saveFriendRequestWithNotification(FriendRequest request, Notification notification) {
+        Objects.requireNonNull(request, "request cannot be null");
+        Objects.requireNonNull(notification, "notification cannot be null");
+
+        jdbi.useTransaction(handle -> {
+            SocialDao transactionalDao = handle.attach(SocialDao.class);
+            transactionalDao.saveFriendRequest(request);
+            transactionalDao.saveNotification(notification);
+        });
     }
 
     @Override

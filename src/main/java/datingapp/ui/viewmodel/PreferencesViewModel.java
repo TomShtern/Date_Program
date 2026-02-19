@@ -24,6 +24,7 @@ public class PreferencesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(PreferencesViewModel.class);
 
     private final AppConfig config;
+    private final AppSession session;
     private final UiUserStore userStore;
     private User currentUser;
 
@@ -43,16 +44,17 @@ public class PreferencesViewModel {
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
-    public PreferencesViewModel(UiUserStore userStore, AppConfig config) {
+    public PreferencesViewModel(UiUserStore userStore, AppConfig config, AppSession session) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
     public void initialize() {
         if (disposed.get()) {
             return;
         }
-        currentUser = AppSession.getInstance().getCurrentUser();
+        currentUser = session.getCurrentUser();
         if (currentUser != null) {
             loadPreferences();
         }

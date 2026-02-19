@@ -3,7 +3,6 @@ package datingapp.core.matching;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.Match;
-import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.InteractionStorage;
@@ -19,12 +18,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class MatchingService {
-
-    private static final Logger logger = LoggerFactory.getLogger(MatchingService.class);
 
     private static final String LIKE_REQUIRED = "like cannot be null";
 
@@ -114,59 +109,19 @@ public class MatchingService {
      */
     public Optional<Match> recordLike(Like like) {
         Objects.requireNonNull(like, LIKE_REQUIRED);
-        // Check if already exists
-        if (interactionStorage.exists(like.whoLikes(), like.whoGotLiked())) {
-            return Optional.empty(); // Already recorded
-        }
-
-        // Save the like
-        interactionStorage.save(like);
-
-        // If it's a PASS, no match possible
-        if (like.direction() == Like.Direction.PASS) {
-            if (activityMetricsService != null) {
-                activityMetricsService.recordSwipe(like.whoLikes(), like.direction(), false);
-            }
-            return Optional.empty();
-        }
-
-        Optional<Match> matchResult = Optional.empty();
-
-        // Check for mutual LIKE
-        if (interactionStorage.mutualLikeExists(like.whoLikes(), like.whoGotLiked())) {
-            // Create match with deterministic ID (allows idempotent saves)
-            Match match = Match.create(like.whoLikes(), like.whoGotLiked());
-
-            try {
-                // Save using upsert semantics (MERGE) - idempotent operation
-                interactionStorage.save(match);
-
-                matchResult = Optional.of(match);
-            } catch (RuntimeException ex) {
-                // Handle storage conflicts (duplicate key, race condition)
-                // JdbiException extends RuntimeException
-                if (logger.isWarnEnabled()) {
-                    logger.warn("Match save conflict for {}: {}", match.getId(), ex.getMessage());
-                }
-                // Guard fallback query (EH-004 fix)
-                try {
-                    matchResult = interactionStorage
-                            .get(match.getId())
-                            .filter(existing -> existing.getState() == MatchState.ACTIVE);
-                } catch (RuntimeException fallbackEx) {
-                    if (logger.isErrorEnabled()) {
-                        logger.error("Fallback match lookup also failed for {}", match.getId(), fallbackEx);
-                    }
-                    // matchResult remains empty — safe to continue
-                }
-            }
-        }
+        InteractionStorage.LikeMatchWriteResult writeResult = interactionStorage.saveLikeAndMaybeCreateMatch(like);
+        Optional<Match> matchResult = writeResult.createdMatch();
 
         if (activityMetricsService != null) {
             activityMetricsService.recordSwipe(like.whoLikes(), like.direction(), matchResult.isPresent());
         }
 
         return matchResult;
+    }
+
+    public List<Match> getMatchesForUser(UUID userId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        return interactionStorage.getAllMatchesFor(userId);
     }
 
     /** Get the session service (for UI access to session info). */

@@ -150,15 +150,32 @@ class UserTest {
     }
 
     @Test
-    @DisplayName("Adding many interests does not throw")
-    void addingManyInterestsAllowed() {
+    @DisplayName("Adding interest above max limit throws")
+    void addingInterestAboveLimitThrows() {
         User user = new User(UUID.randomUUID(), "Bob");
         for (int i = 0; i < Interest.MAX_PER_USER; i++) {
             user.addInterest(Interest.values()[i]);
         }
-        user.addInterest(Interest.TRAVEL);
 
-        assertTrue(user.getInterests().contains(Interest.TRAVEL));
+        Interest extraInterest = Interest.values()[Interest.MAX_PER_USER];
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> user.addInterest(extraInterest));
+
+        assertTrue(ex.getMessage().contains("Cannot add more than"));
+        assertEquals(Interest.MAX_PER_USER, user.getInterests().size());
+    }
+
+    @Test
+    @DisplayName("Setting interests above max limit throws")
+    void setInterestsAboveLimitThrows() {
+        User user = new User(UUID.randomUUID(), "Mila");
+        Set<Interest> tooMany = EnumSet.noneOf(Interest.class);
+        for (int i = 0; i <= Interest.MAX_PER_USER; i++) {
+            tooMany.add(Interest.values()[i]);
+        }
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> user.setInterests(tooMany));
+
+        assertTrue(ex.getMessage().contains("Cannot set more than"));
     }
 
     @Test

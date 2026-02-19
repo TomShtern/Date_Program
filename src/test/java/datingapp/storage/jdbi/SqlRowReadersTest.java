@@ -23,7 +23,6 @@ class SqlRowReadersTest {
     }
 
     /** A very simple manual mock for ResultSet to avoid Mockito dependency. */
-    @SuppressWarnings("deprecation")
     static class MockResultSet implements ResultSet {
         private String value;
 

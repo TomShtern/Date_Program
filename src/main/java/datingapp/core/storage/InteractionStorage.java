@@ -1,10 +1,14 @@
 package datingapp.core.storage;
 
+import datingapp.core.connection.ConnectionModels.Conversation;
+import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.model.Match;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -44,6 +48,56 @@ public interface InteractionStorage {
 
     void delete(UUID likeId);
 
+    /** Result of persisting a like and optionally creating a match. */
+    record LikeMatchWriteResult(boolean likePersisted, Optional<Match> createdMatch) {
+        public LikeMatchWriteResult {
+            Objects.requireNonNull(createdMatch, "createdMatch cannot be null");
+        }
+
+        public static LikeMatchWriteResult duplicateLike() {
+            return new LikeMatchWriteResult(false, Optional.empty());
+        }
+
+        public static LikeMatchWriteResult likeOnly() {
+            return new LikeMatchWriteResult(true, Optional.empty());
+        }
+
+        public static LikeMatchWriteResult likeAndMatch(Match match) {
+            return new LikeMatchWriteResult(true, Optional.of(Objects.requireNonNull(match, "match cannot be null")));
+        }
+    }
+
+    /**
+     * Persists a swipe and, when it is a mutual LIKE, creates the corresponding match.
+     *
+     * <p>Default implementation preserves existing behavior for non-transactional storages.
+     */
+    default LikeMatchWriteResult saveLikeAndMaybeCreateMatch(Like like) {
+        Objects.requireNonNull(like, "like cannot be null");
+
+        if (exists(like.whoLikes(), like.whoGotLiked())) {
+            return LikeMatchWriteResult.duplicateLike();
+        }
+
+        save(like);
+        if (like.direction() != Like.Direction.LIKE) {
+            return LikeMatchWriteResult.likeOnly();
+        }
+
+        if (!mutualLikeExists(like.whoLikes(), like.whoGotLiked())) {
+            return LikeMatchWriteResult.likeOnly();
+        }
+
+        String matchId = Match.generateId(like.whoLikes(), like.whoGotLiked());
+        if (exists(matchId)) {
+            return LikeMatchWriteResult.likeOnly();
+        }
+
+        Match match = Match.create(like.whoLikes(), like.whoGotLiked());
+        save(match);
+        return LikeMatchWriteResult.likeAndMatch(match);
+    }
+
     // ═══ Match Operations ═══
 
     void save(Match match);
@@ -66,6 +120,35 @@ public interface InteractionStorage {
 
     default int purgeDeletedBefore(Instant threshold) {
         return 0;
+    }
+
+    /**
+     * Indicates whether this storage can execute relationship transition writes atomically across
+     * all touched tables.
+     */
+    default boolean supportsAtomicRelationshipTransitions() {
+        return false;
+    }
+
+    /**
+     * Atomically persists the "accept friend zone" transition (match + request + notification).
+     *
+     * <p>Default implementation returns {@code false}, signaling unsupported operation.
+     */
+    default boolean acceptFriendZoneTransition(
+            Match updatedMatch, FriendRequest acceptedRequest, Notification notification) {
+        return false;
+    }
+
+    /**
+     * Atomically persists the graceful-exit transition (match + optional conversation archive +
+     * notification).
+     *
+     * <p>Default implementation returns {@code false}, signaling unsupported operation.
+     */
+    default boolean gracefulExitTransition(
+            Match updatedMatch, Optional<Conversation> archivedConversation, Notification notification) {
+        return false;
     }
 
     // ═══ Transaction Operations ═══

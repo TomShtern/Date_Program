@@ -11,6 +11,7 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import java.util.List;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -36,6 +37,7 @@ public class MatchingViewModel {
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
     private final UndoService undoService;
+    private final AppSession session;
 
     private final Queue<User> candidateQueue = new ConcurrentLinkedQueue<>();
     private final ObjectProperty<User> currentCandidate = new SimpleObjectProperty<>();
@@ -58,10 +60,14 @@ public class MatchingViewModel {
     private User currentUser;
 
     public MatchingViewModel(
-            CandidateFinder candidateFinder, MatchingService matchingService, UndoService undoService) {
-        this.candidateFinder = candidateFinder;
-        this.matchingService = matchingService;
-        this.undoService = undoService;
+            CandidateFinder candidateFinder,
+            MatchingService matchingService,
+            UndoService undoService,
+            AppSession session) {
+        this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
+        this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
+        this.undoService = Objects.requireNonNull(undoService, "undoService cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
     /**
@@ -69,7 +75,7 @@ public class MatchingViewModel {
      */
     private User ensureCurrentUser() {
         if (currentUser == null) {
-            currentUser = AppSession.getInstance().getCurrentUser();
+            currentUser = session.getCurrentUser();
         }
         return currentUser;
     }

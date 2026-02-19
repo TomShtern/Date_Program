@@ -3,6 +3,7 @@ package datingapp.app.cli;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
+import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.User;
@@ -41,6 +42,11 @@ public class SafetyHandler implements LoggingSupport {
         this.inputReader = Objects.requireNonNull(inputReader);
     }
 
+    public static SafetyHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
+        Objects.requireNonNull(services, "services cannot be null");
+        return new SafetyHandler(services.getUserStorage(), services.getTrustSafetyService(), session, inputReader);
+    }
+
     @Override
     public Logger logger() {
         return logger;
@@ -48,7 +54,7 @@ public class SafetyHandler implements LoggingSupport {
 
     /** Allows the current user to block another user. */
     public void blockUser() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             logInfo(CliTextAndInput.HEADER_BLOCK_USER);
 
             User currentUser = session.getCurrentUser();
@@ -80,7 +86,7 @@ public class SafetyHandler implements LoggingSupport {
 
     /** Allows the current user to report another user for violations. */
     public void reportUser() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             if (currentUser.getState() != UserState.ACTIVE) {
                 logInfo("\n⚠️  You must be ACTIVE to report users.\n");
@@ -147,7 +153,7 @@ public class SafetyHandler implements LoggingSupport {
      * Displays blocked users and allows the current user to unblock them.
      */
     public void manageBlockedUsers() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             List<User> blockedUsers = trustSafetyService.getBlockedUsers(currentUser.getId());
 
@@ -252,7 +258,7 @@ public class SafetyHandler implements LoggingSupport {
 
     /** Starts the profile verification flow for the current user. */
     public void verifyProfile() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
 
             if (currentUser.isVerified()) {

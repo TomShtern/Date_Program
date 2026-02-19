@@ -13,9 +13,7 @@ import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
-import datingapp.core.storage.UserStorage;
+import datingapp.core.profile.ProfileService;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
@@ -54,11 +52,9 @@ public class RestApiServer {
     private static final int DEFAULT_MESSAGE_LIMIT = 50;
     private static final String UNKNOWN_USER = "Unknown";
 
-    private final UserStorage userStorage;
-    private final InteractionStorage interactionStorage;
+    private final ProfileService profileService;
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
-    private final CommunicationStorage communicationStorage;
     private final ConnectionService messagingService;
     private final int port;
     private Javalin app;
@@ -70,11 +66,9 @@ public class RestApiServer {
 
     /** Creates a server with the given services and port. */
     public RestApiServer(ServiceRegistry services, int port) {
-        this.userStorage = services.getUserStorage();
-        this.interactionStorage = services.getInteractionStorage();
+        this.profileService = services.getProfileService();
         this.candidateFinder = services.getCandidateFinder();
         this.matchingService = services.getMatchingService();
-        this.communicationStorage = services.getCommunicationStorage();
         this.messagingService = services.getConnectionService();
         this.port = port;
     }
@@ -144,25 +138,19 @@ public class RestApiServer {
 
     private void listUsers(Context ctx) {
         List<UserSummary> users =
-                userStorage.findAll().stream().map(UserSummary::from).toList();
+                profileService.listUsers().stream().map(UserSummary::from).toList();
         ctx.json(users);
     }
 
     private void getUser(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
-        User user = userStorage.get(id);
-        if (user == null) {
-            throw new NotFoundResponse("User not found");
-        }
+        User user = profileService.getUserById(id).orElseThrow(() -> new NotFoundResponse("User not found"));
         ctx.json(UserDetail.from(user));
     }
 
     private void getCandidates(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
-        User user = userStorage.get(id);
-        if (user == null) {
-            throw new NotFoundResponse("User not found");
-        }
+        User user = profileService.getUserById(id).orElseThrow(() -> new NotFoundResponse("User not found"));
         List<UserSummary> candidates = candidateFinder.findCandidatesForUser(user).stream()
                 .map(UserSummary::from)
                 .toList();
@@ -174,7 +162,7 @@ public class RestApiServer {
     private void getMatches(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         validateUserExists(userId);
-        List<MatchSummary> matches = interactionStorage.getAllMatchesFor(userId).stream()
+        List<MatchSummary> matches = matchingService.getMatchesForUser(userId).stream()
                 .map(m -> toMatchSummary(m, userId))
                 .toList();
         ctx.json(matches);
@@ -215,8 +203,8 @@ public class RestApiServer {
     private void getConversations(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         validateUserExists(userId);
-        List<ConversationSummary> conversations = communicationStorage.getConversationsFor(userId).stream()
-                .map(c -> toConversationSummary(c, userId))
+        List<ConversationSummary> conversations = messagingService.getConversations(userId).stream()
+                .map(this::toConversationSummary)
                 .toList();
         ctx.json(conversations);
     }
@@ -226,7 +214,7 @@ public class RestApiServer {
         int limit = ctx.queryParamAsClass("limit", Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
         int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
 
-        List<MessageDto> messages = communicationStorage.getMessages(conversationId, limit, offset).stream()
+        List<MessageDto> messages = messagingService.getMessages(conversationId, limit, offset).stream()
                 .map(MessageDto::from)
                 .toList();
         ctx.json(messages);
@@ -263,26 +251,29 @@ public class RestApiServer {
     }
 
     private void validateUserExists(UUID userId) {
-        if (userStorage.get(userId) == null) {
+        if (profileService.getUserById(userId).isEmpty()) {
             throw new NotFoundResponse("User not found: " + userId);
         }
     }
 
     private MatchSummary toMatchSummary(Match match, UUID currentUserId) {
         UUID otherUserId = match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
-        User otherUser = userStorage.get(otherUserId);
-        String otherUserName = otherUser != null ? otherUser.getName() : UNKNOWN_USER;
+        String otherUserName =
+                profileService.getUserById(otherUserId).map(User::getName).orElse(UNKNOWN_USER);
         return new MatchSummary(
                 match.getId(), otherUserId, otherUserName, match.getState().name(), match.getCreatedAt());
     }
 
-    private ConversationSummary toConversationSummary(Conversation conversation, UUID currentUserId) {
-        UUID otherUserId = extractRecipientFromConversation(conversation.getId(), currentUserId);
-        User otherUser = userStorage.get(otherUserId);
-        String otherUserName = otherUser != null ? otherUser.getName() : UNKNOWN_USER;
-        int messageCount = communicationStorage.countMessages(conversation.getId());
+    private ConversationSummary toConversationSummary(ConnectionService.ConversationPreview preview) {
+        Conversation conversation = preview.conversation();
+        User otherUser = preview.otherUser();
+        int messageCount = messagingService.countMessages(conversation.getId());
         return new ConversationSummary(
-                conversation.getId(), otherUserId, otherUserName, messageCount, conversation.getLastMessageAt());
+                conversation.getId(),
+                otherUser.getId(),
+                otherUser.getName(),
+                messageCount,
+                conversation.getLastMessageAt());
     }
 
     private UUID extractRecipientFromConversation(String conversationId, UUID senderId) {

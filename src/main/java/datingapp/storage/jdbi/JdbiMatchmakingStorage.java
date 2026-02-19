@@ -1,7 +1,12 @@
 package datingapp.storage.jdbi;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.connection.ConnectionModels;
+import datingapp.core.connection.ConnectionModels.Conversation;
+import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
@@ -29,6 +34,92 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 /** Consolidated JDBI storage for likes and matches. */
 public final class JdbiMatchmakingStorage implements InteractionStorage {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String PARAM_ID = "id";
+    private static final String PARAM_WHO_LIKES = "whoLikes";
+    private static final String PARAM_WHO_GOT_LIKED = "whoGotLiked";
+    private static final String PARAM_DIRECTION = "direction";
+    private static final String PARAM_CREATED_AT = "createdAt";
+    private static final String PARAM_STATE = "state";
+    private static final String PARAM_ENDED_AT = "endedAt";
+    private static final String PARAM_ENDED_BY = "endedBy";
+    private static final String PARAM_END_REASON = "endReason";
+    private static final String PARAM_DELETED_AT = "deletedAt";
+    private static final String COLUMN_WHO_LIKES = "who_likes";
+    private static final String COLUMN_CREATED_AT = "created_at";
+
+    private static final String SQL_ACTIVE_LIKE_EXISTS = """
+        SELECT EXISTS (
+        SELECT 1
+        FROM likes
+        WHERE who_likes = :whoLikes
+          AND who_got_liked = :whoGotLiked
+          AND deleted_at IS NULL
+        )
+        """;
+
+    private static final String SQL_UPSERT_LIKE = """
+        MERGE INTO likes (id, who_likes, who_got_liked, direction, created_at, deleted_at)
+        KEY (who_likes, who_got_liked)
+        VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt, NULL)
+        """;
+
+    private static final String SQL_MUTUAL_LIKE_EXISTS = """
+        SELECT EXISTS (
+        SELECT 1
+        FROM likes l1
+        JOIN likes l2 ON l1.who_likes = l2.who_got_liked
+                 AND l1.who_got_liked = l2.who_likes
+        WHERE l1.who_likes = :whoLikes
+          AND l1.who_got_liked = :whoGotLiked
+          AND l1.direction = 'LIKE'
+          AND l2.direction = 'LIKE'
+          AND l1.deleted_at IS NULL
+          AND l2.deleted_at IS NULL
+        )
+        """;
+
+    private static final String SQL_ACTIVE_MATCH_EXISTS =
+            "SELECT EXISTS(SELECT 1 FROM matches WHERE id = :id AND deleted_at IS NULL)";
+
+    private static final String SQL_UPSERT_MATCH = """
+        MERGE INTO matches (
+        id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
+        ) KEY (id)
+        VALUES (
+        :id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
+        )
+        """;
+
+    private static final String SQL_UPDATE_MATCH_TRANSITION = """
+        UPDATE matches
+        SET state = :state,
+        ended_at = :endedAt,
+        ended_by = :endedBy,
+        end_reason = :endReason,
+        deleted_at = :deletedAt
+        WHERE id = :id AND deleted_at IS NULL
+        """;
+
+    private static final String SQL_ACCEPT_FRIEND_REQUEST = """
+        UPDATE friend_requests
+        SET status = :status,
+        responded_at = :respondedAt
+        WHERE id = :id AND status = 'PENDING'
+        """;
+
+    private static final String SQL_ARCHIVE_CONVERSATION = """
+        UPDATE conversations
+        SET archived_at = :archivedAt,
+        archive_reason = :archiveReason
+        WHERE id = :conversationId
+        """;
+
+    private static final String SQL_INSERT_NOTIFICATION = """
+        INSERT INTO notifications (id, user_id, type, title, message, created_at, is_read, data_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """;
+
     private final Jdbi jdbi;
     private final LikeDao likeDao;
     private final MatchDao matchDao;
@@ -55,6 +146,75 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     @Override
     public void save(Like like) {
         likeDao.save(like);
+    }
+
+    @Override
+    public LikeMatchWriteResult saveLikeAndMaybeCreateMatch(Like like) {
+        Objects.requireNonNull(like, "like cannot be null");
+
+        try {
+            return jdbi.inTransaction(handle -> {
+                boolean likeAlreadyExists = handle.createQuery(SQL_ACTIVE_LIKE_EXISTS)
+                        .bind(PARAM_WHO_LIKES, like.whoLikes())
+                        .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
+                        .mapTo(Boolean.class)
+                        .one();
+                if (likeAlreadyExists) {
+                    return LikeMatchWriteResult.duplicateLike();
+                }
+
+                handle.createUpdate(SQL_UPSERT_LIKE)
+                        .bind(PARAM_ID, like.id())
+                        .bind(PARAM_WHO_LIKES, like.whoLikes())
+                        .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
+                        .bind(PARAM_DIRECTION, like.direction().name())
+                        .bind(PARAM_CREATED_AT, like.createdAt())
+                        .execute();
+
+                if (like.direction() != Like.Direction.LIKE) {
+                    return LikeMatchWriteResult.likeOnly();
+                }
+
+                boolean mutualLikeExists = handle.createQuery(SQL_MUTUAL_LIKE_EXISTS)
+                        .bind(PARAM_WHO_LIKES, like.whoLikes())
+                        .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
+                        .mapTo(Boolean.class)
+                        .one();
+                if (!mutualLikeExists) {
+                    return LikeMatchWriteResult.likeOnly();
+                }
+
+                String matchId = Match.generateId(like.whoLikes(), like.whoGotLiked());
+                boolean activeMatchExists = handle.createQuery(SQL_ACTIVE_MATCH_EXISTS)
+                        .bind(PARAM_ID, matchId)
+                        .mapTo(Boolean.class)
+                        .one();
+                if (activeMatchExists) {
+                    return LikeMatchWriteResult.likeOnly();
+                }
+
+                Match match = Match.create(like.whoLikes(), like.whoGotLiked());
+                handle.createUpdate(SQL_UPSERT_MATCH)
+                        .bind(PARAM_ID, match.getId())
+                        .bind("userA", match.getUserA())
+                        .bind("userB", match.getUserB())
+                        .bind(PARAM_CREATED_AT, match.getCreatedAt())
+                        .bind(PARAM_STATE, match.getState().name())
+                        .bind(PARAM_ENDED_AT, match.getEndedAt())
+                        .bind(PARAM_ENDED_BY, match.getEndedBy())
+                        .bind(
+                                PARAM_END_REASON,
+                                match.getEndReason() != null
+                                        ? match.getEndReason().name()
+                                        : null)
+                        .bind(PARAM_DELETED_AT, match.getDeletedAt())
+                        .execute();
+
+                return LikeMatchWriteResult.likeAndMatch(match);
+            });
+        } catch (Exception e) {
+            throw new StorageException("Atomic like->match persistence failed", e);
+        }
     }
 
     @Override
@@ -143,6 +303,102 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     }
 
     @Override
+    public boolean supportsAtomicRelationshipTransitions() {
+        return true;
+    }
+
+    @Override
+    public boolean acceptFriendZoneTransition(
+            Match updatedMatch, FriendRequest acceptedRequest, Notification notification) {
+        Objects.requireNonNull(updatedMatch, "updatedMatch cannot be null");
+        Objects.requireNonNull(acceptedRequest, "acceptedRequest cannot be null");
+        Objects.requireNonNull(notification, "notification cannot be null");
+
+        try {
+            return jdbi.inTransaction(handle -> {
+                int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
+                        .bind(PARAM_ID, updatedMatch.getId())
+                        .bind(PARAM_STATE, updatedMatch.getState().name())
+                        .bind(PARAM_ENDED_AT, updatedMatch.getEndedAt())
+                        .bind(PARAM_ENDED_BY, updatedMatch.getEndedBy())
+                        .bind(
+                                PARAM_END_REASON,
+                                updatedMatch.getEndReason() != null
+                                        ? updatedMatch.getEndReason().name()
+                                        : null)
+                        .bind(PARAM_DELETED_AT, updatedMatch.getDeletedAt())
+                        .execute();
+                if (matchRows != 1) {
+                    return false;
+                }
+
+                int requestRows = handle.createUpdate(SQL_ACCEPT_FRIEND_REQUEST)
+                        .bind(PARAM_ID, acceptedRequest.id())
+                        .bind("status", acceptedRequest.status().name())
+                        .bind("respondedAt", acceptedRequest.respondedAt())
+                        .execute();
+                if (requestRows != 1) {
+                    throw new StorageException("Failed to persist friend request acceptance atomically");
+                }
+
+                saveNotification(handle, notification);
+                return true;
+            });
+        } catch (StorageException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new StorageException("Atomic friend-zone acceptance failed", e);
+        }
+    }
+
+    @Override
+    public boolean gracefulExitTransition(
+            Match updatedMatch, Optional<Conversation> archivedConversation, Notification notification) {
+        Objects.requireNonNull(updatedMatch, "updatedMatch cannot be null");
+        Objects.requireNonNull(archivedConversation, "archivedConversation cannot be null");
+        Objects.requireNonNull(notification, "notification cannot be null");
+
+        try {
+            return jdbi.inTransaction(handle -> {
+                int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
+                        .bind(PARAM_ID, updatedMatch.getId())
+                        .bind(PARAM_STATE, updatedMatch.getState().name())
+                        .bind(PARAM_ENDED_AT, updatedMatch.getEndedAt())
+                        .bind(PARAM_ENDED_BY, updatedMatch.getEndedBy())
+                        .bind(
+                                PARAM_END_REASON,
+                                updatedMatch.getEndReason() != null
+                                        ? updatedMatch.getEndReason().name()
+                                        : null)
+                        .bind(PARAM_DELETED_AT, updatedMatch.getDeletedAt())
+                        .execute();
+                if (matchRows != 1) {
+                    return false;
+                }
+
+                if (archivedConversation.isPresent()) {
+                    Conversation conversation = archivedConversation.get();
+                    int conversationRows = handle.createUpdate(SQL_ARCHIVE_CONVERSATION)
+                            .bind("conversationId", conversation.getId())
+                            .bind("archivedAt", conversation.getArchivedAt())
+                            .bind("archiveReason", conversation.getArchiveReason())
+                            .execute();
+                    if (conversationRows != 1) {
+                        throw new StorageException("Failed to archive conversation atomically");
+                    }
+                }
+
+                saveNotification(handle, notification);
+                return true;
+            });
+        } catch (StorageException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new StorageException("Atomic graceful-exit transition failed", e);
+        }
+    }
+
+    @Override
     public void delete(String matchId) {
         matchDao.delete(matchId);
     }
@@ -152,11 +408,37 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         return matchDao.purgeDeletedBefore(threshold);
     }
 
+    private void saveNotification(org.jdbi.v3.core.Handle handle, Notification notification) {
+        String dataJson = serializeNotificationData(notification.data());
+        handle.execute(
+                SQL_INSERT_NOTIFICATION,
+                notification.id(),
+                notification.userId(),
+                notification.type().name(),
+                notification.title(),
+                notification.message(),
+                notification.createdAt(),
+                notification.isRead(),
+                dataJson);
+    }
+
+    private String serializeNotificationData(Map<String, String> data) {
+        if (data == null || data.isEmpty()) {
+            return null;
+        }
+        try {
+            return OBJECT_MAPPER.writeValueAsString(data);
+        } catch (JsonProcessingException e) {
+            throw new StorageException("Failed to serialize notification data", e);
+        }
+    }
+
     @Override
     public boolean atomicUndoDelete(UUID likeId, String matchId) {
         try {
             return jdbi.inTransaction(handle -> {
-                int likesDeleted = handle.createUpdate("DELETE FROM likes WHERE id = :id")
+                int likesDeleted = handle.createUpdate(
+                                "UPDATE likes SET deleted_at = CURRENT_TIMESTAMP WHERE id = :id AND deleted_at IS NULL")
                         .bind("id", likeId)
                         .execute();
 
@@ -165,7 +447,8 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 }
 
                 if (matchId != null) {
-                    handle.createUpdate("DELETE FROM matches WHERE id = :id")
+                    handle.createUpdate(
+                                    "UPDATE matches SET deleted_at = CURRENT_TIMESTAMP WHERE id = :id AND deleted_at IS NULL")
                             .bind("id", matchId)
                             .execute();
                 }
@@ -177,20 +460,69 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         }
     }
 
+    @SuppressWarnings("unused") // Accessed reflectively by @BindBean
+    private static final class UndoStateBindings {
+
+        private final UUID userId;
+        private final UUID likeId;
+        private final UUID whoLikes;
+        private final UUID whoGotLiked;
+        private final String direction;
+        private final Instant likeCreatedAt;
+        private final String matchId;
+        private final Instant expiresAt;
+
+        private UndoStateBindings(Undo state) {
+            Objects.requireNonNull(state, "state cannot be null");
+            Like like = state.like();
+            this.userId = state.userId();
+            this.likeId = like.id();
+            this.whoLikes = like.whoLikes();
+            this.whoGotLiked = like.whoGotLiked();
+            this.direction = like.direction().name();
+            this.likeCreatedAt = like.createdAt();
+            this.matchId = state.matchId();
+            this.expiresAt = state.expiresAt();
+        }
+
+        public UUID getUserId() {
+            return userId;
+        }
+
+        public UUID getLikeId() {
+            return likeId;
+        }
+
+        public UUID getWhoLikes() {
+            return whoLikes;
+        }
+
+        public UUID getWhoGotLiked() {
+            return whoGotLiked;
+        }
+
+        public String getDirection() {
+            return direction;
+        }
+
+        public Instant getLikeCreatedAt() {
+            return likeCreatedAt;
+        }
+
+        public String getMatchId() {
+            return matchId;
+        }
+
+        public Instant getExpiresAt() {
+            return expiresAt;
+        }
+    }
+
     private final class UndoStorageAdapter implements Undo.Storage {
 
         @Override
         public void save(Undo state) {
-            var like = state.like();
-            undoDao.upsert(
-                    state.userId(),
-                    like.id(),
-                    like.whoLikes(),
-                    like.whoGotLiked(),
-                    like.direction().name(),
-                    like.createdAt(),
-                    state.matchId(),
-                    state.expiresAt());
+            undoDao.upsert(new UndoStateBindings(state));
         }
 
         @Override
@@ -221,20 +553,25 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         @SqlQuery("""
                 SELECT id, who_likes, who_got_liked, direction, created_at
                 FROM likes
-                WHERE who_likes = :fromUserId AND who_got_liked = :toUserId
+            WHERE who_likes = :fromUserId
+              AND who_got_liked = :toUserId
+              AND deleted_at IS NULL
                 """)
         Optional<Like> getLike(@Bind("fromUserId") UUID fromUserId, @Bind("toUserId") UUID toUserId);
 
         @SqlUpdate("""
-                INSERT INTO likes (id, who_likes, who_got_liked, direction, created_at)
-                VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt)
-                """)
+            MERGE INTO likes (id, who_likes, who_got_liked, direction, created_at, deleted_at)
+            KEY (who_likes, who_got_liked)
+            VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt, NULL)
+            """)
         void save(@BindBean Like like);
 
         @SqlQuery("""
                 SELECT EXISTS (
                     SELECT 1 FROM likes
-                    WHERE who_likes = :from AND who_got_liked = :to
+                WHERE who_likes = :from
+                  AND who_got_liked = :to
+                  AND deleted_at IS NULL
                 )
                 """)
         boolean exists(@Bind("from") UUID from, @Bind("to") UUID to);
@@ -245,23 +582,24 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     JOIN likes l2 ON l1.who_likes = l2.who_got_liked
                                  AND l1.who_got_liked = l2.who_likes
                     WHERE l1.who_likes = :a AND l1.who_got_liked = :b
-                      AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
+                                            AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
+                                            AND l1.deleted_at IS NULL AND l2.deleted_at IS NULL
                 )
                 """)
         boolean mutualLikeExists(@Bind("a") UUID a, @Bind("b") UUID b);
 
-        @SqlQuery("SELECT who_got_liked FROM likes WHERE who_likes = :userId")
+        @SqlQuery("SELECT who_got_liked FROM likes WHERE who_likes = :userId AND deleted_at IS NULL")
         Set<UUID> getLikedOrPassedUserIds(@Bind("userId") UUID userId);
 
         @SqlQuery("""
                 SELECT who_likes FROM likes
-                WHERE who_got_liked = :userId AND direction = 'LIKE'
+                WHERE who_got_liked = :userId AND direction = 'LIKE' AND deleted_at IS NULL
                 """)
         Set<UUID> getUserIdsWhoLiked(@Bind("userId") UUID userId);
 
         @SqlQuery("""
                 SELECT who_likes, created_at FROM likes
-                WHERE who_got_liked = :userId AND direction = 'LIKE'
+                WHERE who_got_liked = :userId AND direction = 'LIKE' AND deleted_at IS NULL
                 """)
         List<LikeTimeEntry> getLikeTimesInternal(@Bind("userId") UUID userId);
 
@@ -273,13 +611,13 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         @SqlQuery("""
                 SELECT COUNT(*) FROM likes
-                WHERE who_likes = :userId AND direction = :direction
+                WHERE who_likes = :userId AND direction = :direction AND deleted_at IS NULL
                 """)
         int countByDirection(@Bind("userId") UUID userId, @Bind("direction") Like.Direction direction);
 
         @SqlQuery("""
                 SELECT COUNT(*) FROM likes
-                WHERE who_got_liked = :userId AND direction = :direction
+                WHERE who_got_liked = :userId AND direction = :direction AND deleted_at IS NULL
                 """)
         int countReceivedByDirection(@Bind("userId") UUID userId, @Bind("direction") Like.Direction direction);
 
@@ -289,6 +627,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                              AND l1.who_got_liked = l2.who_likes
                 WHERE l1.who_likes = :userId
                   AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
+                                    AND l1.deleted_at IS NULL AND l2.deleted_at IS NULL
                 """)
         int countMutualLikes(@Bind("userId") UUID userId);
 
@@ -297,6 +636,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 WHERE who_likes = :userId
                   AND direction = 'LIKE'
                   AND created_at >= :startOfDay
+                                    AND deleted_at IS NULL
                 """)
         int countLikesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
@@ -305,10 +645,11 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 WHERE who_likes = :userId
                   AND direction = 'PASS'
                   AND created_at >= :startOfDay
+                                    AND deleted_at IS NULL
                 """)
         int countPassesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
-        @SqlUpdate("DELETE FROM likes WHERE id = :likeId")
+        @SqlUpdate("UPDATE likes SET deleted_at = CURRENT_TIMESTAMP WHERE id = :likeId AND deleted_at IS NULL")
         void delete(@Bind("likeId") UUID likeId);
     }
 
@@ -367,15 +708,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 ) KEY (user_id)
                 VALUES (:userId, :likeId, :whoLikes, :whoGotLiked, :direction, :likeCreatedAt, :matchId, :expiresAt)
                 """)
-        void upsert(
-                @Bind("userId") UUID userId,
-                @Bind("likeId") UUID likeId,
-                @Bind("whoLikes") UUID whoLikes,
-                @Bind("whoGotLiked") UUID whoGotLiked,
-                @Bind("direction") String direction,
-                @Bind("likeCreatedAt") Instant likeCreatedAt,
-                @Bind("matchId") String matchId,
-                @Bind("expiresAt") Instant expiresAt);
+        void upsert(@BindBean UndoStateBindings bindings);
 
         @SqlQuery("""
                 SELECT user_id, like_id, who_likes, who_got_liked, direction, like_created_at, match_id, expires_at
@@ -403,8 +736,8 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     public static class LikeTimeEntryMapper implements RowMapper<LikeTimeEntry> {
         @Override
         public LikeTimeEntry map(ResultSet rs, StatementContext ctx) throws SQLException {
-            UUID userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "who_likes");
-            Instant likedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at");
+            UUID userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_LIKES);
+            Instant likedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, COLUMN_CREATED_AT);
             return new LikeTimeEntry(userId, likedAt);
         }
     }
@@ -412,11 +745,11 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     public static class LikeMapper implements RowMapper<Like> {
         @Override
         public Like map(ResultSet rs, StatementContext ctx) throws SQLException {
-            var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
-            var whoLikes = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "who_likes");
+            var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, PARAM_ID);
+            var whoLikes = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_LIKES);
             var whoGotLiked = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "who_got_liked");
-            var direction = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "direction", Like.Direction.class);
-            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at");
+            var direction = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, PARAM_DIRECTION, Like.Direction.class);
+            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, COLUMN_CREATED_AT);
 
             return new Like(id, whoLikes, whoGotLiked, direction, createdAt);
         }
@@ -429,8 +762,8 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     rs.getString("id"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_a"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_b"),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at"),
-                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "state", MatchState.class),
+                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, COLUMN_CREATED_AT),
+                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, PARAM_STATE, MatchState.class),
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "ended_by"),
                     JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "end_reason", MatchArchiveReason.class));
@@ -444,9 +777,9 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         public Undo map(ResultSet rs, StatementContext ctx) throws SQLException {
             UUID userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_id");
             UUID likeId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "like_id");
-            UUID whoLikes = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "who_likes");
+            UUID whoLikes = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_LIKES);
             UUID whoGotLiked = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "who_got_liked");
-            Like.Direction direction = Like.Direction.valueOf(rs.getString("direction"));
+            Like.Direction direction = Like.Direction.valueOf(rs.getString(PARAM_DIRECTION));
             Instant likeCreatedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "like_created_at");
             String matchId = rs.getString("match_id");
             Instant expiresAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "expires_at");

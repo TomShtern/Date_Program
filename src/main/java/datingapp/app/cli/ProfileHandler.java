@@ -5,6 +5,7 @@ import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
 import datingapp.core.EnumSetUtil;
 import datingapp.core.LoggingSupport;
+import datingapp.core.ServiceRegistry;
 import datingapp.core.TextUtil;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
@@ -72,6 +73,17 @@ public class ProfileHandler implements LoggingSupport {
         this.inputReader = inputReader;
     }
 
+    public static ProfileHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
+        java.util.Objects.requireNonNull(services, "services cannot be null");
+        return new ProfileHandler(
+                services.getUserStorage(),
+                services.getProfileService(),
+                services.getProfileService(),
+                services.getValidationService(),
+                session,
+                inputReader);
+    }
+
     @Override
     public Logger logger() {
         return logger;
@@ -83,7 +95,7 @@ public class ProfileHandler implements LoggingSupport {
      * to activate the profile if complete.
      */
     public void completeProfile() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             logInfo("\n--- Complete Profile for {} ---\n", currentUser.getName());
 
@@ -119,7 +131,7 @@ public class ProfileHandler implements LoggingSupport {
      * percentage and improvement tips.
      */
     public void previewProfile() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             ProfileService.ProfilePreview preview = profileCompletionService.generatePreview(currentUser);
 
@@ -180,7 +192,7 @@ public class ProfileHandler implements LoggingSupport {
      * based on lifestyle MatchPreferences.
      */
     public void setDealbreakers() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             boolean editing = true;
             while (editing) {
@@ -250,7 +262,7 @@ public class ProfileHandler implements LoggingSupport {
                 return;
             }
             currentUser.setBirthDate(birthDate);
-        } catch (DateTimeParseException ignored) {
+        } catch (DateTimeParseException _) {
             logInfo("⚠️  Invalid date format, skipping.");
         }
     }
@@ -718,7 +730,7 @@ public class ProfileHandler implements LoggingSupport {
      * @param subjectName the name of the user (for display)
      */
     public void manageNoteFor(UUID subjectId, String subjectName) {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
 
             logInfo("\n" + CliTextAndInput.MENU_DIVIDER);
@@ -756,7 +768,7 @@ public class ProfileHandler implements LoggingSupport {
 
     /** Views all notes the current user has created. */
     public void viewAllNotes() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
 
             logInfo("\n" + CliTextAndInput.MENU_DIVIDER);
@@ -925,7 +937,7 @@ public class ProfileHandler implements LoggingSupport {
             }
             session.setCurrentUser(users.get(idx));
             logInfo("\n✅ Selected: {}\n", session.getCurrentUser().getName());
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logInfo("❌ Invalid input.\n");
         }
     }
@@ -934,7 +946,7 @@ public class ProfileHandler implements LoggingSupport {
      * Displays the profile completion score and breakdown for the current user.
      */
     public void viewProfileScore() {
-        CliTextAndInput.requireLogin(() -> {
+        CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
             ProfileService.CompletionResult result = profileCompletionService.calculate(currentUser);
 

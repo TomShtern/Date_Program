@@ -35,6 +35,7 @@ public class LoginViewModel {
     private static final Logger logger = LoggerFactory.getLogger(LoginViewModel.class);
 
     private final AppConfig config;
+    private final AppSession session;
     private final UiUserStore userStore;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final ObservableList<User> filteredUsers = FXCollections.observableArrayList();
@@ -54,9 +55,10 @@ public class LoginViewModel {
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
-    public LoginViewModel(UiUserStore userStore, AppConfig config) {
+    public LoginViewModel(UiUserStore userStore, AppConfig config, AppSession session) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
         this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
         loadUsers();
     }
@@ -194,7 +196,7 @@ public class LoginViewModel {
         }
 
         // Set user in the global UI session
-        AppSession.getInstance().setCurrentUser(selectedUser);
+        session.setCurrentUser(selectedUser);
 
         return true;
     }

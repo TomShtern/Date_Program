@@ -5,8 +5,6 @@ import datingapp.core.AppConfig;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.matching.MatchQualityService.InterestMatcher;
 import datingapp.core.model.User;
-import datingapp.core.profile.MatchPreferences.Interest;
-import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.InteractionStorage;
@@ -462,9 +460,7 @@ public final class RecommendationService {
                 : 0.5;
 
         int ageDiff = Math.abs(seeker.getAge() - candidate.getAge());
-        double avgAgeRange =
-                (seeker.getMaxAge() - seeker.getMinAge() + candidate.getMaxAge() - candidate.getMinAge()) / 2.0;
-        double ageScore = avgAgeRange > 0 ? Math.max(0, 1.0 - (ageDiff / avgAgeRange)) : 0.5;
+        double ageScore = CompatibilityScoring.ageScore(ageDiff, seeker, candidate, 0);
 
         InterestMatcher.MatchResult interests =
                 InterestMatcher.compare(seeker.getInterests(), candidate.getInterests());
@@ -487,77 +483,12 @@ public final class RecommendationService {
     }
 
     private double calculateInterestScore(InterestMatcher.MatchResult match, User seeker, User candidate) {
-        Set<Interest> seekerInterests = seeker.getInterests();
-        Set<Interest> candidateInterests = candidate.getInterests();
-
-        if ((seekerInterests == null || seekerInterests.isEmpty())
-                && (candidateInterests == null || candidateInterests.isEmpty())) {
-            return 0.5;
-        }
-        if (seekerInterests == null
-                || seekerInterests.isEmpty()
-                || candidateInterests == null
-                || candidateInterests.isEmpty()) {
-            return 0.3;
-        }
-        return match.overlapRatio();
+        return CompatibilityScoring.interestScore(
+                seeker.getInterests(), candidate.getInterests(), match.overlapRatio(), 0.5, 0.3);
     }
 
     private double calculateLifestyleScore(User seeker, User candidate) {
-        int total = countLifestyleFactors(seeker, candidate);
-        if (total == 0) {
-            return 0.5;
-        }
-
-        int matches = countLifestyleMatches(seeker, candidate);
-        return (double) matches / total;
-    }
-
-    private int countLifestyleFactors(User seeker, User candidate) {
-        int total = 0;
-        if (seeker.getSmoking() != null && candidate.getSmoking() != null) {
-            total++;
-        }
-        if (seeker.getDrinking() != null && candidate.getDrinking() != null) {
-            total++;
-        }
-        if (seeker.getWantsKids() != null && candidate.getWantsKids() != null) {
-            total++;
-        }
-        if (seeker.getLookingFor() != null && candidate.getLookingFor() != null) {
-            total++;
-        }
-        return total;
-    }
-
-    private int countLifestyleMatches(User seeker, User candidate) {
-        int matches = 0;
-        if (sameNonNull(seeker.getSmoking(), candidate.getSmoking())) {
-            matches++;
-        }
-        if (sameNonNull(seeker.getDrinking(), candidate.getDrinking())) {
-            matches++;
-        }
-        if (seeker.getWantsKids() != null
-                && candidate.getWantsKids() != null
-                && areKidsCompatible(seeker.getWantsKids(), candidate.getWantsKids())) {
-            matches++;
-        }
-        if (sameNonNull(seeker.getLookingFor(), candidate.getLookingFor())) {
-            matches++;
-        }
-        return matches;
-    }
-
-    private boolean areKidsCompatible(Lifestyle.WantsKids left, Lifestyle.WantsKids right) {
-        if (left == right) {
-            return true;
-        }
-        if (left == Lifestyle.WantsKids.OPEN || right == Lifestyle.WantsKids.OPEN) {
-            return true;
-        }
-        return (left == Lifestyle.WantsKids.SOMEDAY && right == Lifestyle.WantsKids.HAS_KIDS)
-                || (right == Lifestyle.WantsKids.SOMEDAY && left == Lifestyle.WantsKids.HAS_KIDS);
+        return CompatibilityScoring.lifestyleScore(seeker, candidate, 0.5);
     }
 
     private double calculateActivityScore(User candidate) {

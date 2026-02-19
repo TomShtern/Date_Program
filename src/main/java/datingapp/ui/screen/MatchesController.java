@@ -9,9 +9,15 @@ import datingapp.ui.viewmodel.MatchesViewModel.LikeCardData;
 import datingapp.ui.viewmodel.MatchesViewModel.MatchCardData;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.ResourceBundle;
+import java.util.Set;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
@@ -126,9 +132,15 @@ public class MatchesController extends BaseController implements Initializable {
     private Pane particleLayer;
     private boolean emptyStateAnimated;
     private Section currentSection = Section.MATCHES;
+    private final Map<Section, Map<String, VBox>> cardCacheBySection = new EnumMap<>(Section.class);
+    private final Map<Section, Map<String, Object>> cardDataBySection = new EnumMap<>(Section.class);
 
     public MatchesController(MatchesViewModel viewModel) {
         this.viewModel = viewModel;
+        for (Section section : Section.values()) {
+            cardCacheBySection.put(section, new LinkedHashMap<>());
+            cardDataBySection.put(section, new LinkedHashMap<>());
+        }
     }
 
     @Override
@@ -380,9 +392,8 @@ public class MatchesController extends BaseController implements Initializable {
 
     /** Populate the FlowPane with the current section's cards. */
     private void populateCards() {
-        matchesFlow.getChildren().clear();
-
         if (getActiveCardsCount() == 0) {
+            matchesFlow.getChildren().clear();
             matchesFlow.setVisible(false);
             matchesFlow.setManaged(false);
             emptyStateContainer.setVisible(true);
@@ -394,11 +405,15 @@ public class MatchesController extends BaseController implements Initializable {
             emptyStateContainer.setVisible(false);
             emptyStateContainer.setManaged(false);
 
-            int index = 0;
-            for (VBox card : buildCardsForSection()) {
-                matchesFlow.getChildren().add(card);
-                animateCardEntrance(card, index * 120);
-                index++;
+            List<VBox> cards = resolveCardsForCurrentSection();
+            Set<Node> existingNodes = new HashSet<>(matchesFlow.getChildren());
+            matchesFlow.getChildren().setAll(cards);
+
+            for (int index = 0; index < cards.size(); index++) {
+                VBox card = cards.get(index);
+                if (!existingNodes.contains(card)) {
+                    animateCardEntrance(card, index * 120);
+                }
             }
         }
 
@@ -414,32 +429,65 @@ public class MatchesController extends BaseController implements Initializable {
         };
     }
 
-    private List<VBox> buildCardsForSection() {
+    private List<VBox> resolveCardsForCurrentSection() {
+        return switch (currentSection) {
+            case MATCHES -> resolveMatchCards();
+            case LIKES_YOU -> resolveLikeCards(Section.LIKES_YOU, viewModel.getLikesReceived(), true);
+            case YOU_LIKED -> resolveLikeCards(Section.YOU_LIKED, viewModel.getLikesSent(), false);
+        };
+    }
+
+    private List<VBox> resolveMatchCards() {
+        Map<String, VBox> cache = cardCacheBySection.get(Section.MATCHES);
+        Map<String, Object> snapshots = cardDataBySection.get(Section.MATCHES);
         List<VBox> cards = new ArrayList<>();
-        switch (currentSection) {
-            case MATCHES -> {
-                for (MatchCardData match : viewModel.getMatches()) {
-                    cards.add(createMatchCard(match));
-                }
+        Set<String> activeKeys = new HashSet<>();
+
+        for (MatchCardData match : viewModel.getMatches()) {
+            String key = match.userId().toString();
+            activeKeys.add(key);
+
+            VBox card = cache.get(key);
+            Object previous = snapshots.get(key);
+            if (card == null || !Objects.equals(previous, match)) {
+                card = createMatchCard(match);
+                cache.put(key, card);
+                snapshots.put(key, match);
             }
-            case LIKES_YOU -> {
-                for (LikeCardData like : viewModel.getLikesReceived()) {
-                    cards.add(createIncomingLikeCard(like));
-                }
-            }
-            case YOU_LIKED -> {
-                for (LikeCardData like : viewModel.getLikesSent()) {
-                    cards.add(createOutgoingLikeCard(like));
-                }
-            }
-            default -> {
-                logWarn("Unknown section {}, defaulting to matches list", currentSection);
-                for (MatchCardData match : viewModel.getMatches()) {
-                    cards.add(createMatchCard(match));
-                }
-            }
+            cards.add(card);
         }
+
+        purgeStaleCards(cache, snapshots, activeKeys);
         return cards;
+    }
+
+    private List<VBox> resolveLikeCards(Section section, List<LikeCardData> likes, boolean incoming) {
+        Map<String, VBox> cache = cardCacheBySection.get(section);
+        Map<String, Object> snapshots = cardDataBySection.get(section);
+        List<VBox> cards = new ArrayList<>();
+        Set<String> activeKeys = new HashSet<>();
+
+        for (LikeCardData like : likes) {
+            String key = like.userId().toString();
+            activeKeys.add(key);
+
+            VBox card = cache.get(key);
+            Object previous = snapshots.get(key);
+            if (card == null || !Objects.equals(previous, like)) {
+                card = incoming ? createIncomingLikeCard(like) : createOutgoingLikeCard(like);
+                cache.put(key, card);
+                snapshots.put(key, like);
+            }
+            cards.add(card);
+        }
+
+        purgeStaleCards(cache, snapshots, activeKeys);
+        return cards;
+    }
+
+    private void purgeStaleCards(Map<String, VBox> cache, Map<String, Object> snapshots, Set<String> activeKeys) {
+        cache.keySet().removeIf(key -> !activeKeys.contains(key));
+        snapshots.keySet().removeIf(key -> !activeKeys.contains(key));
     }
 
     /** Animate a card entering with fade + slide up. */
@@ -565,7 +613,7 @@ public class MatchesController extends BaseController implements Initializable {
         logInfo("Starting chat with match: {}", match.userName());
         // Set navigation context so ChatController knows which user to chat with
         NavigationService nav = NavigationService.getInstance();
-        nav.setNavigationContext(match.userId());
+        nav.setNavigationContext(NavigationService.ViewType.CHAT, match.userId());
         nav.navigateTo(NavigationService.ViewType.CHAT);
     }
 
@@ -688,6 +736,8 @@ public class MatchesController extends BaseController implements Initializable {
         if (particleLayer != null) {
             particleLayer.getChildren().clear();
         }
+        cardCacheBySection.values().forEach(Map::clear);
+        cardDataBySection.values().forEach(Map::clear);
         // super.cleanup() stops all tracked animations and subscriptions
         super.cleanup();
     }

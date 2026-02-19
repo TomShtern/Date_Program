@@ -309,7 +309,7 @@ public class User {
         }
 
         public StorageBuilder interests(Set<Interest> interests) {
-            user.interests = EnumSetUtil.safeCopy(interests, Interest.class);
+            user.interests = copyAndValidateInterests(interests);
             return this;
         }
 
@@ -718,7 +718,7 @@ public class User {
      * @param interests set of interests (null treated as empty)
      */
     public void setInterests(Set<Interest> interests) {
-        this.interests = interests != null ? EnumSet.copyOf(interests) : EnumSet.noneOf(Interest.class);
+        this.interests = copyAndValidateInterests(interests);
         touch();
     }
 
@@ -731,8 +731,22 @@ public class User {
         if (interest == null) {
             return;
         }
+        if (interests.contains(interest)) {
+            return;
+        }
+        if (interests.size() >= Interest.MAX_PER_USER) {
+            throw new IllegalStateException("Cannot add more than " + Interest.MAX_PER_USER + " interests");
+        }
         interests.add(interest);
         touch();
+    }
+
+    private static Set<Interest> copyAndValidateInterests(Set<Interest> interests) {
+        Set<Interest> safe = EnumSetUtil.safeCopy(interests, Interest.class);
+        if (safe.size() > Interest.MAX_PER_USER) {
+            throw new IllegalArgumentException("Cannot set more than " + Interest.MAX_PER_USER + " interests");
+        }
+        return safe;
     }
 
     /**

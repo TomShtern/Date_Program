@@ -1,6 +1,5 @@
 package datingapp.ui.screen;
 
-import datingapp.core.AppSession;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
 import datingapp.ui.UiFeedbackService;
@@ -213,7 +212,7 @@ public class DashboardController extends BaseController
                 "Confirm Logout", "Are you sure you want to log out?", "You will need to log in again to continue.");
         if (confirmed) {
             logger.info("Logging out");
-            AppSession.getInstance().logout();
+            viewModel.logout();
             NavigationService.getInstance().getViewModelFactory().reset();
             NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
         }

@@ -58,6 +58,17 @@ public interface CommunicationStorage {
 
     void saveFriendRequest(FriendRequest request);
 
+    /**
+     * Persists a friend request and its paired notification as one logical write.
+     *
+     * <p>Default implementation is sequential for backward compatibility. Implementations with
+     * transactional capabilities should override to guarantee atomic behavior.
+     */
+    default void saveFriendRequestWithNotification(FriendRequest request, Notification notification) {
+        saveFriendRequest(request);
+        saveNotification(notification);
+    }
+
     void updateFriendRequest(FriendRequest request);
 
     Optional<FriendRequest> getFriendRequest(UUID id);
