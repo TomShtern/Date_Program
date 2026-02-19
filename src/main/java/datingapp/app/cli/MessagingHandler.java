@@ -181,7 +181,7 @@ public class MessagingHandler implements LoggingSupport {
 
             printConversationHeader(otherUser.getName(), canMessage);
             printMessages(messages, currentUser, showOlder);
-            printConversationFooter(canMessage, messages.size() >= MESSAGES_PER_PAGE && offset == 0);
+            printConversationFooter(canMessage, messages.size() >= MESSAGES_PER_PAGE);
 
             String userInput = input.readLine("> ").trim();
 
@@ -365,6 +365,9 @@ public class MessagingHandler implements LoggingSupport {
         }
 
         Duration duration = Duration.between(timestamp, AppClock.now());
+        if (duration.isNegative() || duration.toMinutes() == 0) {
+            return "just now";
+        }
 
         if (duration.toMinutes() < 60) {
             return duration.toMinutes() + "m ago";

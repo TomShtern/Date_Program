@@ -2,7 +2,7 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.model.Gender;
+import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Interest;
 import java.util.Collection;
 import java.util.EnumSet;

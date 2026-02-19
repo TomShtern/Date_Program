@@ -4,9 +4,9 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.core.model.MatchState;
+import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.UserState;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
@@ -52,10 +52,10 @@ public class TrustSafetyService {
             AppConfig config,
             Duration verificationTtl,
             Random random) {
-        this.trustSafetyStorage = trustSafetyStorage;
-        this.interactionStorage = interactionStorage;
-        this.userStorage = userStorage;
-        this.config = config;
+        this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
         this.verificationTtl = Objects.requireNonNull(verificationTtl, "verificationTtl cannot be null");
         this.random = Objects.requireNonNull(random, "random cannot be null");
     }
@@ -95,6 +95,18 @@ public class TrustSafetyService {
     /** Report a user for inappropriate behavior and return moderation action. */
     public ReportResult report(UUID reporterId, UUID reportedUserId, Report.Reason reason, String description) {
 
+        if (reporterId == null) {
+            return new ReportResult(false, false, "reporterId is required");
+        }
+        if (reportedUserId == null) {
+            return new ReportResult(false, false, "reportedUserId is required");
+        }
+        if (reason == null) {
+            return new ReportResult(false, false, "reason is required");
+        }
+        if (reporterId.equals(reportedUserId)) {
+            return new ReportResult(false, false, "Cannot report yourself");
+        }
         // Validate description length against configured maximum
         if (description != null && description.length() > config.maxReportDescLength()) {
             return new ReportResult(
@@ -124,15 +136,31 @@ public class TrustSafetyService {
             updateMatchStateForBlock(reporterId, reportedUserId);
         }
 
-        int reportCount = trustSafetyStorage.countReportsAgainst(reportedUserId);
-        boolean autoBanned = false;
-        if (reportCount >= config.autoBanThreshold() && reported.getState() != UserState.BANNED) {
-            reported.ban();
-            userStorage.save(reported);
-            autoBanned = true;
-        }
+        boolean autoBanned = applyAutoBanIfThreshold(reportedUserId);
 
         return new ReportResult(true, autoBanned, null);
+    }
+
+    /**
+     * Applies auto-ban decision atomically inside this service instance to avoid
+     * check-then-act races during concurrent reports.
+     */
+    private boolean applyAutoBanIfThreshold(UUID reportedUserId) {
+        synchronized (this) {
+            int reportCount = trustSafetyStorage.countReportsAgainst(reportedUserId);
+            if (reportCount < config.autoBanThreshold()) {
+                return false;
+            }
+
+            User latestReported = userStorage.get(reportedUserId);
+            if (latestReported == null || latestReported.getState() == UserState.BANNED) {
+                return false;
+            }
+
+            latestReported.ban();
+            userStorage.save(latestReported);
+            return true;
+        }
     }
 
     /**

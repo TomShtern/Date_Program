@@ -112,7 +112,7 @@ datingapp/
 │   ├── DatabaseManager.java           H2 connection pool (HikariCP), singleton lifecycle
 │   ├── StorageFactory.java            Wires JDBI impls → services → ServiceRegistry
 │   ├── schema/
-│   │   ├── SchemaInitializer.java     DDL: 14 tables + indexes + FK constraints (IF NOT EXISTS)
+│   │   ├── SchemaInitializer.java     DDL: 18 application tables (+ schema_version metadata via MigrationRunner), indexes, FK constraints (IF NOT EXISTS)
 │   │   └── MigrationRunner.java       Schema evolution (ALTER TABLE, etc.)
 │   └── jdbi/
 │       ├── profile/JdbiUserStorage.java         → UserStorage
@@ -142,20 +142,20 @@ datingapp/
 
 ## 4. Critical Gotchas (Compilation/Runtime Failure Sources)
 
-| Mistake | Wrong | Correct |
-|---------|-------|---------|
-| Non-static nested type | `public record Y() {}` | `public **static** record Y() {}` |
-| EnumSet null crash | `EnumSet.copyOf(set)` | `set != null ? EnumSet.copyOf(set) : EnumSet.noneOf(X.class)` |
-| Exposed mutable field | `return interests;` | `return EnumSet.copyOf(interests);` |
-| Missing `touch()` | `this.name = name;` | `this.name = name; touch();` |
-| Service throws exception | `throw new MessagingException(...)` | `return SendResult.failure(msg, code)` |
-| Hardcoded threshold | `if (age < 18)` | `if (age < CONFIG.minAge())` |
-| Wrong pair ID | `a + "_" + b` | `a.compareTo(b) < 0 ? a+"_"+b : b+"_"+a` |
-| Raw `Instant.now()` | `this.updatedAt = Instant.now()` | `this.updatedAt = AppClock.now()` |
-| ViewModel imports storage | `import datingapp.core.storage.*` | `import datingapp.ui.viewmodel.data.UiDataAdapters.*` |
-| Standalone enum | `import datingapp.core.Gender` | `User.Gender` (nested in User) |
-| PMD + Spotless | Add `// NOPMD` then verify fails | Run `spotless:apply` after NOPMD, then `verify` |
-| Stale class refs | `Toast`, `UiSupport`, `HandlerFactory`, `AppBootstrap` | `UiFeedbackService`, deleted, deleted, `ApplicationStartup` |
+| Mistake                   | Wrong                                                  | Correct                                                       |
+|---------------------------|--------------------------------------------------------|---------------------------------------------------------------|
+| Non-static nested type    | `public record Y() {}`                                 | `public **static** record Y() {}`                             |
+| EnumSet null crash        | `EnumSet.copyOf(set)`                                  | `set != null ? EnumSet.copyOf(set) : EnumSet.noneOf(X.class)` |
+| Exposed mutable field     | `return interests;`                                    | `return EnumSet.copyOf(interests);`                           |
+| Missing `touch()`         | `this.name = name;`                                    | `this.name = name; touch();`                                  |
+| Service throws exception  | `throw new MessagingException(...)`                    | `return SendResult.failure(msg, code)`                        |
+| Hardcoded threshold       | `if (age < 18)`                                        | `if (age < CONFIG.minAge())`                                  |
+| Wrong pair ID             | `a + "_" + b`                                          | `a.compareTo(b) < 0 ? a+"_"+b : b+"_"+a`                      |
+| Raw `Instant.now()`       | `this.updatedAt = Instant.now()`                       | `this.updatedAt = AppClock.now()`                             |
+| ViewModel imports storage | `import datingapp.core.storage.*`                      | `import datingapp.ui.viewmodel.data.UiDataAdapters.*`         |
+| Standalone enum           | `import datingapp.core.Gender`                         | `User.Gender` (nested in User)                                |
+| PMD + Spotless            | Add `// NOPMD` then verify fails                       | Run `spotless:apply` after NOPMD, then `verify`               |
+| Stale class refs          | `Toast`, `UiSupport`, `HandlerFactory`, `AppBootstrap` | `UiFeedbackService`, deleted, deleted, `ApplicationStartup`   |
 
 ---
 
@@ -350,26 +350,26 @@ ApplicationStartup.initialize()
 
 ## 7. Technology Stack (Exact Versions from pom.xml)
 
-| Layer | Technology | Version | Purpose |
-|-------|-----------|---------|---------|
-| Language | Java | 25 (`--enable-preview` everywhere) | `maven.compiler.release = 25` |
-| Build | Maven | 3.9+ | Compile, test, quality checks |
-| Database | H2 | 2.4.240 | Embedded in-process database |
-| SQL Framework | JDBI 3 | 3.51.0 | `@SqlQuery` / `@SqlUpdate` declarative SQL |
-| Connection Pool | HikariCP | 6.3.0 | Database connection pooling |
-| GUI Framework | JavaFX | 25.0.2 | Desktop UI (FXML + CSS) |
-| GUI Theme | AtlantaFX | 2.1.0 | Material Design-inspired theming |
-| GUI Icons | Ikonli | 12.4.0 | MaterialDesign2 icon pack |
-| REST Framework | Javalin | 6.7.0 | Lightweight HTTP endpoints |
-| JSON | Jackson | 2.21.0 | Config parsing + REST serialization |
-| Logging API | SLF4J | 2.0.17 | Logging facade |
-| Logging Impl | Logback | 1.5.28 | Logging backend |
-| Testing | JUnit 5 | 5.14.2 | Unit + integration tests |
-| Formatting | Spotless (Palantir Java Format) | plugin: 3.2.1 / format: 2.85.0 | 4-space indentation |
-| Style Check | Checkstyle | 13.2.0 (via plugin 3.6.0) | `checkstyle.xml`, fails on violation |
-| Static Analysis | PMD | plugin 3.28.0 | Custom `pmd-rules.xml`, fails on violation |
-| Coverage | JaCoCo | 0.8.14 | 60% minimum line coverage |
-| Nullable | JetBrains Annotations | 24.1.0 | `@Nullable` / `@NotNull` |
+| Layer           | Technology                      | Version                            | Purpose                                    |
+|-----------------|---------------------------------|------------------------------------|--------------------------------------------|
+| Language        | Java                            | 25 (`--enable-preview` everywhere) | `maven.compiler.release = 25`              |
+| Build           | Maven                           | 3.9+                               | Compile, test, quality checks              |
+| Database        | H2                              | 2.4.240                            | Embedded in-process database               |
+| SQL Framework   | JDBI 3                          | 3.51.0                             | `@SqlQuery` / `@SqlUpdate` declarative SQL |
+| Connection Pool | HikariCP                        | 6.3.0                              | Database connection pooling                |
+| GUI Framework   | JavaFX                          | 25.0.2                             | Desktop UI (FXML + CSS)                    |
+| GUI Theme       | AtlantaFX                       | 2.1.0                              | Material Design-inspired theming           |
+| GUI Icons       | Ikonli                          | 12.4.0                             | MaterialDesign2 icon pack                  |
+| REST Framework  | Javalin                         | 6.7.0                              | Lightweight HTTP endpoints                 |
+| JSON            | Jackson                         | 2.21.0                             | Config parsing + REST serialization        |
+| Logging API     | SLF4J                           | 2.0.17                             | Logging facade                             |
+| Logging Impl    | Logback                         | 1.5.28                             | Logging backend                            |
+| Testing         | JUnit 5                         | 5.14.2                             | Unit + integration tests                   |
+| Formatting      | Spotless (Palantir Java Format) | plugin: 3.2.1 / format: 2.85.0     | 4-space indentation                        |
+| Style Check     | Checkstyle                      | 13.2.0 (via plugin 3.6.0)          | `checkstyle.xml`, fails on violation       |
+| Static Analysis | PMD                             | plugin 3.28.0                      | Custom `pmd-rules.xml`, fails on violation |
+| Coverage        | JaCoCo                          | 0.8.14                             | 60% minimum line coverage                  |
+| Nullable        | JetBrains Annotations           | 24.1.0                             | `@Nullable` / `@NotNull`                   |
 
 ### Build Pipeline (`mvn verify`)
 ```
@@ -510,14 +510,14 @@ MatchingService.like(currentUser, candidateId)
 ```
 
 ### Match Quality Score (6 Weighted Factors = 100%)
-| Factor | Weight | Method |
-|--------|--------|--------|
-| Distance | 15% | Inverse of distance |
-| Age | 10% | Inverse of age diff |
-| Interests | 25% | Jaccard similarity |
-| Lifestyle | 25% | Weighted smoking/drinking/wantsKids/lookingFor/education |
-| Pace | 15% | PacePreferences compatibility |
-| Response Time | 10% | Average messaging response time |
+| Factor        | Weight | Method                                                   |
+|---------------|--------|----------------------------------------------------------|
+| Distance      | 15%    | Inverse of distance                                      |
+| Age           | 10%    | Inverse of age diff                                      |
+| Interests     | 25%    | Jaccard similarity                                       |
+| Lifestyle     | 25%    | Weighted smoking/drinking/wantsKids/lookingFor/education |
+| Pace          | 15%    | PacePreferences compatibility                            |
+| Response Time | 10%    | Average messaging response time                          |
 
 Thresholds in `ScoringConstants`: 90+ Excellent, 75+ Great, 60+ Good, 40+ Fair, <40 Low.
 
@@ -537,7 +537,7 @@ ConnectionService.sendMessage() → validate sender ACTIVE → validate conversa
 
 ## 12. Database Schema
 
-**14 tables** managed by `SchemaInitializer` (DDL with `IF NOT EXISTS`) and `MigrationRunner` (ALTER TABLE evolution).
+**18 application tables** managed by `SchemaInitializer` (DDL with `IF NOT EXISTS`) and `MigrationRunner` (ALTER TABLE evolution), plus the `schema_version` metadata table managed by `MigrationRunner`.
 
 Key tables: `users` (42 columns), `likes`, `matches` (VARCHAR PK, deterministic), `conversations` (deterministic ID), `messages`, `blocks`, `reports`, `friend_requests`, `notifications`, `swipe_sessions`, `user_stats`, `user_achievements`, `profile_notes`, `profile_views`, `standouts`, `daily_pick_views`, `platform_stats`, `undo_states`.
 
@@ -547,17 +547,17 @@ All two-user tables have `ON DELETE CASCADE` FK to `users.id`. ~30 indexes cover
 
 ## 13. Domain-Specific Terminology
 
-| Term | Definition |
-|------|-----------|
-| **Candidate** | A potential match found by `CandidateFinder` |
-| **Match** | Mutual like. Deterministic ID: `min(uuidA,uuidB)_max(uuidA,uuidB)` |
-| **Dealbreaker** | Strict lifestyle/age filter that immediately disqualifies a candidate |
-| **Interest** | One of 39 predefined enums across 6 categories (in `MatchPreferences.Interest`) |
-| **Daily Pick** | Seeded-random daily recommendation |
-| **Standout** | High-quality candidate surfaced by standout ranking |
+| Term                | Definition                                                                        |
+|---------------------|-----------------------------------------------------------------------------------|
+| **Candidate**       | A potential match found by `CandidateFinder`                                      |
+| **Match**           | Mutual like. Deterministic ID: `min(uuidA,uuidB)_max(uuidA,uuidB)`                |
+| **Dealbreaker**     | Strict lifestyle/age filter that immediately disqualifies a candidate             |
+| **Interest**        | One of 39 predefined enums across 6 categories (in `MatchPreferences.Interest`)   |
+| **Daily Pick**      | Seeded-random daily recommendation                                                |
+| **Standout**        | High-quality candidate surfaced by standout ranking                               |
 | **PacePreferences** | User preferences for dating speed (messaging frequency, time to first date, etc.) |
-| **Touch** | `updatedAt = AppClock.now()` called in every entity setter |
-| **StorageBuilder** | Pattern to hydrate entities from DB without triggering field validation |
+| **Touch**           | `updatedAt = AppClock.now()` called in every entity setter                        |
+| **StorageBuilder**  | Pattern to hydrate entities from DB without triggering field validation           |
 
 ---
 

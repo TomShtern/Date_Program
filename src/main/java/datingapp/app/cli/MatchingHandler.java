@@ -24,7 +24,7 @@ import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
@@ -222,6 +222,11 @@ public class MatchingHandler implements LoggingSupport {
     private String readValidatedChoice(String prompt, String errorMsg, String... valid) {
         while (true) {
             String input = inputReader.readLine(prompt);
+            if (input == null) {
+                String message = "Input stream closed while waiting for choice: " + prompt;
+                logInfo("❌ {}", message);
+                throw new IllegalStateException(message);
+            }
             Optional<String> validated = CliTextAndInput.validateChoice(input, valid);
             if (validated.isPresent()) {
                 return validated.get();
@@ -306,6 +311,10 @@ public class MatchingHandler implements LoggingSupport {
             Match match = matches.get(idx);
             UUID otherUserId = match.getOtherUser(currentUser.getId());
             User otherUser = userStorage.get(otherUserId);
+            if (otherUser == null) {
+                logInfo("  Other user not found — user may have been removed.");
+                return;
+            }
             MatchQuality quality = matchQualityService
                     .computeQuality(match, currentUser.getId())
                     .orElse(null);
@@ -467,6 +476,10 @@ public class MatchingHandler implements LoggingSupport {
             Match match = matches.get(idx);
             UUID otherUserId = match.getOtherUser(currentUser.getId());
             User otherUser = userStorage.get(otherUserId);
+            if (otherUser == null) {
+                logInfo("❌ User not found — may have already been deleted.\n");
+                return;
+            }
 
             String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
             if ("y".equalsIgnoreCase(confirm)) {
@@ -493,6 +506,10 @@ public class MatchingHandler implements LoggingSupport {
             Match match = matches.get(idx);
             UUID otherUserId = match.getOtherUser(currentUser.getId());
             User otherUser = userStorage.get(otherUserId);
+            if (otherUser == null) {
+                logInfo("❌ User not found — may have already been deleted.\n");
+                return;
+            }
 
             String confirm = inputReader.readLine(
                     CliTextAndInput.BLOCK_PREFIX + otherUser.getName() + "? This will end your match. (y/n): ");
@@ -745,7 +762,7 @@ public class MatchingHandler implements LoggingSupport {
         } else if (isLike) {
             logInfo("✅ Liked {}!\n", candidate.getName());
         } else {
-            logInfo("👋 Passed on {}.\\n", candidate.getName());
+            logInfo("👋 Passed on {}.\n", candidate.getName());
         }
     }
 

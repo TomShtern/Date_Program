@@ -6,8 +6,8 @@ import datingapp.core.LoggingSupport;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
-import datingapp.core.model.VerificationMethod;
+import datingapp.core.model.User.UserState;
+import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.storage.UserStorage;
 import java.util.HashSet;
 import java.util.List;
@@ -137,7 +137,7 @@ public class SafetyHandler implements LoggingSupport {
                 return null;
             }
             return reasons[reasonIdx];
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logInfo("❌ Invalid input.\n");
             return null;
         }
@@ -197,10 +197,14 @@ public class SafetyHandler implements LoggingSupport {
 
     @Nullable
     private String normalizeReportDescription(String description) {
-        if (description == null || description.isBlank()) {
+        if (description == null) {
             return null;
         }
-        return description;
+        String normalized = description.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return normalized.length() > 500 ? normalized.substring(0, 500) : normalized;
     }
 
     private void handleReportResult(TrustSafetyService.ReportResult result, User reportedUser) {
@@ -236,7 +240,7 @@ public class SafetyHandler implements LoggingSupport {
                 return null;
             }
             return users.get(idx);
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logInfo(CliTextAndInput.INVALID_INPUT);
             return null;
         }

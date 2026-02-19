@@ -1,6 +1,9 @@
 package datingapp.core.profile;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import java.time.LocalDate;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -80,6 +83,32 @@ public class ValidationService {
      * @return validation result
      */
     public ValidationResult validateAge(int age) {
+        if (age < config.minAge()) {
+            return ValidationResult.failure(AGE_TOO_YOUNG.formatted(config.minAge()));
+        }
+        if (age > config.maxAge()) {
+            return ValidationResult.failure(AGE_INVALID);
+        }
+        return ValidationResult.success();
+    }
+
+    /**
+     * Validates a birth date against configured age bounds and chronology.
+     *
+     * @param birthDate the birth date to validate
+     * @return validation result
+     */
+    public ValidationResult validateBirthDate(LocalDate birthDate) {
+        if (birthDate == null) {
+            return ValidationResult.failure("Invalid date");
+        }
+
+        LocalDate today = AppClock.today();
+        if (birthDate.isAfter(today)) {
+            return ValidationResult.failure("Invalid date");
+        }
+
+        int age = Period.between(birthDate, today).getYears();
         if (age < config.minAge()) {
             return ValidationResult.failure(AGE_TOO_YOUNG.formatted(config.minAge()));
         }

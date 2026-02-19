@@ -29,12 +29,13 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 /** Consolidated JDBI storage for stats, achievements, profile views, daily picks, and swipe sessions. */
 public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Storage {
 
+    private final Jdbi jdbi;
     private final StatsDao statsDao;
     private final SessionDao sessionDao;
     private final StandoutDao standoutDao;
 
     public JdbiMetricsStorage(Jdbi jdbi) {
-        Objects.requireNonNull(jdbi, "jdbi cannot be null");
+        this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
         this.statsDao = jdbi.onDemand(StatsDao.class);
         this.sessionDao = jdbi.onDemand(SessionDao.class);
         this.standoutDao = jdbi.onDemand(StandoutDao.class);
@@ -187,9 +188,37 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
     @Override
     public void saveStandouts(UUID seekerId, List<Standout> standouts, LocalDate date) {
-        for (Standout standout : standouts) {
-            standoutDao.upsert(new StandoutBindingHelper(standout));
+        Objects.requireNonNull(seekerId, "seekerId cannot be null");
+        Objects.requireNonNull(standouts, "standouts cannot be null");
+        Objects.requireNonNull(date, "date cannot be null");
+        if (standouts.isEmpty()) {
+            return;
         }
+
+        jdbi.useTransaction(handle -> {
+            StandoutDao txStandoutDao = handle.attach(StandoutDao.class);
+            for (Standout standout : standouts) {
+                if (standout == null) {
+                    continue;
+                }
+
+                Standout normalized = standout;
+                if (!seekerId.equals(standout.seekerId()) || !date.equals(standout.featuredDate())) {
+                    normalized = Standout.fromDatabase(
+                            standout.id(),
+                            seekerId,
+                            standout.standoutUserId(),
+                            date,
+                            standout.rank(),
+                            standout.score(),
+                            standout.reason(),
+                            standout.createdAt(),
+                            standout.interactedAt());
+                }
+
+                txStandoutDao.upsert(new StandoutBindingHelper(normalized));
+            }
+        });
     }
 
     @Override
@@ -442,7 +471,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                             COALESCE(AVG(
                                 CASE WHEN ended_at IS NOT NULL
                                 THEN DATEDIFF('SECOND', started_at, ended_at)
-                                ELSE 0 END
+                                ELSE NULL END
                             ), 0) as avg_session_duration_seconds,
                             CASE
                                 WHEN COUNT(*) = 0 THEN 0
@@ -454,7 +483,9 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                                     THEN DATEDIFF('SECOND', started_at, ended_at)
                                     ELSE 0 END
                                 ), 0) = 0 THEN 0
-                                ELSE COALESCE(SUM(swipe_count), 0) * 1.0 /
+                                ELSE COALESCE(SUM(
+                                    CASE WHEN ended_at IS NOT NULL THEN swipe_count ELSE 0 END
+                                ), 0) * 1.0 /
                                     COALESCE(SUM(
                                         CASE WHEN ended_at IS NOT NULL
                                         THEN DATEDIFF('SECOND', started_at, ended_at)
@@ -580,7 +611,9 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
             var startedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "started_at");
             var lastActivityAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "last_activity_at");
             var endedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at");
-            Session.MatchState state = Session.MatchState.valueOf(rs.getString("state"));
+            String stateStr = rs.getString("state");
+            Session.MatchState state =
+                    stateStr == null ? Session.MatchState.ACTIVE : Session.MatchState.valueOf(stateStr);
             int swipeCount = rs.getInt("swipe_count");
             int likeCount = rs.getInt("like_count");
             int passCount = rs.getInt("pass_count");
@@ -648,11 +681,15 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         @Override
         public Standout map(ResultSet rs, StatementContext ctx) throws SQLException {
             Instant interactedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "interacted_at");
+            LocalDate featuredDate = JdbiTypeCodecs.SqlRowReaders.readLocalDate(rs, "featured_date");
+            if (featuredDate == null) {
+                featuredDate = AppClock.today();
+            }
             return Standout.fromDatabase(
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "seeker_id"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "standout_user_id"),
-                    rs.getDate("featured_date").toLocalDate(),
+                    featuredDate,
                     rs.getInt("rank"),
                     rs.getInt("score"),
                     rs.getString("reason"),

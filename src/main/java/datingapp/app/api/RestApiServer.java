@@ -120,6 +120,7 @@ public class RestApiServer {
         // authentication middleware (e.g., app.before() with a shared secret).
         // All routes below operate without any identity verification.
         // ────────────────────────────────────────────────────────────────────
+
         // Health check
         app.get("/api/health", ctx -> ctx.json(new HealthResponse("ok", System.currentTimeMillis())));
 
@@ -422,7 +423,6 @@ public class RestApiServer {
     public static void main(String[] args) {
         ServiceRegistry services = ApplicationStartup.initialize();
         int port = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
-
         RestApiServer server = new RestApiServer(services, port);
         server.start();
 

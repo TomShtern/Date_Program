@@ -180,15 +180,20 @@ public final class RecommendationService {
         return Duration.between(now, resetTime);
     }
 
-    /** Format duration in HH:mm:ss. */
+    /** Format duration as HH:mm:ss (with optional leading '-' for negative values). */
     public static String formatDuration(Duration duration) {
-        long hours = duration.toHours();
-        long minutes = duration.toMinutesPart();
-        if (hours > 0) {
-            return String.format("%dh %02dm", hours, minutes);
-        } else {
-            return String.format("%dm", minutes);
+        if (duration == null) {
+            return "00:00:00";
         }
+
+        boolean negative = duration.isNegative();
+        Duration normalized = negative ? duration.abs() : duration;
+        long hours = normalized.toHours();
+        int minutes = normalized.toMinutesPart();
+        int seconds = normalized.toSecondsPart();
+
+        String formatted = String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        return negative ? "-" + formatted : formatted;
     }
 
     /** Get the daily pick for a user if available. */

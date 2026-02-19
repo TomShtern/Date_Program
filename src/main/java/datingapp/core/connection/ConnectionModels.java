@@ -1,7 +1,7 @@
 package datingapp.core.connection;
 
 import datingapp.core.AppClock;
-import datingapp.core.model.MatchArchiveReason;
+import datingapp.core.model.Match.MatchArchiveReason;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;

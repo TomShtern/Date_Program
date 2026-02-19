@@ -2,8 +2,8 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.model.Gender;
 import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.util.EnumSet;
 import java.util.Objects;
@@ -64,7 +64,7 @@ public class PreferencesViewModel {
         maxDistance.set(currentUser.getMaxDistanceKm());
 
         // Map Set<Gender> to UI GenderPreference
-        Set<Gender> interested = currentUser.getInterestedIn();
+        Set<Gender> interested = currentUser.getInterestedIn() != null ? currentUser.getInterestedIn() : Set.of();
         if (interested.contains(Gender.MALE) && interested.contains(Gender.FEMALE)) {
             interestedIn.set(GenderPreference.EVERYONE);
         } else if (interested.contains(Gender.MALE)) {

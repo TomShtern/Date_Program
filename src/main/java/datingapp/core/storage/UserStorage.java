@@ -1,8 +1,8 @@
 package datingapp.core.storage;
 
-import datingapp.core.model.Gender;
-import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.ProfileNote;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,11 +59,37 @@ public interface UserStorage {
         if (genders == null || genders.isEmpty()) {
             return List.of();
         }
+
+        boolean applyDistanceFilter = maxDistanceKm > 0 && Double.isFinite(seekerLat) && Double.isFinite(seekerLon);
+
         return findActive().stream()
                 .filter(u -> !u.getId().equals(excludeId))
                 .filter(u -> genders.contains(u.getGender()))
                 .filter(u -> u.getAge() >= minAge && u.getAge() <= maxAge)
+                .filter(u -> !applyDistanceFilter || isWithinDistance(seekerLat, seekerLon, u, maxDistanceKm))
                 .toList();
+    }
+
+    private static boolean isWithinDistance(double seekerLat, double seekerLon, User candidate, int maxDistanceKm) {
+        if (candidate == null || !candidate.hasLocation()) {
+            return false;
+        }
+
+        double distanceKm = haversineKm(seekerLat, seekerLon, candidate.getLat(), candidate.getLon());
+        return distanceKm <= maxDistanceKm;
+    }
+
+    private static double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        final double earthRadiusKm = 6371.0;
+        double deltaLat = Math.toRadians(lat2 - lat1);
+        double deltaLon = Math.toRadians(lon2 - lon1);
+
+        double sinHalfLat = Math.sin(deltaLat / 2);
+        double sinHalfLon = Math.sin(deltaLon / 2);
+        double a = sinHalfLat * sinHalfLat
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * sinHalfLon * sinHalfLon;
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthRadiusKm * c;
     }
 
     /** Finds all users regardless of state. */

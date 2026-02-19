@@ -712,10 +712,9 @@ public final class MatchPreferences {
                     return;
                 }
                 Lifestyle.Smoking smoking = candidate.getSmoking();
-                if (smoking == null) {
-                    failures.add("Smoking status not specified");
-                } else if (!db.acceptableSmoking().contains(smoking)) {
-                    failures.add("Smoking: " + smoking.getDisplayName());
+                if (!LifestyleMatcher.isAcceptable(smoking, db.acceptableSmoking())) {
+                    failures.add(
+                            smoking == null ? "Smoking status not specified" : "Smoking: " + smoking.getDisplayName());
                 }
             }
 
@@ -724,10 +723,11 @@ public final class MatchPreferences {
                     return;
                 }
                 Lifestyle.Drinking drinking = candidate.getDrinking();
-                if (drinking == null) {
-                    failures.add("Drinking status not specified");
-                } else if (!db.acceptableDrinking().contains(drinking)) {
-                    failures.add("Drinking: " + drinking.getDisplayName());
+                if (!LifestyleMatcher.isAcceptable(drinking, db.acceptableDrinking())) {
+                    failures.add(
+                            drinking == null
+                                    ? "Drinking status not specified"
+                                    : "Drinking: " + drinking.getDisplayName());
                 }
             }
 
@@ -736,10 +736,9 @@ public final class MatchPreferences {
                     return;
                 }
                 Lifestyle.WantsKids wantsKids = candidate.getWantsKids();
-                if (wantsKids == null) {
-                    failures.add("Kids stance not specified");
-                } else if (!db.acceptableKidsStance().contains(wantsKids)) {
-                    failures.add("Kids: " + wantsKids.getDisplayName());
+                if (!LifestyleMatcher.isAcceptable(wantsKids, db.acceptableKidsStance())) {
+                    failures.add(
+                            wantsKids == null ? "Kids stance not specified" : "Kids: " + wantsKids.getDisplayName());
                 }
             }
 
@@ -748,10 +747,11 @@ public final class MatchPreferences {
                     return;
                 }
                 Lifestyle.LookingFor lookingFor = candidate.getLookingFor();
-                if (lookingFor == null) {
-                    failures.add("Relationship goal not specified");
-                } else if (!db.acceptableLookingFor().contains(lookingFor)) {
-                    failures.add("Looking for: " + lookingFor.getDisplayName());
+                if (!LifestyleMatcher.isAcceptable(lookingFor, db.acceptableLookingFor())) {
+                    failures.add(
+                            lookingFor == null
+                                    ? "Relationship goal not specified"
+                                    : "Looking for: " + lookingFor.getDisplayName());
                 }
             }
 
@@ -760,10 +760,9 @@ public final class MatchPreferences {
                     return;
                 }
                 Lifestyle.Education education = candidate.getEducation();
-                if (education == null) {
-                    failures.add("Education not specified");
-                } else if (!db.acceptableEducation().contains(education)) {
-                    failures.add("Education: " + education.getDisplayName());
+                if (!LifestyleMatcher.isAcceptable(education, db.acceptableEducation())) {
+                    failures.add(
+                            education == null ? "Education not specified" : "Education: " + education.getDisplayName());
                 }
             }
 

@@ -5,7 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.matching.*;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
-import datingapp.core.model.*;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;

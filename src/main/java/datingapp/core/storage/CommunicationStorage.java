@@ -4,7 +4,7 @@ import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
-import datingapp.core.model.MatchArchiveReason;
+import datingapp.core.model.Match.MatchArchiveReason;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

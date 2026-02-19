@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.Match;
-import datingapp.core.model.MatchArchiveReason;
-import datingapp.core.model.MatchState;
+import datingapp.core.model.Match.MatchArchiveReason;
+import datingapp.core.model.Match.MatchState;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.UUID;
@@ -40,7 +40,7 @@ class MatchStateTest {
     }
 
     @Nested
-    @DisplayName("Match MatchState Transitions")
+    @DisplayName("Match State Transitions")
     class StateTransitions {
 
         @Test

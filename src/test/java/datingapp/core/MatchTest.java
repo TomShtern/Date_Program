@@ -3,7 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.Match;
-import datingapp.core.model.MatchState;
+import datingapp.core.model.Match.MatchState;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;

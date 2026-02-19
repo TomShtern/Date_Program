@@ -8,10 +8,12 @@ import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
-import datingapp.core.model.Gender;
-import datingapp.core.model.ProfileNote;
-import datingapp.core.model.UserState;
-import datingapp.core.model.VerificationMethod;
+import datingapp.core.model.Match.MatchArchiveReason;
+import datingapp.core.model.Match.MatchState;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.User.UserState;
+import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.ui.UiAnimations;
 import java.lang.reflect.Modifier;
@@ -67,15 +69,37 @@ class NestedTypeVisibilityTest {
     }
 
     /**
-     * Specific test for CliUtilities nested types accessed from Main.
+     * Specific test for re-nested User types.
      */
     @Test
-    @DisplayName("Top-level types used across packages are public")
-    void topLevelTypesArePublic() {
-        assertTrue(Modifier.isPublic(Gender.class.getModifiers()), "Gender must be public");
-        assertTrue(Modifier.isPublic(UserState.class.getModifiers()), "UserState must be public");
-        assertTrue(Modifier.isPublic(ProfileNote.class.getModifiers()), "ProfileNote must be public");
-        assertTrue(Modifier.isPublic(VerificationMethod.class.getModifiers()), "VerificationMethod must be public");
+    @DisplayName("Re-nested types in User must be public and static")
+    void userNestedTypesArePublicAndStatic() {
+        assertTrue(Modifier.isPublic(Gender.class.getModifiers()), "User.Gender must be public");
+        assertTrue(Modifier.isStatic(Gender.class.getModifiers()), "User.Gender must be static");
+        assertTrue(Modifier.isPublic(UserState.class.getModifiers()), "User.UserState must be public");
+        assertTrue(Modifier.isStatic(UserState.class.getModifiers()), "User.UserState must be static");
+        assertTrue(
+                Modifier.isPublic(VerificationMethod.class.getModifiers()), "User.VerificationMethod must be public");
+        assertTrue(
+                Modifier.isStatic(VerificationMethod.class.getModifiers()), "User.VerificationMethod must be static");
+        assertTrue(Modifier.isPublic(ProfileNote.class.getModifiers()), "User.ProfileNote must be public");
+        assertTrue(Modifier.isStatic(ProfileNote.class.getModifiers()), "User.ProfileNote must be static");
+    }
+
+    @Test
+    @DisplayName("Re-nested types in Match must be public and static")
+    void matchNestedTypesArePublicAndStatic() {
+        assertTrue(Modifier.isPublic(MatchState.class.getModifiers()), "Match.MatchState must be public");
+        assertTrue(Modifier.isStatic(MatchState.class.getModifiers()), "Match.MatchState must be static");
+        assertTrue(
+                Modifier.isPublic(MatchArchiveReason.class.getModifiers()), "Match.MatchArchiveReason must be public");
+        assertTrue(
+                Modifier.isStatic(MatchArchiveReason.class.getModifiers()), "Match.MatchArchiveReason must be static");
+    }
+
+    @Test
+    @DisplayName("Cross-package nested types used by CLI/UI are accessible")
+    void crossPackageNestedTypesAccessible() {
         assertTrue(Modifier.isPublic(PacePreferences.class.getModifiers()), "PacePreferences must be public");
         assertTrue(Modifier.isPublic(RecommendationService.DailyPick.class.getModifiers()), "DailyPick must be public");
         assertTrue(Modifier.isPublic(InputReader.class.getModifiers()), "InputReader must be public");

@@ -1,9 +1,9 @@
 package datingapp.core.testutil;
 
 import datingapp.core.AppClock;
-import datingapp.core.model.Gender;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -19,8 +19,8 @@ public final class TestUserFactory {
     }
 
     /**
-     * Creates an ACTIVE user with minimal required fields. Uses default coordinates
-     * (Tel Aviv).
+     * Creates an ACTIVE user with all required matching fields populated (bio,
+     * birthDate, gender, interestedIn, photoUrls, location, and pacePreferences).
      *
      * @param name the user's name
      * @return a new active user
@@ -30,7 +30,8 @@ public final class TestUserFactory {
     }
 
     /**
-     * Creates an ACTIVE user with specified ID.
+     * Creates an ACTIVE user with all required matching fields populated and a
+     * specified ID.
      *
      * @param id   the user's ID
      * @param name the user's name

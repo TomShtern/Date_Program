@@ -12,18 +12,40 @@ import javafx.animation.KeyValue;
 import javafx.animation.ScaleTransition;
 import javafx.animation.Timeline;
 import javafx.animation.TranslateTransition;
+import javafx.beans.value.ChangeListener;
+import javafx.event.EventHandler;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.effect.DropShadow;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
 /** Utility class for common UI animations and effects. */
 public final class UiAnimations {
 
+    private static final String PARALLAX_BINDING_KEY = UiAnimations.class.getName() + ".parallaxBinding";
+
     private UiAnimations() {
         // Utility class
+    }
+
+    private static final class ParallaxBinding {
+
+        private final EventHandler<MouseEvent> mouseMovedHandler;
+        private final ChangeListener<Scene> sceneListener;
+        private final TranslateTransition parallaxMove;
+
+        private ParallaxBinding(
+                EventHandler<MouseEvent> mouseMovedHandler,
+                ChangeListener<Scene> sceneListener,
+                TranslateTransition parallaxMove) {
+            this.mouseMovedHandler = mouseMovedHandler;
+            this.sceneListener = sceneListener;
+            this.parallaxMove = parallaxMove;
+        }
     }
 
     /**
@@ -93,8 +115,9 @@ public final class UiAnimations {
      *
      * @param node      The node to apply the glow effect to
      * @param glowColor The color of the glow
+     * @return the running Timeline so callers can stop it explicitly if needed
      */
-    public static void addPulsingGlow(Node node, Color glowColor) {
+    public static Timeline addPulsingGlow(Node node, Color glowColor) {
         DropShadow glow = new DropShadow();
         glow.setColor(glowColor);
         glow.setRadius(UiConstants.GLOW_RADIUS_MIN);
@@ -117,6 +140,19 @@ public final class UiAnimations {
 
         node.setEffect(glow);
         timeline.play();
+
+        ChangeListener<Scene> cleanupListener = new ChangeListener<>() {
+            @Override
+            public void changed(
+                    javafx.beans.value.ObservableValue<? extends Scene> observable, Scene oldScene, Scene newScene) {
+                if (newScene == null) {
+                    timeline.stop();
+                    node.sceneProperty().removeListener(this);
+                }
+            }
+        };
+        node.sceneProperty().addListener(cleanupListener);
+        return timeline;
     }
 
     /**
@@ -236,31 +272,57 @@ public final class UiAnimations {
      * @param intensity The intensity of the parallax effect (5-20 recommended)
      */
     public static void addParallaxEffect(Node node, double intensity) {
-        node.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (obs == null) {
-                return;
+        Object existingBinding = node.getProperties().remove(PARALLAX_BINDING_KEY);
+        if (existingBinding instanceof ParallaxBinding binding) {
+            node.sceneProperty().removeListener(binding.sceneListener);
+            Scene currentScene = node.getScene();
+            if (currentScene != null) {
+                currentScene.removeEventHandler(MouseEvent.MOUSE_MOVED, binding.mouseMovedHandler);
             }
-            if (newScene == null) {
+            binding.parallaxMove.stop();
+        }
+
+        TranslateTransition parallaxMove = new TranslateTransition(UiConstants.PARALLAX_MOVE_DURATION, node);
+        parallaxMove.setInterpolator(Interpolator.EASE_BOTH);
+
+        EventHandler<MouseEvent> mouseMovedHandler = e -> {
+            Scene scene = node.getScene();
+            if (scene == null) {
                 return;
             }
 
+            double centerX = scene.getWidth() / 2;
+            double centerY = scene.getHeight() / 2;
+            if (centerX == 0 || centerY == 0) {
+                return;
+            }
+
+            double offsetX = (e.getSceneX() - centerX) / centerX * intensity;
+            double offsetY = (e.getSceneY() - centerY) / centerY * intensity;
+
+            parallaxMove.stop();
+            parallaxMove.setToX(offsetX);
+            parallaxMove.setToY(offsetY);
+            parallaxMove.playFromStart();
+        };
+
+        ChangeListener<Scene> sceneListener = (obs, oldScene, newScene) -> {
             if (oldScene != null) {
-                oldScene.setOnMouseMoved(null);
+                oldScene.removeEventHandler(MouseEvent.MOUSE_MOVED, mouseMovedHandler);
             }
+            if (newScene != null) {
+                newScene.addEventHandler(MouseEvent.MOUSE_MOVED, mouseMovedHandler);
+            }
+        };
 
-            newScene.setOnMouseMoved(e -> {
-                double centerX = newScene.getWidth() / 2;
-                double centerY = newScene.getHeight() / 2;
+        ParallaxBinding binding = new ParallaxBinding(mouseMovedHandler, sceneListener, parallaxMove);
+        node.getProperties().put(PARALLAX_BINDING_KEY, binding);
+        node.sceneProperty().addListener(sceneListener);
 
-                double offsetX = (e.getSceneX() - centerX) / centerX * intensity;
-                double offsetY = (e.getSceneY() - centerY) / centerY * intensity;
-
-                TranslateTransition move = new TranslateTransition(UiConstants.PARALLAX_MOVE_DURATION, node);
-                move.setToX(offsetX);
-                move.setToY(offsetY);
-                move.play();
-            });
-        });
+        Scene scene = node.getScene();
+        if (scene != null) {
+            scene.addEventHandler(MouseEvent.MOUSE_MOVED, mouseMovedHandler);
+        }
     }
 
     /**
@@ -287,6 +349,7 @@ public final class UiAnimations {
 
         /** Starts the confetti animation on the specified canvas. */
         public void play(Canvas canvas) {
+            stop(); // Stop any existing animation first
             this.canvas = canvas;
             initParticles();
             startAnimation();

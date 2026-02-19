@@ -6,7 +6,7 @@ import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.UserState;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;

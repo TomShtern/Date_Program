@@ -54,18 +54,18 @@ You are operating in an environment where ast-grep is installed. For any code se
 
 ## ⚠️ Critical Gotchas (Compilation / Runtime / Agent Accuracy)
 
-| Issue                           | Wrong                                           | Correct                                                |
-|---------------------------------|-------------------------------------------------|--------------------------------------------------------|
-| Non-static nested type          | `public record SendResult(...) {}` inside class | `public static record SendResult(...) {}`              |
-| Nested enum in nested type      | `public enum ErrorCode { ... }`                 | `public static enum ErrorCode { ... }`                 |
-| Externally-used nested type ref | `import datingapp.core.model.User.Gender`       | `import datingapp.core.model.Gender`                   |
-| Clock usage                     | `Instant.now()` in domain/service logic         | `AppClock.now()` (testable via `TestClock`)            |
-| Service error flow              | `throw new ...` for business failure            | Return `*Result.failure(...)` record                   |
-| Pair IDs                        | `a + "_" + b`                                   | lexicographically sorted deterministic ID              |
-| EnumSet null crash              | `EnumSet.copyOf(possiblyNull)`                  | `EnumSetUtil.safeCopy(...)` or null-safe conditional   |
-| Mutable collection exposure     | `return internalSet;`                           | Return defensive copy / unmodifiable view              |
-| Legacy bootstrap references     | `AppBootstrap`, `HandlerFactory`                | `ApplicationStartup` + direct handler wiring in `Main` |
-| Legacy UI references            | `ui/controller`, `Toast`, `UiSupport`           | `ui/screen`, `UiFeedbackService`, `UiComponents`       |
+| Issue                       | Wrong                                           | Correct                                                |
+|-----------------------------|-------------------------------------------------|--------------------------------------------------------|
+| Non-static nested type      | `public record SendResult(...) {}` inside class | `public static record SendResult(...) {}`              |
+| Nested enum in nested type  | `public enum ErrorCode { ... }`                 | `public static enum ErrorCode { ... }`                 |
+| Externally-used model enums | `import datingapp.core.model.Gender`            | `import datingapp.core.model.User.Gender`              |
+| Clock usage                 | `Instant.now()` in domain/service logic         | `AppClock.now()` (testable via `TestClock`)            |
+| Service error flow          | `throw new ...` for business failure            | Return `*Result.failure(...)` record                   |
+| Pair IDs                    | `a + "_" + b`                                   | lexicographically sorted deterministic ID              |
+| EnumSet null crash          | `EnumSet.copyOf(possiblyNull)`                  | `EnumSetUtil.safeCopy(...)` or null-safe conditional   |
+| Mutable collection exposure | `return internalSet;`                           | Return defensive copy / unmodifiable view              |
+| Legacy bootstrap references | `AppBootstrap`, `HandlerFactory`                | `ApplicationStartup` + direct handler wiring in `Main` |
+| Legacy UI references        | `ui/controller`, `Toast`, `UiSupport`           | `ui/screen`, `UiFeedbackService`, `UiComponents`       |
 
 **Config access pattern:** `private static final AppConfig CONFIG = AppConfig.defaults();`
 
@@ -80,7 +80,7 @@ datingapp/
     api/RestApiServer.java
   core/
     AppClock, AppConfig, AppSession, EnumSetUtil, LoggingSupport, PerformanceMonitor, ServiceRegistry, TextUtil
-    model/{User, Match, Gender, UserState, MatchState, MatchArchiveReason, VerificationMethod, ProfileNote}
+    model/{User, Match}
     matching/{CandidateFinder, MatchingService, MatchQualityService, RecommendationService, TrustSafetyService, UndoService, Standout, LifestyleMatcher}
     connection/{ConnectionModels, ConnectionService}
     profile/{ProfileService, ValidationService, MatchPreferences}
@@ -116,13 +116,13 @@ nav.initialize(primaryStage);
 
 ## Domain Model Reality Check
 
-| Model / Enum                                                                    | Location                                | Notes                                                                                 |
-|---------------------------------------------------------------------------------|-----------------------------------------|---------------------------------------------------------------------------------------|
-| `User`                                                                          | `core/model/User.java`                  | Mutable entity + `StorageBuilder` + `touch()` + soft-delete                           |
-| `Match`                                                                         | `core/model/Match.java`                 | Mutable entity + deterministic ID + state transitions                                 |
-| `Gender`, `UserState`, `MatchState`, `MatchArchiveReason`, `VerificationMethod` | `core/model/*.java`                     | Standalone top-level enums (not nested in `User`/`Match`)                             |
-| `ProfileNote`                                                                   | `core/model/ProfileNote.java`           | Record                                                                                |
-| `ConnectionModels.*`                                                            | `core/connection/ConnectionModels.java` | `Message`, `Conversation`, `Like`, `Block`, `Report`, `FriendRequest`, `Notification` |
+| Model / Enum                                                                   | Location                                | Notes                                                                                 |
+|--------------------------------------------------------------------------------|-----------------------------------------|---------------------------------------------------------------------------------------|
+| `User`                                                                         | `core/model/User.java`                  | Mutable entity + `StorageBuilder` + `touch()` + soft-delete + nested enums/records    |
+| `Match`                                                                        | `core/model/Match.java`                 | Mutable entity + deterministic ID + state transitions + nested enums                  |
+| `User.Gender`, `User.UserState`, `User.VerificationMethod`, `User.ProfileNote` | `core/model/User.java`                  | Public static nested types for user domain semantics                                  |
+| `Match.MatchState`, `Match.MatchArchiveReason`                                 | `core/model/Match.java`                 | Public static nested enums for match state and archive semantics                      |
+| `ConnectionModels.*`                                                           | `core/connection/ConnectionModels.java` | `Message`, `Conversation`, `Like`, `Block`, `Report`, `FriendRequest`, `Notification` |
 
 **Deterministic ID rule (always):**
 ```java
@@ -259,7 +259,7 @@ private void touch() { this.updatedAt = AppClock.now(); }
 
 - ❌ Import framework/DB APIs into `core/` domain/service code.
 - ❌ Use removed architecture names (`AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`, `ScoringConstants`).
-- ❌ Use nested `User.Gender` / `User.UserState` / `Match.State` style imports.
+- ❌ Import removed standalone model enums/records (`core.model.Gender`, `UserState`, `VerificationMethod`, `ProfileNote`, `MatchState`, `MatchArchiveReason`).
 - ❌ Throw business-flow exceptions from service operations when result records exist.
 - ❌ Return mutable internal collections directly.
 - ❌ Forget `touch()` in mutable entity setters.

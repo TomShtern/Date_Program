@@ -48,7 +48,14 @@ public final class JdbiTypeCodecs {
                 return uuid;
             }
             if (obj instanceof String str) {
-                return UUID.fromString(str);
+                try {
+                    return UUID.fromString(str);
+                } catch (IllegalArgumentException _) {
+                    if (logger.isWarnEnabled()) {
+                        logger.warn("Skipping invalid UUID value '{}' in column '{}'", str, column);
+                    }
+                    return null;
+                }
             }
             throw new SQLException("Unexpected UUID type: " + obj.getClass());
         }
@@ -75,7 +82,7 @@ public final class JdbiTypeCodecs {
             }
             try {
                 return Enum.valueOf(enumType, value);
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException _) {
                 if (logger.isWarnEnabled()) {
                     logger.warn(
                             "Skipping invalid {} value '{}' in column '{}'", enumType.getSimpleName(), value, column);

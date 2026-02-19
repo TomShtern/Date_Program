@@ -9,7 +9,7 @@ import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.matching.*;
 import datingapp.core.model.*;
-import datingapp.core.model.Gender;
+import datingapp.core.model.User.Gender;
 import datingapp.core.profile.*;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;

@@ -3,9 +3,9 @@ package datingapp.ui.viewmodel;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.model.Gender;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -24,8 +24,8 @@ import java.time.Period;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -87,8 +87,8 @@ public class ProfileViewModel {
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
-    /** Track background thread for cleanup on dispose. */
-    private final AtomicReference<Thread> backgroundThread = new AtomicReference<>();
+    /** Track all background threads for cleanup on dispose. */
+    private final java.util.Set<Thread> backgroundThreads = ConcurrentHashMap.newKeySet();
 
     private ViewModelErrorSink errorHandler;
 
@@ -105,10 +105,12 @@ public class ProfileViewModel {
      */
     public void dispose() {
         disposed.set(true);
-        Thread thread = backgroundThread.getAndSet(null);
-        if (thread != null && thread.isAlive()) {
-            thread.interrupt();
+        for (Thread thread : backgroundThreads) {
+            if (thread != null && thread.isAlive()) {
+                thread.interrupt();
+            }
         }
+        backgroundThreads.clear();
         selectedInterests.clear();
     }
 
@@ -267,6 +269,11 @@ public class ProfileViewModel {
      * Saves the profile changes to storage.
      */
     public void save() {
+        if (disposed.get()) {
+            logWarn("ProfileViewModel is disposed; skipping save");
+            return;
+        }
+
         User user = AppSession.getInstance().getCurrentUser();
         if (user == null) {
             logWarn("No current user to save");
@@ -282,11 +289,30 @@ public class ProfileViewModel {
         applySearchPreferences(user);
         applyDealbreakers(user);
 
-        Thread thread = Thread.ofVirtual().name("profile-save").start(() -> {
+        saveInBackground(user);
+    }
+
+    private void saveInBackground(User user) {
+        startTrackedThread("profile-save", () -> {
             try {
+                if (disposed.get() || Thread.currentThread().isInterrupted()) {
+                    return;
+                }
                 persistUser(user);
+
+                if (disposed.get() || Thread.currentThread().isInterrupted()) {
+                    return;
+                }
                 attemptActivation(user);
+
+                if (disposed.get() || Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+
                 Platform.runLater(() -> {
+                    if (disposed.get()) {
+                        return;
+                    }
                     updateSessionAndCompletion(user);
                     logInfo("Profile saved successfully");
                 });
@@ -295,7 +321,6 @@ public class ProfileViewModel {
                 notifyError("Failed to save profile", e);
             }
         });
-        backgroundThread.set(thread);
     }
 
     private void applyBasicFields(User user) {
@@ -321,7 +346,7 @@ public class ProfileViewModel {
             if (parts.length == 2) {
                 user.setLocation(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()));
             }
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logWarn("Could not parse location: {}", loc);
         }
     }
@@ -356,18 +381,26 @@ public class ProfileViewModel {
             int max = Integer.parseInt(maxAge.get());
             if (min >= config.minAge() && max <= config.maxAge() && min <= max) {
                 user.setAgeRange(min, max);
+            } else {
+                logWarn("Invalid age range values: {}-{}", min, max);
+                UiFeedbackService.showWarning("Please enter valid ages");
             }
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logWarn("Invalid age range values");
+            UiFeedbackService.showWarning("Please enter valid ages");
         }
 
         try {
             int dist = Integer.parseInt(maxDistance.get());
-            if (dist > 0 && dist <= 500) {
+            if (dist > 0 && dist <= config.maxDistanceKm()) {
                 user.setMaxDistanceKm(dist);
+            } else {
+                logWarn("Invalid max distance value: {}", dist);
+                UiFeedbackService.showWarning("Please enter a valid distance");
             }
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             logWarn("Invalid max distance value");
+            UiFeedbackService.showWarning("Please enter a valid distance");
         }
     }
 
@@ -387,7 +420,7 @@ public class ProfileViewModel {
                 user.activate();
                 userStore.save(user);
                 logInfo("User {} activated after profile completion", user.getName());
-                UiFeedbackService.showSuccess("Profile complete! You're now active!");
+                Platform.runLater(() -> UiFeedbackService.showSuccess("Profile complete! You're now active!"));
             } catch (IllegalStateException e) {
                 logWarn("Could not activate user: {}", e.getMessage());
             }
@@ -636,8 +669,12 @@ public class ProfileViewModel {
             return;
         }
 
-        Thread thread = Thread.ofVirtual().name("photo-save").start(() -> {
+        startTrackedThread("photo-save", () -> {
             try {
+                if (disposed.get() || Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+
                 // 1. Create app data directory for photos
                 Path appData = Paths.get(System.getProperty("user.home"), ".datingapp", "photos");
                 Files.createDirectories(appData);
@@ -656,6 +693,9 @@ public class ProfileViewModel {
 
                 // 5. Update UI on FX thread
                 Platform.runLater(() -> {
+                    if (disposed.get()) {
+                        return;
+                    }
                     primaryPhotoUrl.set(photoUrl);
                     updateCompletion(user);
                     UiFeedbackService.showSuccess("Photo saved!");
@@ -667,7 +707,17 @@ public class ProfileViewModel {
                 notifyError("Failed to save profile photo", e);
             }
         });
-        backgroundThread.set(thread);
+    }
+
+    private void startTrackedThread(String name, Runnable task) {
+        Thread thread = Thread.ofVirtual().name(name).start(() -> {
+            try {
+                task.run();
+            } finally {
+                backgroundThreads.remove(Thread.currentThread());
+            }
+        });
+        backgroundThreads.add(thread);
     }
 
     /**

@@ -15,8 +15,6 @@ import org.slf4j.LoggerFactory;
  */
 public final class CliTextAndInput {
 
-    private static final Logger logger = LoggerFactory.getLogger(CliTextAndInput.class);
-
     // ═══ Display Constants ═══
 
     public static final String SEPARATOR_LINE = "═══════════════════════════════════════";
@@ -102,7 +100,7 @@ public final class CliTextAndInput {
      */
     public static boolean requireLogin(Runnable action) {
         if (!AppSession.getInstance().isLoggedIn()) {
-            logger.info(PLEASE_SELECT_USER);
+            System.out.print(PLEASE_SELECT_USER);
             return false;
         }
         action.run();
@@ -204,7 +202,7 @@ public final class CliTextAndInput {
             try {
                 var method = value.getClass().getMethod("getDisplayName");
                 return (String) method.invoke(value);
-            } catch (ReflectiveOperationException _) {
+            } catch (ReflectiveOperationException ignored) {
                 String name = value.name().replace("_", " ").toLowerCase(Locale.ROOT);
                 return Character.toUpperCase(name.charAt(0)) + name.substring(1);
             }

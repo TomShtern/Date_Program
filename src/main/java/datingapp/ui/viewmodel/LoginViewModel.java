@@ -3,9 +3,9 @@ package datingapp.ui.viewmodel;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.model.Gender;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
@@ -97,7 +97,13 @@ public class LoginViewModel {
                     logInfo("Loaded {} users for login selection.", users.size());
                 });
             } catch (Exception e) {
-                Platform.runLater(() -> loading.set(false));
+                if (!disposed.get()) {
+                    Platform.runLater(() -> {
+                        if (!disposed.get()) {
+                            loading.set(false);
+                        }
+                    });
+                }
                 logError("Failed to load users for login: {}", e.getMessage(), e);
                 notifyError("Failed to load users", e);
             }
@@ -214,7 +220,7 @@ public class LoginViewModel {
         }
 
         // Location default (Tel Aviv)
-        if (user.getLat() == 0 && user.getLon() == 0) {
+        if (!user.hasLocation()) {
             user.setLocation(32.0853, 34.7818);
             modified = true;
             logDebug("Auto-filled location for user {}", user.getName());
@@ -260,6 +266,16 @@ public class LoginViewModel {
 
         if (age < config.minAge() || age > config.maxAge()) {
             errorMessage.set("Age must be between " + config.minAge() + " and " + config.maxAge());
+            return null;
+        }
+
+        if (gender == null) {
+            errorMessage.set("Gender must be provided");
+            return null;
+        }
+
+        if (interestedIn == null) {
+            errorMessage.set("InterestedIn must be provided");
             return null;
         }
 

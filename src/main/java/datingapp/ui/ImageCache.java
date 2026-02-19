@@ -85,8 +85,8 @@ public final class ImageCache {
     /** Loads an image with error handling. */
     private static Image loadImage(String path, double width, double height) {
         try {
-            // Background loading (true), smooth scaling (true), preserve ratio (true)
-            Image image = new Image(path, width, height, true, true, true);
+            // Synchronous loading to ensure isError() reflects final load status
+            Image image = new Image(path, width, height, true, true, false);
 
             // Check for load errors
             if (image.isError()) {

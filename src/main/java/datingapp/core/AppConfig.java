@@ -77,8 +77,14 @@ public record AppConfig(
         public ValidationConfig {
             requireNonNegative("minAge", minAge);
             requireNonNegative("maxAge", maxAge);
+            if (minAge > maxAge) {
+                throw new IllegalArgumentException("minAge must be <= maxAge");
+            }
             requireNonNegative("minHeightCm", minHeightCm);
             requireNonNegative("maxHeightCm", maxHeightCm);
+            if (minHeightCm > maxHeightCm) {
+                throw new IllegalArgumentException("minHeightCm must be <= maxHeightCm");
+            }
             requireNonNegative("maxBioLength", maxBioLength);
             requireNonNegative("maxReportDescLength", maxReportDescLength);
             requireNonNegative("maxNameLength", maxNameLength);

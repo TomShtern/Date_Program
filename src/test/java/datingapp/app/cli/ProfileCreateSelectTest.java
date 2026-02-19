@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.AppSession;
-import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.UserStorage;
 import java.io.StringReader;

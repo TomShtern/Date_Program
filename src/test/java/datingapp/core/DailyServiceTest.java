@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
 import datingapp.core.matching.RecommendationService.DailyPick;
-import datingapp.core.model.Gender;
 import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
@@ -249,9 +249,9 @@ class DailyServiceTest {
         @Test
         @DisplayName("formatDuration formats correctly")
         void formatDuration() {
-            assertEquals("12h 00m", RecommendationService.formatDuration(Duration.ofHours(12)));
-            assertEquals("30m", RecommendationService.formatDuration(Duration.ofMinutes(30)));
-            assertEquals("45m", RecommendationService.formatDuration(Duration.ofMinutes(45)));
+            assertEquals("12:00:00", RecommendationService.formatDuration(Duration.ofHours(12)));
+            assertEquals("00:30:00", RecommendationService.formatDuration(Duration.ofMinutes(30)));
+            assertEquals("00:45:00", RecommendationService.formatDuration(Duration.ofMinutes(45)));
         }
     }
 

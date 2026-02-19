@@ -7,10 +7,10 @@ import datingapp.core.EnumSetUtil;
 import datingapp.core.LoggingSupport;
 import datingapp.core.TextUtil;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
-import datingapp.core.model.Gender;
-import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -235,8 +235,20 @@ public class ProfileHandler implements LoggingSupport {
 
     private void promptBirthDate(User currentUser) {
         String birthStr = inputReader.readLine("Birth date (yyyy-MM-dd): ");
+        if (birthStr == null || birthStr.isBlank()) {
+            logInfo("⚠️  Invalid date, skipping.");
+            return;
+        }
         try {
             LocalDate birthDate = LocalDate.parse(birthStr, DATE_FORMAT);
+            ValidationService.ValidationResult result = validationService.validateBirthDate(birthDate);
+            if (!result.valid()) {
+                String message = result.errors().isEmpty()
+                        ? "Invalid date"
+                        : result.errors().getFirst();
+                logInfo("⚠️  {}", message);
+                return;
+            }
             currentUser.setBirthDate(birthDate);
         } catch (DateTimeParseException ignored) {
             logInfo("⚠️  Invalid date format, skipping.");
@@ -932,7 +944,7 @@ public class ProfileHandler implements LoggingSupport {
 
             logInfo("  {} {}% {}", result.getTierEmoji(), result.score(), result.tier());
             if (logger.isInfoEnabled()) {
-                String overallBar = TextUtil.renderProgressBar(result.score(), 25);
+                String overallBar = TextUtil.renderProgressBar(result.score() / 100.0, 25);
                 logInfo("  {}", overallBar);
             }
             logInfo("");
@@ -941,7 +953,7 @@ public class ProfileHandler implements LoggingSupport {
             for (ProfileService.CategoryBreakdown cat : result.breakdown()) {
                 logInfo("  {} - {}%", cat.category(), cat.score());
                 if (logger.isInfoEnabled()) {
-                    String categoryBar = TextUtil.renderProgressBar(cat.score(), 15);
+                    String categoryBar = TextUtil.renderProgressBar(cat.score() / 100.0, 15);
                     logInfo(INDENTED_LINE, categoryBar);
                 }
                 if (!cat.missingItems().isEmpty()) {

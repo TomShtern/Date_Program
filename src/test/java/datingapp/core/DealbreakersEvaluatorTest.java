@@ -4,7 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.model.*;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.testutil.TestClock;

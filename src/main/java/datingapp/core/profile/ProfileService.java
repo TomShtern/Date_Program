@@ -15,6 +15,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 public final class ProfileService {
@@ -229,6 +230,8 @@ public final class ProfileService {
     public ProfileCompleteness calculateCompleteness(User user) {
         List<String> filled = new ArrayList<>();
         List<String> missing = new ArrayList<>();
+        List<String> photoUrls = user.getPhotoUrls() != null ? user.getPhotoUrls() : List.of();
+        Set<Interest> interests = user.getInterests() != null ? user.getInterests() : Set.of();
 
         // Required fields (core profile)
         checkField("Name", user.getName() != null && !user.getName().isBlank(), filled, missing);
@@ -241,7 +244,7 @@ public final class ProfileService {
                 filled,
                 missing);
         checkField("Location", user.getLat() != 0.0 || user.getLon() != 0.0, filled, missing);
-        checkField("Photo", !user.getPhotoUrls().isEmpty(), filled, missing);
+        checkField("Photo", !photoUrls.isEmpty(), filled, missing);
 
         // Lifestyle fields (optional but encouraged)
         checkField("Height", user.getHeightCm() != null, filled, missing);
@@ -249,7 +252,7 @@ public final class ProfileService {
         checkField("Drinking", user.getDrinking() != null, filled, missing);
         checkField("Kids Stance", user.getWantsKids() != null, filled, missing);
         checkField("Looking For", user.getLookingFor() != null, filled, missing);
-        checkField("Interests", user.getInterests().size() >= Interest.MIN_FOR_COMPLETE, filled, missing);
+        checkField("Interests", interests.size() >= Interest.MIN_FOR_COMPLETE, filled, missing);
 
         int total = filled.size() + missing.size();
         int percentage = total > 0 ? filled.size() * 100 / total : 0;
@@ -260,6 +263,8 @@ public final class ProfileService {
     /** Generate improvement tips based on profile state. */
     public List<String> generateTips(User user) {
         List<String> tips = new ArrayList<>();
+        List<String> photoUrls = user.getPhotoUrls() != null ? user.getPhotoUrls() : List.of();
+        Set<Interest> interests = user.getInterests() != null ? user.getInterests() : Set.of();
 
         // Bio tips
         if (user.getBio() == null || user.getBio().isBlank()) {
@@ -269,9 +274,9 @@ public final class ProfileService {
         }
 
         // Photo tips
-        if (user.getPhotoUrls().isEmpty()) {
+        if (photoUrls.isEmpty()) {
             tips.add("📸 Add a photo - it's required for browsing");
-        } else if (user.getPhotoUrls().size() < PHOTO_TIP_MIN_COUNT) {
+        } else if (photoUrls.size() < PHOTO_TIP_MIN_COUNT) {
             tips.add("📸 Add a second photo - users with 2 photos get 40% more matches");
         }
 
@@ -297,7 +302,7 @@ public final class ProfileService {
         }
 
         // Interest tips
-        int interestCount = user.getInterests().size();
+        int interestCount = interests.size();
         if (interestCount == 0) {
             tips.add("🎯 Add at least "
                     + Interest.MIN_FOR_COMPLETE

@@ -10,6 +10,7 @@ import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -74,11 +75,12 @@ public class DashboardViewModel {
             ProfileService achievementService,
             ConnectionService messagingService,
             ProfileService profileCompletionService) {
-        this.dailyService = dailyService;
-        this.matchData = matchData;
-        this.achievementService = achievementService;
-        this.messagingService = messagingService;
-        this.profileCompletionService = profileCompletionService;
+        this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
+        this.matchData = Objects.requireNonNull(matchData, "matchData cannot be null");
+        this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
+        this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
+        this.profileCompletionService =
+                Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
     }
 
     /**
@@ -102,8 +104,13 @@ public class DashboardViewModel {
 
         beginLoading();
 
+        Thread existingThread = backgroundThread.getAndSet(null);
+        if (existingThread != null && existingThread.isAlive()) {
+            existingThread.interrupt();
+        }
+
         // Run data fetching in background to prevent UI freeze
-        Thread thread = Thread.ofVirtual().start(() -> performRefresh(user));
+        Thread thread = Thread.ofVirtual().name("dashboard-refresh").start(() -> performRefresh(user));
         backgroundThread.set(thread);
     }
 
@@ -126,7 +133,7 @@ public class DashboardViewModel {
     }
 
     private void performRefresh(User user) {
-        if (disposed.get()) {
+        if (disposed.get() || Thread.currentThread().isInterrupted()) {
             endLoading();
             return;
         }
@@ -197,9 +204,7 @@ public class DashboardViewModel {
 
         int unreadCount = 0;
         try {
-            if (messagingService != null) {
-                unreadCount = messagingService.getTotalUnreadCount(user.getId());
-            }
+            unreadCount = messagingService.getTotalUnreadCount(user.getId());
         } catch (Exception e) {
             logError("Unread messages error", e);
             if (firstError == null) {
@@ -216,7 +221,19 @@ public class DashboardViewModel {
         final int finalUnreadCount = unreadCount;
 
         final Exception finalError = firstError;
+        if (Thread.currentThread().isInterrupted()) {
+            endLoading();
+            return;
+        }
+        if (disposed.get()) {
+            return;
+        }
+
         Platform.runLater(() -> {
+            if (disposed.get()) {
+                return;
+            }
+
             userName.set(name);
             profileCompletion.set(finalCompletion);
             dailyLikesStatus.set(finalLikes);

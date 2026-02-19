@@ -18,6 +18,33 @@ import java.util.UUID;
  */
 public class Match {
 
+    // ── Nested domain types ────────────────────────────────────────────
+
+    /** Represents the current state of a match. */
+    public static enum MatchState {
+        ACTIVE, // Both users are matched
+        FRIENDS, // Mutual transition to platonic friendship
+        UNMATCHED, // One user ended the match
+        GRACEFUL_EXIT, // One user ended the match kindly
+        BLOCKED // One user blocked the other
+    }
+
+    /**
+     * Reasons why a relationship/match was archived or ended.
+     *
+     * <p>
+     * Note: Some reasons overlap with terminal {@link MatchState} values. We keep
+     * both for analytics/history without changing the state machine.
+     */
+    public static enum MatchArchiveReason {
+        FRIEND_ZONE,
+        GRACEFUL_EXIT,
+        UNMATCH,
+        BLOCK
+    }
+
+    // ── End nested domain types ────────────────────────────────────────
+
     private final String id;
     private final UUID userA;
     private final UUID userB;
@@ -152,6 +179,14 @@ public class Match {
         this.state = MatchState.FRIENDS;
         // We don't set endedAt/endedBy because the relationship is still "active" in a
         // new way
+    }
+
+    /** Reverts match from FRIENDS back to ACTIVE. Used for compensating transactions only. */
+    public void revertToActive() {
+        if (this.state != MatchState.FRIENDS) {
+            throw new IllegalStateException("Can only revert to ACTIVE from FRIENDS state, current: " + this.state);
+        }
+        this.state = MatchState.ACTIVE;
     }
 
     /** gracefulExit - ends the match kindly. */

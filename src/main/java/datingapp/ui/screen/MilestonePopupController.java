@@ -3,7 +3,10 @@ package datingapp.ui.screen;
 import datingapp.core.model.User;
 import datingapp.ui.UiAnimations.ConfettiAnimation;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
+import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
@@ -65,6 +68,7 @@ public class MilestonePopupController implements Initializable {
     private Label matchMessage;
 
     private ConfettiAnimation confetti;
+    private Timeline glowPulse;
     private Runnable onCloseCallback;
     private Runnable onMessageCallback;
     private Runnable onContinueCallback;
@@ -120,27 +124,31 @@ public class MilestonePopupController implements Initializable {
         FadeTransition fadeIn = new FadeTransition(Duration.millis(300), rootPane);
         fadeIn.setToValue(1);
 
-        StackPane iconContainer = (StackPane) achievementIcon.getParent();
-        iconContainer.setScaleX(0);
-        iconContainer.setScaleY(0);
-
-        ScaleTransition iconPop = new ScaleTransition(Duration.millis(400), iconContainer);
-        iconPop.setToX(1.15);
-        iconPop.setToY(1.15);
-        iconPop.setDelay(Duration.millis(200));
-        iconPop.setInterpolator(Interpolator.EASE_OUT);
-        iconPop.setOnFinished(event -> {
-            ScaleTransition settle = new ScaleTransition(Duration.millis(200), iconContainer);
-            settle.setToX(1);
-            settle.setToY(1);
-            settle.setInterpolator(Interpolator.EASE_BOTH);
-            settle.play();
-        });
-
         addIconGlow();
         startConfetti();
 
-        new ParallelTransition(fadeIn, iconPop).play();
+        if (achievementIcon.getParent() instanceof StackPane iconContainer) {
+            iconContainer.setScaleX(0);
+            iconContainer.setScaleY(0);
+
+            ScaleTransition iconPop = new ScaleTransition(Duration.millis(400), iconContainer);
+            iconPop.setToX(1.15);
+            iconPop.setToY(1.15);
+            iconPop.setDelay(Duration.millis(200));
+            iconPop.setInterpolator(Interpolator.EASE_OUT);
+            iconPop.setOnFinished(event -> {
+                ScaleTransition settle = new ScaleTransition(Duration.millis(200), iconContainer);
+                settle.setToX(1);
+                settle.setToY(1);
+                settle.setInterpolator(Interpolator.EASE_BOTH);
+                settle.play();
+            });
+            new ParallelTransition(fadeIn, iconPop).play();
+            return;
+        }
+
+        logger.warn("Achievement icon parent is not StackPane; skipping icon pop animation");
+        fadeIn.play();
     }
 
     private void playMatchEntranceAnimation() {
@@ -152,17 +160,28 @@ public class MilestonePopupController implements Initializable {
         FadeTransition fadeIn = new FadeTransition(Duration.millis(200), rootPane);
         fadeIn.setToValue(1);
 
-        StackPane leftWrapper = (StackPane) leftAvatarIcon.getParent();
-        leftWrapper.setTranslateX(-200);
-        TranslateTransition leftFly = new TranslateTransition(Duration.millis(400), leftWrapper);
-        leftFly.setToX(0);
-        leftFly.setInterpolator(Interpolator.EASE_OUT);
+        List<Animation> animations = new ArrayList<>();
+        animations.add(fadeIn);
 
-        StackPane rightWrapper = (StackPane) rightAvatarIcon.getParent();
-        rightWrapper.setTranslateX(200);
-        TranslateTransition rightFly = new TranslateTransition(Duration.millis(400), rightWrapper);
-        rightFly.setToX(0);
-        rightFly.setInterpolator(Interpolator.EASE_OUT);
+        if (leftAvatarIcon.getParent() instanceof StackPane leftWrapper) {
+            leftWrapper.setTranslateX(-200);
+            TranslateTransition leftFly = new TranslateTransition(Duration.millis(400), leftWrapper);
+            leftFly.setToX(0);
+            leftFly.setInterpolator(Interpolator.EASE_OUT);
+            animations.add(leftFly);
+        } else {
+            logger.warn("Left avatar parent is not StackPane; skipping left fly-in animation");
+        }
+
+        if (rightAvatarIcon.getParent() instanceof StackPane rightWrapper) {
+            rightWrapper.setTranslateX(200);
+            TranslateTransition rightFly = new TranslateTransition(Duration.millis(400), rightWrapper);
+            rightFly.setToX(0);
+            rightFly.setInterpolator(Interpolator.EASE_OUT);
+            animations.add(rightFly);
+        } else {
+            logger.warn("Right avatar parent is not StackPane; skipping right fly-in animation");
+        }
 
         heartIcon.setScaleX(0);
         heartIcon.setScaleY(0);
@@ -176,14 +195,18 @@ public class MilestonePopupController implements Initializable {
             settle.setToY(1);
             settle.play();
         });
+        animations.add(heartPop);
 
         startConfetti();
-        new ParallelTransition(fadeIn, leftFly, rightFly, heartPop).play();
+        new ParallelTransition(animations.toArray(Animation[]::new)).play();
     }
 
     private void startConfetti() {
         if (confettiCanvas == null) {
             return;
+        }
+        if (confetti != null) {
+            confetti.stop();
         }
         confetti = new ConfettiAnimation();
         confetti.play(confettiCanvas);
@@ -193,6 +216,11 @@ public class MilestonePopupController implements Initializable {
         if (achievementIcon == null) {
             return;
         }
+        // Stop any existing glowPulse before creating a new one
+        if (glowPulse != null) {
+            glowPulse.stop();
+            glowPulse = null;
+        }
 
         DropShadow glow = new DropShadow();
         glow.setColor(Color.web("#fbbf24"));
@@ -200,7 +228,7 @@ public class MilestonePopupController implements Initializable {
         glow.setSpread(0.3);
         achievementIcon.setEffect(glow);
 
-        Timeline glowPulse = new Timeline(
+        glowPulse = new Timeline(
                 new KeyFrame(
                         Duration.ZERO,
                         new KeyValue(glow.radiusProperty(), 20),
@@ -209,7 +237,7 @@ public class MilestonePopupController implements Initializable {
                         Duration.millis(800),
                         new KeyValue(glow.radiusProperty(), 40, Interpolator.EASE_BOTH),
                         new KeyValue(glow.spreadProperty(), 0.5, Interpolator.EASE_BOTH)));
-        glowPulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        glowPulse.setCycleCount(Animation.INDEFINITE);
         glowPulse.setAutoReverse(true);
         glowPulse.play();
     }
@@ -238,6 +266,10 @@ public class MilestonePopupController implements Initializable {
     private void close() {
         if (confetti != null) {
             confetti.stop();
+        }
+        if (glowPulse != null) {
+            glowPulse.stop();
+            glowPulse = null;
         }
 
         if (rootPane == null) {

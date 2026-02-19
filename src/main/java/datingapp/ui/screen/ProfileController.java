@@ -1,6 +1,6 @@
 package datingapp.ui.screen;
 
-import datingapp.core.model.Gender;
+import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;

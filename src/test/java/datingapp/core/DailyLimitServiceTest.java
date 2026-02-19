@@ -207,10 +207,10 @@ class DailyLimitServiceTest {
         @DisplayName("formatDuration works correctly")
         void formatDuration_formatsCorrectly() {
             assertEquals(
-                    "4h 30m",
+                    "04:30:00",
                     RecommendationService.formatDuration(Duration.ofHours(4).plusMinutes(30)));
-            assertEquals("5m", RecommendationService.formatDuration(Duration.ofMinutes(5)));
-            assertEquals("12h 00m", RecommendationService.formatDuration(Duration.ofHours(12)));
+            assertEquals("00:05:00", RecommendationService.formatDuration(Duration.ofMinutes(5)));
+            assertEquals("12:00:00", RecommendationService.formatDuration(Duration.ofHours(12)));
         }
     }
 

@@ -9,12 +9,13 @@ import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.UserState;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
@@ -47,6 +48,8 @@ public class MatchingViewModel {
 
     /** Track background thread for cleanup on dispose. */
     private final AtomicReference<Thread> backgroundThread = new AtomicReference<>();
+
+    private final AtomicLong refreshGeneration = new AtomicLong(0);
 
     private final AtomicBoolean disposed = new AtomicBoolean(false);
     private final AtomicInteger activeLoads = new AtomicInteger(0);
@@ -92,6 +95,7 @@ public class MatchingViewModel {
      */
     public void dispose() {
         disposed.set(true);
+        refreshGeneration.incrementAndGet();
         Thread thread = backgroundThread.getAndSet(null);
         if (thread != null && thread.isAlive()) {
             thread.interrupt();
@@ -115,10 +119,17 @@ public class MatchingViewModel {
             return;
         }
 
+        Thread existingThread = backgroundThread.getAndSet(null);
+        if (existingThread != null && existingThread.isAlive()) {
+            existingThread.interrupt();
+        }
+        long localGeneration = refreshGeneration.incrementAndGet();
+
+        activeLoads.set(0);
         beginLoading();
 
         Thread thread = Thread.ofVirtual().name("candidate-refresh").start(() -> {
-            List<User> candidates = null;
+            List<User> candidates = List.of();
             try {
                 logDebug(
                         "Refreshing candidates for user: {} (state={}, isComplete={}, gender={}, interestedIn={})",
@@ -144,13 +155,20 @@ public class MatchingViewModel {
             } catch (Exception e) {
                 logWarn("Failed to refresh candidates", e);
             }
+
+            if (Thread.currentThread().isInterrupted()) {
+                return;
+            }
+
             List<User> finalCandidates = candidates;
             runOnFx(() -> {
-                if (!disposed.get() && finalCandidates != null) {
-                    candidateQueue.clear();
-                    candidateQueue.addAll(finalCandidates);
-                    nextCandidate();
+                if (disposed.get() || refreshGeneration.get() != localGeneration) {
+                    return;
                 }
+
+                candidateQueue.clear();
+                candidateQueue.addAll(finalCandidates);
+                nextCandidate();
                 endLoading();
             });
         });

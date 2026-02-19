@@ -2,9 +2,9 @@ package datingapp.core.matching;
 
 import datingapp.core.LoggingSupport;
 import datingapp.core.PerformanceMonitor;
-import datingapp.core.model.Gender;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;

@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.*;
-import datingapp.core.model.*;
+import datingapp.core.model.Match;
+import datingapp.core.model.Match.MatchArchiveReason;
+import datingapp.core.model.Match.MatchState;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.testutil.TestStorages;

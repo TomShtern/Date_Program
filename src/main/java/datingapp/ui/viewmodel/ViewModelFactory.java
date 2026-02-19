@@ -45,6 +45,8 @@ public class ViewModelFactory {
      */
     private final ObjectProperty<User> currentUserProperty = new SimpleObjectProperty<>();
 
+    private Consumer<User> sessionListener;
+
     // Cached ViewModels (lazy-initialized singletons within UI context)
     private LoginViewModel loginViewModel;
     private DashboardViewModel dashboardViewModel;
@@ -68,7 +70,8 @@ public class ViewModelFactory {
      */
     private void initializeSessionBinding() {
         // Listen to AppSession changes and update UI property on JavaFX thread
-        AppSession.getInstance().addListener(user -> Platform.runLater(() -> currentUserProperty.set(user)));
+        sessionListener = user -> Platform.runLater(() -> currentUserProperty.set(user));
+        AppSession.getInstance().addListener(sessionListener);
         // Sync initial state
         currentUserProperty.set(AppSession.getInstance().getCurrentUser());
     }
@@ -199,6 +202,11 @@ public class ViewModelFactory {
     }
 
     public synchronized void reset() {
+        if (sessionListener != null) {
+            AppSession.getInstance().removeListener(sessionListener);
+            sessionListener = null;
+        }
+
         loginViewModel = quietly(loginViewModel, LoginViewModel::dispose);
         dashboardViewModel = quietly(dashboardViewModel, DashboardViewModel::dispose);
         profileViewModel = quietly(profileViewModel, ProfileViewModel::dispose);

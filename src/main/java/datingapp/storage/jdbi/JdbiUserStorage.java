@@ -1,10 +1,13 @@
 package datingapp.storage.jdbi;
 
-import datingapp.core.model.Gender;
-import datingapp.core.model.ProfileNote;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
-import datingapp.core.model.VerificationMethod;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.User.UserState;
+import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -15,7 +18,6 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +40,9 @@ import org.slf4j.LoggerFactory;
 
 /** Consolidated JDBI-backed user storage implementation. */
 public final class JdbiUserStorage implements UserStorage {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
 
     public static final String ALL_COLUMNS = """
                         id, name, bio, birth_date, gender, interested_in, lat, lon,
@@ -103,10 +108,10 @@ public final class JdbiUserStorage implements UserStorage {
                 double latDelta = maxDistanceKm / 111.0;
                 double cosLat = Math.max(Math.cos(Math.toRadians(Math.abs(seekerLat))), 0.0001);
                 double lonDelta = maxDistanceKm / (111.0 * cosLat);
+                lonDelta = Math.min(lonDelta, 180.0); // Clamp to valid longitude range
                 sql.append(" AND has_location_set = TRUE")
                         .append(" AND lat BETWEEN :latMin AND :latMax")
                         .append(" AND lon BETWEEN :lonMin AND :lonMax");
-
                 return handle.createQuery(sql.toString())
                         .defineList("genders", genderNames)
                         .bind("excludeId", excludeId)
@@ -276,9 +281,7 @@ public final class JdbiUserStorage implements UserStorage {
             Double lat = JdbiTypeCodecs.SqlRowReaders.readDouble(rs, "lat");
             Double lon = JdbiTypeCodecs.SqlRowReaders.readDouble(rs, "lon");
             Boolean hasLocationFlag = rs.getObject("has_location_set", Boolean.class);
-            boolean hasLocationSet =
-                    Boolean.TRUE.equals(hasLocationFlag) || (lat != null && lon != null && (lat != 0.0 || lon != 0.0));
-
+            boolean hasLocationSet = Boolean.TRUE.equals(hasLocationFlag);
             User user = User.StorageBuilder.create(
                             JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
                             rs.getString("name"),
@@ -343,11 +346,38 @@ public final class JdbiUserStorage implements UserStorage {
         }
 
         private List<String> readPhotoUrls(ResultSet rs, String column) throws SQLException {
-            String csv = rs.getString(column);
-            if (csv == null || csv.isBlank()) {
+            String raw = rs.getString(column);
+            if (raw == null) {
                 return new ArrayList<>();
             }
-            return new ArrayList<>(Arrays.asList(csv.split("\\|")));
+
+            String trimmedRaw = raw.trim();
+            if (trimmedRaw.isEmpty()) {
+                return new ArrayList<>();
+            }
+
+            List<String> parsed = parsePhotoUrlsJson(trimmedRaw).orElseGet(() -> List.of(trimmedRaw.split("\\|")));
+
+            return parsed.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(url -> !url.isBlank())
+                    .collect(Collectors.toCollection(ArrayList::new));
+        }
+
+        private Optional<List<String>> parsePhotoUrlsJson(String raw) {
+            if (!raw.startsWith("[") || !raw.endsWith("]")) {
+                return Optional.empty();
+            }
+
+            try {
+                return Optional.of(OBJECT_MAPPER.readValue(raw, STRING_LIST_TYPE));
+            } catch (JsonProcessingException _) {
+                if (logger.isWarnEnabled()) {
+                    logger.warn("Invalid JSON in photo_urls column; falling back to legacy parsing");
+                }
+                return Optional.empty();
+            }
         }
 
         private Set<Interest> readInterestSet(ResultSet rs, String column) throws SQLException {
@@ -515,7 +545,21 @@ public final class JdbiUserStorage implements UserStorage {
             if (user.getPhotoUrls() == null || user.getPhotoUrls().isEmpty()) {
                 return null;
             }
-            return String.join("|", user.getPhotoUrls());
+
+            List<String> normalized = user.getPhotoUrls().stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(url -> !url.isBlank())
+                    .toList();
+            if (normalized.isEmpty()) {
+                return null;
+            }
+
+            try {
+                return OBJECT_MAPPER.writeValueAsString(normalized);
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("Failed to serialize photo URLs to JSON", e);
+            }
         }
 
         public String getState() {
@@ -592,34 +636,58 @@ public final class JdbiUserStorage implements UserStorage {
         }
 
         public String getDealbreakerSmokingCsv() {
+            if (dealbreakers == null) {
+                return null;
+            }
             return serializeEnumSet(dealbreakers.acceptableSmoking());
         }
 
         public String getDealbreakerDrinkingCsv() {
+            if (dealbreakers == null) {
+                return null;
+            }
             return serializeEnumSet(dealbreakers.acceptableDrinking());
         }
 
         public String getDealbreakerWantsKidsCsv() {
+            if (dealbreakers == null) {
+                return null;
+            }
             return serializeEnumSet(dealbreakers.acceptableKidsStance());
         }
 
         public String getDealbreakerLookingForCsv() {
+            if (dealbreakers == null) {
+                return null;
+            }
             return serializeEnumSet(dealbreakers.acceptableLookingFor());
         }
 
         public String getDealbreakerEducationCsv() {
+            if (dealbreakers == null) {
+                return null;
+            }
             return serializeEnumSet(dealbreakers.acceptableEducation());
         }
 
         public Integer getDealbreakerMinHeightCm() {
+            if (dealbreakers == null) {
+                return null;
+            }
             return dealbreakers.minHeightCm();
         }
 
         public Integer getDealbreakerMaxHeightCm() {
+            if (dealbreakers == null) {
+                return null;
+            }
             return dealbreakers.maxHeightCm();
         }
 
         public Integer getDealbreakerMaxAgeDiff() {
+            if (dealbreakers == null) {
+                return null;
+            }
             return dealbreakers.maxAgeDifference();
         }
 

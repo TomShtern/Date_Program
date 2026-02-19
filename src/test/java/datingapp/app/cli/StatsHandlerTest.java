@@ -9,9 +9,9 @@ import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
-import datingapp.core.model.Gender; // Added this import
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
+import datingapp.core.model.User.Gender; // Added this import
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;

@@ -8,7 +8,7 @@ import datingapp.core.matching.MatchingService.PendingLiker;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.UserState;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.Instant;
@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -52,7 +53,7 @@ public class MatchesViewModel {
 
     private ViewModelErrorSink errorHandler;
 
-    private User currentUser;
+    private final AtomicReference<User> currentUser = new AtomicReference<>();
 
     public MatchesViewModel(
             UiMatchDataAccess matchData,
@@ -67,10 +68,21 @@ public class MatchesViewModel {
 
     /** Initialize and load matches for current user. */
     public void initialize() {
-        currentUser = AppSession.getInstance().getCurrentUser();
-        if (currentUser != null) {
+        currentUser.set(AppSession.getInstance().getCurrentUser());
+        if (currentUser.get() != null) {
             refreshAll();
         }
+    }
+
+    private User resolveCurrentUser() {
+        User user = currentUser.get();
+        if (user == null) {
+            user = AppSession.getInstance().getCurrentUser();
+            if (user != null) {
+                currentUser.set(user);
+            }
+        }
+        return user;
     }
 
     /**
@@ -89,22 +101,21 @@ public class MatchesViewModel {
 
     /** Refresh all sections for the current user. */
     public void refreshAll() {
-        if (currentUser == null) {
-            currentUser = AppSession.getInstance().getCurrentUser();
-        }
-        if (currentUser == null) {
+        User user = resolveCurrentUser();
+        if (user == null) {
             logWarn("No current user, cannot refresh matches");
             return;
         }
 
         loading.set(true);
-        UUID userId = currentUser.getId();
-        String userName = currentUser.getName();
+        UUID userId = user.getId();
+        String userName = user.getName();
 
-        // Check if FX toolkit is available (will be false in unit tests)
-        boolean fxAvailable = isFxToolkitAvailable();
+        // Run async only when invoked from FX thread; otherwise keep deterministic
+        // synchronous behavior for background/test callers.
+        boolean runAsync = isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread();
 
-        if (fxAvailable) {
+        if (runAsync) {
             // Execute blocking storage calls on virtual thread to avoid FX thread blocking
             // (H-12)
             Thread.ofVirtual().name("matches-refresh").start(() -> {
@@ -147,9 +158,14 @@ public class MatchesViewModel {
      */
     private boolean isFxToolkitAvailable() {
         try {
-            return javafx.application.Platform.isFxApplicationThread()
-                    || com.sun.javafx.application.PlatformImpl.isFxApplicationThread();
-        } catch (IllegalStateException | NoClassDefFoundError ignored) {
+            if (javafx.application.Platform.isFxApplicationThread()) {
+                return true;
+            }
+            javafx.application.Platform.runLater(() -> {
+                // probe only
+            });
+            return true;
+        } catch (IllegalStateException _) {
             return false;
         }
     }
@@ -261,18 +277,16 @@ public class MatchesViewModel {
 
     public void likeBack(LikeCardData like) {
         Objects.requireNonNull(like, LIKE_REQUIRED);
-        if (currentUser == null) {
-            currentUser = AppSession.getInstance().getCurrentUser();
-        }
-        if (currentUser == null) {
+        User user = resolveCurrentUser();
+        if (user == null) {
             logWarn("No current user, cannot like back");
             return;
         }
 
         loading.set(true);
-        UUID userId = currentUser.getId();
+        UUID userId = user.getId();
 
-        if (isFxToolkitAvailable()) {
+        if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
             Thread.ofVirtual().name("matches-like-back").start(() -> {
                 try {
                     if (!dailyService.canLike(userId)) {
@@ -296,6 +310,7 @@ public class MatchesViewModel {
             try {
                 if (!dailyService.canLike(userId)) {
                     notifyError("Daily like limit reached", new IllegalStateException("Daily limit reached"));
+                    loading.set(false);
                     return;
                 }
                 matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.LIKE));
@@ -310,18 +325,16 @@ public class MatchesViewModel {
 
     public void passOn(LikeCardData like) {
         Objects.requireNonNull(like, LIKE_REQUIRED);
-        if (currentUser == null) {
-            currentUser = AppSession.getInstance().getCurrentUser();
-        }
-        if (currentUser == null) {
+        User user = resolveCurrentUser();
+        if (user == null) {
             logWarn("No current user, cannot pass");
             return;
         }
 
         loading.set(true);
-        UUID userId = currentUser.getId();
+        UUID userId = user.getId();
 
-        if (isFxToolkitAvailable()) {
+        if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
             Thread.ofVirtual().name("matches-pass-on").start(() -> {
                 try {
                     matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.PASS));
@@ -354,7 +367,7 @@ public class MatchesViewModel {
 
         loading.set(true);
 
-        if (isFxToolkitAvailable()) {
+        if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
             Thread.ofVirtual().name("matches-withdraw").start(() -> {
                 try {
                     matchData.deleteLike(like.likeId());

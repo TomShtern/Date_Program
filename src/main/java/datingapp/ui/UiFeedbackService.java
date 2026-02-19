@@ -135,11 +135,14 @@ public final class UiFeedbackService {
     }
 
     private static void dismiss(HBox toast) {
+        StackPane container = toastContainer;
         FadeTransition fadeOut = new FadeTransition(UiConstants.TOAST_EXIT_DURATION, toast);
         fadeOut.setToValue(0);
         fadeOut.setOnFinished(e -> {
             e.consume();
-            toastContainer.getChildren().remove(toast);
+            if (container != null) {
+                container.getChildren().remove(toast);
+            }
         });
         fadeOut.play();
     }
@@ -197,7 +200,7 @@ public final class UiFeedbackService {
 
         private static final String ERROR_CLASS = "error";
         private static final String SUCCESS_CLASS = "success";
-        private static final Pattern EMAIL_PATTERN = Pattern.compile("^[\\w.-]++@(?:[\\w-]++\\.)++[\\w-]{2,4}$");
+        private static final Pattern EMAIL_PATTERN = Pattern.compile("^[\\w.-]++@(?:[\\w-]++\\.)++[\\w-]{2,63}$");
 
         private ValidationHelper() {
             // Utility class

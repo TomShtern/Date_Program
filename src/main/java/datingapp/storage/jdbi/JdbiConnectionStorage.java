@@ -10,7 +10,7 @@ import datingapp.core.connection.ConnectionModels.FriendRequest.Status;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Notification.Type;
-import datingapp.core.model.MatchArchiveReason;
+import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.storage.DatabaseManager.StorageException;
 import java.sql.ResultSet;

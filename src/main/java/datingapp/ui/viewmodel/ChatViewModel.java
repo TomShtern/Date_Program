@@ -9,6 +9,7 @@ import datingapp.core.connection.ConnectionService.SendResult;
 import datingapp.core.model.User;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -119,9 +120,10 @@ public class ChatViewModel {
         }
 
         beginLoading();
+        int initialUnread = readTotalUnreadOnFxThread();
         Thread.ofVirtual().name("chat-refresh").start(() -> {
             List<ConversationPreview> previews = List.of();
-            int unread = totalUnreadCount.get();
+            int unread = initialUnread;
             try {
                 logInfo("Refreshing conversations for user: {}", user.getName());
                 previews = messagingService.getConversations(user.getId());
@@ -264,27 +266,60 @@ public class ChatViewModel {
     }
 
     public boolean sendMessage(String text) {
-        if (currentUser == null || selectedConversation.get() == null || text == null || text.isBlank()) {
+        ConversationPreview conversation = selectedConversation.get();
+        User sender = currentUser;
+        if (sender == null || conversation == null || text == null || text.isBlank()) {
             return false;
         }
 
-        logInfo("Sending message to: {}", selectedConversation.get().otherUser().getName());
-        SendResult result = messagingService.sendMessage(
-                currentUser.getId(), selectedConversation.get().otherUser().getId(), text.trim());
+        String trimmedText = text.trim();
+        logInfo("Sending message to: {}", conversation.otherUser().getName());
+        dispatchSendMessage(
+                conversation, sender.getId(), conversation.otherUser().getId(), trimmedText);
 
-        if (!result.success()) {
-            String msg = "Failed to send message: " + result.errorMessage();
-            if (errorHandler != null) {
-                Platform.runLater(() -> errorHandler.onError(msg));
-            } else {
-                logger.warn(msg);
-            }
-            return false;
-        }
-
-        // Refresh local messages after successful send
-        loadMessages(selectedConversation.get());
         return true;
+    }
+
+    private void dispatchSendMessage(
+            ConversationPreview conversation, UUID senderId, UUID otherUserId, String trimmedText) {
+        Thread.ofVirtual().name("chat-send").start(() -> {
+            try {
+                SendResult result = messagingService.sendMessage(senderId, otherUserId, trimmedText);
+                runOnFx(() -> handleSendResult(conversation, result));
+            } catch (Exception e) {
+                runOnFx(() -> reportSendFailure("Failed to send message: " + e.getMessage(), e));
+            }
+        });
+    }
+
+    private void handleSendResult(ConversationPreview conversation, SendResult result) {
+        if (disposed.get()) {
+            return;
+        }
+        if (!result.success()) {
+            reportSendFailure("Failed to send message: " + result.errorMessage(), null);
+            return;
+        }
+
+        ConversationPreview selected = selectedConversation.get();
+        if (selected != null
+                && selected.conversation()
+                        .getId()
+                        .equals(conversation.conversation().getId())) {
+            loadMessages(selected);
+        }
+    }
+
+    private void reportSendFailure(String message, Exception error) {
+        if (errorHandler != null) {
+            errorHandler.onError(message);
+            return;
+        }
+        if (error != null) {
+            logger.warn(message, error);
+        } else {
+            logger.warn(message);
+        }
     }
 
     /**
@@ -318,6 +353,27 @@ public class ChatViewModel {
         if (activeLoads.incrementAndGet() == 1) {
             setLoadingState(true);
         }
+    }
+
+    private int readTotalUnreadOnFxThread() {
+        if (Platform.isFxApplicationThread()) {
+            return totalUnreadCount.get();
+        }
+
+        AtomicInteger snapshot = new AtomicInteger(0);
+        CountDownLatch latch = new CountDownLatch(1);
+        Platform.runLater(() -> {
+            snapshot.set(totalUnreadCount.get());
+            latch.countDown();
+        });
+
+        try {
+            latch.await();
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            return totalUnreadCount.get();
+        }
+        return snapshot.get();
     }
 
     private void endLoading() {

@@ -36,8 +36,8 @@ public final class TextUtil {
      * @return Formatted progress bar string
      */
     public static String renderProgressBar(double fraction, int width) {
-        int filled = (int) Math.round(fraction * width);
+        int filled = (int) Math.round(Math.max(0.0, Math.min(1.0, fraction)) * width);
         int empty = width - filled;
-        return "█".repeat(Math.max(0, filled)) + "░".repeat(Math.max(0, empty));
+        return "█".repeat(filled) + "░".repeat(empty);
     }
 }

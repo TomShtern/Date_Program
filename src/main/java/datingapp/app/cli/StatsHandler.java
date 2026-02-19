@@ -8,6 +8,8 @@ import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +17,10 @@ import org.slf4j.LoggerFactory;
 /** Handles display of user statistics and achievements in the CLI. */
 public class StatsHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(StatsHandler.class);
+    private static final DateTimeFormatter DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
+    private static final DateTimeFormatter DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
 
     private final ActivityMetricsService statsService;
     private final ProfileService achievementService;
@@ -49,7 +55,7 @@ public class StatsHandler implements LoggingSupport {
             logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
 
             UserStats stats = statsService.getOrComputeStats(currentUser.getId());
-            String computedAt = stats.computedAt().toString().substring(0, 16).replace("T", " ");
+            String computedAt = stats.computedAt() == null ? "N/A" : DATE_TIME_FORMATTER.format(stats.computedAt());
             logInfo("  Last updated: {}\n", computedAt);
 
             // Activity section
@@ -153,7 +159,7 @@ public class StatsHandler implements LoggingSupport {
                             ua.achievement().getDisplayName(),
                             ua.achievement().getDescription());
                     // Date formatting?
-                    String dateStr = ua.unlockedAt().toString().substring(0, 10);
+                    String dateStr = ua.unlockedAt() == null ? "N/A" : DATE_FORMATTER.format(ua.unlockedAt());
                     logInfo("     (Unlocked: {})", dateStr);
                 }
                 logInfo("");

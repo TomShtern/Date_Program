@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppSession;
-import datingapp.core.model.Gender;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;
@@ -39,7 +39,7 @@ class UserSessionTest {
 
     @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
-    @DisplayName("Session MatchState Management")
+    @DisplayName("Session State Management")
     class SessionState {
 
         @Test
@@ -75,7 +75,7 @@ class UserSessionTest {
 
     @SuppressWarnings("unused") // JUnit 5 discovers via reflection
     @Nested
-    @DisplayName("Login MatchState Checks")
+    @DisplayName("Login State Checks")
     class LoginState {
 
         @Test

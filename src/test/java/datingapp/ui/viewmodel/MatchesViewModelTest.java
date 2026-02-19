@@ -11,10 +11,10 @@ import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
-import datingapp.core.model.Gender;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.UserState;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestClock;
@@ -120,8 +120,6 @@ class MatchesViewModelTest {
                 .config(zeroLimitConfig)
                 .build();
 
-        User user = createActiveUser("Current");
-        users.save(user);
         MatchesViewModel limitViewModel =
                 new MatchesViewModel(matchData, userStore, matchingService, zeroLimitRecommendationService);
 
