@@ -2,7 +2,7 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import datingapp.core.model.User.ProfileNote;
+import datingapp.core.model.ProfileNote;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;

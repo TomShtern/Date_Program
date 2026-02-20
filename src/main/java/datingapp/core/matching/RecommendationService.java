@@ -16,8 +16,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -25,7 +27,6 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class RecommendationService {
 
@@ -58,7 +59,14 @@ public final class RecommendationService {
     private final AppConfig config;
     private final Clock clock;
 
-    private final Map<String, UUID> cachedDailyPicks = new ConcurrentHashMap<>();
+    private static final int MAX_CACHED_PICKS = 1000;
+    private final Map<String, UUID> cachedDailyPicks =
+            Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, UUID> eldest) {
+                    return size() > MAX_CACHED_PICKS;
+                }
+            });
 
     public static Builder builder() {
         return new Builder();
@@ -178,7 +186,9 @@ public final class RecommendationService {
         return Duration.between(now, resetTime);
     }
 
-    /** Format duration as HH:mm:ss (with optional leading '-' for negative values). */
+    /**
+     * Format duration as HH:mm:ss (with optional leading '-' for negative values).
+     */
     public static String formatDuration(Duration duration) {
         if (duration == null) {
             return "00:00:00";

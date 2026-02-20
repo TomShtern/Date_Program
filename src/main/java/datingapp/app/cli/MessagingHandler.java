@@ -74,7 +74,7 @@ public class MessagingHandler implements LoggingSupport {
             return;
         }
 
-        List<ConversationPreview> previews = messagingService.getConversations(currentUser.getId());
+        List<ConversationPreview> previews = messagingService.getConversations(currentUser.getId(), 50, 0);
 
         while (true) {
             printConversationListHeader();
@@ -134,8 +134,8 @@ public class MessagingHandler implements LoggingSupport {
     /**
      * Handles the user's selection of a conversation from the list.
      *
-     * @param choice The user's input choice
-     * @param previews The current list of conversation previews
+     * @param choice      The user's input choice
+     * @param previews    The current list of conversation previews
      * @param currentUser The current user
      * @return Updated list of conversation previews
      */
@@ -145,7 +145,7 @@ public class MessagingHandler implements LoggingSupport {
             int idx = Integer.parseInt(choice) - 1;
             if (idx >= 0 && idx < previews.size()) {
                 showConversation(currentUser, previews.get(idx));
-                return messagingService.getConversations(currentUser.getId());
+                return messagingService.getConversations(currentUser.getId(), 50, 0);
             } else {
                 logInfo(CliTextAndInput.INVALID_SELECTION);
             }
@@ -180,36 +180,38 @@ public class MessagingHandler implements LoggingSupport {
         int offset = 0;
         boolean showOlder = false;
 
-        while (true) {
-            List<Message> messages =
+        boolean active = true;
+        while (active) {
+            var result =
                     messagingService.getMessages(currentUser.getId(), otherUser.getId(), MESSAGES_PER_PAGE + offset, 0);
+            if (!result.success()) {
+                logInfo("\n❌ Failed to load messages: {}", result.errorMessage());
+                active = false;
+            } else {
+                List<Message> messages = result.messages();
 
-            String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-            Optional<Match> matchOpt = interactionStorage.get(matchId);
-            boolean canMessage = matchOpt.isPresent() && matchOpt.get().isActive();
+                String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
+                Optional<Match> matchOpt = interactionStorage.get(matchId);
+                boolean canMessage = matchOpt.isPresent() && matchOpt.get().isActive();
 
-            printConversationHeader(otherUser.getName(), canMessage);
-            printMessages(messages, currentUser, showOlder);
-            printConversationFooter(canMessage, messages.size() >= MESSAGES_PER_PAGE);
+                printConversationHeader(otherUser.getName(), canMessage);
+                printMessages(messages, currentUser, showOlder);
+                printConversationFooter(canMessage, messages.size() >= MESSAGES_PER_PAGE);
 
-            String userInput = input.readLine("> ").trim();
+                String userInput = input.readLine("> ").trim();
 
-            if (userInput.isEmpty()) {
-                continue;
-            }
-
-            ConversationAction action = processConversationInput(userInput, canMessage, currentUser, otherUser);
-            if (action == ConversationAction.EXIT) {
-                return;
-            }
-            if (action == ConversationAction.SHOW_OLDER) {
-                offset += MESSAGES_PER_PAGE;
-                showOlder = true;
-                continue;
-            }
-            if (action == ConversationAction.REFRESH) {
-                offset = 0;
-                showOlder = false;
+                if (!userInput.isEmpty()) {
+                    ConversationAction action = processConversationInput(userInput, canMessage, currentUser, otherUser);
+                    if (action == ConversationAction.EXIT) {
+                        active = false;
+                    } else if (action == ConversationAction.SHOW_OLDER) {
+                        offset += MESSAGES_PER_PAGE;
+                        showOlder = true;
+                    } else if (action == ConversationAction.REFRESH) {
+                        offset = 0;
+                        showOlder = false;
+                    }
+                }
             }
         }
     }
@@ -225,7 +227,7 @@ public class MessagingHandler implements LoggingSupport {
      * Prints the header for a conversation view.
      *
      * @param otherUserName The name of the other user in the conversation
-     * @param canMessage Whether the user can send messages in this conversation
+     * @param canMessage    Whether the user can send messages in this conversation
      */
     private void printConversationHeader(String otherUserName, boolean canMessage) {
         logInfo("\n{}", CliTextAndInput.SEPARATOR_LINE);
@@ -239,9 +241,9 @@ public class MessagingHandler implements LoggingSupport {
     /**
      * Prints the messages in a conversation.
      *
-     * @param messages The list of messages to print
+     * @param messages    The list of messages to print
      * @param currentUser The current user
-     * @param showOlder Whether to show older messages
+     * @param showOlder   Whether to show older messages
      */
     private void printMessages(List<Message> messages, User currentUser, boolean showOlder) {
         if (messages.isEmpty()) {
@@ -257,7 +259,7 @@ public class MessagingHandler implements LoggingSupport {
     /**
      * Prints the footer for a conversation view.
      *
-     * @param canMessage Whether the user can send messages
+     * @param canMessage      Whether the user can send messages
      * @param hasMoreMessages Whether there are more messages to show
      */
     private void printConversationFooter(boolean canMessage, boolean hasMoreMessages) {
@@ -277,10 +279,10 @@ public class MessagingHandler implements LoggingSupport {
     /**
      * Processes user input in a conversation.
      *
-     * @param userInput The user's input
-     * @param canMessage Whether the user can send messages
+     * @param userInput   The user's input
+     * @param canMessage  Whether the user can send messages
      * @param currentUser The current user
-     * @param otherUser The other user in the conversation
+     * @param otherUser   The other user in the conversation
      * @return The action to take based on the input
      */
     private ConversationAction processConversationInput(
@@ -423,14 +425,6 @@ public class MessagingHandler implements LoggingSupport {
     }
 
     private int getTotalUnreadCount(User currentUser) {
-        int totalUnread = 0;
-        List<ConversationPreview> conversations = messagingService.getConversations(currentUser.getId());
-
-        for (ConversationPreview conversation : conversations) {
-            totalUnread += messagingService.getUnreadCount(
-                    currentUser.getId(), conversation.conversation().getId());
-        }
-
-        return totalUnread;
+        return messagingService.getTotalUnreadCount(currentUser.getId());
     }
 }

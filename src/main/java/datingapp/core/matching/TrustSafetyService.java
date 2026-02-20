@@ -4,9 +4,11 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Report;
+import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
+import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
@@ -28,23 +30,37 @@ public class TrustSafetyService {
     private final InteractionStorage interactionStorage;
     private final UserStorage userStorage;
     private final AppConfig config;
+    private final CommunicationStorage communicationStorage; // nullable
     private final Duration verificationTtl;
     private final Random random;
 
+    /** Convenience constructor without communication storage (for tests and simple setups). */
     public TrustSafetyService(
             TrustSafetyStorage trustSafetyStorage,
             InteractionStorage interactionStorage,
             UserStorage userStorage,
             AppConfig config) {
+        this(trustSafetyStorage, interactionStorage, userStorage, config, null, DEFAULT_VERIFICATION_TTL, new Random());
+    }
+
+    /** Constructor with communication storage for full conversation archiving on block. */
+    public TrustSafetyService(
+            TrustSafetyStorage trustSafetyStorage,
+            InteractionStorage interactionStorage,
+            UserStorage userStorage,
+            AppConfig config,
+            CommunicationStorage communicationStorage) {
         this(
-                Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null"),
-                Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null"),
-                Objects.requireNonNull(userStorage, "userStorage cannot be null"),
-                Objects.requireNonNull(config, "config cannot be null"),
+                trustSafetyStorage,
+                interactionStorage,
+                userStorage,
+                config,
+                communicationStorage,
                 DEFAULT_VERIFICATION_TTL,
                 new Random());
     }
 
+    /** Full constructor with all dependencies. */
     public TrustSafetyService(
             TrustSafetyStorage trustSafetyStorage,
             InteractionStorage interactionStorage,
@@ -52,10 +68,23 @@ public class TrustSafetyService {
             AppConfig config,
             Duration verificationTtl,
             Random random) {
+        this(trustSafetyStorage, interactionStorage, userStorage, config, null, verificationTtl, random);
+    }
+
+    /** Canonical constructor — all dependencies explicit. */
+    public TrustSafetyService(
+            TrustSafetyStorage trustSafetyStorage,
+            InteractionStorage interactionStorage,
+            UserStorage userStorage,
+            AppConfig config,
+            CommunicationStorage communicationStorage,
+            Duration verificationTtl,
+            Random random) {
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.communicationStorage = communicationStorage;
         this.verificationTtl = Objects.requireNonNull(verificationTtl, "verificationTtl cannot be null");
         this.random = Objects.requireNonNull(random, "random cannot be null");
     }
@@ -93,7 +122,8 @@ public class TrustSafetyService {
     }
 
     /** Report a user for inappropriate behavior and return moderation action. */
-    public ReportResult report(UUID reporterId, UUID reportedUserId, Report.Reason reason, String description) {
+    public ReportResult report(
+            UUID reporterId, UUID reportedUserId, Report.Reason reason, String description, boolean blockUser) {
 
         if (reporterId == null) {
             return new ReportResult(false, false, "reporterId is required");
@@ -113,12 +143,12 @@ public class TrustSafetyService {
                     false, false, "Description too long (max " + config.maxReportDescLength() + " characters)");
         }
 
-        User reporter = userStorage.get(reporterId);
+        User reporter = userStorage.get(reporterId).orElse(null);
         if (reporter == null || reporter.getState() != UserState.ACTIVE) {
             return new ReportResult(false, false, "Reporter must be active user");
         }
 
-        User reported = userStorage.get(reportedUserId);
+        User reported = userStorage.get(reportedUserId).orElse(null);
         if (reported == null) {
             return new ReportResult(false, false, "Reported user not found");
         }
@@ -130,13 +160,13 @@ public class TrustSafetyService {
         Report report = Report.create(reporterId, reportedUserId, reason, description);
         trustSafetyStorage.save(report);
 
-        if (!trustSafetyStorage.isBlocked(reporterId, reportedUserId)) {
+        boolean autoBanned = applyAutoBanIfThreshold(reportedUserId);
+
+        if (!autoBanned && blockUser && !trustSafetyStorage.isBlocked(reporterId, reportedUserId)) {
             Block block = Block.create(reporterId, reportedUserId);
             trustSafetyStorage.save(block);
             updateMatchStateForBlock(reporterId, reportedUserId);
         }
-
-        boolean autoBanned = applyAutoBanIfThreshold(reportedUserId);
 
         return new ReportResult(true, autoBanned, null);
     }
@@ -152,7 +182,7 @@ public class TrustSafetyService {
                 return false;
             }
 
-            User latestReported = userStorage.get(reportedUserId);
+            User latestReported = userStorage.get(reportedUserId).orElse(null);
             if (latestReported == null || latestReported.getState() == UserState.BANNED) {
                 return false;
             }
@@ -164,7 +194,8 @@ public class TrustSafetyService {
     }
 
     /**
-     * Updates the match state to BLOCKED if a match exists between the two users.
+     * Updates the match state to BLOCKED if a match exists between the two users,
+     * and archives any existing conversation from the blocker's perspective.
      * Silently succeeds if interactionStorage is not configured or no match exists.
      */
     private void updateMatchStateForBlock(UUID blockerId, UUID blockedId) {
@@ -181,6 +212,13 @@ public class TrustSafetyService {
                 }
             }
         });
+
+        if (communicationStorage != null) {
+            communicationStorage.getConversationByUsers(blockerId, blockedId).ifPresent(convo -> {
+                communicationStorage.archiveConversation(convo.getId(), blockerId, MatchArchiveReason.BLOCK);
+                communicationStorage.setConversationVisibility(convo.getId(), blockerId, false);
+            });
+        }
     }
 
     /**
@@ -203,12 +241,12 @@ public class TrustSafetyService {
             return new BlockResult(false, "Cannot block yourself");
         }
 
-        User blocker = userStorage.get(blockerId);
+        User blocker = userStorage.get(blockerId).orElse(null);
         if (blocker == null || blocker.getState() != UserState.ACTIVE) {
             return new BlockResult(false, "Blocker must be an active user");
         }
 
-        User blocked = userStorage.get(blockedId);
+        User blocked = userStorage.get(blockedId).orElse(null);
         if (blocked == null) {
             return new BlockResult(false, "User to block not found");
         }
@@ -275,7 +313,7 @@ public class TrustSafetyService {
         }
 
         return trustSafetyStorage.findByBlocker(userId).stream()
-                .map(block -> userStorage.get(block.blockedId()))
+                .map(block -> userStorage.get(block.blockedId()).orElse(null))
                 .filter(Objects::nonNull)
                 .toList();
     }

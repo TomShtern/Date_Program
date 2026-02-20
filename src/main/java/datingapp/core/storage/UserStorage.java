@@ -1,8 +1,8 @@
 package datingapp.core.storage;
 
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,21 +22,26 @@ public interface UserStorage {
      * Gets a user by ID.
      *
      * @param id The user ID
-     * @return The user, or null if not found
+     * @return An Optional containing the user if found, empty otherwise
      */
-    User get(UUID id);
+    Optional<User> get(UUID id);
 
     /** Finds all active users. */
     List<User> findActive();
 
     /**
      * Pre-filtered candidate query for a given seeker's basic criteria.
-     * Filters applied in SQL: active state, gender, age range, and optional bounding-box distance.
-     * Remaining filters (interaction exclusions, dealbreakers, mutual preferences) are applied
+     * Filters applied in SQL: active state, gender, age range, and optional
+     * bounding-box distance.
+     * Remaining filters (interaction exclusions, dealbreakers, mutual preferences)
+     * are applied
      * in-memory by {@code CandidateFinder}.
      *
-     * <p>The default implementation falls back to {@link #findActive()} filtered in-memory,
-     * which is correct but unoptimized. Storage implementations should override this to push
+     * <p>
+     * The default implementation falls back to {@link #findActive()} filtered
+     * in-memory,
+     * which is correct but unoptimized. Storage implementations should override
+     * this to push
      * the filters to the database.
      *
      * @param excludeId     the seeker's own UUID (excluded from results)
@@ -44,8 +49,10 @@ public interface UserStorage {
      * @param minAge        minimum acceptable candidate age (years)
      * @param maxAge        maximum acceptable candidate age (years)
      * @param seekerLat     seeker's latitude (degrees); use 0 when location not set
-     * @param seekerLon     seeker's longitude (degrees); use 0 when location not set
-     * @param maxDistanceKm bounding-box radius in km; use large value (e.g. 50000) to skip distance filter
+     * @param seekerLon     seeker's longitude (degrees); use 0 when location not
+     *                      set
+     * @param maxDistanceKm bounding-box radius in km; use large value (e.g. 50000)
+     *                      to skip distance filter
      * @return active users matching base criteria, unsorted
      */
     default List<User> findCandidates(
@@ -108,25 +115,26 @@ public interface UserStorage {
         }
         Map<UUID, User> result = new java.util.HashMap<>();
         for (UUID id : ids) {
-            User user = get(id);
-            if (user != null) {
-                result.put(id, user);
-            }
+            get(id).ifPresent(user -> result.put(id, user));
         }
         return result;
     }
 
     /**
-     * Deletes a user and all their associated data. When combined with CASCADE DELETE on
-     * foreign keys, this will automatically remove likes, matches, sessions, and stats.
+     * Deletes a user and all their associated data. When combined with CASCADE
+     * DELETE on
+     * foreign keys, this will automatically remove likes, matches, sessions, and
+     * stats.
      *
      * @param id The user ID to delete
      */
     void delete(UUID id);
 
     /**
-     * Permanently removes all soft-deleted users whose {@code deleted_at} is before the
-     * given threshold. This is a hard delete for GDPR compliance and storage reclamation.
+     * Permanently removes all soft-deleted users whose {@code deleted_at} is before
+     * the
+     * given threshold. This is a hard delete for GDPR compliance and storage
+     * reclamation.
      *
      * @param threshold rows with {@code deleted_at < threshold} are purged
      * @return number of rows purged
@@ -149,7 +157,7 @@ public interface UserStorage {
     /**
      * Gets a user's note about another user.
      *
-     * @param authorId ID of the note author
+     * @param authorId  ID of the note author
      * @param subjectId ID of the user the note is about
      * @return the note if it exists
      */
@@ -166,7 +174,7 @@ public interface UserStorage {
     /**
      * Deletes a note.
      *
-     * @param authorId ID of the note author
+     * @param authorId  ID of the note author
      * @param subjectId ID of the user the note is about
      * @return true if a note was deleted
      */

@@ -11,7 +11,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Consolidated storage for messaging and social operations. Merges the former {@code
+ * Consolidated storage for messaging and social operations. Merges the former
+ * {@code
  * MessagingStorage} and {@code SocialStorage} interfaces.
  */
 public interface CommunicationStorage {
@@ -24,13 +25,15 @@ public interface CommunicationStorage {
 
     Optional<Conversation> getConversationByUsers(UUID userA, UUID userB);
 
-    List<Conversation> getConversationsFor(UUID userId);
+    List<Conversation> getConversationsFor(UUID userId, int limit, int offset);
+
+    List<Conversation> getAllConversationsFor(UUID userId);
 
     void updateConversationLastMessageAt(String conversationId, Instant timestamp);
 
     void updateConversationReadTimestamp(String conversationId, UUID userId, Instant timestamp);
 
-    void archiveConversation(String conversationId, MatchArchiveReason reason);
+    void archiveConversation(String conversationId, UUID userId, MatchArchiveReason reason);
 
     void setConversationVisibility(String conversationId, UUID userId, boolean visible);
 
@@ -61,7 +64,9 @@ public interface CommunicationStorage {
     /**
      * Persists a friend request and its paired notification as one logical write.
      *
-     * <p>Default implementation is sequential for backward compatibility. Implementations with
+     * <p>
+     * Default implementation is sequential for backward compatibility.
+     * Implementations with
      * transactional capabilities should override to guarantee atomic behavior.
      */
     default void saveFriendRequestWithNotification(FriendRequest request, Notification notification) {

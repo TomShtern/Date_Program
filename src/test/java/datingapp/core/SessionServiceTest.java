@@ -197,4 +197,53 @@ class SessionServiceTest {
             assertEquals(1, agg.totalPasses());
         }
     }
+
+    @Nested
+    @DisplayName("recordActivity")
+    class RecordActivityTests {
+
+        @Test
+        @DisplayName("updates lastActivityAt on existing session")
+        void updatesLastActivityAtOnExistingSession() {
+            // Create session at the fixed instant
+            service.getOrCreateSession(userId);
+
+            // Advance time and record activity
+            Instant later = FIXED_INSTANT.plusSeconds(30);
+            TestClock.setFixed(later);
+            service.recordActivity(userId);
+
+            Session session = service.getCurrentSession(userId).orElseThrow();
+            assertEquals(later, session.getLastActivityAt());
+        }
+
+        @Test
+        @DisplayName("creates a new session if none exists")
+        void createsSessionWhenNoneExists() {
+            // No prior getOrCreateSession call
+            service.recordActivity(userId);
+
+            assertTrue(service.getCurrentSession(userId).isPresent(), "A session should be created by recordActivity");
+        }
+
+        @Test
+        @DisplayName("does not affect lastActivityAt on completed session")
+        void doesNotUpdateCompletedSession() {
+            Session session = service.getOrCreateSession(userId);
+            Instant endTime = FIXED_INSTANT.plusSeconds(10);
+            TestClock.setFixed(endTime);
+            session.end();
+            analyticsStorage.saveSession(session);
+
+            Instant afterEnd = FIXED_INSTANT.plusSeconds(20);
+            TestClock.setFixed(afterEnd);
+            // recordActivity on a completed session should create a new session
+            service.recordActivity(userId);
+
+            // The new session's lastActivityAt should be afterEnd, not the old endTime
+            Optional<Session> active = service.getCurrentSession(userId);
+            assertTrue(active.isPresent());
+            assertEquals(afterEnd, active.get().getLastActivityAt());
+        }
+    }
 }

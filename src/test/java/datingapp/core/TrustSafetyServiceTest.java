@@ -6,11 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Block;
+import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.matching.*;
+import datingapp.core.model.Match;
+import datingapp.core.model.Match.MatchArchiveReason;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.User.UserState;
 import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
@@ -44,7 +47,8 @@ import org.junit.jupiter.api.Timeout;
  * Unit tests for TrustSafetyService - consolidated from ReportServiceTest and
  * VerificationServiceTest.
  *
- * <p>Tests cover:
+ * <p>
+ * Tests cover:
  * - Report functionality (auto-block, auto-ban, validation)
  * - Verification code validation (expiration, mismatch)
  */
@@ -105,7 +109,7 @@ class TrustSafetyServiceTest {
             @DisplayName("Valid report succeeds")
             void validReportSucceeds() {
                 var result = trustSafetyService.report(
-                        activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, "Sent spam messages");
+                        activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, "Sent spam messages", true);
 
                 assertTrue(result.success(), "Report should succeed");
                 assertFalse(result.userWasBanned(), "First report should not trigger ban");
@@ -115,7 +119,8 @@ class TrustSafetyServiceTest {
             @Test
             @DisplayName("Report auto-blocks the reported user")
             void reportAutoBlocks() {
-                trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.HARASSMENT, null);
+                trustSafetyService.report(
+                        activeReporter.getId(), reportedUser.getId(), Report.Reason.HARASSMENT, null, true);
 
                 assertTrue(
                         trustSafetyStorage.isBlocked(activeReporter.getId(), reportedUser.getId()),
@@ -126,7 +131,7 @@ class TrustSafetyServiceTest {
             @DisplayName("Report is persisted")
             void reportIsPersisted() {
                 trustSafetyService.report(
-                        activeReporter.getId(), reportedUser.getId(), Report.Reason.FAKE_PROFILE, "Fake photos");
+                        activeReporter.getId(), reportedUser.getId(), Report.Reason.FAKE_PROFILE, "Fake photos", true);
 
                 assertTrue(
                         trustSafetyStorage.hasReported(activeReporter.getId(), reportedUser.getId()),
@@ -148,22 +153,22 @@ class TrustSafetyServiceTest {
                 userStorage.save(reporter3);
 
                 // First two reports - no ban
-                trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
-                trustSafetyService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
+                trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
+                trustSafetyService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
                 assertEquals(
                         UserState.ACTIVE,
-                        userStorage.get(reportedUser.getId()).getState(),
+                        userStorage.get(reportedUser.getId()).orElseThrow().getState(),
                         "User should still be ACTIVE after 2 reports");
 
                 // Third report - triggers ban
-                var result =
-                        trustSafetyService.report(reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
+                var result = trustSafetyService.report(
+                        reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
                 assertTrue(result.userWasBanned(), "Third report should trigger ban");
                 assertEquals(
                         UserState.BANNED,
-                        userStorage.get(reportedUser.getId()).getState(),
+                        userStorage.get(reportedUser.getId()).orElseThrow().getState(),
                         "User should be BANNED after 3 reports");
             }
 
@@ -177,8 +182,9 @@ class TrustSafetyServiceTest {
                 User reporter2 = createActiveUser("Reporter2");
                 userStorage.save(reporter2);
 
-                customService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
-                var result = customService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
+                customService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
+                var result =
+                        customService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
                 assertTrue(result.userWasBanned(), "Should ban at custom threshold of 2");
             }
@@ -195,7 +201,7 @@ class TrustSafetyServiceTest {
                 userStorage.save(incompleteUser);
 
                 var result = trustSafetyService.report(
-                        incompleteUser.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
+                        incompleteUser.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
                 assertFalse(result.success(), "Report should fail for inactive reporter");
                 assertEquals("Reporter must be active user", result.errorMessage());
@@ -208,7 +214,8 @@ class TrustSafetyServiceTest {
                         activeReporter.getId(),
                         UUID.randomUUID(), // Non-existent
                         Report.Reason.SPAM,
-                        null);
+                        null,
+                        true);
 
                 assertFalse(result.success(), "Report should fail for non-existent user");
                 assertEquals("Reported user not found", result.errorMessage());
@@ -217,10 +224,14 @@ class TrustSafetyServiceTest {
             @Test
             @DisplayName("Cannot report same user twice")
             void cannotReportSameUserTwice() {
-                trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null);
+                trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
                 var result = trustSafetyService.report(
-                        activeReporter.getId(), reportedUser.getId(), Report.Reason.HARASSMENT, "Different reason");
+                        activeReporter.getId(),
+                        reportedUser.getId(),
+                        Report.Reason.HARASSMENT,
+                        "Different reason",
+                        true);
 
                 assertFalse(result.success(), "Duplicate report should fail");
                 assertEquals("Already reported this user", result.errorMessage());
@@ -341,6 +352,97 @@ class TrustSafetyServiceTest {
     }
 
     // ============================================================
+    // BLOCK WITH CONVERSATION ARCHIVING TESTS
+    // ============================================================
+
+    @Nested
+    @DisplayName("Block with Conversation Archiving")
+    class BlockWithConversation {
+
+        private InMemoryUserStorage userStorage;
+        private TestStorages.TrustSafety trustSafetyStorage;
+        private TestStorages.Interactions interactionStorage;
+        private TestStorages.Communications communicationStorage;
+        private TrustSafetyService service;
+        private User blocker;
+        private User blocked;
+
+        @BeforeEach
+        void setUp() {
+            userStorage = new InMemoryUserStorage();
+            trustSafetyStorage = new TestStorages.TrustSafety();
+            interactionStorage = new TestStorages.Interactions();
+            communicationStorage = new TestStorages.Communications();
+            service = new TrustSafetyService(
+                    trustSafetyStorage, interactionStorage, userStorage, AppConfig.defaults(), communicationStorage);
+            blocker = createActiveUser("Blocker");
+            blocked = createActiveUser("Blocked");
+            userStorage.save(blocker);
+            userStorage.save(blocked);
+        }
+
+        @Test
+        @DisplayName("archives conversation for blocker when blocking")
+        void archivesConversationForBlocker() {
+            Match match = Match.create(blocker.getId(), blocked.getId());
+            interactionStorage.save(match);
+            Conversation convo = Conversation.create(blocker.getId(), blocked.getId());
+            communicationStorage.saveConversation(convo);
+
+            TrustSafetyService.BlockResult result = service.block(blocker.getId(), blocked.getId());
+
+            assertTrue(result.success());
+            Conversation updated = communicationStorage
+                    .getConversation(Conversation.generateId(blocker.getId(), blocked.getId()))
+                    .orElseThrow();
+            MatchArchiveReason archiveReason = updated.getUserA().equals(blocker.getId())
+                    ? updated.getUserAArchiveReason()
+                    : updated.getUserBArchiveReason();
+            assertEquals(MatchArchiveReason.BLOCK, archiveReason, "Archive reason should be BLOCK");
+        }
+
+        @Test
+        @DisplayName("hides conversation from blocker's perspective")
+        void hidesConversationFromBlocker() {
+            Match match = Match.create(blocker.getId(), blocked.getId());
+            interactionStorage.save(match);
+            Conversation convo = Conversation.create(blocker.getId(), blocked.getId());
+            communicationStorage.saveConversation(convo);
+
+            service.block(blocker.getId(), blocked.getId());
+
+            Conversation updated = communicationStorage
+                    .getConversation(Conversation.generateId(blocker.getId(), blocked.getId()))
+                    .orElseThrow();
+            assertFalse(updated.isVisibleTo(blocker.getId()), "Conversation should be hidden from blocker");
+        }
+
+        @Test
+        @DisplayName("block still succeeds when no conversation exists")
+        void blockSucceedsWithNoConversation() {
+            TrustSafetyService.BlockResult result = service.block(blocker.getId(), blocked.getId());
+
+            assertTrue(result.success());
+        }
+
+        @Test
+        @DisplayName("blocked user's conversation visibility is unchanged")
+        void blockedUserVisibilityUnchanged() {
+            Match match = Match.create(blocker.getId(), blocked.getId());
+            interactionStorage.save(match);
+            Conversation convo = Conversation.create(blocker.getId(), blocked.getId());
+            communicationStorage.saveConversation(convo);
+
+            service.block(blocker.getId(), blocked.getId());
+
+            Conversation updated = communicationStorage
+                    .getConversation(Conversation.generateId(blocker.getId(), blocked.getId()))
+                    .orElseThrow();
+            assertTrue(updated.isVisibleTo(blocked.getId()), "Blocked user's visibility should remain unchanged");
+        }
+    }
+
+    // ============================================================
     // HELPER METHODS
     // ============================================================
 
@@ -411,8 +513,8 @@ class TrustSafetyServiceTest {
         }
 
         @Override
-        public User get(UUID id) {
-            return users.get(id);
+        public Optional<User> get(UUID id) {
+            return Optional.ofNullable(users.get(id));
         }
 
         @Override

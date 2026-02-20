@@ -277,7 +277,7 @@ public class MatchingHandler implements LoggingSupport {
             for (int i = 0; i < matches.size(); i++) {
                 Match match = matches.get(i);
                 UUID otherUserId = match.getOtherUser(currentUser.getId());
-                User otherUser = userStorage.get(otherUserId);
+                User otherUser = userStorage.get(otherUserId).orElse(null);
                 final int displayIndex = i + 1;
 
                 if (otherUser != null && logger.isInfoEnabled()) {
@@ -328,7 +328,7 @@ public class MatchingHandler implements LoggingSupport {
 
             Match match = matches.get(idx);
             UUID otherUserId = match.getOtherUser(currentUser.getId());
-            User otherUser = userStorage.get(otherUserId);
+            User otherUser = userStorage.get(otherUserId).orElse(null);
             if (otherUser == null) {
                 logInfo("  Other user not found — user may have been removed.");
                 return;
@@ -347,7 +347,7 @@ public class MatchingHandler implements LoggingSupport {
             logInfo("  (U)nmatch | (B)lock | (F)riend Zone | (G)raceful Exit | back");
             String action = inputReader.readLine("  Your choice: ").toLowerCase(Locale.ROOT);
 
-            handleMatchDetailAction(action, match, otherUser, otherUserId, currentUser);
+            handleMatchDetailAction(action, otherUser, otherUserId, currentUser);
 
         } catch (NumberFormatException _) {
             logInfo(CliTextAndInput.INVALID_INPUT);
@@ -432,15 +432,14 @@ public class MatchingHandler implements LoggingSupport {
                 sharedInterests);
     }
 
-    private void handleMatchDetailAction(
-            String action, Match match, User otherUser, UUID otherUserId, User currentUser) {
+    private void handleMatchDetailAction(String action, User otherUser, UUID otherUserId, User currentUser) {
         switch (action) {
             case "u" -> {
                 String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
                 if ("y".equalsIgnoreCase(confirm)) {
-                    match.unmatch(currentUser.getId());
-                    interactionStorage.update(match);
-                    logInfo("✅ Unmatched with {}.\n", otherUser.getName());
+                    logTransitionResult(
+                            transitionService.unmatch(currentUser.getId(), otherUserId),
+                            "✅ Unmatched with " + otherUser.getName() + ".\n");
                 }
             }
             case "b" -> {
@@ -493,7 +492,7 @@ public class MatchingHandler implements LoggingSupport {
 
             Match match = matches.get(idx);
             UUID otherUserId = match.getOtherUser(currentUser.getId());
-            User otherUser = userStorage.get(otherUserId);
+            User otherUser = userStorage.get(otherUserId).orElse(null);
             if (otherUser == null) {
                 logInfo("❌ User not found — may have already been deleted.\n");
                 return;
@@ -501,9 +500,12 @@ public class MatchingHandler implements LoggingSupport {
 
             String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
             if ("y".equalsIgnoreCase(confirm)) {
-                match.unmatch(currentUser.getId());
-                interactionStorage.update(match);
-                logInfo("✅ Unmatched with {}.\n", otherUser.getName());
+                ConnectionService.TransitionResult result = transitionService.unmatch(currentUser.getId(), otherUserId);
+                if (result.success()) {
+                    logInfo("✅ Unmatched with {}.\n", otherUser.getName());
+                } else {
+                    logInfo(ERR_FAILED, result.errorMessage());
+                }
             } else {
                 logInfo(CliTextAndInput.CANCELLED);
             }
@@ -523,7 +525,7 @@ public class MatchingHandler implements LoggingSupport {
 
             Match match = matches.get(idx);
             UUID otherUserId = match.getOtherUser(currentUser.getId());
-            User otherUser = userStorage.get(otherUserId);
+            User otherUser = userStorage.get(otherUserId).orElse(null);
             if (otherUser == null) {
                 logInfo("❌ User not found — may have already been deleted.\n");
                 return;
@@ -812,7 +814,7 @@ public class MatchingHandler implements LoggingSupport {
         logInfo("\n--- PENDING FRIEND REQUESTS ---");
         for (int i = 0; i < requests.size(); i++) {
             FriendRequest req = requests.get(i);
-            User from = userStorage.get(req.fromUserId());
+            User from = userStorage.get(req.fromUserId()).orElse(null);
             String fromName = from != null ? from.getName() : "Unknown User";
             logInfo("  {}. From: {} (Received: {})", i + 1, fromName, req.createdAt());
         }
@@ -834,7 +836,7 @@ public class MatchingHandler implements LoggingSupport {
             }
 
             FriendRequest req = requests.get(idx);
-            User from = userStorage.get(req.fromUserId());
+            User from = userStorage.get(req.fromUserId()).orElse(null);
             String fromName = from != null ? from.getName() : "Unknown User";
             logInfo("\nFriend Request from {}", fromName);
 

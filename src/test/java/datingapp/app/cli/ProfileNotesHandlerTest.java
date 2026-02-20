@@ -4,9 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.*;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.profile.*;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;

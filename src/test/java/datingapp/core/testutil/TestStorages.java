@@ -19,9 +19,9 @@ import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
@@ -75,8 +75,8 @@ public final class TestStorages {
         }
 
         @Override
-        public User get(UUID id) {
-            return users.get(id);
+        public Optional<User> get(UUID id) {
+            return Optional.ofNullable(users.get(id));
         }
 
         @Override
@@ -392,7 +392,21 @@ public final class TestStorages {
         }
 
         @Override
-        public List<Conversation> getConversationsFor(UUID userId) {
+        public List<Conversation> getConversationsFor(UUID userId, int limit, int offset) {
+            return conversations.values().stream()
+                    .filter(conversation -> conversation.involves(userId))
+                    .sorted(Comparator.comparing((Conversation conversation) -> {
+                                Instant last = conversation.getLastMessageAt();
+                                return last != null ? last : conversation.getCreatedAt();
+                            })
+                            .reversed())
+                    .skip(offset)
+                    .limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public List<Conversation> getAllConversationsFor(UUID userId) {
             return conversations.values().stream()
                     .filter(conversation -> conversation.involves(userId))
                     .sorted(Comparator.comparing((Conversation conversation) -> {
@@ -420,10 +434,10 @@ public final class TestStorages {
         }
 
         @Override
-        public void archiveConversation(String conversationId, MatchArchiveReason reason) {
+        public void archiveConversation(String conversationId, UUID userId, MatchArchiveReason reason) {
             Conversation conversation = conversations.get(conversationId);
             if (conversation != null) {
-                conversation.archive(reason);
+                conversation.archive(userId, reason);
             }
         }
 
@@ -771,6 +785,11 @@ public final class TestStorages {
         public int deleteExpiredDailyPickViews(Instant cutoff) {
             return deleteDailyPickViewsOlderThan(
                     cutoff.atZone(AppConfig.defaults().userTimeZone()).toLocalDate());
+        }
+
+        @Override
+        public int deleteExpiredStandouts(Instant cutoff) {
+            return 0;
         }
 
         @Override

@@ -81,12 +81,14 @@ class CleanupServiceTest {
         void returnsCleanupResult() {
             analyticsStorage.setDailyPickDeletedCount(5);
             analyticsStorage.setSessionDeletedCount(3);
+            analyticsStorage.setStandoutDeletedCount(2);
 
             ActivityMetricsService.CleanupResult result = service.runCleanup();
 
             assertEquals(5, result.dailyPicksDeleted());
             assertEquals(3, result.sessionsDeleted());
-            assertEquals(8, result.totalDeleted());
+            assertEquals(2, result.standoutsDeleted());
+            assertEquals(10, result.totalDeleted());
             assertTrue(result.hadWork());
         }
 
@@ -95,6 +97,7 @@ class CleanupServiceTest {
         void reportsNoWork() {
             analyticsStorage.setDailyPickDeletedCount(0);
             analyticsStorage.setSessionDeletedCount(0);
+            analyticsStorage.setStandoutDeletedCount(0);
 
             ActivityMetricsService.CleanupResult result = service.runCleanup();
 
@@ -109,8 +112,10 @@ class CleanupServiceTest {
 
             assertNotNull(analyticsStorage.receivedDailyPickCutoff);
             assertNotNull(analyticsStorage.receivedSessionCutoff);
+            assertNotNull(analyticsStorage.receivedStandoutCutoff);
             // Cutoff should be in the past
             assertTrue(analyticsStorage.receivedDailyPickCutoff.isBefore(AppClock.now()));
+            assertTrue(analyticsStorage.receivedStandoutCutoff.isBefore(AppClock.now()));
         }
     }
 
@@ -121,32 +126,35 @@ class CleanupServiceTest {
         @Test
         @DisplayName("Should calculate total correctly")
         void calculatesTotal() {
-            var result = new ActivityMetricsService.CleanupResult(10, 20);
-            assertEquals(30, result.totalDeleted());
+            var result = new ActivityMetricsService.CleanupResult(10, 20, 5);
+            assertEquals(35, result.totalDeleted());
         }
 
         @Test
         @DisplayName("Should format toString nicely")
         void formatsToString() {
-            var result = new ActivityMetricsService.CleanupResult(5, 10);
+            var result = new ActivityMetricsService.CleanupResult(5, 10, 2);
             String str = result.toString();
-            assertTrue(str.contains("dailyPicks=5"));
-            assertTrue(str.contains("sessions=10"));
-            assertTrue(str.contains("total=15"));
+            assertTrue(str.contains("dailyPicksDeleted=5"));
+            assertTrue(str.contains("sessionsDeleted=10"));
+            assertTrue(str.contains("standoutsDeleted=2"));
         }
 
         @Test
         @DisplayName("hadWork returns false for zero counts")
         void hadWorkFalseForZero() {
-            var result = new ActivityMetricsService.CleanupResult(0, 0);
+            var result = new ActivityMetricsService.CleanupResult(0, 0, 0);
             assertFalse(result.hadWork());
         }
 
         @Test
         @DisplayName("hadWork returns true when any count > 0")
         void hadWorkTrueForPositive() {
-            var result = new ActivityMetricsService.CleanupResult(1, 0);
+            var result = new ActivityMetricsService.CleanupResult(1, 0, 0);
             assertTrue(result.hadWork());
+
+            var result2 = new ActivityMetricsService.CleanupResult(0, 0, 1);
+            assertTrue(result2.hadWork());
         }
     }
 
@@ -159,8 +167,10 @@ class CleanupServiceTest {
     private static class TestCleanupAnalytics implements AnalyticsStorage {
         int dailyPickDeletedCount = 0;
         int sessionDeletedCount = 0;
+        int standoutDeletedCount = 0;
         Instant receivedDailyPickCutoff;
         Instant receivedSessionCutoff;
+        Instant receivedStandoutCutoff;
 
         void setDailyPickDeletedCount(int count) {
             this.dailyPickDeletedCount = count;
@@ -168,6 +178,10 @@ class CleanupServiceTest {
 
         void setSessionDeletedCount(int count) {
             this.sessionDeletedCount = count;
+        }
+
+        void setStandoutDeletedCount(int count) {
+            this.standoutDeletedCount = count;
         }
 
         @Override
@@ -183,7 +197,15 @@ class CleanupServiceTest {
         }
 
         @Override
-        public void saveUserStats(EngagementDomain.UserStats stats) {}
+        public int deleteExpiredStandouts(Instant cutoff) {
+            this.receivedStandoutCutoff = cutoff;
+            return standoutDeletedCount;
+        }
+
+        @Override
+        public void saveUserStats(EngagementDomain.UserStats stats) {
+            // Not needed for this test double
+        }
 
         @Override
         public Optional<EngagementDomain.UserStats> getLatestUserStats(UUID userId) {
@@ -206,7 +228,9 @@ class CleanupServiceTest {
         }
 
         @Override
-        public void savePlatformStats(EngagementDomain.PlatformStats stats) {}
+        public void savePlatformStats(EngagementDomain.PlatformStats stats) {
+            // Not needed for this test double
+        }
 
         @Override
         public Optional<EngagementDomain.PlatformStats> getLatestPlatformStats() {
@@ -219,7 +243,9 @@ class CleanupServiceTest {
         }
 
         @Override
-        public void recordProfileView(UUID viewerId, UUID viewedId) {}
+        public void recordProfileView(UUID viewerId, UUID viewedId) {
+            // Not needed for this test double
+        }
 
         @Override
         public int getProfileViewCount(UUID userId) {
@@ -242,7 +268,9 @@ class CleanupServiceTest {
         }
 
         @Override
-        public void saveUserAchievement(Achievement.UserAchievement achievement) {}
+        public void saveUserAchievement(Achievement.UserAchievement achievement) {
+            // Not needed for this test double
+        }
 
         @Override
         public List<Achievement.UserAchievement> getUnlockedAchievements(UUID userId) {
@@ -260,7 +288,9 @@ class CleanupServiceTest {
         }
 
         @Override
-        public void markDailyPickAsViewed(UUID userId, LocalDate date) {}
+        public void markDailyPickAsViewed(UUID userId, LocalDate date) {
+            // Not needed for this test double
+        }
 
         @Override
         public boolean isDailyPickViewed(UUID userId, LocalDate date) {
@@ -273,7 +303,9 @@ class CleanupServiceTest {
         }
 
         @Override
-        public void saveSession(Session session) {}
+        public void saveSession(Session session) {
+            // Not needed for this test double
+        }
 
         @Override
         public Optional<Session> getSession(UUID sessionId) {

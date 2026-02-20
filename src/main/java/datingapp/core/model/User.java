@@ -67,95 +67,6 @@ public class User {
      * <li>Track date plans ("Dinner Thursday @ Olive Garden")
      * </ul>
      */
-    public static record ProfileNote(
-            UUID authorId, UUID subjectId, String content, Instant createdAt, Instant updatedAt) {
-
-        /** Maximum length for note content. */
-        public static final int MAX_LENGTH = 500;
-
-        public ProfileNote {
-            Objects.requireNonNull(authorId, "authorId cannot be null");
-            Objects.requireNonNull(subjectId, "subjectId cannot be null");
-            Objects.requireNonNull(content, "content cannot be null");
-            Objects.requireNonNull(createdAt, "createdAt cannot be null");
-            Objects.requireNonNull(updatedAt, "updatedAt cannot be null");
-
-            if (authorId.equals(subjectId)) {
-                throw new IllegalArgumentException("Cannot create a note about yourself");
-            }
-            if (content.isBlank()) {
-                throw new IllegalArgumentException("Note content cannot be blank");
-            }
-            if (content.length() > MAX_LENGTH) {
-                throw new IllegalArgumentException(
-                        "Note content exceeds maximum length of " + MAX_LENGTH + " characters");
-            }
-            if (updatedAt.isBefore(createdAt)) {
-                throw new IllegalArgumentException("updatedAt cannot be before createdAt");
-            }
-        }
-
-        /**
-         * Creates a new profile note with current timestamp.
-         *
-         * @param authorId  ID of the user creating the note
-         * @param subjectId ID of the user the note is about
-         * @param content   the note content
-         * @return a new ProfileNote
-         * @throws IllegalArgumentException if content exceeds MAX_LENGTH or is blank
-         */
-        public static ProfileNote create(UUID authorId, UUID subjectId, String content) {
-            Objects.requireNonNull(authorId, "authorId cannot be null");
-            Objects.requireNonNull(subjectId, "subjectId cannot be null");
-            Objects.requireNonNull(content, "content cannot be null");
-
-            if (content.isBlank()) {
-                throw new IllegalArgumentException("Note content cannot be blank");
-            }
-            if (content.length() > MAX_LENGTH) {
-                throw new IllegalArgumentException(
-                        "Note content exceeds maximum length of " + MAX_LENGTH + " characters");
-            }
-            if (authorId.equals(subjectId)) {
-                throw new IllegalArgumentException("Cannot create a note about yourself");
-            }
-
-            Instant now = AppClock.now();
-            return new ProfileNote(authorId, subjectId, content, now, now);
-        }
-
-        /**
-         * Creates an updated version of this note with new content.
-         *
-         * @param newContent the new content
-         * @return a new ProfileNote with updated content and timestamp
-         */
-        public ProfileNote withContent(String newContent) {
-            if (newContent == null || newContent.isBlank()) {
-                throw new IllegalArgumentException("Note content cannot be blank");
-            }
-            if (newContent.length() > MAX_LENGTH) {
-                throw new IllegalArgumentException(
-                        "Note content exceeds maximum length of " + MAX_LENGTH + " characters");
-            }
-            Instant now = AppClock.now();
-            Instant updatedAt = now.isBefore(createdAt) ? createdAt : now;
-            return new ProfileNote(authorId, subjectId, newContent, createdAt, updatedAt);
-        }
-
-        /**
-         * Gets a preview of the note content (first 50 chars).
-         *
-         * @return truncated preview with ellipsis if content is longer
-         */
-        public String getPreview() {
-            if (content.length() <= 50) {
-                return content;
-            }
-            return content.substring(0, 47) + "...";
-        }
-    }
-
     // ── End nested domain types ────────────────────────────────────────
 
     private static final AppConfig CONFIG = AppConfig.defaults();
@@ -396,110 +307,111 @@ public class User {
 
     // Getters
 
-    public PacePreferences getPacePreferences() {
+    public synchronized PacePreferences getPacePreferences() {
         return pacePreferences;
     }
 
-    public UUID getId() {
+    public synchronized UUID getId() {
         return id;
     }
 
-    public String getName() {
+    public synchronized String getName() {
         return name;
     }
 
-    public String getBio() {
+    public synchronized String getBio() {
         return bio;
     }
 
-    public LocalDate getBirthDate() {
+    public synchronized LocalDate getBirthDate() {
         return birthDate;
     }
 
-    public Gender getGender() {
+    public synchronized Gender getGender() {
         return gender;
     }
 
-    public Set<Gender> getInterestedIn() {
+    public synchronized Set<Gender> getInterestedIn() {
         return EnumSetUtil.safeCopy(interestedIn, Gender.class);
     }
 
-    public double getLat() {
+    public synchronized double getLat() {
         return lat;
     }
 
-    public double getLon() {
+    public synchronized double getLon() {
         return lon;
     }
 
-    public boolean hasLocationSet() {
+    public synchronized boolean hasLocationSet() {
         return hasLocationSet;
     }
 
     /**
-     * Returns true when the user has a valid location value that was explicitly set.
+     * Returns true when the user has a valid location value that was explicitly
+     * set.
      * Coordinates like (0.0, 0.0) are considered valid when location was set.
      */
-    public boolean hasLocation() {
+    public synchronized boolean hasLocation() {
         return hasLocationSet && Double.isFinite(lat) && Double.isFinite(lon);
     }
 
-    public int getMaxDistanceKm() {
+    public synchronized int getMaxDistanceKm() {
         return maxDistanceKm;
     }
 
-    public int getMinAge() {
+    public synchronized int getMinAge() {
         return minAge;
     }
 
-    public int getMaxAge() {
+    public synchronized int getMaxAge() {
         return maxAge;
     }
 
-    public List<String> getPhotoUrls() {
+    public synchronized List<String> getPhotoUrls() {
         return Collections.unmodifiableList(photoUrls);
     }
 
-    public UserState getState() {
+    public synchronized UserState getState() {
         return state;
     }
 
-    public Instant getCreatedAt() {
+    public synchronized Instant getCreatedAt() {
         return createdAt;
     }
 
-    public Instant getUpdatedAt() {
+    public synchronized Instant getUpdatedAt() {
         return updatedAt;
     }
 
     // Lifestyle getters (Phase 0.5b)
 
-    public Lifestyle.Smoking getSmoking() {
+    public synchronized Lifestyle.Smoking getSmoking() {
         return smoking;
     }
 
-    public Lifestyle.Drinking getDrinking() {
+    public synchronized Lifestyle.Drinking getDrinking() {
         return drinking;
     }
 
-    public Lifestyle.WantsKids getWantsKids() {
+    public synchronized Lifestyle.WantsKids getWantsKids() {
         return wantsKids;
     }
 
-    public Lifestyle.LookingFor getLookingFor() {
+    public synchronized Lifestyle.LookingFor getLookingFor() {
         return lookingFor;
     }
 
-    public Lifestyle.Education getEducation() {
+    public synchronized Lifestyle.Education getEducation() {
         return education;
     }
 
-    public Integer getHeightCm() {
+    public synchronized Integer getHeightCm() {
         return heightCm;
     }
 
     /** Returns the user's dealbreakers, or Dealbreakers.none() if not set. */
-    public MatchPreferences.Dealbreakers getDealbreakers() {
+    public synchronized MatchPreferences.Dealbreakers getDealbreakers() {
         return dealbreakers != null ? dealbreakers : MatchPreferences.Dealbreakers.none();
     }
 
@@ -508,7 +420,7 @@ public class User {
      *
      * @return set of interests (never null, may be empty)
      */
-    public Set<Interest> getInterests() {
+    public synchronized Set<Interest> getInterests() {
         return EnumSetUtil.safeCopy(interests, Interest.class);
     }
 
@@ -519,8 +431,8 @@ public class User {
      * off-by-one issues
      * when the birthday occurs at midnight across timezones.
      */
-    public int getAge() {
-        return getAge(java.time.ZoneId.systemDefault());
+    public synchronized int getAge() {
+        return getAge(AppConfig.defaults().safety().userTimeZone());
     }
 
     /**
@@ -530,7 +442,7 @@ public class User {
      * @param timezone the timezone to use for age calculation
      * @return the user's age in years, or 0 if birth date is not set
      */
-    public int getAge(java.time.ZoneId timezone) {
+    public synchronized int getAge(java.time.ZoneId timezone) {
         if (birthDate == null) {
             return 0;
         }
@@ -538,70 +450,70 @@ public class User {
     }
 
     // Verification getters (Phase 2 feature)
-    public boolean isVerified() {
+    public synchronized boolean isVerified() {
         return isVerified;
     }
 
-    public VerificationMethod getVerificationMethod() {
+    public synchronized VerificationMethod getVerificationMethod() {
         return verificationMethod;
     }
 
-    public String getVerificationCode() {
+    public synchronized String getVerificationCode() {
         return verificationCode;
     }
 
-    public Instant getVerificationSentAt() {
+    public synchronized Instant getVerificationSentAt() {
         return verificationSentAt;
     }
 
-    public Instant getVerifiedAt() {
+    public synchronized Instant getVerifiedAt() {
         return verifiedAt;
     }
 
-    public String getEmail() {
+    public synchronized String getEmail() {
         return email;
     }
 
-    public String getPhone() {
+    public synchronized String getPhone() {
         return phone;
     }
 
     // Pace preference setters
-    public void setPacePreferences(PacePreferences pacePreferences) {
+    public synchronized void setPacePreferences(PacePreferences pacePreferences) {
         this.pacePreferences = pacePreferences;
         touch();
     }
 
     // Setters (with updatedAt)
 
-    public void setName(String name) {
+    public synchronized void setName(String name) {
         this.name = Objects.requireNonNull(name);
         touch();
     }
 
-    public void setBio(String bio) {
+    public synchronized void setBio(String bio) {
         this.bio = bio;
         touch();
     }
 
-    public void setEmail(String email) {
+    public synchronized void setEmail(String email) {
         this.email = email;
         touch();
     }
 
-    public void setPhone(String phone) {
+    public synchronized void setPhone(String phone) {
         this.phone = phone;
         touch();
     }
 
-    public void startVerification(VerificationMethod method, String verificationCode) {
+    public synchronized void startVerification(VerificationMethod method, String verificationCode) {
         this.verificationMethod = Objects.requireNonNull(method, "method cannot be null");
         this.verificationCode = Objects.requireNonNull(verificationCode, "verificationCode cannot be null");
         this.verificationSentAt = AppClock.now();
         touch();
     }
 
-    public void markVerified() {
+    public synchronized void markVerified() {
         this.isVerified = true;
         this.verifiedAt = AppClock.now();
         this.verificationCode = null;
@@ -609,35 +521,35 @@ public class User {
         touch();
     }
 
-    public void clearVerificationAttempt() {
+    public synchronized void clearVerificationAttempt() {
         this.verificationCode = null;
         this.verificationSentAt = null;
         touch();
     }
 
-    public void setBirthDate(LocalDate birthDate) {
+    public synchronized void setBirthDate(LocalDate birthDate) {
         this.birthDate = birthDate;
         touch();
     }
 
-    public void setGender(Gender gender) {
+    public synchronized void setGender(Gender gender) {
         this.gender = gender;
         touch();
     }
 
-    public void setInterestedIn(Set<Gender> interestedIn) {
+    public synchronized void setInterestedIn(Set<Gender> interestedIn) {
         this.interestedIn = EnumSetUtil.safeCopy(interestedIn, Gender.class);
         touch();
     }
 
-    public void setLocation(double lat, double lon) {
+    public synchronized void setLocation(double lat, double lon) {
         this.lat = lat;
         this.lon = lon;
         this.hasLocationSet = true;
         touch();
     }
 
-    public void setMaxDistanceKm(int maxDistanceKm) {
+    public synchronized void setMaxDistanceKm(int maxDistanceKm) {
         if (maxDistanceKm <= 0) {
             throw new IllegalArgumentException("maxDistanceKm must be positive");
         }
@@ -645,7 +557,7 @@ public class User {
         touch();
     }
 
-    public void setAgeRange(int minAge, int maxAge) {
+    public synchronized void setAgeRange(int minAge, int maxAge) {
         if (minAge < CONFIG.minAge()) {
             throw new IllegalArgumentException("minAge must be at least " + CONFIG.minAge());
         }
@@ -661,45 +573,45 @@ public class User {
     }
 
     /** Sets photo URLs with null-safe copy. */
-    public void setPhotoUrls(List<String> photoUrls) {
+    public synchronized void setPhotoUrls(List<String> photoUrls) {
         this.photoUrls = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
         touch();
     }
 
     /** Adds a photo URL. */
-    public void addPhotoUrl(String url) {
+    public synchronized void addPhotoUrl(String url) {
         photoUrls.add(url);
         touch();
     }
 
     // Lifestyle setters (Phase 0.5b)
 
-    public void setSmoking(Lifestyle.Smoking smoking) {
+    public synchronized void setSmoking(Lifestyle.Smoking smoking) {
         this.smoking = smoking;
         touch();
     }
 
-    public void setDrinking(Lifestyle.Drinking drinking) {
+    public synchronized void setDrinking(Lifestyle.Drinking drinking) {
         this.drinking = drinking;
         touch();
     }
 
-    public void setWantsKids(Lifestyle.WantsKids wantsKids) {
+    public synchronized void setWantsKids(Lifestyle.WantsKids wantsKids) {
         this.wantsKids = wantsKids;
         touch();
     }
 
-    public void setLookingFor(Lifestyle.LookingFor lookingFor) {
+    public synchronized void setLookingFor(Lifestyle.LookingFor lookingFor) {
         this.lookingFor = lookingFor;
         touch();
     }
 
-    public void setEducation(Lifestyle.Education education) {
+    public synchronized void setEducation(Lifestyle.Education education) {
         this.education = education;
         touch();
     }
 
-    public void setHeightCm(Integer heightCm) {
+    public synchronized void setHeightCm(Integer heightCm) {
         if (heightCm != null && heightCm <= 0) {
             throw new IllegalArgumentException("Height must be positive");
         }
@@ -707,7 +619,7 @@ public class User {
         touch();
     }
 
-    public void setDealbreakers(MatchPreferences.Dealbreakers dealbreakers) {
+    public synchronized void setDealbreakers(MatchPreferences.Dealbreakers dealbreakers) {
         this.dealbreakers = dealbreakers;
         touch();
     }
@@ -717,7 +629,7 @@ public class User {
      *
      * @param interests set of interests (null treated as empty)
      */
-    public void setInterests(Set<Interest> interests) {
+    public synchronized void setInterests(Set<Interest> interests) {
         this.interests = copyAndValidateInterests(interests);
         touch();
     }
@@ -727,7 +639,7 @@ public class User {
      *
      * @param interest the interest to add
      */
-    public void addInterest(Interest interest) {
+    public synchronized void addInterest(Interest interest) {
         if (interest == null) {
             return;
         }
@@ -754,7 +666,7 @@ public class User {
      *
      * @param interest the interest to remove
      */
-    public void removeInterest(Interest interest) {
+    public synchronized void removeInterest(Interest interest) {
         if (interest != null && interests.remove(interest)) {
             touch();
         }
@@ -766,7 +678,7 @@ public class User {
      * Activates the user. Only valid from INCOMPLETE or PAUSED state. Profile must
      * be complete.
      */
-    public void activate() {
+    public synchronized void activate() {
         if (state == UserState.BANNED) {
             throw new IllegalStateException("Cannot activate a banned user");
         }
@@ -778,7 +690,7 @@ public class User {
     }
 
     /** Pauses the user. Only valid from ACTIVE state. */
-    public void pause() {
+    public synchronized void pause() {
         if (state != UserState.ACTIVE) {
             throw new IllegalStateException("Can only pause an active user");
         }
@@ -787,7 +699,7 @@ public class User {
     }
 
     /** Bans the user. One-way transition. */
-    public void ban() {
+    public synchronized void ban() {
         if (state == UserState.BANNED) {
             return; // Already banned
         }
@@ -799,7 +711,7 @@ public class User {
      * Checks if the user profile is complete. A complete profile has all required
      * fields filled.
      */
-    public boolean isComplete() {
+    public synchronized boolean isComplete() {
         return name != null
                 && !name.isBlank()
                 && bio != null
@@ -817,16 +729,16 @@ public class User {
     }
 
     /** Checks if the user has completed their pace MatchPreferences. */
-    public boolean hasCompletePace() {
+    public synchronized boolean hasCompletePace() {
         return pacePreferences != null && pacePreferences.isComplete();
     }
 
-    private void touch() {
+    private synchronized void touch() {
         this.updatedAt = AppClock.now();
     }
 
     @Override
-    public boolean equals(Object o) {
+    public synchronized boolean equals(Object o) {
         if (this == o) {
             return true;
         }
@@ -838,12 +750,12 @@ public class User {
     }
 
     @Override
-    public int hashCode() {
+    public synchronized int hashCode() {
         return Objects.hash(id);
     }
 
     @Override
-    public String toString() {
+    public synchronized String toString() {
         return "User{id=" + id + ", name='" + name + "', state=" + state + "}";
     }
 
@@ -852,17 +764,17 @@ public class User {
     // ================================
 
     /** Returns the deletion timestamp, or {@code null} if not deleted. */
-    public Instant getDeletedAt() {
+    public synchronized Instant getDeletedAt() {
         return deletedAt;
     }
 
     /** Marks this entity as soft-deleted at the given instant. */
-    public void markDeleted(Instant deletedAt) {
+    public synchronized void markDeleted(Instant deletedAt) {
         this.deletedAt = Objects.requireNonNull(deletedAt, "deletedAt cannot be null");
     }
 
     /** Returns {@code true} if this user has been soft-deleted. */
-    public boolean isDeleted() {
+    public synchronized boolean isDeleted() {
         return deletedAt != null;
     }
 }

@@ -145,6 +145,50 @@ class UserSessionTest {
         }
     }
 
+    @SuppressWarnings("unused")
+    @Nested
+    @DisplayName("Concurrency Checks")
+    class Concurrency {
+
+        @Test
+        @DisplayName("Concurrent writes to session do not cause race conditions")
+        void concurrentSessionUpdates() throws InterruptedException {
+            int threadCount = 20;
+            java.util.concurrent.ExecutorService executor =
+                    java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+            java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threadCount);
+            java.util.concurrent.atomic.AtomicInteger exceptions = new java.util.concurrent.atomic.AtomicInteger();
+
+            userSession.addListener(_ -> Thread.yield());
+
+            User finalUser = new User(UUID.randomUUID(), "FinalUser");
+
+            for (int i = 0; i < threadCount; i++) {
+                final int idx = i;
+                executor.submit(() -> {
+                    try {
+                        latch.await();
+                        userSession.setCurrentUser(new User(UUID.randomUUID(), "User" + idx));
+                        userSession.getCurrentUser();
+                    } catch (Exception _) {
+                        exceptions.incrementAndGet();
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+
+            latch.countDown(); // Go
+            assertTrue(done.await(5, TimeUnit.SECONDS), "Threads timed out");
+            executor.shutdown();
+
+            userSession.setCurrentUser(finalUser);
+            assertEquals(0, exceptions.get(), "Should have no concurrency exceptions");
+            assertEquals(finalUser, userSession.getCurrentUser(), "Should cleanly accept final state");
+        }
+    }
+
     // === Helper Methods ===
 
     private User createCompleteUser(String name) {

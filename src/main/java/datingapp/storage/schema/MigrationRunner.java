@@ -9,12 +9,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Runs schema migrations: column additions, foreign-key backfills, and version tracking. Extracted
+ * Runs schema migrations: column additions, foreign-key backfills, and version
+ * tracking. Extracted
  * from {@code DatabaseManager} for single-responsibility.
  *
- * <p><strong>Ordering constraint:</strong> column migrations in {@link
- * #migrateSchemaColumns(Statement)} must only run <em>after</em> the target tables exist. Fresh
- * databases create tables with all columns already present; migrations cover backward compatibility
+ * <p>
+ * <strong>Ordering constraint:</strong> column migrations in {@link
+ * #migrateSchemaColumns(Statement)} must only run <em>after</em> the target
+ * tables exist. Fresh
+ * databases create tables with all columns already present; migrations cover
+ * backward compatibility
  * for databases created by earlier schema versions.
  */
 public final class MigrationRunner {
@@ -31,9 +35,12 @@ public final class MigrationRunner {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Runs the complete V1 migration: creates or upgrades the schema to version 1. On a fresh
-     * database, delegates to {@link SchemaInitializer#createAllTables(Statement)} for full DDL. On
-     * an existing database (version 1 already recorded), runs column migration for backward
+     * Runs the complete V1 migration: creates or upgrades the schema to version 1.
+     * On a fresh
+     * database, delegates to {@link SchemaInitializer#createAllTables(Statement)}
+     * for full DDL. On
+     * an existing database (version 1 already recorded), runs column migration for
+     * backward
      * compatibility.
      *
      * @param stmt a JDBC statement connected to the target database
@@ -75,7 +82,8 @@ public final class MigrationRunner {
     /**
      * Checks whether a given schema version has already been applied.
      *
-     * @return true if the version row exists, false otherwise (including if the table is missing)
+     * @return true if the version row exists, false otherwise (including if the
+     *         table is missing)
      */
     static boolean isVersionApplied(Statement stmt, int version) throws SQLException {
         try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = " + version)) {
@@ -91,8 +99,8 @@ public final class MigrationRunner {
     /**
      * Records a schema version as applied.
      *
-     * @param stmt the statement to use
-     * @param version the schema version number
+     * @param stmt        the statement to use
+     * @param version     the schema version number
      * @param description description of what this version includes
      */
     static void recordSchemaVersion(Statement stmt, int version, String description) throws SQLException {
@@ -114,10 +122,13 @@ public final class MigrationRunner {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Adds columns that were introduced after the initial schema. Uses {@code IF NOT EXISTS} to
+     * Adds columns that were introduced after the initial schema. Uses
+     * {@code IF NOT EXISTS} to
      * safely handle already-migrated databases.
      *
-     * <p><strong>Important:</strong> This method must only be called when the tables already exist
+     * <p>
+     * <strong>Important:</strong> This method must only be called when the tables
+     * already exist
      * (i.e., when {@code isVersionApplied(stmt, 1)} returns true).
      */
     static void migrateSchemaColumns(Statement stmt) throws SQLException {
@@ -160,6 +171,11 @@ public final class MigrationRunner {
         stmt.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
         stmt.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
         stmt.execute("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
+        // Conversation individual archives (Phase 4.1)
+        stmt.execute("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS archived_at_a TIMESTAMP");
+        stmt.execute("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS archive_reason_a VARCHAR(20)");
+        stmt.execute("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS archived_at_b TIMESTAMP");
+        stmt.execute("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS archive_reason_b VARCHAR(20)");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -167,8 +183,10 @@ public final class MigrationRunner {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Adds missing foreign key constraints to existing tables. Uses {@code IF NOT EXISTS} to safely
-     * handle already-constrained databases. Silently skips tables that don't exist yet.
+     * Adds missing foreign key constraints to existing tables. Uses
+     * {@code IF NOT EXISTS} to safely
+     * handle already-constrained databases. Silently skips tables that don't exist
+     * yet.
      */
     static void addMissingForeignKeys(Statement stmt) throws SQLException {
         // daily_pick_views - add FK to users
@@ -249,7 +267,8 @@ public final class MigrationRunner {
     }
 
     /**
-     * Checks if the SQLException indicates a missing table (H2 error code 42102 / SQL state
+     * Checks if the SQLException indicates a missing table (H2 error code 42102 /
+     * SQL state
      * 42S02).
      */
     private static boolean isMissingTable(SQLException e) {

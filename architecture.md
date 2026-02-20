@@ -1,8 +1,8 @@
 # Dating App Architecture
 
-> **Last verified against source code:** 2026-02-15
+> **Last verified against source code:** 2026-02-19
 > **Phase:** 2.1 | **Java 25** + Maven + H2/JDBI + JavaFX 25 + Javalin
-> **Codebase:** 135 files (77 main + 58 test) | ~43K lines | 802 tests | 60% coverage min
+> **Codebase:** 139 Java files (81 main + 58 test) | ~45K lines (~34K code) | 802 tests | 60% coverage min
 
 This document describes the **system design** of the Dating App. For quick-reference coding
 patterns and gotchas, see [CLAUDE.md](../CLAUDE.md). For coding standards and quality tools,
@@ -125,7 +125,7 @@ datingapp/
 │   ├── StorageFactory.java            Wires JDBI impls → services → ServiceRegistry
 │   │
 │   ├── schema/
-│   │   ├── SchemaInitializer.java     DDL: 14 tables + indexes + FK constraints
+│   │   ├── SchemaInitializer.java     DDL: 18 tables + indexes + FK constraints
 │   │   └── MigrationRunner.java       Schema evolution (ALTER TABLE, etc.)
 │   │
 │   └── jdbi/                          JDBI implementations (domain subpackages)
@@ -579,7 +579,7 @@ Parameters are grouped by purpose:
 
 ## 7. Database Schema
 
-H2 embedded database with **14 tables**. Schema is managed by `SchemaInitializer`
+H2 embedded database with **18 tables**. Schema is managed by `SchemaInitializer`
 (DDL) and `MigrationRunner` (ALTER TABLE evolution). All DDL uses `IF NOT EXISTS`
 for idempotent re-runs.
 

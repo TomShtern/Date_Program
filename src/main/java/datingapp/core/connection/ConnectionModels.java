@@ -65,8 +65,10 @@ public final class ConnectionModels {
         private Instant lastMessageAt;
         private Instant userAReadAt;
         private Instant userBReadAt;
-        private Instant archivedAt;
-        private MatchArchiveReason archiveReason;
+        private Instant userAArchivedAt;
+        private MatchArchiveReason userAArchiveReason;
+        private Instant userBArchivedAt;
+        private MatchArchiveReason userBArchiveReason;
         private boolean visibleToUserA;
         private boolean visibleToUserB;
 
@@ -79,8 +81,10 @@ public final class ConnectionModels {
                 Instant lastMessageAt,
                 Instant userAReadAt,
                 Instant userBReadAt,
-                Instant archivedAt,
-                MatchArchiveReason archiveReason,
+                Instant userAArchivedAt,
+                MatchArchiveReason userAArchiveReason,
+                Instant userBArchivedAt,
+                MatchArchiveReason userBArchiveReason,
                 boolean visibleToUserA,
                 boolean visibleToUserB) {
             Objects.requireNonNull(id, ID_REQUIRED);
@@ -103,8 +107,10 @@ public final class ConnectionModels {
             this.lastMessageAt = lastMessageAt;
             this.userAReadAt = userAReadAt;
             this.userBReadAt = userBReadAt;
-            this.archivedAt = archivedAt;
-            this.archiveReason = archiveReason;
+            this.userAArchivedAt = userAArchivedAt;
+            this.userAArchiveReason = userAArchiveReason;
+            this.userBArchivedAt = userBArchivedAt;
+            this.userBArchiveReason = userBArchiveReason;
             this.visibleToUserA = visibleToUserA;
             this.visibleToUserB = visibleToUserB;
         }
@@ -132,7 +138,8 @@ public final class ConnectionModels {
 
             String id = normalizedA + CONVERSATION_ID_SEPARATOR + normalizedB;
             Instant now = AppClock.now();
-            return new Conversation(id, normalizedA, normalizedB, now, null, null, null, null, null, true, true);
+            return new Conversation(
+                    id, normalizedA, normalizedB, now, null, null, null, null, null, null, null, true, true);
         }
 
         public static String generateId(UUID a, UUID b) {
@@ -215,12 +222,20 @@ public final class ConnectionModels {
             return userBReadAt;
         }
 
-        public Instant getArchivedAt() {
-            return archivedAt;
+        public Instant getUserAArchivedAt() {
+            return userAArchivedAt;
         }
 
-        public MatchArchiveReason getArchiveReason() {
-            return archiveReason;
+        public MatchArchiveReason getUserAArchiveReason() {
+            return userAArchiveReason;
+        }
+
+        public Instant getUserBArchivedAt() {
+            return userBArchivedAt;
+        }
+
+        public MatchArchiveReason getUserBArchiveReason() {
+            return userBArchiveReason;
         }
 
         public boolean isVisibleToUserA() {
@@ -231,9 +246,16 @@ public final class ConnectionModels {
             return visibleToUserB;
         }
 
-        public void archive(MatchArchiveReason reason) {
-            this.archivedAt = AppClock.now();
-            this.archiveReason = reason;
+        public void archive(UUID userId, MatchArchiveReason reason) {
+            if (userA.equals(userId)) {
+                this.userAArchivedAt = AppClock.now();
+                this.userAArchiveReason = reason;
+            } else if (userB.equals(userId)) {
+                this.userBArchivedAt = AppClock.now();
+                this.userBArchiveReason = reason;
+            } else {
+                throw new IllegalArgumentException("User is not part of this conversation");
+            }
         }
 
         public void setVisibility(UUID userId, boolean visible) {

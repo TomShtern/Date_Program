@@ -6,6 +6,7 @@ import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
+import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
@@ -36,26 +37,41 @@ public class ConnectionService {
     private final CommunicationStorage communicationStorage;
     private final InteractionStorage interactionStorage;
     private final UserStorage userStorage;
+    private final ActivityMetricsService activityMetricsService;
 
-    /** Full constructor — all dependencies are required. */
+    /** Compatibility constructor for tests. */
     public ConnectionService(
             AppConfig config,
             CommunicationStorage communicationStorage,
             InteractionStorage interactionStorage,
             UserStorage userStorage) {
+        this(config, communicationStorage, interactionStorage, userStorage, null);
+    }
+
+    /**
+     * Full constructor — all dependencies are required except
+     * activityMetricsService.
+     */
+    public ConnectionService(
+            AppConfig config,
+            CommunicationStorage communicationStorage,
+            InteractionStorage interactionStorage,
+            UserStorage userStorage,
+            ActivityMetricsService activityMetricsService) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.communicationStorage = Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+        this.activityMetricsService = activityMetricsService;
     }
 
     public SendResult sendMessage(UUID senderId, UUID recipientId, String content) {
-        User sender = userStorage.get(senderId);
+        User sender = userStorage.get(senderId).orElse(null);
         if (sender == null || sender.getState() != UserState.ACTIVE) {
             return SendResult.failure(SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
 
-        User recipient = userStorage.get(recipientId);
+        User recipient = userStorage.get(recipientId).orElse(null);
         if (recipient == null || recipient.getState() != UserState.ACTIVE) {
             return SendResult.failure(RECIPIENT_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
         }
@@ -85,40 +101,44 @@ public class ConnectionService {
         communicationStorage.saveMessage(message);
         communicationStorage.updateConversationLastMessageAt(conversationId, message.createdAt());
 
+        if (activityMetricsService != null) {
+            activityMetricsService.recordActivity(senderId);
+        }
+
         return SendResult.success(message);
     }
 
-    public List<Message> getMessages(UUID userId, UUID otherUserId, int limit, int offset) {
+    public MessageLoadResult getMessages(UUID userId, UUID otherUserId, int limit, int offset) {
         if (limit < 1 || limit > config.messageMaxPageSize()) {
-            return List.of();
+            return MessageLoadResult.failure("Invalid limit");
         }
         if (offset < 0) {
-            return List.of();
+            return MessageLoadResult.failure("Invalid offset");
         }
 
         String conversationId = Conversation.generateId(userId, otherUserId);
         Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
         if (convoOpt.isEmpty() || !convoOpt.get().involves(userId)) {
-            return List.of();
+            return MessageLoadResult.failure("Conversation not found or unauthorized");
         }
 
-        return communicationStorage.getMessages(conversationId, limit, offset);
+        return MessageLoadResult.success(communicationStorage.getMessages(conversationId, limit, offset));
     }
 
-    public List<Message> getMessages(String conversationId, int limit, int offset) {
+    public MessageLoadResult getMessages(String conversationId, int limit, int offset) {
         if (conversationId == null || conversationId.isBlank()) {
-            return List.of();
+            return MessageLoadResult.failure("Conversation ID cannot be empty");
         }
         if (limit < 1 || limit > config.messageMaxPageSize()) {
-            return List.of();
+            return MessageLoadResult.failure("Invalid limit");
         }
         if (offset < 0) {
-            return List.of();
+            return MessageLoadResult.failure("Invalid offset");
         }
         if (communicationStorage.getConversation(conversationId).isEmpty()) {
-            return List.of();
+            return MessageLoadResult.failure("Conversation not found");
         }
-        return communicationStorage.getMessages(conversationId, limit, offset);
+        return MessageLoadResult.success(communicationStorage.getMessages(conversationId, limit, offset));
     }
 
     public int countMessages(String conversationId) {
@@ -128,8 +148,14 @@ public class ConnectionService {
         return communicationStorage.countMessages(conversationId);
     }
 
-    public List<ConversationPreview> getConversations(UUID userId) {
-        List<Conversation> conversations = communicationStorage.getConversationsFor(userId);
+    public List<ConversationPreview> getConversations(UUID userId, int limit, int offset) {
+        if (limit < 1 || limit > config.messageMaxPageSize()) {
+            return List.of();
+        }
+        if (offset < 0) {
+            return List.of();
+        }
+        List<Conversation> conversations = communicationStorage.getConversationsFor(userId, limit, offset);
 
         List<UUID> otherUserIds =
                 conversations.stream().map(c -> c.getOtherUser(userId)).toList();
@@ -183,7 +209,7 @@ public class ConnectionService {
     }
 
     public int getTotalUnreadCount(UUID userId) {
-        List<Conversation> conversations = communicationStorage.getConversationsFor(userId);
+        List<Conversation> conversations = communicationStorage.getAllConversationsFor(userId);
         int total = 0;
         for (Conversation convo : conversations) {
             total += calculateUnreadCount(userId, convo);
@@ -347,7 +373,10 @@ public class ConnectionService {
         match.gracefulExit(initiatorId);
 
         Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetUserId);
-        convoOpt.ifPresent(convo -> convo.archive(MatchArchiveReason.GRACEFUL_EXIT));
+        convoOpt.ifPresent(convo -> {
+            convo.archive(convo.getUserA(), MatchArchiveReason.GRACEFUL_EXIT);
+            convo.archive(convo.getUserB(), MatchArchiveReason.GRACEFUL_EXIT);
+        });
 
         Notification gracefulExitNotification = Notification.create(
                 targetUserId,
@@ -370,13 +399,52 @@ public class ConnectionService {
         }
 
         interactionStorage.update(match);
-        // KNOWN LIMITATION: the match state update and conversation archive are not atomic.
-        // If archiveConversation fails, the match is already GRACEFUL_EXIT but the conversation
+        // KNOWN LIMITATION: the match state update and conversation archive are not
+        // atomic.
+        // If archiveConversation fails, the match is already GRACEFUL_EXIT but the
+        // conversation
         // remains unarchived. Proper fix requires cross-storage transaction support.
-        convoOpt.ifPresent(
-                convo -> communicationStorage.archiveConversation(convo.getId(), MatchArchiveReason.GRACEFUL_EXIT));
+        convoOpt.ifPresent(convo -> {
+            communicationStorage.archiveConversation(convo.getId(), convo.getUserA(), MatchArchiveReason.GRACEFUL_EXIT);
+            communicationStorage.archiveConversation(convo.getId(), convo.getUserB(), MatchArchiveReason.GRACEFUL_EXIT);
+        });
         // Notification is informational-only — best-effort, not reverted on failure.
         communicationStorage.saveNotification(gracefulExitNotification);
+        return TransitionResult.ok();
+    }
+
+    /**
+     * Unmatches two users by transitioning the match to UNMATCHED and archiving
+     * any existing conversation from both sides.
+     *
+     * @param initiatorId the user initiating the unmatch
+     * @param targetId    the other user
+     * @return result of the unmatch operation
+     */
+    public TransitionResult unmatch(UUID initiatorId, UUID targetId) {
+        Objects.requireNonNull(initiatorId, "initiatorId cannot be null");
+        Objects.requireNonNull(targetId, "targetId cannot be null");
+
+        Optional<Match> matchOpt = interactionStorage.getByUsers(initiatorId, targetId);
+        if (matchOpt.isEmpty()) {
+            return TransitionResult.failure("No match found between these users.");
+        }
+        Match match = matchOpt.get();
+
+        if (!match.isActive() && match.getState() != MatchState.FRIENDS) {
+            return TransitionResult.failure("Match cannot be unmatched from its current state.");
+        }
+
+        match.unmatch(initiatorId);
+        interactionStorage.update(match);
+
+        // Archive the conversation for both participants, if one exists.
+        Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetId);
+        convoOpt.ifPresent(convo -> {
+            communicationStorage.archiveConversation(convo.getId(), convo.getUserA(), MatchArchiveReason.UNMATCH);
+            communicationStorage.archiveConversation(convo.getId(), convo.getUserB(), MatchArchiveReason.UNMATCH);
+        });
+
         return TransitionResult.ok();
     }
 
@@ -428,7 +496,7 @@ public class ConnectionService {
         }
 
         /** Error codes for message sending failures. */
-        public static enum ErrorCode {
+        public enum ErrorCode {
             NO_ACTIVE_MATCH,
             USER_NOT_FOUND,
             EMPTY_MESSAGE,
@@ -441,6 +509,31 @@ public class ConnectionService {
 
         public static SendResult failure(String error, ErrorCode code) {
             return new SendResult(false, null, error, code);
+        }
+    }
+
+    /** Result of loading messages. */
+    public static record MessageLoadResult(boolean success, List<Message> messages, String errorMessage) {
+        public MessageLoadResult {
+            if (success) {
+                Objects.requireNonNull(messages, "messages cannot be null when success is true");
+                if (errorMessage != null) {
+                    throw new IllegalArgumentException("errorMessage must be null on success");
+                }
+            } else {
+                Objects.requireNonNull(errorMessage, "errorMessage cannot be null when success is false");
+                if (messages != null) {
+                    throw new IllegalArgumentException("messages must be null on failure");
+                }
+            }
+        }
+
+        public static MessageLoadResult success(List<Message> messages) {
+            return new MessageLoadResult(true, messages, null);
+        }
+
+        public static MessageLoadResult failure(String error) {
+            return new MessageLoadResult(false, null, error);
         }
     }
 

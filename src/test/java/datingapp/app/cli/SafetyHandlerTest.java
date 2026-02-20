@@ -161,8 +161,8 @@ class SafetyHandlerTest {
             User otherUser = createActiveUser("BadUser");
             userStorage.save(otherUser);
 
-            // Select user 1, reason 1 (FAKE_PROFILE), empty description
-            SafetyHandler handler = createHandler("1\n1\n\n");
+            // Select user 1, reason 1 (FAKE_PROFILE), empty description, block user (yes)
+            SafetyHandler handler = createHandler("1\n1\n\ny\n");
             handler.reportUser();
 
             assertTrue(trustSafetyStorage.hasReported(testUser.getId(), otherUser.getId()));
@@ -175,7 +175,7 @@ class SafetyHandlerTest {
             User otherUser = createActiveUser("BadUser");
             userStorage.save(otherUser);
 
-            SafetyHandler handler = createHandler("1\n1\nThis is a fake profile\n");
+            SafetyHandler handler = createHandler("1\n1\nThis is a fake profile\nn\n");
             handler.reportUser();
 
             assertTrue(trustSafetyStorage.hasReported(testUser.getId(), otherUser.getId()));
@@ -214,7 +214,7 @@ class SafetyHandlerTest {
             User otherUser = createActiveUser("OtherUser");
             userStorage.save(otherUser);
 
-            SafetyHandler handler = createHandler("1\n99\n");
+            SafetyHandler handler = createHandler("1\n99\n"); // Won't reach block prompt because reason is invalid
             handler.reportUser();
 
             assertFalse(trustSafetyStorage.hasReported(testUser.getId(), otherUser.getId()));
@@ -226,7 +226,7 @@ class SafetyHandlerTest {
             testUser.pause();
             userStorage.save(testUser);
 
-            SafetyHandler handler = createHandler("1\n1\n\n");
+            SafetyHandler handler = createHandler("1\n1\n\ny\n");
             handler.reportUser();
 
             assertEquals(0, trustSafetyStorage.countReportsBy(testUser.getId()));
@@ -236,7 +236,7 @@ class SafetyHandlerTest {
         @DisplayName("Requires login")
         void requiresLogin() {
             session.logout();
-            SafetyHandler handler = createHandler("1\n1\n\n");
+            SafetyHandler handler = createHandler("1\n1\n\ny\n");
             handler.reportUser();
 
             assertEquals(0, trustSafetyStorage.countReportsBy(testUser.getId()));
@@ -387,7 +387,7 @@ class SafetyHandlerTest {
             handler.verifyProfile();
 
             // Should not modify user
-            User stored = userStorage.get(testUser.getId());
+            User stored = userStorage.get(testUser.getId()).orElse(null);
             assertFalse(stored.isVerified());
         }
     }

@@ -26,7 +26,10 @@ import org.jdbi.v3.sqlobject.customizer.BindBean;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
-/** Consolidated JDBI storage for stats, achievements, profile views, daily picks, and swipe sessions. */
+/**
+ * Consolidated JDBI storage for stats, achievements, profile views, daily
+ * picks, and swipe sessions.
+ */
 public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Storage {
 
     private final Jdbi jdbi;
@@ -147,6 +150,11 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
     }
 
     @Override
+    public int deleteExpiredStandouts(Instant cutoff) {
+        return standoutDao.deleteExpiredStandouts(cutoff);
+    }
+
+    @Override
     public void saveSession(Session session) {
         sessionDao.save(session);
     }
@@ -240,63 +248,63 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
     private interface StatsDao {
 
         @SqlUpdate("""
-            INSERT INTO user_stats (id, user_id, computed_at,
-                total_swipes_given, likes_given, passes_given, like_ratio,
-                total_swipes_received, likes_received, passes_received, incoming_like_ratio,
-                total_matches, active_matches, match_rate,
-                blocks_given, blocks_received, reports_given, reports_received,
-                reciprocity_score, selectiveness_score, attractiveness_score)
-            VALUES (:id, :userId, :computedAt, :totalSwipesGiven, :likesGiven, :passesGiven, :likeRatio,
-                :totalSwipesReceived, :likesReceived, :passesReceived, :incomingLikeRatio,
-                :totalMatches, :activeMatches, :matchRate,
-                :blocksGiven, :blocksReceived, :reportsGiven, :reportsReceived,
-                :reciprocityScore, :selectivenessScore, :attractivenessScore)
-            """)
+                INSERT INTO user_stats (id, user_id, computed_at,
+                    total_swipes_given, likes_given, passes_given, like_ratio,
+                    total_swipes_received, likes_received, passes_received, incoming_like_ratio,
+                    total_matches, active_matches, match_rate,
+                    blocks_given, blocks_received, reports_given, reports_received,
+                    reciprocity_score, selectiveness_score, attractiveness_score)
+                VALUES (:id, :userId, :computedAt, :totalSwipesGiven, :likesGiven, :passesGiven, :likeRatio,
+                    :totalSwipesReceived, :likesReceived, :passesReceived, :incomingLikeRatio,
+                    :totalMatches, :activeMatches, :matchRate,
+                    :blocksGiven, :blocksReceived, :reportsGiven, :reportsReceived,
+                    :reciprocityScore, :selectivenessScore, :attractivenessScore)
+                """)
         void saveUserStats(@BindBean UserStats stats);
 
         @SqlQuery("""
-            SELECT id, user_id, computed_at,
-                total_swipes_given, likes_given, passes_given, like_ratio,
-                total_swipes_received, likes_received, passes_received, incoming_like_ratio,
-                total_matches, active_matches, match_rate,
-                blocks_given, blocks_received, reports_given, reports_received,
-                reciprocity_score, selectiveness_score, attractiveness_score
-            FROM user_stats
-            WHERE user_id = :userId
-            ORDER BY computed_at DESC
-            LIMIT 1
-            """)
+                SELECT id, user_id, computed_at,
+                    total_swipes_given, likes_given, passes_given, like_ratio,
+                    total_swipes_received, likes_received, passes_received, incoming_like_ratio,
+                    total_matches, active_matches, match_rate,
+                    blocks_given, blocks_received, reports_given, reports_received,
+                    reciprocity_score, selectiveness_score, attractiveness_score
+                FROM user_stats
+                WHERE user_id = :userId
+                ORDER BY computed_at DESC
+                LIMIT 1
+                """)
         @RegisterRowMapper(UserStatsMapper.class)
         Optional<UserStats> getLatestUserStats(@Bind("userId") UUID userId);
 
         @SqlQuery("""
-            SELECT id, user_id, computed_at,
-                total_swipes_given, likes_given, passes_given, like_ratio,
-                total_swipes_received, likes_received, passes_received, incoming_like_ratio,
-                total_matches, active_matches, match_rate,
-                blocks_given, blocks_received, reports_given, reports_received,
-                reciprocity_score, selectiveness_score, attractiveness_score
-            FROM user_stats
-            WHERE user_id = :userId
-            ORDER BY computed_at DESC
-            LIMIT :limit
-            """)
+                SELECT id, user_id, computed_at,
+                    total_swipes_given, likes_given, passes_given, like_ratio,
+                    total_swipes_received, likes_received, passes_received, incoming_like_ratio,
+                    total_matches, active_matches, match_rate,
+                    blocks_given, blocks_received, reports_given, reports_received,
+                    reciprocity_score, selectiveness_score, attractiveness_score
+                FROM user_stats
+                WHERE user_id = :userId
+                ORDER BY computed_at DESC
+                LIMIT :limit
+                """)
         @RegisterRowMapper(UserStatsMapper.class)
         List<UserStats> getUserStatsHistory(@Bind("userId") UUID userId, @Bind("limit") int limit);
 
         @SqlQuery("""
-            SELECT s.id, s.user_id, s.computed_at,
-                s.total_swipes_given, s.likes_given, s.passes_given, s.like_ratio,
-                s.total_swipes_received, s.likes_received, s.passes_received, s.incoming_like_ratio,
-                s.total_matches, s.active_matches, s.match_rate,
-                s.blocks_given, s.blocks_received, s.reports_given, s.reports_received,
-                s.reciprocity_score, s.selectiveness_score, s.attractiveness_score
-            FROM user_stats s
-            WHERE NOT EXISTS (
-                SELECT 1 FROM user_stats s2
-                WHERE s2.user_id = s.user_id AND s2.computed_at > s.computed_at
-            )
-            """)
+                SELECT s.id, s.user_id, s.computed_at,
+                    s.total_swipes_given, s.likes_given, s.passes_given, s.like_ratio,
+                    s.total_swipes_received, s.likes_received, s.passes_received, s.incoming_like_ratio,
+                    s.total_matches, s.active_matches, s.match_rate,
+                    s.blocks_given, s.blocks_received, s.reports_given, s.reports_received,
+                    s.reciprocity_score, s.selectiveness_score, s.attractiveness_score
+                FROM user_stats s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM user_stats s2
+                    WHERE s2.user_id = s.user_id AND s2.computed_at > s.computed_at
+                )
+                """)
         @RegisterRowMapper(UserStatsMapper.class)
         List<UserStats> getAllLatestUserStats();
 
@@ -304,37 +312,37 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         int deleteUserStatsOlderThan(@Bind("cutoff") Instant cutoff);
 
         @SqlUpdate("""
-            INSERT INTO platform_stats (id, computed_at, total_active_users,
-                avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio)
-            VALUES (:id, :computedAt, :totalActiveUsers, :avgLikesReceived,
-                :avgLikesGiven, :avgMatchRate, :avgLikeRatio)
-            """)
+                INSERT INTO platform_stats (id, computed_at, total_active_users,
+                    avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio)
+                VALUES (:id, :computedAt, :totalActiveUsers, :avgLikesReceived,
+                    :avgLikesGiven, :avgMatchRate, :avgLikeRatio)
+                """)
         void savePlatformStats(@BindBean PlatformStats stats);
 
         @SqlQuery("""
-            SELECT id, computed_at, total_active_users,
-                avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio
-            FROM platform_stats
-            ORDER BY computed_at DESC
-            LIMIT 1
-            """)
+                SELECT id, computed_at, total_active_users,
+                    avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio
+                FROM platform_stats
+                ORDER BY computed_at DESC
+                LIMIT 1
+                """)
         @RegisterRowMapper(PlatformStatsMapper.class)
         Optional<PlatformStats> getLatestPlatformStats();
 
         @SqlQuery("""
-            SELECT id, computed_at, total_active_users,
-                avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio
-            FROM platform_stats
-            ORDER BY computed_at DESC
-            LIMIT :limit
-            """)
+                SELECT id, computed_at, total_active_users,
+                    avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio
+                FROM platform_stats
+                ORDER BY computed_at DESC
+                LIMIT :limit
+                """)
         @RegisterRowMapper(PlatformStatsMapper.class)
         List<PlatformStats> getPlatformStatsHistory(@Bind("limit") int limit);
 
         @SqlUpdate("""
-            INSERT INTO profile_views (viewer_id, viewed_id, viewed_at)
-            VALUES (:viewerId, :viewedId, :viewedAt)
-            """)
+                INSERT INTO profile_views (viewer_id, viewed_id, viewed_at)
+                VALUES (:viewerId, :viewedId, :viewedAt)
+                """)
         void insertView(
                 @Bind("viewerId") UUID viewerId, @Bind("viewedId") UUID viewedId, @Bind("viewedAt") Instant viewedAt);
 
@@ -352,13 +360,13 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         int getUniqueViewerCount(@Bind("userId") UUID userId);
 
         @SqlQuery("""
-            SELECT viewer_id, MAX(viewed_at) as last_view
-            FROM profile_views
-            WHERE viewed_id = :userId
-            GROUP BY viewer_id
-            ORDER BY last_view DESC
-            LIMIT :limit
-            """)
+                SELECT viewer_id, MAX(viewed_at) as last_view
+                FROM profile_views
+                WHERE viewed_id = :userId
+                GROUP BY viewer_id
+                ORDER BY last_view DESC
+                LIMIT :limit
+                """)
         List<UUID> getRecentViewersRaw(@Bind("userId") UUID userId, @Bind("limit") int limit);
 
         default List<UUID> getRecentViewers(UUID userId, int limit) {
@@ -366,33 +374,33 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         }
 
         @SqlQuery("""
-            SELECT EXISTS (
-                SELECT 1 FROM profile_views
-                WHERE viewer_id = :viewerId AND viewed_id = :viewedId
-                LIMIT 1
-            )
-            """)
+                SELECT EXISTS (
+                    SELECT 1 FROM profile_views
+                    WHERE viewer_id = :viewerId AND viewed_id = :viewedId
+                    LIMIT 1
+                )
+                """)
         boolean hasViewedProfile(@Bind("viewerId") UUID viewerId, @Bind("viewedId") UUID viewedId);
 
         @SqlUpdate("""
-                        MERGE INTO user_achievements (id, user_id, achievement, unlocked_at)
-                        KEY (user_id, achievement)
-                        VALUES (:id, :userId, :achievement, :unlockedAt)
-                        """)
+                MERGE INTO user_achievements (id, user_id, achievement, unlocked_at)
+                KEY (user_id, achievement)
+                VALUES (:id, :userId, :achievement, :unlockedAt)
+                """)
         void saveUserAchievement(@BindBean UserAchievement achievement);
 
         @SqlQuery("""
-                        SELECT id, user_id, achievement, unlocked_at
-                        FROM user_achievements
-                        WHERE user_id = :userId
-                        ORDER BY unlocked_at DESC
-                        """)
+                SELECT id, user_id, achievement, unlocked_at
+                FROM user_achievements
+                WHERE user_id = :userId
+                ORDER BY unlocked_at DESC
+                """)
         List<UserAchievement> getUnlockedAchievements(@Bind("userId") UUID userId);
 
         @SqlQuery("""
-                        SELECT COUNT(*) > 0 FROM user_achievements
-                        WHERE user_id = :userId AND achievement = :achievement
-                        """)
+                SELECT COUNT(*) > 0 FROM user_achievements
+                WHERE user_id = :userId AND achievement = :achievement
+                """)
         boolean hasAchievement(@Bind("userId") UUID userId, @Bind("achievement") Achievement achievement);
 
         @SqlQuery("SELECT COUNT(*) FROM user_achievements WHERE user_id = :userId")
@@ -420,88 +428,88 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
     private interface SessionDao {
 
         @SqlUpdate("""
-                        MERGE INTO swipe_sessions (id, user_id, started_at, last_activity_at, ended_at,
-                                                   state, swipe_count, like_count, pass_count, match_count)
-                        KEY (id)
-                        VALUES (:id, :userId, :startedAt, :lastActivityAt, :endedAt,
-                                :state, :swipeCount, :likeCount, :passCount, :matchCount)
-                        """)
+                MERGE INTO swipe_sessions (id, user_id, started_at, last_activity_at, ended_at,
+                                           state, swipe_count, like_count, pass_count, match_count)
+                KEY (id)
+                VALUES (:id, :userId, :startedAt, :lastActivityAt, :endedAt,
+                        :state, :swipeCount, :likeCount, :passCount, :matchCount)
+                """)
         void save(@BindBean Session session);
 
         @SqlQuery("""
-                        SELECT id, user_id, started_at, last_activity_at, ended_at,
-                               state, swipe_count, like_count, pass_count, match_count
-                        FROM swipe_sessions WHERE id = :sessionId
-                        """)
+                SELECT id, user_id, started_at, last_activity_at, ended_at,
+                       state, swipe_count, like_count, pass_count, match_count
+                FROM swipe_sessions WHERE id = :sessionId
+                """)
         Optional<Session> get(@Bind("sessionId") UUID sessionId);
 
         @SqlQuery("""
-                        SELECT id, user_id, started_at, last_activity_at, ended_at,
-                               state, swipe_count, like_count, pass_count, match_count
-                        FROM swipe_sessions WHERE user_id = :userId AND state = 'ACTIVE'
-                        LIMIT 1
-                        """)
+                SELECT id, user_id, started_at, last_activity_at, ended_at,
+                       state, swipe_count, like_count, pass_count, match_count
+                FROM swipe_sessions WHERE user_id = :userId AND state = 'ACTIVE'
+                LIMIT 1
+                """)
         Optional<Session> getActiveSession(@Bind("userId") UUID userId);
 
         @SqlQuery("""
-                        SELECT id, user_id, started_at, last_activity_at, ended_at,
-                               state, swipe_count, like_count, pass_count, match_count
-                        FROM swipe_sessions WHERE user_id = :userId
-                        ORDER BY started_at DESC LIMIT :limit
-                        """)
+                SELECT id, user_id, started_at, last_activity_at, ended_at,
+                       state, swipe_count, like_count, pass_count, match_count
+                FROM swipe_sessions WHERE user_id = :userId
+                ORDER BY started_at DESC LIMIT :limit
+                """)
         List<Session> getSessionsFor(@Bind("userId") UUID userId, @Bind("limit") int limit);
 
         @SqlQuery("""
-                        SELECT id, user_id, started_at, last_activity_at, ended_at,
-                               state, swipe_count, like_count, pass_count, match_count
-                        FROM swipe_sessions
-                        WHERE user_id = :userId AND started_at >= :start AND started_at <= :end
-                        ORDER BY started_at DESC
-                        """)
+                SELECT id, user_id, started_at, last_activity_at, ended_at,
+                       state, swipe_count, like_count, pass_count, match_count
+                FROM swipe_sessions
+                WHERE user_id = :userId AND started_at >= :start AND started_at <= :end
+                ORDER BY started_at DESC
+                """)
         List<Session> getSessionsInRange(
                 @Bind("userId") UUID userId, @Bind("start") Instant start, @Bind("end") Instant end);
 
         @SqlQuery("""
-                        SELECT
-                            COUNT(*) as total_sessions,
-                            COALESCE(SUM(swipe_count), 0) as total_swipes,
-                            COALESCE(SUM(like_count), 0) as total_likes,
-                            COALESCE(SUM(pass_count), 0) as total_passes,
-                            COALESCE(SUM(match_count), 0) as total_matches,
-                            COALESCE(AVG(
+                SELECT
+                    COUNT(*) as total_sessions,
+                    COALESCE(SUM(swipe_count), 0) as total_swipes,
+                    COALESCE(SUM(like_count), 0) as total_likes,
+                    COALESCE(SUM(pass_count), 0) as total_passes,
+                    COALESCE(SUM(match_count), 0) as total_matches,
+                    COALESCE(AVG(
+                        CASE WHEN ended_at IS NOT NULL
+                        THEN DATEDIFF('SECOND', started_at, ended_at)
+                        ELSE NULL END
+                    ), 0) as avg_session_duration_seconds,
+                    CASE
+                        WHEN COUNT(*) = 0 THEN 0
+                        ELSE COALESCE(SUM(swipe_count), 0) * 1.0 / COUNT(*)
+                    END as avg_swipes_per_session,
+                    CASE
+                        WHEN COALESCE(SUM(
+                            CASE WHEN ended_at IS NOT NULL
+                            THEN DATEDIFF('SECOND', started_at, ended_at)
+                            ELSE 0 END
+                        ), 0) = 0 THEN 0
+                        ELSE COALESCE(SUM(
+                            CASE WHEN ended_at IS NOT NULL THEN swipe_count ELSE 0 END
+                        ), 0) * 1.0 /
+                            COALESCE(SUM(
                                 CASE WHEN ended_at IS NOT NULL
                                 THEN DATEDIFF('SECOND', started_at, ended_at)
-                                ELSE NULL END
-                            ), 0) as avg_session_duration_seconds,
-                            CASE
-                                WHEN COUNT(*) = 0 THEN 0
-                                ELSE COALESCE(SUM(swipe_count), 0) * 1.0 / COUNT(*)
-                            END as avg_swipes_per_session,
-                            CASE
-                                WHEN COALESCE(SUM(
-                                    CASE WHEN ended_at IS NOT NULL
-                                    THEN DATEDIFF('SECOND', started_at, ended_at)
-                                    ELSE 0 END
-                                ), 0) = 0 THEN 0
-                                ELSE COALESCE(SUM(
-                                    CASE WHEN ended_at IS NOT NULL THEN swipe_count ELSE 0 END
-                                ), 0) * 1.0 /
-                                    COALESCE(SUM(
-                                        CASE WHEN ended_at IS NOT NULL
-                                        THEN DATEDIFF('SECOND', started_at, ended_at)
-                                        ELSE 0 END
-                                    ), 0)
-                            END as avg_swipe_velocity
-                        FROM swipe_sessions
-                        WHERE user_id = :userId
-                        """)
+                                ELSE 0 END
+                            ), 0)
+                    END as avg_swipe_velocity
+                FROM swipe_sessions
+                WHERE user_id = :userId
+                """)
         SessionAggregates getAggregates(@Bind("userId") UUID userId);
 
         @SqlUpdate("""
-                        UPDATE swipe_sessions
-                        SET state = 'COMPLETED', ended_at = :now
-                        WHERE state = 'ACTIVE' AND last_activity_at < :cutoff
-                        """)
+                UPDATE swipe_sessions
+                SET state = 'COMPLETED', ended_at = :now
+                WHERE state = 'ACTIVE' AND last_activity_at < :cutoff
+                """)
         int endStaleSessions(@Bind("now") Instant now, @Bind("cutoff") Instant cutoff);
 
         default int endStaleSessions(Duration timeout) {
@@ -548,6 +556,9 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
         @SqlUpdate("DELETE FROM standouts WHERE featured_date < :before")
         int cleanup(@Bind("before") LocalDate before);
+
+        @SqlUpdate("DELETE FROM standouts WHERE created_at < :cutoff")
+        int deleteExpiredStandouts(@Bind("cutoff") Instant cutoff);
     }
 
     public static class UserStatsMapper implements RowMapper<UserStats> {

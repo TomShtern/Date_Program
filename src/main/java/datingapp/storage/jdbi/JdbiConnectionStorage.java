@@ -30,7 +30,10 @@ import org.jdbi.v3.sqlobject.customizer.BindBean;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
-/** Consolidated JDBI storage for conversations, messages, friend requests, and notifications. */
+/**
+ * Consolidated JDBI storage for conversations, messages, friend requests, and
+ * notifications.
+ */
 public final class JdbiConnectionStorage implements CommunicationStorage {
 
     private final Jdbi jdbi;
@@ -59,8 +62,13 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     }
 
     @Override
-    public List<Conversation> getConversationsFor(UUID userId) {
-        return messagingDao.getConversationsFor(userId);
+    public List<Conversation> getConversationsFor(UUID userId, int limit, int offset) {
+        return messagingDao.getConversationsFor(userId, limit, offset);
+    }
+
+    @Override
+    public List<Conversation> getAllConversationsFor(UUID userId) {
+        return messagingDao.getAllConversationsFor(userId);
     }
 
     @Override
@@ -74,8 +82,8 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     }
 
     @Override
-    public void archiveConversation(String conversationId, MatchArchiveReason reason) {
-        messagingDao.archiveConversation(conversationId, reason);
+    public void archiveConversation(String conversationId, UUID userId, MatchArchiveReason reason) {
+        messagingDao.archiveConversation(conversationId, userId, reason);
     }
 
     @Override
@@ -205,22 +213,26 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     private interface MessagingDao {
 
         @SqlUpdate("""
-            INSERT INTO conversations (id, user_a, user_b, created_at, last_message_at,
-                                       user_a_last_read_at, user_b_last_read_at,
-                                       archived_at, archive_reason, visible_to_user_a, visible_to_user_b)
-            VALUES (:id, :userA, :userB, :createdAt, :lastMessageAt,
-                    :userAReadAt, :userBReadAt, :archivedAt, :archiveReason,
-                    :visibleToUserA, :visibleToUserB)
-            """)
+                INSERT INTO conversations (id, user_a, user_b, created_at, last_message_at,
+                                           user_a_last_read_at, user_b_last_read_at,
+                                           archived_at_a, archive_reason_a, archived_at_b, archive_reason_b,
+                                           visible_to_user_a, visible_to_user_b)
+                VALUES (:id, :userA, :userB, :createdAt, :lastMessageAt,
+                        :userAReadAt, :userBReadAt,
+                        :userAArchivedAt, :userAArchiveReason, :userBArchivedAt, :userBArchiveReason,
+                        :visibleToUserA, :visibleToUserB)
+                """)
         void saveConversation(@BindBean Conversation conversation);
 
         @SqlQuery("""
-            SELECT id, user_a, user_b, created_at, last_message_at,
-                user_a_last_read_at, user_b_last_read_at,
-                archived_at, archive_reason, visible_to_user_a, visible_to_user_b
-            FROM conversations
-            WHERE id = :conversationId
-            """)
+                SELECT id, user_a, user_b, created_at, last_message_at,
+                    user_a_last_read_at, user_b_last_read_at,
+                    archived_at_a AS user_a_archived_at, archive_reason_a AS user_a_archive_reason,
+                    archived_at_b AS user_b_archived_at, archive_reason_b AS user_b_archive_reason,
+                    visible_to_user_a, visible_to_user_b
+                FROM conversations
+                WHERE id = :conversationId
+                """)
         Optional<Conversation> getConversation(@Bind("conversationId") String conversationId);
 
         default Optional<Conversation> getConversationByUsers(UUID userA, UUID userB) {
@@ -229,47 +241,70 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         }
 
         @SqlQuery("""
-            SELECT id, user_a, user_b, created_at, last_message_at,
-                user_a_last_read_at, user_b_last_read_at,
-                archived_at, archive_reason, visible_to_user_a, visible_to_user_b
-            FROM conversations
-            WHERE user_a = :userId OR user_b = :userId
-            ORDER BY COALESCE(last_message_at, created_at) DESC
-            """)
-        List<Conversation> getConversationsFor(@Bind("userId") UUID userId);
+                SELECT id, user_a, user_b, created_at, last_message_at,
+                    user_a_last_read_at, user_b_last_read_at,
+                    archived_at_a AS user_a_archived_at, archive_reason_a AS user_a_archive_reason,
+                    archived_at_b AS user_b_archived_at, archive_reason_b AS user_b_archive_reason,
+                    visible_to_user_a, visible_to_user_b
+                FROM conversations
+                WHERE user_a = :userId OR user_b = :userId
+                ORDER BY COALESCE(last_message_at, created_at) DESC
+                LIMIT :limit OFFSET :offset
+                """)
+        List<Conversation> getConversationsFor(
+                @Bind("userId") UUID userId, @Bind("limit") int limit, @Bind("offset") int offset);
+
+        @SqlQuery("""
+                SELECT id, user_a, user_b, created_at, last_message_at,
+                    user_a_last_read_at, user_b_last_read_at,
+                    archived_at_a AS user_a_archived_at, archive_reason_a AS user_a_archive_reason,
+                    archived_at_b AS user_b_archived_at, archive_reason_b AS user_b_archive_reason,
+                    visible_to_user_a, visible_to_user_b
+                FROM conversations
+                WHERE user_a = :userId OR user_b = :userId
+                ORDER BY COALESCE(last_message_at, created_at) DESC
+                """)
+        List<Conversation> getAllConversationsFor(@Bind("userId") UUID userId);
 
         @SqlUpdate("UPDATE conversations SET last_message_at = :timestamp WHERE id = :conversationId")
         void updateConversationLastMessageAt(
                 @Bind("conversationId") String conversationId, @Bind("timestamp") Instant timestamp);
 
         @SqlUpdate("""
-            UPDATE conversations
-            SET user_a_last_read_at = CASE WHEN user_a = :userId THEN :timestamp ELSE user_a_last_read_at END,
-                user_b_last_read_at = CASE WHEN user_b = :userId THEN :timestamp ELSE user_b_last_read_at END
-            WHERE id = :conversationId AND (user_a = :userId OR user_b = :userId)
-            """)
+                UPDATE conversations
+                SET user_a_last_read_at = CASE WHEN user_a = :userId THEN :timestamp ELSE user_a_last_read_at END,
+                    user_b_last_read_at = CASE WHEN user_b = :userId THEN :timestamp ELSE user_b_last_read_at END
+                WHERE id = :conversationId AND (user_a = :userId OR user_b = :userId)
+                """)
         void updateConversationReadTimestamp(
                 @Bind("conversationId") String conversationId,
                 @Bind("userId") UUID userId,
                 @Bind("timestamp") Instant timestamp);
 
-        default void archiveConversation(String conversationId, MatchArchiveReason reason) {
-            archiveConversationInternal(conversationId, AppClock.now(), reason);
+        default void archiveConversation(String conversationId, UUID userId, MatchArchiveReason reason) {
+            archiveConversationInternal(conversationId, userId, AppClock.now(), reason);
         }
 
-        @SqlUpdate(
-                "UPDATE conversations SET archived_at = :archivedAt, archive_reason = :reason WHERE id = :conversationId")
+        @SqlUpdate("""
+                UPDATE conversations
+                SET archived_at_a = CASE WHEN user_a = :userId THEN :archivedAt ELSE archived_at_a END,
+                    archive_reason_a = CASE WHEN user_a = :userId THEN :reason ELSE archive_reason_a END,
+                    archived_at_b = CASE WHEN user_b = :userId THEN :archivedAt ELSE archived_at_b END,
+                    archive_reason_b = CASE WHEN user_b = :userId THEN :reason ELSE archive_reason_b END
+                WHERE id = :conversationId AND (user_a = :userId OR user_b = :userId)
+                """)
         void archiveConversationInternal(
                 @Bind("conversationId") String conversationId,
+                @Bind("userId") UUID userId,
                 @Bind("archivedAt") Instant archivedAt,
                 @Bind("reason") MatchArchiveReason reason);
 
         @SqlUpdate("""
-            UPDATE conversations
-            SET visible_to_user_a = CASE WHEN user_a = :userId THEN :visible ELSE visible_to_user_a END,
-                visible_to_user_b = CASE WHEN user_b = :userId THEN :visible ELSE visible_to_user_b END
-            WHERE id = :conversationId
-            """)
+                UPDATE conversations
+                SET visible_to_user_a = CASE WHEN user_a = :userId THEN :visible ELSE visible_to_user_a END,
+                    visible_to_user_b = CASE WHEN user_b = :userId THEN :visible ELSE visible_to_user_b END
+                WHERE id = :conversationId
+                """)
         void setConversationVisibility(
                 @Bind("conversationId") String conversationId,
                 @Bind("userId") UUID userId,
@@ -279,53 +314,53 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         void deleteConversation(@Bind("conversationId") String conversationId);
 
         @SqlUpdate("""
-            INSERT INTO messages (id, conversation_id, sender_id, content, created_at)
-            VALUES (:id, :conversationId, :senderId, :content, :createdAt)
-            """)
+                INSERT INTO messages (id, conversation_id, sender_id, content, created_at)
+                VALUES (:id, :conversationId, :senderId, :content, :createdAt)
+                """)
         void saveMessage(@BindBean Message message);
 
         @SqlQuery("""
-            SELECT id, conversation_id, sender_id, content, created_at
-            FROM messages
-            WHERE conversation_id = :conversationId
-            ORDER BY created_at ASC
-            LIMIT :limit OFFSET :offset
-            """)
+                SELECT id, conversation_id, sender_id, content, created_at
+                FROM messages
+                WHERE conversation_id = :conversationId
+                ORDER BY created_at ASC
+                LIMIT :limit OFFSET :offset
+                """)
         List<Message> getMessages(
                 @Bind("conversationId") String conversationId, @Bind("limit") int limit, @Bind("offset") int offset);
 
         @SqlQuery("""
-            SELECT id, conversation_id, sender_id, content, created_at
-            FROM messages
-            WHERE conversation_id = :conversationId
-            ORDER BY created_at DESC
-            LIMIT 1
-            """)
+                SELECT id, conversation_id, sender_id, content, created_at
+                FROM messages
+                WHERE conversation_id = :conversationId
+                ORDER BY created_at DESC
+                LIMIT 1
+                """)
         Optional<Message> getLatestMessage(@Bind("conversationId") String conversationId);
 
         @SqlQuery("SELECT COUNT(*) FROM messages WHERE conversation_id = :conversationId")
         int countMessages(@Bind("conversationId") String conversationId);
 
         @SqlQuery("""
-            SELECT COUNT(*) FROM messages
-            WHERE conversation_id = :conversationId
-            AND created_at > :after
-            """)
+                SELECT COUNT(*) FROM messages
+                WHERE conversation_id = :conversationId
+                AND created_at > :after
+                """)
         int countMessagesAfter(@Bind("conversationId") String conversationId, @Bind("after") Instant after);
 
         @SqlQuery("""
-            SELECT COUNT(*) FROM messages
-            WHERE conversation_id = :conversationId
-            AND sender_id != :senderId
-            """)
+                SELECT COUNT(*) FROM messages
+                WHERE conversation_id = :conversationId
+                AND sender_id != :senderId
+                """)
         int countMessagesNotFromSender(@Bind("conversationId") String conversationId, @Bind("senderId") UUID senderId);
 
         @SqlQuery("""
-            SELECT COUNT(*) FROM messages
-            WHERE conversation_id = :conversationId
-            AND created_at > :after
-            AND sender_id != :excludeSenderId
-            """)
+                SELECT COUNT(*) FROM messages
+                WHERE conversation_id = :conversationId
+                AND created_at > :after
+                AND sender_id != :excludeSenderId
+                """)
         int countMessagesAfterNotFrom(
                 @Bind("conversationId") String conversationId,
                 @Bind("after") Instant after,
@@ -342,45 +377,45 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
         @SqlUpdate("""
-            INSERT INTO friend_requests (id, from_user_id, to_user_id, created_at, status, responded_at)
-            VALUES (:id, :fromUserId, :toUserId, :createdAt, :status, :respondedAt)
-            """)
+                INSERT INTO friend_requests (id, from_user_id, to_user_id, created_at, status, responded_at)
+                VALUES (:id, :fromUserId, :toUserId, :createdAt, :status, :respondedAt)
+                """)
         void saveFriendRequest(@BindBean FriendRequest request);
 
         @SqlUpdate("""
-            UPDATE friend_requests SET status = :status, responded_at = :respondedAt
-            WHERE id = :id
-            """)
+                UPDATE friend_requests SET status = :status, responded_at = :respondedAt
+                WHERE id = :id
+                """)
         void updateFriendRequest(@BindBean FriendRequest request);
 
         @SqlQuery("""
-            SELECT id, from_user_id, to_user_id, created_at, status, responded_at
-            FROM friend_requests WHERE id = :id
-            """)
+                SELECT id, from_user_id, to_user_id, created_at, status, responded_at
+                FROM friend_requests WHERE id = :id
+                """)
         Optional<FriendRequest> getFriendRequest(@Bind("id") UUID id);
 
         @SqlQuery("""
-            SELECT id, from_user_id, to_user_id, created_at, status, responded_at
-            FROM friend_requests
-            WHERE ((from_user_id = :user1 AND to_user_id = :user2) OR (from_user_id = :user2 AND to_user_id = :user1))
-            AND status = 'PENDING'
-            """)
+                SELECT id, from_user_id, to_user_id, created_at, status, responded_at
+                FROM friend_requests
+                WHERE ((from_user_id = :user1 AND to_user_id = :user2) OR (from_user_id = :user2 AND to_user_id = :user1))
+                AND status = 'PENDING'
+                """)
         Optional<FriendRequest> getPendingFriendRequestBetween(@Bind("user1") UUID user1, @Bind("user2") UUID user2);
 
         @SqlQuery("""
-            SELECT id, from_user_id, to_user_id, created_at, status, responded_at
-            FROM friend_requests
-            WHERE to_user_id = :userId AND status = 'PENDING'
-            """)
+                SELECT id, from_user_id, to_user_id, created_at, status, responded_at
+                FROM friend_requests
+                WHERE to_user_id = :userId AND status = 'PENDING'
+                """)
         List<FriendRequest> getPendingFriendRequestsForUser(@Bind("userId") UUID userId);
 
         @SqlUpdate("DELETE FROM friend_requests WHERE id = :id")
         void deleteFriendRequest(@Bind("id") UUID id);
 
         @SqlUpdate("""
-            INSERT INTO notifications (id, user_id, type, title, message, created_at, is_read, data_json)
-            VALUES (:id, :userId, :type, :title, :message, :createdAt, :isRead, :dataJson)
-            """)
+                INSERT INTO notifications (id, user_id, type, title, message, created_at, is_read, data_json)
+                VALUES (:id, :userId, :type, :title, :message, :createdAt, :isRead, :dataJson)
+                """)
         void saveNotificationInternal(@BindBean Notification notification, @Bind("dataJson") String dataJson);
 
         default void saveNotification(Notification notification) {
@@ -392,17 +427,17 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         void markNotificationAsRead(@Bind("id") UUID id);
 
         @SqlQuery("""
-            SELECT id, user_id, type, title, message, created_at, is_read, data_json
-            FROM notifications WHERE user_id = :userId
-            ORDER BY created_at DESC
-            """)
+                SELECT id, user_id, type, title, message, created_at, is_read, data_json
+                FROM notifications WHERE user_id = :userId
+                ORDER BY created_at DESC
+                """)
         List<Notification> getAllNotificationsForUser(@Bind("userId") UUID userId);
 
         @SqlQuery("""
-            SELECT id, user_id, type, title, message, created_at, is_read, data_json
-            FROM notifications WHERE user_id = :userId AND is_read = FALSE
-            ORDER BY created_at DESC
-            """)
+                SELECT id, user_id, type, title, message, created_at, is_read, data_json
+                FROM notifications WHERE user_id = :userId AND is_read = FALSE
+                ORDER BY created_at DESC
+                """)
         List<Notification> getUnreadNotificationsForUser(@Bind("userId") UUID userId);
 
         default List<Notification> getNotificationsForUser(UUID userId, boolean unreadOnly) {
@@ -410,9 +445,9 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         }
 
         @SqlQuery("""
-            SELECT id, user_id, type, title, message, created_at, is_read, data_json
-            FROM notifications WHERE id = :id
-            """)
+                SELECT id, user_id, type, title, message, created_at, is_read, data_json
+                FROM notifications WHERE id = :id
+                """)
         Optional<Notification> getNotification(@Bind("id") UUID id);
 
         @SqlUpdate("DELETE FROM notifications WHERE id = :id")
@@ -434,18 +469,23 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     }
 
     public static class ConversationMapper implements RowMapper<Conversation> {
+        private static final String COL_CREATED_AT = "created_at";
+
         @Override
         public Conversation map(ResultSet rs, StatementContext ctx) throws SQLException {
             String id = rs.getString("id");
             UUID userA = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_a");
             UUID userB = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_b");
-            Instant createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at");
+            Instant createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, COL_CREATED_AT);
             Instant lastMessageAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "last_message_at");
             Instant userAReadAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "user_a_last_read_at");
             Instant userBReadAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "user_b_last_read_at");
-            Instant archivedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "archived_at");
-            MatchArchiveReason archiveReason =
-                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "archive_reason", MatchArchiveReason.class);
+            Instant userAArchivedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "user_a_archived_at");
+            MatchArchiveReason userAArchiveReason =
+                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "user_a_archive_reason", MatchArchiveReason.class);
+            Instant userBArchivedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "user_b_archived_at");
+            MatchArchiveReason userBArchiveReason =
+                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "user_b_archive_reason", MatchArchiveReason.class);
             boolean visibleToUserA = rs.getBoolean("visible_to_user_a");
             boolean visibleToUserB = rs.getBoolean("visible_to_user_b");
 
@@ -457,8 +497,10 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                     lastMessageAt,
                     userAReadAt,
                     userBReadAt,
-                    archivedAt,
-                    archiveReason,
+                    userAArchivedAt,
+                    userAArchiveReason,
+                    userBArchivedAt,
+                    userBArchiveReason,
                     visibleToUserA,
                     visibleToUserB);
         }

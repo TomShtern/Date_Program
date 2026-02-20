@@ -11,7 +11,6 @@ import datingapp.core.matching.RecommendationService;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.User.UserState;
 import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
@@ -82,8 +81,6 @@ class NestedTypeVisibilityTest {
                 Modifier.isPublic(VerificationMethod.class.getModifiers()), "User.VerificationMethod must be public");
         assertTrue(
                 Modifier.isStatic(VerificationMethod.class.getModifiers()), "User.VerificationMethod must be static");
-        assertTrue(Modifier.isPublic(ProfileNote.class.getModifiers()), "User.ProfileNote must be public");
-        assertTrue(Modifier.isStatic(ProfileNote.class.getModifiers()), "User.ProfileNote must be static");
     }
 
     @Test

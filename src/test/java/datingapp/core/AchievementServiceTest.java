@@ -8,9 +8,9 @@ import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.Match;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.UserStorage;
@@ -164,8 +164,8 @@ class AchievementServiceTest {
         }
 
         @Override
-        public User get(UUID id) {
-            return users.get(id);
+        public Optional<User> get(UUID id) {
+            return Optional.ofNullable(users.get(id));
         }
 
         @Override

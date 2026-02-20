@@ -83,7 +83,7 @@ public final class ProfileService {
 
     public Optional<User> getUserById(UUID userId) {
         Objects.requireNonNull(userId, "userId cannot be null");
-        return Optional.ofNullable(userStorage.get(userId));
+        return userStorage.get(userId);
     }
 
     // ========================================================================
@@ -660,7 +660,7 @@ public final class ProfileService {
     /** Check all achievements for a user and unlock any newly earned ones. */
     public List<UserAchievement> checkAndUnlock(UUID userId) {
         List<UserAchievement> newlyUnlocked = new ArrayList<>();
-        User user = userStorage.get(userId);
+        User user = userStorage.get(userId).orElse(null);
         if (user == null) {
             return newlyUnlocked;
         }
@@ -684,7 +684,7 @@ public final class ProfileService {
     /** Get progress for all achievements (both locked and unlocked). */
     public List<AchievementProgress> getProgress(UUID userId) {
         List<AchievementProgress> progress = new ArrayList<>();
-        User user = userStorage.get(userId);
+        User user = userStorage.get(userId).orElse(null);
         if (user == null) {
             return progress;
         }

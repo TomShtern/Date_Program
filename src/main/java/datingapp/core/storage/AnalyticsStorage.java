@@ -13,8 +13,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Consolidated storage for analytics: stats, achievements, profile views, daily picks, and swipe
- * sessions. Merges the former {@code StatsStorage} and {@code SwipeSessionStorage} interfaces.
+ * Consolidated storage for analytics: stats, achievements, profile views, daily
+ * picks, and swipe
+ * sessions. Merges the former {@code StatsStorage} and
+ * {@code SwipeSessionStorage} interfaces.
  */
 public interface AnalyticsStorage {
 
@@ -69,6 +71,10 @@ public interface AnalyticsStorage {
     int deleteDailyPickViewsOlderThan(LocalDate before);
 
     int deleteExpiredDailyPickViews(Instant cutoff);
+
+    // ═══ Standouts ═══
+
+    int deleteExpiredStandouts(Instant cutoff);
 
     // ═══ Swipe Sessions ═══
 

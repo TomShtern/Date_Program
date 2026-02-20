@@ -8,9 +8,9 @@ import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.MatchingService.PendingLiker;
 import datingapp.core.model.Match;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
@@ -159,7 +159,9 @@ class LikerBrowserServiceTest {
         }
 
         @Override
-        public void save(Like like) {}
+        public void save(Like like) {
+            // Not needed for this test
+        }
 
         @Override
         public boolean exists(UUID from, UUID to) {
@@ -212,7 +214,9 @@ class LikerBrowserServiceTest {
         }
 
         @Override
-        public void delete(UUID likeId) {}
+        public void delete(UUID likeId) {
+            // Not needed for this test
+        }
 
         @Override
         public void save(Match match) {
@@ -360,8 +364,8 @@ class LikerBrowserServiceTest {
         }
 
         @Override
-        public User get(UUID id) {
-            return users.get(id);
+        public Optional<User> get(UUID id) {
+            return Optional.ofNullable(users.get(id));
         }
 
         @Override

@@ -3,9 +3,9 @@ package datingapp.storage.jdbi;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.User.UserState;
 import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
@@ -45,15 +45,15 @@ public final class JdbiUserStorage implements UserStorage {
     private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
 
     public static final String ALL_COLUMNS = """
-                        id, name, bio, birth_date, gender, interested_in, lat, lon,
-                        has_location_set, max_distance_km, min_age, max_age, photo_urls, state, created_at,
-                        updated_at, smoking, drinking, wants_kids, looking_for, education,
-                        height_cm, db_smoking, db_drinking, db_wants_kids, db_looking_for,
-                        db_education, db_min_height_cm, db_max_height_cm, db_max_age_diff,
-                        interests, email, phone, is_verified, verification_method,
-                        verification_code, verification_sent_at, verified_at,
-                        pace_messaging_frequency, pace_time_to_first_date,
-                        pace_communication_style, pace_depth_preference, deleted_at""";
+            id, name, bio, birth_date, gender, interested_in, lat, lon,
+            has_location_set, max_distance_km, min_age, max_age, photo_urls, state, created_at,
+            updated_at, smoking, drinking, wants_kids, looking_for, education,
+            height_cm, db_smoking, db_drinking, db_wants_kids, db_looking_for,
+            db_education, db_min_height_cm, db_max_height_cm, db_max_age_diff,
+            interests, email, phone, is_verified, verification_method,
+            verification_code, verification_sent_at, verified_at,
+            pace_messaging_frequency, pace_time_to_first_date,
+            pace_communication_style, pace_depth_preference, deleted_at""";
 
     private final Jdbi jdbi;
     private final Dao dao;
@@ -69,7 +69,7 @@ public final class JdbiUserStorage implements UserStorage {
     }
 
     @Override
-    public User get(UUID id) {
+    public Optional<User> get(UUID id) {
         return dao.get(id);
     }
 
@@ -196,35 +196,35 @@ public final class JdbiUserStorage implements UserStorage {
     private static interface Dao {
 
         @SqlUpdate("""
-                        MERGE INTO users (
-                            id, name, bio, birth_date, gender, interested_in, lat, lon,
-                            has_location_set, max_distance_km, min_age, max_age, photo_urls, state, created_at,
-                            updated_at, smoking, drinking, wants_kids, looking_for, education,
-                            height_cm, db_smoking, db_drinking, db_wants_kids, db_looking_for,
-                            db_education, db_min_height_cm, db_max_height_cm, db_max_age_diff,
-                            interests, email, phone, is_verified, verification_method,
-                            verification_code, verification_sent_at, verified_at,
-                            pace_messaging_frequency, pace_time_to_first_date,
-                            pace_communication_style, pace_depth_preference, deleted_at
-                        ) KEY (id) VALUES (
-                            :id, :name, :bio, :birthDate, :gender, :interestedInCsv,
-                            :lat, :lon, :hasLocationSet, :maxDistanceKm, :minAge, :maxAge, :photoUrlsCsv,
-                            :state, :createdAt, :updatedAt,
-                            :smoking, :drinking, :wantsKids, :lookingFor,
-                            :education, :heightCm,
-                            :dealbreakerSmokingCsv, :dealbreakerDrinkingCsv, :dealbreakerWantsKidsCsv,
-                            :dealbreakerLookingForCsv, :dealbreakerEducationCsv,
-                            :dealbreakerMinHeightCm, :dealbreakerMaxHeightCm, :dealbreakerMaxAgeDiff,
-                            :interestsCsv, :email, :phone, :verified, :verificationMethod,
-                            :verificationCode, :verificationSentAt, :verifiedAt,
-                            :paceMessagingFrequency, :paceTimeToFirstDate,
-                            :paceCommunicationStyle, :paceDepthPreference, :deletedAt
-                        )
-                        """)
+                MERGE INTO users (
+                    id, name, bio, birth_date, gender, interested_in, lat, lon,
+                    has_location_set, max_distance_km, min_age, max_age, photo_urls, state, created_at,
+                    updated_at, smoking, drinking, wants_kids, looking_for, education,
+                    height_cm, db_smoking, db_drinking, db_wants_kids, db_looking_for,
+                    db_education, db_min_height_cm, db_max_height_cm, db_max_age_diff,
+                    interests, email, phone, is_verified, verification_method,
+                    verification_code, verification_sent_at, verified_at,
+                    pace_messaging_frequency, pace_time_to_first_date,
+                    pace_communication_style, pace_depth_preference, deleted_at
+                ) KEY (id) VALUES (
+                    :id, :name, :bio, :birthDate, :gender, :interestedInCsv,
+                    :lat, :lon, :hasLocationSet, :maxDistanceKm, :minAge, :maxAge, :photoUrlsCsv,
+                    :state, :createdAt, :updatedAt,
+                    :smoking, :drinking, :wantsKids, :lookingFor,
+                    :education, :heightCm,
+                    :dealbreakerSmokingCsv, :dealbreakerDrinkingCsv, :dealbreakerWantsKidsCsv,
+                    :dealbreakerLookingForCsv, :dealbreakerEducationCsv,
+                    :dealbreakerMinHeightCm, :dealbreakerMaxHeightCm, :dealbreakerMaxAgeDiff,
+                    :interestsCsv, :email, :phone, :verified, :verificationMethod,
+                    :verificationCode, :verificationSentAt, :verifiedAt,
+                    :paceMessagingFrequency, :paceTimeToFirstDate,
+                    :paceCommunicationStyle, :paceDepthPreference, :deletedAt
+                )
+                """)
         void save(@BindBean UserSqlBindings helper);
 
         @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE id = :id AND deleted_at IS NULL")
-        User get(@Bind("id") UUID id);
+        Optional<User> get(@Bind("id") UUID id);
 
         @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE state = 'ACTIVE' AND deleted_at IS NULL")
         List<User> findActive();
@@ -239,31 +239,31 @@ public final class JdbiUserStorage implements UserStorage {
         int purgeDeletedBefore(@Bind("threshold") Instant threshold);
 
         @SqlUpdate("""
-                        MERGE INTO profile_notes (author_id, subject_id, content, created_at, updated_at)
-                        KEY (author_id, subject_id)
-                        VALUES (:authorId, :subjectId, :content, :createdAt, :updatedAt)
-                        """)
+                MERGE INTO profile_notes (author_id, subject_id, content, created_at, updated_at)
+                KEY (author_id, subject_id)
+                VALUES (:authorId, :subjectId, :content, :createdAt, :updatedAt)
+                """)
         void saveProfileNote(@BindBean ProfileNote note);
 
         @SqlQuery("""
-                        SELECT author_id, subject_id, content, created_at, updated_at
-                        FROM profile_notes
-                        WHERE author_id = :authorId AND subject_id = :subjectId
-                        """)
+                SELECT author_id, subject_id, content, created_at, updated_at
+                FROM profile_notes
+                WHERE author_id = :authorId AND subject_id = :subjectId
+                """)
         Optional<ProfileNote> getProfileNote(@Bind("authorId") UUID authorId, @Bind("subjectId") UUID subjectId);
 
         @SqlQuery("""
-                        SELECT author_id, subject_id, content, created_at, updated_at
-                        FROM profile_notes
-                        WHERE author_id = :authorId
-                        ORDER BY updated_at DESC
-                        """)
+                SELECT author_id, subject_id, content, created_at, updated_at
+                FROM profile_notes
+                WHERE author_id = :authorId
+                ORDER BY updated_at DESC
+                """)
         List<ProfileNote> getProfileNotesByAuthor(@Bind("authorId") UUID authorId);
 
         @SqlUpdate("""
-                        DELETE FROM profile_notes
-                        WHERE author_id = :authorId AND subject_id = :subjectId
-                        """)
+                DELETE FROM profile_notes
+                WHERE author_id = :authorId AND subject_id = :subjectId
+                """)
         int deleteProfileNoteInternal(@Bind("authorId") UUID authorId, @Bind("subjectId") UUID subjectId);
 
         default boolean deleteProfileNote(UUID authorId, UUID subjectId) {

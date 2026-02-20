@@ -28,21 +28,23 @@ import org.slf4j.LoggerFactory;
 /**
  * REST API server for the dating application.
  *
- * <p>Provides a lightweight HTTP interface wrapping the core services.
- * All business logic remains in the core layer; this is purely a thin transport adapter.
+ * <p>
+ * Provides a lightweight HTTP interface wrapping the core services.
+ * All business logic remains in the core layer; this is purely a thin transport
+ * adapter.
  *
  * <h3>Endpoints:</h3>
  * <ul>
- *   <li>GET /api/health - Health check</li>
- *   <li>GET /api/users - List all users</li>
- *   <li>GET /api/users/{id} - Get user by ID</li>
- *   <li>GET /api/users/{id}/candidates - Get matching candidates for user</li>
- *   <li>GET /api/users/{id}/matches - Get matches for user</li>
- *   <li>POST /api/users/{id}/like/{targetId} - Like a user</li>
- *   <li>POST /api/users/{id}/pass/{targetId} - Pass on a user</li>
- *   <li>GET /api/users/{id}/conversations - Get conversations</li>
- *   <li>GET /api/conversations/{conversationId}/messages - Get messages</li>
- *   <li>POST /api/conversations/{conversationId}/messages - Send message</li>
+ * <li>GET /api/health - Health check</li>
+ * <li>GET /api/users - List all users</li>
+ * <li>GET /api/users/{id} - Get user by ID</li>
+ * <li>GET /api/users/{id}/candidates - Get matching candidates for user</li>
+ * <li>GET /api/users/{id}/matches - Get matches for user</li>
+ * <li>POST /api/users/{id}/like/{targetId} - Like a user</li>
+ * <li>POST /api/users/{id}/pass/{targetId} - Pass on a user</li>
+ * <li>GET /api/users/{id}/conversations - Get conversations</li>
+ * <li>GET /api/conversations/{conversationId}/messages - Get messages</li>
+ * <li>POST /api/conversations/{conversationId}/messages - Send message</li>
  * </ul>
  */
 public class RestApiServer {
@@ -55,6 +57,8 @@ public class RestApiServer {
     private final ProfileService profileService;
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
+    private static final String BAD_REQUEST = "BAD_REQUEST";
+
     private final ConnectionService messagingService;
     private final int port;
     private Javalin app;
@@ -202,8 +206,10 @@ public class RestApiServer {
 
     private void getConversations(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
+        int limit = ctx.queryParamAsClass("limit", Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
+        int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
         validateUserExists(userId);
-        List<ConversationSummary> conversations = messagingService.getConversations(userId).stream()
+        List<ConversationSummary> conversations = messagingService.getConversations(userId, limit, offset).stream()
                 .map(this::toConversationSummary)
                 .toList();
         ctx.json(conversations);
@@ -214,10 +220,15 @@ public class RestApiServer {
         int limit = ctx.queryParamAsClass("limit", Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
         int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
 
-        List<MessageDto> messages = messagingService.getMessages(conversationId, limit, offset).stream()
-                .map(MessageDto::from)
-                .toList();
-        ctx.json(messages);
+        var result = messagingService.getMessages(conversationId, limit, offset);
+        if (result.success()) {
+            List<MessageDto> messages =
+                    result.messages().stream().map(MessageDto::from).toList();
+            ctx.json(messages);
+        } else {
+            ctx.status(400);
+            ctx.json(new ErrorResponse(BAD_REQUEST, "Failed to mark messages as read"));
+        }
     }
 
     private void sendMessage(Context ctx) {
@@ -307,7 +318,7 @@ public class RestApiServer {
     private void registerExceptionHandlers() {
         app.exception(IllegalArgumentException.class, (e, ctx) -> {
             ctx.status(400);
-            ctx.json(new ErrorResponse("BAD_REQUEST", e.getMessage()));
+            ctx.json(new ErrorResponse(BAD_REQUEST, e.getMessage()));
         });
 
         app.exception(IllegalStateException.class, (e, ctx) -> {
@@ -322,7 +333,7 @@ public class RestApiServer {
 
         app.exception(com.fasterxml.jackson.core.JacksonException.class, (e, ctx) -> {
             ctx.status(400);
-            ctx.json(new ErrorResponse("BAD_REQUEST", "Invalid request body format"));
+            ctx.json(new ErrorResponse(BAD_REQUEST, "Invalid request body format"));
         });
 
         app.exception(Exception.class, (e, ctx) -> {

@@ -129,7 +129,7 @@ public class ChatViewModel {
             int unread = initialUnread;
             try {
                 logInfo("Refreshing conversations for user: {}", user.getName());
-                previews = messagingService.getConversations(user.getId());
+                previews = messagingService.getConversations(user.getId(), 50, 0);
                 unread = computeUnreadCount(previews);
             } catch (Exception e) {
                 logError("Failed to refresh conversations", e);
@@ -162,7 +162,7 @@ public class ChatViewModel {
             boolean loaded = false;
             try {
                 Conversation conversation = messagingService.getOrCreateConversation(user.getId(), otherUserId);
-                previews = messagingService.getConversations(user.getId());
+                previews = messagingService.getConversations(user.getId(), 50, 0);
                 preview = previews.stream()
                         .filter(p -> p.conversation().getId().equals(conversation.getId()))
                         .findFirst()
@@ -190,8 +190,11 @@ public class ChatViewModel {
     /**
      * Loads messages for the specified conversation.
      *
-     * <p>Uses tokenized requests to prevent race conditions when rapidly switching conversations.
-     * If a new request arrives before this one completes, the stale token is detected and the
+     * <p>
+     * Uses tokenized requests to prevent race conditions when rapidly switching
+     * conversations.
+     * If a new request arrives before this one completes, the stale token is
+     * detected and the
      * background work is skipped early (before database queries).
      */
     private void loadMessages(ConversationPreview conversation) {
@@ -211,12 +214,13 @@ public class ChatViewModel {
     }
 
     /**
-     * Background task for loading messages. Supports early exit if conversation was switched.
+     * Background task for loading messages. Supports early exit if conversation was
+     * switched.
      *
-     * @param token the request token for race condition detection
+     * @param token          the request token for race condition detection
      * @param conversationId the conversation to load messages for
-     * @param otherUserId the other user in the conversation
-     * @param user the current user
+     * @param otherUserId    the other user in the conversation
+     * @param user           the current user
      */
     private void loadMessagesInBackground(long token, String conversationId, UUID otherUserId, User user) {
         // Early check: if token is stale, skip database work immediately
@@ -229,10 +233,15 @@ public class ChatViewModel {
         Integer unread = null;
         try {
             logInfo("Loading messages for conversation: {}", otherUserId);
-            messages = messagingService.getMessages(user.getId(), otherUserId, 100, 0);
+            var result = messagingService.getMessages(user.getId(), otherUserId, 100, 0);
+            if (result.success()) {
+                messages = result.messages();
+            } else {
+                logError("Failed to load messages: " + result.errorMessage(), null);
+            }
             messagingService.markAsRead(user.getId(), conversationId);
 
-            List<ConversationPreview> previews = messagingService.getConversations(user.getId());
+            List<ConversationPreview> previews = messagingService.getConversations(user.getId(), 50, 0);
             unread = computeUnreadCount(previews);
         } catch (Exception e) {
             logError("Failed to load messages", e);
@@ -246,10 +255,10 @@ public class ChatViewModel {
     /**
      * Updates message display on FX thread after background load completes.
      *
-     * @param token the request token for final race condition check
+     * @param token          the request token for final race condition check
      * @param conversationId the conversation loaded
-     * @param messages the loaded messages (or null if load failed)
-     * @param unread the new unread count (or null if computation failed)
+     * @param messages       the loaded messages (or null if load failed)
+     * @param unread         the new unread count (or null if computation failed)
      */
     private void updateMessagesOnFx(long token, String conversationId, List<Message> messages, Integer unread) {
         ConversationPreview selected = selectedConversation.get();

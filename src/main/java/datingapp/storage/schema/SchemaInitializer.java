@@ -4,11 +4,15 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 /**
- * Creates all database tables, indexes, and foreign key constraints. Extracted from {@code
- * DatabaseManager} for single-responsibility: this class owns DDL, while {@code DatabaseManager}
+ * Creates all database tables, indexes, and foreign key constraints. Extracted
+ * from {@code
+ * DatabaseManager} for single-responsibility: this class owns DDL, while
+ * {@code DatabaseManager}
  * owns connection pooling and lifecycle.
  *
- * <p>Every method is idempotent — uses {@code IF NOT EXISTS} so re-running is safe.
+ * <p>
+ * Every method is idempotent — uses {@code IF NOT EXISTS} so re-running is
+ * safe.
  */
 public final class SchemaInitializer {
 
@@ -21,8 +25,10 @@ public final class SchemaInitializer {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Creates all application tables, indexes, and foreign keys using the given JDBC statement.
-     * Order matters: core tables first (users), then dependent tables, then indexes/FKs.
+     * Creates all application tables, indexes, and foreign keys using the given
+     * JDBC statement.
+     * Order matters: core tables first (users), then dependent tables, then
+     * indexes/FKs.
      *
      * @param stmt a JDBC statement connected to the target database
      * @throws SQLException if any DDL statement fails
@@ -108,18 +114,18 @@ public final class SchemaInitializer {
 
     static void createLikesTable(Statement stmt) throws SQLException {
         stmt.execute("""
-                CREATE TABLE IF NOT EXISTS likes (
-                    id UUID PRIMARY KEY,
-                    who_likes UUID NOT NULL,
-                    who_got_liked UUID NOT NULL,
-                    direction VARCHAR(10) NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
-                    deleted_at TIMESTAMP,
-                    CONSTRAINT fk_likes_who_likes FOREIGN KEY (who_likes) REFERENCES users(id) ON DELETE CASCADE,
-                    CONSTRAINT fk_likes_who_got_liked FOREIGN KEY (who_got_liked) REFERENCES users(id) ON DELETE CASCADE,
-                    CONSTRAINT uk_likes UNIQUE (who_likes, who_got_liked)
-                )
-                """);
+                        CREATE TABLE IF NOT EXISTS likes (
+                            id UUID PRIMARY KEY,
+                            who_likes UUID NOT NULL,
+                            who_got_liked UUID NOT NULL,
+                            direction VARCHAR(10) NOT NULL,
+                            created_at TIMESTAMP NOT NULL,
+                            deleted_at TIMESTAMP,
+                            CONSTRAINT fk_likes_who_likes FOREIGN KEY (who_likes) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_likes_who_got_liked FOREIGN KEY (who_got_liked) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT uk_likes UNIQUE (who_likes, who_got_liked)
+                        )
+                        """);
     }
 
     static void createMatchesTable(Statement stmt) throws SQLException {
@@ -238,7 +244,8 @@ public final class SchemaInitializer {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Creates messaging-related tables (conversations, messages). Conversations and messages are
+     * Creates messaging-related tables (conversations, messages). Conversations and
+     * messages are
      * retained after match ends (soft delete model).
      */
     static void createMessagingSchema(Statement stmt) throws SQLException {
@@ -251,8 +258,10 @@ public final class SchemaInitializer {
                     last_message_at TIMESTAMP,
                     user_a_last_read_at TIMESTAMP,
                     user_b_last_read_at TIMESTAMP,
-                    archived_at TIMESTAMP,
-                    archive_reason VARCHAR(20),
+                    archived_at_a TIMESTAMP,
+                    archive_reason_a VARCHAR(20),
+                    archived_at_b TIMESTAMP,
+                    archive_reason_b VARCHAR(20),
                     visible_to_user_a BOOLEAN DEFAULT TRUE,
                     visible_to_user_b BOOLEAN DEFAULT TRUE,
                     deleted_at TIMESTAMP,

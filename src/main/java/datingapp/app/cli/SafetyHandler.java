@@ -12,6 +12,7 @@ import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.storage.UserStorage;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -114,9 +115,14 @@ public class SafetyHandler implements LoggingSupport {
 
             String description =
                     normalizeReportDescription(inputReader.readLine("Additional details (optional, max 500 chars): "));
+            String blockResponse = inputReader
+                    .readLine("Do you also want to block them? (y/n)> ")
+                    .trim()
+                    .toLowerCase(Locale.ROOT);
+            boolean blockUser = "y".equals(blockResponse) || "yes".equals(blockResponse);
 
             TrustSafetyService.ReportResult result =
-                    trustSafetyService.report(currentUser.getId(), toReport.getId(), reason, description);
+                    trustSafetyService.report(currentUser.getId(), toReport.getId(), reason, description, blockUser);
 
             handleReportResult(result, toReport);
         });

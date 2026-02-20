@@ -9,8 +9,9 @@ import datingapp.core.connection.*;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.model.Match;
+import datingapp.core.model.Match.MatchArchiveReason;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
@@ -214,31 +215,34 @@ class MessagingServiceTest {
             messagingService.sendMessage(userA, userB, "First");
             messagingService.sendMessage(userB, userA, "Second");
 
-            List<Message> messages = messagingService.getMessages(userA, userB, 10, 0);
+            var result = messagingService.getMessages(userA, userB, 10, 0);
 
+            assertTrue(result.success());
+            List<Message> messages = result.messages();
             assertEquals(2, messages.size());
             assertEquals("First", messages.get(0).content());
             assertEquals("Second", messages.get(1).content());
         }
 
         @Test
-        @DisplayName("should return empty list for no conversation")
-        void returnEmptyForNoConversation() {
-            List<Message> messages = messagingService.getMessages(userA, userB, 10, 0);
-            assertTrue(messages.isEmpty());
+        @DisplayName("should return failure for no conversation")
+        void returnFailureForNoConversation() {
+            var result = messagingService.getMessages(userA, userB, 10, 0);
+            assertFalse(result.success());
+            assertEquals("Conversation not found or unauthorized", result.errorMessage());
         }
 
         @Test
-        @DisplayName("should return empty list for zero limit")
-        void returnsEmptyForZeroLimit() {
+        @DisplayName("should return failure for zero limit")
+        void returnsFailureForZeroLimit() {
             Match match = Match.create(userA, userB);
             matchStorage.save(match);
 
             messagingService.sendMessage(userA, userB, "Hello");
 
-            List<Message> msgs = messagingService.getMessages(userA, userB, 0, 0);
-            assertNotNull(msgs);
-            assertTrue(msgs.isEmpty(), "Zero limit should return empty list");
+            var result = messagingService.getMessages(userA, userB, 0, 0);
+            assertFalse(result.success());
+            assertEquals("Invalid limit", result.errorMessage());
         }
     }
 
@@ -453,7 +457,7 @@ class MessagingServiceTest {
             messagingStorage.updateConversationLastMessageAt(convoIdAB, now);
             messagingStorage.updateConversationLastMessageAt(convoIdAC, now.plusSeconds(1));
 
-            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA);
+            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA, 50, 0);
 
             assertEquals(2, previews.size());
             // C conversation should be first (more recent)
@@ -472,7 +476,7 @@ class MessagingServiceTest {
             messagingService.sendMessage(userB, userA, "2");
             messagingService.sendMessage(userB, userA, "3");
 
-            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA);
+            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA, 50, 0);
 
             assertEquals(1, previews.size());
             assertEquals(3, previews.get(0).unreadCount());
@@ -491,7 +495,7 @@ class MessagingServiceTest {
             messagingStorage.saveMessage(lastMessage);
             messagingStorage.updateConversationLastMessageAt(conversationId, later);
 
-            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA);
+            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA, 50, 0);
 
             assertEquals(1, previews.size());
             assertTrue(previews.get(0).lastMessage().isPresent());
@@ -501,7 +505,7 @@ class MessagingServiceTest {
         @Test
         @DisplayName("should return empty for user with no conversations")
         void returnEmptyForNoConversations() {
-            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA);
+            List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA, 50, 0);
 
             assertTrue(previews.isEmpty());
         }
@@ -544,6 +548,78 @@ class MessagingServiceTest {
         }
     }
 
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
+    @Nested
+    @DisplayName("unmatch")
+    class Unmatch {
+
+        @Test
+        @DisplayName("should transition match state to UNMATCHED")
+        void transitionsMatchToUnmatched() {
+            Match match = Match.create(userA, userB);
+            matchStorage.save(match);
+
+            ConnectionService.TransitionResult result = messagingService.unmatch(userA, userB);
+
+            assertTrue(result.success());
+            Match updated = matchStorage.get(Match.generateId(userA, userB)).orElseThrow();
+            assertEquals(Match.MatchState.UNMATCHED, updated.getState());
+        }
+
+        @Test
+        @DisplayName("should archive conversation for both sides when one exists")
+        void archivesExistingConversationForBothSides() {
+            Match match = Match.create(userA, userB);
+            matchStorage.save(match);
+            // Create conversation by sending a message
+            messagingService.sendMessage(userA, userB, "Hello!");
+
+            ConnectionService.TransitionResult result = messagingService.unmatch(userA, userB);
+
+            assertTrue(result.success());
+            Conversation convo = messagingStorage
+                    .getConversation(Conversation.generateId(userA, userB))
+                    .orElseThrow();
+            assertNotNull(convo.getUserAArchivedAt(), "UserA side should be archived");
+            assertNotNull(convo.getUserBArchivedAt(), "UserB side should be archived");
+            assertEquals(MatchArchiveReason.UNMATCH, convo.getUserAArchiveReason());
+            assertEquals(MatchArchiveReason.UNMATCH, convo.getUserBArchiveReason());
+        }
+
+        @Test
+        @DisplayName("should succeed even when no conversation exists yet")
+        void succeedsWithoutConversation() {
+            Match match = Match.create(userA, userB);
+            matchStorage.save(match);
+
+            ConnectionService.TransitionResult result = messagingService.unmatch(userA, userB);
+
+            assertTrue(result.success());
+        }
+
+        @Test
+        @DisplayName("should fail when no match exists between users")
+        void failsWhenNoMatch() {
+            ConnectionService.TransitionResult result = messagingService.unmatch(userA, userB);
+
+            assertFalse(result.success());
+            assertNotNull(result.errorMessage());
+        }
+
+        @Test
+        @DisplayName("should fail when match is already in a terminal state")
+        void failsForAlreadyTerminatedMatch() {
+            Match match = Match.create(userA, userB);
+            match.unmatch(userA);
+            matchStorage.save(match);
+
+            ConnectionService.TransitionResult result = messagingService.unmatch(userA, userB);
+
+            assertFalse(result.success());
+            assertNotNull(result.errorMessage());
+        }
+    }
+
     // ===== In-Memory Test Implementations =====
 
     static class InMemoryUserStorage implements UserStorage {
@@ -560,8 +636,8 @@ class MessagingServiceTest {
         }
 
         @Override
-        public User get(UUID id) {
-            return users.get(id);
+        public Optional<User> get(UUID id) {
+            return Optional.ofNullable(users.get(id));
         }
 
         @Override

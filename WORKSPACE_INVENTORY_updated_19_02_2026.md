@@ -1,0 +1,209 @@
+# Workspace Inventory
+Generated: 2026-02-19
+
+### 📊 Project Statistics
+- **Total Files**: ~290
+- **Lines of Code**: ~119,000 (Java: ~71k total / ~39k code, XML/Config: ~287 total)
+- **Primary Languages**: Java 25, JavaFX 25, SQL (H2)
+
+### 🏗 Architecture Overview
+- **`core/`**: pure Java domain layer. Contains entities, value objects (records), and service interfaces. Zero framework dependencies. VALID 🟢
+- **`storage/`**: Persistence layer. H2/JDBC implementations of core storage interfaces. VALID 🟢
+- **`app/`**: Presentation layer, including CLI and Javalin REST endpoints.
+- **`ui/`**: JavaFX desktop interface. Follows **MVVM** pattern (View -> Controller -> ViewModel -> Service). VALID 🟢
+
+### 📂 File List
+
+- **src/**
+  - **main/**
+    - **java/**
+      - **datingapp/**
+        - [Main.java](src/main\java\datingapp\Main.java) — Console-based dating app - Phase 0.5. Main entry point with interactive menu. VALID 🟢
+        - **app/**
+          - **api/**
+            - [RestApiServer.java](src/main\java\datingapp\app\api\RestApiServer.java) — Added after last inventory. [NEW]
+          - **bootstrap/**
+            - [ApplicationStartup.java](src/main\java\datingapp\app\bootstrap\ApplicationStartup.java) — Added after last inventory. [NEW]
+          - **cli/**
+            - [CliTextAndInput.java](src/main\java\datingapp\app\cli\CliTextAndInput.java) — Added after last inventory. [NEW]
+            - [MatchingHandler.java](src/main\java\datingapp\app\cli\MatchingHandler.java) — Handler for matching-related CLI operations. Manages swiping, match discovery, daily picks, and match quality display. VALID 🟢
+            - [MessagingHandler.java](src/main\java\datingapp\app\cli\MessagingHandler.java) — Handler for messaging functionality in the CLI. VALID 🟢
+            - [ProfileHandler.java](src/main\java\datingapp\app\cli\ProfileHandler.java) — Handler for profile-related CLI operations. Manages profile completion, preview, and dealbreaker settings. VALID 🟢
+            - [SafetyHandler.java](src/main\java\datingapp\app\cli\SafetyHandler.java) — Handles user blocking and reporting operations in the CLI. VALID 🟢
+            - [StatsHandler.java](src/main\java\datingapp\app\cli\StatsHandler.java) — Handles display of user statistics and achievements in the CLI. VALID 🟢
+        - **core/**
+          - [AppClock.java](src/main\java\datingapp\core\AppClock.java) — Added after last inventory. [NEW]
+          - [AppConfig.java](src/main\java\datingapp\core\AppConfig.java) — **Configuration Singleton**. Centralized, immutable application configuration. All configurable values should be defined here for easy modification. VALID 🟢
+          - [AppSession.java](src/main\java\datingapp\core\AppSession.java) — Added after last inventory. [NEW]
+          - [EnumSetUtil.java](src/main\java\datingapp\core\EnumSetUtil.java) — Added after last inventory. [NEW]
+          - [LoggingSupport.java](src/main\java\datingapp\core\LoggingSupport.java) — Added after last inventory. [NEW]
+          - [PerformanceMonitor.java](src/main\java\datingapp\core\PerformanceMonitor.java) — Added after last inventory. [NEW]
+          - [ServiceRegistry.java](src/main\java\datingapp\core\ServiceRegistry.java) — **Dependency Injection Container**. Central registry holding all storage and service instances. VALID 🟢
+          - [TextUtil.java](src/main\java\datingapp\core\TextUtil.java) — Added after last inventory. [NEW]
+          - **connection/**
+            - [ConnectionModels.java](src/main\java\datingapp\core\connection\ConnectionModels.java) — Added after last inventory. [NEW]
+            - [ConnectionService.java](src/main\java\datingapp\core\connection\ConnectionService.java) — Added after last inventory. [NEW]
+          - **matching/**
+            - [CandidateFinder.java](src/main\java\datingapp\core\matching\CandidateFinder.java) — Finds candidate users for matching based on preferences and filters. VALID 🟢
+            - [CompatibilityScoring.java](src/main\java\datingapp\core\matching\CompatibilityScoring.java) — Added after last inventory. [NEW]
+            - [LifestyleMatcher.java](src/main\java\datingapp\core\matching\LifestyleMatcher.java) — Added after last inventory. [NEW]
+            - [MatchQualityService.java](src/main\java\datingapp\core\matching\MatchQualityService.java) — Service for computing match quality/compatibility. VALID 🟢
+            - [MatchingService.java](src/main\java\datingapp\core\matching\MatchingService.java) — Business logic for processing likes and creating matches. VALID 🟢
+            - [RecommendationService.java](src/main\java\datingapp\core\matching\RecommendationService.java) — Added after last inventory. [NEW]
+            - [Standout.java](src/main\java\datingapp\core\matching\Standout.java) — Added after last inventory. [NEW]
+            - [TrustSafetyService.java](src/main\java\datingapp\core\matching\TrustSafetyService.java) — Consolidated safety and verification workflows. VALID 🟢
+            - [UndoService.java](src/main\java\datingapp\core\matching\UndoService.java) — Service for managing undo state and executing undo operations. VALID 🟢
+          - **metrics/**
+            - [ActivityMetricsService.java](src/main\java\datingapp\core\metrics\ActivityMetricsService.java) — Added after last inventory. [NEW]
+            - [EngagementDomain.java](src/main\java\datingapp\core\metrics\EngagementDomain.java) — Added after last inventory. [NEW]
+            - [SwipeState.java](src/main\java\datingapp\core\metrics\SwipeState.java) — Added after last inventory. [NEW]
+          - **model/**
+            - [Match.java](src/main\java\datingapp\core\model\Match.java) — Represents a match between two users who mutually liked each other. VALID 🟢
+            - [User.java](src/main\java\datingapp\core\model\User.java) — Represents a user in the dating app. Mutable entity - state can change over time. VALID 🟢
+          - **profile/**
+            - [MatchPreferences.java](src/main\java\datingapp\core\profile\MatchPreferences.java) — Added after last inventory. [NEW]
+            - [ProfileService.java](src/main\java\datingapp\core\profile\ProfileService.java) — Added after last inventory. [NEW]
+            - [ValidationService.java](src/main\java\datingapp\core\profile\ValidationService.java) — Added after last inventory. [NEW]
+          - **storage/**
+            - [AnalyticsStorage.java](src/main\java\datingapp\core\storage\AnalyticsStorage.java) — Added after last inventory. [NEW]
+            - [CommunicationStorage.java](src/main\java\datingapp\core\storage\CommunicationStorage.java) — Added after last inventory. [NEW]
+            - [InteractionStorage.java](src/main\java\datingapp\core\storage\InteractionStorage.java) — Added after last inventory. [NEW]
+            - [TrustSafetyStorage.java](src/main\java\datingapp\core\storage\TrustSafetyStorage.java) — Added after last inventory. [NEW]
+            - [UserStorage.java](src/main\java\datingapp\core\storage\UserStorage.java) — Storage interface for User entities. Defined in core, implemented in storage layer. VALID 🟢
+        - **storage/**
+          - [DatabaseManager.java](src/main\java\datingapp\storage\DatabaseManager.java) — Manages H2 database connections and schema initialization. VALID 🟢
+          - [StorageFactory.java](src/main\java\datingapp\storage\StorageFactory.java) — Added after last inventory. [NEW]
+          - **jdbi/**
+            - [JdbiConnectionStorage.java](src/main\java\datingapp\storage\jdbi\JdbiConnectionStorage.java) — Added after last inventory. [NEW]
+            - [JdbiMatchmakingStorage.java](src/main\java\datingapp\storage\jdbi\JdbiMatchmakingStorage.java) — Added after last inventory. [NEW]
+            - [JdbiMetricsStorage.java](src/main\java\datingapp\storage\jdbi\JdbiMetricsStorage.java) — Added after last inventory. [NEW]
+            - [JdbiTrustSafetyStorage.java](src/main\java\datingapp\storage\jdbi\JdbiTrustSafetyStorage.java) — Added after last inventory. [NEW]
+            - [JdbiTypeCodecs.java](src/main\java\datingapp\storage\jdbi\JdbiTypeCodecs.java) — Added after last inventory. [NEW]
+            - [JdbiUserStorage.java](src/main\java\datingapp\storage\jdbi\JdbiUserStorage.java) — Added after last inventory. [NEW]
+          - **schema/**
+            - [MigrationRunner.java](src/main\java\datingapp\storage\schema\MigrationRunner.java) — Added after last inventory. [NEW]
+            - [SchemaInitializer.java](src/main\java\datingapp\storage\schema\SchemaInitializer.java) — Added after last inventory. [NEW]
+        - **ui/**
+          - [DatingApp.java](src/main\java\datingapp\ui\DatingApp.java) — Main JavaFX Application entry point for the Dating App. VALID 🟢
+          - [ImageCache.java](src/main\java\datingapp\ui\ImageCache.java) — Thread-safe LRU-style image cache for avatars and profile photos. VALID 🟢
+          - [NavigationService.java](src/main\java\datingapp\ui\NavigationService.java) — Singleton service handling navigation between different screens in the application. VALID 🟢
+          - [UiAnimations.java](src/main\java\datingapp\ui\UiAnimations.java) — Utility class for common UI animations and effects. VALID 🟢
+          - [UiComponents.java](src/main\java\datingapp\ui\UiComponents.java) — Added after last inventory. [NEW]
+          - [UiConstants.java](src/main\java\datingapp\ui\UiConstants.java) — Added after last inventory. [NEW]
+          - [UiFeedbackService.java](src/main\java\datingapp\ui\UiFeedbackService.java) — Added after last inventory. [NEW]
+          - **screen/**
+            - [BaseController.java](src/main\java\datingapp\ui\screen\BaseController.java) — Provides: initialize, cleanup. VALID 🟢
+            - [ChatController.java](src/main\java\datingapp\ui\screen\ChatController.java) — Controller for the Chat screen (chat.fxml). Handles conversation display, message styling, and sending messages. VALID 🟢
+            - [DashboardController.java](src/main\java\datingapp\ui\screen\DashboardController.java) — Controller for the Dashboard screen (dashboard.fxml). VALID 🟢
+            - [LoginController.java](src/main\java\datingapp\ui\screen\LoginController.java) — Controller for the Login screen (login.fxml). Handles user selection, login, and account creation dialog. VALID 🟢
+            - [MatchesController.java](src/main\java\datingapp\ui\screen\MatchesController.java) — Controller for the Matches screen (matches.fxml). Displays all active matches for the current user with premium animations. VALID 🟢
+            - [MatchingController.java](src/main\java\datingapp\ui\screen\MatchingController.java) — Controller for the Matching screen (matching.fxml). VALID 🟢
+            - [MilestonePopupController.java](src/main\java\datingapp\ui\screen\MilestonePopupController.java) — Added after last inventory. [NEW]
+            - [PreferencesController.java](src/main\java\datingapp\ui\screen\PreferencesController.java) — Controller for the Preferences/Filter screen. Extends BaseController for automatic subscription cleanup. VALID 🟢
+            - [ProfileController.java](src/main\java\datingapp\ui\screen\ProfileController.java) — Controller for the Profile Editor screen (profile.fxml). VALID 🟢
+            - [StatsController.java](src/main\java\datingapp\ui\screen\StatsController.java) — Controller for the Stats screen (stats.fxml). Extends BaseController for automatic subscription cleanup. VALID 🟢
+          - **viewmodel/**
+            - [ChatViewModel.java](src/main\java\datingapp\ui\viewmodel\ChatViewModel.java) — ViewModel for the Messaging screen. Handles the conversation list and the active message thread. VALID 🟢
+            - [DashboardViewModel.java](src/main\java\datingapp\ui\viewmodel\DashboardViewModel.java) — ViewModel for the Dashboard screen. Aggregates information from various services to display on the main hub. VALID 🟢
+            - [LoginViewModel.java](src/main\java\datingapp\ui\viewmodel\LoginViewModel.java) — ViewModel for the Login screen. Handles user listing, selection, login, and account creation. VALID 🟢
+            - [MatchesViewModel.java](src/main\java\datingapp\ui\viewmodel\MatchesViewModel.java) — ViewModel for the Matches screen. Displays all active matches for the current user. VALID 🟢
+            - [MatchingViewModel.java](src/main\java\datingapp\ui\viewmodel\MatchingViewModel.java) — ViewModel for the Matching screen. Handles the logic for browsing candidates, liking/passing, undoing swipes, and detecting matches. VALID 🟢
+            - [PreferencesViewModel.java](src/main\java\datingapp\ui\viewmodel\PreferencesViewModel.java) — ViewModel for the Preferences screen. Handles loading and saving user discovery preferences. VALID 🟢
+            - [ProfileViewModel.java](src/main\java\datingapp\ui\viewmodel\ProfileViewModel.java) — ViewModel for the Profile Editor screen. Handles editing of user bio, location, and profile photo. VALID 🟢
+            - [StatsViewModel.java](src/main\java\datingapp\ui\viewmodel\StatsViewModel.java) — ViewModel for the Stats and Achievements screen. Displays user progress, match statistics, and earned achievements. VALID 🟢
+            - [UiDataAdapters.java](src/main\java\datingapp\ui\viewmodel\UiDataAdapters.java) — Added after last inventory. [NEW]
+            - [ViewModelErrorSink.java](src/main\java\datingapp\ui\viewmodel\ViewModelErrorSink.java) — Added after last inventory. [NEW]
+            - [ViewModelFactory.java](src/main\java\datingapp\ui\viewmodel\ViewModelFactory.java) — Factory for creating ViewModels and Controllers with proper dependency injection. VALID 🟢
+    - **resources/**
+      - **css/**
+        - [light-theme.css](src/main\resources\css\light-theme.css) — UI Theme Styles. VALID 🟢
+        - [theme.css](src/main\resources\css\theme.css) — UI Theme Styles. VALID 🟢
+      - **fxml/**
+        - [achievement_popup.fxml](src/main\resources\fxml\achievement_popup.fxml) — View controlled by AchievementPopupController. VALID 🟢
+        - [chat.fxml](src/main\resources\fxml\chat.fxml) — View controlled by ChatController. VALID 🟢
+        - [dashboard.fxml](src/main\resources\fxml\dashboard.fxml) — View controlled by DashboardController. VALID 🟢
+        - [login.fxml](src/main\resources\fxml\login.fxml) — View controlled by LoginController. VALID 🟢
+        - [match_popup.fxml](src/main\resources\fxml\match_popup.fxml) — View controlled by MatchPopupController. VALID 🟢
+        - [matches.fxml](src/main\resources\fxml\matches.fxml) — View controlled by MatchesController. VALID 🟢
+        - [matching.fxml](src/main\resources\fxml\matching.fxml) — View controlled by MatchingController. VALID 🟢
+        - [preferences.fxml](src/main\resources\fxml\preferences.fxml) — View controlled by PreferencesController. VALID 🟢
+        - [profile.fxml](src/main\resources\fxml\profile.fxml) — View controlled by ProfileController. VALID 🟢
+        - [stats.fxml](src/main\resources\fxml\stats.fxml) — View controlled by StatsController. VALID 🟢
+      - [logback.xml](src/main\resources\logback.xml) — Logging Configuration. VALID 🟢
+  - **test/**
+    - **java/**
+      - **datingapp/**
+        - **app/**
+          - [ConfigLoaderTest.java](src/test\java\datingapp\app\ConfigLoaderTest.java) — Added after last inventory. [NEW]
+          - **api/**
+            - [RestApiRoutesTest.java](src/test\java\datingapp\app\api\RestApiRoutesTest.java) — Added after last inventory. [NEW]
+          - **cli/**
+            - [EnumMenuTest.java](src/test\java\datingapp\app\cli\EnumMenuTest.java) — Added after last inventory. [NEW]
+            - [LikerBrowserHandlerTest.java](src/test\java\datingapp\app\cli\LikerBrowserHandlerTest.java) — Added after last inventory. [NEW]
+            - [MessagingHandlerTest.java](src/test\java\datingapp\app\cli\MessagingHandlerTest.java) — Added after last inventory. [NEW]
+            - [ProfileCreateSelectTest.java](src/test\java\datingapp\app\cli\ProfileCreateSelectTest.java) — Added after last inventory. [NEW]
+            - [ProfileNotesHandlerTest.java](src/test\java\datingapp\app\cli\ProfileNotesHandlerTest.java) — Added after last inventory. [NEW]
+            - [RelationshipHandlerTest.java](src/test\java\datingapp\app\cli\RelationshipHandlerTest.java) — Added after last inventory. [NEW]
+            - [SafetyHandlerTest.java](src/test\java\datingapp\app\cli\SafetyHandlerTest.java) — Added after last inventory. [NEW]
+            - [StatsHandlerTest.java](src/test\java\datingapp\app\cli\StatsHandlerTest.java) — Added after last inventory. [NEW]
+            - [UserSessionTest.java](src/test\java\datingapp\app\cli\UserSessionTest.java) — Unit tests for UserSession. Verifies login state management, active status checks, and user lifecycle states. VALID 🟢
+        - **core/**
+          - [AchievementServiceTest.java](src/test\java\datingapp\core\AchievementServiceTest.java) — Unit tests for gamification service. Verifies achievement unlocking logic (milestones, profile completeness, swipe behavior) and progress tracking. VALID 🟢
+          - [AppClockTest.java](src/test\java\datingapp\core\AppClockTest.java) — Added after last inventory. [NEW]
+          - [AppConfigTest.java](src/test\java\datingapp\core\AppConfigTest.java) — Unit tests for AppConfig. Verifies default values, builder pattern correctness, and record immutability. VALID 🟢
+          - [CandidateFinderTest.java](src/test\java\datingapp\core\CandidateFinderTest.java) — Unit tests for candidate discovery logic. Verifies self-exclusion, interaction history checks, and preference matching. VALID 🟢
+          - [CleanupServiceTest.java](src/test\java\datingapp\core\CleanupServiceTest.java) — Added after last inventory. [NEW]
+          - [CoreUtilitiesTest.java](src/test\java\datingapp\core\CoreUtilitiesTest.java) — Added after last inventory. [NEW]
+          - [DailyLimitServiceTest.java](src/test\java\datingapp\core\DailyLimitServiceTest.java) — Unit tests for daily interaction limits. Verifies like/pass quotas, 24h reset logic, and admin overrides. VALID 🟢
+          - [DailyPickServiceTest.java](src/test\java\datingapp\core\DailyPickServiceTest.java) — Unit tests for Daily Picks. Verifies deterministic selection per user/date, blocklist enforcement, and exclusion of previously liked users. VALID 🟢
+          - [DailyServiceTest.java](src/test\java\datingapp\core\DailyServiceTest.java) — Added after last inventory. [NEW]
+          - [DealbreakersEvaluatorTest.java](src/test\java\datingapp\core\DealbreakersEvaluatorTest.java) — Unit tests for hard filter evaluation. Verifies strict matching for smoking, drinking, kids, height, and age preferences. VALID 🟢
+          - [DealbreakersTest.java](src/test\java\datingapp\core\DealbreakersTest.java) — Unit tests for Dealbreakers validation and builder. Ensures constraints like min/max height and age difference are enforced. VALID 🟢
+          - [EdgeCaseRegressionTest.java](src/test\java\datingapp\core\EdgeCaseRegressionTest.java) — Added after last inventory. [NEW]
+          - [EnumSetUtilTest.java](src/test\java\datingapp\core\EnumSetUtilTest.java) — Added after last inventory. [NEW]
+          - [LikerBrowserServiceTest.java](src/test\java\datingapp\core\LikerBrowserServiceTest.java) — Unit tests for "Who Liked You" feature. Verifies filtering of blocked/matched users and sorting by recency. VALID 🟢
+          - [MatchQualityServiceTest.java](src/test\java\datingapp\core\MatchQualityServiceTest.java) — Unit tests for match compatibility scoring. Verifies partial scores (lifestyle, interests, distance), highlight generation, and progress bar rendering. VALID 🟢
+          - [MatchQualityTest.java](src/test\java\datingapp\core\MatchQualityTest.java) — Unit tests for MatchQuality score container. Verifies validation logic and star rating conversion. VALID 🟢
+          - [MatchStateTest.java](src/test\java\datingapp\core\MatchStateTest.java) — Unit tests for match lifecycle transitions. Verifies state changes (ACTIVE -> UNMATCHED/BLOCKED) and archival reasons. VALID 🟢
+          - [MatchTest.java](src/test\java\datingapp\core\MatchTest.java) — Unit tests for Match entity. Ensures deterministic ID generation and participant validation. VALID 🟢
+          - [MatchingServiceTest.java](src/test\java\datingapp\core\MatchingServiceTest.java) — Unit tests for match creation logic. Verifies mutual like detection, duplicate like prevention, and atomicity. VALID 🟢
+          - [MessagingDomainTest.java](src/test\java\datingapp\core\MessagingDomainTest.java) — Added after last inventory. [NEW]
+          - [MessagingServiceTest.java](src/test\java\datingapp\core\MessagingServiceTest.java) — Unit tests for messaging workflows. Verifies message delivery, conversation creation, unread counts, and enforcement of match/block rules. VALID 🟢
+          - [NestedTypeVisibilityTest.java](src/test\java\datingapp\core\NestedTypeVisibilityTest.java) — Added after last inventory. [NEW]
+          - [PaceCompatibilityTest.java](src/test\java\datingapp\core\PaceCompatibilityTest.java) — Added after last inventory. [NEW]
+          - [PerformanceMonitorTest.java](src/test\java\datingapp\core\PerformanceMonitorTest.java) — Added after last inventory. [NEW]
+          - [ProfileCompletionServiceTest.java](src/test\java\datingapp\core\ProfileCompletionServiceTest.java) — Unit tests for profile scoring logic. Verifies gamification tiers (Starter->Diamond) and actionable completion tips. VALID 🟢
+          - [ProfileNoteTest.java](src/test\java\datingapp\core\ProfileNoteTest.java) — Unit tests for ProfileNote entity. Verifies private note creation restrictions and content limits. VALID 🟢
+          - [RelationshipTransitionServiceTest.java](src/test\java\datingapp\core\RelationshipTransitionServiceTest.java) — Unit tests for relationship state changes. Verifies "Friend Zone" requests and "Graceful Exit" logic. VALID 🟢
+          - [ServiceRegistryTest.java](src/test\java\datingapp\core\ServiceRegistryTest.java) — Added after last inventory. [NEW]
+          - [SessionServiceTest.java](src/test\java\datingapp\core\SessionServiceTest.java) — Unit tests for swipe session management. Verifies session creation/timeout logic, swipe limit enforcement, and session history/aggregation. VALID 🟢
+          - [SoftDeletableTest.java](src/test\java\datingapp\core\SoftDeletableTest.java) — Added after last inventory. [NEW]
+          - [StandoutsServiceTest.java](src/test\java\datingapp\core\StandoutsServiceTest.java) — Added after last inventory. [NEW]
+          - [StatsMetricsTest.java](src/test\java\datingapp\core\StatsMetricsTest.java) — Added after last inventory. [NEW]
+          - [StatsServiceTest.java](src/test\java\datingapp\core\StatsServiceTest.java) — Added after last inventory. [NEW]
+          - [SwipeSessionTest.java](src/test\java\datingapp\core\SwipeSessionTest.java) — Unit tests for SwipeSession state machine. Verifies swipe recording, match ratio calculations, and session timeouts. VALID 🟢
+          - [TextUtilTest.java](src/test\java\datingapp\core\TextUtilTest.java) — Added after last inventory. [NEW]
+          - [TrustSafetyServiceTest.java](src/test\java\datingapp\core\TrustSafetyServiceTest.java) — Added after last inventory. [NEW]
+          - [UndoServiceTest.java](src/test\java\datingapp\core\UndoServiceTest.java) — Added after last inventory. [NEW]
+          - [UserInteractionsTest.java](src/test\java\datingapp\core\UserInteractionsTest.java) — Added after last inventory. [NEW]
+          - [UserTest.java](src/test\java\datingapp\core\UserTest.java) — Unit tests for User entity. Verifies state transitions (INCOMPLETE->ACTIVE->BANNED), age calculation, and input constraints. VALID 🟢
+          - [ValidationServiceTest.java](src/test\java\datingapp\core\ValidationServiceTest.java) — Added after last inventory. [NEW]
+          - **testutil/**
+            - [TestClock.java](src/test\java\datingapp\core\testutil\TestClock.java) — Added after last inventory. [NEW]
+            - [TestStorages.java](src/test\java\datingapp\core\testutil\TestStorages.java) — Added after last inventory. [NEW]
+            - [TestUserFactory.java](src/test\java\datingapp\core\testutil\TestUserFactory.java) — Added after last inventory. [NEW]
+        - **storage/**
+          - [DatabaseManagerThreadSafetyTest.java](src/test\java\datingapp\storage\DatabaseManagerThreadSafetyTest.java) — Added after last inventory. [NEW]
+          - **jdbi/**
+            - [SqlRowReadersTest.java](src/test\java\datingapp\storage\jdbi\SqlRowReadersTest.java) — Added after last inventory. [NEW]
+          - **schema/**
+            - [SchemaInitializerTest.java](src/test\java\datingapp\storage\schema\SchemaInitializerTest.java) — Added after last inventory. [NEW]
+        - **ui/**
+          - [JavaFxCssValidationTest.java](src/test\java\datingapp\ui\JavaFxCssValidationTest.java) — Added after last inventory. [NEW]
+          - [NavigationServiceContextTest.java](src/test\java\datingapp\ui\NavigationServiceContextTest.java) — Added after last inventory. [NEW]
+          - **viewmodel/**
+            - [MatchesViewModelTest.java](src/test\java\datingapp\ui\viewmodel\MatchesViewModelTest.java) — Added after last inventory. [NEW]
+    - **resources/**
+      - [logback-test-verbose.xml](src/test\resources\logback-test-verbose.xml) — Added after last inventory. [NEW]
+      - [logback-test.xml](src/test\resources\logback-test.xml) — Added after last inventory. [NEW]
+      - [logging-test.properties](src/test\resources\logging-test.properties) — Added after last inventory. [NEW]

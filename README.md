@@ -21,7 +21,8 @@ A modern dating application built with **Clean Architecture** principles, featur
 - **User Profiles** — Complete profile management with state machine (Incomplete → Active ↔ Paused → Banned)
 - **Smart Matching** — Bidirectional preference filtering with distance, age, and dealbreaker support
 - **Match System** — Deterministic match IDs, match quality scoring, and relationship transitions
-- **Messaging** — Real-time chat between matched users with read receipts
+- **Messaging** — Real-time chat between matched users with read receipts and archival support
+- **Connection Models** — Unified handling of Messages, Likes, Blocks, Reports, and Friend Requests
 - **Statistics & Achievements** — Track activity metrics and unlock achievements
 - **Undo Actions** — Reverse accidental swipes within a configurable window
 - **Daily Picks** — Seeded-random daily recommendations
@@ -31,22 +32,22 @@ A modern dating application built with **Clean Architecture** principles, featur
 | Category            | Technology                 | Version                       |
 |---------------------|----------------------------|-------------------------------|
 | **Language**        | Java                       | 25 (preview features enabled) |
-| **UI Framework**    | JavaFX                     | 25.0.1                        |
+| **UI Framework**    | JavaFX                     | 25.0.2                        |
 | **UI Theme**        | AtlantaFX (Primer-based)   | 2.1.0                         |
 | **Icons**           | Ikonli (Material Design 2) | 12.4.0                        |
 | **Database Access** | JDBI 3 (Declarative SQL)   | 3.51.0                        |
 | **Database**        | H2 (embedded)              | 2.4.240                       |
 | **JSON**            | Jackson                    | 2.21.0                        |
 | **Testing**         | JUnit 5                    | 5.14.2                        |
-| **Logging**         | SLF4J + Logback            | 2.0.17 / 1.5.25               |
-| **Build**           | Maven                      | 3.8+                          |
+| **Logging**         | SLF4J + Logback            | 2.0.17 / 1.5.28               |
+| **Build**           | Maven                      | 3.9+                          |
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
 - **Java 25** (JDK with preview features support)
-- **Maven 3.8+**
+- **Maven 3.9+**
 - **Windows 11**: Enable UTF-8 encoding (see [Windows Setup](#-windows-setup))
 
 ### Running the Application
@@ -71,9 +72,9 @@ Run the full test suite:
 mvn clean test
 ```
 
-**820 tests** covering core domain, services, and storage layers.
+**800+ tests** covering core domain, services, and storage layers.
 
-## � Code Quality
+## 🛡 Code Quality
 
 | Tool           | Purpose                                | Enforcement          |
 |----------------|----------------------------------------|----------------------|
@@ -97,9 +98,10 @@ mvn verify
 ```
 datingapp/
 ├── core/           # Pure domain models & business logic (no framework deps)
+│   ├── connection/ # ConnectionModels (Message, Like, Block, etc.)
 │   └── storage/    # Storage interfaces (dependency inversion)
 ├── storage/        # JDBI-based persistence (H2 database)
-│   └── jdbi/       # SQLObject interfaces
+│   └── jdbi/       # SQLObject implementations
 ├── ui/             # JavaFX GUI (MVVM pattern)
 │   ├── controller/ # FXML controllers
 │   └── viewmodel/  # UI state management
@@ -107,9 +109,10 @@ datingapp/
 ```
 
 **Key Principles:**
-- **Core stays pure** — Only `java.*` imports in domain layer
-- **Manual DI** — `ServiceRegistry` pattern (no Spring/framework annotations)
-- **Fail-fast validation** — Constructor validation with `Objects.requireNonNull`
+- **Core stays pure** — Only `java.*` imports in domain layer.
+- **Manual DI** — `ServiceRegistry` pattern (no Spring/framework annotations).
+- **Fail-fast validation** — Constructor validation with `Objects.requireNonNull`.
+- **Phase 2.1 Architecture** — Consolidated domain models and streamlined storage interfaces.
 
 ## 💾 Database
 
@@ -134,10 +137,10 @@ Embedded H2 database stored at `./data/dating.mv.db`
 
 | Metric            | Value                            |
 |-------------------|----------------------------------|
-| **Java Files**    | 182 (126 main + 56 test)         |
-| **Lines of Code** | ~46K total (~34K code)           |
-| **Test Cases**    | 820                              |
-| **Core Services** | 17 (+ CandidateFinder utility)   |
+| **Java Files**    | ~139 (Main + Test)               |
+| **Lines of Code** | ~45K total (~34K code)           |
+| **Test Cases**    | ~802                             |
+| **Core Services** | 9 (+ CandidateFinder utility)    |
 | **GUI Views**     | 10 FXML screens                  |
 | **CLI Handlers**  | 8 command handlers               |
 
@@ -165,4 +168,5 @@ chcp 65001
 example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples regen|src/ui/*
 1|2026-01-30 20:45:00|agent:antigravity|docs|Complete README rewrite: updated title, tech stack, architecture, test count (99→576), formatting tool (Google→Palantir), added GUI docs, removed stale Recent Changes|README.md
 2|2026-02-08 11:15:00|agent:claude_code|docs|Fixed stale CLI commands (removed shade/fat JAR), updated stats (182 files, 820 tests, 8 handlers), Checkstyle+PMD now blocking|README.md
+3|2026-02-19 20:30:00|agent:gemini|docs|Updated README to reflect Java 25, Phase 2.1 architecture, and latest file counts|README.md
 ---AGENT-LOG-END---

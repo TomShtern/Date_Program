@@ -6,9 +6,9 @@ import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
 import datingapp.core.matching.RecommendationService.DailyPick;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle;
@@ -307,6 +307,25 @@ class DailyPickServiceTest {
         assertEquals(pickedId, secondPick.user().getId());
     }
 
+    @Test
+    void getDailyPick_enforcesMaxCacheSize() throws Exception {
+        User candidate = createActiveUser("TargetCandidate", 25);
+        userStorage.save(candidate);
+
+        for (int i = 0; i < 1005; i++) {
+            User seeker = createActiveUser("Seeker" + i, 25);
+            userStorage.save(seeker);
+            service.getDailyPick(seeker);
+        }
+
+        java.lang.reflect.Field cacheField = RecommendationService.class.getDeclaredField("cachedDailyPicks");
+        cacheField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, UUID> cache = (java.util.Map<String, UUID>) cacheField.get(service);
+
+        assertTrue(cache.size() <= 1000, "Cache size should not exceed 1000, but was " + cache.size());
+    }
+
     // Helper methods
 
     private User createActiveUser(String name, int age) {
@@ -345,8 +364,8 @@ class DailyPickServiceTest {
         }
 
         @Override
-        public User get(UUID id) {
-            return users.stream().filter(u -> u.getId().equals(id)).findFirst().orElse(null);
+        public Optional<User> get(UUID id) {
+            return users.stream().filter(u -> u.getId().equals(id)).findFirst();
         }
 
         @Override

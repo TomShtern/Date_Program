@@ -90,6 +90,15 @@ public class ActivityMetricsService {
         }
     }
 
+    public void recordActivity(UUID userId) {
+        Object lock = lockStripes[Math.floorMod(userId.hashCode(), LOCK_STRIPE_COUNT)];
+        synchronized (lock) {
+            Session session = getOrCreateSession(userId);
+            session.recordActivity();
+            analyticsStorage.saveSession(session);
+        }
+    }
+
     public void recordMatch(UUID userId) {
         Optional<Session> active = analyticsStorage.getActiveSession(userId);
         if (active.isPresent()) {
@@ -135,7 +144,8 @@ public class ActivityMetricsService {
         Instant cutoffDate = AppClock.now().minus(config.cleanupRetentionDays(), ChronoUnit.DAYS);
         int dailyPicksDeleted = analyticsStorage.deleteExpiredDailyPickViews(cutoffDate);
         int sessionsDeleted = analyticsStorage.deleteExpiredSessions(cutoffDate);
-        return new CleanupResult(dailyPicksDeleted, sessionsDeleted);
+        int standoutsDeleted = analyticsStorage.deleteExpiredStandouts(cutoffDate);
+        return new CleanupResult(dailyPicksDeleted, sessionsDeleted, standoutsDeleted);
     }
 
     public UserStats computeAndSaveStats(UUID userId) {
@@ -237,9 +247,9 @@ public class ActivityMetricsService {
         return analyticsStorage.getLatestPlatformStats();
     }
 
-    public static record CleanupResult(int dailyPicksDeleted, int sessionsDeleted) {
+    public static record CleanupResult(int dailyPicksDeleted, int sessionsDeleted, int standoutsDeleted) {
         public int totalDeleted() {
-            return dailyPicksDeleted + sessionsDeleted;
+            return dailyPicksDeleted + sessionsDeleted + standoutsDeleted;
         }
 
         public boolean hadWork() {
@@ -248,8 +258,9 @@ public class ActivityMetricsService {
 
         @Override
         public String toString() {
-            return "CleanupResult[dailyPicks=" + dailyPicksDeleted
-                    + ", sessions=" + sessionsDeleted
+            return "CleanupResult[dailyPicksDeleted=" + dailyPicksDeleted
+                    + ", sessionsDeleted=" + sessionsDeleted
+                    + ", standoutsDeleted=" + standoutsDeleted
                     + ", total=" + totalDeleted() + "]";
         }
     }

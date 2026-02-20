@@ -5,948 +5,880 @@
 # 1) pick SEQ = highestSEQ+1 (recheck before write),
 # 2) locate affected doc fragment using prioritized search (see below),
 # 3) archive replaced text with <!--ARCHIVE:SEQ:agent:scope-->...<!--/ARCHIVE-->,
-# 4) apply minimal precise edits (edit only nearest matching fragment),
-# 5) append one ChangeStamp line to the file-end changelog and inside the edited fragment (immediately after the edited paragraph or code fence),
+# 4) apply minimal precise edits (edit only minimal precise edits),
+# 5) append one ChangeStamp line to the file-end changelog and inside the edited fragment,
 # 6) if uncertain to auto-edit, append TODO+ChangeStamp next to nearest heading.
 <!--/AGENT-DOCSYNC-->
 
+# Dating App - Qwen Code Context
 
+**Phase:** 2.1 | **Java 25** (preview) | **Maven** | **H2 + JDBI 3** | **JavaFX 25** | **Javalin REST**
 
-# Dating App CLI - Project Context
+> **Purpose:** This document provides essential context for generating compatible code. Read this first before any implementation task.
 
-## Overview
-This is a command-line based dating application built with Java 21, Maven, and H2 embedded database. The project follows a clean architecture with strict separation between business logic and persistence layers. It has evolved from basic matching to include sophisticated features like messaging, relationship transitions, pace compatibility matching, gamification, profile verification, standout recommendations, and comprehensive safety features.
+---
 
-The application has both CLI and UI interfaces, with the UI layer built using JavaFX. The architecture emphasizes clean separation of concerns with core business logic completely isolated from database and framework dependencies.
+## Quick Reference
 
-## Key Features
-- **User Management**: Complete user lifecycle with profile creation, verification, and state management
-- **Advanced Matching**: Multi-factor compatibility scoring with configurable weights
-- **Messaging System**: Full-featured conversation management between matches
-- **Relationship Transitions**: Friend zone requests and graceful exit options
-- **Gamification**: Achievement system with 11 different milestones
-- **Safety & Trust**: Reporting, blocking, and verification systems
-- **Profile Enhancement**: Notes, standouts, and profile completion scoring
-- **Configurable Parameters**: Extensive configuration options for all aspects of the app
-- **Data Retention**: Soft-delete support with configurable cleanup policies
-- **Performance Monitoring**: Built-in performance monitoring capabilities
+| Aspect | Value |
+|--------|-------|
+| **Entry Points** | `Main.java` (CLI), `DatingApp.java` (JavaFX), `RestApiServer.java` (REST on port 7070) |
+| **Bootstrap** | `ApplicationStartup.initialize()` → `StorageFactory.buildH2()` |
+| **Session** | `AppSession` singleton (current user) |
+| **Database** | H2 at `./data/dating.mv.db`, user: `sa`, password: `dev` or `DATING_APP_DB_PASSWORD` |
+| **Config** | `./config/app-config.json` + env vars (`DATING_APP_*`) |
+| **Run CLI** | `mvn exec:java` |
+| **Run JavaFX** | `mvn javafx:run` |
+| **Run Tests** | `mvn test` |
+| **Format** | `mvn spotless:apply` (REQUIRED before commit) |
+| **Full Build** | `mvn clean verify package` |
+| **Java Version** | Java 25 with `--enable-preview` and `--enable-native-access=ALL-UNNAMED` |
 
-## Project Structure
+---
+
+## Architecture Overview
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  PRESENTATION: CLI (app/cli/) │ JavaFX MVVM (ui/) │ REST    │
+├──────────────────────────────────────────────────────────────┤
+│  DOMAIN (core/): Models + Services + Storage Interfaces      │
+│  → ZERO framework/database imports (pure java.* only)        │
+├──────────────────────────────────────────────────────────────┤
+│  INFRASTRUCTURE (storage/): JDBI implementations + Schema    │
+├──────────────────────────────────────────────────────────────┤
+│  PLATFORM: H2 embedded + HikariCP + JVM                      │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Package Structure:**
 ```
 datingapp/
-├── app/           Application layer (CLI handlers, UI controllers)
-│   └── cli/       Console UI handlers
-├── core/          Pure Java business logic (NO framework/database imports)
-│   ├── storage/   Storage interfaces (defined in core, implemented in storage/)
-│   └── Messaging.java  Messaging domain models (Message, Conversation)
-│   └── Preferences.java  User preferences (Interests, Lifestyle choices)
-│   └── Social.java       Social domain models (FriendRequest, Notification)
-├── storage/       H2 database implementations
-│   ├── jdbi/      JDBI adapter implementations
-│   ├── mapper/    Custom type mappers for JDBI
-│   └── DatabaseManager.java  Database connection and schema management
-└── ui/            JavaFX UI layer (controllers, viewmodels, views)
-└── Main.java      Application entry point
+├── Main.java                    CLI entry point (20-option menu)
+├── app/
+│   ├── bootstrap/ApplicationStartup.java  Centralized init + config loading
+│   ├── api/RestApiServer.java             Javalin REST API (port 7070)
+│   └── cli/                   CLI handlers (Dependencies record pattern)
+│       ├── MatchingHandler.java           Swiping, matches, daily picks, standouts
+│       ├── ProfileHandler.java            Profile completion, dealbreakers, notes
+│       ├── MessagingHandler.java          Conversations, messages
+│       ├── SafetyHandler.java             Block, report, verify
+│       └── StatsHandler.java              Statistics, achievements
+├── core/                      DOMAIN LAYER (pure Java, no framework imports)
+│   ├── AppConfig.java         57-parameter config record + Builder
+│   ├── AppClock.java          Testable clock (TestClock in tests)
+│   ├── AppSession.java        Singleton: current logged-in user
+│   ├── ServiceRegistry.java   Holds all services + storage interfaces
+│   ├── EnumSetUtil.java       Null-safe EnumSet utilities
+│   ├── LoggingSupport.java    Default logging methods
+│   ├── PerformanceMonitor.java Timing + metrics
+│   │
+│   ├── model/                 Primary domain entities
+│   │   ├── User.java          Mutable, state machine, nested enums (Gender, UserState, VerificationMethod, ProfileNote)
+│   │   └── Match.java         Mutable, deterministic ID (userA_userB), state machine (MatchState, MatchArchiveReason)
+│   │
+│   ├── connection/            Messaging & social domain
+│   │   ├── ConnectionModels.java  7 nested types: Message, Conversation, Like, Block, Report, FriendRequest, Notification
+│   │   └── ConnectionService.java   Send messages, relationship transitions
+│   │
+│   ├── matching/              Discovery & matching
+│   │   ├── CandidateFinder.java     7-stage filter pipeline + GeoUtils (Haversine)
+│   │   ├── MatchingService.java     Like/pass/unmatch/block, PendingLiker browser
+│   │   ├── MatchQualityService.java 6-factor scoring + InterestMatcher utility
+│   │   ├── RecommendationService.java Daily limits, daily picks, standouts
+│   │   ├── UndoService.java         Time-windowed undo (default 30s)
+│   │   ├── LifestyleMatcher.java    Lifestyle compatibility
+│   │   ├── CompatibilityScoring.java Score calculation utilities
+│   │   └── Standout.java            Standout candidate data + Storage interface
+│   │
+│   ├── profile/               Profile management
+│   │   ├── ProfileService.java      Completion scoring, achievements, behavior analysis
+│   │   ├── ValidationService.java   Field validation against AppConfig
+│   │   └── MatchPreferences.java    Dealbreakers + PacePreferences + Interest enum (37 values)
+│   │
+│   ├── metrics/               Analytics & engagement
+│   │   ├── ActivityMetricsService.java Session lifecycle, stats aggregation (256 lock stripes)
+│   │   ├── EngagementDomain.java       UserStats, PlatformStats, Achievement enum (11 values)
+│   │   └── SwipeState.java             Session + Undo.Storage records
+│   │
+│   └── storage/               Storage INTERFACES (5 consolidated)
+│       ├── UserStorage.java           User + ProfileNote
+│       ├── InteractionStorage.java    Like + Match + atomic undo
+│       ├── CommunicationStorage.java  Conversation + Message + FriendRequest + Notification
+│       ├── AnalyticsStorage.java      Stats + Achievements + Sessions + DailyPicks
+│       └── TrustSafetyStorage.java    Block + Report
+│
+├── storage/                   INFRASTRUCTURE LAYER
+│   ├── DatabaseManager.java   H2 + HikariCP singleton
+│   ├── StorageFactory.java    Wires JDBI impls → services → ServiceRegistry
+│   ├── schema/
+│   │   ├── SchemaInitializer.java  DDL (14 tables + indexes + FK)
+│   │   └── MigrationRunner.java    Schema evolution
+│   └── jdbi/                  JDBI implementations
+│       ├── JdbiUserStorage.java           → UserStorage
+│       ├── JdbiMatchmakingStorage.java    → InteractionStorage + Undo.Storage
+│       ├── JdbiConnectionStorage.java     → CommunicationStorage
+│       ├── JdbiMetricsStorage.java        → AnalyticsStorage + Standout.Storage
+│       ├── JdbiTrustSafetyStorage.java    → TrustSafetyStorage
+│       └── JdbiTypeCodecs.java            EnumSet codec, SqlRowReaders
+│
+└── ui/                        JAVAFX LAYER (MVVM)
+    ├── DatingApp.java         JavaFX Application entry point
+    ├── NavigationService.java Singleton: scene transitions (8 views + history)
+    ├── UiConstants.java       Window sizes, timing
+    ├── UiComponents.java      Reusable UI factories
+    ├── UiFeedbackService.java Toast notifications
+    ├── UiAnimations.java      Fade, slide transitions
+    ├── ImageCache.java        Lazy image caching
+    ├── screen/                FXML Controllers (extend BaseController)
+    │   ├── BaseController.java        Overlay mgmt, lifecycle hooks
+    │   ├── LoginController.java
+    │   ├── DashboardController.java
+    │   ├── ProfileController.java
+    │   ├── MatchingController.java
+    │   ├── MatchesController.java
+    │   ├── ChatController.java
+    │   ├── StatsController.java
+    │   ├── PreferencesController.java
+    │   └── MilestonePopupController.java
+    └── viewmodel/
+        ├── ViewModelFactory.java  Lazy ViewModel creation, AppSession binding
+        ├── screen/                8 ViewModels (one per screen)
+        ├── UiDataAdapters.java    UiUserStore + UiMatchDataAccess interfaces
+        └── ViewModelErrorSink.java Error callback functional interface
 ```
 
-## Architecture Principles
-1. **Core Purity**: The `core/` package has ZERO framework or database imports
-2. **Interface Definition**: Storage interfaces defined in `core/`, implemented in `storage/`
-3. **Dependency Injection**: Constructor injection ONLY
-4. **Immutability**: Use records for immutable data
-5. **State Machines**: Mutable entities have explicit state transitions
-6. **MVC Pattern**: UI layer follows Model-View-Controller pattern with ViewModels
-7. **Consolidated Storage**: Using JDBI for database access with SQL Object pattern
-8. **Centralized Configuration**: All configurable values in `AppConfig` record
-9. **Service Registry**: Single point of access for all services via `ServiceRegistry`
-10. **Single Responsibility**: Each class has a single, well-defined responsibility
-11. **Defensive Copying**: Collections are defensively copied when returned from getters
-12. **Fail-Fast Validation**: Constructor parameters are validated immediately
-13. **Soft-Delete Support**: All entities support soft-delete with configurable retention
-14. **Performance Monitoring**: Built-in performance monitoring for critical operations
-15. **External Configuration**: Configurable via JSON files and environment variables
+---
 
-## Key Features (Phase 4)
+## Domain Models
 
-### Core Domain Models
-- `User` - Mutable entity with state machine: `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`. Includes interests set (max 10), verification status, profile completeness metrics, pace preferences, soft-delete support. Contains nested enums: `Gender`, `UserState`, `VerificationMethod`
-- `Like` - Immutable record with `LIKE` or `PASS` direction and timestamp
-- `Match` - Mutable entity with state machine: `ACTIVE → FRIENDS | UNMATCHED | GRACEFUL_EXIT | BLOCKED`. Deterministic ID generated from sorted UUIDs (lexicographically smaller UUID first) using `Match.generateId(userA, userB)`. Contains nested enums: `State`, `ArchiveReason`
-- `Block` - Immutable record for bidirectional blocking
-- `Report` - Immutable record with reason enum (SPAM, HARASSMENT, FAKE_PROFILE, etc.)
-- `SwipeSession` - Mutable entity tracking continuous swiping activity
-- `MatchQuality` - Immutable record containing compatibility score (0-100), star rating (1-5), highlights
-- `Dealbreakers` - Immutable record defining user's filtering preferences
-- `Interest` - Enum of 37 predefined interests across 6 categories (OUTDOORS, ARTS & CULTURE, FOOD & DRINK, SPORTS & FITNESS, GAMES & TECH, SOCIAL). Contains nested `Category` enum.
-- `Achievement` - Enum of 11 gamification achievements across 4 categories (Matching Milestones, Behavior, Profile Excellence, Safety & Community). Contains nested `Category` enum.
-- `UserAchievement` - Immutable record linking users to unlocked achievements
-- `ProfileNote` - Immutable record for private notes about other users (max 500 chars)
-- `Messaging.Message` - Immutable record with max 1000 chars, timestamp, sender reference
-- `Messaging.Conversation` - Mutable entity with deterministic ID (userA_userB where UUIDs are sorted lexicographically), per-user read timestamps, archiving support
-- `Social.FriendRequest` - Immutable record for Friend Zone requests with status tracking
-- `Social.Notification` - Immutable record for user notifications with type and metadata
-- `PacePreferences` - Immutable record tracking messaging frequency, time to first date, communication style, and depth preference. Contains nested enums: `MessagingFrequency`, `TimeToFirstDate`, `CommunicationStyle`, `DepthPreference`
-- `Standout` - Immutable record for standout recommendations with scoring algorithm
-- `Lifestyle` - Container class with nested enums: `Smoking`, `Drinking`, `WantsKids`, `LookingFor`, `Education`
+### User (Mutable Entity)
+**State Machine:** `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`
 
-### Core Services
-- `CandidateFinder` - Multi-stage filter pipeline following 7-stage Stream pattern:
-  1. `filter(!self)` - Exclude current user
-  2. `filter(active)` - Only ACTIVE users
-  3. `filter(noPriorInteraction)` - No previous like/pass
-  4. `filter(mutualGender)` - Mutual interest in gender
-  5. `filter(mutualAge)` - Within age preferences
-  6. `filter(distance)` - Within distance threshold
-  7. `filter(dealbreakers)` - Pass dealbreaker evaluation
-  Sorts results by distance.
-- `MatchingService` - Records likes, creates matches on mutual like, integrates with UndoService
-- `ReportService` - Files reports with auto-blocking and configurable auto-ban threshold
-- `UndoService` - Allows users to undo their last swipe within configurable time window (default 30s)
-- `DailyService` - Enforces daily quotas for likes (default 100/day) and passes (unlimited by default)
-- `MatchQualityService` - Calculates 5-factor compatibility scores (distance, age, interests, lifestyle, pace) with configurable weights
-- `DealbreakersEvaluator` - One-way filter evaluator applying lifestyle, physical, and age dealbreakers
-- `SessionService` - Manages swipe session lifecycle with timeout detection, velocity tracking
-- `ProfilePreviewService` - Generates profile completeness scores with actionable improvement tips
-- `StatsService` - Aggregates user and platform-wide statistics
-- `InterestMatcher` - Stateless utility comparing interest sets between users
-- `AchievementService` - Gamification system tracking 11 achievements
-- `DailyPickService` - Selects one serendipitous "Daily Pick" per user per day using deterministic seeding
-- `LikerBrowserService` - Browse users who have liked you
-- `ProfileCompletionService` - Comprehensive profile quality scoring
-- `VerificationService` - Profile verification workflow management
-- `MessagingService` - Full-featured messaging system with authorization checks
-- `RelationshipTransitionService` - Manages relationship lifecycle transitions: Friend Zone requests and Graceful Exit
-- `StandoutsService` - Generates standout recommendations based on compatibility and activity
-- `CleanupService` - Handles soft-delete cleanup and data retention policies
-- `TrustSafetyService` - Consolidated trust and safety operations
+**Key Fields:**
+- Identity: `id` (UUID), `name`, `bio`, `birthDate`, `gender`, `interestedIn` (Set<Gender>)
+- Location: `lat`, `lon`, `hasLocationSet`, `maxDistanceKm`
+- Preferences: `minAge`, `maxAge`, `photoUrls` (max 2), `interests` (max 10)
+- Lifestyle: `smoking`, `drinking`, `wantsKids`, `lookingFor`, `education`, `heightCm`
+- Dealbreakers: `Dealbreakers` record
+- Pace: `PacePreferences` record (messaging frequency, time to first date, communication style, depth)
+- Verification: `email`, `phone`, `isVerified`, `verificationMethod`, `verificationCode`, `verifiedAt`
+- Timestamps: `createdAt`, `updatedAt`, `deletedAt`
 
-### Storage Interfaces (defined in `core/`, implemented in `storage/`)
-- `UserStorage`, `LikeStorage`, `MatchStorage`, `BlockStorage`, `ReportStorage`
-- `SwipeSessionStorage` - Session CRUD with timeout queries and aggregate statistics
-- `StatsStorage` - Consolidated metrics persistence (user and platform stats)
-- `MessagingStorage` - Consolidated messaging persistence (conversations and messages)
-- `SocialStorage` - Consolidated social features persistence (friend requests and notifications)
+**Nested Types:**
+- `Gender`: MALE, FEMALE, OTHER
+- `UserState`: INCOMPLETE, ACTIVE, PAUSED, BANNED
+- `VerificationMethod`: EMAIL, PHONE
+- `ProfileNote`: Private notes about other users (max 500 chars)
+- `StorageBuilder`: Bypasses validation for DB reconstitution
 
-### CLI Layer
-- `Main` - Orchestrator with menu loop and dependency wiring (in `datingapp/` package)
-- `HandlerFactory` - Factory for creating CLI handlers with proper dependency injection
-- `ProfileHandler` - Profile completion, dealbreakers configuration, profile preview
-- `MatchingHandler` - Candidate browsing, daily pick display, match viewing, standout recommendations
-- `SafetyHandler` - Blocking and reporting
-- `StatsHandler` - Statistics and achievement display
-- `ProfileNotesHandler` - Private note-taking for profiles
-- `LikerBrowserHandler` - Browse incoming likes
-- `MessagingHandler` - Conversation list, message view, send/receive UI
-- `RelationshipHandler` - Friend Zone requests, notifications, and relationship transitions UI
-- `InputReader` - I/O abstraction over Scanner
-- `CliSupport` - UI string constants and formatting utilities
-- `AppBootstrap` - Centralized application initialization for both CLI and JavaFX
-- `ConfigLoader` - Configuration loading from JSON files and environment variables
+**Key Methods:**
+- `activate()` - Requires `isComplete()`
+- `pause()` - From ACTIVE only
+- `ban()` - One-way, irreversible
+- `isComplete()` - Checks all required fields + pace preferences
 
-### UI Layer (JavaFX)
-- `DatingApp` - JavaFX Application entry point
-- `NavigationService` - Routing and navigation between views
-- `UISession` - Session management for UI state
-- `ViewFactory` - Factory for creating view instances
-- `ViewModelFactory` - Factory for creating view model instances
-- `controller/` - JavaFX controller classes (e.g., `MatchingController`)
-- `viewmodel/` - ViewModel classes for managing UI state
-- FXML files for UI layout
-- CSS files for styling (theme.css)
-- MVVM Pattern: Uses Model-View-ViewModel architecture for clean separation of concerns
+### Match (Mutable Entity)
+**State Machine:** `ACTIVE → FRIENDS | UNMATCHED | GRACEFUL_EXIT | BLOCKED`
 
-### API Layer
-- `RestApiServer` - REST API server implementation with endpoints for all major functionality
-- `Endpoints` - HTTP endpoint definitions following REST conventions
+**Deterministic ID:** `userA_userB` (lexicographically sorted UUIDs)
 
-## Interests System
-The application includes 37 predefined interests across 6 categories:
+**Key Fields:**
+- `id` (String), `userA`, `userB`, `createdAt`
+- `state` (MatchState), `endedAt`, `endedBy`, `endReason` (MatchArchiveReason)
+- `deletedAt` (soft-delete)
 
-- **OUTDOORS** (6): Hiking, Camping, Fishing, Cycling, Running, Climbing
-- **ARTS & CULTURE** (8): Movies, Music, Concerts, Art Galleries, Theater, Photography, Reading, Writing
-- **FOOD & DRINK** (6): Cooking, Baking, Wine, Craft Beer, Coffee, Foodie
-- **SPORTS & FITNESS** (7): Gym, Yoga, Basketball, Soccer, Tennis, Swimming, Golf
-- **GAMES & TECH** (5): Video Games, Board Games, Coding, Tech, Podcasts
-- **SOCIAL** (7): Travel, Dancing, Volunteering, Pets, Dogs, Cats, Nightlife
+**Nested Types:**
+- `MatchState`: ACTIVE, FRIENDS, UNMATCHED, GRACEFUL_EXIT, BLOCKED
+- `MatchArchiveReason`: FRIEND_ZONE, GRACEFUL_EXIT, UNMATCH, BLOCK
 
-**Constraints:**
-- `MAX_PER_USER = 10` - Maximum interests per profile
-- `MIN_FOR_COMPLETE = 3` - Minimum interests for profile completeness
+**Key Methods:**
+- `canMessage()` - Returns true if ACTIVE or FRIENDS
+- `involves(UUID)` - Checks if user is part of match
+- `getOtherUser(UUID)` - Gets the other user in match
+- State transitions: `unmatch()`, `block()`, `transitionToFriends()`, `gracefulExit()`
 
-**Matching Algorithm:**
-- Uses **Overlap Ratio**: `shared / min(userA.size, userB.size)`
-- Rewards scenarios where smaller interest set is fully satisfied
-- Also calculates Jaccard Index for reference: `shared / union`
-- Highlights shared interests in match quality display
+### ConnectionModels (7 Nested Types)
 
-## Achievement System
-The application includes 11 gamification achievements across 4 categories:
+| Type | Kind | Key Fields |
+|------|------|------------|
+| `Message` | record | `id`, `conversationId`, `senderId`, `content` (max 1000), `createdAt` |
+| `Conversation` | class | Deterministic ID, `userA`, `userB`, `lastMessageAt`, per-user read timestamps, archive state, visibility flags |
+| `Like` | record | `id`, `whoLikes`, `whoGotLiked`, `direction` (LIKE/PASS), `createdAt` |
+| `Block` | record | `id`, `blockerId`, `blockedId`, `createdAt` |
+| `Report` | record | `id`, `reporterId`, `reportedUserId`, `reason` (enum), `description`, `createdAt` |
+| `FriendRequest` | record | `id`, `fromUserId`, `toUserId`, `status` (PENDING/ACCEPTED/DECLINED/EXPIRED), `createdAt`, `respondedAt` |
+| `Notification` | record | `id`, `userId`, `type` (enum), `title`, `message`, `createdAt`, `isRead`, `data` (Map) |
 
-**Matching Milestones** (5):
-- `FIRST_SPARK` - Get 1 match
-- `SOCIAL_BUTTERFLY` - Get 5 matches
-- `POPULAR` - Get 10 matches
-- `SUPERSTAR` - Get 25 matches
-- `LEGEND` - Get 50 matches
+### MatchPreferences (Profile Configuration)
 
-**Behavior** (2):
-- `SELECTIVE` - Maintain <20% like ratio
-- `OPEN_MINDED` - Maintain >60% like ratio
+**Interest Enum (37 values across 6 categories):**
+- OUTDOORS (6): Hiking, Camping, Fishing, Cycling, Running, Climbing
+- ARTS (8): Movies, Music, Concerts, Art Galleries, Theater, Photography, Reading, Writing
+- FOOD (6): Cooking, Baking, Wine, Craft Beer, Coffee, Foodie
+- SPORTS (7): Gym, Yoga, Basketball, Soccer, Tennis, Swimming, Golf
+- TECH (5): Video Games, Board Games, Coding, Tech, Podcasts
+- SOCIAL (7): Travel, Dancing, Volunteering, Pets, Dogs, Cats, Nightlife
 
-**Profile Excellence** (3):
-- `COMPLETE_PACKAGE` - Achieve 100% profile completeness
-- `STORYTELLER` - Write a bio with 100+ characters
-- `LIFESTYLE_GURU` - Complete all lifestyle fields
+**Lifestyle Enums:**
+- `Smoking`: NEVER, SOMETIMES, REGULARLY
+- `Drinking`: NEVER, SOCIALLY, REGULARLY
+- `WantsKids`: NO, OPEN, SOMEDAY, HAS_KIDS
+- `LookingFor`: CASUAL, SHORT_TERM, LONG_TERM, MARRIAGE, UNSURE
+- `Education`: HIGH_SCHOOL, SOME_COLLEGE, BACHELORS, MASTERS, PHD, TRADE_SCHOOL, OTHER
 
-**Safety & Community** (1):
-- `GUARDIAN` - Report a fake profile
+**PacePreferences Record:**
+- `MessagingFrequency`: RARELY, OFTEN, CONSTANTLY, WILDCARD
+- `TimeToFirstDate`: QUICKLY, FEW_DAYS, WEEKS, MONTHS, WILDCARD
+- `CommunicationStyle`: TEXT_ONLY, VOICE_NOTES, VIDEO_CALLS, IN_PERSON_ONLY, MIX_OF_EVERYTHING
+- `DepthPreference`: SMALL_TALK, DEEP_CHAT, EXISTENTIAL, DEPENDS_ON_VIBE
 
-## Service Registry & Dependency Injection
-The application uses a Service Registry pattern for dependency management:
+**Dealbreakers Record:**
+- Lifestyle: `acceptableSmoking`, `acceptableDrinking`, `acceptableKidsStance`, `acceptableLookingFor`, `acceptableEducation`
+- Physical: `minHeightCm`, `maxHeightCm`
+- Age: `maxAgeDifference`
 
-- `ServiceRegistry` - Central container holding all services and storage implementations
-- `StorageFactory` - Factory for wiring H2 implementations and service initialization (replaces deprecated ServiceRegistryBuilder)
-- All services are injected via constructors following pure dependency injection
-- The registry is built once in `Main.java` and dependencies are passed to handlers
+### SwipeState (Session + Undo)
 
-## GeoUtils & Location-Based Matching
-The application uses Haversine distance calculation for location-based matching:
+**Session Record:**
+- `id`, `userId`, `startedAt`, `lastActivityAt`, `endedAt`
+- `state` (ACTIVE/COMPLETED)
+- `swipeCount`, `likeCount`, `passCount`, `matchCount`
 
-- `GeoUtils` - Utility class with static methods for distance calculation
-- **Haversine Formula**: Calculates great-circle distances between two points on Earth
-- Distance is calculated in kilometers between user coordinates (lat/lon)
-- Used in `CandidateFinder` to filter candidates within user's `maxDistanceKm`
-- Distance factor contributes 15% to match quality score (configurable)
+**Undo Record:**
+- `userId`, `like` (Like record), `matchId`, `expiresAt`
+- `Storage` interface for persistence
 
-## Match Quality Configuration
-The match quality system calculates compatibility across 6 factors with configurable weights:
+### EngagementDomain (Achievements + Stats)
 
-- **Distance Score** (15% default): Linear decay from max distance
-- **Age Score** (10% default): Normalized against mutual age preferences
-- **Interest Score** (25% default): Overlap ratio via `InterestMatcher.compare()`
-  - Uses `shared / min(setA, setB)` metric rewarding smaller set completeness
-  - Returns 0.5 if neither has interests, 0.3 if only one has interests
-- **Lifestyle Score** (25% default): Smoking, drinking, kids, relationship goals
-- **Pace Score** (15% default): Compatibility based on messaging frequency, time to first date, communication style, and depth preferences
-- **Response Time Score** (10% default): Mutual like speed in tiers from <1hr to >1mo
+**Achievement Enum (11 values across 4 categories):**
+- Matching Milestones (5): FIRST_SPARK (1), SOCIAL_BUTTERFLY (5), POPULAR (10), SUPERSTAR (25), LEGEND (50)
+- Behavior (2): SELECTIVE (<20% like ratio), OPEN_MINDED (>60% like ratio)
+- Profile Excellence (3): COMPLETE_PACKAGE (100%), STORYTELLER (100+ bio chars), LIFESTYLE_GURU (all lifestyle fields)
+- Safety (1): GUARDIAN (report fake profile)
 
-## Dealbreakers Configuration
-The dealbreakers system allows users to set filtering preferences across multiple dimensions:
+**UserStats:** Aggregated metrics (likes given/received, match rate, reciprocity, selectiveness, attractiveness)
+**PlatformStats:** Global aggregates for normalization
 
-- **Lifestyle Dealbreakers**: Smoking, drinking, children, relationship goals
-- **Physical Dealbreakers**: Height range requirements
-- **Age Dealbreakers**: Age range preferences beyond basic min/max
-- Applied as 7th filter stage in `CandidateFinder`
-- If any dealbreaker is violated, candidate is excluded from results
-- Missing lifestyle data on candidate profile causes automatic rejection
+---
 
-## User State Machine
-The User entity has a well-defined state machine with explicit transitions:
+## Services (9 Domain Services)
 
-```
-INCOMPLETE → ACTIVE ↔ PAUSED → BANNED
-```
+| Service | Responsibility | Key Dependencies |
+|---------|---------------|------------------|
+| `CandidateFinder` | 7-stage filter pipeline | UserStorage, InteractionStorage, TrustSafetyStorage |
+| `MatchingService` | Like/pass/unmatch/block, PendingLiker browser | InteractionStorage, TrustSafetyStorage, UserStorage + 3 optional |
+| `MatchQualityService` | 6-factor compatibility scoring + InterestMatcher | UserStorage, InteractionStorage, AppConfig |
+| `RecommendationService` | Daily limits, daily picks, standouts | UserStorage, InteractionStorage, TrustSafetyStorage, AnalyticsStorage, CandidateFinder, ProfileService, AppConfig |
+| `UndoService` | Time-windowed undo (default 30s) | InteractionStorage, Undo.Storage, AppConfig |
+| `ProfileService` | Completion scoring, achievements, behavior | AppConfig, AnalyticsStorage, InteractionStorage, TrustSafetyStorage, UserStorage |
+| `ValidationService` | Field validation against AppConfig bounds | AppConfig |
+| `ConnectionService` | Messaging, relationship transitions | CommunicationStorage, InteractionStorage, UserStorage |
+| `ActivityMetricsService` | Session tracking, stats aggregation (256 lock stripes) | InteractionStorage, TrustSafetyStorage, AnalyticsStorage, AppConfig |
+| `TrustSafetyService` | Block/report, auto-ban at threshold | TrustSafetyStorage, InteractionStorage, UserStorage, AppConfig |
 
-**State Transitions:**
-- `activate()`: INCOMPLETE/PAUSED → ACTIVE (requires `isComplete()`)
-- `pause()`: ACTIVE → PAUSED
-- `ban()`: ANY → BANNED (one-way, irreversible)
-- Profile completion is required before activation
+### CandidateFinder Pipeline (7 Stages)
+1. `filter(!self)` - Exclude current user
+2. `filter(active)` - Only ACTIVE users
+3. `filter(noPriorInteraction)` - No previous like/pass
+4. `filter(mutualGender)` - Mutual interest in gender
+5. `filter(mutualAge)` - Within age preferences (both ways)
+6. `filter(distance)` - Within maxDistanceKm (Haversine)
+7. `filter(dealbreakers)` - Pass Dealbreakers.Evaluator
 
-## Database Management
-The application uses H2 embedded database with proper connection management:
+Results sorted by distance ascending.
 
-- `DatabaseManager` - Singleton managing H2 connections and schema initialization
-- Connection pooling handled internally by H2
-- Schema initialized automatically on first access
-- Data persists to `./data/dating.mv.db`
-- Proper cleanup via `shutdown()` method
+### MatchQualityService Scoring (6 Factors)
 
+| Factor | Weight | Calculation |
+|--------|--------|-------------|
+| Distance | 15% | Linear decay from maxDistanceKm |
+| Age | 10% | Inverse of age difference |
+| Interests | 25% | Overlap ratio: `shared / min(setA, setB)` |
+| Lifestyle | 25% | Smoking, drinking, kids, relationship goals match |
+| Pace | 15% | 4-dimension compatibility (messaging, time to date, communication, depth) |
+| Response Time | 10% | Time between mutual likes (tiers: <1h, <24h, <72h, <1w, <1mo) |
 
-## Profile Completion Service
-The profile completion system evaluates 12+ tracked fields for quality scoring:
+**Thresholds:** 90+ = Excellent (5★), 75+ = Great (4★), 60+ = Good (3★), 40+ = Fair (2★), <40 = Low (1★)
 
-- **Required Fields**: Name, bio, birth date, gender, interested in, location
-- **Optional Enhancements**: Photos (up to 2), interests (up to 10), lifestyle details
-- **Scoring Algorithm**: Percentage of completed recommended fields
-- **Actionable Tips**: Provides specific improvement suggestions
-- **Tier System**: Emoji indicators based on completion percentage
+---
 
+## Storage Layer
 
-## Advanced Database Queries
-The application implements several optimized database patterns:
+### 5 Consolidated Interfaces
 
-- **Indexing Strategy**: Strategic indexes on frequently queried columns (user IDs, timestamps)
-- **Batch Operations**: Efficient bulk operations where appropriate
-- **Transaction Boundaries**: Though full ACID transactions aren't implemented for undo, proper isolation where needed
+| Interface | Entities | Methods |
+|-----------|----------|---------|
+| `UserStorage` | User, ProfileNote | ~11 methods |
+| `InteractionStorage` | Like, Match, atomic undo | ~25 methods + `saveLikeAndMaybeCreateMatch()`, `acceptFriendZoneTransition()`, `gracefulExitTransition()` |
+| `CommunicationStorage` | Conversation, Message, FriendRequest, Notification | ~25 methods |
+| `AnalyticsStorage` | UserStats, PlatformStats, Session, Achievement, DailyPick, ProfileView | ~25 methods |
+| `TrustSafetyStorage` | Block, Report | ~10 methods |
 
-## Performance Considerations
-The application addresses several performance aspects:
+### JDBI Implementation Pattern
 
-- **Memory Management**: Proper resource cleanup and garbage collection
-- **Lazy Loading**: Load data only when needed in UI
-- **Caching Strategies**: Potential for caching frequently accessed data
-- **Efficient Algorithms**: Optimized matching and filtering algorithms
-- **UI Responsiveness**: Background threads for long-running operations in UI
+```java
+public final class JdbiUserStorage implements UserStorage {
+    private final Jdbi jdbi;
+    private final Dao dao;  // @SqlObject interface
 
-## Security Considerations
-The application implements several security measures:
+    public JdbiUserStorage(Jdbi jdbi) {
+        this.jdbi = jdbi;
+        this.dao = jdbi.onDemand(Dao.class);
+    }
 
-- **Authentication Ready**: Architecture prepared for authentication layer (though not implemented)
-- **Data Privacy**: Personal information properly stored and accessed
-- **Access Control**: Proper service layer authorization checks
-- **Secure Defaults**: Safe default configurations
+    @Override
+    public void save(User user) {
+        dao.save(new UserSqlBindings(user));
+    }
 
+    @RegisterRowMapper(Mapper.class)
+    interface Dao {
+        @SqlUpdate("MERGE INTO users (...) KEY (id) VALUES (...)")
+        void save(@BindBean UserSqlBindings helper);
 
+        @SqlQuery("SELECT ... FROM users WHERE id = :id")
+        User get(@Bind("id") UUID id);
+    }
 
-## Build & Development Commands
-
-### Environment Setup (Windows 11)
-To ensure emojis and special characters display correctly in the terminal:
-```powershell
-chcp 65001
+    static class Mapper implements RowMapper<User> {
+        public User map(ResultSet rs, StatementContext ctx) {
+            return User.StorageBuilder.create(...)
+                .bio(rs.getString("bio"))
+                .build();
+        }
+    }
+}
 ```
 
-### Essential Commands
-```bash
-# Compile
-mvn compile
+**Key Utilities:**
+- `JdbiTypeCodecs.SqlRowReaders` - Null-safe readers (`readUuid`, `readInstant`, `readLocalDate`, `readEnum`)
+- `JdbiTypeCodecs.EnumSetSqlCodec` - CSV ↔ EnumSet conversion
+- `StorageBuilder` - Bypasses validation for DB reconstitution
 
-# Run CLI application
-mvn exec:java
+---
 
-# Run JavaFX UI application
-mvn javafx:run
+## AppConfig (57 Parameters)
 
-# Run tests
-mvn test
+**MatchingConfig:**
+- `dailyLikeLimit` (100), `dailySuperLikeLimit` (1), `dailyPassLimit` (-1=unlimited)
+- `maxSwipesPerSession` (500), `suspiciousSwipeVelocity` (30.0 swipes/min)
+- Weights: `distanceWeight` (0.15), `ageWeight` (0.10), `interestWeight` (0.25), `lifestyleWeight` (0.25), `paceWeight` (0.15), `responseWeight` (0.10)
+- `minSharedInterests` (3), `maxDistanceKm` (500)
 
-# Format code (REQUIRED before committing)
-mvn spotless:apply
+**ValidationConfig:**
+- `minAge` (18), `maxAge` (120), `minHeightCm` (50), `maxHeightCm` (300)
+- `maxBioLength` (500), `maxReportDescLength` (500), `maxNameLength` (100)
+- `minAgeRangeSpan` (5), `minDistanceKm` (1), `maxInterests` (10), `maxPhotos` (2), `messageMaxPageSize` (100)
 
-# Build fat JAR
-mvn package
+**AlgorithmConfig:**
+- Distance: `nearbyDistanceKm` (5), `closeDistanceKm` (10)
+- Age: `similarAgeDiff` (2), `compatibleAgeDiff` (5)
+- Pace: `paceCompatibilityThreshold` (50)
+- Response: `responseTimeExcellentHours` (1), `responseTimeGreatHours` (24), `responseTimeGoodHours` (72), `responseTimeWeekHours` (168), `responseTimeMonthHours` (720)
+- Standout weights (6): distance (0.20), age (0.15), interest (0.25), lifestyle (0.20), completeness (0.10), activity (0.10)
 
-# Full build with quality checks
-mvn clean verify package
-```
+**SafetyConfig:**
+- `autoBanThreshold` (3 reports)
+- `userTimeZone` (system default)
+- `sessionTimeoutMinutes` (5), `undoWindowSeconds` (30)
+- Achievement tiers: 1, 5, 10, 25, 50 matches
+- `selectiveThreshold` (0.20), `openMindedThreshold` (0.60)
+- `bioAchievementLength` (100), `lifestyleFieldTarget` (5)
+- `cleanupRetentionDays` (30), `softDeleteRetentionDays` (90)
 
-### Quality Tools
-- **Spotless**: Code formatting (Google Java Format) - BUILD FAILS if violated
-- **Checkstyle**: Code style validation (non-blocking)
-- **PMD**: Code quality analysis (non-blocking)
-- **JaCoCo**: Code coverage (target: 80%+)
-
-## Dependencies
-- **H2 Database**: 2.4.240 - Embedded database
-- **JDBI**: 3.51.0 - Declarative SQL framework (core and sqlobject)
-- **JUnit Jupiter**: 5.14.2 - Testing framework
-- **SLF4J API**: 2.0.17 - Logging facade
-- **Logback Classic**: 1.5.25 - Logging implementation
-- **Jackson**: Core and Databind (2.21.0) - JSON support
-- **JavaFX**: Controls, FXML, Graphics (25.0.1) - UI framework
-- **AtlantaFX**: 2.1.0 - Modern theme based on GitHub Primer
-- **Ikonli**: Core, JavaFX, MaterialDesign2 pack (12.4.0) - Professional SVG icon library
-
-## Configuration
-The application uses `AppConfig` with 60+ configurable parameters:
-
-### Matching & Discovery
-- `maxDistanceKm` (default: 500) - Maximum candidate search radius
-- `minAgeRange`, `maxAgeRange` (default: 18-120) - Global age boundaries
-
-### Daily Limits
-- `dailyLikeLimit` (default: 100) - Max likes per day (-1 = unlimited)
-- `dailySuperLikeLimit` (default: 1) - Max super likes per day
-- `dailyPassLimit` (default: -1) - Max passes per day (-1 = unlimited)
-- `userTimeZone` (default: system) - Timezone for midnight reset and daily pick rotation
-
-### Undo Feature
-- `undoWindowSeconds` (default: 30) - Time window to undo swipes
-
-### Session Management
-- `sessionTimeoutMinutes` (default: 5) - Inactivity timeout for sessions
-- `maxSwipesPerSession` (default: 500) - Hard limit per session (anti-bot)
-- `suspiciousSwipeVelocity` (default: 30.0) - Swipes/min warning threshold
-
-### Safety & Moderation
-- `autoBanThreshold` (default: 3) - Reports needed for auto-ban
-
-### Match Quality
-- `distanceWeight` (default: 0.15) - Weight for distance score
-- `ageWeight` (default: 0.10) - Weight for age score
-- `interestWeight` (default: 0.25) - Weight for interest score
-- `lifestyleWeight` (default: 0.25) - Weight for lifestyle score
-- `paceWeight` (default: 0.15) - Weight for pace score
-- `responseWeight` (default: 0.10) - Weight for response time score
-
-### Standout Scoring Weights
-- `standoutDistanceWeight` (default: 0.20) - Weight for distance in standouts
-- `standoutAgeWeight` (default: 0.15) - Weight for age in standouts
-- `standoutInterestWeight` (default: 0.25) - Weight for interests in standouts
-- `standoutLifestyleWeight` (default: 0.20) - Weight for lifestyle in standouts
-- `standoutCompletenessWeight` (default: 0.10) - Weight for profile completeness
-- `standoutActivityWeight` (default: 0.10) - Weight for activity recency
-
-### Algorithm Thresholds
-- `nearbyDistanceKm` (default: 5) - Distance considered "nearby"
-- `closeDistanceKm` (default: 10) - Distance considered "close"
-- `similarAgeDiff` (default: 2) - Age difference considered "similar"
-- `compatibleAgeDiff` (default: 5) - Age difference considered "compatible"
-- `minSharedInterests` (default: 3) - Min shared interests for "many"
-- `paceCompatibilityThreshold` (default: 50) - Min pace score for compatibility
-- `responseTimeExcellentHours` (default: 1) - Response time for "excellent"
-- `responseTimeGreatHours` (default: 24) - Response time for "great"
-- `responseTimeGoodHours` (default: 72) - Response time for "good"
-- `responseTimeWeekHours` (default: 168) - Response time threshold for "okay"
-- `responseTimeMonthHours` (default: 720) - Response time threshold for "low"
-
-### Achievement Thresholds
-- `achievementMatchTier1` (default: 1) - First match milestone
-- `achievementMatchTier2` (default: 5) - Second match milestone
-- `achievementMatchTier3` (default: 10) - Third match milestone
-- `achievementMatchTier4` (default: 25) - Fourth match milestone
-- `achievementMatchTier5` (default: 50) - Fifth match milestone
-- `minSwipesForBehaviorAchievement` (default: 50) - Min swipes to evaluate behavior
-- `selectiveThreshold` (default: 0.20) - Like ratio below which behavior is "selective"
-- `openMindedThreshold` (default: 0.60) - Like ratio above which behavior is "open-minded"
-- `bioAchievementLength` (default: 100) - Min bio length for detailed writer achievement
-- `lifestyleFieldTarget` (default: 5) - Lifestyle fields needed for guru achievement
-
-### Validation Bounds
-- `minAge` (default: 18) - Min legal age
-- `maxAge` (default: 120) - Max valid age
-- `minHeightCm` (default: 50) - Min valid height
-- `maxHeightCm` (default: 300) - Max valid height
-- `minDistanceKm` (default: 1) - Min search distance
-- `maxNameLength` (default: 100) - Max name length
-- `minAgeRangeSpan` (default: 5) - Min age range span
-- `maxInterests` (default: 10) - Max interests per user
-- `maxPhotos` (default: 2) - Max photos per user
-- `maxBioLength` (default: 500) - Max bio length
-- `maxReportDescLength` (default: 500) - Max report description length
-
-### Data Retention & Cleanup
-- `cleanupRetentionDays` (default: 30) - Days to retain expired data before cleanup
-- `softDeleteRetentionDays` (default: 90) - Days before purging soft-deleted rows
-- `messageMaxPageSize` (default: 100) - Max messages per page query
-
-### Additional Configuration Options
-Beyond the basic configuration, the application supports additional settings:
-
-- **UI Configuration**: Window sizes, themes, animations
-- **Performance Tuning**: Database connection pool settings, cache sizes
-- **Feature Flags**: Enable/disable specific features dynamically
-- **Localization**: Potential for multi-language support (though not currently implemented)
-- **External Configuration**: JSON files and environment variables support
-
+---
 
 ## Database Schema
-- Persistent data stored in `./data/dating.mv.db`
-- **Users table**: Stores user profiles with all attributes (location, preferences, interests, lifestyle, verification, pace preferences, etc.) with soft-delete support
-- **Likes table**: Records user interactions (likes/passes) with timestamps and soft-delete support
-- **Matches table**: Stores mutual likes with deterministic IDs and soft-delete support
-- **Blocks table**: Bidirectional blocking relationships with soft-delete support
-- **Reports table**: User reports with reasons and soft-delete support
-- **Conversations table**: Messaging conversations between matched users with soft-delete support
-- **Messages table**: Individual messages with foreign key to conversations and soft-delete support
-- **Swipe sessions table**: Session tracking with timestamps and counters
-- **User stats table**: User statistics snapshots
-- **Platform stats table**: Platform-wide statistics
-- **Daily pick views table**: Tracks which daily picks users have seen
-- **User achievements table**: Gamification tracking
-- **Friend requests table**: Friend zone request tracking
-- **Notifications table**: User notifications with read status
-- **Profile notes table**: Private notes about other users
-- **Profile views table**: Tracks profile viewing history
-- **Schema version table**: Tracks database schema version for migrations
-- **Foreign Key Constraints**: Added for referential integrity with cascade deletes
-- **Migration Support**: Automated schema migration system for backward compatibility
 
+**14 Tables** with soft-delete support (`deleted_at` column on all entity tables):
 
+| Table | Key Columns | Notes |
+|-------|-------------|-------|
+| `users` | 42 columns | Location, preferences, lifestyle, dealbreakers (`db_*`), verification, pace |
+| `likes` | `who_likes`, `who_got_liked`, `direction`, `created_at` | UNIQUE(who_likes, who_got_liked) |
+| `matches` | `id` (VARCHAR), `user_a`, `user_b`, `state`, `ended_at`, `end_reason` | Deterministic ID |
+| `conversations` | `id` (VARCHAR), `user_a`, `user_b`, `last_message_at`, read timestamps, visibility | Deterministic ID |
+| `messages` | `conversation_id`, `sender_id`, `content`, `created_at` | FK cascade |
+| `friend_requests` | `from_user_id`, `to_user_id`, `status`, `responded_at` | |
+| `notifications` | `user_id`, `type`, `title`, `message`, `is_read`, `data_json` | |
+| `blocks` | `blocker_id`, `blocked_id`, `created_at` | UNIQUE |
+| `reports` | `reporter_id`, `reported_user_id`, `reason`, `description` | UNIQUE |
+| `swipe_sessions` | `user_id`, `started_at`, `state`, swipe counts | |
+| `user_stats` | `user_id`, computed metrics | |
+| `user_achievements` | `user_id`, `achievement`, `unlocked_at` | UNIQUE |
+| `profile_notes` | `author_id`, `subject_id`, `content` | Composite PK |
+| `platform_stats` | Aggregates | Standalone |
+
+**Indexes:** ~30 indexes on user IDs, states, timestamps, composite queries.
+
+---
+
+## Bootstrap Flow
+
+```
+ApplicationStartup.initialize()
+    │
+    ├── load() → app-config.json + env vars (DATING_APP_*)
+    │
+    ├── DatabaseManager.getInstance()
+    │       └── HikariCP pool (max 10, min idle 2)
+    │       └── MigrationRunner.migrateV1() → SchemaInitializer
+    │
+    ├── StorageFactory.buildH2(dbManager, config)
+    │       ├── Jdbi instance + SqlObjectPlugin + type codecs
+    │       ├── 5 JDBI storage implementations
+    │       └── 9 services constructed in dependency order
+    │
+    └── ServiceRegistry (immutable, all fields requireNonNull)
+```
+
+**Thread Safety:** `synchronized` init, `volatile` fields, idempotent.
+
+---
+
+## UI Architecture (JavaFX MVVM)
+
+**NavigationService:**
+- 8 ViewTypes: LOGIN, DASHBOARD, PROFILE, MATCHING, MATCHES, CHAT, STATS, PREFERENCES
+- History stack (max 20), context passing, transition animations (FADE, SLIDE_LEFT, SLIDE_RIGHT)
+
+**ViewModelFactory:**
+- Lazy ViewModel creation (cached singletons)
+- `currentUserProperty()` bound to AppSession (Platform.runLater for thread safety)
+- `UiDataAdapters` wrap storage interfaces for UI consumption
+
+**ViewModels (8):**
+- `LoginViewModel` - User selection
+- `DashboardViewModel` - Overview, daily pick, notifications
+- `ProfileViewModel` - Profile editing, preview
+- `MatchingViewModel` - Swiping, candidate display
+- `MatchesViewModel` - Match list, quality display
+- `ChatViewModel` - Conversations, messaging
+- `StatsViewModel` - Statistics, achievements
+- `PreferencesViewModel` - Dealbreakers, settings
+
+**BaseController:**
+- Lifecycle: `initialize()` → wire ViewModel, `onLoad()` → fetch data, `onUnload()` → cleanup
+- Overlay management (loading, error toasts)
+
+---
+
+## CLI Architecture
+
+**Handler Pattern:** Each handler has `Dependencies` record for explicit DI.
+
+| Handler | Methods |
+|---------|---------|
+| `MatchingHandler` | `browseCandidates()`, `viewMatches()`, `browseWhoLikedMe()`, `viewNotifications()`, `viewPendingRequests()`, `viewStandouts()` |
+| `ProfileHandler` | `createUser()`, `selectUser()`, `completeProfile()`, `setDealbreakers()`, `previewProfile()`, `viewAllNotes()`, `viewProfileScore()` |
+| `MessagingHandler` | `showConversations()`, `getTotalUnreadCount()` |
+| `SafetyHandler` | `blockUser()`, `reportUser()`, `manageBlockedUsers()`, `verifyProfile()` |
+| `StatsHandler` | `viewStatistics()`, `viewAchievements()` |
+
+**CliTextAndInput:**
+- ~40 display constants
+- `InputReader` (Scanner wrapper)
+- `EnumMenu` (generic enum selection)
+- `requireLogin(Runnable)` guard
+
+---
 
 ## Testing Strategy
-- **Unit Tests**: Pure Java, no database (in `core/`)
-- **Integration Tests**: With H2 database (in `storage/`)
-- **In-Memory Mocks**: Create inline implementations in tests instead of Mockito (NO external mocking libraries)
-- **Test Coverage**: Minimum 80% line coverage (enforced by JaCoCo)
-- **Naming Convention**: `{ClassName}Test.java` with `@DisplayName` annotations
-- **Organization**: `@Nested` classes for logical grouping
-- **Setup**: `@BeforeEach` for test initialization
 
-## Coding Standards & Patterns
+**No Mockito** - All tests use `TestStorages.*` (in-memory HashMap/ArrayList implementations).
 
-### Philosophy
-- **Pure Core:** The `core/` package is a "POJO-only" zone. No JDBC, no Jackson, no JavaFX.
-- **Deterministic Logic:** Everything from Match IDs to Daily Picks must be reproducible (seeded randomness or sorted IDs).
-- **Safety First:** Use a "fail-fast" approach. Validate state and nulls in constructors, not during execution.
-- **Single Responsibility:** Each class has a single, well-defined responsibility.
-- **Defensive Programming:** Use defensive copying for collections and validate inputs.
-- **External Configuration:** Support configuration via JSON files and environment variables.
+**TestClock:** `AppClock.setTestClock(fixedInstant)` for deterministic time.
 
-### Naming Conventions
-**Classes:**
-- Domain models: Singular, clear entity names (`User`, `Match`, `Like`)
-- Services: Suffix with "Service" (`MatchingService`, `DailyPickService`)
-- Storage interfaces: Suffix with "Storage" (`UserStorage`, `LikeStorage`)
-- Storage implementations: Prefix with database type (`H2UserStorage`)
-- Handlers: Suffix with "Handler" (`ProfileHandler`, `MatchingHandler`)
-- Utilities: Descriptive names (`GeoUtils`, `InterestMatcher`)
-- Containers: For grouping related classes (`Messaging`, `Social`, `Preferences`, `Lifestyle`)
+**H2 In-Memory:** CLI handler tests use `jdbc:h2:mem:test_<UUID>`.
 
-**Methods:**
-- Factory methods: `create()`, `of()`, `fromDatabase()`, `builder()`
-- Getters/Setters: `getId()`, `getState()`, `getName()`, `setName()`
-- Predicates: `isComplete()`, `hasAnyDealbreaker()`, `canLike()`
-- State transitions: `activate()`, `pause()`, `ban()`, `unmatch()`
-- Bulk operations: `findAll()`, `findByUser()`, `deleteAll()`
+**Organization:**
+- `@Nested @DisplayName` for scenario grouping
+- `@Timeout(5)` or `@Timeout(10)` on all test classes
+- 820+ tests, 60%+ JaCoCo minimum (core/ only, UI/CLI excluded)
 
-**Variables:**
-- Specific entity references: `userId`, `matchId`, `likeId`
-- Ordered pairs: `userA`, `userB` (when ordering matters)
-- Directional clarity: `perspectiveUserId`, `otherUserId`
-- Collections: `alreadyInteracted`, `blockedUsers`, `sharedIntersects`
+**Test Files:** 58 test classes across `app/`, `core/`, `storage/`, `ui/`.
 
-### Storage Pattern
-- **JDBI Framework:** Using JDBI 3 with SQL Object pattern for database access
-- **SQL Patterns:**
-  - Schema initialization handled by `MigrationRunner.migrateV1()` and `SchemaInitializer.createAllTables()` using `IF NOT EXISTS`
-  - Use JDBI's SQL Object pattern for type-safe queries
-  - Wrap `SQLException` in custom `RuntimeException` (e.g., `StorageException`)
-- **Null Safety:** Use `Optional<T>` for all storage lookups and nullable service returns
-- **Soft Deletes:** Support soft-delete with configurable retention period
-- **Foreign Keys:** Use foreign key constraints with cascade deletes for referential integrity
+---
 
-### Configuration Pattern
-- **AppConfig Record:** Centralized configuration using a record with validation
-- **Builder Pattern:** Support for custom configuration via builder
-- **External Loading:** Load from JSON files and environment variables
-- **Validation:** Validate configuration values at startup
+## Key Design Patterns
 
-### Service Initialization Pattern
-- **StorageFactory:** Uses `StorageFactory.buildH2()` method to wire all services and storage implementations
-- **AppBootstrap:** Centralized application initialization for both CLI and JavaFX entry points
-- **AppSession:** Unified session management singleton for current user state across all interfaces
-
-### Logging
-- **Framework:** Use SLF4J
-- **Declaration:** `private static final Logger logger = LoggerFactory.getLogger(YourClass.class);`
-- **Placeholders:** Use `logger.info("User {} matched", id);` instead of string concatenation
-- **Levels:** Use appropriate log levels (info, warn, debug, error)
-
-### Code Organization Patterns
-**Service Structure:**
+### Result Pattern (No Exceptions in Services)
 ```java
-public class ServiceName {
-  // Immutable dependencies (final)
-  private final DependencyA dependencyA;
-  private final DependencyB dependencyB;
-
-  // Constructor with all dependencies
-  public ServiceName(DependencyA a, DependencyB b) {
-    this.dependencyA = Objects.requireNonNull(a);
-    this.dependencyB = Objects.requireNonNull(b);
-  }
-
-  // Public business logic methods
-  public ResultType publicMethod(InputType input) {
-    // Implementation
-  }
-
-  // Private helper methods
-  private ResultType privateHelper() {
-    // Implementation
-  }
+public static record SendResult(
+    boolean success, Message message, String errorMessage, ErrorCode errorCode
+) {
+    public static SendResult success(Message m) { ... }
+    public static SendResult failure(String err, ErrorCode code) { ... }
 }
 ```
 
-### Immutability Patterns
-**Records (for immutable data):**
+### Builder Pattern (Optional Dependencies)
 ```java
-public record Like(
-    UUID id, UUID whoLikes, UUID whoGotLiked,
-    Direction direction, Instant createdAt) {
-
-  // Compact constructor for validation
-  public Like {
-    Objects.requireNonNull(id, "id cannot be null");
-    if (whoLikes.equals(whoGotLiked)) {
-      throw new IllegalArgumentException("Cannot like yourself");
-    }
-  }
-
-  // Factory method
-  public static Like create(UUID whoLikes, UUID whoGotLiked, Direction direction) {
-    return new Like(UUID.randomUUID(), whoLikes, whoGotLiked, direction, Instant.now());
-  }
-}
+MatchingService service = MatchingService.builder()
+    .interactionStorage(storage)
+    .activityMetricsService(metrics)  // optional
+    .undoService(undo)                // optional
+    .dailyService(daily)              // optional
+    .build();
 ```
 
-**Mutable Classes (for entities with state):**
+### StorageBuilder (DB Reconstitution)
 ```java
-public class Match {
-  private final String id;      // Immutable
-  private final UUID userA;     // Immutable
-  private State state;          // Mutable with state machine
-
-  // State transition with validation
-  public void unmatch(UUID userId) {
-    if (this.state != State.ACTIVE) {
-      throw new IllegalStateException("Match is not active");
-    }
-    if (!involves(userId)) {
-      throw new IllegalArgumentException("User is not part of this match");
-    }
-    this.state = State.UNMATCHED;
-    this.endedAt = Instant.now();
-    this.endedBy = userId;
-  }
-}
+User user = User.StorageBuilder.create(id, name, createdAt)
+    .bio(rs.getString("bio"))
+    .gender(Gender.valueOf(rs.getString("gender")))
+    .build();
 ```
 
-### Error Handling
-**Validation in Constructors:**
+### Lock Striping (Concurrent Stats)
 ```java
-public record Block(UUID id, UUID blockerId, UUID blockedId, Instant createdAt) {
-  public Block {
-    Objects.requireNonNull(id, "id cannot be null");
-    Objects.requireNonNull(blockerId, "blockerId cannot be null");
-    Objects.requireNonNull(blockedId, "blockedId cannot be null");
-    if (blockerId.equals(blockedId)) {
-      throw new IllegalArgumentException("Cannot block yourself");
-    }
-  }
-}
+private static final int LOCK_STRIPE_COUNT = 256;
+private final Object[] lockStripes = new Object[LOCK_STRIPE_COUNT];
+// Usage: lockStripes[Math.floorMod(userId.hashCode(), LOCK_STRIPE_COUNT)]
 ```
 
-**Storage Exception Wrapping:**
-```java
-public void save(Like like) {
-  try (Connection conn = dbManager.getConnection();
-      PreparedStatement stmt = conn.prepareStatement(sql)) {
-    // SQL operations
-  } catch (SQLException e) {
-    throw new StorageException("Failed to save like: " + like.id(), e);
-  }
-}
-```
+---
 
-### Performance Optimization
-**Monitoring:** Built-in performance monitoring for critical operations
-**Efficiency:** Use efficient algorithms and minimize database queries
-**Caching:** Consider caching for frequently accessed data
-**Pagination:** Implement pagination for large datasets
+## Critical Rules
 
-## Templates
+### ❌ NEVER
+1. Import frameworks/databases in `core/`
+2. Skip constructor validation (`Objects.requireNonNull`)
+3. Throw exceptions in CLI layer (use result records)
+4. Use Mockito (use `TestStorages.*`)
+5. Forget `mvn spotless:apply` before commit
+6. Return direct collection references (use defensive copy)
+7. Skip state validation in transitions
+8. Hardcode config values (use `AppConfig`)
+9. Access `AppSession` directly without initialization
+10. Use deprecated `ServiceRegistryBuilder` (use `StorageFactory`)
 
-### New Service Implementation
-```java
-public class MyNewService {
-    private final UserStorage userStorage;
+### ✅ ALWAYS
+1. Run `mvn spotless:apply` before committing
+2. Validate all constructor parameters
+3. Use defensive copying for collections
+4. Add `@DisplayName` to test methods
+5. Update `updatedAt` on entity changes (touch pattern)
+6. Use `Optional` for nullable returns
+7. Group tests with `@Nested` classes
+8. Use factory methods (`create()`, `of()`, `fromDatabase()`)
+9. Check state before transitions
+10. Use JDBI SQL Object pattern
+11. Handle soft-delete consistently
+12. Initialize `AppSession` via `AppBootstrap`
 
-    public MyNewService(UserStorage userStorage) {
-        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
-    }
-}
-```
-
-### New Storage Method
-```java
-public Optional<User> get(UUID id) {
-    String sql = "SELECT * FROM users WHERE id = ?";
-    try (Connection conn = dbManager.getConnection();
-         PreparedStatement ps = conn.prepareStatement(sql)) {
-        ps.setObject(1, id);
-        try (ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) return Optional.of(mapRow(rs));
-        }
-    } catch (SQLException e) {
-        throw new StorageException("Lookup failed", e);
-    }
-    return Optional.empty();
-}
-```
+---
 
 ## Common Workflows
 
-### Adding a New Feature
-1. Plan: Create feature design doc in `docs/plans/phase-X-features/`
-2. Core Layer: Add domain models, services, storage interfaces
-3. Storage Layer: Implement H2*Storage classes
-4. CLI Layer: Add handler methods or new handler
-5. UI Layer: Add controller, viewmodel, and FXML if needed
-6. API Layer: Add REST endpoints if needed
-7. Wire Service: Register the new service in `StorageFactory` for proper dependency injection
-8. Tests: Write unit tests (core/) and integration tests (storage/)
-9. Format: Run `mvn spotless:apply`
-10. Verify: Run `mvn clean verify`
-11. Document: Update CLAUDE.md and architecture.md
+### Add New Service
+1. Add domain logic in `core/` (pure Java)
+2. Add storage interface in `core/storage/` (if needed)
+3. Implement in `storage/jdbi/` (JDBI pattern)
+4. Wire in `StorageFactory.buildH2()`
+5. Add to `ServiceRegistry`
+6. Add tests (unit + integration)
+7. `mvn spotless:apply && mvn verify`
 
-### Adding a New Domain Model
-**Immutable (Record):**
-```java
-package datingapp.core;
+### Add Config Parameter
+1. Add to appropriate sub-record in `AppConfig`
+2. Add validation in compact constructor
+3. Add default in `AppConfig.Builder`
+4. Add to `app-config.json`
+5. Add env var handling in `ApplicationStartup` (if needed)
+6. Use in service
 
-public record NewModel(UUID id, String field, Instant createdAt) {
-  public NewModel {
-    Objects.requireNonNull(id, "id cannot be null");
-    Objects.requireNonNull(field, "field cannot be null");
-    Objects.requireNonNull(createdAt, "createdAt cannot be null");
-  }
+### Add Nested Enum
+1. Define in appropriate domain class (e.g., `User.Gender`)
+2. Add `public static` for visibility
+3. Add to `JdbiTypeCodecs` if persisted
+4. Update `CLAUDE.md` / `QWEN.md` documentation
 
-  public static NewModel create(String field) {
-    return new NewModel(UUID.randomUUID(), field, Instant.now());
-  }
-}
-```
-
-**Mutable (Class with State):**
-```java
-package datingapp.core;
-
-public class NewEntity {
-  private final UUID id;
-  private final Instant createdAt;
-  private Instant updatedAt;
-  private String field;
-  private State state;
-
-  public enum State { PENDING, ACTIVE, INACTIVE }
-
-  private NewEntity(UUID id, Instant createdAt) {
-    this.id = id;
-    this.createdAt = createdAt;
-    this.updatedAt = createdAt;
-    this.state = State.PENDING;
-  }
-
-  public static NewEntity create(String field) {
-    NewEntity entity = new NewEntity(UUID.randomUUID(), Instant.now());
-    entity.field = field;
-    return entity;
-  }
-
-  public void setField(String field) {
-    this.field = Objects.requireNonNull(field);
-    touch();
-  }
-
-  public void activate() {
-    if (state != State.PENDING) {
-      throw new IllegalStateException("Cannot activate from state: " + state);
-    }
-    this.state = State.ACTIVE;
-    touch();
-  }
-
-  private void touch() {
-    this.updatedAt = Instant.now();
-  }
-
-  // Getters with defensive copying for collections
-}
-```
-
-### Adding a New Service
-```java
-package datingapp.core;
-
-public class NewService {
-  private final Dependency1 dep1;
-  private final Dependency2 dep2;
-
-  public NewService(Dependency1 dep1, Dependency2 dep2) {
-    this.dep1 = Objects.requireNonNull(dep1);
-    this.dep2 = Objects.requireNonNull(dep2);
-  }
-
-  public ResultType businessMethod(InputType input) {
-    // Implementation with validation
-    Objects.requireNonNull(input, "input cannot be null");
-
-    // Business logic
-
-    return result;
-  }
-}
-```
-
-### Adding a New Storage Interface
-```java
-package datingapp.core;
-
-public interface NewStorage {
-  void save(NewModel model);
-  Optional<NewModel> get(UUID id);
-  List<NewModel> findAll();
-}
-```
-
-### Implementing Storage
-```java
-package datingapp.storage;
-
-public class H2NewStorage implements NewStorage {
-  private final DatabaseManager dbManager;
-
-  public H2NewStorage(DatabaseManager dbManager) {
-    this.dbManager = Objects.requireNonNull(dbManager);
-  }
-
-  @Override
-  public void save(NewModel model) {
-    String sql = "MERGE INTO new_table (id, field, created_at) VALUES (?, ?, ?)";
-    try (Connection conn = dbManager.getConnection();
-         PreparedStatement stmt = conn.prepareStatement(sql)) {
-      stmt.setObject(1, model.id());
-      stmt.setString(2, model.field());
-      stmt.setTimestamp(3, Timestamp.from(model.createdAt()));
-      stmt.executeUpdate();
-    } catch (SQLException e) {
-      throw new StorageException("Failed to save NewModel: " + model.id(), e);
-    }
-  }
-
-  // Implement other methods
-}
-```
-
-### Adding Configuration Parameter
-1. Add parameter to `AppConfig` record with validation
-2. Update `AppConfig.defaults()` with default value
-3. Add to `AppConfig.Builder` with setter method
-4. Update JSON configuration loading in `ConfigLoader`
-5. Update environment variable loading in `ConfigLoader`
-6. Use parameter in relevant services
-
-### Adding Soft-Delete Support
-1. Add `deleted_at` column to relevant tables
-2. Update storage interfaces and implementations to handle soft deletes
-3. Add methods to check if entity is deleted
-4. Update queries to exclude soft-deleted records
-5. Implement cleanup service to periodically purge old records
-
-## Critical Rules & Guardrails
-
-### ❌ NEVER DO THIS
-1. Import frameworks/databases in `core/`
-2. Skip constructor validation
-3. Throw exceptions in CLI layer
-4. Use implementation in service
-5. Forget to format before committing
-6. Create mutable records
-7. Skip state validation in transitions
-8. Return direct collection references
-9. Use Mockito or external mocking
-10. Update documentation without timestamp
-11. Use raw JDBC directly - always use JDBI
-12. Store services as static variables outside ServiceRegistry
-13. Bypass validation in storage layer
-14. Expose mutable internal state
-15. Ignore soft-delete status in queries
-16. Hardcode configuration values outside AppConfig
-17. Skip null checks in public APIs
-18. Use magic numbers in business logic
-19. Create circular dependencies between services
-20. Bypass the service registry for dependency access
-21. Use deprecated ServiceRegistryBuilder instead of StorageFactory
-22. Access AppSession directly without proper initialization
-
-### ✅ ALWAYS DO THIS
-1. Run `mvn spotless:apply` before committing
-2. Validate all constructor parameters with `Objects.requireNonNull()`
-3. Use defensive copying when returning collections
-4. Add `@DisplayName` to test methods
-5. Update `updatedAt` timestamp on entity changes (touch pattern)
-6. Write complete, compilable code in documentation (not pseudocode)
-7. Group related tests with `@Nested` classes
-8. Use factory methods for object creation (`create()`, `of()`, `fromDatabase()`)
-9. Check state before state transitions
-10. Update QWEN.md "Recent Updates" section with changes
-11. Use JDBI SQL Object pattern for database operations
-12. Access all services through ServiceRegistry
-13. Handle soft-delete status consistently across all layers
-14. Use external configuration for all configurable values
-15. Implement proper logging with appropriate log levels
-16. Follow naming conventions consistently
-17. Use enums for fixed sets of values
-18. Implement proper error handling and exception wrapping
-19. Use records for immutable data structures
-20. Apply the single responsibility principle to all classes
-21. Use StorageFactory for service initialization instead of ServiceRegistryBuilder
-22. Initialize AppSession properly through AppBootstrap
-
-## Final Checklist Before Completion
-Before considering a task complete, verify:
-1. Did I run `mvn spotless:apply`?
-2. Did I wire the service in `StorageFactory` (not deprecated ServiceRegistryBuilder)?
-3. Did I add a `@Nested` test class for this feature?
-4. Did I use `Optional` for null safety?
-5. Did I properly initialize `AppSession` through `AppBootstrap`?
-6. Did I update documentation to reflect nested enums in domain models?
-
-## Current Status (Phase 4)
-- **Completed**: Basic matching, daily limits, undo, interests, achievements, messaging, relationship transitions, verification, pace preferences, comprehensive stats, social features, standout recommendations, soft-delete support, external configuration
-- **In Development**: Advanced UI features, notification delivery mechanisms, performance optimizations
-- **Architecture**: Clean, well-tested, extensible with JDBI integration and external configuration support
+---
 
 ## Known Limitations
-- No database transactions (undo deletions not atomic)
-- Identity: Currently lacks a password/auth layer (anyone can select any user)
-- No proactive notifications delivery (UI alerts/email)
-- Media: Photo support uses string URLs; no actual image processing yet
-- Location: Geolocation is manual (users enter lat/lon coordinates)
-- JavaFX UI is experimental and not fully integrated
-- JDBI integration: Some complex queries may require custom solutions
-- Configuration: External configuration supports JSON and environment variables but could be extended to other formats
 
-## Key Files to Know
-- `CLAUDE.md` - Comprehensive project documentation for and from Claude-Code.
-- `AGENTS.md` - AI agent development guidelines for and from OpenCode+supporting agents.
-- `GEMINI.md` - AI agent development guidelines for and from Gemini-CLI.
-- `QWEN.md` - AI agent development guidelines for and from Qwen-Code (this file).
-- `docs/architecture.md` - Visual architecture diagrams
-- `pom.xml` - Build configuration
-- `Main.java` - CLI application entry point
-- `datingapp.ui.DatingApp` - JavaFX UI application entry point
-- `datingapp.app.api.RestApiServer` - REST API server implementation
-- `src/main/resources/logback.xml` - Logging configuration
-- `datingapp.app.AppBootstrap` - Centralized application initialization
-- `datingapp.app.ConfigLoader` - Configuration loading from JSON and environment variables
-- `datingapp.core.AppSession` - Unified session management for current user state
-- `datingapp.storage.StorageFactory` - Factory for wiring all services and storage implementations
+- No authentication layer (any user can select any identity)
+- No proactive notifications (UI-only alerts)
+- Photo URLs are strings (no image processing)
+- Manual location entry (lat/lon coordinates)
+- No database transactions for undo (atomic undo implemented but not full ACID)
+- JavaFX UI experimental (not fully integrated with all features)
 
-## Recent Additions (Phase 4)
-- **JDBI Integration**: Migration from raw JDBC to JDBI 3 for type-safe database access
-- **Service Registry Consolidation**: Unified service creation using StorageFactory instead of ServiceRegistryBuilder
-- **Messaging System**: Full conversation and message management
-- **Relationship Transitions**: Friend zone requests and graceful exit
-- **Social Features**: Friend requests and notification system
-- **Enhanced User Profiles**: Verification system and pace preferences
-- **Interests System**: 37 predefined interests across 6 categories with matching algorithm
-- **Achievement System**: 11 gamification achievements across 4 categories
-- **Advanced Matching**: Multi-factor compatibility scoring with configurable weights
-- **Comprehensive Stats**: User and platform statistics with snapshot system
-- **Profile Management**: Notes, views, and privacy controls
-- **Safety & Moderation**: Reporting, blocking, and verification systems
-- **Standout Recommendations**: Personalized standout recommendations based on compatibility
-- **Soft-Delete Support**: Configurable soft-delete with retention policies
-- **External Configuration**: JSON file and environment variable configuration support
-- **Performance Monitoring**: Built-in performance monitoring capabilities
-- **Migration System**: Automated schema migration for backward compatibility
-- **REST API**: Full-featured REST API server implementation
-- **Unified Session Management**: AppSession singleton for consistent user state across interfaces
-- **Centralized Bootstrapping**: AppBootstrap for unified application initialization
+---
 
-This project serves as an excellent example of clean architecture principles applied to a real-world application with comprehensive testing and quality controls.
+## Data Flows
 
+### Like → Match Creation
+```
+User likes candidate
+    → RecommendationService.canLike() check daily limit
+    → MatchingService.recordLike() creates Like record
+    → ActivityMetricsService.recordSwipe() track session
+    → UndoService.recordSwipe() store for potential undo
+    → InteractionStorage.mutualLikeExists() check for match
+    → If mutual: Match.create() + save → return Optional<Match>
+```
 
+### Send Message
+```
+User sends message
+    → ConnectionService.sendMessage()
+        1. Validate sender ACTIVE
+        2. Validate recipient ACTIVE
+        3. Validate match exists + canMessage() (ACTIVE or FRIENDS)
+        4. Validate content (not blank, ≤1000 chars)
+        5. Create/get Conversation (deterministic ID)
+        6. Save Message + update conversation.lastMessageAt
+        7. Return SendResult
+```
 
+### Report → Auto-Ban
+```
+User reports another user
+    → TrustSafetyService.report()
+        1. Validate not self-report
+        2. Check no duplicate report exists
+        3. Save Report
+        4. Auto-block reporter ← reported user
+        5. Count reports against reported user
+        6. If count ≥ autoBanThreshold (3): User.ban()
+```
 
+### Candidate Discovery
+```
+Browse candidates
+    → CandidateFinder.findCandidatesForUser(currentUser)
+        1. Get excluded IDs (liked, passed, blocked, matched)
+        2. UserStorage.findCandidates() with SQL pre-filter:
+           - ACTIVE state, deleted_at IS NULL
+           - gender IN interestedIn
+           - age BETWEEN minAge AND maxAge
+           - Optional: lat/lon bounding box
+        3. In-memory filters:
+           - Not self
+           - No prior interaction
+           - Mutual gender preferences
+           - Mutual age preferences
+           - Distance (Haversine ≤ maxDistanceKm)
+           - Dealbreakers.Evaluator.passes()
+        4. Sort by distance ascending
+```
+
+---
+
+## Code Templates
+
+### New Service Template
+```java
+package datingapp.core.matching;
+
+import datingapp.core.storage.UserStorage;
+import java.util.Objects;
+
+public class NewService {
+    private final UserStorage userStorage;
+
+    public NewService(UserStorage userStorage) {
+        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+    }
+
+    public ResultType businessMethod(InputType input) {
+        Objects.requireNonNull(input, "input cannot be null");
+        // Business logic
+        return result;
+    }
+}
+```
+
+### New Storage Interface Template
+```java
+package datingapp.core.storage;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface NewStorage {
+    void save(Entity entity);
+    Optional<Entity> get(UUID id);
+    List<Entity> findAll();
+}
+```
+
+### JDBI Storage Implementation Template
+```java
+package datingapp.storage.jdbi;
+
+import datingapp.core.storage.NewStorage;
+import org.jdbi.v3.core.Jdbi;
+import org.jdbi.v3.core.mapper.RowMapper;
+import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
+import org.jdbi.v3.sqlobject.customizer.Bind;
+import org.jdbi.v3.sqlobject.statement.SqlQuery;
+import org.jdbi.v3.sqlobject.statement.SqlUpdate;
+
+public final class JdbiNewStorage implements NewStorage {
+    private final Dao dao;
+
+    public JdbiNewStorage(Jdbi jdbi) {
+        this.dao = jdbi.onDemand(Dao.class);
+    }
+
+    @Override
+    public void save(Entity entity) {
+        dao.save(new EntityBindings(entity));
+    }
+
+    @Override
+    public Entity get(UUID id) {
+        return dao.get(id);
+    }
+
+    @Override
+    public List<Entity> findAll() {
+        return dao.findAll();
+    }
+
+    @RegisterRowMapper(Mapper.class)
+    interface Dao {
+        @SqlUpdate("MERGE INTO new_table (id, ...) KEY (id) VALUES (...)")
+        void save(@BindBean EntityBindings b);
+
+        @SqlQuery("SELECT * FROM new_table WHERE id = :id")
+        Entity get(@Bind("id") UUID id);
+
+        @SqlQuery("SELECT * FROM new_table")
+        List<Entity> findAll();
+    }
+
+    static class Mapper implements RowMapper<Entity> {
+        public Entity map(ResultSet rs, StatementContext ctx) {
+            return new Entity(...);
+        }
+    }
+}
+```
+
+### Immutable Record Template
+```java
+public record Entity(UUID id, String name, Instant createdAt) {
+    public Entity {
+        Objects.requireNonNull(id, "id cannot be null");
+        Objects.requireNonNull(name, "name cannot be null");
+        Objects.requireNonNull(createdAt, "createdAt cannot be null");
+    }
+
+    public static Entity create(String name) {
+        return new Entity(UUID.randomUUID(), name, AppClock.now());
+    }
+}
+```
+
+### Mutable Entity Template
+```java
+public class Entity {
+    private final UUID id;
+    private final Instant createdAt;
+    private String name;
+    private Instant updatedAt;
+
+    private Entity(UUID id, Instant createdAt) {
+        this.id = id;
+        this.createdAt = createdAt;
+        this.updatedAt = createdAt;
+    }
+
+    public static Entity create(String name) {
+        Entity e = new Entity(UUID.randomUUID(), AppClock.now());
+        e.name = name;
+        return e;
+    }
+
+    public void setName(String name) {
+        this.name = Objects.requireNonNull(name);
+        touch();
+    }
+
+    private void touch() {
+        this.updatedAt = AppClock.now();
+    }
+
+    // Getters...
+}
+```
+
+### Result Record Template
+```java
+public static record Result(boolean success, String message, DataType data) {
+    public Result {
+        if (success) {
+            Objects.requireNonNull(data, "data required on success");
+        }
+    }
+
+    public static Result success(DataType d) {
+        return new Result(true, null, d);
+    }
+
+    public static Result failure(String msg) {
+        return new Result(false, msg, null);
+    }
+}
+```
+
+---
+
+## Debugging Tips
+
+| Issue | Check |
+|-------|-------|
+| Service not wired | Verify `StorageFactory.buildH2()` includes new service |
+| Database column missing | Check `SchemaInitializer.createAllTables()` DDL |
+| Enum not persisting | Add codec to `JdbiTypeCodecs` |
+| Test failing on time | Use `AppClock.setTestClock(fixedInstant)` |
+| NullPointerException | Check `Objects.requireNonNull` in constructor |
+| State transition error | Verify current state allows target state |
+| Match not created | Check `mutualLikeExists()` returns true |
+| Distance filter wrong | Verify `hasLocationSet()` is true, check Haversine |
+
+---
+
+## Performance Considerations
+
+- **Lock Striping:** `ActivityMetricsService` uses 256 stripes for concurrent stats
+- **Batch Loading:** `UserStorage.findByIds()` loads multiple users in one query
+- **SQL Pre-filtering:** `CandidateFinder` pushes basic filters to SQL before in-memory
+- **Lazy Loading:** ViewModels created on-demand by `ViewModelFactory`
+- **Connection Pooling:** HikariCP (max 10, min idle 2)
+- **Deterministic IDs:** Match/Conversation IDs avoid extra lookups
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `CLAUDE.md` | Comprehensive project documentation |
+| `AGENTS.md` | AI agent development guidelines |
+| `GEMINI.md` | Gemini-CLI agent guidelines |
+| `QWEN.md` | This file - Qwen Code context |
+| `architecture.md` | Visual architecture diagrams |
+| `STATUS.md` | Implementation status vs PRD |
+| `pom.xml` | Maven build configuration |
+| `Main.java` | CLI entry point |
+| `DatingApp.java` | JavaFX entry point |
+| `ApplicationStartup.java` | Centralized initialization |
+| `StorageFactory.java` | Service wiring |
+| `AppSession.java` | Current user singleton |
+| `AppConfig.java` | 57-parameter configuration |
+
+---
 
 ## Agent Changelog (append-only)
 ---AGENT-LOG-START---
 # Format: SEQ|TS|agent|scope|summary|files
 # Append-only. Do not edit past entries. If SEQ conflict after 3 tries append ":CONFLICT".
-example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples regen|src/ui/*
+1|2026-02-19 12:00:00|agent:qwen_code|docs|Complete QWEN.md rewrite: architecture, 9 services, 5 storage interfaces, 14 tables, 820 tests, Java 25, JDBI pattern, MVVM UI, data flows, code templates, debugging tips|QWEN.md
 ---AGENT-LOG-END---

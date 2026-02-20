@@ -140,11 +140,13 @@ class RelationshipTransitionServiceTest {
         assertEquals(MatchArchiveReason.GRACEFUL_EXIT, match.getEndReason());
         assertEquals(aliceId, match.getEndedBy());
 
-        // Check conversation archive
+        // Check conversation archive — graceful exit archives both sides
         ConnectionModels.Conversation archived =
                 communicationStorage.getConversation(convo.getId()).orElseThrow();
-        assertNotNull(archived.getArchivedAt());
-        assertEquals(MatchArchiveReason.GRACEFUL_EXIT, archived.getArchiveReason());
+        assertNotNull(archived.getUserAArchivedAt(), "UserA side should be archived");
+        assertNotNull(archived.getUserBArchivedAt(), "UserB side should be archived");
+        assertEquals(MatchArchiveReason.GRACEFUL_EXIT, archived.getUserAArchiveReason());
+        assertEquals(MatchArchiveReason.GRACEFUL_EXIT, archived.getUserBArchiveReason());
 
         // Check notification
         List<ConnectionModels.Notification> notifications = communicationStorage.getNotificationsForUser(bobId, true);

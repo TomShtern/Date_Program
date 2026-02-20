@@ -8,9 +8,9 @@ import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.TextUtil;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.ProfileNote;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
@@ -485,7 +485,7 @@ public class ProfileHandler implements LoggingSupport {
             } else {
                 currentUser.setAgeRange(minAge, maxAge);
             }
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logInfo("⚠️  Invalid age range, using defaults.");
         }
     }
@@ -517,7 +517,7 @@ public class ProfileHandler implements LoggingSupport {
                 } else {
                     currentUser.setHeightCm(height);
                 }
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException _) {
                 logInfo("⚠️  Invalid height, skipping.");
             }
         }
@@ -696,7 +696,7 @@ public class ProfileHandler implements LoggingSupport {
             }
             currentUser.setDealbreakers(builder.build());
             logInfo("✅ Height dealbreaker updated.\n");
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             logInfo(CliTextAndInput.INVALID_INPUT);
         } catch (IllegalArgumentException e) {
             logInfo(ERROR_MESSAGE_FORMAT, e.getMessage());
@@ -712,7 +712,7 @@ public class ProfileHandler implements LoggingSupport {
                 builder.maxAgeDifference(Integer.parseInt(input));
                 currentUser.setDealbreakers(builder.build());
                 logInfo("✅ Age dealbreaker updated.\n");
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException _) {
                 logInfo(CliTextAndInput.INVALID_INPUT);
             }
         } else {
@@ -787,7 +787,7 @@ public class ProfileHandler implements LoggingSupport {
 
             for (int i = 0; i < notes.size(); i++) {
                 ProfileNote note = notes.get(i);
-                User subject = userStorage.get(note.subjectId());
+                User subject = userStorage.get(note.subjectId()).orElse(null);
                 String subjectName = subject != null ? subject.getName() : "(deleted user)";
 
                 logInfo("  {}. {} - \"{}\"", i + 1, subjectName, note.getPreview());
@@ -800,7 +800,7 @@ public class ProfileHandler implements LoggingSupport {
                 int idx = Integer.parseInt(input) - 1;
                 if (idx >= 0 && idx < notes.size()) {
                     ProfileNote note = notes.get(idx);
-                    User subject = userStorage.get(note.subjectId());
+                    User subject = userStorage.get(note.subjectId()).orElse(null);
                     String subjectName = subject != null ? subject.getName() : "this user";
                     manageNoteFor(note.subjectId(), subjectName);
                 }

@@ -26,10 +26,8 @@ public final class AppSession {
         return currentUser;
     }
 
-    public void setCurrentUser(User user) {
-        synchronized (this) {
-            this.currentUser = user;
-        }
+    public synchronized void setCurrentUser(User user) {
+        this.currentUser = user;
         notifyListeners(user);
     }
 

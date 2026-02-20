@@ -94,6 +94,12 @@ public final class SwipeState {
             return new Session(UUID.randomUUID(), userId, AppClock.now());
         }
 
+        public void recordActivity() {
+            if (state == MatchState.ACTIVE) {
+                this.lastActivityAt = AppClock.now();
+            }
+        }
+
         public void recordSwipe(ConnectionModels.Like.Direction direction, boolean matched) {
             if (state != MatchState.ACTIVE) {
                 throw new IllegalStateException("Cannot record swipe on completed session");

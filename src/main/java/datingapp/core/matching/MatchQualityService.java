@@ -350,8 +350,8 @@ public class MatchQualityService {
     public Optional<MatchQuality> computeQuality(Match match, UUID perspectiveUserId) {
         UUID otherUserId = match.getOtherUser(perspectiveUserId);
 
-        User me = userStorage.get(perspectiveUserId);
-        User them = userStorage.get(otherUserId);
+        User me = userStorage.get(perspectiveUserId).orElse(null);
+        User them = userStorage.get(otherUserId).orElse(null);
 
         if (me == null || them == null) {
             logger.warn("computeQuality: user not found — perspective={} other={}", perspectiveUserId, otherUserId);
@@ -392,6 +392,13 @@ public class MatchQualityService {
         String paceSyncLevel = getPaceSyncLevel(paceScore);
 
         // === Calculate Overall Score ===
+        double totalWeight = config.distanceWeight()
+                + config.ageWeight()
+                + config.interestWeight()
+                + config.lifestyleWeight()
+                + config.paceWeight()
+                + config.responseWeight();
+
         double weightedScore = distanceScore * config.distanceWeight()
                 + ageScore * config.ageWeight()
                 + interestScore * config.interestWeight()
@@ -399,7 +406,8 @@ public class MatchQualityService {
                 + paceScore * config.paceWeight()
                 + responseScore * config.responseWeight();
 
-        int compatibilityScore = (int) Math.round(weightedScore * 100);
+        double normalizedScore = totalWeight > 0 ? (weightedScore / totalWeight) : 0.0;
+        int compatibilityScore = (int) Math.round(normalizedScore * 100);
 
         // === Generate Highlights ===
         List<String> highlights = generateHighlights(

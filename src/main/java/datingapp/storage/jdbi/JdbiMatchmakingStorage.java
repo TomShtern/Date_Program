@@ -49,76 +49,78 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     private static final String COLUMN_CREATED_AT = "created_at";
 
     private static final String SQL_ACTIVE_LIKE_EXISTS = """
-        SELECT EXISTS (
-        SELECT 1
-        FROM likes
-        WHERE who_likes = :whoLikes
-          AND who_got_liked = :whoGotLiked
-          AND deleted_at IS NULL
-        )
-        """;
+            SELECT EXISTS (
+            SELECT 1
+            FROM likes
+            WHERE who_likes = :whoLikes
+              AND who_got_liked = :whoGotLiked
+              AND deleted_at IS NULL
+            )
+            """;
 
     private static final String SQL_UPSERT_LIKE = """
-        MERGE INTO likes (id, who_likes, who_got_liked, direction, created_at, deleted_at)
-        KEY (who_likes, who_got_liked)
-        VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt, NULL)
-        """;
+            MERGE INTO likes (id, who_likes, who_got_liked, direction, created_at, deleted_at)
+            KEY (who_likes, who_got_liked)
+            VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt, NULL)
+            """;
 
     private static final String SQL_MUTUAL_LIKE_EXISTS = """
-        SELECT EXISTS (
-        SELECT 1
-        FROM likes l1
-        JOIN likes l2 ON l1.who_likes = l2.who_got_liked
-                 AND l1.who_got_liked = l2.who_likes
-        WHERE l1.who_likes = :whoLikes
-          AND l1.who_got_liked = :whoGotLiked
-          AND l1.direction = 'LIKE'
-          AND l2.direction = 'LIKE'
-          AND l1.deleted_at IS NULL
-          AND l2.deleted_at IS NULL
-        )
-        """;
+            SELECT EXISTS (
+            SELECT 1
+            FROM likes l1
+            JOIN likes l2 ON l1.who_likes = l2.who_got_liked
+                     AND l1.who_got_liked = l2.who_likes
+            WHERE l1.who_likes = :whoLikes
+              AND l1.who_got_liked = :whoGotLiked
+              AND l1.direction = 'LIKE'
+              AND l2.direction = 'LIKE'
+              AND l1.deleted_at IS NULL
+              AND l2.deleted_at IS NULL
+            )
+            """;
 
     private static final String SQL_ACTIVE_MATCH_EXISTS =
             "SELECT EXISTS(SELECT 1 FROM matches WHERE id = :id AND deleted_at IS NULL)";
 
     private static final String SQL_UPSERT_MATCH = """
-        MERGE INTO matches (
-        id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
-        ) KEY (id)
-        VALUES (
-        :id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
-        )
-        """;
+            MERGE INTO matches (
+            id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
+            ) KEY (id)
+            VALUES (
+            :id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
+            )
+            """;
 
     private static final String SQL_UPDATE_MATCH_TRANSITION = """
-        UPDATE matches
-        SET state = :state,
-        ended_at = :endedAt,
-        ended_by = :endedBy,
-        end_reason = :endReason,
-        deleted_at = :deletedAt
-        WHERE id = :id AND deleted_at IS NULL
-        """;
+            UPDATE matches
+            SET state = :state,
+            ended_at = :endedAt,
+            ended_by = :endedBy,
+            end_reason = :endReason,
+            deleted_at = :deletedAt
+            WHERE id = :id AND deleted_at IS NULL
+            """;
 
     private static final String SQL_ACCEPT_FRIEND_REQUEST = """
-        UPDATE friend_requests
-        SET status = :status,
-        responded_at = :respondedAt
-        WHERE id = :id AND status = 'PENDING'
-        """;
+            UPDATE friend_requests
+            SET status = :status,
+            responded_at = :respondedAt
+            WHERE id = :id AND status = 'PENDING'
+            """;
 
     private static final String SQL_ARCHIVE_CONVERSATION = """
-        UPDATE conversations
-        SET archived_at = :archivedAt,
-        archive_reason = :archiveReason
-        WHERE id = :conversationId
-        """;
+            UPDATE conversations
+            SET archived_at_a = :archivedAtA,
+                archive_reason_a = :archiveReasonA,
+                archived_at_b = :archivedAtB,
+                archive_reason_b = :archiveReasonB
+            WHERE id = :conversationId
+            """;
 
     private static final String SQL_INSERT_NOTIFICATION = """
-        INSERT INTO notifications (id, user_id, type, title, message, created_at, is_read, data_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """;
+            INSERT INTO notifications (id, user_id, type, title, message, created_at, is_read, data_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """;
 
     private final Jdbi jdbi;
     private final LikeDao likeDao;
@@ -380,8 +382,10 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     Conversation conversation = archivedConversation.get();
                     int conversationRows = handle.createUpdate(SQL_ARCHIVE_CONVERSATION)
                             .bind("conversationId", conversation.getId())
-                            .bind("archivedAt", conversation.getArchivedAt())
-                            .bind("archiveReason", conversation.getArchiveReason())
+                            .bind("archivedAtA", conversation.getUserAArchivedAt())
+                            .bind("archiveReasonA", conversation.getUserAArchiveReason())
+                            .bind("archivedAtB", conversation.getUserBArchivedAt())
+                            .bind("archiveReasonB", conversation.getUserBArchiveReason())
                             .execute();
                     if (conversationRows != 1) {
                         throw new StorageException("Failed to archive conversation atomically");
@@ -551,19 +555,19 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     private interface LikeDao {
 
         @SqlQuery("""
-                SELECT id, who_likes, who_got_liked, direction, created_at
-                FROM likes
-            WHERE who_likes = :fromUserId
-              AND who_got_liked = :toUserId
-              AND deleted_at IS NULL
-                """)
+                    SELECT id, who_likes, who_got_liked, direction, created_at
+                    FROM likes
+                WHERE who_likes = :fromUserId
+                  AND who_got_liked = :toUserId
+                  AND deleted_at IS NULL
+                    """)
         Optional<Like> getLike(@Bind("fromUserId") UUID fromUserId, @Bind("toUserId") UUID toUserId);
 
         @SqlUpdate("""
-            MERGE INTO likes (id, who_likes, who_got_liked, direction, created_at, deleted_at)
-            KEY (who_likes, who_got_liked)
-            VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt, NULL)
-            """)
+                MERGE INTO likes (id, who_likes, who_got_liked, direction, created_at, deleted_at)
+                KEY (who_likes, who_got_liked)
+                VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt, NULL)
+                """)
         void save(@BindBean Like like);
 
         @SqlQuery("""
