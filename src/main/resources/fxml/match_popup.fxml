@@ -25,7 +25,7 @@
         <FontIcon fx:id="leftAvatarIcon" iconLiteral="mdi2a-account" iconSize="48" iconColor="white"/>
       </StackPane>
       <FontIcon fx:id="heartIcon" iconLiteral="mdi2h-heart" iconSize="64"
-                                  styleClass="match-heart"/>
+                                        styleClass="match-heart"/>
       <StackPane styleClass="match-avatar-wrapper">
         <FontIcon fx:id="rightAvatarIcon" iconLiteral="mdi2a-account" iconSize="48" iconColor="white"/>
       </StackPane>
@@ -34,7 +34,7 @@
     <Label text="It's a Match!" styleClass="match-title"/>
     <!-- Subtitle -->
     <Label fx:id="matchMessage" styleClass="match-subtitle"
-                       text="You and Sarah liked each other!"/>
+                           text="You and Sarah liked each other!"/>
     <!-- Action Buttons -->
     <VBox spacing="12" alignment="CENTER">
       <Button text="Send Message" onAction="#handleMessage" styleClass="match-popup-message-btn" maxWidth="280">
@@ -44,5 +44,18 @@
       </Button>
       <Button text="Keep Browsing" onAction="#handleContinue" styleClass="match-continue-btn"/>
     </VBox>
+    <!-- Trust & Safety -->
+    <HBox spacing="15" alignment="CENTER">
+      <Button text="Block" onAction="#handleBlock" styleClass="button-transparent">
+        <graphic>
+          <FontIcon iconLiteral="mdi2b-block-helper" iconSize="16" iconColor="#ef4444"/>
+        </graphic>
+      </Button>
+      <Button text="Report" onAction="#handleReport" styleClass="button-transparent">
+        <graphic>
+          <FontIcon iconLiteral="mdi2f-flag" iconSize="16" iconColor="#ef4444"/>
+        </graphic>
+      </Button>
+    </HBox>
   </VBox>
 </StackPane>

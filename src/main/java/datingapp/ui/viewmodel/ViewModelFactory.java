@@ -10,8 +10,11 @@ import datingapp.ui.screen.MatchesController;
 import datingapp.ui.screen.MatchingController;
 import datingapp.ui.screen.PreferencesController;
 import datingapp.ui.screen.ProfileController;
+import datingapp.ui.screen.SocialController;
+import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
@@ -58,6 +61,8 @@ public class ViewModelFactory {
     private ChatViewModel chatViewModel;
     private StatsViewModel statsViewModel;
     private PreferencesViewModel preferencesViewModel;
+    private StandoutsViewModel standoutsViewModel;
+    private SocialViewModel socialViewModel;
     private final Map<Class<?>, Supplier<Object>> controllerFactories;
 
     public ViewModelFactory(ServiceRegistry services) {
@@ -105,6 +110,8 @@ public class ViewModelFactory {
         map.put(ChatController.class, () -> new ChatController(getChatViewModel()));
         map.put(StatsController.class, () -> new StatsController(getStatsViewModel()));
         map.put(PreferencesController.class, () -> new PreferencesController(getPreferencesViewModel()));
+        map.put(StandoutsController.class, () -> new StandoutsController(getStandoutsViewModel()));
+        map.put(SocialController.class, () -> new SocialController(getSocialViewModel()));
         return Collections.unmodifiableMap(map);
     }
 
@@ -160,7 +167,11 @@ public class ViewModelFactory {
     public synchronized MatchingViewModel getMatchingViewModel() {
         if (matchingViewModel == null) {
             matchingViewModel = new MatchingViewModel(
-                    services.getCandidateFinder(), services.getMatchingService(), services.getUndoService(), session);
+                    services.getCandidateFinder(),
+                    services.getMatchingService(),
+                    services.getUndoService(),
+                    services.getTrustSafetyService(),
+                    session);
         }
         return matchingViewModel;
     }
@@ -179,7 +190,8 @@ public class ViewModelFactory {
 
     public synchronized ChatViewModel getChatViewModel() {
         if (chatViewModel == null) {
-            chatViewModel = new ChatViewModel(services.getConnectionService(), session);
+            chatViewModel =
+                    new ChatViewModel(services.getConnectionService(), services.getTrustSafetyService(), session);
         }
         return chatViewModel;
     }
@@ -197,6 +209,24 @@ public class ViewModelFactory {
             preferencesViewModel = new PreferencesViewModel(createUiUserStore(), services.getConfig(), session);
         }
         return preferencesViewModel;
+    }
+
+    public synchronized StandoutsViewModel getStandoutsViewModel() {
+        if (standoutsViewModel == null) {
+            standoutsViewModel = new StandoutsViewModel(services.getRecommendationService(), session);
+        }
+        return standoutsViewModel;
+    }
+
+    public synchronized SocialViewModel getSocialViewModel() {
+        if (socialViewModel == null) {
+            socialViewModel = new SocialViewModel(
+                    services.getConnectionService(),
+                    new StorageUiSocialDataAccess(services.getCommunicationStorage()),
+                    createUiUserStore(),
+                    session);
+        }
+        return socialViewModel;
     }
 
     /**
@@ -224,6 +254,8 @@ public class ViewModelFactory {
         chatViewModel = quietly(chatViewModel, ChatViewModel::dispose);
         statsViewModel = quietly(statsViewModel, StatsViewModel::dispose);
         preferencesViewModel = quietly(preferencesViewModel, PreferencesViewModel::dispose);
+        standoutsViewModel = quietly(standoutsViewModel, StandoutsViewModel::dispose);
+        socialViewModel = quietly(socialViewModel, SocialViewModel::dispose);
         logDebug("All ViewModels disposed and reset");
     }
 

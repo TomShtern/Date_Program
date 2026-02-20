@@ -24,7 +24,7 @@
         <Insets bottom="20" left="15" right="15" top="20"/>
       </padding>
       <Label styleClass="text-secondary conversation-section-label"
-                                              text="CONVERSATIONS" />
+                                                    text="CONVERSATIONS" />
       <ListView fx:id="conversationListView" VBox.vgrow="ALWAYS"/>
     </VBox>
   </left>
@@ -38,17 +38,34 @@
             <Insets left="25" right="25"/>
           </padding>
           <Label fx:id="chatHeaderLabel" styleClass="subheading" text="User Name"/>
+          <Region HBox.hgrow="ALWAYS"/>
+          <Button onAction="#handleBlock" styleClass="button-transparent">
+            <graphic>
+              <FontIcon iconLiteral="mdi2b-block-helper" iconSize="20" iconColor="#ef4444"/>
+            </graphic>
+            <tooltip>
+              <Tooltip text="Block User"/>
+            </tooltip>
+          </Button>
+          <Button onAction="#handleReport" styleClass="button-transparent">
+            <graphic>
+              <FontIcon iconLiteral="mdi2f-flag" iconSize="20" iconColor="#ef4444"/>
+            </graphic>
+            <tooltip>
+              <Tooltip text="Report User"/>
+            </tooltip>
+          </Button>
         </HBox>
         <ListView fx:id="messageListView" VBox.vgrow="ALWAYS"
-                                                            styleClass="message-list-view" />
+                                                                    styleClass="message-list-view" />
         <HBox spacing="15.0" alignment="CENTER" styleClass="header-bar">
           <padding>
             <Insets bottom="20" left="20" right="20" top="20"/>
           </padding>
           <TextArea fx:id="messageArea" prefHeight="50.0" promptText="Type a message..."
-                                                                          wrapText="true" HBox.hgrow="ALWAYS" />
+                                                                                    wrapText="true" HBox.hgrow="ALWAYS" />
           <Button fx:id="sendButton" onAction="#handleSendMessage" prefHeight="50.0"
-                                                                          prefWidth="60.0" styleClass="button">
+                                                                                    prefWidth="60.0" styleClass="button">
             <graphic>
               <FontIcon iconLiteral="mdi2s-send" iconSize="20" iconColor="white"/>
             </graphic>

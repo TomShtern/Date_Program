@@ -40,7 +40,7 @@
         <Label fx:id="completionLabel" styleClass="notification-badge profile-completion-percent" text="20%"/>
         <Label styleClass="profile-completion-text" text="complete"/>
         <Label fx:id="completionDetailsLabel" maxWidth="180" styleClass="text-secondary" text="Missing: --"
-                       wrapText="true"/>
+                               wrapText="true"/>
       </VBox>
     </HBox>
   </top>
@@ -57,19 +57,35 @@
           <StackPane styleClass="profile-avatar-container">
             <!-- Outer glow ring -->
             <StackPane styleClass="profile-glow-ring"/>
-            <!-- Inner avatar circle with photo or placeholder -->
-            <StackPane fx:id="avatarInner" styleClass="profile-avatar-inner">
-              <!-- Profile photo ImageView (hidden by default) -->
-              <ImageView fx:id="profileImageView" fitWidth="100" fitHeight="100" preserveRatio="true" visible="false">
-                <clip>
-                  <Circle radius="50" centerX="50" centerY="50"/>
-                </clip>
-              </ImageView>
-              <!-- Placeholder icon (shown when no photo) -->
-              <FontIcon fx:id="avatarPlaceholderIcon" iconLiteral="mdi2a-account" iconSize="56" iconColor="#94a3b8"/>
-            </StackPane>
+            <HBox alignment="CENTER" spacing="10">
+              <!-- Left Nav Button -->
+              <Button fx:id="prevPhotoButton" onAction="#handlePrevPhoto" styleClass="photo-nav-btn" visible="false" managed="false">
+                <graphic>
+                  <FontIcon iconLiteral="mdi2c-chevron-left" iconSize="24" iconColor="#667eea"/>
+                </graphic>
+              </Button>
+              <!-- Inner avatar circle with photo or placeholder -->
+              <StackPane fx:id="avatarInner" styleClass="profile-avatar-inner">
+                <!-- Profile photo ImageView (hidden by default) -->
+                <ImageView fx:id="profileImageView" fitWidth="100" fitHeight="100" preserveRatio="true" visible="false">
+                  <clip>
+                    <Circle radius="50" centerX="50" centerY="50"/>
+                  </clip>
+                </ImageView>
+                <!-- Placeholder icon (shown when no photo) -->
+                <FontIcon fx:id="avatarPlaceholderIcon" iconLiteral="mdi2a-account" iconSize="56" iconColor="#94a3b8"/>
+                <!-- Photo indicator -->
+                <Label fx:id="photoIndicatorLabel" styleClass="photo-indicator" text="1/1" visible="false" StackPane.alignment="TOP_RIGHT"/>
+              </StackPane>
+              <!-- Right Nav Button -->
+              <Button fx:id="nextPhotoButton" onAction="#handleNextPhoto" styleClass="photo-nav-btn" visible="false" managed="false">
+                <graphic>
+                  <FontIcon iconLiteral="mdi2c-chevron-right" iconSize="24" iconColor="#667eea"/>
+                </graphic>
+              </Button>
+            </HBox>
             <!-- Camera button overlay - clickable -->
-            <VBox alignment="BOTTOM_RIGHT">
+            <VBox alignment="BOTTOM_RIGHT" StackPane.alignment="BOTTOM_RIGHT">
               <padding>
                 <Insets right="5" bottom="5"/>
               </padding>
@@ -99,7 +115,7 @@
             <Label fx:id="charCountLabel" styleClass="char-counter" text="0/500"/>
           </HBox>
           <TextArea fx:id="bioArea" prefHeight="100" promptText="Tell others about yourself..."
-                                                                wrapText="true" styleClass="bio-textarea"/>
+                                                                          wrapText="true" styleClass="bio-textarea"/>
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Birth date:" prefWidth="120"/>
             <DatePicker fx:id="birthDatePicker" promptText="YYYY-MM-DD" prefWidth="180"/>
@@ -116,7 +132,7 @@
           <HBox spacing="12" alignment="CENTER_LEFT">
             <FontIcon iconLiteral="mdi2m-map-marker-outline" iconSize="20" iconColor="#64748b"/>
             <TextField fx:id="locationField" promptText="e.g. 40.7128, -74.0060"
-                                                                            HBox.hgrow="ALWAYS"/>
+                                                                                        HBox.hgrow="ALWAYS"/>
           </HBox>
         </VBox>
         <!-- Gender &amp; Preferences Section - CRITICAL for matching -->

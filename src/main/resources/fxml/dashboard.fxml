@@ -53,8 +53,8 @@
         </columnConstraints>
         <!-- Browse Card - Amber -->
         <Button fx:id="browseButton" onAction="#handleBrowse" maxHeight="160" maxWidth="Infinity"
-                                                                    prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
-                                                                    GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
+                                                                            GridPane.columnIndex="0" GridPane.rowIndex="0">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -66,8 +66,8 @@
         </Button>
         <!-- Matches Card - Rose -->
         <Button fx:id="matchesButton" onAction="#handleMatches" maxHeight="160" maxWidth="Infinity"
-                                                                    prefHeight="160" styleClass="dashboard-card dashboard-card-matches"
-                                                                    GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-matches"
+                                                                            GridPane.columnIndex="1" GridPane.rowIndex="0">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -77,14 +77,14 @@
             </VBox>
           </graphic>
         </Button>
-        <!-- Chat Card - Blue -->
         <Button fx:id="chatButton" onAction="#handleChat" maxHeight="160" maxWidth="Infinity"
-                                                                    prefHeight="160" styleClass="dashboard-card dashboard-card-chat"
-                                                                    GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-chat"
+                                                                            GridPane.columnIndex="0" GridPane.rowIndex="1">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
                 <FontIcon iconLiteral="mdi2c-chat" iconSize="32" iconColor="#3b82f6"/>
+                <Label fx:id="unreadBadgeLabel" styleClass="notification-badge" managed="false" visible="false" StackPane.alignment="TOP_RIGHT"/>
               </StackPane>
               <Label text="Chat" styleClass="dashboard-card-label"/>
             </VBox>
@@ -92,14 +92,40 @@
         </Button>
         <!-- Profile Card - Purple -->
         <Button fx:id="profileButton" onAction="#handleProfile" maxHeight="160" maxWidth="Infinity"
-                                                                    prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
-                                                                    GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
+                                                                            GridPane.columnIndex="1" GridPane.rowIndex="1">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
                 <FontIcon iconLiteral="mdi2a-account-circle" iconSize="32" iconColor="#a855f7"/>
               </StackPane>
               <Label text="Profile" styleClass="dashboard-card-label"/>
+            </VBox>
+          </graphic>
+        </Button>
+        <!-- Standouts Card - Teal -->
+        <Button fx:id="standoutsButton" onAction="#handleStandouts" maxHeight="160" maxWidth="Infinity"
+                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
+                                                                            GridPane.columnIndex="0" GridPane.rowIndex="2">
+          <graphic>
+            <VBox alignment="CENTER" spacing="12">
+              <StackPane styleClass="dashboard-icon-container">
+                <FontIcon iconLiteral="mdi2s-star-circle" iconSize="32" iconColor="#10b981"/>
+              </StackPane>
+              <Label text="Standouts" styleClass="dashboard-card-label"/>
+            </VBox>
+          </graphic>
+        </Button>
+        <!-- Social Card - Indigo -->
+        <Button fx:id="socialButton" onAction="#handleSocial" maxHeight="160" maxWidth="Infinity"
+                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
+                                                                            GridPane.columnIndex="1" GridPane.rowIndex="2">
+          <graphic>
+            <VBox alignment="CENTER" spacing="12">
+              <StackPane styleClass="dashboard-icon-container">
+                <FontIcon iconLiteral="mdi2a-account-group" iconSize="32" iconColor="#6366f1"/>
+              </StackPane>
+              <Label text="Social" styleClass="dashboard-card-label"/>
             </VBox>
           </graphic>
         </Button>
@@ -111,7 +137,7 @@
           <Label text="DAILY PICK" styleClass="daily-pick-title"/>
         </HBox>
         <Label fx:id="dailyPickLabel" styleClass="text-secondary"
-                                                                    text="Loading your daily pick..."/>
+                                                                            text="Loading your daily pick..."/>
         <Button fx:id="dailyPickButton" onAction="#handleViewDailyPick" styleClass="matches-browse-btn" text="View Profile">
           <graphic>
             <FontIcon iconLiteral="mdi2e-eye" iconSize="16" iconColor="white"/>

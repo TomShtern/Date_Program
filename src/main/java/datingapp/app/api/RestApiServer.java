@@ -208,6 +208,12 @@ public class RestApiServer {
         UUID userId = parseUuid(ctx.pathParam("id"));
         int limit = ctx.queryParamAsClass("limit", Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
         int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be greater than 0");
+        }
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must be non-negative");
+        }
         validateUserExists(userId);
         List<ConversationSummary> conversations = messagingService.getConversations(userId, limit, offset).stream()
                 .map(this::toConversationSummary)
@@ -219,6 +225,12 @@ public class RestApiServer {
         String conversationId = ctx.pathParam("conversationId");
         int limit = ctx.queryParamAsClass("limit", Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
         int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be greater than 0");
+        }
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must be non-negative");
+        }
 
         var result = messagingService.getMessages(conversationId, limit, offset);
         if (result.success()) {

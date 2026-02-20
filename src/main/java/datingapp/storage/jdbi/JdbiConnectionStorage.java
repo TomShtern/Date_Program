@@ -317,7 +317,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 INSERT INTO messages (id, conversation_id, sender_id, content, created_at)
                 VALUES (:id, :conversationId, :senderId, :content, :createdAt)
                 """)
-        void saveMessage(@BindBean Message message);
+        void saveMessage(@org.jdbi.v3.sqlobject.customizer.BindMethods Message message);
 
         @SqlQuery("""
                 SELECT id, conversation_id, sender_id, content, created_at
@@ -380,13 +380,13 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 INSERT INTO friend_requests (id, from_user_id, to_user_id, created_at, status, responded_at)
                 VALUES (:id, :fromUserId, :toUserId, :createdAt, :status, :respondedAt)
                 """)
-        void saveFriendRequest(@BindBean FriendRequest request);
+        void saveFriendRequest(@org.jdbi.v3.sqlobject.customizer.BindMethods FriendRequest request);
 
         @SqlUpdate("""
                 UPDATE friend_requests SET status = :status, responded_at = :respondedAt
                 WHERE id = :id
                 """)
-        void updateFriendRequest(@BindBean FriendRequest request);
+        void updateFriendRequest(@org.jdbi.v3.sqlobject.customizer.BindMethods FriendRequest request);
 
         @SqlQuery("""
                 SELECT id, from_user_id, to_user_id, created_at, status, responded_at
@@ -416,7 +416,9 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 INSERT INTO notifications (id, user_id, type, title, message, created_at, is_read, data_json)
                 VALUES (:id, :userId, :type, :title, :message, :createdAt, :isRead, :dataJson)
                 """)
-        void saveNotificationInternal(@BindBean Notification notification, @Bind("dataJson") String dataJson);
+        void saveNotificationInternal(
+                @org.jdbi.v3.sqlobject.customizer.BindMethods Notification notification,
+                @Bind("dataJson") String dataJson);
 
         default void saveNotification(Notification notification) {
             String dataJson = toJson(notification.data());
@@ -513,7 +515,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
             var conversationId = rs.getString("conversation_id");
             var senderId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "sender_id");
             var content = rs.getString("content");
-            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at");
+            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ConversationMapper.COL_CREATED_AT);
             return new Message(id, conversationId, senderId, content, createdAt);
         }
     }
@@ -524,7 +526,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
             var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
             var fromUserId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "from_user_id");
             var toUserId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "to_user_id");
-            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at");
+            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ConversationMapper.COL_CREATED_AT);
             var status = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "status", Status.class);
             var respondedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "responded_at");
 
@@ -542,7 +544,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
             var type = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "type", Type.class);
             var title = rs.getString("title");
             var message = rs.getString("message");
-            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at");
+            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ConversationMapper.COL_CREATED_AT);
             var isRead = rs.getBoolean("is_read");
             var data = fromJson(rs.getString("data_json"));
 

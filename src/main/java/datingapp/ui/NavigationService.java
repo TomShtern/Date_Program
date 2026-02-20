@@ -71,7 +71,9 @@ public final class NavigationService {
         MATCHES("/fxml/matches.fxml"),
         CHAT("/fxml/chat.fxml"),
         STATS("/fxml/stats.fxml"),
-        PREFERENCES("/fxml/MatchPreferences.fxml");
+        PREFERENCES("/fxml/MatchPreferences.fxml"),
+        STANDOUTS("/fxml/standouts.fxml"),
+        SOCIAL("/fxml/social.fxml");
 
         private final String fxmlPath;
 

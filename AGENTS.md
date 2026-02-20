@@ -41,6 +41,12 @@ mvn verify                           # Full build + all quality checks + JaCoCo
 # Database Management
 rm ./data/dating.mv.db               # Reset database (delete all data)
 mvn clean                            # Clean build artifacts
+
+### Database Password
+The app uses an embedded H2 database managed via HikariCP. `DatabaseManager` handles passwords automatically based on the JDBC URL:
+- Production/external: Requires `$env:DATING_APP_DB_PASSWORD` set in shell.
+- Local File (`jdbc:h2:./...`): Auto-defaults to `dev`.
+- Test Memory (`jdbc:h2:mem:...`): Auto-defaults to `""`.
 ```
 
 ### Build Command Discipline

@@ -8,12 +8,11 @@ import datingapp.ui.ImageCache;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
 import datingapp.ui.UiFeedbackService;
+import datingapp.ui.UiUtils;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
 import java.net.URL;
 import java.util.ResourceBundle;
-import java.util.Set;
-import java.util.function.Function;
 import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
@@ -118,6 +117,15 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private StackPane avatarInner;
+
+    @FXML
+    private Button prevPhotoButton;
+
+    @FXML
+    private Button nextPhotoButton;
+
+    @FXML
+    private Label photoIndicatorLabel;
 
     @FXML
     private Label interestCountLabel;
@@ -235,6 +243,12 @@ public class ProfileController extends BaseController implements Initializable {
         updateProfilePhoto(viewModel.primaryPhotoUrlProperty().get());
         addSubscription(viewModel.primaryPhotoUrlProperty().subscribe(this::updateProfilePhoto));
 
+        addSubscription(viewModel.currentPhotoIndexProperty().subscribe(index -> updatePhotoControlsVisibility()));
+
+        viewModel.getPhotoUrls().addListener((javafx.collections.ListChangeListener<String>)
+                c -> updatePhotoControlsVisibility());
+        updatePhotoControlsVisibility();
+
         // Refresh interested in buttons AFTER user data is loaded (they show the actual
         // preferences)
         if (interestedInFlow != null) {
@@ -276,29 +290,29 @@ public class ProfileController extends BaseController implements Initializable {
         // Smoking ComboBox
         if (smokingCombo != null) {
             smokingCombo.setItems(FXCollections.observableArrayList(Lifestyle.Smoking.values()));
-            smokingCombo.setConverter(createEnumStringConverter(Lifestyle.Smoking::getDisplayName));
-            smokingCombo.setButtonCell(createDisplayCell(Lifestyle.Smoking::getDisplayName));
+            smokingCombo.setConverter(UiUtils.createEnumStringConverter(Lifestyle.Smoking::getDisplayName));
+            smokingCombo.setButtonCell(UiUtils.createDisplayCell(Lifestyle.Smoking::getDisplayName));
         }
 
         // Drinking ComboBox
         if (drinkingCombo != null) {
             drinkingCombo.setItems(FXCollections.observableArrayList(Lifestyle.Drinking.values()));
-            drinkingCombo.setConverter(createEnumStringConverter(Lifestyle.Drinking::getDisplayName));
-            drinkingCombo.setButtonCell(createDisplayCell(Lifestyle.Drinking::getDisplayName));
+            drinkingCombo.setConverter(UiUtils.createEnumStringConverter(Lifestyle.Drinking::getDisplayName));
+            drinkingCombo.setButtonCell(UiUtils.createDisplayCell(Lifestyle.Drinking::getDisplayName));
         }
 
         // Wants Kids ComboBox
         if (wantsKidsCombo != null) {
             wantsKidsCombo.setItems(FXCollections.observableArrayList(Lifestyle.WantsKids.values()));
-            wantsKidsCombo.setConverter(createEnumStringConverter(Lifestyle.WantsKids::getDisplayName));
-            wantsKidsCombo.setButtonCell(createDisplayCell(Lifestyle.WantsKids::getDisplayName));
+            wantsKidsCombo.setConverter(UiUtils.createEnumStringConverter(Lifestyle.WantsKids::getDisplayName));
+            wantsKidsCombo.setButtonCell(UiUtils.createDisplayCell(Lifestyle.WantsKids::getDisplayName));
         }
 
         // Looking For ComboBox
         if (lookingForCombo != null) {
             lookingForCombo.setItems(FXCollections.observableArrayList(Lifestyle.LookingFor.values()));
-            lookingForCombo.setConverter(createEnumStringConverter(Lifestyle.LookingFor::getDisplayName));
-            lookingForCombo.setButtonCell(createDisplayCell(Lifestyle.LookingFor::getDisplayName));
+            lookingForCombo.setConverter(UiUtils.createEnumStringConverter(Lifestyle.LookingFor::getDisplayName));
+            lookingForCombo.setButtonCell(UiUtils.createDisplayCell(Lifestyle.LookingFor::getDisplayName));
         }
     }
 
@@ -370,12 +384,14 @@ public class ProfileController extends BaseController implements Initializable {
                     });
 
             boolean isSelected = viewModel.getInterestedInGenders().contains(g);
-            updateInterestedInButtonStyle(btn, isSelected);
+            UiUtils.updateToggleStyle(
+                    btn, isSelected, "-fx-background-radius: 20; -fx-padding: 8 16; -fx-font-size: 13px;");
 
             btn.setOnAction(event -> {
                 event.consume();
                 boolean nowSelected = viewModel.toggleInterestedIn(g);
-                updateInterestedInButtonStyle(btn, nowSelected);
+                UiUtils.updateToggleStyle(
+                        btn, nowSelected, "-fx-background-radius: 20; -fx-padding: 8 16; -fx-font-size: 13px;");
                 updateInterestedInLabel();
             });
 
@@ -383,18 +399,6 @@ public class ProfileController extends BaseController implements Initializable {
         }
 
         updateInterestedInLabel();
-    }
-
-    /**
-     * Updates the style of an interested-in toggle button.
-     */
-    private void updateInterestedInButtonStyle(Button btn, boolean selected) {
-        String baseStyle = "-fx-background-radius: 20; -fx-padding: 8 16; -fx-font-size: 13px;";
-        if (selected) {
-            btn.setStyle("-fx-background-color: #667eea; -fx-text-fill: white; " + baseStyle);
-        } else {
-            btn.setStyle("-fx-background-color: #334155; -fx-text-fill: #94a3b8; " + baseStyle);
-        }
     }
 
     /**
@@ -414,37 +418,6 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     /**
-     * Creates a StringConverter for enum types using a display name function.
-     */
-    private <T extends Enum<T>> StringConverter<T> createEnumStringConverter(Function<T, String> displayNameFunc) {
-        return new StringConverter<>() {
-            @Override
-            public String toString(T object) {
-                return object == null ? "" : displayNameFunc.apply(object);
-            }
-
-            @Override
-            public T fromString(String string) {
-                return null; // Not needed for ComboBox
-            }
-        };
-    }
-
-    /**
-     * Creates a ListCell that displays enum values using their display name.
-     */
-    private <T extends Enum<T>> ListCell<T> createDisplayCell(Function<T, String> displayNameFunc) {
-        return new ListCell<>() {
-
-            @Override
-            protected void updateItem(T item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : displayNameFunc.apply(item));
-            }
-        };
-    }
-
-    /**
      * Binds lifestyle ComboBoxes to ViewModel properties.
      */
     private void bindHeightField() {
@@ -456,7 +429,7 @@ public class ProfileController extends BaseController implements Initializable {
             try {
                 int height = Integer.parseInt(newVal.trim());
                 viewModel.heightProperty().set(height);
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException _) {
                 assert true; // Non-numeric input ignored; user is still typing
             }
         }));
@@ -480,7 +453,7 @@ public class ProfileController extends BaseController implements Initializable {
                 viewModel.heightProperty().set(null);
                 UiFeedbackService.showWarning("Please enter a height between " + minHeight + "-" + maxHeight + " cm");
             }
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             heightField.setText("");
             viewModel.heightProperty().set(null);
         }
@@ -535,6 +508,49 @@ public class ProfileController extends BaseController implements Initializable {
         if (avatarPlaceholderIcon != null) {
             avatarPlaceholderIcon.setVisible(false);
         }
+    }
+
+    private void updatePhotoControlsVisibility() {
+        int count = viewModel.getPhotoUrls().size();
+        if (count > 1) {
+            if (prevPhotoButton != null) {
+                prevPhotoButton.setVisible(true);
+                prevPhotoButton.setManaged(true);
+            }
+            if (nextPhotoButton != null) {
+                nextPhotoButton.setVisible(true);
+                nextPhotoButton.setManaged(true);
+            }
+            if (photoIndicatorLabel != null) {
+                photoIndicatorLabel.setText(
+                        (viewModel.currentPhotoIndexProperty().get() + 1) + "/" + count);
+                photoIndicatorLabel.setVisible(true);
+                photoIndicatorLabel.setManaged(true);
+            }
+        } else {
+            if (prevPhotoButton != null) {
+                prevPhotoButton.setVisible(false);
+                prevPhotoButton.setManaged(false);
+            }
+            if (nextPhotoButton != null) {
+                nextPhotoButton.setVisible(false);
+                nextPhotoButton.setManaged(false);
+            }
+            if (photoIndicatorLabel != null) {
+                photoIndicatorLabel.setVisible(false);
+                photoIndicatorLabel.setManaged(false);
+            }
+        }
+    }
+
+    @FXML
+    private void handlePrevPhoto() {
+        viewModel.showPreviousPhoto();
+    }
+
+    @FXML
+    private void handleNextPhoto() {
+        viewModel.showNextPhoto();
     }
 
     /**
@@ -642,12 +658,12 @@ public class ProfileController extends BaseController implements Initializable {
             for (Interest interest : Interest.byCategory(category)) {
                 Button chipBtn = new Button(interest.getDisplayName());
                 boolean isSelected = viewModel.getSelectedInterests().contains(interest);
-                updateInterestChipStyle(chipBtn, isSelected);
+                UiUtils.updateChipStyle(chipBtn, isSelected, "#667eea");
 
                 chipBtn.setOnAction(event -> {
                     event.consume();
                     boolean nowSelected = viewModel.toggleInterest(interest);
-                    updateInterestChipStyle(chipBtn, nowSelected);
+                    UiUtils.updateChipStyle(chipBtn, nowSelected, "#667eea");
                     updateInterestCountLabel();
                 });
 
@@ -669,19 +685,6 @@ public class ProfileController extends BaseController implements Initializable {
         // Update display after dialog closes
         populateInterestChips();
         updateInterestCountLabel();
-    }
-
-    /**
-     * Updates the style of an interest chip button based on selection state.
-     */
-    private void updateInterestChipStyle(Button chip, boolean selected) {
-        if (selected) {
-            chip.setStyle(
-                    "-fx-background-color: #667eea; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 6 12;");
-        } else {
-            chip.setStyle(
-                    "-fx-background-color: #334155; -fx-text-fill: #94a3b8; -fx-background-radius: 20; -fx-padding: 6 12;");
-        }
     }
 
     /**
@@ -760,39 +763,43 @@ public class ProfileController extends BaseController implements Initializable {
 
         // --- Smoking Section ---
         content.getChildren()
-                .add(createDealbreakersSection(
+                .add(UiUtils.createSelectionSection(
                         "Smoking Preferences",
                         DEALBREAKER_HEADER,
                         Lifestyle.Smoking.values(),
                         selectedSmoking,
-                        Lifestyle.Smoking::getDisplayName));
+                        Lifestyle.Smoking::getDisplayName,
+                        "#10b981"));
 
         // --- Drinking Section ---
         content.getChildren()
-                .add(createDealbreakersSection(
+                .add(UiUtils.createSelectionSection(
                         "Drinking Preferences",
                         DEALBREAKER_HEADER,
                         Lifestyle.Drinking.values(),
                         selectedDrinking,
-                        Lifestyle.Drinking::getDisplayName));
+                        Lifestyle.Drinking::getDisplayName,
+                        "#10b981"));
 
         // --- Kids Section ---
         content.getChildren()
-                .add(createDealbreakersSection(
+                .add(UiUtils.createSelectionSection(
                         "Kids Preferences",
                         DEALBREAKER_HEADER,
                         Lifestyle.WantsKids.values(),
                         selectedKids,
-                        Lifestyle.WantsKids::getDisplayName));
+                        Lifestyle.WantsKids::getDisplayName,
+                        "#10b981"));
 
         // --- Looking For Section ---
         content.getChildren()
-                .add(createDealbreakersSection(
+                .add(UiUtils.createSelectionSection(
                         "Relationship Goals",
                         "Only show people looking for:",
                         Lifestyle.LookingFor.values(),
                         selectedLookingFor,
-                        Lifestyle.LookingFor::getDisplayName));
+                        Lifestyle.LookingFor::getDisplayName,
+                        "#10b981"));
 
         // --- Clear All Button ---
         Button clearAllBtn = new Button("Clear All Dealbreakers");
@@ -868,52 +875,6 @@ public class ProfileController extends BaseController implements Initializable {
     private void logError(String message, Throwable error) {
         if (logger.isErrorEnabled()) {
             logger.error(message, error);
-        }
-    }
-
-    // --- Dealbreaker chip rendering (inlined from DealbreakersChipHelper) ---
-
-    private static <T extends Enum<T>> VBox createDealbreakersSection(
-            String title, String subtitle, T[] values, Set<T> selected, Function<T, String> displayNameFunc) {
-        VBox section = new VBox(8);
-
-        Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: white; -fx-font-size: 14px;");
-
-        Label subtitleLabel = new Label(subtitle);
-        subtitleLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 12px;");
-
-        FlowPane itemsPane = new FlowPane(8, 8);
-        for (T value : values) {
-            Button chip = new Button(displayNameFunc.apply(value));
-            boolean isSelected = selected.contains(value);
-            updateChipStyle(chip, isSelected);
-
-            chip.setOnAction(event -> {
-                event.consume();
-                if (selected.contains(value)) {
-                    selected.remove(value);
-                    updateChipStyle(chip, false);
-                } else {
-                    selected.add(value);
-                    updateChipStyle(chip, true);
-                }
-            });
-
-            itemsPane.getChildren().add(chip);
-        }
-
-        section.getChildren().addAll(titleLabel, subtitleLabel, itemsPane);
-        return section;
-    }
-
-    private static void updateChipStyle(Button chip, boolean selected) {
-        if (selected) {
-            chip.setStyle(
-                    "-fx-background-color: #10b981; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 6 12;");
-        } else {
-            chip.setStyle(
-                    "-fx-background-color: #334155; -fx-text-fill: #94a3b8; -fx-background-radius: 20; -fx-padding: 6 12;");
         }
     }
 }

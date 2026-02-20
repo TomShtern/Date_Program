@@ -43,6 +43,9 @@ public class DashboardController extends BaseController
     private Label completionLabel;
 
     @FXML
+    private Label unreadBadgeLabel;
+
+    @FXML
     private ListView<String> achievementsListView;
 
     @FXML
@@ -66,6 +69,12 @@ public class DashboardController extends BaseController
     @FXML
     private Button statsButton;
 
+    @FXML
+    private Button standoutsButton;
+
+    @FXML
+    private Button socialButton;
+
     private final DashboardViewModel viewModel;
 
     public DashboardController(DashboardViewModel viewModel) {
@@ -82,6 +91,16 @@ public class DashboardController extends BaseController
         addSubscription(viewModel.dailyPickNameProperty().subscribe(dailyPickLabel::setText));
         addSubscription(viewModel.totalMatchesProperty().subscribe(totalMatchesLabel::setText));
         addSubscription(viewModel.profileCompletionProperty().subscribe(completionLabel::setText));
+        addSubscription(viewModel.notificationCountProperty().subscribe(count -> {
+            if (count != null && count.intValue() > 0) {
+                unreadBadgeLabel.setText(String.valueOf(count));
+                unreadBadgeLabel.setVisible(true);
+                unreadBadgeLabel.setManaged(true);
+            } else {
+                unreadBadgeLabel.setVisible(false);
+                unreadBadgeLabel.setManaged(false);
+            }
+        }));
 
         // Set initial values
         userNameLabel.setText(viewModel.userNameProperty().get());
@@ -162,6 +181,18 @@ public class DashboardController extends BaseController
                 handleStats();
             });
         }
+        if (standoutsButton != null) {
+            standoutsButton.setOnAction(event -> {
+                event.consume();
+                handleStandouts();
+            });
+        }
+        if (socialButton != null) {
+            socialButton.setOnAction(event -> {
+                event.consume();
+                handleSocial();
+            });
+        }
         if (logoutButton != null) {
             logoutButton.setOnAction(event -> {
                 event.consume();
@@ -204,6 +235,18 @@ public class DashboardController extends BaseController
     private void handleViewDailyPick() {
         logger.info("Viewing daily pick - navigating to Matching");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
+    }
+
+    @FXML
+    private void handleStandouts() {
+        logger.info("Navigating to Standouts screen");
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.STANDOUTS);
+    }
+
+    @FXML
+    private void handleSocial() {
+        logger.info("Navigating to Social screen");
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.SOCIAL);
     }
 
     @FXML

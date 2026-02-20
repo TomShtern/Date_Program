@@ -50,6 +50,7 @@ public class DashboardViewModel {
     private final StringProperty profileCompletion = new SimpleStringProperty("0%");
     private final IntegerProperty notificationCount = new SimpleIntegerProperty(0);
     private final IntegerProperty unreadMessages = new SimpleIntegerProperty(0);
+    private final IntegerProperty friendRequestsCount = new SimpleIntegerProperty(0);
     private final BooleanProperty loading = new SimpleBooleanProperty(true);
 
     private final ObservableList<String> recentAchievements = FXCollections.observableArrayList();
@@ -64,8 +65,10 @@ public class DashboardViewModel {
     /**
      * Track disposed state to prevent operations after cleanup.
      *
-     * <p>Uses {@link AtomicBoolean} instead of a volatile flag to make the threading
-     * semantics explicit and consistent with other atomics (e.g. {@link #activeLoads}).
+     * <p>
+     * Uses {@link AtomicBoolean} instead of a volatile flag to make the threading
+     * semantics explicit and consistent with other atomics (e.g.
+     * {@link #activeLoads}).
      * This allows safe, lock-free checks and updates from background threads and
      * keeps the option open for compound atomic operations if the lifecycle logic
      * becomes more complex.
@@ -211,10 +214,15 @@ public class DashboardViewModel {
             }
 
             int unreadCount = 0;
+            int pendingRequests = 0;
+            int unreadNotifications = 0;
             try {
                 unreadCount = messagingService.getTotalUnreadCount(user.getId());
+                pendingRequests =
+                        messagingService.getPendingRequestsFor(user.getId()).size();
+                unreadNotifications = messagingService.getUnreadNotificationCount(user.getId());
             } catch (Exception e) {
-                logError("Unread messages error", e);
+                logError("Notifications/Messages error", e);
                 if (firstError == null) {
                     firstError = e;
                 }
@@ -227,6 +235,8 @@ public class DashboardViewModel {
             final String finalPick = pickName;
             final List<UserAchievement> finalAchievements = achievements;
             final int finalUnreadCount = unreadCount;
+            final int finalPendingRequests = pendingRequests;
+            final int finalUnreadNotifications = unreadNotifications;
 
             final Exception finalError = firstError;
             if (isRefreshInvalid(generation)) {
@@ -246,7 +256,8 @@ public class DashboardViewModel {
                 totalMatches.set(finalMatches);
                 dailyPickName.set(finalPick);
                 unreadMessages.set(finalUnreadCount);
-                // notificationCount could aggregate unread + other alerts in future
+                friendRequestsCount.set(finalPendingRequests);
+                notificationCount.set(finalUnreadCount + finalPendingRequests + finalUnreadNotifications);
 
                 recentAchievements.clear();
                 finalAchievements.stream()
@@ -369,6 +380,10 @@ public class DashboardViewModel {
 
     public IntegerProperty unreadMessagesProperty() {
         return unreadMessages;
+    }
+
+    public IntegerProperty friendRequestsCountProperty() {
+        return friendRequestsCount;
     }
 
     public BooleanProperty loadingProperty() {

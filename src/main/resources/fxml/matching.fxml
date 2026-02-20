@@ -3,6 +3,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
@@ -28,28 +29,40 @@
       <VBox styleClass="card card-stack-2" visible="false" managed="false" maxWidth="400.0"/>
       <!-- Candidate Card (front) -->
       <VBox fx:id="candidateCard" alignment="TOP_CENTER" maxWidth="400.0" spacing="0.0"
-                                                    styleClass="card card-stack-1">
+                                                          styleClass="card card-stack-1">
         <!-- Swipe Overlays -->
         <StackPane>
           <!-- LIKE Overlay -->
           <Label fx:id="likeOverlay" text="LIKE" visible="false" managed="false"
-                                               styleClass="swipe-overlay swipe-like-overlay swipe-overlay-text"
-                                               StackPane.alignment="TOP_LEFT">
+                                                         styleClass="swipe-overlay swipe-like-overlay swipe-overlay-text"
+                                                         StackPane.alignment="TOP_LEFT">
             <StackPane.margin>
               <javafx.geometry.Insets top="20" left="20"/>
             </StackPane.margin>
           </Label>
           <!-- PASS Overlay -->
           <Label fx:id="passOverlay" text="NOPE" visible="false" managed="false"
-                                               styleClass="swipe-overlay swipe-pass-overlay swipe-overlay-text"
-                                               StackPane.alignment="TOP_RIGHT">
+                                                         styleClass="swipe-overlay swipe-pass-overlay swipe-overlay-text"
+                                                         StackPane.alignment="TOP_RIGHT">
             <StackPane.margin>
               <javafx.geometry.Insets top="20" right="20"/>
             </StackPane.margin>
           </Label>
-          <!-- Photo placeholder -->
-          <StackPane prefHeight="350.0" styleClass="card-photo-placeholder">
-            <Label styleClass="text-secondary" text="[Photo Placeholder]"/>
+          <!-- Candidate Photo -->
+          <StackPane prefHeight="350.0" styleClass="card-photo-container">
+            <javafx.scene.image.ImageView fx:id="candidatePhoto" fitHeight="350.0" fitWidth="400.0" preserveRatio="true"/>
+            <!-- Photo Navigation Overlays -->
+            <HBox alignment="CENTER" pickOnBounds="false">
+              <Button fx:id="prevPhotoButton" styleClass="button-transparent, photo-nav-button" text="◀" onAction="#handlePrevPhoto" visible="false" managed="false"/>
+              <Region HBox.hgrow="ALWAYS" pickOnBounds="false"/>
+              <Button fx:id="nextPhotoButton" styleClass="button-transparent, photo-nav-button" text="▶" onAction="#handleNextPhoto" visible="false" managed="false"/>
+            </HBox>
+            <!-- Photo Indicator Label -->
+            <Label fx:id="photoIndicatorLabel" styleClass="photo-indicator-label" StackPane.alignment="BOTTOM_CENTER" visible="false" managed="false" style="-fx-text-fill: white; -fx-font-weight: bold; -fx-background-color: rgba(0,0,0,0.5); -fx-padding: 2 6; -fx-background-radius: 10;">
+              <StackPane.margin>
+                <Insets bottom="10.0"/>
+              </StackPane.margin>
+            </Label>
           </StackPane>
         </StackPane>
         <VBox spacing="10.0" styleClass="card-info-container">
@@ -61,12 +74,12 @@
           </HBox>
           <Label fx:id="distanceLabel" styleClass="card-distance" text="📍 3km away"/>
           <Label fx:id="bioLabel" prefHeight="80.0" wrapText="true"
-                                                                                    text="Lover of hiking, coding and good coffee. Always looking for the next adventure!" />
+                                                                                              text="Lover of hiking, coding and good coffee. Always looking for the next adventure!" />
         </VBox>
       </VBox>
       <!-- Empty State: No More Candidates (Enhanced) -->
       <VBox fx:id="noCandidatesContainer" alignment="CENTER" spacing="24" visible="false"
-                                          styleClass="matches-empty-container" maxWidth="450">
+                                                styleClass="matches-empty-container" maxWidth="450">
         <padding>
           <Insets top="40" right="48" bottom="40" left="48"/>
         </padding>
@@ -76,7 +89,7 @@
         </StackPane>
         <Label styleClass="empty-state-heading" text="No more people around you!"/>
         <Label styleClass="empty-state-body" wrapText="true" maxWidth="350"
-                                               text="You've seen everyone nearby. Try expanding your search or check back later!"/>
+                                                       text="You've seen everyone nearby. Try expanding your search or check back later!"/>
         <!-- Separator -->
         <Region styleClass="matches-separator" prefHeight="1" prefWidth="200">
           <VBox.margin>
@@ -154,6 +167,23 @@
         </graphic>
         <tooltip>
           <Tooltip text="Super Like (↑)"/>
+        </tooltip>
+      </Button>
+      <Separator orientation="VERTICAL" prefHeight="40.0"/>
+      <Button onAction="#handleBlock" styleClass="action-button-round action-btn-neutral">
+        <graphic>
+          <FontIcon iconLiteral="mdi2b-block-helper" iconSize="18" iconColor="#ef4444"/>
+        </graphic>
+        <tooltip>
+          <Tooltip text="Block this person"/>
+        </tooltip>
+      </Button>
+      <Button onAction="#handleReport" styleClass="action-button-round action-btn-neutral">
+        <graphic>
+          <FontIcon iconLiteral="mdi2f-flag" iconSize="18" iconColor="#f59e0b"/>
+        </graphic>
+        <tooltip>
+          <Tooltip text="Report this person"/>
         </tooltip>
       </Button>
     </HBox>

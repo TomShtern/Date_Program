@@ -3,9 +3,11 @@ package datingapp.ui.viewmodel;
 import static datingapp.core.matching.CandidateFinder.GeoUtils.distanceKm;
 
 import datingapp.core.AppSession;
+import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
+import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
@@ -13,6 +15,7 @@ import datingapp.core.model.User.UserState;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,9 +23,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,12 +44,17 @@ public class MatchingViewModel {
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
     private final UndoService undoService;
+    private final TrustSafetyService trustSafetyService;
     private final AppSession session;
 
     private final Queue<User> candidateQueue = new ConcurrentLinkedQueue<>();
     private final ObjectProperty<User> currentCandidate = new SimpleObjectProperty<>();
     private final BooleanProperty hasMoreCandidates = new SimpleBooleanProperty(false);
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
+
+    private final ObjectProperty<List<String>> currentCandidatePhotoUrls = new SimpleObjectProperty<>(List.of());
+    private final IntegerProperty currentCandidatePhotoIndex = new SimpleIntegerProperty(0);
+    private final StringProperty currentCandidatePhotoUrl = new SimpleStringProperty();
 
     // New: Property to notify when a match occurs
     private final ObjectProperty<Match> lastMatch = new SimpleObjectProperty<>();
@@ -63,10 +75,12 @@ public class MatchingViewModel {
             CandidateFinder candidateFinder,
             MatchingService matchingService,
             UndoService undoService,
+            TrustSafetyService trustSafetyService,
             AppSession session) {
         this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
         this.undoService = Objects.requireNonNull(undoService, "undoService cannot be null");
+        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
@@ -190,6 +204,16 @@ public class MatchingViewModel {
         runOnFx(() -> {
             User next = candidateQueue.poll();
             currentCandidate.set(next);
+            if (next != null) {
+                List<String> urls = next.getPhotoUrls();
+                currentCandidatePhotoUrls.set(urls);
+                currentCandidatePhotoIndex.set(0);
+                currentCandidatePhotoUrl.set(urls.isEmpty() ? null : urls.get(0));
+            } else {
+                currentCandidatePhotoUrls.set(List.of());
+                currentCandidatePhotoIndex.set(0);
+                currentCandidatePhotoUrl.set(null);
+            }
             hasMoreCandidates.set(next != null);
         });
     }
@@ -245,6 +269,10 @@ public class MatchingViewModel {
                 // Return last candidate to view
                 if (lastSwipedCandidate != null) {
                     currentCandidate.set(lastSwipedCandidate);
+                    List<String> urls = lastSwipedCandidate.getPhotoUrls();
+                    currentCandidatePhotoUrls.set(urls);
+                    currentCandidatePhotoIndex.set(0);
+                    currentCandidatePhotoUrl.set(urls.isEmpty() ? null : urls.get(0));
                     lastSwipedCandidate = null;
                     hasMoreCandidates.set(true);
                 } else {
@@ -344,6 +372,74 @@ public class MatchingViewModel {
 
     public ObjectProperty<User> matchedUserProperty() {
         return matchedUser;
+    }
+
+    public void showNextPhoto() {
+        List<String> urls = currentCandidatePhotoUrls.get();
+        if (urls == null || urls.isEmpty()) {
+            return;
+        }
+        int nextIdx = (currentCandidatePhotoIndex.get() + 1) % urls.size();
+        currentCandidatePhotoIndex.set(nextIdx);
+        currentCandidatePhotoUrl.set(urls.get(nextIdx));
+    }
+
+    public void showPreviousPhoto() {
+        List<String> urls = currentCandidatePhotoUrls.get();
+        if (urls == null || urls.isEmpty()) {
+            return;
+        }
+        int prevIdx = currentCandidatePhotoIndex.get() - 1;
+        if (prevIdx < 0) {
+            prevIdx = urls.size() - 1;
+        }
+        currentCandidatePhotoIndex.set(prevIdx);
+        currentCandidatePhotoUrl.set(urls.get(prevIdx));
+    }
+
+    public StringProperty currentCandidatePhotoUrlProperty() {
+        return currentCandidatePhotoUrl;
+    }
+
+    public void blockCandidate(UUID targetId) {
+        User user = ensureCurrentUser();
+        if (user == null || targetId == null) {
+            return;
+        }
+        Thread.ofVirtual().start(() -> {
+            try {
+                trustSafetyService.block(user.getId(), targetId);
+                // After blocking, advance to next candidate
+                runOnFx(this::nextCandidate);
+            } catch (Exception e) {
+                logWarn("Failed to block user", e);
+            }
+        });
+    }
+
+    public void reportCandidate(UUID targetId, Report.Reason reason, String description, boolean blockUser) {
+        User user = ensureCurrentUser();
+        if (user == null || targetId == null || reason == null) {
+            return;
+        }
+        Thread.ofVirtual().start(() -> {
+            try {
+                trustSafetyService.report(user.getId(), targetId, reason, description, blockUser);
+                if (blockUser) {
+                    runOnFx(this::nextCandidate);
+                }
+            } catch (Exception e) {
+                logWarn("Failed to report user", e);
+            }
+        });
+    }
+
+    public ObjectProperty<List<String>> currentCandidatePhotoUrlsProperty() {
+        return currentCandidatePhotoUrls;
+    }
+
+    public IntegerProperty currentCandidatePhotoIndexProperty() {
+        return currentCandidatePhotoIndex;
     }
 
     private void logDebug(String message, Object... args) {

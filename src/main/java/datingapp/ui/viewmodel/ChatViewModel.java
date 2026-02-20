@@ -3,9 +3,11 @@ package datingapp.ui.viewmodel;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
+import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.connection.ConnectionService.SendResult;
+import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.User;
 import java.util.List;
 import java.util.Objects;
@@ -36,6 +38,7 @@ public class ChatViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ChatViewModel.class);
 
     private final ConnectionService messagingService;
+    private final TrustSafetyService trustSafetyService;
     private final AppSession session;
     private final ObservableList<ConversationPreview> conversations = FXCollections.observableArrayList();
     private final ObservableList<Message> activeMessages = FXCollections.observableArrayList();
@@ -61,8 +64,10 @@ public class ChatViewModel {
     /** Keep reference to listener for cleanup. */
     private final javafx.beans.value.ChangeListener<ConversationPreview> selectionListener;
 
-    public ChatViewModel(ConnectionService messagingService, AppSession session) {
+    public ChatViewModel(
+            ConnectionService messagingService, TrustSafetyService trustSafetyService, AppSession session) {
         this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
+        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
 
         // Listen for selection changes to load messages
@@ -422,6 +427,38 @@ public class ChatViewModel {
         if (logger.isErrorEnabled()) {
             logger.error(message, error);
         }
+    }
+
+    public void blockUser(UUID targetId) {
+        User user = ensureCurrentUser();
+        if (user == null || targetId == null) {
+            return;
+        }
+        Thread.ofVirtual().start(() -> {
+            try {
+                trustSafetyService.block(user.getId(), targetId);
+                runOnFx(this::refreshConversations);
+            } catch (Exception e) {
+                logError("Failed to block user", e);
+            }
+        });
+    }
+
+    public void reportUser(UUID targetId, Report.Reason reason, String description, boolean blockUser) {
+        User user = ensureCurrentUser();
+        if (user == null || targetId == null || reason == null) {
+            return;
+        }
+        Thread.ofVirtual().start(() -> {
+            try {
+                trustSafetyService.report(user.getId(), targetId, reason, description, blockUser);
+                if (blockUser) {
+                    runOnFx(this::refreshConversations);
+                }
+            } catch (Exception e) {
+                logError("Failed to report user", e);
+            }
+        });
     }
 
     // --- Properties ---

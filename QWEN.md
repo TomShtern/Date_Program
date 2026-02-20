@@ -5,7 +5,7 @@
 # 1) pick SEQ = highestSEQ+1 (recheck before write),
 # 2) locate affected doc fragment using prioritized search (see below),
 # 3) archive replaced text with <!--ARCHIVE:SEQ:agent:scope-->...<!--/ARCHIVE-->,
-# 4) apply minimal precise edits (edit only minimal precise edits),
+# 4) apply minimal precise edits,
 # 5) append one ChangeStamp line to the file-end changelog and inside the edited fragment,
 # 6) if uncertain to auto-edit, append TODO+ChangeStamp next to nearest heading.
 <!--/AGENT-DOCSYNC-->

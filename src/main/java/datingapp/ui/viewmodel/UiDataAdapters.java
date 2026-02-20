@@ -1,8 +1,10 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
+import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
@@ -62,6 +64,21 @@ public final class UiDataAdapters {
         void deleteLike(UUID likeId);
     }
 
+    /** UI-layer adapter interface for social and notification data access. */
+    public interface UiSocialDataAccess {
+
+        /**
+         * Returns notifications for the user.
+         *
+         * @param userId     the user to fetch notifications for
+         * @param unreadOnly if {@code true}, only returns unread notifications
+         */
+        List<Notification> getNotifications(UUID userId, boolean unreadOnly);
+
+        /** Marks the notification with the given ID as read. */
+        void markNotificationRead(UUID notificationId);
+    }
+
     // ── Implementations ─────────────────────────────────────────────────────
 
     /** Bridges the UI layer to the core {@link UserStorage} interface. */
@@ -86,6 +103,27 @@ public final class UiDataAdapters {
         @Override
         public Map<UUID, User> findByIds(Set<UUID> ids) {
             return userStorage.findByIds(ids);
+        }
+    }
+
+    /** Bridges the UI layer to the core {@link CommunicationStorage} interface. */
+    public static final class StorageUiSocialDataAccess implements UiSocialDataAccess {
+
+        private final CommunicationStorage communicationStorage;
+
+        public StorageUiSocialDataAccess(CommunicationStorage communicationStorage) {
+            this.communicationStorage =
+                    Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
+        }
+
+        @Override
+        public List<Notification> getNotifications(UUID userId, boolean unreadOnly) {
+            return communicationStorage.getNotificationsForUser(userId, unreadOnly);
+        }
+
+        @Override
+        public void markNotificationRead(UUID notificationId) {
+            communicationStorage.markNotificationAsRead(notificationId);
         }
     }
 

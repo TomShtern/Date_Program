@@ -1,10 +1,14 @@
 package datingapp.ui.screen;
 
 import datingapp.core.connection.ConnectionModels.Message;
+import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
+import datingapp.core.model.User;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
 import datingapp.ui.UiConstants;
+import datingapp.ui.UiFeedbackService;
+import datingapp.ui.UiUtils;
 import datingapp.ui.viewmodel.ChatViewModel;
 import java.net.URL;
 import java.time.ZoneId;
@@ -16,6 +20,10 @@ import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -199,6 +207,8 @@ public class ChatController extends BaseController implements Initializable {
         private final VBox bubble = new VBox(4);
         private final Label contentLabel = new Label();
         private final Label timeLabel = new Label();
+        private final Region readReceiptIcon = new Region();
+        private final HBox metaBox = new HBox(4);
         private final ChatViewModel viewModel;
 
         public MessageListCell(ChatViewModel viewModel) {
@@ -208,7 +218,18 @@ public class ChatController extends BaseController implements Initializable {
             contentLabel.setWrapText(true);
             contentLabel.setMaxWidth(280);
             timeLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.6);");
-            bubble.getChildren().addAll(contentLabel, timeLabel);
+
+            readReceiptIcon.getStyleClass().addAll("read-receipt-icon", "read-receipt-seen");
+            readReceiptIcon.setPrefSize(12, 12);
+            readReceiptIcon.setMinSize(12, 12);
+            readReceiptIcon.setMaxSize(12, 12);
+            readReceiptIcon.setVisible(false);
+            readReceiptIcon.setManaged(false);
+
+            metaBox.setAlignment(Pos.CENTER_RIGHT);
+            metaBox.getChildren().addAll(timeLabel, readReceiptIcon);
+
+            bubble.getChildren().addAll(contentLabel, metaBox);
         }
 
         @Override
@@ -232,11 +253,27 @@ public class ChatController extends BaseController implements Initializable {
                     bubble.setStyle(""); // Clear any explicit style
                     container.setAlignment(Pos.CENTER_RIGHT);
                     container.getChildren().add(bubble);
+
+                    ConversationPreview currentConv =
+                            viewModel.selectedConversationProperty().get();
+                    if (currentConv != null) {
+                        boolean isRead = !msg.createdAt()
+                                .isAfter(currentConv
+                                        .conversation()
+                                        .getLastReadAt(currentConv.otherUser().getId()));
+                        readReceiptIcon.setVisible(isRead);
+                        readReceiptIcon.setManaged(isRead);
+                    } else {
+                        readReceiptIcon.setVisible(false);
+                        readReceiptIcon.setManaged(false);
+                    }
                 } else {
                     bubble.getStyleClass().clear();
                     bubble.setStyle("-fx-background-color: -fx-surface-dark; -fx-background-radius: 18 18 18 4;");
                     container.setAlignment(Pos.CENTER_LEFT);
                     container.getChildren().add(bubble);
+                    readReceiptIcon.setVisible(false);
+                    readReceiptIcon.setManaged(false);
                 }
 
                 container.setPadding(new Insets(4, 10, 4, 10));
@@ -267,5 +304,60 @@ public class ChatController extends BaseController implements Initializable {
     @FXML
     private void handleBrowseMatches() {
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleBlock() {
+        ConversationPreview selected = viewModel.selectedConversationProperty().get();
+        if (selected == null) {
+            return;
+        }
+        User otherUser = selected.otherUser();
+        boolean confirmed = UiFeedbackService.showConfirmation(
+                "Block User",
+                "Block " + otherUser.getName() + "?",
+                "Your conversation will end and they cannot contact you.");
+        if (confirmed) {
+            viewModel.blockUser(otherUser.getId());
+            UiFeedbackService.showSuccess(otherUser.getName() + " has been blocked.");
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleReport() {
+        ConversationPreview selected = viewModel.selectedConversationProperty().get();
+        if (selected == null) {
+            return;
+        }
+        showReportDialog(selected.otherUser());
+    }
+
+    private void showReportDialog(User otherUser) {
+        Dialog<Report.Reason> dialog = new Dialog<>();
+        dialog.setTitle("Report User");
+        dialog.setHeaderText("Report " + otherUser.getName());
+
+        ChoiceBox<Report.Reason> reasonBox = new ChoiceBox<>();
+        reasonBox.getItems().addAll(Report.Reason.values());
+        reasonBox.setConverter(UiUtils.createEnumStringConverter(r -> r.name().replace('_', ' ')));
+        reasonBox.setValue(Report.Reason.INAPPROPRIATE_CONTENT);
+
+        VBox content = new VBox(10);
+        content.setStyle("-fx-padding: 20;");
+        content.getChildren().addAll(new Label("Select a reason:"), reasonBox);
+        dialog.getDialogPane().setContent(content);
+
+        ButtonType reportBtn = new ButtonType("Report", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelBtn = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(reportBtn, cancelBtn);
+
+        dialog.setResultConverter(
+                bt -> bt == reportBtn ? reasonBox.getValue() : null); // NOPMD CompareObjectsWithEquals
+        dialog.showAndWait().ifPresent(reason -> {
+            viewModel.reportUser(otherUser.getId(), reason, null, true);
+            UiFeedbackService.showSuccess(otherUser.getName() + " has been reported.");
+        });
     }
 }

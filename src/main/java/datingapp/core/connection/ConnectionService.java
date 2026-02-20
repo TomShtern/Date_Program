@@ -217,6 +217,10 @@ public class ConnectionService {
         return total;
     }
 
+    public int getUnreadNotificationCount(UUID userId) {
+        return communicationStorage.getNotificationsForUser(userId, true).size();
+    }
+
     public boolean canMessage(UUID userA, UUID userB) {
         String matchId = Match.generateId(userA, userB);
         Optional<Match> matchOpt = interactionStorage.get(matchId);

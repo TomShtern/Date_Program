@@ -1,9 +1,13 @@
 package datingapp.ui.screen;
 
+import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
+import datingapp.ui.ImageCache;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiFeedbackService;
+import datingapp.ui.UiUtils;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
 import java.util.Objects;
@@ -21,8 +25,10 @@ import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -45,6 +51,18 @@ public class MatchingController extends BaseController implements Initializable 
 
     @FXML
     private VBox candidateCard;
+
+    @FXML
+    private ImageView candidatePhoto;
+
+    @FXML
+    private Button prevPhotoButton;
+
+    @FXML
+    private Button nextPhotoButton;
+
+    @FXML
+    private Label photoIndicatorLabel;
 
     @FXML
     private Label nameLabel;
@@ -140,8 +158,46 @@ public class MatchingController extends BaseController implements Initializable 
 
         wireActionHandlers();
 
+        // Bind Photo URL
+        addSubscription(viewModel.currentCandidatePhotoUrlProperty().subscribe(url -> {
+            if (url != null && !url.isBlank()) {
+                candidatePhoto.setImage(ImageCache.getImage(url, 400, 350));
+            } else {
+                candidatePhoto.setImage(null);
+            }
+        }));
+
+        addSubscription(
+                viewModel.currentCandidatePhotoUrlsProperty().subscribe(urls -> updatePhotoControlsVisibility()));
+        addSubscription(
+                viewModel.currentCandidatePhotoIndexProperty().subscribe(idx -> updatePhotoControlsVisibility()));
+
         // Setup swipe gestures
         setupSwipeGestures();
+    }
+
+    private void updatePhotoControlsVisibility() {
+        if (viewModel.currentCandidatePhotoUrlsProperty().get() == null) {
+            return;
+        }
+        int size = viewModel.currentCandidatePhotoUrlsProperty().get().size();
+        if (size > 1) {
+            prevPhotoButton.setVisible(true);
+            prevPhotoButton.setManaged(true);
+            nextPhotoButton.setVisible(true);
+            nextPhotoButton.setManaged(true);
+            photoIndicatorLabel.setVisible(true);
+            photoIndicatorLabel.setManaged(true);
+            photoIndicatorLabel.setText(
+                    (viewModel.currentCandidatePhotoIndexProperty().get() + 1) + "/" + size);
+        } else {
+            prevPhotoButton.setVisible(false);
+            prevPhotoButton.setManaged(false);
+            nextPhotoButton.setVisible(false);
+            nextPhotoButton.setManaged(false);
+            photoIndicatorLabel.setVisible(false);
+            photoIndicatorLabel.setManaged(false);
+        }
     }
 
     /** Setup drag-to-swipe gestures on the candidate card. */
@@ -433,9 +489,79 @@ public class MatchingController extends BaseController implements Initializable 
         viewModel.pass();
     }
 
+    @SuppressWarnings("unused")
+    @FXML
+    private void handlePrevPhoto() {
+        viewModel.showPreviousPhoto();
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleNextPhoto() {
+        viewModel.showNextPhoto();
+    }
+
     @FXML
     private void handleUndo() {
         viewModel.undo();
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleBlock() {
+        User candidate = viewModel.currentCandidateProperty().get();
+        if (candidate == null) {
+            return;
+        }
+        boolean confirmed = UiFeedbackService.showConfirmation(
+                "Block User", "Block " + candidate.getName() + "?", "They will no longer appear in your feed.");
+        if (confirmed) {
+            viewModel.blockCandidate(candidate.getId());
+            UiFeedbackService.showSuccess(candidate.getName() + " has been blocked.");
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleReport() {
+        User candidate = viewModel.currentCandidateProperty().get();
+        if (candidate == null) {
+            return;
+        }
+        showReportDialog(candidate);
+    }
+
+    private void showReportDialog(User candidate) {
+        Dialog<Report.Reason> dialog = new Dialog<>();
+        dialog.setTitle("Report User");
+        dialog.setHeaderText("Report " + candidate.getName());
+
+        String themeStylesheet = resolveStylesheet("/css/theme.css");
+        if (themeStylesheet != null) {
+            dialog.getDialogPane().getStylesheets().add(themeStylesheet);
+        }
+        dialog.getDialogPane().getStyleClass().add("dialog-pane");
+
+        ChoiceBox<Report.Reason> reasonBox = new ChoiceBox<>();
+        reasonBox.getItems().addAll(Report.Reason.values());
+        reasonBox.setConverter(UiUtils.createEnumStringConverter(r -> r.name().replace('_', ' ')));
+        reasonBox.setValue(Report.Reason.INAPPROPRIATE_CONTENT);
+
+        VBox content = new VBox(10);
+        content.setStyle("-fx-padding: 20;");
+        content.getChildren().addAll(new Label("Select a reason:"), reasonBox);
+        dialog.getDialogPane().setContent(content);
+
+        ButtonType reportBtn = new ButtonType("Report", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelBtn = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(reportBtn, cancelBtn);
+
+        dialog.setResultConverter(
+                bt -> bt == reportBtn ? reasonBox.getValue() : null); // NOPMD CompareObjectsWithEquals
+        dialog.showAndWait().ifPresent(reason -> {
+            viewModel.reportCandidate(candidate.getId(), reason, null, true);
+            UiFeedbackService.showSuccess(candidate.getName() + " has been reported.");
+        });
     }
 
     @FXML

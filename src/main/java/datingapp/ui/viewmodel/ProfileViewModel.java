@@ -60,6 +60,11 @@ public class ProfileViewModel {
     private final StringProperty completionDetails = new SimpleStringProperty("");
     private final StringProperty primaryPhotoUrl = new SimpleStringProperty("");
 
+    // Multiple photos
+    private final javafx.collections.ObservableList<String> photoUrls = FXCollections.observableArrayList();
+    private final javafx.beans.property.IntegerProperty currentPhotoIndex =
+            new javafx.beans.property.SimpleIntegerProperty(0);
+
     // Gender and preferences
     private final ObjectProperty<Gender> gender = new SimpleObjectProperty<>(null);
     private final ObservableSet<Gender> interestedInGenders = FXCollections.observableSet(EnumSet.noneOf(Gender.class));
@@ -115,6 +120,7 @@ public class ProfileViewModel {
         }
         backgroundThreads.clear();
         selectedInterests.clear();
+        photoUrls.clear();
     }
 
     public void setErrorHandler(ViewModelErrorSink handler) {
@@ -246,9 +252,14 @@ public class ProfileViewModel {
     private void updatePrimaryPhoto(User user) {
         if (user == null) {
             primaryPhotoUrl.set("");
+            photoUrls.clear();
+            currentPhotoIndex.set(0);
             return;
         }
         List<String> urls = user.getPhotoUrls();
+        photoUrls.setAll(urls != null ? urls : List.of());
+        currentPhotoIndex.set(0);
+
         if (urls == null || urls.isEmpty()) {
             primaryPhotoUrl.set("");
             return;
@@ -435,12 +446,18 @@ public class ProfileViewModel {
         updateCompletion(user);
     }
 
-    /** Returns configured minimum height in cm (for controllers to use instead of AppConfig.defaults()). */
+    /**
+     * Returns configured minimum height in cm (for controllers to use instead of
+     * AppConfig.defaults()).
+     */
     public int getMinHeightCm() {
         return config.minHeightCm();
     }
 
-    /** Returns configured maximum height in cm (for controllers to use instead of AppConfig.defaults()). */
+    /**
+     * Returns configured maximum height in cm (for controllers to use instead of
+     * AppConfig.defaults()).
+     */
     public int getMaxHeightCm() {
         return config.maxHeightCm();
     }
@@ -509,6 +526,51 @@ public class ProfileViewModel {
      */
     public StringProperty primaryPhotoUrlProperty() {
         return primaryPhotoUrl;
+    }
+
+    public javafx.collections.ObservableList<String> getPhotoUrls() {
+        return photoUrls;
+    }
+
+    public javafx.beans.property.IntegerProperty currentPhotoIndexProperty() {
+        return currentPhotoIndex;
+    }
+
+    public void showNextPhoto() {
+        if (photoUrls.isEmpty()) {
+            return;
+        }
+        int nextIndex = (currentPhotoIndex.get() + 1) % photoUrls.size();
+        currentPhotoIndex.set(nextIndex);
+        updatePrimaryPhotoFromIndex();
+    }
+
+    public void showPreviousPhoto() {
+        if (photoUrls.isEmpty()) {
+            return;
+        }
+        int prevIndex = currentPhotoIndex.get() - 1;
+        if (prevIndex < 0) {
+            prevIndex = photoUrls.size() - 1;
+        }
+        currentPhotoIndex.set(prevIndex);
+        updatePrimaryPhotoFromIndex();
+    }
+
+    private void updatePrimaryPhotoFromIndex() {
+        if (photoUrls.isEmpty()) {
+            primaryPhotoUrl.set("");
+            return;
+        }
+        int index = currentPhotoIndex.get();
+        if (index >= 0 && index < photoUrls.size()) {
+            String url = photoUrls.get(index);
+            if (url == null || url.isBlank() || PLACEHOLDER_PHOTO_URL.equals(url)) {
+                primaryPhotoUrl.set("");
+            } else {
+                primaryPhotoUrl.set(url);
+            }
+        }
     }
 
     // --- Gender and preferences properties ---
@@ -672,44 +734,59 @@ public class ProfileViewModel {
             return;
         }
 
-        startTrackedThread("photo-save", () -> {
-            try {
-                if (disposed.get() || Thread.currentThread().isInterrupted()) {
+        startTrackedThread("photo-save", () -> processPhotoUpload(user, photoFile));
+    }
+
+    private void processPhotoUpload(User user, File photoFile) {
+        try {
+            if (disposed.get() || Thread.currentThread().isInterrupted()) {
+                return;
+            }
+
+            // 1. Create app data directory for photos
+            Path appData = Paths.get(System.getProperty("user.home"), ".datingapp", "photos");
+            Files.createDirectories(appData);
+
+            // 2. Generate unique filename based on user ID and timestamp
+            String filename = user.getId() + "_" + System.currentTimeMillis() + getExtension(photoFile);
+            Path destination = appData.resolve(filename);
+
+            // 3. Copy file to app data directory
+            Files.copy(photoFile.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
+
+            // 4. Update user record with photo URL (use file:// URI)
+            String photoUrl = destination.toUri().toString();
+
+            // Add new photo instead of overwriting all
+            List<String> newUrls =
+                    new java.util.ArrayList<>(user.getPhotoUrls() != null ? user.getPhotoUrls() : List.of());
+            if (newUrls.size() >= 2) {
+                newUrls.set(1, photoUrl); // Limit to 2 per requirement, replace second if maxed
+            } else {
+                newUrls.add(photoUrl);
+            }
+
+            user.setPhotoUrls(newUrls);
+            userStore.save(user);
+
+            // 5. Update UI on FX thread
+            Platform.runLater(() -> {
+                if (disposed.get()) {
                     return;
                 }
+                photoUrls.setAll(newUrls);
+                currentPhotoIndex.set(photoUrls.size() - 1); // Select the new photo
+                updatePrimaryPhotoFromIndex();
 
-                // 1. Create app data directory for photos
-                Path appData = Paths.get(System.getProperty("user.home"), ".datingapp", "photos");
-                Files.createDirectories(appData);
+                updateCompletion(user);
+                UiFeedbackService.showSuccess("Photo saved!");
+                logInfo("Profile photo saved: {}", destination);
+            });
 
-                // 2. Generate unique filename based on user ID and timestamp
-                String filename = user.getId() + "_" + System.currentTimeMillis() + getExtension(photoFile);
-                Path destination = appData.resolve(filename);
-
-                // 3. Copy file to app data directory
-                Files.copy(photoFile.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
-
-                // 4. Update user record with photo URL (use file:// URI)
-                String photoUrl = destination.toUri().toString();
-                user.setPhotoUrls(List.of(photoUrl));
-                userStore.save(user);
-
-                // 5. Update UI on FX thread
-                Platform.runLater(() -> {
-                    if (disposed.get()) {
-                        return;
-                    }
-                    primaryPhotoUrl.set(photoUrl);
-                    updateCompletion(user);
-                    UiFeedbackService.showSuccess("Photo saved!");
-                    logInfo("Profile photo saved: {}", destination);
-                });
-
-            } catch (IOException e) {
-                logError("Failed to save profile photo", e);
-                notifyError("Failed to save profile photo", e);
-            }
-        });
+        } catch (IOException e) {
+            logError("Failed to save profile photo", e);
+            notifyError("Failed to save profile photo", e);
+        }
     }
 
     private void startTrackedThread(String name, Runnable task) {
