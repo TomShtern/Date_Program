@@ -24,10 +24,6 @@ public class ValidationService {
     /** Shared configuration for validation thresholds. */
     private final AppConfig config;
 
-    public ValidationService() {
-        this(AppConfig.defaults());
-    }
-
     public ValidationService(AppConfig config) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
     }

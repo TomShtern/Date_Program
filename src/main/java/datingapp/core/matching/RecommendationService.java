@@ -331,7 +331,8 @@ public final class RecommendationService {
     }
 
     private void addAgeReasons(List<String> reasons, User seeker, User picked) {
-        int ageDiff = Math.abs(seeker.getAge() - picked.getAge());
+        ZoneId tz = config.safety().userTimeZone();
+        int ageDiff = Math.abs(seeker.getAge(tz) - picked.getAge(tz));
         if (ageDiff <= config.similarAgeDiff()) {
             reasons.add("Similar age");
         } else if (ageDiff <= config.compatibleAgeDiff()) {
@@ -469,7 +470,8 @@ public final class RecommendationService {
                 ? Math.max(0, 1.0 - (distanceKm / seeker.getMaxDistanceKm()))
                 : 0.5;
 
-        int ageDiff = Math.abs(seeker.getAge() - candidate.getAge());
+        ZoneId tz = config.safety().userTimeZone();
+        int ageDiff = Math.abs(seeker.getAge(tz) - candidate.getAge(tz));
         double ageScore = CompatibilityScoring.ageScore(ageDiff, seeker, candidate, 0);
 
         InterestMatcher.MatchResult interests =

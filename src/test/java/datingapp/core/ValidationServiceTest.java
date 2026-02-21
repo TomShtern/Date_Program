@@ -18,7 +18,7 @@ class ValidationServiceTest {
 
     @BeforeEach
     void setUp() {
-        validator = new ValidationService();
+        validator = new ValidationService(AppConfig.defaults());
     }
 
     @Nested

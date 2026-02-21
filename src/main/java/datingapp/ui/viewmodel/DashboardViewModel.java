@@ -194,7 +194,9 @@ public class DashboardViewModel {
                 Optional<DailyPick> pick = dailyService.getDailyPick(user);
                 if (pick.isPresent()) {
                     User pickedUser = pick.get().user();
-                    pickName = pickedUser.getName() + ", " + pickedUser.getAge();
+                    @SuppressWarnings("deprecation") // UI display - system timezone appropriate
+                    String age = pickedUser.getAge() > 0 ? String.valueOf(pickedUser.getAge()) : "?";
+                    pickName = pickedUser.getName() + ", " + age;
                 }
             } catch (Exception e) {
                 logError("Daily pick error", e);

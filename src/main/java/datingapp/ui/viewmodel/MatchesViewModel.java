@@ -225,11 +225,13 @@ public class MatchesViewModel {
             if (liker != null && liker.getState() == UserState.ACTIVE) {
                 Like like = matchData.getLike(liker.getId(), userId).orElse(null);
                 if (like != null) {
+                    @SuppressWarnings("deprecation") // UI display - system timezone appropriate
+                    int age = liker.getAge();
                     received.add(new LikeCardData(
                             liker.getId(),
                             like.id(),
                             liker.getName(),
-                            liker.getAge(),
+                            age,
                             summarizeBio(liker),
                             TextUtil.formatTimeAgo(pending.likedAt()),
                             pending.likedAt()));
@@ -257,11 +259,13 @@ public class MatchesViewModel {
             if (like != null && like.direction() == Like.Direction.LIKE) {
                 User otherUser = potentialUsers.get(otherUserId);
                 if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
+                    @SuppressWarnings("deprecation") // UI display - system timezone appropriate
+                    int age = otherUser.getAge();
                     sent.add(new LikeCardData(
                             otherUser.getId(),
                             like.id(),
                             otherUser.getName(),
-                            otherUser.getAge(),
+                            age,
                             summarizeBio(otherUser),
                             TextUtil.formatTimeAgo(like.createdAt()),
                             like.createdAt()));

@@ -109,8 +109,8 @@ public class PreferencesViewModel {
         }
         int maxDistVal = Math.clamp(maxDistance.get(), 1, config.maxDistanceKm());
 
-        currentUser.setAgeRange(minAgeVal, maxAgeVal);
-        currentUser.setMaxDistanceKm(maxDistVal);
+        currentUser.setAgeRange(minAgeVal, maxAgeVal, config.minAge(), config.maxAge());
+        currentUser.setMaxDistanceKm(maxDistVal, config.maxDistanceKm());
 
         // Map UI GenderPreference to Set<Gender>
         Set<Gender> newInterests = EnumSet.noneOf(Gender.class);

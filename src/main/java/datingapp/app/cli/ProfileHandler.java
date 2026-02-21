@@ -2,6 +2,7 @@ package datingapp.app.cli;
 
 import datingapp.app.cli.CliTextAndInput.EnumMenu;
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.EnumSetUtil;
 import datingapp.core.LoggingSupport;
@@ -52,6 +53,7 @@ public class ProfileHandler implements LoggingSupport {
     private final ProfileService profileCompletionService;
     private final ProfileService achievementService;
     private final ValidationService validationService;
+    private final AppConfig config;
     private final AppSession session;
     private final InputReader inputReader;
 
@@ -62,6 +64,7 @@ public class ProfileHandler implements LoggingSupport {
             ProfileService profileCompletionService,
             ProfileService achievementService,
             ValidationService validationService,
+            AppConfig config,
             AppSession session,
             InputReader inputReader) {
         this.userStorage = userStorage;
@@ -69,6 +72,7 @@ public class ProfileHandler implements LoggingSupport {
         this.achievementService = achievementService;
         this.validationService =
                 java.util.Objects.requireNonNull(validationService, "validationService cannot be null");
+        this.config = java.util.Objects.requireNonNull(config, "config cannot be null");
         this.session = session;
         this.inputReader = inputReader;
     }
@@ -80,6 +84,7 @@ public class ProfileHandler implements LoggingSupport {
                 services.getProfileService(),
                 services.getProfileService(),
                 services.getValidationService(),
+                services.getConfig(),
                 session,
                 inputReader);
     }
@@ -145,7 +150,9 @@ public class ProfileHandler implements LoggingSupport {
             // Card display
             logInfo(CliTextAndInput.BOX_TOP);
             String verifiedBadge = currentUser.isVerified() ? " ✅ Verified" : "";
-            logInfo("│ 💝 {}, {} years old{}", currentUser.getName(), currentUser.getAge(), verifiedBadge);
+            @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
+            int age = currentUser.getAge();
+            logInfo("│ 💝 {}, {} years old{}", currentUser.getName(), age, verifiedBadge);
             logInfo("│ 📍 Location: {}, {}", currentUser.getLat(), currentUser.getLon());
             String bio = preview.displayBio();
             if (bio.length() > 50) {
@@ -464,7 +471,7 @@ public class ProfileHandler implements LoggingSupport {
                     result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
                     logInfo("    Using default (50km)");
                 } else {
-                    currentUser.setMaxDistanceKm(dist);
+                    currentUser.setMaxDistanceKm(dist, config.maxDistanceKm());
                 }
             } catch (NumberFormatException e) {
                 logTrace("Using default distance, input was: {}", e.getMessage());
@@ -483,7 +490,7 @@ public class ProfileHandler implements LoggingSupport {
                 result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
                 logInfo("    Using defaults (18-99)");
             } else {
-                currentUser.setAgeRange(minAge, maxAge);
+                currentUser.setAgeRange(minAge, maxAge, config.minAge(), config.maxAge());
             }
         } catch (NumberFormatException _) {
             logInfo("⚠️  Invalid age range, using defaults.");

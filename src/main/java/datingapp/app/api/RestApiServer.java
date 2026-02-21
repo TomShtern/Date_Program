@@ -367,6 +367,11 @@ public class RestApiServer {
 
     /** Minimal user info for lists. */
     public static record UserSummary(UUID id, String name, int age, String state) {
+        /**
+         * Creates a UserSummary from a User entity.
+         * Uses system default timezone for age calculation (appropriate for API display).
+         */
+        @SuppressWarnings("deprecation") // API display layer - system timezone appropriate
         public static UserSummary from(User user) {
             return new UserSummary(
                     user.getId(), user.getName(), user.getAge(), user.getState().name());
@@ -386,6 +391,11 @@ public class RestApiServer {
             int maxDistanceKm,
             List<String> photoUrls,
             String state) {
+        /**
+         * Creates a UserDetail from a User entity.
+         * Uses system default timezone for age calculation (appropriate for API display).
+         */
+        @SuppressWarnings("deprecation") // API display layer - system timezone appropriate
         public static UserDetail from(User user) {
             return new UserDetail(
                     user.getId(),

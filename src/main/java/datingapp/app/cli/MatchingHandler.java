@@ -211,12 +211,14 @@ public class MatchingHandler implements LoggingSupport {
     private void displayCandidateProfile(User candidate, User currentUser, double distance) {
         logInfo(CliTextAndInput.BOX_TOP);
         boolean verified = candidate.isVerified();
+        @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
+        int age = candidate.getAge();
         logInfo(
                 "│ 💝 {}{}{}, {} years old",
                 candidate.getName(),
                 verified ? " " : "",
                 verified ? "✅ Verified" : "",
-                candidate.getAge());
+                age);
         if (logger.isInfoEnabled()) {
             logInfo("│ 📍 {} km away", String.format("%.1f", distance));
         }
@@ -285,13 +287,15 @@ public class MatchingHandler implements LoggingSupport {
                             .computeQuality(match, currentUser.getId())
                             .ifPresent(quality -> {
                                 String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
+                                @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
+                                int age = otherUser.getAge();
                                 logInfo(
                                         "  {}. {} {}{}, {}         {} {}%",
                                         displayIndex,
                                         quality.getStarDisplay(),
                                         otherUser.getName(),
                                         verifiedBadge,
-                                        otherUser.getAge(),
+                                        age,
                                         " "
                                                 .repeat(Math.max(
                                                         0,
@@ -360,7 +364,9 @@ public class MatchingHandler implements LoggingSupport {
         logInfo("         MATCH WITH {}", nameUpper);
         logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
 
-        logInfo("  👤 {}, {}", otherUser.getName(), otherUser.getAge());
+        @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
+        int age = otherUser.getAge();
+        logInfo("  👤 {}, {}", otherUser.getName(), age);
         if (otherUser.getBio() != null) {
             logInfo("  📝 {}", otherUser.getBio());
         }
@@ -605,7 +611,9 @@ public class MatchingHandler implements LoggingSupport {
         logInfo("");
         User candidate = pick.user();
         logInfo(CliTextAndInput.BOX_TOP);
-        logInfo("│ 🎁 {}, {} years old", candidate.getName(), candidate.getAge());
+        @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
+        int age = candidate.getAge();
+        logInfo("│ 🎁 {}, {} years old", candidate.getName(), age);
         if (logger.isInfoEnabled()) {
             logInfo("│ 📍 {} km away", String.format("%.1f", distance));
         }
@@ -739,7 +747,9 @@ public class MatchingHandler implements LoggingSupport {
             logInfo(
                     "{}. {} {} (Score: {}%){}",
                     s.rank(), getStandoutEmoji(s.rank()), candidate.getName(), s.score(), interacted);
-            logInfo("   {} - {}", s.reason(), candidate.getAge() + "yo");
+            @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
+            int age = candidate.getAge();
+            logInfo("   {} - {}", s.reason(), age + "yo");
         }
     }
 
@@ -927,7 +937,9 @@ public class MatchingHandler implements LoggingSupport {
         String likedAgo = TextUtil.formatTimeAgo(pending.likedAt());
 
         logInfo(CliTextAndInput.BOX_TOP);
-        logInfo("│ 💝 {}, {} years old{}", user.getName(), user.getAge(), verifiedBadge);
+        @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
+        int age = user.getAge();
+        logInfo("│ 💝 {}, {} years old{}", user.getName(), age, verifiedBadge);
         logInfo("│ 🕒 Liked you {}", likedAgo);
         logInfo("│ 📍 Location: {}, {}", user.getLat(), user.getLon());
 

@@ -67,7 +67,11 @@ public final class StorageFactory {
         Undo.Storage undoStorage = matchmakingStorage.undoStorage();
         Standout.Storage standoutStorage = metricsStorage;
 
-        CandidateFinder candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
+        CandidateFinder candidateFinder = new CandidateFinder(
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                config.safety().userTimeZone());
         ProfileService profileService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
         RecommendationService recommendationService = RecommendationService.builder()

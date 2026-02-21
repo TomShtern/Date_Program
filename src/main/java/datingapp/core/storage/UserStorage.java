@@ -55,6 +55,7 @@ public interface UserStorage {
      *                      to skip distance filter
      * @return active users matching base criteria, unsorted
      */
+    @SuppressWarnings("deprecation") // Pre-filtering only; precise age checks done in CandidateFinder with timezone
     default List<User> findCandidates(
             UUID excludeId,
             Set<Gender> genders,

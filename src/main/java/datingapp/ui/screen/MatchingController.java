@@ -405,7 +405,9 @@ public class MatchingController extends BaseController implements Initializable 
             return;
         }
 
-        nameLabel.setText(user.getName() + ", " + user.getAge());
+        @SuppressWarnings("deprecation") // UI display - system timezone appropriate
+        int age = user.getAge();
+        nameLabel.setText(user.getName() + ", " + age);
         bioLabel.setText(user.getBio() != null ? user.getBio() : "No bio provided.");
         distanceLabel.setText("📍 " + viewModel.getDistanceDisplay(user));
         matchScoreLabel.setText("⭐ " + viewModel.getCompatibilityDisplay(user));

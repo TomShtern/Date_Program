@@ -371,7 +371,8 @@ public class MatchQualityService {
                 distanceKm >= 0 ? calculateDistanceScore(distanceKm, me.getMaxDistanceKm()) : NEUTRAL_SCORE;
 
         // Age Score
-        int ageDiff = Math.abs(me.getAge() - them.getAge());
+        int ageDiff = Math.abs(me.getAge(config.safety().userTimeZone())
+                - them.getAge(config.safety().userTimeZone()));
         double ageScore = calculateAgeScore(ageDiff, me, them);
 
         // Interest Score
@@ -596,7 +597,10 @@ public class MatchQualityService {
         highlights.addAll(lifestyleMatches);
         addPaceHighlight(highlights, paceScore);
         addResponseHighlight(highlights, timeBetween);
-        addAgeHighlight(highlights, Math.abs(me.getAge() - them.getAge()));
+        addAgeHighlight(
+                highlights,
+                Math.abs(me.getAge(config.safety().userTimeZone())
+                        - them.getAge(config.safety().userTimeZone())));
         if (highlights.size() > HIGHLIGHT_MAX_COUNT) {
             highlights = new ArrayList<>(highlights.subList(0, HIGHLIGHT_MAX_COUNT));
         }

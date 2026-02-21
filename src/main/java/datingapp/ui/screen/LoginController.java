@@ -1,7 +1,6 @@
 package datingapp.ui.screen;
 
 import datingapp.core.AppClock;
-import datingapp.core.AppConfig;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
@@ -75,9 +74,6 @@ public class LoginController extends BaseController implements Initializable {
     private static final String LABEL_GENDER = "Gender:";
     private static final String LABEL_INTERESTED_IN = "Interested In:";
     private static final String PROMPT_ENTER_NAME = "Enter your name";
-    private static final AppConfig CONFIG = AppConfig.defaults();
-    private static final int AGE_MIN = CONFIG.minAge();
-    private static final int AGE_MAX = CONFIG.maxAge();
     private static final int AGE_DEFAULT = 25;
 
     // Log Messages
@@ -327,18 +323,20 @@ public class LoginController extends BaseController implements Initializable {
         Label ageLabel = new Label(LABEL_AGE);
         ageLabel.setStyle(SECONDARY_TEXT_STYLE);
         Spinner<Integer> ageSpinner = new Spinner<>();
+        int ageMin = viewModel.getMinAge();
+        int ageMax = viewModel.getMaxAge();
         SpinnerValueFactory<Integer> ageValueFactory = new SpinnerValueFactory<>() {
             @Override
             public void decrement(int steps) {
                 int current = getValue() == null ? AGE_DEFAULT : getValue();
-                int next = Math.max(AGE_MIN, current - steps);
+                int next = Math.max(ageMin, current - steps);
                 setValue(next);
             }
 
             @Override
             public void increment(int steps) {
                 int current = getValue() == null ? AGE_DEFAULT : getValue();
-                int next = Math.min(AGE_MAX, current + steps);
+                int next = Math.min(ageMax, current + steps);
                 setValue(next);
             }
         };
@@ -551,7 +549,9 @@ public class LoginController extends BaseController implements Initializable {
                     container.setScaleY(1.0);
                 } else {
                     setText(null);
-                    nameLabel.setText(user.getName() + ", " + user.getAge());
+                    @SuppressWarnings("deprecation") // UI display - system timezone appropriate
+                    int age = user.getAge();
+                    nameLabel.setText(user.getName() + ", " + age);
 
                     StringBuilder sb = new StringBuilder(formatState(user.getState()));
                     if (user.isVerified()) {

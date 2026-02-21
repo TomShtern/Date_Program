@@ -151,6 +151,16 @@ public class LoginViewModel {
         return filterText;
     }
 
+    /** Returns the minimum allowed age from configuration. */
+    public int getMinAge() {
+        return config.minAge();
+    }
+
+    /** Returns the maximum allowed age from configuration. */
+    public int getMaxAge() {
+        return config.maxAge();
+    }
+
     public void setSelectedUser(User user) {
         this.selectedUser = user;
         this.loginDisabled.set(user == null);
@@ -298,12 +308,12 @@ public class LoginViewModel {
             newUser.setBio("New to the app! 👋");
 
             // Set default age range preferences (±5 years from user's age)
-            int minAge = Math.max(18, age - 5);
-            int maxAge = Math.min(100, age + 5);
-            newUser.setAgeRange(minAge, maxAge);
+            int minAge = Math.max(config.minAge(), age - 5);
+            int maxAge = Math.min(config.maxAge(), age + 5);
+            newUser.setAgeRange(minAge, maxAge, config.minAge(), config.maxAge());
 
             // Set default distance preference
-            newUser.setMaxDistanceKm(50);
+            newUser.setMaxDistanceKm(50, config.maxDistanceKm());
 
             // Set default photo placeholder - required for profile completion
             newUser.setPhotoUrls(List.of("placeholder://default-avatar"));
@@ -421,6 +431,7 @@ public class LoginViewModel {
         return containsAllTerms(searchable, normalized);
     }
 
+    @SuppressWarnings("deprecation") // UI display/search indexing - system timezone appropriate
     private static String buildSearchable(User user) {
         String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);
         String state = user.getState() == null ? "" : user.getState().name().toLowerCase(Locale.ROOT);

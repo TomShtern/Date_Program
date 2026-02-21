@@ -394,7 +394,7 @@ public class ProfileViewModel {
             int min = Integer.parseInt(minAge.get());
             int max = Integer.parseInt(maxAge.get());
             if (min >= config.minAge() && max <= config.maxAge() && min <= max) {
-                user.setAgeRange(min, max);
+                user.setAgeRange(min, max, config.minAge(), config.maxAge());
             } else {
                 logWarn("Invalid age range values: {}-{}", min, max);
                 UiFeedbackService.showWarning("Please enter valid ages");
@@ -407,7 +407,7 @@ public class ProfileViewModel {
         try {
             int dist = Integer.parseInt(maxDistance.get());
             if (dist > 0 && dist <= config.maxDistanceKm()) {
-                user.setMaxDistanceKm(dist);
+                user.setMaxDistanceKm(dist, config.maxDistanceKm());
             } else {
                 logWarn("Invalid max distance value: {}", dist);
                 UiFeedbackService.showWarning("Please enter a valid distance");

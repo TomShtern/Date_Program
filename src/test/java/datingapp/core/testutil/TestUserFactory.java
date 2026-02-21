@@ -67,8 +67,8 @@ public final class TestUserFactory {
         User user = createActiveUser(name);
         user.setBio("Test bio for " + name);
         user.setLocation(32.0853, 34.7818); // Tel Aviv coordinates
-        user.setMaxDistanceKm(50);
-        user.setAgeRange(18, 99);
+        user.setMaxDistanceKm(50, 500);
+        user.setAgeRange(18, 99, 18, 120);
         return user;
     }
 

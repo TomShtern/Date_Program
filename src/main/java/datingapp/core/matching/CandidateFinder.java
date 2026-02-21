@@ -25,20 +25,42 @@ public class CandidateFinder implements LoggingSupport {
     private final UserStorage userStorage;
     private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
+    private final java.time.ZoneId timezone;
 
     /**
      * Constructs a CandidateFinder with the required storage dependencies.
+     * Uses system default timezone for age calculations.
      *
      * @param userStorage the user storage implementation
      * @param interactionStorage the interaction storage implementation
      * @param trustSafetyStorage the trust safety storage implementation
      * @throws NullPointerException if any parameter is null
+     * @deprecated Use {@link #CandidateFinder(UserStorage, InteractionStorage, TrustSafetyStorage, java.time.ZoneId)}
      */
+    @Deprecated
     public CandidateFinder(
             UserStorage userStorage, InteractionStorage interactionStorage, TrustSafetyStorage trustSafetyStorage) {
+        this(userStorage, interactionStorage, trustSafetyStorage, java.time.ZoneId.systemDefault());
+    }
+
+    /**
+     * Constructs a CandidateFinder with the required storage dependencies and timezone.
+     *
+     * @param userStorage the user storage implementation
+     * @param interactionStorage the interaction storage implementation
+     * @param trustSafetyStorage the trust safety storage implementation
+     * @param timezone the timezone to use for age calculations
+     * @throws NullPointerException if any parameter is null
+     */
+    public CandidateFinder(
+            UserStorage userStorage,
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            java.time.ZoneId timezone) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
+        this.timezone = Objects.requireNonNull(timezone, "timezone cannot be null");
     }
 
     /** Geographic utility functions. Pure Java - no external dependencies. */
@@ -99,7 +121,7 @@ public class CandidateFinder implements LoggingSupport {
                 seeker.getState(),
                 seeker.getGender(),
                 seekerInterestedIn,
-                seeker.getAge(),
+                seeker.getAge(timezone),
                 seeker.getMinAge(),
                 seeker.getMaxAge());
         logDebug("Total active users to filter: {}", allActive.size());
@@ -215,10 +237,10 @@ public class CandidateFinder implements LoggingSupport {
                     "Rejecting {} ({}): AGE MISMATCH - seeker(age={}, range={}-{}), candidate(age={}, range={}-{})",
                     candidate.getName(),
                     candidate.getId(),
-                    seeker.getAge(),
+                    seeker.getAge(timezone),
                     seeker.getMinAge(),
                     seeker.getMaxAge(),
-                    candidate.getAge(),
+                    candidate.getAge(timezone),
                     candidate.getMinAge(),
                     candidate.getMaxAge());
         }
@@ -240,7 +262,7 @@ public class CandidateFinder implements LoggingSupport {
     }
 
     private boolean passesDealbreakers(User seeker, User candidate) {
-        boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate);
+        boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate, timezone);
         if (!passesDb) {
             logDebug("Rejecting {} ({}): DEALBREAKER HIT", candidate.getName(), candidate.getId());
         }
@@ -272,8 +294,8 @@ public class CandidateFinder implements LoggingSupport {
      * Seeker's age is within candidate's age range.
      */
     private boolean hasMatchingAgePreferences(User seeker, User candidate) {
-        int seekerAge = seeker.getAge();
-        int candidateAge = candidate.getAge();
+        int seekerAge = seeker.getAge(timezone);
+        int candidateAge = candidate.getAge(timezone);
 
         if (seekerAge == 0 || candidateAge == 0) {
             return false; // Missing birth date

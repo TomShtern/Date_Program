@@ -1,7 +1,6 @@
 package datingapp.core.model;
 
 import datingapp.core.AppClock;
-import datingapp.core.AppConfig;
 import datingapp.core.EnumSetUtil;
 import datingapp.core.profile.MatchPreferences;
 import datingapp.core.profile.MatchPreferences.Interest;
@@ -69,9 +68,8 @@ public class User {
      */
     // ── End nested domain types ────────────────────────────────────────
 
-    private static final AppConfig CONFIG = AppConfig.defaults();
-
     private final UUID id;
+
     private String name;
     private String bio;
     private LocalDate birthDate;
@@ -430,9 +428,13 @@ public class User {
      * Uses system default timezone to match local date perception and avoid
      * off-by-one issues
      * when the birthday occurs at midnight across timezones.
+     *
+     * @deprecated Use {@link #getAge(java.time.ZoneId)} to explicitly specify timezone.
+     *             For business logic (matching, validation), always pass the configured timezone.
      */
+    @Deprecated
     public synchronized int getAge() {
-        return getAge(AppConfig.defaults().safety().userTimeZone());
+        return getAge(java.time.ZoneId.systemDefault());
     }
 
     /**
@@ -549,20 +551,34 @@ public class User {
         touch();
     }
 
-    public synchronized void setMaxDistanceKm(int maxDistanceKm) {
+    public synchronized void setMaxDistanceKm(int maxDistanceKm, int systemMaxLimit) {
         if (maxDistanceKm <= 0) {
             throw new IllegalArgumentException("maxDistanceKm must be positive");
+        }
+        if (maxDistanceKm > systemMaxLimit) {
+            throw new IllegalArgumentException("maxDistanceKm cannot exceed " + systemMaxLimit + " km");
         }
         this.maxDistanceKm = maxDistanceKm;
         touch();
     }
 
-    public synchronized void setAgeRange(int minAge, int maxAge) {
-        if (minAge < CONFIG.minAge()) {
-            throw new IllegalArgumentException("minAge must be at least " + CONFIG.minAge());
+    /**
+     * Sets max distance with a default system limit of 500km.
+     * For production use, prefer {@link #setMaxDistanceKm(int, int)} with explicit system limit.
+     *
+     * @deprecated Use {@link #setMaxDistanceKm(int, int)} with explicit system limit
+     */
+    @Deprecated
+    public synchronized void setMaxDistanceKm(int maxDistanceKm) {
+        setMaxDistanceKm(maxDistanceKm, 500);
+    }
+
+    public synchronized void setAgeRange(int minAge, int maxAge, int systemMinAge, int systemMaxAge) {
+        if (minAge < systemMinAge) {
+            throw new IllegalArgumentException("minAge must be at least " + systemMinAge);
         }
-        if (maxAge > CONFIG.maxAge()) {
-            throw new IllegalArgumentException("maxAge cannot exceed " + CONFIG.maxAge());
+        if (maxAge > systemMaxAge) {
+            throw new IllegalArgumentException("maxAge cannot exceed " + systemMaxAge);
         }
         if (maxAge < minAge) {
             throw new IllegalArgumentException("maxAge cannot be less than minAge");
@@ -570,6 +586,17 @@ public class User {
         this.minAge = minAge;
         this.maxAge = maxAge;
         touch();
+    }
+
+    /**
+     * Sets age range with default system limits (18-120).
+     * For production use, prefer {@link #setAgeRange(int, int, int, int)} with explicit system limits.
+     *
+     * @deprecated Use {@link #setAgeRange(int, int, int, int)} with explicit system limits
+     */
+    @Deprecated
+    public synchronized void setAgeRange(int minAge, int maxAge) {
+        setAgeRange(minAge, maxAge, 18, 120);
     }
 
     /** Sets photo URLs with null-safe copy. */

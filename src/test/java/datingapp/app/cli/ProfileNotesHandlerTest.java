@@ -40,7 +40,14 @@ class ProfileNotesHandlerTest {
 
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        return new ProfileHandler(userStorage, null, null, new ValidationService(), session, inputReader);
+        return new ProfileHandler(
+                userStorage,
+                null,
+                null,
+                new ValidationService(AppConfig.defaults()),
+                AppConfig.defaults(),
+                session,
+                inputReader);
     }
 
     private void saveNote(UUID authorId, UUID subjectId, String content) {

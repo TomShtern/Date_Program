@@ -1,6 +1,5 @@
 package datingapp.core.profile;
 
-import datingapp.core.AppConfig;
 import datingapp.core.matching.LifestyleMatcher;
 import datingapp.core.model.User;
 import java.util.ArrayList;
@@ -389,8 +388,6 @@ public final class MatchPreferences {
             Integer maxAgeDifference // null = use standard age preference
             ) {
 
-        private static final AppConfig CONFIG = AppConfig.defaults();
-
         // Compact constructor - validates and creates defensive copies
         public Dealbreakers {
             // Defensive copies - null becomes empty set
@@ -416,10 +413,10 @@ public final class MatchPreferences {
                             : EnumSet.noneOf(Lifestyle.Education.class));
 
             // Validate height range using configured bounds
-            if (minHeightCm != null && minHeightCm < CONFIG.minHeightCm()) {
+            if (minHeightCm != null && minHeightCm < 50) {
                 throw new IllegalArgumentException("minHeightCm too low: " + minHeightCm);
             }
-            if (maxHeightCm != null && maxHeightCm > CONFIG.maxHeightCm()) {
+            if (maxHeightCm != null && maxHeightCm > 300) {
                 throw new IllegalArgumentException("maxHeightCm too high: " + maxHeightCm);
             }
             if (minHeightCm != null && maxHeightCm != null && minHeightCm > maxHeightCm) {
@@ -619,7 +616,29 @@ public final class MatchPreferences {
                 // Prevent instantiation - all methods are static
             }
 
+            /**
+             * Evaluates whether a candidate passes all of a seeker's dealbreakers.
+             * Uses system default timezone for age calculations.
+             *
+             * @param seeker    the user looking for matches
+             * @param candidate the potential match
+             * @return true if candidate passes all dealbreakers
+             * @deprecated Use {@link #passes(User, User, java.time.ZoneId)} for explicit timezone handling
+             */
+            @Deprecated
             public static boolean passes(User seeker, User candidate) {
+                return passes(seeker, candidate, java.time.ZoneId.systemDefault());
+            }
+
+            /**
+             * Evaluates whether a candidate passes all of a seeker's dealbreakers.
+             *
+             * @param seeker    the user looking for matches
+             * @param candidate the potential match
+             * @param timezone  the timezone to use for age calculations
+             * @return true if candidate passes all dealbreakers
+             */
+            public static boolean passes(User seeker, User candidate, java.time.ZoneId timezone) {
                 Dealbreakers db = seeker.getDealbreakers();
 
                 return !db.hasAnyDealbreaker()
@@ -629,7 +648,21 @@ public final class MatchPreferences {
                                 && passesLookingFor(db, candidate)
                                 && passesEducation(db, candidate)
                                 && passesHeight(db, candidate)
-                                && passesAgeDifference(db, seeker, candidate));
+                                && passesAgeDifference(db, seeker, candidate, timezone));
+            }
+
+            /**
+             * Get a list of which dealbreakers a candidate fails (for debugging/display).
+             * Uses system default timezone for age calculations.
+             *
+             * @param seeker    The user looking for matches
+             * @param candidate The potential match
+             * @return List of human-readable failure descriptions
+             * @deprecated Use {@link #getFailedDealbreakers(User, User, java.time.ZoneId)} for explicit timezone
+             */
+            @Deprecated
+            public static List<String> getFailedDealbreakers(User seeker, User candidate) {
+                return getFailedDealbreakers(seeker, candidate, java.time.ZoneId.systemDefault());
             }
 
             /**
@@ -637,9 +670,10 @@ public final class MatchPreferences {
              *
              * @param seeker    The user looking for matches
              * @param candidate The potential match
+             * @param timezone  The timezone to use for age calculations
              * @return List of human-readable failure descriptions
              */
-            public static List<String> getFailedDealbreakers(User seeker, User candidate) {
+            public static List<String> getFailedDealbreakers(User seeker, User candidate, java.time.ZoneId timezone) {
                 List<String> failures = new ArrayList<>();
                 Dealbreakers db = seeker.getDealbreakers();
 
@@ -649,7 +683,7 @@ public final class MatchPreferences {
                 addLookingForFailure(db, candidate, failures);
                 addEducationFailure(db, candidate, failures);
                 addHeightFailure(db, candidate, failures);
-                addAgeFailure(db, seeker, candidate, failures);
+                addAgeFailure(db, seeker, candidate, timezone, failures);
 
                 return failures;
             }
@@ -695,12 +729,13 @@ public final class MatchPreferences {
                 return maxHeight == null || candidateHeight <= maxHeight;
             }
 
-            private static boolean passesAgeDifference(Dealbreakers db, User seeker, User candidate) {
+            private static boolean passesAgeDifference(
+                    Dealbreakers db, User seeker, User candidate, java.time.ZoneId timezone) {
                 if (!db.hasAgeDealbreaker()) {
                     return true;
                 }
-                int seekerAge = seeker.getAge();
-                int candidateAge = candidate.getAge();
+                int seekerAge = seeker.getAge(timezone);
+                int candidateAge = candidate.getAge(timezone);
                 if (seekerAge <= 0 || candidateAge <= 0) {
                     return true;
                 }
@@ -784,12 +819,13 @@ public final class MatchPreferences {
                 }
             }
 
-            private static void addAgeFailure(Dealbreakers db, User seeker, User candidate, List<String> failures) {
+            private static void addAgeFailure(
+                    Dealbreakers db, User seeker, User candidate, java.time.ZoneId timezone, List<String> failures) {
                 if (!db.hasAgeDealbreaker()) {
                     return;
                 }
-                int seekerAge = seeker.getAge();
-                int candidateAge = candidate.getAge();
+                int seekerAge = seeker.getAge(timezone);
+                int candidateAge = candidate.getAge(timezone);
                 if (seekerAge <= 0 || candidateAge <= 0) {
                     return;
                 }
