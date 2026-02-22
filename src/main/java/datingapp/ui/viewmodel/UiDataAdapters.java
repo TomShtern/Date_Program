@@ -6,6 +6,7 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.PageData;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.List;
@@ -18,8 +19,10 @@ import java.util.UUID;
 /**
  * UI-layer adapter interfaces and implementations for data access.
  *
- * <p>Decouples ViewModels from {@code datingapp.core.storage.*} interfaces.
- * ViewModels depend on the inner interfaces ({@link UiUserStore}, {@link UiMatchDataAccess}),
+ * <p>
+ * Decouples ViewModels from {@code datingapp.core.storage.*} interfaces.
+ * ViewModels depend on the inner interfaces ({@link UiUserStore},
+ * {@link UiMatchDataAccess}),
  * while the inner implementations bridge to core storage.
  */
 @SuppressWarnings("PMD.MissingStaticMethodInNonInstantiatableClass")
@@ -50,6 +53,22 @@ public final class UiDataAdapters {
 
         /** Returns ALL matches (including ended) for the given user. */
         List<Match> getAllMatchesFor(UUID userId);
+
+        /**
+         * Returns a bounded page of ACTIVE matches, newest first.
+         *
+         * @param userId the user whose active matches to page through
+         * @param offset zero-based start index
+         * @param limit  maximum number of items per page
+         */
+        PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit);
+
+        /**
+         * Returns the total number of non-deleted matches (active + ended) for the
+         * user.
+         * Used to derive total page count in the UI.
+         */
+        int countMatchesFor(UUID userId);
 
         /** Returns the IDs of all users blocked by (or blocking) this user. */
         Set<UUID> getBlockedUserIds(UUID userId);
@@ -146,6 +165,16 @@ public final class UiDataAdapters {
         @Override
         public List<Match> getAllMatchesFor(UUID userId) {
             return interactionStorage.getAllMatchesFor(userId);
+        }
+
+        @Override
+        public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+            return interactionStorage.getPageOfActiveMatchesFor(userId, offset, limit);
+        }
+
+        @Override
+        public int countMatchesFor(UUID userId) {
+            return interactionStorage.countMatchesFor(userId);
         }
 
         @Override

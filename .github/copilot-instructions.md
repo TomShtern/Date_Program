@@ -51,24 +51,28 @@ You are operating in an environment where ast-grep is installed. For any code se
 # Dating App - AI Agent Instructions
 
 **Platform:** Windows 11 | PowerShell 7.5.x | VS Code Insiders | Java 25 (preview enabled) | JavaFX 25.0.2
-**Verified snapshot (2026-02-18):** 84 main + 59 test Java files (143 total) | 43,455 LOC / 33,227 code | JaCoCo line coverage gate: 60%
+**Verified snapshot (2026-02-22):** 87 main + 65 test Java files (152 total) | 48,494 LOC / 37,150 code | JaCoCo line coverage gate: 60%
 
 ## ⚠️ Critical Gotchas (Compilation / Runtime / Agent Accuracy)
 
-| Issue                       | Wrong                                           | Correct                                                |
-|-----------------------------|-------------------------------------------------|--------------------------------------------------------|
-| Non-static nested type      | `public record SendResult(...) {}` inside class | `public static record SendResult(...) {}`              |
-| Nested enum in nested type  | `public enum ErrorCode { ... }`                 | `public static enum ErrorCode { ... }`                 |
-| Externally-used model enums | `import datingapp.core.model.Gender`            | `import datingapp.core.model.User.Gender`              |
-| Clock usage                 | `Instant.now()` in domain/service logic         | `AppClock.now()` (testable via `TestClock`)            |
-| Service error flow          | `throw new ...` for business failure            | Return `*Result.failure(...)` record                   |
-| Pair IDs                    | `a + "_" + b`                                   | lexicographically sorted deterministic ID              |
-| EnumSet null crash          | `EnumSet.copyOf(possiblyNull)`                  | `EnumSetUtil.safeCopy(...)` or null-safe conditional   |
-| Mutable collection exposure | `return internalSet;`                           | Return defensive copy / unmodifiable view              |
-| Legacy bootstrap references | `AppBootstrap`, `HandlerFactory`                | `ApplicationStartup` + direct handler wiring in `Main` |
-| Legacy UI references        | `ui/controller`, `Toast`, `UiSupport`           | `ui/screen`, `UiFeedbackService`, `UiComponents`       |
+| Issue                       | Wrong                                           | Correct                                                                 |
+|-----------------------------|-------------------------------------------------|-------------------------------------------------------------------------|
+| Non-static nested type      | `public record SendResult(...) {}` inside class | `public static record SendResult(...) {}`                               |
+| Model enum import           | `import datingapp.core.model.Gender`            | `import datingapp.core.model.User.Gender`                               |
+| `ProfileNote` import        | `import datingapp.core.model.User.ProfileNote`  | `import datingapp.core.model.ProfileNote`                               |
+| Clock usage                 | `Instant.now()` in domain/service logic         | `AppClock.now()` (testable via `TestClock`)                             |
+| Service error flow          | `throw new ...` for business failure            | Return `*Result.failure(...)` record                                    |
+| Pair IDs                    | `a + "_" + b`                                   | lexicographically sorted deterministic ID (`generateId(a, b)`)          |
+| EnumSet null crash          | `EnumSet.copyOf(possiblyNull)`                  | `EnumSetUtil.safeCopy(...)` or null-safe conditional                    |
+| Mutable collection exposure | `return internalSet;`                           | Return defensive copy / unmodifiable view                               |
+| Legacy bootstrap references | `AppBootstrap`, `HandlerFactory`                | `ApplicationStartup` + service-based `fromServices(...)` handler wiring |
+| Legacy UI references        | `ui/controller`, `Toast`, `UiSupport`           | `ui/screen`, `ui/popup`, `UiFeedbackService`, `UiComponents`            |
 
 **Config access pattern:** `private static final AppConfig CONFIG = AppConfig.defaults();`
+
+**Config JSON loading:** `ApplicationStartup.applyJsonConfig()` uses Jackson databinding (`readerForUpdating(builder).readValue(json)`) via a `BuilderMixin` — no annotations in `core/`. Adding a new config property only requires a field + setter in `AppConfig.Builder` and an entry in `app-config.json`. No `ApplicationStartup` edits needed.
+
+> Note: `ConnectionService.SendResult.ErrorCode` is currently declared as `public enum` inside a `public static record`; Java treats nested enums as implicitly static.
 
 ## Current Architecture (source-of-truth)
 
@@ -81,8 +85,8 @@ datingapp/
     api/RestApiServer.java
   core/
     AppClock, AppConfig, AppSession, EnumSetUtil, LoggingSupport, PerformanceMonitor, ServiceRegistry, TextUtil
-    model/{User, Match}
-    matching/{CandidateFinder, MatchingService, MatchQualityService, RecommendationService, TrustSafetyService, UndoService, Standout, LifestyleMatcher}
+    model/{User, Match, ProfileNote}
+    matching/{CandidateFinder, CompatibilityScoring, MatchingService, MatchQualityService, RecommendationService, TrustSafetyService, UndoService, Standout, LifestyleMatcher}
     connection/{ConnectionModels, ConnectionService}
     profile/{ProfileService, ValidationService, MatchPreferences}
     metrics/{ActivityMetricsService, EngagementDomain, SwipeState}
@@ -92,9 +96,10 @@ datingapp/
     jdbi/{JdbiUserStorage, JdbiMatchmakingStorage, JdbiConnectionStorage, JdbiMetricsStorage, JdbiTrustSafetyStorage, JdbiTypeCodecs}
     schema/{SchemaInitializer, MigrationRunner}
   ui/
-    DatingApp, NavigationService, UiComponents, UiFeedbackService, UiConstants, UiAnimations, ImageCache
-    screen/{BaseController + 8 screen controllers + MilestonePopupController}
-    viewmodel/{8 ViewModels + ViewModelFactory + ViewModelErrorSink + UiDataAdapters}
+    DatingApp, NavigationService, UiComponents, UiFeedbackService, UiConstants, UiAnimations, ImageCache, UiUtils
+    screen/{BaseController + 10 screen controllers + MilestonePopupController}
+    popup/{MatchPopupController, MilestonePopupController}
+    viewmodel/{10 ViewModels + ViewModelFactory + ViewModelErrorSink + UiDataAdapters}
 ```
 
 ## Entry Points (current)
@@ -104,9 +109,13 @@ datingapp/
 ServiceRegistry services = ApplicationStartup.initialize();
 AppSession session = AppSession.getInstance();
 
-// CLI wiring in Main.java (no HandlerFactory)
+// CLI wiring in Main.java (service-based helper construction)
 InputReader inputReader = new CliTextAndInput.InputReader(scanner);
-MatchingHandler matching = new MatchingHandler(new MatchingHandler.Dependencies(...));
+MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
+ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
+SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
+StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
+MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);
 
 // JavaFX wiring in DatingApp.java
 ViewModelFactory vmFactory = new ViewModelFactory(services);
@@ -117,13 +126,14 @@ nav.initialize(primaryStage);
 
 ## Domain Model Reality Check
 
-| Model / Enum                                                                   | Location                                | Notes                                                                                 |
-|--------------------------------------------------------------------------------|-----------------------------------------|---------------------------------------------------------------------------------------|
-| `User`                                                                         | `core/model/User.java`                  | Mutable entity + `StorageBuilder` + `touch()` + soft-delete + nested enums/records    |
-| `Match`                                                                        | `core/model/Match.java`                 | Mutable entity + deterministic ID + state transitions + nested enums                  |
-| `User.Gender`, `User.UserState`, `User.VerificationMethod`, `User.ProfileNote` | `core/model/User.java`                  | Public static nested types for user domain semantics                                  |
-| `Match.MatchState`, `Match.MatchArchiveReason`                                 | `core/model/Match.java`                 | Public static nested enums for match state and archive semantics                      |
-| `ConnectionModels.*`                                                           | `core/connection/ConnectionModels.java` | `Message`, `Conversation`, `Like`, `Block`, `Report`, `FriendRequest`, `Notification` |
+| Model / Enum                                               | Location                                | Notes                                                                                 |
+|------------------------------------------------------------|-----------------------------------------|---------------------------------------------------------------------------------------|
+| `User`                                                     | `core/model/User.java`                  | Mutable entity + `StorageBuilder` + `touch()` + soft-delete + nested enums            |
+| `Match`                                                    | `core/model/Match.java`                 | Mutable entity + deterministic ID + state transitions + nested enums                  |
+| `ProfileNote`                                              | `core/model/ProfileNote.java`           | Standalone immutable record (not nested in `User`)                                    |
+| `User.Gender`, `User.UserState`, `User.VerificationMethod` | `core/model/User.java`                  | Public nested user domain types                                                       |
+| `Match.MatchState`, `Match.MatchArchiveReason`             | `core/model/Match.java`                 | Public nested match domain types                                                      |
+| `ConnectionModels.*`                                       | `core/connection/ConnectionModels.java` | `Message`, `Conversation`, `Like`, `Block`, `Report`, `FriendRequest`, `Notification` |
 
 **Deterministic ID rule (always):**
 ```java
@@ -149,7 +159,7 @@ viewModel.setErrorHandler(UiFeedbackService::showError);
 ```
 
 ### Base controller lifecycle
-- All UI controllers extend `ui/screen/BaseController`.
+- All screen controllers extend `ui/screen/BaseController`.
 - Register listeners via `addSubscription(...)`.
 - Register overlays via `registerOverlay(...)`.
 - Track long-running animations via `trackAnimation(...)`.
@@ -236,8 +246,8 @@ private void touch() { this.updatedAt = AppClock.now(); }
 ```
 
 ### ViewModel storage decoupling
-- ViewModels depend on `UiDataAdapters.UiUserStore` / `UiMatchDataAccess`.
-- Adapter implementations (`StorageUiUserStore`, `StorageUiMatchDataAccess`) bridge to `core.storage`.
+- ViewModels depend on `UiDataAdapters` interfaces (`UiUserStore`, `UiMatchDataAccess`, `UiSocialDataAccess`).
+- Adapter implementations bridge to `core.storage` in `ViewModelFactory`.
 
 ## JDBI Layer Conventions
 
@@ -247,7 +257,7 @@ private void touch() { this.updatedAt = AppClock.now(); }
 
 ## VS Code Java LS Stability (Important)
 
-- Keep `target/` out of `search.exclude` only (already configured), not out of Java project resource model.
+- Keep `target/**` excluded from file/search/watch noise, but not from Java project resource filters.
 - `.vscode/tasks.json` includes:
   - `Set UTF-8 Console`
   - `Ensure Maven Output Dirs` (runs on folder open)
@@ -260,7 +270,7 @@ private void touch() { this.updatedAt = AppClock.now(); }
 
 - ❌ Import framework/DB APIs into `core/` domain/service code.
 - ❌ Use removed architecture names (`AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`, `ScoringConstants`).
-- ❌ Import removed standalone model enums/records (`core.model.Gender`, `UserState`, `VerificationMethod`, `ProfileNote`, `MatchState`, `MatchArchiveReason`).
+- ❌ Import removed standalone model enums (`core.model.Gender`, `UserState`, `VerificationMethod`, `MatchState`, `MatchArchiveReason`).
 - ❌ Throw business-flow exceptions from service operations when result records exist.
 - ❌ Return mutable internal collections directly.
 - ❌ Forget `touch()` in mutable entity setters.
@@ -272,8 +282,11 @@ private void touch() { this.updatedAt = AppClock.now(); }
 - Cross-storage writes in parts of `ConnectionService` are not fully transactional.
 - Undo state is in-memory and does not survive restart.
 - ViewModel instances are cached singletons within `ViewModelFactory` by design.
+- Recommendation daily picks use in-memory LRU caching (`MAX_CACHED_PICKS=1000`).
 
 ## Docs Worth Consulting
+
+> Docs may lag. Always verify against `src/main/java` and `pom.xml` first.
 
 | Doc                                    | Purpose                                    |
 |----------------------------------------|--------------------------------------------|

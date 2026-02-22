@@ -51,6 +51,9 @@ graph TD
             ChatCtrl["ChatController"]
             StatsCtrl["StatsController"]
             PrefsCtrl["PreferencesController"]
+            SocialCtrl["SocialController"]
+            StandoutsCtrl["StandoutsController"]
+            MilestonePopupCtrl["MilestonePopupController"]
         end
 
         subgraph "ViewModels (ui/viewmodel/screen/)"
@@ -62,6 +65,8 @@ graph TD
             ChatVM["ChatViewModel"]
             StatsVM["StatsViewModel"]
             PrefsVM["PreferencesViewModel"]
+            SocialVM["SocialViewModel"]
+            StandoutsVM["StandoutsViewModel"]
         end
 
         subgraph "UI Support"
@@ -79,9 +84,12 @@ graph TD
         subgraph "Domain Models"
             User["User<br/><i>INCOMPLETE→ACTIVE↔PAUSED→BANNED</i>"]
             Match["Match<br/><i>ACTIVE→FRIENDS|UNMATCHED|BLOCKED</i>"]
-            ConnModels["ConnectionModels<br/><i>Message, Conversation, Like,<br/>Block, Report, FriendRequest</i>"]
+            ConnModels["ConnectionModels<br/><i>Message, Conversation, Like, Block, Report, FriendRequest</i>"]
             EngageDomain["EngagementDomain<br/><i>UserStats, Achievement</i>"]
             MatchPrefs["MatchPreferences<br/><i>Dealbreakers, PacePreferences</i>"]
+            ProfileNote["ProfileNote"]
+            SwipeState["SwipeState"]
+            Standout["Standout"]
         end
 
         subgraph "Services"
@@ -111,20 +119,20 @@ graph TD
     %% ═══════════════════════════════════════
     subgraph "Infrastructure Layer (storage/)"
         DatabaseManager["DatabaseManager<br/><i>HikariCP + H2</i>"]
-        SchemaInit["SchemaInitializer<br/><i>14 tables + indexes</i>"]
+        SchemaInit["SchemaInitializer<br/><i>18 tables + indexes</i>"]
 
         subgraph "JDBI Implementations (storage/jdbi/)"
-            JdbiUser["JdbiUserStorage<br/><i>profile/</i>"]
-            JdbiMatch["JdbiMatchmakingStorage<br/><i>matching/</i>"]
-            JdbiConn["JdbiConnectionStorage<br/><i>connection/</i>"]
-            JdbiMetrics["JdbiMetricsStorage<br/><i>metrics/</i>"]
-            JdbiSafety["JdbiTrustSafetyStorage<br/><i>safety/</i>"]
-            JdbiCodecs["JdbiTypeCodecs<br/><i>shared/</i>"]
+            JdbiUser["JdbiUserStorage"]
+            JdbiMatch["JdbiMatchmakingStorage"]
+            JdbiConn["JdbiConnectionStorage"]
+            JdbiMetrics["JdbiMetricsStorage"]
+            JdbiSafety["JdbiTrustSafetyStorage"]
+            JdbiCodecs["JdbiTypeCodecs"]
         end
     end
 
     subgraph "Database"
-        H2[("H2 Database<br/>14 tables")]
+        H2[("H2 Database<br/>18 tables")]
     end
 
     %% ═══════════════════════════════════════
@@ -162,10 +170,21 @@ graph TD
     ChatCtrl --> ChatVM
     StatsCtrl --> StatsVM
     PrefsCtrl --> PrefsVM
+    SocialCtrl --> SocialVM
+    StandoutsCtrl --> StandoutsVM
 
     %% All controllers inherit BaseController
     LoginCtrl --> BaseController
     DashboardCtrl --> BaseController
+    MatchingCtrl --> BaseController
+    MatchesCtrl --> BaseController
+    ProfileCtrl --> BaseController
+    ChatCtrl --> BaseController
+    StatsCtrl --> BaseController
+    PrefsCtrl --> BaseController
+    SocialCtrl --> BaseController
+    StandoutsCtrl --> BaseController
+    MilestonePopupCtrl --> BaseController
 
     %% ViewModel → UI Support
     LoginVM --> ErrorSink
@@ -198,9 +217,10 @@ graph TD
     JdbiUser --> DatabaseManager
     JdbiMatch --> DatabaseManager
     JdbiConn --> DatabaseManager
-
+    JdbiMetrics --> DatabaseManager
+    JdbiSafety --> DatabaseManager
     %% Apply styles
-    class User,Match,ConnModels,EngageDomain,MatchPrefs core
+    class User,Match,ConnModels,EngageDomain,MatchPrefs,ProfileNote,SwipeState,Standout core
     class CandidateFinder,MatchingService,MatchQuality,UndoService core
     class ProfileService,ValidationService,ConnectionService core
     class MetricsService,RecommendService,TrustSafety core
@@ -208,7 +228,7 @@ graph TD
     class ServiceRegistry,AppConfig,ApplicationStartup,StorageFactory bootstrap
     class DatabaseManager,SchemaInit,JdbiUser,JdbiMatch,JdbiConn,JdbiMetrics,JdbiSafety,JdbiCodecs storage
     class NavigationService,ViewModelFactory,BaseController,UiFeedback,UiAdapters,UiComponents,ErrorSink ui
-    class LoginCtrl,DashboardCtrl,MatchingCtrl,MatchesCtrl,ProfileCtrl,ChatCtrl,StatsCtrl,PrefsCtrl ui
-    class LoginVM,DashboardVM,MatchingVM,MatchesVM,ProfileVM,ChatVM,StatsVM,PrefsVM ui
+    class LoginCtrl,DashboardCtrl,MatchingCtrl,MatchesCtrl,ProfileCtrl,ChatCtrl,StatsCtrl,PrefsCtrl,SocialCtrl,StandoutsCtrl,MilestonePopupCtrl ui
+    class LoginVM,DashboardVM,MatchingVM,MatchesVM,ProfileVM,ChatVM,StatsVM,PrefsVM,SocialVM,StandoutsVM ui
     class Main,DatingApp,RestApi cli
     class MatchingHandler,ProfileHandler,MessagingHandler,SafetyHandler,StatsHandler,CliTextAndInput cli

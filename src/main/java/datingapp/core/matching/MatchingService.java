@@ -6,6 +6,7 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.PageData;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Instant;
@@ -122,6 +123,28 @@ public class MatchingService {
     public List<Match> getMatchesForUser(UUID userId) {
         Objects.requireNonNull(userId, "userId cannot be null");
         return interactionStorage.getAllMatchesFor(userId);
+    }
+
+    /**
+     * Returns a bounded page of all matches (active + ended) for the given user,
+     * newest first.
+     *
+     * <p>
+     * This is the paginated alternative to {@link #getMatchesForUser(UUID)} — use
+     * this
+     * in any context where the user may have a large number of matches, such as the
+     * REST API
+     * and future admin tooling.
+     *
+     * @param userId the user whose matches to page through
+     * @param offset zero-based start index
+     * @param limit  maximum number of matches per page
+     * @return a {@link PageData} wrapper with items, totalCount, and pagination
+     *         helpers
+     */
+    public PageData<Match> getPageOfMatchesForUser(UUID userId, int offset, int limit) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        return interactionStorage.getPageOfMatchesFor(userId, offset, limit);
     }
 
     /** Get the session service (for UI access to session info). */

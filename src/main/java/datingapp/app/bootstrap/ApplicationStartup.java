@@ -1,7 +1,13 @@
 package datingapp.app.bootstrap;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
@@ -15,19 +21,63 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Consolidated application startup and configuration loader entry point. */
+/**
+ * Consolidated application startup and configuration loader entry point.
+ *
+ * <p>
+ * Configuration loading uses Jackson databinding with a mix-in strategy to
+ * automatically map a
+ * flat JSON object onto {@link AppConfig.Builder} private fields — without
+ * placing any Jackson
+ * annotations inside the pure {@code core/} module (domain-purity rule
+ * preserved).
+ *
+ * <p>
+ * Adding a new config property now requires only:
+ * <ol>
+ * <li>Adding the field + setter to {@link AppConfig.Builder} with the same
+ * camelCase name.
+ * <li>Adding the corresponding key to {@code config/app-config.json}.
+ * </ol>
+ * <strong>No changes to this class are needed for new properties.</strong>
+ */
 public final class ApplicationStartup {
     private static final Logger logger = LoggerFactory.getLogger(ApplicationStartup.class);
 
     private static final String CONFIG_FILE = "./config/app-config.json";
     private static final String ENV_PREFIX = "DATING_APP_";
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /**
+     * Pre-configured {@link ObjectMapper} for config deserialization.
+     *
+     * <p>
+     * The {@link BuilderMixin} is registered on {@link AppConfig.Builder} to:
+     * <ul>
+     * <li>Enable direct field access ({@code @JsonAutoDetect}) so Jackson can
+     * populate the
+     * private fields of the builder without needing {@code setXxx}-prefixed methods
+     * or
+     * Jackson annotations inside {@code core/}.
+     * <li>Silence unknown-property errors
+     * ({@code @JsonIgnoreProperties(ignoreUnknown = true)})
+     * so legacy or future JSON keys that have no corresponding builder field are
+     * skipped.
+     * </ul>
+     * A {@link ZoneIdDeserializer} is also registered to map a plain timezone
+     * string like
+     * {@code "America/New_York"} to a {@link ZoneId}.
+     */
+    private static final ObjectMapper MAPPER = buildObjectMapper();
 
     private static volatile ServiceRegistry services;
     private static volatile DatabaseManager dbManager;
     private static volatile boolean initialized = false;
 
     private ApplicationStartup() {}
+
+    // ========================================================================
+    // Lifecycle
+    // ========================================================================
 
     public static synchronized ServiceRegistry initialize() {
         return initialize(load());
@@ -65,6 +115,10 @@ public final class ApplicationStartup {
         AppSession.getInstance().reset();
     }
 
+    // ========================================================================
+    // Config loading
+    // ========================================================================
+
     public static AppConfig load() {
         return load(Path.of(CONFIG_FILE));
     }
@@ -97,70 +151,48 @@ public final class ApplicationStartup {
         return builder.build();
     }
 
+    /**
+     * Applies JSON configuration onto an existing builder using Jackson
+     * databinding.
+     *
+     * <p>
+     * {@link ObjectMapper#readerForUpdating} deserializes only the fields present
+     * in the JSON
+     * document, leaving every other builder field at its default value. This
+     * replaces the previous
+     * manual property-by-property mapping and means <em>no code changes are needed
+     * here</em> when
+     * new configuration properties are added to {@link AppConfig.Builder}.
+     *
+     * <p>
+     * If the JSON is malformed the exception is logged and the builder is left with
+     * defaults,
+     * preserving the previous lenient-on-parse behavior.
+     */
     private static void applyJsonConfig(AppConfig.Builder builder, String json) {
         try {
-            JsonNode root = MAPPER.readTree(json);
-
-            applyInt(root, "autoBanThreshold", builder::autoBanThreshold);
-            applyInt(root, "dailyLikeLimit", builder::dailyLikeLimit);
-            applyInt(root, "dailySuperLikeLimit", builder::dailySuperLikeLimit);
-            applyInt(root, "dailyPassLimit", builder::dailyPassLimit);
-            applyInt(root, "maxInterests", builder::maxInterests);
-            applyInt(root, "maxPhotos", builder::maxPhotos);
-            applyInt(root, "maxBioLength", builder::maxBioLength);
-            applyInt(root, "maxReportDescLength", builder::maxReportDescLength);
-
-            applyInt(root, "sessionTimeoutMinutes", builder::sessionTimeoutMinutes);
-            applyInt(root, "maxSwipesPerSession", builder::maxSwipesPerSession);
-            applyDouble(root, "suspiciousSwipeVelocity", builder::suspiciousSwipeVelocity);
-            applyInt(root, "undoWindowSeconds", builder::undoWindowSeconds);
-
-            applyInt(root, "nearbyDistanceKm", builder::nearbyDistanceKm);
-            applyInt(root, "closeDistanceKm", builder::closeDistanceKm);
-            applyInt(root, "similarAgeDiff", builder::similarAgeDiff);
-            applyInt(root, "compatibleAgeDiff", builder::compatibleAgeDiff);
-            applyInt(root, "minSharedInterests", builder::minSharedInterests);
-            applyInt(root, "paceCompatibilityThreshold", builder::paceCompatibilityThreshold);
-            applyInt(root, "responseTimeExcellentHours", builder::responseTimeExcellentHours);
-            applyInt(root, "responseTimeGreatHours", builder::responseTimeGreatHours);
-            applyInt(root, "responseTimeGoodHours", builder::responseTimeGoodHours);
-            applyInt(root, "responseTimeWeekHours", builder::responseTimeWeekHours);
-            applyInt(root, "responseTimeMonthHours", builder::responseTimeMonthHours);
-
-            applyInt(root, "achievementMatchTier1", builder::achievementMatchTier1);
-            applyInt(root, "achievementMatchTier2", builder::achievementMatchTier2);
-            applyInt(root, "achievementMatchTier3", builder::achievementMatchTier3);
-            applyInt(root, "achievementMatchTier4", builder::achievementMatchTier4);
-            applyInt(root, "achievementMatchTier5", builder::achievementMatchTier5);
-            applyInt(root, "minSwipesForBehaviorAchievement", builder::minSwipesForBehaviorAchievement);
-
-            applyInt(root, "maxDistanceKm", builder::maxDistanceKm);
-            applyInt(root, "maxAge", builder::maxAge);
-            applyInt(root, "minAge", builder::minAge);
-
-            applyInt(root, "minHeightCm", builder::minHeightCm);
-            applyInt(root, "maxHeightCm", builder::maxHeightCm);
-            applyInt(root, "minDistanceKm", builder::minDistanceKm);
-            applyInt(root, "maxNameLength", builder::maxNameLength);
-            applyInt(root, "minAgeRangeSpan", builder::minAgeRangeSpan);
-
-            applyDouble(root, "distanceWeight", builder::distanceWeight);
-            applyDouble(root, "ageWeight", builder::ageWeight);
-            applyDouble(root, "interestWeight", builder::interestWeight);
-            applyDouble(root, "lifestyleWeight", builder::lifestyleWeight);
-            applyDouble(root, "paceWeight", builder::paceWeight);
-            applyDouble(root, "responseWeight", builder::responseWeight);
-
-            applyInt(root, "cleanupRetentionDays", builder::cleanupRetentionDays);
-
-            if (root.has("userTimeZone")) {
-                builder.userTimeZone(ZoneId.of(root.get("userTimeZone").asText()));
-            }
+            MAPPER.readerForUpdating(builder).readValue(json);
         } catch (IOException ex) {
-            logWarn("Failed to parse JSON config", ex);
+            logWarn("Failed to parse JSON config — using defaults for all unread fields", ex);
         }
     }
 
+    // ========================================================================
+    // Environment overrides
+    // ========================================================================
+
+    /**
+     * Applies environment variable overrides on top of whatever JSON (or defaults)
+     * set.
+     *
+     * <p>
+     * Environment variables use SCREAMING_SNAKE_CASE with the {@code DATING_APP_}
+     * prefix, so an
+     * automated mapping like JSON databinding is not practical here. The explicit
+     * list is therefore
+     * intentional: only variables that are useful to configure at the deployment
+     * level are exposed.
+     */
     private static void applyEnvironmentOverrides(AppConfig.Builder builder) {
         applyEnvInt("DAILY_LIKE_LIMIT", builder::dailyLikeLimit);
         applyEnvInt("DAILY_SUPER_LIKE_LIMIT", builder::dailySuperLikeLimit);
@@ -184,18 +216,6 @@ public final class ApplicationStartup {
         }
     }
 
-    private static void applyInt(JsonNode root, String key, java.util.function.IntConsumer setter) {
-        if (root.has(key)) {
-            setter.accept(root.get(key).asInt());
-        }
-    }
-
-    private static void applyDouble(JsonNode root, String key, java.util.function.DoubleConsumer setter) {
-        if (root.has(key)) {
-            setter.accept(root.get(key).asDouble());
-        }
-    }
-
     private static void applyEnvInt(String suffix, java.util.function.IntConsumer setter) {
         String value = System.getenv(ENV_PREFIX + suffix);
         if (value != null && !value.isBlank()) {
@@ -206,6 +226,114 @@ public final class ApplicationStartup {
             }
         }
     }
+
+    // ========================================================================
+    // ObjectMapper factory — mix-ins and custom deserializers live here,
+    // not inside core/, to preserve domain purity.
+    // ========================================================================
+
+    /**
+     * Builds and returns the {@link ObjectMapper} used exclusively for config
+     * deserialization.
+     *
+     * <p>
+     * The mapper is configured with two concerns:
+     * <ol>
+     * <li><strong>Mix-in registration</strong> — {@link BuilderMixin} overlays
+     * Jackson
+     * annotations onto {@link AppConfig.Builder} without touching the {@code core/}
+     * package,
+     * enabling direct private-field deserialization and unknown-field tolerance.
+     * <li><strong>Custom deserializer</strong> — {@link ZoneIdDeserializer}
+     * converts a plain
+     * timezone ID string into a {@link ZoneId}.
+     * </ol>
+     */
+    private static ObjectMapper buildObjectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+
+        // Register the field-visibility and unknown-property mix-in for
+        // AppConfig.Builder.
+        // This is the core of the mix-in strategy: we add Jackson metadata to a class
+        // in core/
+        // without actually modifying that class.
+        mapper.addMixIn(AppConfig.Builder.class, BuilderMixin.class);
+
+        // Register a custom deserializer for ZoneId, which Jackson has no built-in
+        // handler for.
+        SimpleModule module = new SimpleModule("AppConfigModule");
+        module.addDeserializer(ZoneId.class, new ZoneIdDeserializer());
+        mapper.registerModule(module);
+
+        return mapper;
+    }
+
+    // ========================================================================
+    // Private Jackson mix-in (annotations only, no implementation)
+    // ========================================================================
+
+    /**
+     * Jackson mix-in for {@link AppConfig.Builder}.
+     *
+     * <p>
+     * A mix-in is an abstract class whose Jackson annotations are "merged" onto the
+     * target class
+     * at runtime, avoiding any {@code com.fasterxml.jackson.*} imports inside
+     * {@code core/}.
+     *
+     * <ul>
+     * <li>{@link JsonAutoDetect} — enables visibility of private fields so Jackson
+     * can populate
+     * them directly. Getters, setters, and creator methods are disabled to avoid
+     * interfering
+     * with the standard POJO deserialization path; only {@code ANY} field
+     * visibility is used.
+     * <li>{@link JsonIgnoreProperties} — silently skips unknown JSON keys (e.g.,
+     * legacy config
+     * entries in {@code app-config.json} that no longer correspond to builder
+     * fields).
+     * </ul>
+     */
+    @JsonAutoDetect(
+            fieldVisibility = Visibility.ANY,
+            getterVisibility = Visibility.NONE,
+            isGetterVisibility = Visibility.NONE,
+            setterVisibility = Visibility.NONE,
+            creatorVisibility = Visibility.NONE)
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private interface BuilderMixin {}
+
+    // ========================================================================
+    // Private custom deserializer for ZoneId
+    // ========================================================================
+
+    /**
+     * Deserializes a JSON string value into a {@link ZoneId}.
+     *
+     * <p>
+     * Jackson does not ship with a built-in deserializer for {@link ZoneId}. This
+     * implementation
+     * accepts any valid IANA timezone string (e.g., {@code "America/New_York"},
+     * {@code "UTC"}).
+     * If the string is invalid, {@link ZoneId#of} throws a descriptive exception
+     * that propagates
+     * as a Jackson deserialization failure.
+     */
+    private static final class ZoneIdDeserializer extends StdDeserializer<ZoneId> {
+
+        ZoneIdDeserializer() {
+            super(ZoneId.class);
+        }
+
+        @Override
+        public ZoneId deserialize(JsonParser p, DeserializationContext ctx) throws IOException {
+            return ZoneId.of(p.getText());
+        }
+    }
+
+    // ========================================================================
+    // Logging helpers — conditional to suppress allocation at disabled log levels
+    // ========================================================================
 
     private static void logInfo(String message, Object... args) {
         if (logger.isInfoEnabled()) {

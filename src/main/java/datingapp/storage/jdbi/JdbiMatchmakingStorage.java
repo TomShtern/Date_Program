@@ -12,6 +12,7 @@ import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
 import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.PageData;
 import datingapp.storage.DatabaseManager.StorageException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -302,6 +303,63 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     @Override
     public List<Match> getAllMatchesFor(UUID userId) {
         return matchDao.getAllMatchesFor(userId);
+    }
+
+    /**
+     * Returns the total number of non-deleted matches for {@code userId} via a
+     * single
+     * {@code SELECT COUNT(*)} — no rows hydrated, no GC pressure.
+     */
+    @Override
+    public int countMatchesFor(UUID userId) {
+        return matchDao.countMatchesFor(userId);
+    }
+
+    /**
+     * Returns a bounded page of all matches (active + ended), newest first, using
+     * SQL
+     * {@code LIMIT}/{@code OFFSET} so only the requested rows are transferred from
+     * H2.
+     */
+    @Override
+    public PageData<Match> getPageOfMatchesFor(UUID userId, int offset, int limit) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must be >= 0");
+        }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be > 0");
+        }
+
+        int total = matchDao.countMatchesFor(userId);
+        if (offset >= total) {
+            return PageData.empty(limit, total);
+        }
+        List<Match> page = matchDao.getPageOfMatchesFor(userId, offset, limit);
+        return new PageData<>(page, total, offset, limit);
+    }
+
+    /**
+     * Returns a bounded page of active matches only, newest first, using SQL
+     * {@code LIMIT}/{@code OFFSET} — safe for highly-active users with thousands of
+     * matches.
+     */
+    @Override
+    public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must be >= 0");
+        }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be > 0");
+        }
+
+        int total = matchDao.countActiveMatchesFor(userId);
+        if (offset >= total) {
+            return PageData.empty(limit, total);
+        }
+        List<Match> page = matchDao.getPageOfActiveMatchesFor(userId, offset, limit);
+        return new PageData<>(page, total, offset, limit);
     }
 
     @Override
@@ -695,6 +753,39 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         @SqlQuery("SELECT " + MATCH_COLUMNS + " FROM matches WHERE (user_a = :userId OR user_b = :userId) "
                 + "AND deleted_at IS NULL")
         List<Match> getAllMatchesFor(@Bind("userId") UUID userId);
+
+        /**
+         * Counts all non-deleted matches for the user (active + ended). Used as the
+         * {@code totalCount} for {@code getPageOfMatchesFor}.
+         */
+        @SqlQuery("SELECT COUNT(*) FROM matches WHERE (user_a = :userId OR user_b = :userId) AND deleted_at IS NULL")
+        int countMatchesFor(@Bind("userId") UUID userId);
+
+        /**
+         * Counts only active, non-deleted matches for the user. Used as the totalCount
+         * for {@code getPageOfActiveMatchesFor}.
+         */
+        @SqlQuery("SELECT COUNT(*) FROM matches WHERE (user_a = :userId OR user_b = :userId) "
+                + "AND state = 'ACTIVE' AND deleted_at IS NULL")
+        int countActiveMatchesFor(@Bind("userId") UUID userId);
+
+        /**
+         * Returns a page of ALL matches (active and ended), newest first.
+         * The DB drives the slice — no in-memory list accumulation.
+         */
+        @SqlQuery("SELECT " + MATCH_COLUMNS + " FROM matches WHERE (user_a = :userId OR user_b = :userId) "
+                + "AND deleted_at IS NULL ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
+        List<Match> getPageOfMatchesFor(
+                @Bind("userId") UUID userId, @Bind("offset") int offset, @Bind("limit") int limit);
+
+        /**
+         * Returns a page of ACTIVE matches only, newest first.
+         * The DB drives the slice — no in-memory list accumulation.
+         */
+        @SqlQuery("SELECT " + MATCH_COLUMNS + " FROM matches WHERE (user_a = :userId OR user_b = :userId) "
+                + "AND state = 'ACTIVE' AND deleted_at IS NULL ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
+        List<Match> getPageOfActiveMatchesFor(
+                @Bind("userId") UUID userId, @Bind("offset") int offset, @Bind("limit") int limit);
 
         @SqlUpdate("UPDATE matches SET deleted_at = CURRENT_TIMESTAMP WHERE id = :matchId")
         void delete(@Bind("matchId") String matchId);

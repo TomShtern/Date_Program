@@ -163,6 +163,18 @@ private static final AppConfig CONFIG = AppConfig.defaults();
 // Backward compatibility delegates exist: CONFIG.dailyLikeLimit()
 ```
 
+### 5.2a Config Loading — Jackson Databinding (ApplicationStartup)
+`ApplicationStartup.applyJsonConfig()` uses Jackson `readerForUpdating(builder).readValue(json)` with
+a **mix-in strategy** — no Jackson annotations in `core/`. A `BuilderMixin` registered via
+`mapper.addMixIn(AppConfig.Builder.class, BuilderMixin.class)` enables direct private-field access
+(`@JsonAutoDetect(fieldVisibility = ANY)`) and unknown-key tolerance (`@JsonIgnoreProperties`). A
+`ZoneIdDeserializer` handles the `userTimeZone` field.
+
+**Adding a new config property requires only:**
+1. Add field + setter to `AppConfig.Builder` (same camelCase name as the JSON key).
+2. Add the key to `config/app-config.json`.
+No changes to `ApplicationStartup` needed.
+
 ### 5.2 Entity Construction: New vs DB-Load
 ```java
 // NEW entity — generates UUID + uses AppClock.now() for timestamp

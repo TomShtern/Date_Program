@@ -1,20 +1,8 @@
-<!--AGENT-DOCSYNC:ON-->
-# ChangeStamp format: SEQ|YYYY-MM-DD HH:MM:SS|agent:<id>|scope:<tag>|summary|files
-# SEQ: file-local increasing int. If collision after 3 retries append "<SEQ>:CONFLICT".
-# Agents MAY NOT use git. After code changes they MUST:
-# 1) pick SEQ = highestSEQ+1 (recheck before write),
-# 2) locate affected doc fragment using prioritized search (see below),
-# 3) archive replaced text with <!--ARCHIVE:SEQ:agent:scope-->...<!--/ARCHIVE-->,
-# 4) apply minimal precise edits,
-# 5) append one ChangeStamp line to the file-end changelog and inside the edited fragment,
-# 6) if uncertain to auto-edit, append TODO+ChangeStamp next to nearest heading.
-<!--/AGENT-DOCSYNC-->
-
 # Dating App - Qwen Code Context
 
 **Phase:** 2.1 | **Java 25** (preview) | **Maven** | **H2 + JDBI 3** | **JavaFX 25** | **Javalin REST**
 
-> **Purpose:** This document provides essential context for generating compatible code. Read this first before any implementation task.
+> **Purpose:** This document provides essential context for generating compatible code. Read this first before any implementation task. **CODE IS THE ONLY SOURCE OF TRUTH** — documentation may be stale.
 
 ---
 
@@ -27,12 +15,14 @@
 | **Session** | `AppSession` singleton (current user) |
 | **Database** | H2 at `./data/dating.mv.db`, user: `sa`, password: `dev` or `DATING_APP_DB_PASSWORD` |
 | **Config** | `./config/app-config.json` + env vars (`DATING_APP_*`) |
-| **Run CLI** | `mvn exec:java` |
+| **Run CLI** | `mvn compile && mvn exec:exec` |
 | **Run JavaFX** | `mvn javafx:run` |
 | **Run Tests** | `mvn test` |
 | **Format** | `mvn spotless:apply` (REQUIRED before commit) |
 | **Full Build** | `mvn clean verify package` |
 | **Java Version** | Java 25 with `--enable-preview` and `--enable-native-access=ALL-UNNAMED` |
+| **LOC** | Main: 22,325 code + 4,238 blanks + 3,056 comments = 29,619 total (87 files) |
+| **Tests** | 14,825 code + 3,271 blanks + 779 comments = 18,875 total (65 Java files, 62 test classes) |
 
 ---
 
@@ -51,31 +41,34 @@
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Package Structure:**
+**Package Structure (verified from source):**
 ```
 datingapp/
 ├── Main.java                    CLI entry point (20-option menu)
 ├── app/
 │   ├── bootstrap/ApplicationStartup.java  Centralized init + config loading
 │   ├── api/RestApiServer.java             Javalin REST API (port 7070)
-│   └── cli/                   CLI handlers (Dependencies record pattern)
+│   └── cli/                   CLI handlers (flat, no subpackages)
+│       ├── CliTextAndInput.java           Constants + InputReader + EnumMenu
 │       ├── MatchingHandler.java           Swiping, matches, daily picks, standouts
-│       ├── ProfileHandler.java            Profile completion, dealbreakers, notes
 │       ├── MessagingHandler.java          Conversations, messages
+│       ├── ProfileHandler.java            Profile completion, dealbreakers, notes
 │       ├── SafetyHandler.java             Block, report, verify
 │       └── StatsHandler.java              Statistics, achievements
 ├── core/                      DOMAIN LAYER (pure Java, no framework imports)
-│   ├── AppConfig.java         57-parameter config record + Builder
+│   ├── AppConfig.java         57-parameter config record with 4 sub-records
 │   ├── AppClock.java          Testable clock (TestClock in tests)
 │   ├── AppSession.java        Singleton: current logged-in user
-│   ├── ServiceRegistry.java   Holds all services + storage interfaces
+│   ├── ServiceRegistry.java   Holds all services + storage interfaces (16 fields)
 │   ├── EnumSetUtil.java       Null-safe EnumSet utilities
 │   ├── LoggingSupport.java    Default logging methods
 │   ├── PerformanceMonitor.java Timing + metrics
+│   ├── TextUtil.java          Text utilities
 │   │
 │   ├── model/                 Primary domain entities
-│   │   ├── User.java          Mutable, state machine, nested enums (Gender, UserState, VerificationMethod, ProfileNote)
-│   │   └── Match.java         Mutable, deterministic ID (userA_userB), state machine (MatchState, MatchArchiveReason)
+│   │   ├── User.java          Mutable, state machine, nested enums (Gender, UserState, VerificationMethod)
+│   │   ├── Match.java         Mutable, deterministic ID, nested enums (MatchState, MatchArchiveReason)
+│   │   └── ProfileNote.java   Standalone record: private notes on profiles
 │   │
 │   ├── connection/            Messaging & social domain
 │   │   ├── ConnectionModels.java  7 nested types: Message, Conversation, Like, Block, Report, FriendRequest, Notification
@@ -84,11 +77,12 @@ datingapp/
 │   ├── matching/              Discovery & matching
 │   │   ├── CandidateFinder.java     7-stage filter pipeline + GeoUtils (Haversine)
 │   │   ├── MatchingService.java     Like/pass/unmatch/block, PendingLiker browser
-│   │   ├── MatchQualityService.java 6-factor scoring + InterestMatcher utility
+│   │   ├── MatchQualityService.java 6-factor scoring + CompatibilityScoring utility
 │   │   ├── RecommendationService.java Daily limits, daily picks, standouts
 │   │   ├── UndoService.java         Time-windowed undo (default 30s)
 │   │   ├── LifestyleMatcher.java    Lifestyle compatibility
 │   │   ├── CompatibilityScoring.java Score calculation utilities
+│   │   ├── TrustSafetyService.java  Block/report, auto-ban at threshold
 │   │   └── Standout.java            Standout candidate data + Storage interface
 │   │
 │   ├── profile/               Profile management
@@ -112,23 +106,24 @@ datingapp/
 │   ├── DatabaseManager.java   H2 + HikariCP singleton
 │   ├── StorageFactory.java    Wires JDBI impls → services → ServiceRegistry
 │   ├── schema/
-│   │   ├── SchemaInitializer.java  DDL (14 tables + indexes + FK)
+│   │   ├── SchemaInitializer.java  DDL (18 tables + indexes + FK)
 │   │   └── MigrationRunner.java    Schema evolution
-│   └── jdbi/                  JDBI implementations
+│   └── jdbi/                  JDBI implementations (flat, no subpackages)
 │       ├── JdbiUserStorage.java           → UserStorage
 │       ├── JdbiMatchmakingStorage.java    → InteractionStorage + Undo.Storage
 │       ├── JdbiConnectionStorage.java     → CommunicationStorage
 │       ├── JdbiMetricsStorage.java        → AnalyticsStorage + Standout.Storage
-│       ├── JdbiTrustSafetyStorage.java    → TrustSafetyStorage
-│       └── JdbiTypeCodecs.java            EnumSet codec, SqlRowReaders
+│       ├── JdbiTrustSafetyStorage.java    → TrustSafetyStorage (SqlObject onDemand)
+│       └── JdbiTypeCodecs.java            EnumSet codec, SqlRowReaders (helper utility)
 │
 └── ui/                        JAVAFX LAYER (MVVM)
     ├── DatingApp.java         JavaFX Application entry point
-    ├── NavigationService.java Singleton: scene transitions (8 views + history)
+    ├── NavigationService.java Singleton: scene transitions (10 views + history)
     ├── UiConstants.java       Window sizes, timing
     ├── UiComponents.java      Reusable UI factories
     ├── UiFeedbackService.java Toast notifications
     ├── UiAnimations.java      Fade, slide transitions
+    ├── UiUtils.java           UI utilities
     ├── ImageCache.java        Lazy image caching
     ├── screen/                FXML Controllers (extend BaseController)
     │   ├── BaseController.java        Overlay mgmt, lifecycle hooks
@@ -140,12 +135,26 @@ datingapp/
     │   ├── ChatController.java
     │   ├── StatsController.java
     │   ├── PreferencesController.java
+    │   ├── StandoutsController.java
+    │   ├── SocialController.java
+    │   └── MilestonePopupController.java
+    ├── popup/
+    │   ├── MatchPopupController.java
     │   └── MilestonePopupController.java
     └── viewmodel/
         ├── ViewModelFactory.java  Lazy ViewModel creation, AppSession binding
-        ├── screen/                8 ViewModels (one per screen)
+        ├── ViewModelErrorSink.java Error callback functional interface
         ├── UiDataAdapters.java    UiUserStore + UiMatchDataAccess interfaces
-        └── ViewModelErrorSink.java Error callback functional interface
+        ├── LoginViewModel.java
+        ├── DashboardViewModel.java
+        ├── ProfileViewModel.java
+        ├── MatchingViewModel.java
+        ├── MatchesViewModel.java
+        ├── ChatViewModel.java
+        ├── StatsViewModel.java
+        ├── PreferencesViewModel.java
+        ├── StandoutsViewModel.java
+        └── SocialViewModel.java
 ```
 
 ---
@@ -160,23 +169,22 @@ datingapp/
 - Location: `lat`, `lon`, `hasLocationSet`, `maxDistanceKm`
 - Preferences: `minAge`, `maxAge`, `photoUrls` (max 2), `interests` (max 10)
 - Lifestyle: `smoking`, `drinking`, `wantsKids`, `lookingFor`, `education`, `heightCm`
-- Dealbreakers: `Dealbreakers` record
-- Pace: `PacePreferences` record (messaging frequency, time to first date, communication style, depth)
+- Dealbreakers: `MatchPreferences.Dealbreakers`
+- Pace: `PacePreferences` (messaging frequency, time to first date, communication style, depth)
 - Verification: `email`, `phone`, `isVerified`, `verificationMethod`, `verificationCode`, `verifiedAt`
 - Timestamps: `createdAt`, `updatedAt`, `deletedAt`
 
-**Nested Types:**
+**Nested Types (all `public static`):**
 - `Gender`: MALE, FEMALE, OTHER
 - `UserState`: INCOMPLETE, ACTIVE, PAUSED, BANNED
 - `VerificationMethod`: EMAIL, PHONE
-- `ProfileNote`: Private notes about other users (max 500 chars)
-- `StorageBuilder`: Bypasses validation for DB reconstitution
 
 **Key Methods:**
 - `activate()` - Requires `isComplete()`
 - `pause()` - From ACTIVE only
 - `ban()` - One-way, irreversible
 - `isComplete()` - Checks all required fields + pace preferences
+- `getAge()` - Computes from `birthDate` using configured `ZoneId`
 
 ### Match (Mutable Entity)
 **State Machine:** `ACTIVE → FRIENDS | UNMATCHED | GRACEFUL_EXIT | BLOCKED`
@@ -188,7 +196,7 @@ datingapp/
 - `state` (MatchState), `endedAt`, `endedBy`, `endReason` (MatchArchiveReason)
 - `deletedAt` (soft-delete)
 
-**Nested Types:**
+**Nested Types (all `public static`):**
 - `MatchState`: ACTIVE, FRIENDS, UNMATCHED, GRACEFUL_EXIT, BLOCKED
 - `MatchArchiveReason`: FRIEND_ZONE, GRACEFUL_EXIT, UNMATCH, BLOCK
 
@@ -196,9 +204,9 @@ datingapp/
 - `canMessage()` - Returns true if ACTIVE or FRIENDS
 - `involves(UUID)` - Checks if user is part of match
 - `getOtherUser(UUID)` - Gets the other user in match
-- State transitions: `unmatch()`, `block()`, `transitionToFriends()`, `gracefulExit()`
+- State transitions: `unmatch()`, `block()`, `transitionToFriends()`, `gracefulExit()`, `revertToActive()`
 
-### ConnectionModels (7 Nested Types)
+### ConnectionModels (7 Nested Types in `core/connection/`)
 
 | Type | Kind | Key Fields |
 |------|------|------------|
@@ -247,7 +255,7 @@ datingapp/
 
 **Undo Record:**
 - `userId`, `like` (Like record), `matchId`, `expiresAt`
-- `Storage` interface for persistence
+- `Storage` interface for persistence (**persisted to `undo_states` table**, one row per user, expires after configured window)
 
 ### EngagementDomain (Achievements + Stats)
 
@@ -262,20 +270,20 @@ datingapp/
 
 ---
 
-## Services (9 Domain Services)
+## Services (10 Domain Services)
 
 | Service | Responsibility | Key Dependencies |
 |---------|---------------|------------------|
-| `CandidateFinder` | 7-stage filter pipeline | UserStorage, InteractionStorage, TrustSafetyStorage |
+| `CandidateFinder` | 7-stage filter pipeline | UserStorage, InteractionStorage, TrustSafetyStorage, ZoneId |
 | `MatchingService` | Like/pass/unmatch/block, PendingLiker browser | InteractionStorage, TrustSafetyStorage, UserStorage + 3 optional |
-| `MatchQualityService` | 6-factor compatibility scoring + InterestMatcher | UserStorage, InteractionStorage, AppConfig |
-| `RecommendationService` | Daily limits, daily picks, standouts | UserStorage, InteractionStorage, TrustSafetyStorage, AnalyticsStorage, CandidateFinder, ProfileService, AppConfig |
+| `MatchQualityService` | 6-factor compatibility scoring | UserStorage, InteractionStorage, AppConfig |
+| `RecommendationService` | Daily limits, daily picks, standouts | UserStorage, InteractionStorage, TrustSafetyStorage, AnalyticsStorage, CandidateFinder, Standout.Storage, ProfileService, AppConfig, Clock |
 | `UndoService` | Time-windowed undo (default 30s) | InteractionStorage, Undo.Storage, AppConfig |
 | `ProfileService` | Completion scoring, achievements, behavior | AppConfig, AnalyticsStorage, InteractionStorage, TrustSafetyStorage, UserStorage |
-| `ValidationService` | Field validation against AppConfig bounds | AppConfig |
-| `ConnectionService` | Messaging, relationship transitions | CommunicationStorage, InteractionStorage, UserStorage |
+| `ValidationService` | Field validation against AppConfig limits | AppConfig |
+| `ConnectionService` | Messaging, relationship transitions | AppConfig, CommunicationStorage, InteractionStorage, UserStorage, ActivityMetricsService |
 | `ActivityMetricsService` | Session tracking, stats aggregation (256 lock stripes) | InteractionStorage, TrustSafetyStorage, AnalyticsStorage, AppConfig |
-| `TrustSafetyService` | Block/report, auto-ban at threshold | TrustSafetyStorage, InteractionStorage, UserStorage, AppConfig |
+| `TrustSafetyService` | Block/report, auto-ban at threshold | TrustSafetyStorage, InteractionStorage, UserStorage, AppConfig, CommunicationStorage |
 
 ### CandidateFinder Pipeline (7 Stages)
 1. `filter(!self)` - Exclude current user
@@ -309,11 +317,22 @@ Results sorted by distance ascending.
 
 | Interface | Entities | Methods |
 |-----------|----------|---------|
-| `UserStorage` | User, ProfileNote | ~11 methods |
-| `InteractionStorage` | Like, Match, atomic undo | ~25 methods + `saveLikeAndMaybeCreateMatch()`, `acceptFriendZoneTransition()`, `gracefulExitTransition()` |
-| `CommunicationStorage` | Conversation, Message, FriendRequest, Notification | ~25 methods |
-| `AnalyticsStorage` | UserStats, PlatformStats, Session, Achievement, DailyPick, ProfileView | ~25 methods |
-| `TrustSafetyStorage` | Block, Report | ~10 methods |
+| `UserStorage` | User, ProfileNote | ~15 methods: save, get, findActive, findCandidates, findByIds, delete, purgeDeletedBefore, profile notes CRUD |
+| `InteractionStorage` | Like, Match, atomic undo | ~30 methods: saveLikeAndMaybeCreateMatch, getActiveMatchesFor, getAllMatchesFor, atomicUndoDelete, acceptFriendZoneTransition, gracefulExitTransition |
+| `CommunicationStorage` | Conversation, Message, FriendRequest, Notification | ~30 methods: conversation CRUD, message CRUD, friend request CRUD, notification CRUD |
+| `AnalyticsStorage` | UserStats, PlatformStats, Session, Achievement, DailyPick, ProfileView | ~30 methods: session tracking, stats aggregation, achievements, daily picks |
+| `TrustSafetyStorage` | Block, Report | ~12 methods: block/unblock, report, count reports |
+
+### JDBI Implementations (5 storage + 1 helper)
+
+| Implementation | Implements | Notes |
+|----------------|------------|-------|
+| `JdbiUserStorage` | `UserStorage` | Outer class + inner Dao, Mapper, SqlBindings |
+| `JdbiMatchmakingStorage` | `InteractionStorage` | Also provides `Undo.Storage` via `undoStorage()` accessor |
+| `JdbiConnectionStorage` | `CommunicationStorage` | Outer class + inner Dao, Mappers |
+| `JdbiMetricsStorage` | `AnalyticsStorage` | Also implements `Standout.Storage` |
+| `JdbiTrustSafetyStorage` | `TrustSafetyStorage` | Uses `jdbi.onDemand(...)` directly (SqlObject) |
+| `JdbiTypeCodecs` | (utility) | `SqlRowReaders`, `EnumSetSqlCodec`, column mappers |
 
 ### JDBI Implementation Pattern
 
@@ -358,27 +377,27 @@ public final class JdbiUserStorage implements UserStorage {
 
 ---
 
-## AppConfig (57 Parameters)
+## AppConfig (57 Parameters in 4 Sub-Records)
 
-**MatchingConfig:**
+**MatchingConfig (13 params):**
 - `dailyLikeLimit` (100), `dailySuperLikeLimit` (1), `dailyPassLimit` (-1=unlimited)
 - `maxSwipesPerSession` (500), `suspiciousSwipeVelocity` (30.0 swipes/min)
 - Weights: `distanceWeight` (0.15), `ageWeight` (0.10), `interestWeight` (0.25), `lifestyleWeight` (0.25), `paceWeight` (0.15), `responseWeight` (0.10)
 - `minSharedInterests` (3), `maxDistanceKm` (500)
 
-**ValidationConfig:**
+**ValidationConfig (12 params):**
 - `minAge` (18), `maxAge` (120), `minHeightCm` (50), `maxHeightCm` (300)
 - `maxBioLength` (500), `maxReportDescLength` (500), `maxNameLength` (100)
 - `minAgeRangeSpan` (5), `minDistanceKm` (1), `maxInterests` (10), `maxPhotos` (2), `messageMaxPageSize` (100)
 
-**AlgorithmConfig:**
+**AlgorithmConfig (16 params):**
 - Distance: `nearbyDistanceKm` (5), `closeDistanceKm` (10)
 - Age: `similarAgeDiff` (2), `compatibleAgeDiff` (5)
 - Pace: `paceCompatibilityThreshold` (50)
 - Response: `responseTimeExcellentHours` (1), `responseTimeGreatHours` (24), `responseTimeGoodHours` (72), `responseTimeWeekHours` (168), `responseTimeMonthHours` (720)
 - Standout weights (6): distance (0.20), age (0.15), interest (0.25), lifestyle (0.20), completeness (0.10), activity (0.10)
 
-**SafetyConfig:**
+**SafetyConfig (16 params):**
 - `autoBanThreshold` (3 reports)
 - `userTimeZone` (system default)
 - `sessionTimeoutMinutes` (5), `undoWindowSeconds` (30)
@@ -387,28 +406,34 @@ public final class JdbiUserStorage implements UserStorage {
 - `bioAchievementLength` (100), `lifestyleFieldTarget` (5)
 - `cleanupRetentionDays` (30), `softDeleteRetentionDays` (90)
 
+**Access:** `private static final AppConfig CONFIG = AppConfig.defaults();`
+
 ---
 
 ## Database Schema
 
-**14 Tables** with soft-delete support (`deleted_at` column on all entity tables):
+**18 Tables** with soft-delete support (`deleted_at` column on all entity tables):
 
 | Table | Key Columns | Notes |
 |-------|-------------|-------|
-| `users` | 42 columns | Location, preferences, lifestyle, dealbreakers (`db_*`), verification, pace |
+| `users` | 45 columns | Location, preferences, lifestyle, dealbreakers (`db_*`), verification, pace |
 | `likes` | `who_likes`, `who_got_liked`, `direction`, `created_at` | UNIQUE(who_likes, who_got_liked) |
 | `matches` | `id` (VARCHAR), `user_a`, `user_b`, `state`, `ended_at`, `end_reason` | Deterministic ID |
+| `swipe_sessions` | `user_id`, `started_at`, `state`, swipe counts | |
+| `user_stats` | `user_id`, computed metrics | |
+| `platform_stats` | Aggregates | Standalone |
+| `daily_pick_views` | `user_id`, `viewed_date` | Composite PK |
+| `user_achievements` | `user_id`, `achievement`, `unlocked_at` | UNIQUE |
 | `conversations` | `id` (VARCHAR), `user_a`, `user_b`, `last_message_at`, read timestamps, visibility | Deterministic ID |
 | `messages` | `conversation_id`, `sender_id`, `content`, `created_at` | FK cascade |
 | `friend_requests` | `from_user_id`, `to_user_id`, `status`, `responded_at` | |
 | `notifications` | `user_id`, `type`, `title`, `message`, `is_read`, `data_json` | |
 | `blocks` | `blocker_id`, `blocked_id`, `created_at` | UNIQUE |
 | `reports` | `reporter_id`, `reported_user_id`, `reason`, `description` | UNIQUE |
-| `swipe_sessions` | `user_id`, `started_at`, `state`, swipe counts | |
-| `user_stats` | `user_id`, computed metrics | |
-| `user_achievements` | `user_id`, `achievement`, `unlocked_at` | UNIQUE |
 | `profile_notes` | `author_id`, `subject_id`, `content` | Composite PK |
-| `platform_stats` | Aggregates | Standalone |
+| `profile_views` | `viewer_id`, `viewed_id`, `viewed_at` | |
+| `standouts` | `seeker_id`, `standout_user_id`, `featured_date` | |
+| `undo_states` | `user_id` (PK), `like_id`, `who_likes`, `who_got_liked`, `direction`, `like_created_at`, `match_id`, `expires_at` | One per user; stores serialized Like + matchId for time-windowed undo (default 30s) |
 
 **Indexes:** ~30 indexes on user IDs, states, timestamps, composite queries.
 
@@ -427,8 +452,8 @@ ApplicationStartup.initialize()
     │
     ├── StorageFactory.buildH2(dbManager, config)
     │       ├── Jdbi instance + SqlObjectPlugin + type codecs
-    │       ├── 5 JDBI storage implementations
-    │       └── 9 services constructed in dependency order
+    │       ├── 5 JDBI storage implementations (+ JdbiTypeCodecs helper)
+    │       └── 10 services constructed in dependency order
     │
     └── ServiceRegistry (immutable, all fields requireNonNull)
 ```
@@ -440,7 +465,7 @@ ApplicationStartup.initialize()
 ## UI Architecture (JavaFX MVVM)
 
 **NavigationService:**
-- 8 ViewTypes: LOGIN, DASHBOARD, PROFILE, MATCHING, MATCHES, CHAT, STATS, PREFERENCES
+- 10 ViewTypes: LOGIN, DASHBOARD, PROFILE, MATCHING, MATCHES, CHAT, STATS, PREFERENCES, STANDOUTS, SOCIAL
 - History stack (max 20), context passing, transition animations (FADE, SLIDE_LEFT, SLIDE_RIGHT)
 
 **ViewModelFactory:**
@@ -448,7 +473,7 @@ ApplicationStartup.initialize()
 - `currentUserProperty()` bound to AppSession (Platform.runLater for thread safety)
 - `UiDataAdapters` wrap storage interfaces for UI consumption
 
-**ViewModels (8):**
+**ViewModels (11):**
 - `LoginViewModel` - User selection
 - `DashboardViewModel` - Overview, daily pick, notifications
 - `ProfileViewModel` - Profile editing, preview
@@ -457,10 +482,13 @@ ApplicationStartup.initialize()
 - `ChatViewModel` - Conversations, messaging
 - `StatsViewModel` - Statistics, achievements
 - `PreferencesViewModel` - Dealbreakers, settings
+- `StandoutsViewModel` - Top 10 daily matches
+- `SocialViewModel` - Friend requests, notifications
 
 **BaseController:**
 - Lifecycle: `initialize()` → wire ViewModel, `onLoad()` → fetch data, `onUnload()` → cleanup
 - Overlay management (loading, error toasts)
+- Subscription tracking for cleanup
 
 ---
 
@@ -495,9 +523,9 @@ ApplicationStartup.initialize()
 **Organization:**
 - `@Nested @DisplayName` for scenario grouping
 - `@Timeout(5)` or `@Timeout(10)` on all test classes
-- 820+ tests, 60%+ JaCoCo minimum (core/ only, UI/CLI excluded)
+- 62 test classes across `app/`, `core/`, `storage/`, `ui/`
 
-**Test Files:** 58 test classes across `app/`, `core/`, `storage/`, `ui/`.
+**Test Files:** 65 test classes.
 
 ---
 
@@ -553,6 +581,9 @@ private final Object[] lockStripes = new Object[LOCK_STRIPE_COUNT];
 8. Hardcode config values (use `AppConfig`)
 9. Access `AppSession` directly without initialization
 10. Use deprecated `ServiceRegistryBuilder` (use `StorageFactory`)
+11. Import removed standalone model enums (`Gender`, `UserState`, etc.) — use nested: `User.Gender`, `Match.MatchState`
+12. Use `Instant.now()` directly (use `AppClock.now()`)
+13. Import `core.storage.*` in ViewModels (use `UiDataAdapters`)
 
 ### ✅ ALWAYS
 1. Run `mvn spotless:apply` before committing
@@ -566,7 +597,7 @@ private final Object[] lockStripes = new Object[LOCK_STRIPE_COUNT];
 9. Check state before transitions
 10. Use JDBI SQL Object pattern
 11. Handle soft-delete consistently
-12. Initialize `AppSession` via `AppBootstrap`
+12. Initialize `AppSession` via `ApplicationStartup`
 
 ---
 
@@ -589,12 +620,6 @@ private final Object[] lockStripes = new Object[LOCK_STRIPE_COUNT];
 5. Add env var handling in `ApplicationStartup` (if needed)
 6. Use in service
 
-### Add Nested Enum
-1. Define in appropriate domain class (e.g., `User.Gender`)
-2. Add `public static` for visibility
-3. Add to `JdbiTypeCodecs` if persisted
-4. Update `CLAUDE.md` / `QWEN.md` documentation
-
 ---
 
 ## Known Limitations
@@ -603,7 +628,6 @@ private final Object[] lockStripes = new Object[LOCK_STRIPE_COUNT];
 - No proactive notifications (UI-only alerts)
 - Photo URLs are strings (no image processing)
 - Manual location entry (lat/lon coordinates)
-- No database transactions for undo (atomic undo implemented but not full ACID)
 - JavaFX UI experimental (not fully integrated with all features)
 
 ---
@@ -662,7 +686,7 @@ Browse candidates
            - Mutual gender preferences
            - Mutual age preferences
            - Distance (Haversine ≤ maxDistanceKm)
-           - Dealbreakers.Evaluator.passes()
+           - Dealbreakers.Evaluator.pass()
         4. Sort by distance ascending
 ```
 
@@ -845,25 +869,12 @@ public static record Result(boolean success, String message, DataType data) {
 
 ---
 
-## Performance Considerations
-
-- **Lock Striping:** `ActivityMetricsService` uses 256 stripes for concurrent stats
-- **Batch Loading:** `UserStorage.findByIds()` loads multiple users in one query
-- **SQL Pre-filtering:** `CandidateFinder` pushes basic filters to SQL before in-memory
-- **Lazy Loading:** ViewModels created on-demand by `ViewModelFactory`
-- **Connection Pooling:** HikariCP (max 10, min idle 2)
-- **Deterministic IDs:** Match/Conversation IDs avoid extra lookups
-
----
-
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `CLAUDE.md` | Comprehensive project documentation |
-| `AGENTS.md` | AI agent development guidelines |
-| `GEMINI.md` | Gemini-CLI agent guidelines |
-| `QWEN.md` | This file - Qwen Code context |
+| `AGENTS.md` | AI agent operational context & coding standards |
 | `architecture.md` | Visual architecture diagrams |
 | `STATUS.md` | Implementation status vs PRD |
 | `pom.xml` | Maven build configuration |
@@ -879,6 +890,6 @@ public static record Result(boolean success, String message, DataType data) {
 ## Agent Changelog (append-only)
 ---AGENT-LOG-START---
 # Format: SEQ|TS|agent|scope|summary|files
-# Append-only. Do not edit past entries. If SEQ conflict after 3 tries append ":CONFLICT".
-1|2026-02-19 12:00:00|agent:qwen_code|docs|Complete QWEN.md rewrite: architecture, 9 services, 5 storage interfaces, 14 tables, 820 tests, Java 25, JDBI pattern, MVVM UI, data flows, code templates, debugging tips|QWEN.md
+# Append-only. Do not edit past entries. If SEQ conflict after 3 retries append ":CONFLICT".
+1|2026-02-22 00:00:00|agent:qwen_code|docs|Complete QWEN.md rewrite from SOURCE CODE: 87 main files (22,325 LOC), 65 tests (14,825 LOC), 18 tables, 10 services, 5 storage interfaces, Java 25, verified package structure, actual nested types, bootstrap flow|QWEN.md
 ---AGENT-LOG-END---

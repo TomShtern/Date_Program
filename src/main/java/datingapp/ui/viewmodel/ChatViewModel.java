@@ -48,6 +48,7 @@ public class ChatViewModel {
     private final IntegerProperty totalUnreadCount = new SimpleIntegerProperty(0);
     private final AtomicInteger activeLoads = new AtomicInteger(0);
     private final AtomicLong messageLoadToken = new AtomicLong(0);
+    private final AtomicInteger refreshGeneration = new AtomicInteger(0);
 
     private User currentUser;
 
@@ -128,6 +129,7 @@ public class ChatViewModel {
         }
 
         beginLoading();
+        int generation = refreshGeneration.incrementAndGet();
         int initialUnread = readTotalUnreadOnFxThread();
         Thread.ofVirtual().name("chat-refresh").start(() -> {
             List<ConversationPreview> previews = List.of();
@@ -143,7 +145,7 @@ public class ChatViewModel {
             List<ConversationPreview> finalPreviews = previews;
             int finalUnread = unread;
             runOnFx(() -> {
-                if (!disposed.get()) {
+                if (!disposed.get() && generation == refreshGeneration.get()) {
                     updateConversations(finalPreviews, finalUnread);
                 }
                 endLoading();

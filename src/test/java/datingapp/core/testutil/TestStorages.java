@@ -26,6 +26,7 @@ import datingapp.core.model.User.UserState;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.PageData;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Clock;
@@ -320,6 +321,66 @@ public final class TestStorages {
                     .filter(match -> match.getDeletedAt() == null)
                     .filter(match -> match.involves(userId))
                     .toList();
+        }
+
+        /**
+         * In-memory count: number of non-deleted matches for {@code userId} (active and
+         * ended).
+         * Overrides the default to avoid double-streaming through getAllMatchesFor.
+         */
+        @Override
+        public int countMatchesFor(UUID userId) {
+            return (int) matches.values().stream()
+                    .filter(match -> match.getDeletedAt() == null)
+                    .filter(match -> match.involves(userId))
+                    .count();
+        }
+
+        /**
+         * In-memory pagination of ALL matches, newest first (mirrors DB ORDER BY
+         * created_at DESC).
+         */
+        @Override
+        public PageData<Match> getPageOfMatchesFor(UUID userId, int offset, int limit) {
+            Objects.requireNonNull(userId, "userId cannot be null");
+            if (offset < 0) throw new IllegalArgumentException("offset must be >= 0");
+            if (limit <= 0) throw new IllegalArgumentException("limit must be > 0");
+
+            // Sort newest-first to match the SQL ORDER BY created_at DESC
+            List<Match> all = matches.values().stream()
+                    .filter(match -> match.getDeletedAt() == null)
+                    .filter(match -> match.involves(userId))
+                    .sorted(Comparator.comparing(Match::getCreatedAt).reversed())
+                    .toList();
+            int total = all.size();
+            if (offset >= total) {
+                return PageData.empty(limit, total);
+            }
+            return new PageData<>(all.subList(offset, Math.min(total, offset + limit)), total, offset, limit);
+        }
+
+        /**
+         * In-memory pagination of ACTIVE matches only, newest first (mirrors DB ORDER
+         * BY created_at DESC).
+         */
+        @Override
+        public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+            Objects.requireNonNull(userId, "userId cannot be null");
+            if (offset < 0) throw new IllegalArgumentException("offset must be >= 0");
+            if (limit <= 0) throw new IllegalArgumentException("limit must be > 0");
+
+            // Sort newest-first to match the SQL ORDER BY created_at DESC
+            List<Match> all = matches.values().stream()
+                    .filter(match -> match.getDeletedAt() == null)
+                    .filter(match -> match.getState() == MatchState.ACTIVE)
+                    .filter(match -> match.involves(userId))
+                    .sorted(Comparator.comparing(Match::getCreatedAt).reversed())
+                    .toList();
+            int total = all.size();
+            if (offset >= total) {
+                return PageData.empty(limit, total);
+            }
+            return new PageData<>(all.subList(offset, Math.min(total, offset + limit)), total, offset, limit);
         }
 
         @Override

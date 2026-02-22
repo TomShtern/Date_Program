@@ -15,7 +15,7 @@
 - **tokei** v12.1.2 - LOC counter
 - **bat**, **sd**, **jq**, **yq**, **Semgrep** - Additional utilities
 
-**Tip:** Use `ast-grep --lang java -p '<pattern>'` for structural searches. Prefer `rg` over `grep`.
+**Tip:** Use `ast-grep --lang java -p '<pattern>'` for structural searches. Prefer `rg` over `grep` for plain-text scans.
 
 ## Essential Commands
 
@@ -28,7 +28,7 @@ mvn javafx:run                       # Run JavaFX GUI app
 # Testing (default concise output)
 mvn test                             # All tests
 mvn -Ptest-output-verbose test       # All tests (verbose diagnostics)
-mvn test -Dtest=CandidateFinderTest                    # Single test class
+mvn -Dtest=CandidateFinderTest test                    # Single test class
 mvn -Ptest-output-verbose -Dtest="StatsHandlerTest#displaysUnlockedAchievements" test  # Single method
 
 # Code Quality (REQUIRED before commit)
@@ -39,42 +39,47 @@ mvn pmd:check                        # Run PMD analysis (verify phase)
 mvn verify                           # Full build + all quality checks + JaCoCo
 
 # Database Management
-rm ./data/dating.mv.db               # Reset database (delete all data)
+Remove-Item .\data\dating.mv.db     # Reset local DB file (PowerShell)
 mvn clean                            # Clean build artifacts
+```
 
 ### Database Password
-The app uses an embedded H2 database managed via HikariCP. `DatabaseManager` handles passwords automatically based on the JDBC URL:
-- Production/external: Requires `$env:DATING_APP_DB_PASSWORD` set in shell.
-- Local File (`jdbc:h2:./...`): Auto-defaults to `dev`.
-- Test Memory (`jdbc:h2:mem:...`): Auto-defaults to `""`.
-```
+
+The app uses an embedded H2 database via HikariCP. `DatabaseManager` resolves passwords by JDBC URL:
+
+- Production/external URLs: require `$env:DATING_APP_DB_PASSWORD`
+- Local file URLs (`jdbc:h2:./...`): default password is `dev`
+- Test/memory URLs (`jdbc:h2:mem:...` or `*test*`): default password is empty string
 
 ### Build Command Discipline
 
-**NEVER run expensive commands multiple times.** Capture once, query N times:
+**NEVER run expensive commands multiple times for different filters.** Capture once, query N times:
 
 ```powershell
-# CORRECT: single run, multiple filters
 $out = mvn verify 2>&1 | Out-String
 $out | Select-String "BUILD (SUCCESS|FAILURE)" | Select-Object -Last 1
 $out | Select-String "Tests run:" | Select-Object -Last 1
+$out | Select-String "ERROR|WARNING.*violation"
 ```
 
 ## Critical Gotchas (Compilation / Runtime)
 
-| Issue                          | Wrong                                        | Correct                                               |
-|--------------------------------|----------------------------------------------|-------------------------------------------------------|
-| Nested type visibility         | `public record SendResult(...)` inside class | `public static record SendResult(...)`                |
-| Model enum location            | `core.model.Gender`, `core.model.UserState`  | `core.model.User.Gender`, `core.model.User.UserState` |
-| Clock usage in domain          | `Instant.now()`                              | `AppClock.now()` (testable)                           |
-| Service error flow             | `throw new ...` for business failure         | Return `*Result.failure(...)` record                  |
-| Pair IDs (Match, Conversation) | `a + "_" + b`                                | Lexicographically sorted: `generateId(a, b)`          |
-| EnumSet null crash             | `EnumSet.copyOf(possiblyNull)`               | `EnumSetUtil.safeCopy(...)`                           |
-| Mutable collection exposure    | `return internalSet;`                        | Return defensive copy                                 |
-| Bootstrap reference            | `AppBootstrap`                               | `ApplicationStartup`                                  |
-| UI controller package          | `ui/controller`                              | `ui/screen`                                           |
+| Issue                          | Wrong                                        | Correct                                                           |
+|--------------------------------|----------------------------------------------|-------------------------------------------------------------------|
+| Nested record/class visibility | `public record SendResult(...)` inside class | `public static record SendResult(...)`                            |
+| Model enum location            | `core.model.Gender`, `core.model.UserState`  | `core.model.User.Gender`, `core.model.User.UserState`             |
+| `ProfileNote` import           | `core.model.User.ProfileNote`                | `core.model.ProfileNote`                                          |
+| Clock usage in domain          | `Instant.now()`                              | `AppClock.now()` (testable)                                       |
+| Service error flow             | `throw new ...` for business failure         | Return `*Result.failure(...)` record                              |
+| Pair IDs (Match, Conversation) | `a + "_" + b`                                | Lexicographically sorted: `generateId(a, b)`                      |
+| EnumSet null crash             | `EnumSet.copyOf(possiblyNull)`               | `EnumSetUtil.safeCopy(...)`                                       |
+| Mutable collection exposure    | `return internalSet;`                        | Return defensive copy                                             |
+| Bootstrap reference            | `AppBootstrap`, `HandlerFactory`             | `ApplicationStartup` + handler/service `fromServices(...)` wiring |
+| UI package reference           | `ui/controller`                              | `ui/screen` and `ui/popup`                                        |
 
 **Config access:** `private static final AppConfig CONFIG = AppConfig.defaults();`
+
+> Note: `ConnectionService.SendResult.ErrorCode` is currently declared as `public enum` inside a `public static record`; nested enums are implicitly static in Java.
 
 ## Architecture
 
@@ -82,14 +87,14 @@ $out | Select-String "Tests run:" | Select-Object -Last 1
 datingapp/
   Main.java                           # CLI entry point
   app/
-    bootstrap/ApplicationStartup.java # Singleton initializer
-    cli/{MatchingHandler, ProfileHandler, SafetyHandler, StatsHandler, MessagingHandler, CliTextAndInput}.java
+    bootstrap/ApplicationStartup.java # Shared initialization
+    cli/{CliTextAndInput, MatchingHandler, MessagingHandler, ProfileHandler, SafetyHandler, StatsHandler}.java
     api/RestApiServer.java
   core/
     AppClock, AppConfig, AppSession, EnumSetUtil, LoggingSupport, PerformanceMonitor, ServiceRegistry, TextUtil
-        model/{User, Match}  # user/match enums and ProfileNote are nested public static types
-    matching/{CandidateFinder, MatchingService, MatchQualityService, RecommendationService, TrustSafetyService, UndoService, Standout, LifestyleMatcher}
-    connection/{ConnectionService, ConnectionModels}
+    model/{User, Match, ProfileNote}
+    matching/{CandidateFinder, CompatibilityScoring, LifestyleMatcher, MatchingService, MatchQualityService, RecommendationService, Standout, TrustSafetyService, UndoService}
+    connection/{ConnectionModels, ConnectionService}
     profile/{ProfileService, ValidationService, MatchPreferences}
     metrics/{ActivityMetricsService, EngagementDomain, SwipeState}
     storage/{UserStorage, InteractionStorage, CommunicationStorage, AnalyticsStorage, TrustSafetyStorage}
@@ -98,16 +103,18 @@ datingapp/
     jdbi/{JdbiUserStorage, JdbiMatchmakingStorage, JdbiConnectionStorage, JdbiMetricsStorage, JdbiTrustSafetyStorage, JdbiTypeCodecs}
     schema/{SchemaInitializer, MigrationRunner}
   ui/
-    DatingApp, NavigationService, UiComponents, UiFeedbackService, UiConstants, UiAnimations, ImageCache
-    screen/{BaseController + 8 screen controllers + MilestonePopupController}
-    viewmodel/{8 ViewModels + ViewModelFactory + ViewModelErrorSink + UiDataAdapters}
+    DatingApp, NavigationService, UiComponents, UiFeedbackService, UiConstants, UiAnimations, ImageCache, UiUtils
+    screen/{BaseController + 10 screen controllers + MilestonePopupController}
+    popup/{MatchPopupController, MilestonePopupController}
+    viewmodel/{10 ViewModels + ViewModelFactory + ViewModelErrorSink + UiDataAdapters}
 ```
 
 **Three-Layer Clean Architecture:**
-- **Layer 1 (core/):** Pure Java business logic - ZERO framework/database imports
-- **Layer 2 (storage/):** JDBI 3 + H2 database implementations
-- **Layer 3A (app/cli/):** Console handlers with interactive menu
-- **Layer 3B (ui/):** JavaFX MVVM with AtlantaFX theme
+
+- **Layer 1 (`core/`)**: Pure Java business logic — ZERO framework/database imports
+- **Layer 2 (`storage/`)**: JDBI + H2 implementations and schema
+- **Layer 3A (`app/cli/`)**: Console handlers and interactive flows
+- **Layer 3B (`ui/`)**: JavaFX MVVM app
 
 ## Entry Points
 
@@ -116,9 +123,13 @@ datingapp/
 ServiceRegistry services = ApplicationStartup.initialize();
 AppSession session = AppSession.getInstance();
 
-// CLI wiring in Main.java (direct handler construction)
-InputReader inputReader = new InputReader(scanner);
-MatchingHandler matching = new MatchingHandler(new MatchingHandler.Dependencies(...));
+// CLI wiring in Main.java
+InputReader inputReader = new CliTextAndInput.InputReader(scanner);
+MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
+ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
+SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
+StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
+MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);
 
 // JavaFX wiring in DatingApp.java
 ViewModelFactory vmFactory = new ViewModelFactory(services);
@@ -129,39 +140,42 @@ nav.initialize(primaryStage);
 
 ## Code Style
 
-**Formatting:** Palantir Java Format v2.85.0 (4-space indentation). Run `mvn spotless:apply` before every commit.
+**Formatting:** Palantir Java Format v2.85.0. Run `mvn spotless:apply` before committing.
 
-**Imports:** No star imports. Order: static first, then third-party, then standard library.
+**Imports:** No star imports. Keep imports clean; avoid accidental reordering churn.
 
 **Naming:**
-- Classes: `PascalCase` - `UserService`, `JdbiUserStorage`
-- Methods: `camelCase` - `getUserById()`, `createMatch()`
-- Predicates: `is`/`has`/`can` prefix - `isActive()`, `hasDealbreakers()`
-- Constants: `UPPER_SNAKE_CASE` - `MAX_DISTANCE_KM`
-- Identifiers: Avoid `_` as standalone name (Java reserves it)
+
+- Classes: `PascalCase`
+- Methods/fields: `camelCase`
+- Predicates: `is`/`has`/`can`
+- Constants: `UPPER_SNAKE_CASE`
 
 **Types:**
-- `record` for immutable data (`ConnectionModels.Like`, `ConnectionModels.Message`, Result records)
-- `class` for mutable entities with state (`User`, `Match`)
-- `enum` for fixed sets - **nested public static** in `User`/`Match` for model-owned states
-- `Optional<T>` for nullable returns from storage
-- **Nested types MUST be `public static`** for cross-package access
+
+- `record` for immutable data contracts (`ConnectionModels.Message`, service result records)
+- `class` for mutable entities (`User`, `Match`)
+- `enum` for fixed sets (domain enums nested under owning model)
+- `Optional<T>` for nullable-return contracts
+- Nested records/classes used cross-file should be `public static`; enums are implicitly static
 
 **State Machines:**
+
 - `User`: `INCOMPLETE → ACTIVE ↔ PAUSED → BANNED`
 - `Match`: `ACTIVE → FRIENDS | UNMATCHED | GRACEFUL_EXIT | BLOCKED`
-- Validate state before transitions with `IllegalStateException`
 
 ## Error Handling
 
 **Validation:**
-- Constructor parameters: `Objects.requireNonNull(param, "param cannot be null")`
-- Business rules: `IllegalArgumentException("Cannot like yourself")`
-- State transitions: `IllegalStateException("User is not ACTIVE")`
 
-**Storage Layer:** Wrap `SQLException` in `RuntimeException`
+- Constructor args: `Objects.requireNonNull(param, "param cannot be null")`
+- Business rules: `IllegalArgumentException`
+- Invalid state transitions: `IllegalStateException`
 
-**Service Layer:** Return Result records (never throw for business failures)
+**Storage layer:** wrap SQL/infrastructure failures in storage/runtime exceptions.
+
+**Service layer:** return result records for business failures instead of throwing.
+
 ```java
 public static record SendResult(boolean success, Message message, String errorMessage, ErrorCode errorCode) {
     public static SendResult success(Message m) { return new SendResult(true, m, null, null); }
@@ -169,17 +183,18 @@ public static record SendResult(boolean success, Message message, String errorMe
 }
 ```
 
-**CLI/UI Layer:** Never throw exceptions to users. Log user-friendly messages and continue gracefully.
+**CLI/UI:** show user-friendly messages; do not leak raw exceptions to end users.
 
 ## Testing Standards
 
-**Test Structure:**
-- JUnit 5 with `@Nested` classes for logical grouping
-- Test class name: `{ClassName}Test.java`
-- Methods: `@DisplayName("Description")` + descriptive method name
-- `@Timeout(5)` to catch infinite loops
+**Test structure:**
 
-**Mocking:** Use `TestStorages` (NO Mockito):
+- JUnit 5 + `@Nested` grouping
+- Test class naming: `{ClassName}Test`
+- Deterministic timing with `@Timeout(...)` where appropriate
+
+**Mocking strategy:** use `TestStorages` (no Mockito framework dependency in current tests).
+
 ```java
 var userStorage = new TestStorages.Users();
 var interactionStorage = new TestStorages.Interactions();
@@ -189,21 +204,39 @@ var trustSafetyStorage = new TestStorages.TrustSafety();
 ```
 
 **Utilities:**
-- `TestClock.setFixed(...)` / `TestClock.reset()` for deterministic time
-- `TestUserFactory` for quick user fixtures
 
-**Coverage:** Minimum 60% line coverage (JaCoCo enforced, excludes `ui/` and `app/cli/`)
+- `TestClock.setFixed(...)` / `TestClock.reset()`
+- `TestUserFactory`
+
+**Coverage:** JaCoCo minimum line coverage is **60%** (bundle-level check in `verify`, with UI and CLI exclusions).
 
 ## Special Patterns
 
+**Config JSON loading (Jackson mix-in, `ApplicationStartup`):**
+
+```java
+// applyJsonConfig() — replaces the old manual applyInt/applyDouble dispatch.
+// BuilderMixin uses @JsonAutoDetect(fieldVisibility=ANY) so Jackson populates
+// AppConfig.Builder private fields directly by JSON key name. No Jackson
+// annotations are needed inside core/.
+MAPPER.readerForUpdating(builder).readValue(json);
+
+// Adding a new config property requires ONLY:
+// 1. Add field + setter to AppConfig.Builder (camelCase matches JSON key).
+// 2. Add key to config/app-config.json.
+// ApplicationStartup itself does NOT need to change.
+```
+
 **Deterministic IDs** (Match, Conversation):
+
 ```java
 public static String generateId(UUID a, UUID b) {
     return a.toString().compareTo(b.toString()) < 0 ? a + "_" + b : b + "_" + a;
 }
 ```
 
-**StorageBuilder Pattern** (reconstruct from database):
+**StorageBuilder pattern** (reconstruct from storage):
+
 ```java
 User user = User.StorageBuilder.create(id, name, createdAt)
     .bio(bio)
@@ -212,140 +245,112 @@ User user = User.StorageBuilder.create(id, name, createdAt)
     .build();
 ```
 
-**Touch Pattern** (mutable entities):
+**Touch pattern** (mutable entities):
+
 ```java
 private void touch() { this.updatedAt = AppClock.now(); }
-public void setBio(String bio) { this.bio = bio; touch(); }  // EVERY setter calls touch()
+public void setBio(String bio) { this.bio = bio; touch(); }
 ```
 
-**EnumSet Defensive Patterns:**
-```java
-// Setter - handle null safely
-public void setInterestedIn(Set<Gender> interestedIn) {
-    this.interestedIn = EnumSetUtil.safeCopy(interestedIn, Gender.class);
-    touch();
-}
+**EnumSet defensive pattern:**
 
-// Getter - never expose internal reference
-public Set<Gender> getInterestedIn() {
-    return EnumSetUtil.safeCopy(interestedIn, Gender.class);
-}
-```
-
-**LoggingSupport Pattern:**
 ```java
-public interface LoggingSupport {
-    Logger logger();
-    default void logInfo(String message, Object... args) {
-        Logger log = logger();
-        if (log != null && log.isInfoEnabled()) { log.info(message, args); }
-    }
-}
+this.interestedIn = EnumSetUtil.safeCopy(interestedIn, Gender.class);
+return EnumSetUtil.safeCopy(interestedIn, Gender.class);
 ```
 
 ## MVVM UI Architecture (JavaFX)
 
-**BaseController** (lifecycle management):
-- All controllers extend `ui.screen.BaseController`
-- `addSubscription(Subscription)` - register for cleanup
-- `registerOverlay(Node)` - track overlays
-- `trackAnimation(Animation)` - track indefinite animations
-- Call `cleanup()` before navigating away
+**BaseController lifecycle:**
 
-**ViewModel Error Propagation:**
+- `addSubscription(Subscription)`
+- `registerOverlay(Node)`
+- `trackAnimation(Animation)`
+- `cleanup()` on navigation/disposal
+
+**ViewModel error propagation:**
+
 ```java
-// ViewModel side
 private ViewModelErrorSink errorHandler;
 public void setErrorHandler(ViewModelErrorSink handler) { this.errorHandler = handler; }
-
-// Controller side
+// Controller wiring
 viewModel.setErrorHandler(UiFeedbackService::showError);
 ```
 
-**Navigation Context:**
+**Navigation context handoff:**
+
 ```java
 navigationService.setNavigationContext(payload);
 navigationService.navigateTo(ViewType.CHAT);
 Object context = navigationService.consumeNavigationContext();
 ```
 
-**Threading:** Use `Thread.ofVirtual()` for background work, `Platform.runLater()` for UI updates.
+**Threading:** `Thread.ofVirtual()` for background work, `Platform.runLater()` for UI-bound updates.
+
+**ViewModel storage decoupling:** depend on `UiDataAdapters.UiUserStore`, `UiMatchDataAccess`, `UiSocialDataAccess` interfaces, not `core.storage` interfaces directly.
 
 ## JDBI Layer Conventions
 
-- Use `JdbiTypeCodecs.SqlRowReaders.*` for null-safe ResultSet reads
-- Define `ALL_COLUMNS` constant to avoid SQL column drift
-- Build domain objects through `StorageBuilder` in mappers
+- Use `JdbiTypeCodecs.SqlRowReaders.*` for null-safe reads
+- Prefer `ALL_COLUMNS` constants to avoid column drift
+- Map persisted rows back through model `StorageBuilder`
 
 ```java
-@RegisterRowMapper(Mapper.class)
-public interface JdbiUserStorage extends UserStorage {
-    String ALL_COLUMNS = "id, name, bio, birth_date, ...";
+public final class JdbiUserStorage implements UserStorage {
+    public static final String ALL_COLUMNS = "id, name, ...";
 
-    @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE id = :id")
-    User findById(@Bind("id") UUID id);
-
-    class Mapper implements RowMapper<User> {
-        public User map(ResultSet rs, StatementContext ctx) throws SQLException {
-            return User.StorageBuilder.create(
-                JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
-                rs.getString("name"),
-                JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at")
-            ).build();
-        }
+    @RegisterRowMapper(Mapper.class)
+    interface Dao {
+        @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE id = :id")
+        User get(@Bind("id") UUID id);
     }
 }
 ```
 
 ## CLI Handler Patterns
 
-**Input Validation Template:**
+**Construction boundary:** use `fromServices(...)` helper methods from handlers (`MatchingHandler.Dependencies.fromServices(...)`, `MessagingHandler.fromServices(...)`, etc.) at composition root.
+
+**Input validation template:**
+
 ```java
-private void promptNumber(User user) {
-    String input = inputReader.readLine("Value: ");
-    try {
-        int value = Integer.parseInt(input);
-        if (value < 0) { logInfo("❌ Must be positive.\n"); return; }
-        user.setValue(value);
-        logInfo("✅ Updated.\n");
-    } catch (NumberFormatException e) {
-        logInfo("⚠️  Invalid number format.\n");
-    }
+try {
+    int value = Integer.parseInt(inputReader.readLine("Value: "));
+    // validate bounds...
+} catch (NumberFormatException e) {
+    logInfo("⚠️  Invalid number format.");
 }
 ```
-
-**Common Patterns:**
-- Log with emojis: ✅ ❌ ⚠️ 🎉
-- Handle all `NumberFormatException` gracefully
-- Include default branches in switches for Checkstyle
 
 ## Code Quality Checklist
 
 **Before committing:**
+
 1. Run `mvn spotless:apply`
-2. Run `mvn verify` (compiles, tests, Checkstyle, PMD, JaCoCo)
-3. No framework imports in `core/`
-4. All dependencies via constructor injection
-5. Nested types are `public static`
-6. Services return Result records instead of throwing
+2. Run `mvn verify`
+3. Keep `core/` free from framework/DB imports
+4. Keep dependency injection explicit in constructors/builders
+5. Use safe nested-type visibility (`public static` for records/classes crossing files)
+6. Use result records for business-flow failures
 
 ## Never Do These
 
 - ❌ Import framework/DB APIs into `core/` domain/service code
-- ❌ Use removed names (`AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`)
-- ❌ Use removed standalone model enum imports (`core.model.Gender`, `UserState`, `MatchState`, etc.)
-- ❌ Throw business-flow exceptions when Result records exist
+- ❌ Use removed names (`AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`, `ScoringConstants`)
+- ❌ Import removed standalone model enums (`core.model.Gender`, `core.model.UserState`, `core.model.MatchState`, etc.)
+- ❌ Throw business-flow exceptions where result records exist
 - ❌ Return mutable internal collections directly
 - ❌ Forget `touch()` in mutable entity setters
 - ❌ Use `Instant.now()` where `AppClock.now()` is expected
+- ❌ Import `core.storage.*` directly into ViewModels
 
 ## Known Limitations
 
-- Cross-storage writes not fully transactional
+- Cross-storage writes are not fully transactional in some flows
 - Undo state is in-memory (lost on restart)
-- Email/phone verification simulated (no real sending)
-- No caching layer
+- Email/phone verification delivery is simulated in CLI flow
+- Recommendation daily-pick cache is in-memory LRU (`MAX_CACHED_PICKS=1000`)
 
 ---
-**Last Updated:** 2026-02-18 | **Phase:** 2.4 | **Files:** ~78 main + ~59 test
-**Tests:** ~800+ | **Coverage:** 60% minimum (JaCoCo)
+**Last Updated:** 2026-02-22 | **Java Files:** 87 main + 65 test (152 total)
+**LOC:** 48,494 total / 37,150 code | **Coverage Gate:** 60% minimum (JaCoCo)

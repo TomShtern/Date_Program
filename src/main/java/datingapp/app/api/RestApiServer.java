@@ -52,12 +52,19 @@ public class RestApiServer {
     private static final Logger logger = LoggerFactory.getLogger(RestApiServer.class);
     private static final int DEFAULT_PORT = 7070;
     private static final int DEFAULT_MESSAGE_LIMIT = 50;
+    private static final int DEFAULT_MATCHES_LIMIT = 20;
     private static final String UNKNOWN_USER = "Unknown";
+    private static final String BAD_REQUEST = "BAD_REQUEST";
+    /**
+     * Pagination query-parameter names shared by match and future list endpoints.
+     */
+    private static final String PARAM_LIMIT = "limit";
+
+    private static final String PARAM_OFFSET = "offset";
 
     private final ProfileService profileService;
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
-    private static final String BAD_REQUEST = "BAD_REQUEST";
 
     private final ConnectionService messagingService;
     private final int port;
@@ -165,11 +172,21 @@ public class RestApiServer {
 
     private void getMatches(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
+        int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MATCHES_LIMIT);
+        int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be greater than 0");
+        }
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must be non-negative");
+        }
         validateUserExists(userId);
-        List<MatchSummary> matches = matchingService.getMatchesForUser(userId).stream()
-                .map(m -> toMatchSummary(m, userId))
-                .toList();
-        ctx.json(matches);
+
+        // Use paginated query — prevents OOM for users with thousands of matches.
+        var page = matchingService.getPageOfMatchesForUser(userId, offset, limit);
+        List<MatchSummary> items =
+                page.items().stream().map(m -> toMatchSummary(m, userId)).toList();
+        ctx.json(new PagedMatchResponse(items, page.totalCount(), offset, limit, page.hasMore()));
     }
 
     private void likeUser(Context ctx) {
@@ -206,8 +223,8 @@ public class RestApiServer {
 
     private void getConversations(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        int limit = ctx.queryParamAsClass("limit", Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
-        int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
+        int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
+        int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be greater than 0");
         }
@@ -369,7 +386,8 @@ public class RestApiServer {
     public static record UserSummary(UUID id, String name, int age, String state) {
         /**
          * Creates a UserSummary from a User entity.
-         * Uses system default timezone for age calculation (appropriate for API display).
+         * Uses system default timezone for age calculation (appropriate for API
+         * display).
          */
         @SuppressWarnings("deprecation") // API display layer - system timezone appropriate
         public static UserSummary from(User user) {
@@ -393,7 +411,8 @@ public class RestApiServer {
             String state) {
         /**
          * Creates a UserDetail from a User entity.
-         * Uses system default timezone for age calculation (appropriate for API display).
+         * Uses system default timezone for age calculation (appropriate for API
+         * display).
          */
         @SuppressWarnings("deprecation") // API display layer - system timezone appropriate
         public static UserDetail from(User user) {
@@ -427,6 +446,18 @@ public class RestApiServer {
 
     /** Response for pass action. */
     public static record PassResponse(String message) {}
+
+    /**
+     * Paginated match list response.
+     *
+     * @param matches    the matches on this page
+     * @param totalCount total number of matches across all pages
+     * @param offset     zero-based start index of this page
+     * @param limit      maximum items per page that was requested
+     * @param hasMore    {@code true} if another page exists
+     */
+    public static record PagedMatchResponse(
+            List<MatchSummary> matches, int totalCount, int offset, int limit, boolean hasMore) {}
 
     /** Conversation summary for API responses. */
     public static record ConversationSummary(

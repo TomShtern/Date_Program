@@ -9,6 +9,7 @@ import datingapp.core.matching.RecommendationService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
+import datingapp.core.storage.PageData;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.Instant;
@@ -20,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
@@ -33,10 +35,21 @@ import org.slf4j.LoggerFactory;
 /**
  * ViewModel for the Matches screen.
  * Displays active matches plus received and sent likes for the current user.
+ *
+ * <p>
+ * Matches are loaded in pages of {@value #PAGE_SIZE} to avoid loading an
+ * unbounded
+ * number of {@link Match} objects into the JVM heap simultaneously. Call
+ * {@link #loadNextMatchPage()} to append the next page, or
+ * {@link #resetMatchPage()} to
+ * start over from the beginning.
  */
 public class MatchesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(MatchesViewModel.class);
     private static final String LIKE_REQUIRED = "like cannot be null";
+
+    /** Number of matches returned per page from storage. */
+    private static final int PAGE_SIZE = 20;
 
     private final UiMatchDataAccess matchData;
     private final UiUserStore userStore;
@@ -50,6 +63,26 @@ public class MatchesViewModel {
     private final IntegerProperty matchCount = new SimpleIntegerProperty(0);
     private final IntegerProperty likesReceivedCount = new SimpleIntegerProperty(0);
     private final IntegerProperty likesSentCount = new SimpleIntegerProperty(0);
+
+    /**
+     * Total number of active matches in storage for the current user (across all
+     * pages).
+     */
+    private final IntegerProperty totalMatchCount = new SimpleIntegerProperty(0);
+
+    /**
+     * {@code true} when at least one more page of matches exists beyond what is
+     * currently loaded.
+     */
+    private final BooleanProperty hasMoreMatches = new SimpleBooleanProperty(false);
+
+    /**
+     * Zero-based index of the next match to load; incremented as pages are
+     * appended.
+     */
+    private final AtomicInteger currentMatchOffset = new AtomicInteger(0);
+
+    private final AtomicInteger fetchEpoch = new AtomicInteger(0);
 
     private ViewModelErrorSink errorHandler;
 
@@ -109,7 +142,11 @@ public class MatchesViewModel {
             return;
         }
 
+        fetchEpoch.incrementAndGet();
         loading.set(true);
+        // Reset pagination state so we always start from the first page on a full
+        // refresh.
+        currentMatchOffset.set(0);
         UUID userId = user.getId();
         String userName = user.getName();
 
@@ -122,12 +159,12 @@ public class MatchesViewModel {
             // (H-12)
             Thread.ofVirtual().name("matches-refresh").start(() -> {
                 try {
-                    List<MatchCardData> matchCardDataList = fetchMatchesFromStorage(userId);
+                    MatchFetchResult matchResult = fetchMatchesFromStorage(userId);
                     List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
                     List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
 
                     javafx.application.Platform.runLater(() -> {
-                        updateObservableLists(matchCardDataList, received, sent, userName);
+                        updateObservableLists(matchResult, received, sent, userName);
                         loading.set(false);
                     });
                 } catch (Exception e) {
@@ -141,10 +178,10 @@ public class MatchesViewModel {
         } else {
             // Synchronous execution for tests (no FX toolkit available)
             try {
-                List<MatchCardData> matchCardDataList = fetchMatchesFromStorage(userId);
+                MatchFetchResult matchResult = fetchMatchesFromStorage(userId);
                 List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
                 List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
-                updateObservableLists(matchCardDataList, received, sent, userName);
+                updateObservableLists(matchResult, received, sent, userName);
             } catch (Exception e) {
                 logWarn("Failed to refresh matches: {}", e.getMessage(), e);
                 notifyError("Failed to refresh matches", e);
@@ -176,12 +213,11 @@ public class MatchesViewModel {
      * Updates the observable lists with fetched data.
      */
     private void updateObservableLists(
-            List<MatchCardData> matchCardDataList,
-            List<LikeCardData> received,
-            List<LikeCardData> sent,
-            String userName) {
-        matches.setAll(matchCardDataList);
+            MatchFetchResult matchResult, List<LikeCardData> received, List<LikeCardData> sent, String userName) {
+        matches.setAll(matchResult.cards());
         matchCount.set(matches.size());
+        totalMatchCount.set(matchResult.totalCount());
+        hasMoreMatches.set(matchResult.hasMore());
 
         likesReceived.setAll(received);
         likesReceivedCount.set(likesReceived.size());
@@ -194,14 +230,33 @@ public class MatchesViewModel {
         }
     }
 
-    private List<MatchCardData> fetchMatchesFromStorage(UUID userId) {
-        List<Match> activeMatches = matchData.getActiveMatchesFor(userId);
+    /**
+     * Private result record returned by {@link #fetchMatchesFromStorage(UUID)} so
+     * that
+     * pagination metadata (total count, has-more flag) can travel alongside the UI
+     * card data
+     * without an extra storage round-trip.
+     */
+    private record MatchFetchResult(List<MatchCardData> cards, int totalCount, boolean hasMore) {}
+
+    private MatchFetchResult fetchMatchesFromStorage(UUID userId) {
+        // Use the paginated method: only load PAGE_SIZE matches, not the entire table.
+        // getAndAdd atomically reads the current offset and advances it by the page
+        // size
+        // before the DB call completes; we correct it below with the actual items
+        // fetched.
+        int offset = currentMatchOffset.get();
+        PageData<Match> page = matchData.getPageOfActiveMatchesFor(userId, offset, PAGE_SIZE);
+
+        // Advance by actual items fetched (may be < PAGE_SIZE on the last page).
+        currentMatchOffset.addAndGet(page.items().size());
+
         List<UUID> otherUserIds =
-                activeMatches.stream().map(m -> m.getOtherUser(userId)).toList();
+                page.items().stream().map(m -> m.getOtherUser(userId)).toList();
         Map<UUID, User> otherUsers = userStore.findByIds(new HashSet<>(otherUserIds));
 
         List<MatchCardData> cardData = new ArrayList<>();
-        for (Match match : activeMatches) {
+        for (Match match : page.items()) {
             UUID otherUserId = match.getOtherUser(userId);
             User otherUser = otherUsers.get(otherUserId);
             if (otherUser != null) {
@@ -213,7 +268,7 @@ public class MatchesViewModel {
                         match.getCreatedAt()));
             }
         }
-        return cardData;
+        return new MatchFetchResult(List.copyOf(cardData), page.totalCount(), page.hasMore());
     }
 
     private List<LikeCardData> fetchReceivedLikesFromStorage(UUID userId) {
@@ -278,6 +333,83 @@ public class MatchesViewModel {
 
     /** Refresh the matches list. */
     public void refresh() {
+        refreshAll();
+    }
+
+    /**
+     * Loads the next page of active matches and appends them to the current list.
+     *
+     * <p>
+     * This is a "load more" operation — it does not clear the existing list. Useful
+     * for
+     * infinite-scroll or "Show More" button patterns in the UI.
+     */
+    public void loadNextMatchPage() {
+        if (!hasMoreMatches.get()) {
+            return;
+        }
+        User user = resolveCurrentUser();
+        if (user == null) {
+            return;
+        }
+        UUID userId = user.getId();
+        int capturedEpoch = fetchEpoch.get();
+        loading.set(true);
+
+        if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
+            Thread.ofVirtual().name("matches-load-more").start(() -> {
+                try {
+                    MatchFetchResult result = fetchMatchesFromStorage(userId);
+                    javafx.application.Platform.runLater(() -> {
+                        if (capturedEpoch != fetchEpoch.get()) {
+                            return;
+                        }
+                        matches.addAll(result.cards());
+                        matchCount.set(matches.size());
+                        totalMatchCount.set(result.totalCount());
+                        hasMoreMatches.set(result.hasMore());
+                        loading.set(false);
+                    });
+                } catch (Exception e) {
+                    javafx.application.Platform.runLater(() -> {
+                        if (capturedEpoch != fetchEpoch.get()) {
+                            return;
+                        }
+                        logWarn("Failed to load next match page: {}", e.getMessage(), e);
+                        notifyError("Failed to load more matches", e);
+                        loading.set(false);
+                    });
+                }
+            });
+        } else {
+            try {
+                MatchFetchResult result = fetchMatchesFromStorage(userId);
+                if (capturedEpoch != fetchEpoch.get()) {
+                    return;
+                }
+                matches.addAll(result.cards());
+                matchCount.set(matches.size());
+                totalMatchCount.set(result.totalCount());
+                hasMoreMatches.set(result.hasMore());
+            } catch (Exception e) {
+                if (capturedEpoch != fetchEpoch.get()) {
+                    return;
+                }
+                logWarn("Failed to load next match page: {}", e.getMessage(), e);
+                notifyError("Failed to load more matches", e);
+            } finally {
+                if (capturedEpoch == fetchEpoch.get()) {
+                    loading.set(false);
+                }
+            }
+        }
+    }
+
+    /**
+     * Resets the match page offset to zero and performs a full refresh.
+     * Call this when navigating back to the screen or after a match state change.
+     */
+    public void resetMatchPage() {
         refreshAll();
     }
 
@@ -479,6 +611,20 @@ public class MatchesViewModel {
 
     public IntegerProperty likesSentCountProperty() {
         return likesSentCount;
+    }
+
+    /** Total number of active matches in storage (across all pages). */
+    public IntegerProperty totalMatchCountProperty() {
+        return totalMatchCount;
+    }
+
+    /**
+     * {@code true} when there are more pages of active matches that have not yet
+     * been loaded.
+     * Bind to a "Load More" button's visibility in the UI.
+     */
+    public BooleanProperty hasMoreMatchesProperty() {
+        return hasMoreMatches;
     }
 
     /** Data class for a match card display. */
