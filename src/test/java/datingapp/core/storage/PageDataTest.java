@@ -99,8 +99,7 @@ class PageDataTest {
 
         @Test
         @DisplayName("hasMore() is true when offset + items.size() < totalCount")
-        void hasMOreTrueWhenMoreItemsExist() {
-            // 3 items loaded, starting at 0, total is 10 → hasMore = true
+        void hasMoreTrueWhenMoreItemsExist() { // 3 items loaded, starting at 0, total is 10 → hasMore = true
             PageData<String> page = new PageData<>(List.of("a", "b", "c"), 10, 0, 5);
             assertTrue(page.hasMore());
         }

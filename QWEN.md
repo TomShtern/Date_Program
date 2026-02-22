@@ -525,7 +525,7 @@ ApplicationStartup.initialize()
 - `@Timeout(5)` or `@Timeout(10)` on all test classes
 - 62 test classes across `app/`, `core/`, `storage/`, `ui/`
 
-**Test Files:** 65 test classes.
+**Test Files:** 65 Java files (62 test classes).
 
 ---
 

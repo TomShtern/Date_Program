@@ -48,6 +48,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     private static final String PARAM_DELETED_AT = "deletedAt";
     private static final String COLUMN_WHO_LIKES = "who_likes";
     private static final String COLUMN_CREATED_AT = "created_at";
+    private static final String ERR_USER_ID_NULL = "userId cannot be null";
 
     private static final String SQL_ACTIVE_LIKE_EXISTS = """
             SELECT EXISTS (
@@ -312,6 +313,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
      */
     @Override
     public int countMatchesFor(UUID userId) {
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
         return matchDao.countMatchesFor(userId);
     }
 
@@ -323,7 +325,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
      */
     @Override
     public PageData<Match> getPageOfMatchesFor(UUID userId, int offset, int limit) {
-        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
         if (offset < 0) {
             throw new IllegalArgumentException("offset must be >= 0");
         }
@@ -346,7 +348,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
      */
     @Override
     public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
-        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
         if (offset < 0) {
             throw new IllegalArgumentException("offset must be >= 0");
         }
@@ -360,6 +362,12 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         }
         List<Match> page = matchDao.getPageOfActiveMatchesFor(userId, offset, limit);
         return new PageData<>(page, total, offset, limit);
+    }
+
+    @Override
+    public int countActiveMatchesFor(UUID userId) {
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
+        return matchDao.countActiveMatchesFor(userId);
     }
 
     @Override

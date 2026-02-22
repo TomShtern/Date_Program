@@ -140,6 +140,21 @@ public interface InteractionStorage {
     }
 
     /**
+     * Returns the total number of active, non-deleted matches involving
+     * {@code userId}.
+     *
+     * <p>
+     * Default delegates to {@link #getActiveMatchesFor(UUID)} so existing
+     * implementations compile without changes. Override for better performance
+     * (e.g.
+     * {@code SELECT COUNT(*)}).
+     */
+    default int countActiveMatchesFor(UUID userId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        return getActiveMatchesFor(userId).size();
+    }
+
+    /**
      * Returns a single page of <em>all</em> matches (active and ended) for
      * {@code userId},
      * ordered by {@code created_at} descending (newest first).
@@ -168,7 +183,8 @@ public interface InteractionStorage {
         if (offset >= total) {
             return PageData.empty(limit, total);
         }
-        List<Match> page = all.subList(offset, Math.min(total, offset + limit));
+        int end = offset + Math.min(limit, total - offset);
+        List<Match> page = all.subList(offset, end);
         return new PageData<>(page, total, offset, limit);
     }
 
@@ -199,7 +215,8 @@ public interface InteractionStorage {
         if (offset >= total) {
             return PageData.empty(limit, total);
         }
-        List<Match> page = all.subList(offset, Math.min(total, offset + limit));
+        int end = offset + Math.min(limit, total - offset);
+        List<Match> page = all.subList(offset, end);
         return new PageData<>(page, total, offset, limit);
     }
 

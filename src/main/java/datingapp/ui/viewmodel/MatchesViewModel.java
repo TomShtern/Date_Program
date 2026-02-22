@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.beans.property.BooleanProperty;
@@ -83,6 +84,7 @@ public class MatchesViewModel {
     private final AtomicInteger currentMatchOffset = new AtomicInteger(0);
 
     private final AtomicInteger fetchEpoch = new AtomicInteger(0);
+    private final AtomicBoolean isFetchingNextPage = new AtomicBoolean(false);
 
     private ViewModelErrorSink errorHandler;
 
@@ -240,16 +242,22 @@ public class MatchesViewModel {
     private record MatchFetchResult(List<MatchCardData> cards, int totalCount, boolean hasMore) {}
 
     private MatchFetchResult fetchMatchesFromStorage(UUID userId) {
-        // Use the paginated method: only load PAGE_SIZE matches, not the entire table.
-        // getAndAdd atomically reads the current offset and advances it by the page
-        // size
-        // before the DB call completes; we correct it below with the actual items
-        // fetched.
-        int offset = currentMatchOffset.get();
+        // Reservce PAGE_SIZE items atomically to prevent concurrent callers of
+        // fetchMatchesFromStorage from fetching the same page (TOCTOU race).
+        // currentMatchOffset is advanced immediately; we adjust it downward below
+        // if the storage call returns fewer items.
+        int offset = currentMatchOffset.getAndAdd(PAGE_SIZE);
+
+        // Call matchData.getPageOfActiveMatchesFor using the reserved offset.
         PageData<Match> page = matchData.getPageOfActiveMatchesFor(userId, offset, PAGE_SIZE);
 
-        // Advance by actual items fetched (may be < PAGE_SIZE on the last page).
-        currentMatchOffset.addAndGet(page.items().size());
+        // If the returned page items size is less than PAGE_SIZE (last page),
+        // adjust currentMatchOffset downward so the counter accurately reflects
+        // the total items fetched.
+        int actualCount = page.items().size();
+        if (actualCount < PAGE_SIZE) {
+            currentMatchOffset.addAndGet(actualCount - PAGE_SIZE);
+        }
 
         List<UUID> otherUserIds =
                 page.items().stream().map(m -> m.getOtherUser(userId)).toList();
@@ -348,10 +356,18 @@ public class MatchesViewModel {
         if (!hasMoreMatches.get()) {
             return;
         }
-        User user = resolveCurrentUser();
-        if (user == null) {
+
+        // Atomic guard to prevent concurrent fetches (H-12)
+        if (!isFetchingNextPage.compareAndSet(false, true)) {
             return;
         }
+
+        User user = resolveCurrentUser();
+        if (user == null) {
+            isFetchingNextPage.set(false);
+            return;
+        }
+
         UUID userId = user.getId();
         int capturedEpoch = fetchEpoch.get();
         loading.set(true);
@@ -360,49 +376,43 @@ public class MatchesViewModel {
             Thread.ofVirtual().name("matches-load-more").start(() -> {
                 try {
                     MatchFetchResult result = fetchMatchesFromStorage(userId);
-                    javafx.application.Platform.runLater(() -> {
-                        if (capturedEpoch != fetchEpoch.get()) {
-                            return;
-                        }
-                        matches.addAll(result.cards());
-                        matchCount.set(matches.size());
-                        totalMatchCount.set(result.totalCount());
-                        hasMoreMatches.set(result.hasMore());
-                        loading.set(false);
-                    });
+                    javafx.application.Platform.runLater(() -> updateMatchesList(result, capturedEpoch));
                 } catch (Exception e) {
-                    javafx.application.Platform.runLater(() -> {
-                        if (capturedEpoch != fetchEpoch.get()) {
-                            return;
-                        }
-                        logWarn("Failed to load next match page: {}", e.getMessage(), e);
-                        notifyError("Failed to load more matches", e);
-                        loading.set(false);
-                    });
+                    javafx.application.Platform.runLater(() -> handleLoadError(e, capturedEpoch));
+                } finally {
+                    isFetchingNextPage.set(false);
                 }
             });
         } else {
             try {
                 MatchFetchResult result = fetchMatchesFromStorage(userId);
-                if (capturedEpoch != fetchEpoch.get()) {
-                    return;
-                }
-                matches.addAll(result.cards());
-                matchCount.set(matches.size());
-                totalMatchCount.set(result.totalCount());
-                hasMoreMatches.set(result.hasMore());
+                updateMatchesList(result, capturedEpoch);
             } catch (Exception e) {
-                if (capturedEpoch != fetchEpoch.get()) {
-                    return;
-                }
-                logWarn("Failed to load next match page: {}", e.getMessage(), e);
-                notifyError("Failed to load more matches", e);
+                handleLoadError(e, capturedEpoch);
             } finally {
-                if (capturedEpoch == fetchEpoch.get()) {
-                    loading.set(false);
-                }
+                isFetchingNextPage.set(false);
             }
         }
+    }
+
+    private void updateMatchesList(MatchFetchResult result, int capturedEpoch) {
+        if (capturedEpoch != fetchEpoch.get()) {
+            return;
+        }
+        matches.addAll(result.cards());
+        matchCount.set(matches.size());
+        totalMatchCount.set(result.totalCount());
+        hasMoreMatches.set(result.hasMore());
+        loading.set(false);
+    }
+
+    private void handleLoadError(Exception e, int capturedEpoch) {
+        if (capturedEpoch != fetchEpoch.get()) {
+            return;
+        }
+        logWarn("Failed to load next match page: {}", e.getMessage(), e);
+        notifyError("Failed to load more matches", e);
+        loading.set(false);
     }
 
     /**

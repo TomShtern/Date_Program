@@ -180,8 +180,7 @@ public class DashboardViewModel {
 
             String matchCount = "--";
             try {
-                matchCount = String.valueOf(
-                        matchData.getActiveMatchesFor(user.getId()).size());
+                matchCount = String.valueOf(matchData.countActiveMatchesFor(user.getId()));
             } catch (Exception e) {
                 logError("Match count error", e);
                 if (firstError == null) {

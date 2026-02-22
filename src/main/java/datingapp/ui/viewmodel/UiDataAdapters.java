@@ -64,11 +64,10 @@ public final class UiDataAdapters {
         PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit);
 
         /**
-         * Returns the total number of non-deleted matches (active + ended) for the
-         * user.
+         * Returns the total number of ACTIVE matches for the user.
          * Used to derive total page count in the UI.
          */
-        int countMatchesFor(UUID userId);
+        int countActiveMatchesFor(UUID userId);
 
         /** Returns the IDs of all users blocked by (or blocking) this user. */
         Set<UUID> getBlockedUserIds(UUID userId);
@@ -173,8 +172,8 @@ public final class UiDataAdapters {
         }
 
         @Override
-        public int countMatchesFor(UUID userId) {
-            return interactionStorage.countMatchesFor(userId);
+        public int countActiveMatchesFor(UUID userId) {
+            return interactionStorage.countActiveMatchesFor(userId);
         }
 
         @Override

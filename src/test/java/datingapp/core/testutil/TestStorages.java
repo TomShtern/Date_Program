@@ -336,6 +336,15 @@ public final class TestStorages {
                     .count();
         }
 
+        @Override
+        public int countActiveMatchesFor(UUID userId) {
+            return (int) matches.values().stream()
+                    .filter(match -> match.getDeletedAt() == null)
+                    .filter(match -> match.getState() == MatchState.ACTIVE)
+                    .filter(match -> match.involves(userId))
+                    .count();
+        }
+
         /**
          * In-memory pagination of ALL matches, newest first (mirrors DB ORDER BY
          * created_at DESC).
@@ -356,7 +365,8 @@ public final class TestStorages {
             if (offset >= total) {
                 return PageData.empty(limit, total);
             }
-            return new PageData<>(all.subList(offset, Math.min(total, offset + limit)), total, offset, limit);
+            int end = offset + Math.min(limit, total - offset);
+            return new PageData<>(all.subList(offset, end), total, offset, limit);
         }
 
         /**
@@ -380,7 +390,8 @@ public final class TestStorages {
             if (offset >= total) {
                 return PageData.empty(limit, total);
             }
-            return new PageData<>(all.subList(offset, Math.min(total, offset + limit)), total, offset, limit);
+            int end = offset + Math.min(limit, total - offset);
+            return new PageData<>(all.subList(offset, end), total, offset, limit);
         }
 
         @Override
