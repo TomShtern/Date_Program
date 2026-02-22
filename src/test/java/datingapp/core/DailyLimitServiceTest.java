@@ -272,7 +272,7 @@ class DailyLimitServiceTest {
         var trustSafetyStorage = new TestStorages.TrustSafety();
         var standoutStorage = new TestStorages.Standouts();
         var candidateFinder =
-                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
+                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config.userTimeZone());
         var profileService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
 

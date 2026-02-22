@@ -436,9 +436,8 @@ public class LoginViewModel {
     private static String buildSearchable(User user) {
         String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);
         String state = user.getState() == null ? "" : user.getState().name().toLowerCase(Locale.ROOT);
-        String ageText = user.getAge(AppConfig.defaults().safety().userTimeZone()) > 0
-                ? String.valueOf(user.getAge(AppConfig.defaults().safety().userTimeZone()))
-                : "";
+        int age = user.getAge(AppConfig.defaults().safety().userTimeZone());
+        String ageText = age > 0 ? String.valueOf(age) : "";
         String verifiedTag = user.isVerified() ? "verified" : "";
         return String.join(" ", name, state, ageText, verifiedTag);
     }

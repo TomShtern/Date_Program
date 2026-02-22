@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.RecommendationService;
@@ -193,13 +194,9 @@ public class DashboardViewModel {
                 Optional<DailyPick> pick = dailyService.getDailyPick(user);
                 if (pick.isPresent()) {
                     User pickedUser = pick.get().user();
-                    String age = pickedUser.getAge(datingapp.core.AppConfig.defaults()
-                                            .safety()
-                                            .userTimeZone())
-                                    > 0
-                            ? String.valueOf(pickedUser.getAge(
-                                    datingapp.core.AppConfig.defaults().safety().userTimeZone()))
-                            : "?";
+                    java.time.ZoneId timezone = AppConfig.defaults().safety().userTimeZone();
+                    int ageVal = pickedUser.getAge(timezone);
+                    String age = ageVal > 0 ? String.valueOf(ageVal) : "?";
                     pickName = pickedUser.getName() + ", " + age;
                 }
             } catch (Exception e) {
