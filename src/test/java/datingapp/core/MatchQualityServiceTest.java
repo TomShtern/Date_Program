@@ -57,8 +57,8 @@ class MatchQualityServiceTest {
         void closeDistanceGivesHighScore() {
             User alice = createUser("Alice", 25, 32.0, 34.0);
             User bob = createUser("Bob", 26, 32.01, 34.01); // ~1.4km
-            alice.setMaxDistanceKm(50);
-            bob.setMaxDistanceKm(50);
+            alice.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+            bob.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
 
             userStorage.save(alice);
             userStorage.save(bob);
@@ -253,8 +253,8 @@ class MatchQualityServiceTest {
         void closeDistanceGeneratesHighlight() {
             User alice = createUser("Alice", 25, 32.0, 34.0);
             User bob = createUser("Bob", 26, 32.01, 34.01); // Very close
-            alice.setMaxDistanceKm(50);
-            bob.setMaxDistanceKm(50);
+            alice.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+            bob.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
 
             userStorage.save(alice);
             userStorage.save(bob);
@@ -405,8 +405,8 @@ class MatchQualityServiceTest {
 
             User alice = createUser("Alice", 25, 32.0, 34.0);
             User bob = createUser("Bob", 26, 32.0, 34.0); // Very close
-            alice.setMaxDistanceKm(50);
-            bob.setMaxDistanceKm(50);
+            alice.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+            bob.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
 
             userStorage.save(alice);
             userStorage.save(bob);
@@ -525,7 +525,7 @@ class MatchQualityServiceTest {
         @Test
         @DisplayName("Three interests joins with comma and 'and'")
         void threeInterests_joinsWithCommaAnd() {
-            Set<Interest> shared = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL);
+            Set<Interest> shared = new LinkedHashSet<>(List.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL));
             String formatted = InterestMatcher.formatSharedInterests(shared);
             assertEquals("Hiking, Coffee, and Travel", formatted);
         }
@@ -560,8 +560,9 @@ class MatchQualityServiceTest {
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.of(Gender.OTHER));
         user.setLocation(lat, lon);
-        user.setMaxDistanceKm(50);
-        user.setAgeRange(18, 60);
+        user.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+        user.setAgeRange(
+                18, 60, AppConfig.defaults().minAge(), AppConfig.defaults().maxAge());
         user.addPhotoUrl("http://example.com/photo.jpg");
         user.setBio("Test bio");
         user.setPacePreferences(new PacePreferences(

@@ -20,6 +20,7 @@ import datingapp.core.testutil.TestStorages;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -67,7 +68,8 @@ class DashboardViewModelTest {
         TestClock.setFixed(FIXED_INSTANT);
 
         AppConfig config = AppConfig.defaults();
-        CandidateFinder candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage);
+        CandidateFinder candidateFinder =
+                new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
         TestStorages.Standouts standoutStorage = new TestStorages.Standouts();
         ProfileService profileService =
                 new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
@@ -166,8 +168,8 @@ class DashboardViewModelTest {
         user.setBirthDate(AppClock.today().minusYears(25));
         user.setGender(Gender.MALE);
         user.setInterestedIn(EnumSet.of(Gender.FEMALE));
-        user.setAgeRange(18, 60);
-        user.setMaxDistanceKm(50);
+        user.setAgeRange(18, 60, 18, 120);
+        user.setMaxDistanceKm(50, 500);
         user.setLocation(40.7128, -74.0060);
         user.addPhotoUrl("http://example.com/" + name + ".jpg");
         user.setBio("Dashboard bio");

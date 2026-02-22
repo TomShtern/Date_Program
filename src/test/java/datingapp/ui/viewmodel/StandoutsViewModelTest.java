@@ -20,6 +20,7 @@ import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
@@ -71,7 +72,7 @@ class StandoutsViewModelTest {
         TestClock.setFixed(FIXED_INSTANT);
 
         AppConfig config = AppConfig.defaults();
-        CandidateFinder candidateFinder = new CandidateFinder(users, interactions, trustSafety);
+        CandidateFinder candidateFinder = new CandidateFinder(users, interactions, trustSafety, ZoneId.of("UTC"));
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
 
         RecommendationService recommendationService = RecommendationService.builder()
@@ -114,7 +115,8 @@ class StandoutsViewModelTest {
 
         assertTrue(viewModel.getStandouts().isEmpty());
         assertFalse(viewModel.loadingProperty().get());
-        // The ViewModel should communicate the empty state to the user via statusMessage
+        // The ViewModel should communicate the empty state to the user via
+        // statusMessage
         assertNotNull(viewModel.statusMessageProperty().get());
         assertFalse(viewModel.statusMessageProperty().get().isBlank());
     }
@@ -232,8 +234,9 @@ class StandoutsViewModelTest {
         user.setBirthDate(AppClock.today().minusYears(27));
         user.setGender(Gender.FEMALE);
         user.setInterestedIn(EnumSet.of(Gender.MALE));
-        user.setAgeRange(20, 45);
-        user.setMaxDistanceKm(100);
+        user.setAgeRange(
+                20, 45, AppConfig.defaults().minAge(), AppConfig.defaults().maxAge());
+        user.setMaxDistanceKm(100, AppConfig.defaults().maxDistanceKm());
         user.setLocation(40.7128, -74.0060);
         user.addPhotoUrl("http://example.com/" + name + ".jpg");
         user.setBio("Standouts test bio");

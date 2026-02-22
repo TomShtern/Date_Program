@@ -198,8 +198,8 @@ class UserSessionTest {
         user.setGender(Gender.MALE);
         user.setInterestedIn(EnumSet.of(Gender.FEMALE));
         user.setLocation(32.0, 34.0);
-        user.setMaxDistanceKm(50);
-        user.setAgeRange(20, 40);
+        user.setMaxDistanceKm(50, 500);
+        user.setAgeRange(20, 40, 18, 120);
         user.addPhotoUrl("photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,

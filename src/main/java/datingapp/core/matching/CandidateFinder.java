@@ -31,11 +31,12 @@ public class CandidateFinder implements LoggingSupport {
      * Constructs a CandidateFinder with the required storage dependencies.
      * Uses system default timezone for age calculations.
      *
-     * @param userStorage the user storage implementation
+     * @param userStorage        the user storage implementation
      * @param interactionStorage the interaction storage implementation
      * @param trustSafetyStorage the trust safety storage implementation
      * @throws NullPointerException if any parameter is null
-     * @deprecated Use {@link #CandidateFinder(UserStorage, InteractionStorage, TrustSafetyStorage, java.time.ZoneId)}
+     * @deprecated Use
+     *             {@link #CandidateFinder(UserStorage, InteractionStorage, TrustSafetyStorage, java.time.ZoneId)}
      */
     @Deprecated
     public CandidateFinder(
@@ -44,12 +45,13 @@ public class CandidateFinder implements LoggingSupport {
     }
 
     /**
-     * Constructs a CandidateFinder with the required storage dependencies and timezone.
+     * Constructs a CandidateFinder with the required storage dependencies and
+     * timezone.
      *
-     * @param userStorage the user storage implementation
+     * @param userStorage        the user storage implementation
      * @param interactionStorage the interaction storage implementation
      * @param trustSafetyStorage the trust safety storage implementation
-     * @param timezone the timezone to use for age calculations
+     * @param timezone           the timezone to use for age calculations
      * @throws NullPointerException if any parameter is null
      */
     public CandidateFinder(
@@ -61,6 +63,10 @@ public class CandidateFinder implements LoggingSupport {
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.timezone = Objects.requireNonNull(timezone, "timezone cannot be null");
+    }
+
+    public java.time.ZoneId getTimezone() {
+        return timezone;
     }
 
     /** Geographic utility functions. Pure Java - no external dependencies. */
@@ -155,7 +161,8 @@ public class CandidateFinder implements LoggingSupport {
     }
 
     /**
-     * Convenience method to find candidates for the given user by fetching active users and
+     * Convenience method to find candidates for the given user by fetching active
+     * users and
      * exclusions from storage.
      *
      * @param currentUser the user searching for candidates

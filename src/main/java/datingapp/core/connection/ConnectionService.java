@@ -456,6 +456,11 @@ public class ConnectionService {
         return communicationStorage.getPendingFriendRequestsForUser(userId);
     }
 
+    /** Returns the count of pending friend-zone requests sent to {@code userId}. */
+    public int countPendingRequestsFor(UUID userId) {
+        return communicationStorage.countPendingFriendRequestsForUser(userId);
+    }
+
     /** Exception thrown when a relationship transition is invalid. */
     public static class TransitionValidationException extends RuntimeException {
         public TransitionValidationException(String message) {

@@ -102,7 +102,8 @@ public final class TestStorages {
                     .filter(u -> !u.getId().equals(excludeId))
                     .filter(u -> u.getState() == UserState.ACTIVE)
                     .filter(u -> genders == null || genders.isEmpty() || genders.contains(u.getGender()))
-                    .filter(u -> u.getAge() >= minAge && u.getAge() <= maxAge)
+                    .filter(u -> u.getAge(java.time.ZoneId.of("UTC")) >= minAge
+                            && u.getAge(java.time.ZoneId.of("UTC")) <= maxAge)
                     .toList();
         }
 

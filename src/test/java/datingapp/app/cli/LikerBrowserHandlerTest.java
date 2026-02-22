@@ -11,8 +11,8 @@ import datingapp.core.model.*;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.*;
-import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.testutil.TestUserFactory;
 import java.io.StringReader;
 import java.time.LocalDate;
 import java.util.*;
@@ -44,7 +44,7 @@ class LikerBrowserHandlerTest {
         session = AppSession.getInstance();
         session.reset();
 
-        testUser = createActiveUser("TestUser");
+        testUser = TestUserFactory.createActiveUser("TestUser");
         userStorage.save(testUser);
         session.setCurrentUser(testUser);
     }
@@ -59,7 +59,11 @@ class LikerBrowserHandlerTest {
                 .build();
         TrustSafetyService trustSafetyService =
                 new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
-        CandidateFinder candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
+        CandidateFinder candidateFinder = new CandidateFinder(
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                config.safety().userTimeZone());
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
         ProfileService profileCompletionService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
@@ -120,7 +124,7 @@ class LikerBrowserHandlerTest {
         @Test
         @DisplayName("Lists users who liked me")
         void listsUsersWhoLikedMe() {
-            User liker = createActiveUser("Liker");
+            User liker = TestUserFactory.createActiveUser("Liker");
             userStorage.save(liker);
 
             Like like = Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE);
@@ -135,7 +139,7 @@ class LikerBrowserHandlerTest {
         @Test
         @DisplayName("Likes back a user")
         void likesBackAUser() {
-            User liker = createActiveUser("Liker");
+            User liker = TestUserFactory.createActiveUser("Liker");
             userStorage.save(liker);
 
             Like like = Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE);
@@ -152,7 +156,7 @@ class LikerBrowserHandlerTest {
         @Test
         @DisplayName("Creates match on mutual like")
         void createsMatchOnMutualLike() {
-            User liker = createActiveUser("Liker");
+            User liker = TestUserFactory.createActiveUser("Liker");
             userStorage.save(liker);
 
             Like like = Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE);
@@ -170,7 +174,7 @@ class LikerBrowserHandlerTest {
         @Test
         @DisplayName("Passes on a user")
         void passesOnAUser() {
-            User liker = createActiveUser("Liker");
+            User liker = TestUserFactory.createActiveUser("Liker");
             userStorage.save(liker);
 
             Like like = Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE);
@@ -189,8 +193,8 @@ class LikerBrowserHandlerTest {
         @Test
         @DisplayName("Stops browsing with 0")
         void stopsBrowsingWithZero() {
-            User liker1 = createActiveUser("Liker1");
-            User liker2 = createActiveUser("Liker2");
+            User liker1 = TestUserFactory.createActiveUser("Liker1");
+            User liker2 = TestUserFactory.createActiveUser("Liker2");
             userStorage.save(liker1);
             userStorage.save(liker2);
 
@@ -209,7 +213,7 @@ class LikerBrowserHandlerTest {
         @Test
         @DisplayName("Skips blocked likers")
         void skipsBlockedLikers() {
-            User blockedLiker = createActiveUser("BlockedLiker");
+            User blockedLiker = TestUserFactory.createActiveUser("BlockedLiker");
             userStorage.save(blockedLiker);
 
             // They liked us
@@ -223,13 +227,13 @@ class LikerBrowserHandlerTest {
             handler.browseWhoLikedMe();
 
             // Should show "No new likes yet" since the only liker is blocked
-            // (No assertion needed - just verify no exception)
+            assertFalse(interactionStorage.exists(testUser.getId(), blockedLiker.getId()));
         }
 
         @Test
         @DisplayName("Skips already matched likers")
         void skipsAlreadyMatchedLikers() {
-            User matchedUser = createActiveUser("MatchedUser");
+            User matchedUser = TestUserFactory.createActiveUser("MatchedUser");
             userStorage.save(matchedUser);
 
             // They liked us
@@ -243,12 +247,15 @@ class LikerBrowserHandlerTest {
             handler.browseWhoLikedMe();
 
             // Should not show matched user in pending likers
+            assertTrue(interactionStorage
+                    .getByUsers(testUser.getId(), matchedUser.getId())
+                    .isPresent());
         }
 
         @Test
         @DisplayName("Skips already responded likers")
         void skipsAlreadyRespondedLikers() {
-            User liker = createActiveUser("Liker");
+            User liker = TestUserFactory.createActiveUser("Liker");
             userStorage.save(liker);
 
             // They liked us
@@ -261,6 +268,8 @@ class LikerBrowserHandlerTest {
             handler.browseWhoLikedMe();
 
             // Should not show in pending likers
+            assertTrue(
+                    interactionStorage.getLike(testUser.getId(), liker.getId()).isPresent());
         }
 
         @Test
@@ -280,12 +289,13 @@ class LikerBrowserHandlerTest {
             handler.browseWhoLikedMe();
 
             // Should not show inactive user in pending likers
+            assertFalse(interactionStorage.exists(testUser.getId(), inactiveLiker.getId()));
         }
 
         @Test
         @DisplayName("Shows end of list message after browsing all")
         void showsEndOfListMessageAfterBrowsingAll() {
-            User liker = createActiveUser("Liker");
+            User liker = TestUserFactory.createActiveUser("Liker");
             userStorage.save(liker);
 
             interactionStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
@@ -300,7 +310,7 @@ class LikerBrowserHandlerTest {
         @DisplayName("Requires login")
         void requiresLogin() {
             session.logout();
-            User liker = createActiveUser("Liker");
+            User liker = TestUserFactory.createActiveUser("Liker");
             userStorage.save(liker);
 
             interactionStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
@@ -315,7 +325,7 @@ class LikerBrowserHandlerTest {
         @Test
         @DisplayName("Handles invalid selection")
         void handlesInvalidSelection() {
-            User liker = createActiveUser("Liker");
+            User liker = TestUserFactory.createActiveUser("Liker");
             userStorage.save(liker);
 
             interactionStorage.save(Like.create(liker.getId(), testUser.getId(), Like.Direction.LIKE));
@@ -329,7 +339,7 @@ class LikerBrowserHandlerTest {
         @Test
         @DisplayName("Shows verified badge for verified likers")
         void showsVerifiedBadgeForVerifiedLikers() {
-            User verifiedLiker = createActiveUser("VerifiedUser");
+            User verifiedLiker = TestUserFactory.createActiveUser("VerifiedUser");
             verifiedLiker.startVerification(VerificationMethod.EMAIL, "123456");
             verifiedLiker.markVerified();
             userStorage.save(verifiedLiker);
@@ -344,7 +354,7 @@ class LikerBrowserHandlerTest {
         @Test
         @DisplayName("Shows bio preview for likers")
         void showsBioPreviewForLikers() {
-            User likerWithBio = createActiveUser("BioPerson");
+            User likerWithBio = TestUserFactory.createActiveUser("BioPerson");
             likerWithBio.setBio("I love hiking and traveling around the world exploring new cultures and cuisines!");
             userStorage.save(likerWithBio);
 
@@ -358,19 +368,4 @@ class LikerBrowserHandlerTest {
 
     // === Helper Methods ===
 
-    private User createActiveUser(String name) {
-        User user = new User(UUID.randomUUID(), name);
-        user.setBio("Test bio for " + name);
-        user.setBirthDate(LocalDate.of(1990, 1, 1));
-        user.setGender(Gender.OTHER);
-        user.setInterestedIn(EnumSet.of(Gender.OTHER));
-        user.addPhotoUrl("https://example.com/photo.jpg");
-        user.setPacePreferences(new PacePreferences(
-                PacePreferences.MessagingFrequency.OFTEN,
-                PacePreferences.TimeToFirstDate.FEW_DAYS,
-                PacePreferences.CommunicationStyle.TEXT_ONLY,
-                PacePreferences.DepthPreference.SMALL_TALK));
-        user.activate();
-        return user;
-    }
 }

@@ -21,6 +21,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -116,7 +117,7 @@ class UserTest {
         User user = new User(UUID.randomUUID(), "Eve");
         user.setBirthDate(AppClock.today().minusYears(25).minusDays(10));
 
-        assertEquals(25, user.getAge());
+        assertEquals(25, user.getAge(ZoneId.of("UTC")));
     }
 
     @Test
@@ -218,7 +219,7 @@ class UserTest {
     @DisplayName("setAgeRange allows min and max equal")
     void setAgeRange_allowsEqualBounds() {
         User user = new User(UUID.randomUUID(), "Eve");
-        user.setAgeRange(18, 18);
+        user.setAgeRange(18, 18, 18, 120);
 
         assertEquals(18, user.getMinAge());
         assertEquals(18, user.getMaxAge());
@@ -242,8 +243,8 @@ class UserTest {
         user.setGender(Gender.MALE);
         user.setInterestedIn(EnumSet.of(Gender.FEMALE));
         user.setLocation(32.0, 34.0);
-        user.setMaxDistanceKm(50);
-        user.setAgeRange(20, 40);
+        user.setMaxDistanceKm(50, 500);
+        user.setAgeRange(20, 40, 18, 120);
         user.addPhotoUrl("photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,

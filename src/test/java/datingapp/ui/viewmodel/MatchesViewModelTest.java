@@ -17,16 +17,23 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.storage.PageData;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
+import java.lang.reflect.Field;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,7 +67,7 @@ class MatchesViewModelTest {
 
         // Create dependencies for RecommendationService
         var analyticsStorage = new TestStorages.Analytics();
-        var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage);
+        var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
         var standoutStorage = new TestStorages.Standouts();
         var profileService = new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
 
@@ -104,7 +111,7 @@ class MatchesViewModelTest {
         // Re-create dependencies or reuse? Reusing mostly fine since they are
         // mocks/stubs.
         var analyticsStorage = new TestStorages.Analytics();
-        var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage);
+        var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
         var standoutStorage = new TestStorages.Standouts();
         var profileService =
                 new ProfileService(zeroLimitConfig, analyticsStorage, interactions, trustSafetyStorage, users);
@@ -127,7 +134,13 @@ class MatchesViewModelTest {
         users.save(otherUser);
 
         MatchesViewModel.LikeCardData likeCard = new MatchesViewModel.LikeCardData(
-                otherUser.getId(), UUID.randomUUID(), otherUser.getName(), otherUser.getAge(), "Bio", "Just now", null);
+                otherUser.getId(),
+                UUID.randomUUID(),
+                otherUser.getName(),
+                otherUser.getAge(ZoneId.of("UTC")),
+                "Bio",
+                "Just now",
+                null);
 
         limitViewModel.likeBack(likeCard);
 
@@ -258,13 +271,99 @@ class MatchesViewModelTest {
         assertEquals(0, viewModel.getLikesReceived().size());
     }
 
+    @Test
+    @DisplayName("loadNextMatchPage does not corrupt offset if refreshAll resets it concurrently")
+    void loadNextMatchPageDoesNotCorruptOffsetOnConcurrentReset() throws Exception {
+        // Setup: Current user has 5 matches (less than PAGE_SIZE=20)
+        for (int i = 0; i < 5; i++) {
+            User other = createActiveUser("Match" + i);
+            users.save(other);
+            interactions.save(Match.create(currentUser.getId(), other.getId()));
+        }
+
+        // Flag to trigger a nested refreshAll exactly once to simulate the race
+        final AtomicBoolean raceTriggered = new AtomicBoolean(false);
+        final AtomicReference<MatchesViewModel> vmRef = new AtomicReference<>();
+
+        // Custom wrapper to inject a refreshAll() call mid-fetch in
+        // fetchMatchesFromStorage
+        UiMatchDataAccess raceMatchData = new UiMatchDataAccess() {
+            @Override
+            public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+                if (raceTriggered.compareAndSet(false, true)) {
+                    // Simulate refreshAll() happening after offset reservation
+                    // but before the downward adjustment in fetchMatchesFromStorage.
+                    vmRef.get().refreshAll();
+                }
+                return matchData.getPageOfActiveMatchesFor(userId, offset, limit);
+            }
+
+            @Override
+            public List<Match> getActiveMatchesFor(UUID userId) {
+                return matchData.getActiveMatchesFor(userId);
+            }
+
+            @Override
+            public List<Match> getAllMatchesFor(UUID userId) {
+                return matchData.getAllMatchesFor(userId);
+            }
+
+            @Override
+            public java.util.Optional<Like> getLike(UUID from, UUID to) {
+                return matchData.getLike(from, to);
+            }
+
+            @Override
+            public java.util.Set<UUID> getBlockedUserIds(UUID userId) {
+                return matchData.getBlockedUserIds(userId);
+            }
+
+            @Override
+            public java.util.Set<UUID> getLikedOrPassedUserIds(UUID userId) {
+                return matchData.getLikedOrPassedUserIds(userId);
+            }
+
+            @Override
+            public void deleteLike(UUID likeId) {
+                matchData.deleteLike(likeId);
+            }
+
+            @Override
+            public int countActiveMatchesFor(UUID userId) {
+                return matchData.countActiveMatchesFor(userId);
+            }
+        };
+
+        MatchesViewModel raceViewModel =
+                new MatchesViewModel(raceMatchData, userStore, matchingService, dailyService, AppSession.getInstance());
+        vmRef.set(raceViewModel);
+
+        // 1. Trigger the race via initialize -> refreshAll -> fetchMatchesFromStorage
+        // -> nested refreshAll
+        raceViewModel.initialize();
+
+        // 2. Verify internal offset state using reflection.
+        // If the fix works, the outer fetch (epoch 1) skips its adjustment because
+        // fetchEpoch is now 2.
+        // The inner fetch (epoch 2) completes its adjustment correctly.
+        Field offsetField = MatchesViewModel.class.getDeclaredField("currentMatchOffset");
+        offsetField.setAccessible(true);
+        AtomicInteger offset = (AtomicInteger) offsetField.get(raceViewModel);
+
+        // Without the fix, the offset would be negative:
+        // Nested refresh completes correctly (offset = 5).
+        // Outer refresh adjustment executes: 5 + (5 - 20) = -10.
+        assertTrue(offset.get() >= 0, "Offset should not be negative: " + offset.get());
+        assertEquals(5, offset.get(), "Offset should reflect the state of the latest successful refresh");
+    }
+
     private static User createActiveUser(String name) {
         User user = new User(UUID.randomUUID(), name);
         user.setBirthDate(AppClock.today().minusYears(25));
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.of(Gender.OTHER));
-        user.setAgeRange(18, 60);
-        user.setMaxDistanceKm(50);
+        user.setAgeRange(18, 60, 18, 120);
+        user.setMaxDistanceKm(50, 500);
         user.setLocation(40.7128, -74.0060);
         user.addPhotoUrl("http://example.com/" + name + ".jpg");
         user.setBio("Bio");

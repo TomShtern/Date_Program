@@ -311,11 +311,9 @@ public class MatchingViewModel {
         score += (int) (interestMatch.jaccardIndex() * 30);
 
         // Age compatibility (0-15 points)
-        @SuppressWarnings("deprecation") // UI scoring heuristic - system timezone appropriate
-        int theirAge = candidate.getAge();
+        int theirAge = candidate.getAge(candidateFinder.getTimezone());
         if (theirAge >= currentUser.getMinAge() && theirAge <= currentUser.getMaxAge()) {
-            @SuppressWarnings("deprecation") // UI scoring heuristic - system timezone appropriate
-            int currentUserAge = currentUser.getAge();
+            int currentUserAge = currentUser.getAge(candidateFinder.getTimezone());
             int ageDiff = Math.abs(theirAge - currentUserAge);
             score += Math.max(0, 15 - ageDiff); // Closer ages score higher
         }

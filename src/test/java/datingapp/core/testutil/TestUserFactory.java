@@ -18,6 +18,8 @@ public final class TestUserFactory {
         // Utility class
     }
 
+    private static final datingapp.core.AppConfig CONFIG = datingapp.core.AppConfig.defaults();
+
     /**
      * Creates an ACTIVE user with all required matching fields populated (bio,
      * birthDate, gender, interestedIn, photoUrls, location, and pacePreferences).
@@ -47,6 +49,8 @@ public final class TestUserFactory {
                 .photoUrls(java.util.List.of("http://example.com/photo.jpg"))
                 .location(32.0853, 34.7818)
                 .hasLocationSet(true)
+                .maxDistanceKm(CONFIG.matching().maxDistanceKm())
+                .ageRange(CONFIG.validation().minAge(), CONFIG.validation().maxAge())
                 .pacePreferences(new datingapp.core.profile.MatchPreferences.PacePreferences(
                         datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
                         datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
@@ -64,12 +68,23 @@ public final class TestUserFactory {
      * @return a new complete user with bio, location, and preferences
      */
     public static User createCompleteUser(String name) {
-        User user = createActiveUser(name);
-        user.setBio("Test bio for " + name);
-        user.setLocation(32.0853, 34.7818); // Tel Aviv coordinates
-        user.setMaxDistanceKm(50, 500);
-        user.setAgeRange(18, 99, 18, 120);
-        return user;
+        return User.StorageBuilder.create(UUID.randomUUID(), name, AppClock.now())
+                .state(UserState.ACTIVE)
+                .bio("Test bio for " + name)
+                .birthDate(AppClock.today().minusYears(25))
+                .gender(Gender.MALE)
+                .interestedIn(java.util.Set.of(Gender.FEMALE))
+                .photoUrls(java.util.List.of("http://example.com/photo.jpg"))
+                .location(32.0853, 34.7818)
+                .hasLocationSet(true)
+                .maxDistanceKm(CONFIG.matching().maxDistanceKm())
+                .ageRange(CONFIG.validation().minAge(), CONFIG.validation().maxAge())
+                .pacePreferences(new datingapp.core.profile.MatchPreferences.PacePreferences(
+                        datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference.DEEP_CHAT))
+                .build();
     }
 
     /**

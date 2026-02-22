@@ -211,8 +211,7 @@ public class MatchingHandler implements LoggingSupport {
     private void displayCandidateProfile(User candidate, User currentUser, double distance) {
         logInfo(CliTextAndInput.BOX_TOP);
         boolean verified = candidate.isVerified();
-        @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
-        int age = candidate.getAge();
+        int age = candidate.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone());
         logInfo(
                 "│ 💝 {}{}{}, {} years old",
                 candidate.getName(),
@@ -287,8 +286,9 @@ public class MatchingHandler implements LoggingSupport {
                             .computeQuality(match, currentUser.getId())
                             .ifPresent(quality -> {
                                 String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
-                                @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
-                                int age = otherUser.getAge();
+                                int age = otherUser.getAge(datingapp.core.AppConfig.defaults()
+                                        .safety()
+                                        .userTimeZone());
                                 logInfo(
                                         "  {}. {} {}{}, {}         {} {}%",
                                         displayIndex,
@@ -364,8 +364,7 @@ public class MatchingHandler implements LoggingSupport {
         logInfo("         MATCH WITH {}", nameUpper);
         logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
 
-        @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
-        int age = otherUser.getAge();
+        int age = otherUser.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone());
         logInfo("  👤 {}, {}", otherUser.getName(), age);
         if (otherUser.getBio() != null) {
             logInfo("  📝 {}", otherUser.getBio());
@@ -611,8 +610,7 @@ public class MatchingHandler implements LoggingSupport {
         logInfo("");
         User candidate = pick.user();
         logInfo(CliTextAndInput.BOX_TOP);
-        @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
-        int age = candidate.getAge();
+        int age = candidate.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone());
         logInfo("│ 🎁 {}, {} years old", candidate.getName(), age);
         if (logger.isInfoEnabled()) {
             logInfo("│ 📍 {} km away", String.format("%.1f", distance));
@@ -747,8 +745,8 @@ public class MatchingHandler implements LoggingSupport {
             logInfo(
                     "{}. {} {} (Score: {}%){}",
                     s.rank(), getStandoutEmoji(s.rank()), candidate.getName(), s.score(), interacted);
-            @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
-            int age = candidate.getAge();
+            int age = candidate.getAge(
+                    datingapp.core.AppConfig.defaults().safety().userTimeZone());
             logInfo("   {} - {}", s.reason(), age + "yo");
         }
     }
@@ -937,8 +935,7 @@ public class MatchingHandler implements LoggingSupport {
         String likedAgo = TextUtil.formatTimeAgo(pending.likedAt());
 
         logInfo(CliTextAndInput.BOX_TOP);
-        @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
-        int age = user.getAge();
+        int age = user.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone());
         logInfo("│ 💝 {}, {} years old{}", user.getName(), age, verifiedBadge);
         logInfo("│ 🕒 Liked you {}", likedAgo);
         logInfo("│ 📍 Location: {}, {}", user.getLat(), user.getLon());

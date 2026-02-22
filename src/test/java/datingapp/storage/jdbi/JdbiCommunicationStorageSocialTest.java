@@ -107,6 +107,33 @@ class JdbiCommunicationStorageSocialTest {
                     .getPendingFriendRequestBetween(bob.getId(), alice.getId())
                     .isPresent()); // Should be bidirectional for pending
         }
+
+        @Test
+        @DisplayName("should count pending friend requests")
+        void shouldCountPendingFriendRequests() {
+            // Save two pending requests for bob
+            FriendRequest req1 = FriendRequest.create(alice.getId(), bob.getId());
+            User carol = new User(UUID.randomUUID(), "Carol");
+            userStorage.save(carol);
+            UUID carolId = carol.getId();
+
+            FriendRequest req2 = FriendRequest.create(carolId, bob.getId());
+            communicationStorage.saveFriendRequest(req1);
+            communicationStorage.saveFriendRequest(req2);
+
+            // Save one accepted request for bob
+            FriendRequest req3 = new FriendRequest(
+                    UUID.randomUUID(), alice.getId(), bob.getId(), Instant.now(), FriendRequest.Status.ACCEPTED, null);
+            communicationStorage.saveFriendRequest(req3);
+
+            // Save one pending request for carol (from bob)
+            FriendRequest req4 = FriendRequest.create(bob.getId(), carolId);
+            communicationStorage.saveFriendRequest(req4);
+
+            assertEquals(2, communicationStorage.countPendingFriendRequestsForUser(bob.getId()));
+            assertEquals(1, communicationStorage.countPendingFriendRequestsForUser(carolId));
+            assertEquals(0, communicationStorage.countPendingFriendRequestsForUser(alice.getId()));
+        }
     }
 
     @Nested

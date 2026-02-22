@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
@@ -83,7 +84,7 @@ public class MatchesViewModel {
      */
     private final AtomicInteger currentMatchOffset = new AtomicInteger(0);
 
-    private final AtomicInteger fetchEpoch = new AtomicInteger(0);
+    private final AtomicLong refreshEpoch = new AtomicLong(0);
     private final AtomicBoolean isFetchingNextPage = new AtomicBoolean(false);
 
     private ViewModelErrorSink errorHandler;
@@ -144,7 +145,7 @@ public class MatchesViewModel {
             return;
         }
 
-        fetchEpoch.incrementAndGet();
+        long capturedEpoch = refreshEpoch.incrementAndGet();
         loading.set(true);
         // Reset pagination state so we always start from the first page on a full
         // refresh.
@@ -161,26 +162,30 @@ public class MatchesViewModel {
             // (H-12)
             Thread.ofVirtual().name("matches-refresh").start(() -> {
                 try {
-                    MatchFetchResult matchResult = fetchMatchesFromStorage(userId);
+                    MatchFetchResult matchResult = fetchMatchesFromStorage(userId, capturedEpoch);
                     List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
                     List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
 
                     javafx.application.Platform.runLater(() -> {
-                        updateObservableLists(matchResult, received, sent, userName);
-                        loading.set(false);
+                        if (refreshEpoch.get() == capturedEpoch) {
+                            updateObservableLists(matchResult, received, sent, userName);
+                            loading.set(false);
+                        }
                     });
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> {
-                        logWarn("Failed to refresh matches: {}", e.getMessage(), e);
-                        notifyError("Failed to refresh matches", e);
-                        loading.set(false);
+                        if (refreshEpoch.get() == capturedEpoch) {
+                            logWarn("Failed to refresh matches: {}", e.getMessage(), e);
+                            notifyError("Failed to refresh matches", e);
+                            loading.set(false);
+                        }
                     });
                 }
             });
         } else {
             // Synchronous execution for tests (no FX toolkit available)
             try {
-                MatchFetchResult matchResult = fetchMatchesFromStorage(userId);
+                MatchFetchResult matchResult = fetchMatchesFromStorage(userId, capturedEpoch);
                 List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
                 List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
                 updateObservableLists(matchResult, received, sent, userName);
@@ -188,7 +193,9 @@ public class MatchesViewModel {
                 logWarn("Failed to refresh matches: {}", e.getMessage(), e);
                 notifyError("Failed to refresh matches", e);
             } finally {
-                loading.set(false);
+                if (refreshEpoch.get() == capturedEpoch) {
+                    loading.set(false);
+                }
             }
         }
     }
@@ -241,7 +248,7 @@ public class MatchesViewModel {
      */
     private record MatchFetchResult(List<MatchCardData> cards, int totalCount, boolean hasMore) {}
 
-    private MatchFetchResult fetchMatchesFromStorage(UUID userId) {
+    private MatchFetchResult fetchMatchesFromStorage(UUID userId, long expectedEpoch) {
         // Reservce PAGE_SIZE items atomically to prevent concurrent callers of
         // fetchMatchesFromStorage from fetching the same page (TOCTOU race).
         // currentMatchOffset is advanced immediately; we adjust it downward below
@@ -254,8 +261,12 @@ public class MatchesViewModel {
         // If the returned page items size is less than PAGE_SIZE (last page),
         // adjust currentMatchOffset downward so the counter accurately reflects
         // the total items fetched.
+        // GUARD: Only adjust if the current fetch is still valid for its epoch.
+        // If a refreshAll() happened in between, currentMatchOffset has been reset
+        // to 0 and adjusting it would corrupt the new state (possibly making it
+        // negative).
         int actualCount = page.items().size();
-        if (actualCount < PAGE_SIZE) {
+        if (actualCount < PAGE_SIZE && refreshEpoch.get() == expectedEpoch) {
             currentMatchOffset.addAndGet(actualCount - PAGE_SIZE);
         }
 
@@ -288,8 +299,8 @@ public class MatchesViewModel {
             if (liker != null && liker.getState() == UserState.ACTIVE) {
                 Like like = matchData.getLike(liker.getId(), userId).orElse(null);
                 if (like != null) {
-                    @SuppressWarnings("deprecation") // UI display - system timezone appropriate
-                    int age = liker.getAge();
+                    int age = liker.getAge(
+                            datingapp.core.AppConfig.defaults().safety().userTimeZone());
                     received.add(new LikeCardData(
                             liker.getId(),
                             like.id(),
@@ -322,8 +333,8 @@ public class MatchesViewModel {
             if (like != null && like.direction() == Like.Direction.LIKE) {
                 User otherUser = potentialUsers.get(otherUserId);
                 if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
-                    @SuppressWarnings("deprecation") // UI display - system timezone appropriate
-                    int age = otherUser.getAge();
+                    int age = otherUser.getAge(
+                            datingapp.core.AppConfig.defaults().safety().userTimeZone());
                     sent.add(new LikeCardData(
                             otherUser.getId(),
                             like.id(),
@@ -369,13 +380,13 @@ public class MatchesViewModel {
         }
 
         UUID userId = user.getId();
-        int capturedEpoch = fetchEpoch.get();
+        long capturedEpoch = refreshEpoch.get();
         loading.set(true);
 
         if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
             Thread.ofVirtual().name("matches-load-more").start(() -> {
                 try {
-                    MatchFetchResult result = fetchMatchesFromStorage(userId);
+                    MatchFetchResult result = fetchMatchesFromStorage(userId, capturedEpoch);
                     javafx.application.Platform.runLater(() -> updateMatchesList(result, capturedEpoch));
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> handleLoadError(e, capturedEpoch));
@@ -385,7 +396,7 @@ public class MatchesViewModel {
             });
         } else {
             try {
-                MatchFetchResult result = fetchMatchesFromStorage(userId);
+                MatchFetchResult result = fetchMatchesFromStorage(userId, capturedEpoch);
                 updateMatchesList(result, capturedEpoch);
             } catch (Exception e) {
                 handleLoadError(e, capturedEpoch);
@@ -395,8 +406,8 @@ public class MatchesViewModel {
         }
     }
 
-    private void updateMatchesList(MatchFetchResult result, int capturedEpoch) {
-        if (capturedEpoch != fetchEpoch.get()) {
+    private void updateMatchesList(MatchFetchResult result, long capturedEpoch) {
+        if (capturedEpoch != refreshEpoch.get()) {
             return;
         }
         matches.addAll(result.cards());
@@ -406,8 +417,8 @@ public class MatchesViewModel {
         loading.set(false);
     }
 
-    private void handleLoadError(Exception e, int capturedEpoch) {
-        if (capturedEpoch != fetchEpoch.get()) {
+    private void handleLoadError(Exception e, long capturedEpoch) {
+        if (capturedEpoch != refreshEpoch.get()) {
             return;
         }
         logWarn("Failed to load next match page: {}", e.getMessage(), e);

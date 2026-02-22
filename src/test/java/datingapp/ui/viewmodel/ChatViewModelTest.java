@@ -168,7 +168,8 @@ class ChatViewModelTest {
         assertEquals(2, viewModel.getConversations().size());
 
         // Resolve conversations by user identity, not by list index.
-        // Conversations are sorted by lastMessageAt: both timestamps are equal under the
+        // Conversations are sorted by lastMessageAt: both timestamps are equal under
+        // the
         // fixed clock, so HashMap iteration order is non-deterministic.
         final UUID user3Id = user3.getId();
         ConversationPreview otherUserConv = viewModel.getConversations().stream()
@@ -181,7 +182,8 @@ class ChatViewModelTest {
                 .orElseThrow(() -> new AssertionError("user3 conversation not found"));
 
         // Select otherUser first, then immediately select User3.
-        // The stale load (token 1) should be skipped; only the User3 load (token 2) completes.
+        // The stale load (token 1) should be skipped; only the User3 load (token 2)
+        // completes.
         viewModel.selectedConversationProperty().set(otherUserConv);
         viewModel.selectedConversationProperty().set(user3Conv);
 
@@ -226,8 +228,9 @@ class ChatViewModelTest {
         user.setBirthDate(AppClock.today().minusYears(25));
         user.setGender(Gender.MALE);
         user.setInterestedIn(EnumSet.of(Gender.FEMALE));
-        user.setAgeRange(18, 60);
-        user.setMaxDistanceKm(50);
+        user.setAgeRange(
+                18, 60, AppConfig.defaults().minAge(), AppConfig.defaults().maxAge());
+        user.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
         user.setLocation(40.7128, -74.0060);
         user.addPhotoUrl("http://example.com/photo.jpg");
         user.setBio("Bio");

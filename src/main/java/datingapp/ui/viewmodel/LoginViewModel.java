@@ -212,7 +212,8 @@ public class LoginViewModel {
     }
 
     /**
-     * Fills in missing profile fields with defaults to help user become activatable.
+     * Fills in missing profile fields with defaults to help user become
+     * activatable.
      */
     private void autoCompleteUserProfile(User user) {
         boolean modified = false;
@@ -326,7 +327,8 @@ public class LoginViewModel {
                     PacePreferences.DepthPreference.DEPENDS_ON_VIBE);
             newUser.setPacePreferences(pacePrefs);
 
-            // Set default dealbreakers (none) - marks section as reviewed for profile completion
+            // Set default dealbreakers (none) - marks section as reviewed for profile
+            // completion
             newUser.setDealbreakers(Dealbreakers.none());
 
             // Now attempt to activate the user since profile is complete
@@ -431,11 +433,12 @@ public class LoginViewModel {
         return containsAllTerms(searchable, normalized);
     }
 
-    @SuppressWarnings("deprecation") // UI display/search indexing - system timezone appropriate
     private static String buildSearchable(User user) {
         String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);
         String state = user.getState() == null ? "" : user.getState().name().toLowerCase(Locale.ROOT);
-        String ageText = user.getAge() > 0 ? String.valueOf(user.getAge()) : "";
+        String ageText = user.getAge(AppConfig.defaults().safety().userTimeZone()) > 0
+                ? String.valueOf(user.getAge(AppConfig.defaults().safety().userTimeZone()))
+                : "";
         String verifiedTag = user.isVerified() ? "verified" : "";
         return String.join(" ", name, state, ageText, verifiedTag);
     }

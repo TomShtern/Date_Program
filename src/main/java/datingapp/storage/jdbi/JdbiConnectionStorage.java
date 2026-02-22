@@ -174,6 +174,11 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     }
 
     @Override
+    public int countPendingFriendRequestsForUser(UUID userId) {
+        return socialDao.countPendingFriendRequestsForUser(userId);
+    }
+
+    @Override
     public void deleteFriendRequest(UUID id) {
         socialDao.deleteFriendRequest(id);
     }
@@ -408,6 +413,12 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 WHERE to_user_id = :userId AND status = 'PENDING'
                 """)
         List<FriendRequest> getPendingFriendRequestsForUser(@Bind("userId") UUID userId);
+
+        @SqlQuery("""
+                SELECT COUNT(*) FROM friend_requests
+                WHERE to_user_id = :userId AND status = 'PENDING'
+                """)
+        int countPendingFriendRequestsForUser(@Bind("userId") UUID userId);
 
         @SqlUpdate("DELETE FROM friend_requests WHERE id = :id")
         void deleteFriendRequest(@Bind("id") UUID id);

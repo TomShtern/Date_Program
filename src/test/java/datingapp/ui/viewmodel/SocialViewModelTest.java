@@ -4,24 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
-import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.Instant;
-import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -41,7 +37,6 @@ class SocialViewModelTest {
 
     private TestStorages.Users users;
     private TestStorages.Interactions interactions;
-    private TestStorages.TrustSafety trustSafety;
     private TestStorages.Communications communications;
 
     private SocialViewModel viewModel;
@@ -60,7 +55,6 @@ class SocialViewModelTest {
     void setUp() {
         users = new TestStorages.Users();
         interactions = new TestStorages.Interactions();
-        trustSafety = new TestStorages.TrustSafety();
         communications = new TestStorages.Communications();
 
         TestClock.setFixed(FIXED_INSTANT);
@@ -72,7 +66,7 @@ class SocialViewModelTest {
 
         viewModel = new SocialViewModel(connectionService, socialDataAccess, userStore, AppSession.getInstance());
 
-        currentUser = buildActiveUser("Mia");
+        currentUser = TestUserFactory.createActiveUser("Mia");
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
     }
@@ -113,7 +107,7 @@ class SocialViewModelTest {
     @Test
     @DisplayName("refresh() resolves sender names for pending friend requests")
     void shouldLoadFriendRequestsWithResolvedSenderNames() throws InterruptedException {
-        User sender = buildActiveUser("Leo");
+        User sender = TestUserFactory.createActiveUser("Leo");
         users.save(sender);
 
         FriendRequest request = FriendRequest.create(sender.getId(), currentUser.getId());
@@ -192,7 +186,8 @@ class SocialViewModelTest {
         Thread.sleep(500);
         waitForFxEvents();
 
-        // Calling markNotificationRead on an already-read notification should be a no-op
+        // Calling markNotificationRead on an already-read notification should be a
+        // no-op
         int notifCount = viewModel.getNotifications().size();
         viewModel.markNotificationRead(alreadyRead);
 
@@ -258,27 +253,5 @@ class SocialViewModelTest {
         if (!latch.await(5, TimeUnit.SECONDS)) {
             throw new RuntimeException("Timeout waiting for FX thread");
         }
-    }
-
-    private static User buildActiveUser(String name) {
-        User user = new User(UUID.randomUUID(), name);
-        user.setBirthDate(AppClock.today().minusYears(25));
-        user.setGender(Gender.MALE);
-        user.setInterestedIn(EnumSet.of(Gender.FEMALE));
-        user.setAgeRange(18, 60);
-        user.setMaxDistanceKm(50);
-        user.setLocation(40.7128, -74.0060);
-        user.addPhotoUrl("http://example.com/" + name + ".jpg");
-        user.setBio("Social test bio");
-        user.setPacePreferences(new PacePreferences(
-                PacePreferences.MessagingFrequency.OFTEN,
-                PacePreferences.TimeToFirstDate.FEW_DAYS,
-                PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
-                PacePreferences.DepthPreference.DEEP_CHAT));
-        user.activate();
-        if (user.getState() != UserState.ACTIVE) {
-            throw new IllegalStateException("User must be ACTIVE for test");
-        }
-        return user;
     }
 }

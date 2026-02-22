@@ -193,8 +193,13 @@ public class DashboardViewModel {
                 Optional<DailyPick> pick = dailyService.getDailyPick(user);
                 if (pick.isPresent()) {
                     User pickedUser = pick.get().user();
-                    @SuppressWarnings("deprecation") // UI display - system timezone appropriate
-                    String age = pickedUser.getAge() > 0 ? String.valueOf(pickedUser.getAge()) : "?";
+                    String age = pickedUser.getAge(datingapp.core.AppConfig.defaults()
+                                            .safety()
+                                            .userTimeZone())
+                                    > 0
+                            ? String.valueOf(pickedUser.getAge(
+                                    datingapp.core.AppConfig.defaults().safety().userTimeZone()))
+                            : "?";
                     pickName = pickedUser.getName() + ", " + age;
                 }
             } catch (Exception e) {
@@ -219,8 +224,7 @@ public class DashboardViewModel {
             int unreadNotifications = 0;
             try {
                 unreadCount = messagingService.getTotalUnreadCount(user.getId());
-                pendingRequests =
-                        messagingService.getPendingRequestsFor(user.getId()).size();
+                pendingRequests = messagingService.countPendingRequestsFor(user.getId());
                 unreadNotifications = messagingService.getUnreadNotificationCount(user.getId());
             } catch (Exception e) {
                 logError("Notifications/Messages error", e);

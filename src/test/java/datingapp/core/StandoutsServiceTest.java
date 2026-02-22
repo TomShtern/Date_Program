@@ -12,6 +12,7 @@ import datingapp.core.testutil.TestStorages;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -52,7 +53,7 @@ class StandoutsServiceTest {
         var trustSafetyStorage = new TestStorages.TrustSafety();
         var analyticsStorage = new TestStorages.Analytics();
         standoutStorage = new TestStandoutStorage();
-        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
+        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
         profileCompletionService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
         service = RecommendationService.builder()
@@ -80,8 +81,8 @@ class StandoutsServiceTest {
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.allOf(Gender.class));
         user.setLocation(32.0853, 34.7818); // Tel Aviv
-        user.setMaxDistanceKm(50);
-        user.setAgeRange(18, 99);
+        user.setMaxDistanceKm(50, config.maxDistanceKm());
+        user.setAgeRange(18, 99, config.minAge(), config.maxAge());
         user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 PacePreferences.MessagingFrequency.WILDCARD,
@@ -100,8 +101,8 @@ class StandoutsServiceTest {
         user.setGender(myGender);
         user.setInterestedIn(EnumSet.of(interestedIn));
         user.setLocation(32.0853, 34.7818);
-        user.setMaxDistanceKm(50);
-        user.setAgeRange(18, 99);
+        user.setMaxDistanceKm(50, config.maxDistanceKm());
+        user.setAgeRange(18, 99, config.minAge(), config.maxAge());
         user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 PacePreferences.MessagingFrequency.WILDCARD,

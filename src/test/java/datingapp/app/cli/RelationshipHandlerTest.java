@@ -9,12 +9,10 @@ import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.matching.*;
 import datingapp.core.model.*;
-import datingapp.core.model.User.Gender;
 import datingapp.core.profile.*;
-import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.testutil.TestUserFactory;
 import java.io.StringReader;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
@@ -45,7 +43,7 @@ class RelationshipHandlerTest {
         session = AppSession.getInstance();
         session.reset();
 
-        testUser = createActiveUser("TestUser");
+        testUser = TestUserFactory.createActiveUser("TestUser");
         userStorage.save(testUser);
         session.setCurrentUser(testUser);
     }
@@ -62,7 +60,11 @@ class RelationshipHandlerTest {
                 new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
         ConnectionService transitionService =
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
-        CandidateFinder candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
+        CandidateFinder candidateFinder = new CandidateFinder(
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                config.safety().userTimeZone());
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
         ProfileService profileCompletionService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
@@ -132,7 +134,7 @@ class RelationshipHandlerTest {
         @Test
         @DisplayName("Lists pending friend requests")
         void listsPendingFriendRequests() {
-            User otherUser = createActiveUser("OtherUser");
+            User otherUser = TestUserFactory.createActiveUser("OtherUser");
             userStorage.save(otherUser);
 
             // Create friend request TO testUser
@@ -147,7 +149,7 @@ class RelationshipHandlerTest {
         @Test
         @DisplayName("Accepts friend request")
         void acceptsFriendRequest() {
-            User otherUser = createActiveUser("OtherUser");
+            User otherUser = TestUserFactory.createActiveUser("OtherUser");
             userStorage.save(otherUser);
 
             // Create match first (required for friend zone)
@@ -171,7 +173,7 @@ class RelationshipHandlerTest {
         @Test
         @DisplayName("Declines friend request")
         void declinesFriendRequest() {
-            User otherUser = createActiveUser("OtherUser");
+            User otherUser = TestUserFactory.createActiveUser("OtherUser");
             userStorage.save(otherUser);
 
             Match match = Match.create(testUser.getId(), otherUser.getId());
@@ -192,7 +194,7 @@ class RelationshipHandlerTest {
         @Test
         @DisplayName("Handles back selection")
         void handlesBackSelection() {
-            User otherUser = createActiveUser("OtherUser");
+            User otherUser = TestUserFactory.createActiveUser("BackTester");
             userStorage.save(otherUser);
 
             FriendRequest request = FriendRequest.create(otherUser.getId(), testUser.getId());
@@ -206,7 +208,7 @@ class RelationshipHandlerTest {
         @Test
         @DisplayName("Handles invalid selection")
         void handlesInvalidSelection() {
-            User otherUser = createActiveUser("OtherUser");
+            User otherUser = TestUserFactory.createActiveUser("OtherUser");
             userStorage.save(otherUser);
 
             Match match = Match.create(testUser.getId(), otherUser.getId());
@@ -300,23 +302,5 @@ class RelationshipHandlerTest {
 
             assertDoesNotThrow(handler::viewNotifications);
         }
-    }
-
-    // === Helper Methods ===
-
-    private User createActiveUser(String name) {
-        User user = new User(UUID.randomUUID(), name);
-        user.setBio("Test bio for " + name);
-        user.setBirthDate(LocalDate.of(1990, 1, 1));
-        user.setGender(Gender.OTHER);
-        user.setInterestedIn(EnumSet.of(Gender.OTHER));
-        user.addPhotoUrl("https://example.com/photo.jpg");
-        user.setPacePreferences(new PacePreferences(
-                PacePreferences.MessagingFrequency.OFTEN,
-                PacePreferences.TimeToFirstDate.FEW_DAYS,
-                PacePreferences.CommunicationStyle.TEXT_ONLY,
-                PacePreferences.DepthPreference.SMALL_TALK));
-        user.activate();
-        return user;
     }
 }

@@ -51,7 +51,7 @@ class DailyPickServiceTest {
         analyticsStorage = new TestStorages.Analytics();
         config = AppConfig.defaults();
 
-        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
+        candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
         // Create dummies for missing dependencies
         var standoutStorage = new TestStorages.Standouts();
         var profileService =

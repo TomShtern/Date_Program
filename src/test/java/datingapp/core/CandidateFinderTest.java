@@ -15,6 +15,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -29,6 +30,8 @@ class CandidateFinderTest {
     private CandidateFinder finder;
     private User seeker;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+    private static final AppConfig CONFIG = AppConfig.defaults();
+    private static final ZoneId ZONE = ZoneId.of("UTC");
 
     @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
@@ -38,7 +41,7 @@ class CandidateFinderTest {
         var interactionStorage = new TestStorages.Interactions();
         var trustSafetyStorage = new TestStorages.TrustSafety();
 
-        finder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
+        finder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZONE);
         seeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.0853, 34.7818);
     }
 
@@ -83,11 +86,11 @@ class CandidateFinderTest {
         // Seeker is 30, looking for 25-35
         // Compatible is 28, looking for 25-35 (seeker fits)
         User compatible = createUser("Compatible", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
-        compatible.setAgeRange(25, 35);
+        compatible.setAgeRange(25, 35, CONFIG.minAge(), CONFIG.maxAge());
 
         // TooOld is 28, but only looking for 18-25 (seeker doesn't fit)
         User tooOld = createUser("TooOld", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
-        tooOld.setAgeRange(18, 25);
+        tooOld.setAgeRange(18, 25, CONFIG.minAge(), CONFIG.maxAge());
 
         List<User> result = finder.findCandidates(seeker, List.of(compatible, tooOld), Set.of());
 
@@ -103,7 +106,7 @@ class CandidateFinderTest {
         // Far candidate - different city (~60km away)
         User far = createUser("Far", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 31.7683, 35.2137);
 
-        seeker.setMaxDistanceKm(30); // Only 30km radius
+        seeker.setMaxDistanceKm(30, CONFIG.maxDistanceKm()); // Only 30km radius
 
         List<User> result = finder.findCandidates(seeker, List.of(close, far), Set.of());
 
@@ -118,7 +121,7 @@ class CandidateFinderTest {
         User close = createUser("Close", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.1, 34.8);
         User medium = createUser("Medium", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.3, 34.9);
 
-        seeker.setMaxDistanceKm(200);
+        seeker.setMaxDistanceKm(200, CONFIG.maxDistanceKm());
 
         List<User> result = finder.findCandidates(seeker, List.of(far, close, medium), Set.of());
 
@@ -132,7 +135,7 @@ class CandidateFinderTest {
     @DisplayName("Treats (0,0) as a valid location when explicitly set")
     void treatsZeroZeroAsValidLocationWhenSet() {
         User zeroSeeker = createUser("ZeroSeeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 0.0, 0.0);
-        zeroSeeker.setMaxDistanceKm(1);
+        zeroSeeker.setMaxDistanceKm(1, CONFIG.maxDistanceKm());
 
         User farCandidate = createUser("FarAway", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 10.0, 10.0);
 
@@ -148,8 +151,8 @@ class CandidateFinderTest {
         user.setGender(gender);
         user.setInterestedIn(interestedIn);
         user.setLocation(lat, lon);
-        user.setMaxDistanceKm(100);
-        user.setAgeRange(18, 60);
+        user.setMaxDistanceKm(100, CONFIG.maxDistanceKm());
+        user.setAgeRange(18, 60, CONFIG.minAge(), CONFIG.maxAge());
         user.addPhotoUrl("photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,

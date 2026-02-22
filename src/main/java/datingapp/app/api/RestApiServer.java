@@ -389,10 +389,11 @@ public class RestApiServer {
          * Uses system default timezone for age calculation (appropriate for API
          * display).
          */
-        @SuppressWarnings("deprecation") // API display layer - system timezone appropriate
         public static UserSummary from(User user) {
             return new UserSummary(
-                    user.getId(), user.getName(), user.getAge(), user.getState().name());
+                    user.getId(), user.getName(),
+                    user.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone()),
+                            user.getState().name());
         }
     }
 
@@ -414,12 +415,11 @@ public class RestApiServer {
          * Uses system default timezone for age calculation (appropriate for API
          * display).
          */
-        @SuppressWarnings("deprecation") // API display layer - system timezone appropriate
         public static UserDetail from(User user) {
             return new UserDetail(
                     user.getId(),
                     user.getName(),
-                    user.getAge(),
+                    user.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone()),
                     user.getBio(),
                     user.getGender() != null ? user.getGender().name() : null,
                     user.getInterestedIn().stream().map(Enum::name).toList(),

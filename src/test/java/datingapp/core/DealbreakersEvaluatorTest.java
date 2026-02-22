@@ -10,6 +10,7 @@ import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
@@ -59,14 +60,14 @@ class DealbreakersEvaluatorTest {
         @DisplayName("No dealbreakers means everyone passes")
         void noDealbreakersPassesAll() {
             // seeker has no dealbreakers set
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
         @DisplayName("Dealbreakers.none() accepts all")
         void explicitNonePasses() {
             seeker.setDealbreakers(Dealbreakers.none());
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
     }
 
@@ -83,7 +84,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setSmoking(Lifestyle.Smoking.NEVER);
 
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -95,7 +96,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setSmoking(Lifestyle.Smoking.REGULARLY);
 
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -107,7 +108,7 @@ class DealbreakersEvaluatorTest {
 
             // candidate.setSmoking is not called - remains null
 
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -119,7 +120,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setSmoking(Lifestyle.Smoking.SOMETIMES);
 
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
     }
 
@@ -136,7 +137,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setDrinking(Lifestyle.Drinking.SOCIALLY);
 
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -148,7 +149,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setDrinking(Lifestyle.Drinking.REGULARLY);
 
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
     }
 
@@ -165,7 +166,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setWantsKids(Lifestyle.WantsKids.SOMEDAY);
 
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -177,7 +178,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setWantsKids(Lifestyle.WantsKids.NO);
 
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
     }
 
@@ -194,7 +195,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setLookingFor(Lifestyle.LookingFor.MARRIAGE);
 
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -206,7 +207,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setLookingFor(Lifestyle.LookingFor.CASUAL);
 
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
     }
 
@@ -221,7 +222,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setHeightCm(180);
 
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -231,7 +232,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setHeightCm(170);
 
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -241,7 +242,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setHeightCm(185);
 
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -251,7 +252,7 @@ class DealbreakersEvaluatorTest {
 
             // candidate height not set
 
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
     }
 
@@ -266,7 +267,7 @@ class DealbreakersEvaluatorTest {
 
             // seeker is 30, candidate is 28 - difference is 2
 
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -276,7 +277,7 @@ class DealbreakersEvaluatorTest {
 
             // seeker is 30, candidate is 28 - difference is 2
 
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -286,7 +287,7 @@ class DealbreakersEvaluatorTest {
 
             // seeker is 30, candidate is 28 - difference is 2
 
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
     }
 
@@ -305,7 +306,7 @@ class DealbreakersEvaluatorTest {
             candidate.setSmoking(Lifestyle.Smoking.NEVER);
             candidate.setDrinking(Lifestyle.Drinking.REGULARLY); // fails this one
 
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -321,7 +322,7 @@ class DealbreakersEvaluatorTest {
             candidate.setDrinking(Lifestyle.Drinking.SOCIALLY);
             // age difference is 2, within limit
 
-            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertTrue(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
     }
 
@@ -337,7 +338,7 @@ class DealbreakersEvaluatorTest {
                     .build());
 
             // candidate drinking is null
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -348,7 +349,7 @@ class DealbreakersEvaluatorTest {
                     .build());
 
             // candidate wantsKids is null
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -359,7 +360,7 @@ class DealbreakersEvaluatorTest {
                     .build());
 
             // candidate lookingFor is null
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -370,7 +371,7 @@ class DealbreakersEvaluatorTest {
                     .build());
 
             // candidate education is null
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
 
         @Test
@@ -378,8 +379,9 @@ class DealbreakersEvaluatorTest {
         void failsNullHeight() {
             seeker.setDealbreakers(Dealbreakers.builder().minHeight(160).build());
 
-            // height is null by default and should not be a blocker
-            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate));
+            // height is null by default and should be a blocker when a minHeight
+            // dealbreaker is set
+            assertFalse(Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC")));
         }
     }
 
@@ -396,7 +398,7 @@ class DealbreakersEvaluatorTest {
 
             candidate.setSmoking(Lifestyle.Smoking.NEVER);
 
-            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate);
+            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate, ZoneId.of("UTC"));
             assertTrue(failures.isEmpty());
         }
 
@@ -411,7 +413,7 @@ class DealbreakersEvaluatorTest {
             candidate.setSmoking(Lifestyle.Smoking.REGULARLY);
             candidate.setDrinking(Lifestyle.Drinking.REGULARLY);
 
-            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate);
+            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate, ZoneId.of("UTC"));
             assertEquals(2, failures.size());
         }
 
@@ -424,7 +426,7 @@ class DealbreakersEvaluatorTest {
 
             // candidate smoking not set
 
-            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate);
+            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate, ZoneId.of("UTC"));
             assertEquals(1, failures.size());
             assertTrue(failures.get(0).contains("not specified"));
         }

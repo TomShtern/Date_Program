@@ -82,6 +82,18 @@ public interface CommunicationStorage {
 
     List<FriendRequest> getPendingFriendRequestsForUser(UUID userId);
 
+    /**
+     * Returns the number of pending friend requests directed at {@code userId}.
+     *
+     * <p>
+     * Default implementation counts from the full list — override with a
+     * {@code SELECT COUNT(*)}
+     * for better performance.
+     */
+    default int countPendingFriendRequestsForUser(UUID userId) {
+        return getPendingFriendRequestsForUser(userId).size();
+    }
+
     void deleteFriendRequest(UUID id);
 
     // ═══ Notification Operations ═══
