@@ -415,8 +415,13 @@ public class LoginViewModel {
             return;
         }
 
-        List<User> matches =
-                users.stream().filter(user -> matchesFilter(user, normalized)).toList();
+        // Pass the injected config's timezone so age calculation is consistent
+        // with the rest of the application and never falls back to
+        // AppConfig.defaults().
+        java.time.ZoneId zone = config.safety().userTimeZone();
+        List<User> matches = users.stream()
+                .filter(user -> matchesFilter(user, normalized, zone))
+                .toList();
         filteredUsers.setAll(matches);
     }
 
@@ -424,19 +429,27 @@ public class LoginViewModel {
         return text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
     }
 
-    private static boolean matchesFilter(User user, String normalized) {
+    private static boolean matchesFilter(User user, String normalized, java.time.ZoneId zone) {
         if (user == null) {
             return false;
         }
 
-        String searchable = buildSearchable(user);
+        String searchable = buildSearchable(user, zone);
         return containsAllTerms(searchable, normalized);
     }
 
-    private static String buildSearchable(User user) {
+    /**
+     * Builds a lowercase searchable string for the given user.
+     *
+     * @param user the user to index
+     * @param zone the timezone to use for age calculation — must come from the
+     *             injected {@code config} so we never silently fall back to
+     *             {@code AppConfig.defaults()}
+     */
+    private static String buildSearchable(User user, java.time.ZoneId zone) {
         String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);
         String state = user.getState() == null ? "" : user.getState().name().toLowerCase(Locale.ROOT);
-        int age = user.getAge(AppConfig.defaults().safety().userTimeZone());
+        int age = user.getAge(zone);
         String ageText = age > 0 ? String.valueOf(age) : "";
         String verifiedTag = user.isVerified() ? "verified" : "";
         return String.join(" ", name, state, ageText, verifiedTag);

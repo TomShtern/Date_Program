@@ -4,11 +4,15 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 /**
- * Creates all database tables, indexes, and foreign key constraints. Extracted
- * from {@code
- * DatabaseManager} for single-responsibility: this class owns DDL, while
- * {@code DatabaseManager}
- * owns connection pooling and lifecycle.
+ * V1 baseline schema: creates all database tables, indexes, and foreign key
+ * constraints.
+ *
+ * <p>
+ * <strong>FROZEN — do not modify.</strong> All future schema changes must be
+ * added as new
+ * versioned migrations in {@link MigrationRunner}. Adding tables or columns
+ * here will cause
+ * schema drift between fresh and upgraded databases.
  *
  * <p>
  * Every method is idempotent — uses {@code IF NOT EXISTS} so re-running is

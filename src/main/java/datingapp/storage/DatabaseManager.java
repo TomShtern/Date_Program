@@ -116,7 +116,7 @@ public final class DatabaseManager {
         try (Connection conn = localDataSource.getConnection();
                 Statement stmt = conn.createStatement()) {
 
-            MigrationRunner.migrateV1(stmt);
+            MigrationRunner.runAllPending(stmt);
             initialized = true;
 
         } catch (SQLException e) {

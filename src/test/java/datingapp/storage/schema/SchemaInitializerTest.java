@@ -19,7 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Tests for {@link SchemaInitializer} — validates that all expected tables and indexes are created
+ * Tests for {@link SchemaInitializer} — validates that all expected tables and
+ * indexes are created
  * on a fresh in-memory H2 database.
  */
 @Timeout(10)
@@ -128,22 +129,23 @@ class SchemaInitializerTest {
     }
 
     @Nested
-    @DisplayName("MigrationRunner.migrateV1")
+    @DisplayName("MigrationRunner.runAllPending")
     @SuppressWarnings("unused")
-    class MigrateV1 {
+    class RunAllPending {
 
         @Test
         @DisplayName("should create all tables and record schema version on fresh database")
         void freshDatabaseMigration() throws SQLException {
             try (Statement stmt = connection.createStatement()) {
-                MigrationRunner.migrateV1(stmt);
+                MigrationRunner.runAllPending(stmt);
             }
 
             Set<String> tables = getTableNames();
             assertTrue(tables.contains("USERS"), "Missing table: users");
             assertTrue(tables.contains("SCHEMA_VERSION"), "Missing table: schema_version");
 
-            // Verify version was recorded
+            // Verify both V1 and V2 were recorded (new migration system applies both on
+            // fresh DB)
             try (Statement stmt = connection.createStatement();
                     ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 1")) {
                 assertTrue(rs.next());
@@ -155,9 +157,9 @@ class SchemaInitializerTest {
         @DisplayName("should be idempotent — running twice does not fail")
         void isIdempotent() throws SQLException {
             try (Statement stmt = connection.createStatement()) {
-                MigrationRunner.migrateV1(stmt);
-                // Run again — should take the migration branch instead
-                MigrationRunner.migrateV1(stmt);
+                MigrationRunner.runAllPending(stmt);
+                // Run again — all versions already applied, each migration is skipped
+                MigrationRunner.runAllPending(stmt);
             }
 
             Set<String> tables = getTableNames();
@@ -165,16 +167,16 @@ class SchemaInitializerTest {
         }
 
         @Test
-        @DisplayName("should handle existing database with version already applied")
+        @DisplayName("should handle existing database with all versions already applied")
         void existingDatabaseMigration() throws SQLException {
-            // First run — creates everything
+            // First run — creates everything, records V1 and V2
             try (Statement stmt = connection.createStatement()) {
-                MigrationRunner.migrateV1(stmt);
+                MigrationRunner.runAllPending(stmt);
             }
 
-            // Second run — should enter migration branch without error
+            // Second run — all versions already recorded, should be entirely no-op
             try (Statement stmt = connection.createStatement()) {
-                MigrationRunner.migrateV1(stmt);
+                MigrationRunner.runAllPending(stmt);
             }
 
             // Verify schema is still intact

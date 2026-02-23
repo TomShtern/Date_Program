@@ -3,23 +3,32 @@ package datingapp.storage.schema;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Runs schema migrations: column additions, foreign-key backfills, and version
- * tracking. Extracted
- * from {@code DatabaseManager} for single-responsibility.
+ * Versioned migration runner: applies schema migrations in version order, each
+ * exactly once.
  *
  * <p>
- * <strong>Ordering constraint:</strong> column migrations in {@link
- * #migrateSchemaColumns(Statement)} must only run <em>after</em> the target
- * tables exist. Fresh
- * databases create tables with all columns already present; migrations cover
- * backward compatibility
- * for databases created by earlier schema versions.
+ * Fresh databases execute every migration in sequence. Upgraded databases skip
+ * already-applied
+ * versions (tracked in {@code schema_version}) and execute only what remains.
+ * Both paths converge
+ * on an identical final schema.
+ *
+ * <p>
+ * <strong>Adding a future migration (V3+):</strong>
+ *
+ * <ol>
+ * <li>Append a new {@code VersionedMigration} entry to {@link #MIGRATIONS}.
+ * <li>Add the corresponding {@code applyVN(Statement)} private static method.
+ * </ol>
+ *
+ * No other files need changes.
  */
 public final class MigrationRunner {
 
@@ -31,44 +40,136 @@ public final class MigrationRunner {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // Migration registry
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * A single versioned migration step. The {@code action} is a
+     * {@link MigrationAction} applied
+     * exactly once when {@code version} has not yet been recorded in
+     * {@code schema_version}.
+     */
+    private record VersionedMigration(int version, String description, MigrationAction action) {
+
+        @FunctionalInterface
+        interface MigrationAction {
+            void apply(Statement stmt) throws SQLException;
+        }
+    }
+
+    /**
+     * Ordered registry of all schema migrations. Fresh databases execute all
+     * entries; upgraded
+     * databases skip already-applied versions.
+     *
+     * <p>
+     * <strong>APPEND-ONLY:</strong> never reorder or remove entries. New migrations
+     * go at the
+     * end.
+     */
+    private static final List<VersionedMigration> MIGRATIONS = List.of(
+            new VersionedMigration(
+                    1, "Baseline schema: all tables, columns, indexes, FKs, and constraints", MigrationRunner::applyV1),
+            new VersionedMigration(
+                    2,
+                    "Backfill FKs, indexes, and constraints for databases migrated under old V1",
+                    MigrationRunner::applyV2)
+            // Future: new VersionedMigration(3, "Describe change here",
+            // MigrationRunner::applyV3)
+            );
+
+    // ═══════════════════════════════════════════════════════════════
     // Public entry point
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Runs the complete V1 migration: creates or upgrades the schema to version 1.
-     * On a fresh
-     * database, delegates to {@link SchemaInitializer#createAllTables(Statement)}
-     * for full DDL. On
-     * an existing database (version 1 already recorded), runs column migration for
-     * backward
-     * compatibility.
+     * Runs all pending migrations in version order. Each migration is applied
+     * exactly once
+     * (tracked in the {@code schema_version} table). Fresh and upgraded databases
+     * take the same
+     * code path — the only difference is which versions are already recorded and
+     * therefore skipped.
      *
      * @param stmt a JDBC statement connected to the target database
      * @throws SQLException if any migration statement fails
      */
-    public static void migrateV1(Statement stmt) throws SQLException {
+    public static void runAllPending(Statement stmt) throws SQLException {
         createSchemaVersionTable(stmt);
 
-        if (isVersionApplied(stmt, 1)) {
-            // Existing database — add any new columns for backward compatibility
-            migrateSchemaColumns(stmt);
-            return;
+        for (VersionedMigration migration : MIGRATIONS) {
+            if (!isVersionApplied(stmt, migration.version())) {
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Applying migration V{}: {}", migration.version(), migration.description());
+                }
+                migration.action().apply(stmt);
+                recordSchemaVersion(stmt, migration.version(), migration.description());
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Migration V{} applied successfully", migration.version());
+                }
+            }
         }
+    }
 
-        // Fresh database — create all tables from scratch
+    // ═══════════════════════════════════════════════════════════════
+    // Migration implementations
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * V1 baseline migration. Creates all tables via {@link SchemaInitializer}, then
+     * ensures all
+     * columns, foreign keys, and indexes exist. Every operation uses
+     * {@code IF NOT EXISTS} — fully
+     * idempotent.
+     *
+     * <p>
+     * <strong>FROZEN:</strong> do not modify. Future schema changes go into V3+.
+     */
+    private static void applyV1(Statement stmt) throws SQLException {
+        // 1. Create all tables (idempotent — IF NOT EXISTS throughout)
         SchemaInitializer.createAllTables(stmt);
 
-        // Add foreign keys (safe on fresh DB — all tables already exist)
+        // 2. Ensure columns added after the initial schema exist (covers pre-V1 partial
+        // schemas)
+        migrateSchemaColumns(stmt);
+
+        // 3. Ensure all foreign key constraints exist
         addMissingForeignKeys(stmt);
 
-        recordSchemaVersion(stmt, 1, "Initial consolidated schema with all tables and FK constraints");
+        // 4. Ensure all indexes exist (SchemaInitializer uses IF NOT EXISTS — safe
+        // no-op if present)
+        ensureAllIndexes(stmt);
+    }
+
+    /**
+     * V2 backfill migration. Databases where V1 was applied under the old migration
+     * system (which
+     * ran only {@code migrateSchemaColumns()}) have V1 recorded but are missing
+     * FKs, indexes, and
+     * constraints. This migration catches them up.
+     *
+     * <p>
+     * On fresh databases where V1 ran under the new system, every operation is a
+     * safe no-op
+     * because all {@code IF NOT EXISTS} checks short-circuit.
+     *
+     * <p>
+     * <strong>FROZEN:</strong> do not modify. Future schema changes go into V3+.
+     */
+    private static void applyV2(Statement stmt) throws SQLException {
+        // Re-run the same idempotent operations as V1:
+        // - New-system V1 databases: all IF NOT EXISTS → no-op.
+        // - Old-system V1 databases: creates missing tables, adds FKs/indexes.
+        SchemaInitializer.createAllTables(stmt);
+        migrateSchemaColumns(stmt);
+        addMissingForeignKeys(stmt);
+        ensureAllIndexes(stmt);
     }
 
     // ═══════════════════════════════════════════════════════════════
     // Schema versioning
     // ═══════════════════════════════════════════════════════════════
 
-    /** Creates the schema_version tracking table if it does not exist. */
+    /** Creates the {@code schema_version} tracking table if it does not exist. */
     static void createSchemaVersionTable(Statement stmt) throws SQLException {
         stmt.execute("""
                 CREATE TABLE IF NOT EXISTS schema_version (
@@ -82,7 +183,8 @@ public final class MigrationRunner {
     /**
      * Checks whether a given schema version has already been applied.
      *
-     * @return true if the version row exists, false otherwise (including if the
+     * @return {@code true} if the version row exists, {@code false} otherwise
+     *         (including if the
      *         table is missing)
      */
     static boolean isVersionApplied(Statement stmt, int version) throws SQLException {
@@ -99,9 +201,9 @@ public final class MigrationRunner {
     /**
      * Records a schema version as applied.
      *
-     * @param stmt        the statement to use
+     * @param stmt        the JDBC statement to use
      * @param version     the schema version number
-     * @param description description of what this version includes
+     * @param description human-readable description of what this version includes
      */
     static void recordSchemaVersion(Statement stmt, int version, String description) throws SQLException {
         String sql = """
@@ -127,9 +229,9 @@ public final class MigrationRunner {
      * safely handle already-migrated databases.
      *
      * <p>
-     * <strong>Important:</strong> This method must only be called when the tables
-     * already exist
-     * (i.e., when {@code isVersionApplied(stmt, 1)} returns true).
+     * Called from both {@link #applyV1} and {@link #applyV2} — safe to run on any
+     * database
+     * state.
      */
     static void migrateSchemaColumns(Statement stmt) throws SQLException {
         // Lifestyle fields
@@ -183,48 +285,90 @@ public final class MigrationRunner {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Adds missing foreign key constraints to existing tables. Uses
+     * Adds missing foreign key constraints to all tables. Uses
      * {@code IF NOT EXISTS} to safely
-     * handle already-constrained databases. Silently skips tables that don't exist
-     * yet.
+     * handle databases that already have them. Silently skips tables that do not
+     * exist yet.
      */
     static void addMissingForeignKeys(Statement stmt) throws SQLException {
-        // daily_pick_views - add FK to users
+        // likes (named FKs in SchemaInitializer — IF NOT EXISTS is a true no-op on
+        // fresh DBs)
+        addForeignKeyIfPresent(stmt, "likes", "fk_likes_who_likes", "who_likes", "users", "id");
+        addForeignKeyIfPresent(stmt, "likes", "fk_likes_who_got_liked", "who_got_liked", "users", "id");
+
+        // matches (named FKs in SchemaInitializer — same logic)
+        addForeignKeyIfPresent(stmt, "matches", "fk_matches_user_a", "user_a", "users", "id");
+        addForeignKeyIfPresent(stmt, "matches", "fk_matches_user_b", "user_b", "users", "id");
+
+        // swipe_sessions (named FK in SchemaInitializer)
+        addForeignKeyIfPresent(stmt, "swipe_sessions", "fk_sessions_user", "user_id", "users", "id");
+
+        // user_stats (named FK in SchemaInitializer)
+        addForeignKeyIfPresent(stmt, "user_stats", "fk_user_stats_user", "user_id", "users", "id");
+
+        // standouts (unnamed FKs in SchemaInitializer — produces benign double-FK on
+        // fresh DBs)
+        addForeignKeyIfPresent(stmt, "standouts", "fk_standouts_seeker", "seeker_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "standouts", "fk_standouts_user", "standout_user_id", "users", "id");
+
+        // daily_pick_views
         addForeignKeyIfPresent(stmt, "daily_pick_views", "fk_daily_pick_views_user", "user_id", "users", "id");
 
-        // user_achievements - add FK to users
+        // user_achievements
         addForeignKeyIfPresent(stmt, "user_achievements", "fk_user_achievements_user", "user_id", "users", "id");
 
-        // friend_requests
+        // friend_requests (unnamed FKs in SchemaInitializer)
         addForeignKeyIfPresent(stmt, "friend_requests", "fk_friend_requests_from", "from_user_id", "users", "id");
         addForeignKeyIfPresent(stmt, "friend_requests", "fk_friend_requests_to", "to_user_id", "users", "id");
 
-        // notifications
+        // notifications (unnamed FK in SchemaInitializer)
         addForeignKeyIfPresent(stmt, "notifications", "fk_notifications_user", "user_id", "users", "id");
 
-        // blocks
+        // blocks (unnamed FKs in SchemaInitializer)
         addForeignKeyIfPresent(stmt, "blocks", "fk_blocks_blocker", "blocker_id", "users", "id");
         addForeignKeyIfPresent(stmt, "blocks", "fk_blocks_blocked", "blocked_id", "users", "id");
 
-        // reports
+        // reports (unnamed FKs in SchemaInitializer)
         addForeignKeyIfPresent(stmt, "reports", "fk_reports_reporter", "reporter_id", "users", "id");
         addForeignKeyIfPresent(stmt, "reports", "fk_reports_reported", "reported_user_id", "users", "id");
 
-        // conversations
+        // conversations (unnamed FKs in SchemaInitializer)
         addForeignKeyIfPresent(stmt, "conversations", "fk_conversations_user_a", "user_a", "users", "id");
         addForeignKeyIfPresent(stmt, "conversations", "fk_conversations_user_b", "user_b", "users", "id");
 
-        // messages
+        // messages (unnamed FKs in SchemaInitializer)
         addForeignKeyIfPresent(stmt, "messages", "fk_messages_sender", "sender_id", "users", "id");
         addForeignKeyIfPresent(stmt, "messages", "fk_messages_conversation", "conversation_id", "conversations", "id");
 
-        // profile_notes
+        // profile_notes (unnamed FKs in SchemaInitializer)
         addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_author", "author_id", "users", "id");
         addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_subject", "subject_id", "users", "id");
 
-        // profile_views
+        // profile_views (unnamed FKs in SchemaInitializer)
         addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewer", "viewer_id", "users", "id");
         addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewed", "viewed_id", "users", "id");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Index backfill
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Ensures all indexes exist by delegating to {@link SchemaInitializer}'s index
+     * methods. All
+     * three methods use {@code IF NOT EXISTS} — safe to call on databases that
+     * already have the
+     * indexes.
+     *
+     * <p>
+     * Both classes are in {@code datingapp.storage.schema}, so package-private
+     * visibility is
+     * sufficient.
+     */
+    private static void ensureAllIndexes(Statement stmt) throws SQLException {
+        SchemaInitializer.createCoreIndexes(stmt);
+        SchemaInitializer.createStatsIndexes(stmt);
+        SchemaInitializer.createAdditionalIndexes(stmt);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -267,9 +411,9 @@ public final class MigrationRunner {
     }
 
     /**
-     * Checks if the SQLException indicates a missing table (H2 error code 42102 /
-     * SQL state
-     * 42S02).
+     * Checks if the {@link SQLException} indicates a missing table (H2 error code
+     * 42102 / SQL
+     * state 42S02).
      */
     private static boolean isMissingTable(SQLException e) {
         return "42S02".equals(e.getSQLState()) || e.getErrorCode() == 42102;
