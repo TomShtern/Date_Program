@@ -81,8 +81,9 @@ class StandoutsServiceTest {
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.allOf(Gender.class));
         user.setLocation(32.0853, 34.7818); // Tel Aviv
-        user.setMaxDistanceKm(50, config.maxDistanceKm());
-        user.setAgeRange(18, 99, config.minAge(), config.maxAge());
+        user.setMaxDistanceKm(50, config.matching().maxDistanceKm());
+        user.setAgeRange(
+                18, 99, config.validation().minAge(), config.validation().maxAge());
         user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 PacePreferences.MessagingFrequency.WILDCARD,
@@ -101,8 +102,9 @@ class StandoutsServiceTest {
         user.setGender(myGender);
         user.setInterestedIn(EnumSet.of(interestedIn));
         user.setLocation(32.0853, 34.7818);
-        user.setMaxDistanceKm(50, config.maxDistanceKm());
-        user.setAgeRange(18, 99, config.minAge(), config.maxAge());
+        user.setMaxDistanceKm(50, config.matching().maxDistanceKm());
+        user.setAgeRange(
+                18, 99, config.validation().minAge(), config.validation().maxAge());
         user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 PacePreferences.MessagingFrequency.WILDCARD,

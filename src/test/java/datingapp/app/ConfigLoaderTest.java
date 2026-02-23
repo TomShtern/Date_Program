@@ -40,9 +40,9 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.load(configFile);
 
-            assertEquals(25, config.dailyLikeLimit());
-            assertEquals(75, config.maxDistanceKm());
-            assertEquals(21, config.minAge());
+            assertEquals(25, config.matching().dailyLikeLimit());
+            assertEquals(75, config.matching().maxDistanceKm());
+            assertEquals(21, config.validation().minAge());
         }
 
         @Test
@@ -53,7 +53,9 @@ class ConfigLoaderTest {
             AppConfig config = ApplicationStartup.load(nonExistent);
 
             // Should have default values
-            assertEquals(AppConfig.defaults().dailyLikeLimit(), config.dailyLikeLimit());
+            assertEquals(
+                    AppConfig.defaults().matching().dailyLikeLimit(),
+                    config.matching().dailyLikeLimit());
         }
 
         @Test
@@ -89,13 +91,13 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.fromJson(json);
 
-            assertEquals(10, config.autoBanThreshold());
-            assertEquals(50, config.dailyLikeLimit());
-            assertEquals(3, config.dailySuperLikeLimit());
-            assertEquals(200, config.dailyPassLimit());
-            assertEquals(15, config.maxInterests());
-            assertEquals(8, config.maxPhotos());
-            assertEquals(1000, config.maxBioLength());
+            assertEquals(10, config.safety().autoBanThreshold());
+            assertEquals(50, config.matching().dailyLikeLimit());
+            assertEquals(3, config.matching().dailySuperLikeLimit());
+            assertEquals(200, config.matching().dailyPassLimit());
+            assertEquals(15, config.validation().maxInterests());
+            assertEquals(8, config.validation().maxPhotos());
+            assertEquals(1000, config.validation().maxBioLength());
         }
 
         @Test
@@ -111,9 +113,9 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.fromJson(json);
 
-            assertEquals(60, config.sessionTimeoutMinutes());
-            assertEquals(200, config.maxSwipesPerSession());
-            assertEquals(2.5, config.suspiciousSwipeVelocity(), 0.01);
+            assertEquals(60, config.safety().sessionTimeoutMinutes());
+            assertEquals(200, config.matching().maxSwipesPerSession());
+            assertEquals(2.5, config.matching().suspiciousSwipeVelocity(), 0.01);
         }
 
         @Test
@@ -131,11 +133,11 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.fromJson(json);
 
-            assertEquals(10, config.nearbyDistanceKm());
-            assertEquals(25, config.closeDistanceKm());
-            assertEquals(3, config.similarAgeDiff());
-            assertEquals(8, config.compatibleAgeDiff());
-            assertEquals(5, config.minSharedInterests());
+            assertEquals(10, config.algorithm().nearbyDistanceKm());
+            assertEquals(25, config.algorithm().closeDistanceKm());
+            assertEquals(3, config.algorithm().similarAgeDiff());
+            assertEquals(8, config.algorithm().compatibleAgeDiff());
+            assertEquals(5, config.matching().minSharedInterests());
         }
 
         @Test
@@ -154,12 +156,12 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.fromJson(json);
 
-            assertEquals(0.25, config.distanceWeight(), 0.01);
-            assertEquals(0.15, config.ageWeight(), 0.01);
-            assertEquals(0.20, config.interestWeight(), 0.01);
-            assertEquals(0.20, config.lifestyleWeight(), 0.01);
-            assertEquals(0.10, config.paceWeight(), 0.01);
-            assertEquals(0.10, config.responseWeight(), 0.01);
+            assertEquals(0.25, config.matching().distanceWeight(), 0.01);
+            assertEquals(0.15, config.matching().ageWeight(), 0.01);
+            assertEquals(0.20, config.matching().interestWeight(), 0.01);
+            assertEquals(0.20, config.matching().lifestyleWeight(), 0.01);
+            assertEquals(0.10, config.matching().paceWeight(), 0.01);
+            assertEquals(0.10, config.matching().responseWeight(), 0.01);
         }
 
         @Test
@@ -173,7 +175,7 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.fromJson(json);
 
-            assertEquals(60, config.cleanupRetentionDays());
+            assertEquals(60, config.safety().cleanupRetentionDays());
         }
 
         @Test
@@ -187,7 +189,7 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.fromJson(json);
 
-            assertEquals("America/New_York", config.userTimeZone().getId());
+            assertEquals("America/New_York", config.safety().userTimeZone().getId());
         }
 
         @Test
@@ -198,9 +200,9 @@ class ConfigLoaderTest {
             AppConfig config = ApplicationStartup.fromJson(json);
             AppConfig defaults = AppConfig.defaults();
 
-            assertEquals(defaults.dailyLikeLimit(), config.dailyLikeLimit());
-            assertEquals(defaults.minAge(), config.minAge());
-            assertEquals(defaults.maxAge(), config.maxAge());
+            assertEquals(defaults.matching().dailyLikeLimit(), config.matching().dailyLikeLimit());
+            assertEquals(defaults.validation().minAge(), config.validation().minAge());
+            assertEquals(defaults.validation().maxAge(), config.validation().maxAge());
         }
 
         @Test
@@ -226,7 +228,7 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.fromJson(json);
 
-            assertEquals(60, config.undoWindowSeconds());
+            assertEquals(60, config.safety().undoWindowSeconds());
         }
 
         @Test
@@ -244,11 +246,11 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.fromJson(json);
 
-            assertEquals(2, config.achievementMatchTier1());
-            assertEquals(10, config.achievementMatchTier2());
-            assertEquals(25, config.achievementMatchTier3());
-            assertEquals(75, config.achievementMatchTier4());
-            assertEquals(200, config.achievementMatchTier5());
+            assertEquals(2, config.safety().achievementMatchTier1());
+            assertEquals(10, config.safety().achievementMatchTier2());
+            assertEquals(25, config.safety().achievementMatchTier3());
+            assertEquals(75, config.safety().achievementMatchTier4());
+            assertEquals(200, config.safety().achievementMatchTier5());
         }
 
         @Test
@@ -266,11 +268,11 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.fromJson(json);
 
-            assertEquals(100, config.minHeightCm());
-            assertEquals(250, config.maxHeightCm());
-            assertEquals(5, config.minDistanceKm());
-            assertEquals(100, config.maxNameLength());
-            assertEquals(3, config.minAgeRangeSpan());
+            assertEquals(100, config.validation().minHeightCm());
+            assertEquals(250, config.validation().maxHeightCm());
+            assertEquals(5, config.validation().minDistanceKm());
+            assertEquals(100, config.validation().maxNameLength());
+            assertEquals(3, config.validation().minAgeRangeSpan());
         }
 
         @Test
@@ -287,10 +289,10 @@ class ConfigLoaderTest {
 
             AppConfig config = ApplicationStartup.fromJson(json);
 
-            assertEquals(2, config.responseTimeExcellentHours());
-            assertEquals(6, config.responseTimeGreatHours());
-            assertEquals(12, config.responseTimeGoodHours());
-            assertEquals(60, config.paceCompatibilityThreshold());
+            assertEquals(2, config.algorithm().responseTimeExcellentHours());
+            assertEquals(6, config.algorithm().responseTimeGreatHours());
+            assertEquals(12, config.algorithm().responseTimeGoodHours());
+            assertEquals(60, config.algorithm().paceCompatibilityThreshold());
         }
     }
 }

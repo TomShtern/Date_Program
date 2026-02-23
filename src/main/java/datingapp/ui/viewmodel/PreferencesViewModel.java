@@ -99,18 +99,24 @@ public class PreferencesViewModel {
                 interestedIn.get());
 
         // M-17: Validate input ranges before saving using centralized config bounds
-        int minAgeVal = Math.clamp(minAge.get(), config.minAge(), config.maxAge());
-        int maxAgeVal = Math.clamp(maxAge.get(), config.minAge(), config.maxAge());
+        int minAgeVal = Math.clamp(
+                minAge.get(), config.validation().minAge(), config.validation().maxAge());
+        int maxAgeVal = Math.clamp(
+                maxAge.get(), config.validation().minAge(), config.validation().maxAge());
         if (minAgeVal > maxAgeVal) {
             logWarn("Invalid age range: {}>{}, swapping values", minAgeVal, maxAgeVal);
             int temp = minAgeVal;
             minAgeVal = maxAgeVal;
             maxAgeVal = temp;
         }
-        int maxDistVal = Math.clamp(maxDistance.get(), 1, config.maxDistanceKm());
+        int maxDistVal = Math.clamp(maxDistance.get(), 1, config.matching().maxDistanceKm());
 
-        currentUser.setAgeRange(minAgeVal, maxAgeVal, config.minAge(), config.maxAge());
-        currentUser.setMaxDistanceKm(maxDistVal, config.maxDistanceKm());
+        currentUser.setAgeRange(
+                minAgeVal,
+                maxAgeVal,
+                config.validation().minAge(),
+                config.validation().maxAge());
+        currentUser.setMaxDistanceKm(maxDistVal, config.matching().maxDistanceKm());
 
         // Map UI GenderPreference to Set<Gender>
         Set<Gender> newInterests = EnumSet.noneOf(Gender.class);

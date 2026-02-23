@@ -217,7 +217,7 @@ class DailyPickServiceTest {
         Optional<DailyPick> pick = service.getDailyPick(seeker);
 
         assertTrue(pick.isPresent());
-        assertEquals(AppClock.today(config.userTimeZone()), pick.get().date());
+        assertEquals(AppClock.today(config.safety().userTimeZone()), pick.get().date());
     }
 
     @Test
@@ -246,17 +246,19 @@ class DailyPickServiceTest {
         service.markDailyPickViewed(seeker.getId());
 
         assertTrue(service.hasViewedDailyPick(seeker.getId()));
-        assertEquals(0, service.cleanupOldDailyPickViews(AppClock.today(config.userTimeZone())));
+        assertEquals(
+                0,
+                service.cleanupOldDailyPickViews(AppClock.today(config.safety().userTimeZone())));
         assertEquals(
                 1,
                 service.cleanupOldDailyPickViews(
-                        AppClock.today(config.userTimeZone()).plusDays(1)));
+                        AppClock.today(config.safety().userTimeZone()).plusDays(1)));
     }
 
     @Test
     void cleanupOldDailyPickViews_removesOldEntries() {
-        LocalDate oldDate = AppClock.today(config.userTimeZone()).minusDays(10);
-        ZoneId zone = config.userTimeZone();
+        LocalDate oldDate = AppClock.today(config.safety().userTimeZone()).minusDays(10);
+        ZoneId zone = config.safety().userTimeZone();
         Clock oldClock = Clock.fixed(oldDate.atStartOfDay(zone).toInstant(), zone);
         RecommendationService oldService = RecommendationService.builder()
                 .userStorage(userStorage)

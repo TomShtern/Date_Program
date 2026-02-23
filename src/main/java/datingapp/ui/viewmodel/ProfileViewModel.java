@@ -393,8 +393,14 @@ public class ProfileViewModel {
         try {
             int min = Integer.parseInt(minAge.get());
             int max = Integer.parseInt(maxAge.get());
-            if (min >= config.minAge() && max <= config.maxAge() && min <= max) {
-                user.setAgeRange(min, max, config.minAge(), config.maxAge());
+            if (min >= config.validation().minAge()
+                    && max <= config.validation().maxAge()
+                    && min <= max) {
+                user.setAgeRange(
+                        min,
+                        max,
+                        config.validation().minAge(),
+                        config.validation().maxAge());
             } else {
                 logWarn("Invalid age range values: {}-{}", min, max);
                 UiFeedbackService.showWarning("Please enter valid ages");
@@ -406,8 +412,8 @@ public class ProfileViewModel {
 
         try {
             int dist = Integer.parseInt(maxDistance.get());
-            if (dist > 0 && dist <= config.maxDistanceKm()) {
-                user.setMaxDistanceKm(dist, config.maxDistanceKm());
+            if (dist > 0 && dist <= config.matching().maxDistanceKm()) {
+                user.setMaxDistanceKm(dist, config.matching().maxDistanceKm());
             } else {
                 logWarn("Invalid max distance value: {}", dist);
                 UiFeedbackService.showWarning("Please enter a valid distance");
@@ -451,7 +457,7 @@ public class ProfileViewModel {
      * AppConfig.defaults()).
      */
     public int getMinHeightCm() {
-        return config.minHeightCm();
+        return config.validation().minHeightCm();
     }
 
     /**
@@ -459,7 +465,7 @@ public class ProfileViewModel {
      * AppConfig.defaults()).
      */
     public int getMaxHeightCm() {
-        return config.maxHeightCm();
+        return config.validation().maxHeightCm();
     }
 
     private void logInfo(String message, Object... args) {
@@ -843,9 +849,12 @@ public class ProfileViewModel {
             return;
         }
         int age = Period.between(selected, today).getYears();
-        if (age < config.minAge() || age > config.maxAge()) {
+        if (age < config.validation().minAge() || age > config.validation().maxAge()) {
             logWarn("Birth date outside allowed age range: {}", selected);
-            UiFeedbackService.showWarning("Birth date must be for ages " + config.minAge() + "-" + config.maxAge());
+            UiFeedbackService.showWarning("Birth date must be for ages "
+                    + config.validation().minAge()
+                    + "-"
+                    + config.validation().maxAge());
             return;
         }
         user.setBirthDate(selected);

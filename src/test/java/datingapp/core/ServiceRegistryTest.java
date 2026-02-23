@@ -177,7 +177,7 @@ class ServiceRegistryTest {
             AppConfig config = registry.getConfig();
 
             // Verify some default values
-            assertNotNull(config.userTimeZone());
+            assertNotNull(config.safety().userTimeZone());
             assertNotNull(config);
         }
     }

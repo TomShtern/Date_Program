@@ -235,8 +235,11 @@ class StandoutsViewModelTest {
         user.setGender(Gender.FEMALE);
         user.setInterestedIn(EnumSet.of(Gender.MALE));
         user.setAgeRange(
-                20, 45, AppConfig.defaults().minAge(), AppConfig.defaults().maxAge());
-        user.setMaxDistanceKm(100, AppConfig.defaults().maxDistanceKm());
+                20,
+                45,
+                AppConfig.defaults().validation().minAge(),
+                AppConfig.defaults().validation().maxAge());
+        user.setMaxDistanceKm(100, AppConfig.defaults().matching().maxDistanceKm());
         user.setLocation(40.7128, -74.0060);
         user.addPhotoUrl("http://example.com/" + name + ".jpg");
         user.setBio("Standouts test bio");

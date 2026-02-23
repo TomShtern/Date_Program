@@ -138,9 +138,11 @@ public class TrustSafetyService {
             return new ReportResult(false, false, "Cannot report yourself");
         }
         // Validate description length against configured maximum
-        if (description != null && description.length() > config.maxReportDescLength()) {
+        if (description != null && description.length() > config.validation().maxReportDescLength()) {
             return new ReportResult(
-                    false, false, "Description too long (max " + config.maxReportDescLength() + " characters)");
+                    false,
+                    false,
+                    "Description too long (max " + config.validation().maxReportDescLength() + " characters)");
         }
 
         User reporter = userStorage.get(reporterId).orElse(null);
@@ -178,7 +180,7 @@ public class TrustSafetyService {
     private boolean applyAutoBanIfThreshold(UUID reportedUserId) {
         synchronized (this) {
             int reportCount = trustSafetyStorage.countReportsAgainst(reportedUserId);
-            if (reportCount < config.autoBanThreshold()) {
+            if (reportCount < config.safety().autoBanThreshold()) {
                 return false;
             }
 

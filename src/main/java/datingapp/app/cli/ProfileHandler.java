@@ -471,7 +471,7 @@ public class ProfileHandler implements LoggingSupport {
                     result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
                     logInfo("    Using default (50km)");
                 } else {
-                    currentUser.setMaxDistanceKm(dist, config.maxDistanceKm());
+                    currentUser.setMaxDistanceKm(dist, config.matching().maxDistanceKm());
                 }
             } catch (NumberFormatException e) {
                 logTrace("Using default distance, input was: {}", e.getMessage());
@@ -490,7 +490,11 @@ public class ProfileHandler implements LoggingSupport {
                 result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
                 logInfo("    Using defaults (18-99)");
             } else {
-                currentUser.setAgeRange(minAge, maxAge, config.minAge(), config.maxAge());
+                currentUser.setAgeRange(
+                        minAge,
+                        maxAge,
+                        config.validation().minAge(),
+                        config.validation().maxAge());
             }
         } catch (NumberFormatException _) {
             logInfo("⚠️  Invalid age range, using defaults.");

@@ -94,7 +94,10 @@ class ProfileCompletionServiceTest {
             user.addPhotoUrl("https://example.com/photo.jpg");
             user.setLocation(32.0, 34.0);
             user.setAgeRange(
-                    25, 35, AppConfig.defaults().minAge(), AppConfig.defaults().maxAge());
+                    25,
+                    35,
+                    AppConfig.defaults().validation().minAge(),
+                    AppConfig.defaults().validation().maxAge());
 
             // Lifestyle
             user.setHeightCm(180);
@@ -319,7 +322,7 @@ class ProfileCompletionServiceTest {
         @ValueSource(ints = {1, 5, 9})
         @DisplayName("low distance values trigger tip")
         void lowDistanceValuesTriggertip(int distance) {
-            user.setMaxDistanceKm(distance, AppConfig.defaults().maxDistanceKm());
+            user.setMaxDistanceKm(distance, AppConfig.defaults().matching().maxDistanceKm());
             assertTrue(hasTip(user, "distance"), "Distance " + distance + " should trigger tip");
         }
 
@@ -327,7 +330,7 @@ class ProfileCompletionServiceTest {
         @ValueSource(ints = {10, 50, 100})
         @DisplayName("high distance values do not trigger tip")
         void highDistanceValuesDoNotTriggerTip(int distance) {
-            user.setMaxDistanceKm(distance, AppConfig.defaults().maxDistanceKm());
+            user.setMaxDistanceKm(distance, AppConfig.defaults().matching().maxDistanceKm());
             assertFalse(hasTip(user, "distance"), "Distance " + distance + " should NOT trigger tip");
         }
     }
@@ -345,9 +348,12 @@ class ProfileCompletionServiceTest {
         full.setBirthDate(AppClock.today().minusYears(25));
         full.setGender(Gender.FEMALE);
         full.setInterestedIn(Set.of(Gender.MALE));
-        full.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+        full.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
         full.setAgeRange(
-                20, 30, AppConfig.defaults().minAge(), AppConfig.defaults().maxAge());
+                20,
+                30,
+                AppConfig.defaults().validation().minAge(),
+                AppConfig.defaults().validation().maxAge());
         full.addPhotoUrl("http://example.com/photo1.jpg");
         full.addPhotoUrl("http://example.com/photo2.jpg");
         full.setHeightCm(170);

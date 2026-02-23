@@ -857,7 +857,7 @@ public final class TestStorages {
         @Override
         public int deleteExpiredDailyPickViews(Instant cutoff) {
             return deleteDailyPickViewsOlderThan(
-                    cutoff.atZone(AppConfig.defaults().userTimeZone()).toLocalDate());
+                    cutoff.atZone(AppConfig.defaults().safety().userTimeZone()).toLocalDate());
         }
 
         @Override

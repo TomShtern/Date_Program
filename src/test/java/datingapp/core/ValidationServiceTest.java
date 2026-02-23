@@ -234,7 +234,7 @@ class ValidationServiceTest {
         @Test
         @DisplayName("Bio at max limit passes validation")
         void bioAtLimit() {
-            int maxBio = AppConfig.defaults().maxBioLength();
+            int maxBio = AppConfig.defaults().validation().maxBioLength();
             String bio = "a".repeat(maxBio);
             ValidationResult result = validator.validateBio(bio);
             assertTrue(result.valid());
@@ -243,7 +243,7 @@ class ValidationServiceTest {
         @Test
         @DisplayName("Bio over max limit fails validation")
         void bioTooLong() {
-            int maxBio = AppConfig.defaults().maxBioLength();
+            int maxBio = AppConfig.defaults().validation().maxBioLength();
             String bio = "a".repeat(maxBio + 1);
             ValidationResult result = validator.validateBio(bio);
             assertFalse(result.valid());

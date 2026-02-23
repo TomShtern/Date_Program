@@ -109,7 +109,7 @@ public class ConnectionService {
     }
 
     public MessageLoadResult getMessages(UUID userId, UUID otherUserId, int limit, int offset) {
-        if (limit < 1 || limit > config.messageMaxPageSize()) {
+        if (limit < 1 || limit > config.validation().messageMaxPageSize()) {
             return MessageLoadResult.failure("Invalid limit");
         }
         if (offset < 0) {
@@ -129,7 +129,7 @@ public class ConnectionService {
         if (conversationId == null || conversationId.isBlank()) {
             return MessageLoadResult.failure("Conversation ID cannot be empty");
         }
-        if (limit < 1 || limit > config.messageMaxPageSize()) {
+        if (limit < 1 || limit > config.validation().messageMaxPageSize()) {
             return MessageLoadResult.failure("Invalid limit");
         }
         if (offset < 0) {
@@ -149,7 +149,7 @@ public class ConnectionService {
     }
 
     public List<ConversationPreview> getConversations(UUID userId, int limit, int offset) {
-        if (limit < 1 || limit > config.messageMaxPageSize()) {
+        if (limit < 1 || limit > config.validation().messageMaxPageSize()) {
             return List.of();
         }
         if (offset < 0) {

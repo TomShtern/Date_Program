@@ -153,12 +153,12 @@ public class LoginViewModel {
 
     /** Returns the minimum allowed age from configuration. */
     public int getMinAge() {
-        return config.minAge();
+        return config.validation().minAge();
     }
 
     /** Returns the maximum allowed age from configuration. */
     public int getMaxAge() {
-        return config.maxAge();
+        return config.validation().maxAge();
     }
 
     public void setSelectedUser(User user) {
@@ -277,8 +277,9 @@ public class LoginViewModel {
             return null;
         }
 
-        if (age < config.minAge() || age > config.maxAge()) {
-            errorMessage.set("Age must be between " + config.minAge() + " and " + config.maxAge());
+        if (age < config.validation().minAge() || age > config.validation().maxAge()) {
+            errorMessage.set("Age must be between " + config.validation().minAge() + " and "
+                    + config.validation().maxAge());
             return null;
         }
 
@@ -309,12 +310,16 @@ public class LoginViewModel {
             newUser.setBio("New to the app! 👋");
 
             // Set default age range preferences (±5 years from user's age)
-            int minAge = Math.max(config.minAge(), age - 5);
-            int maxAge = Math.min(config.maxAge(), age + 5);
-            newUser.setAgeRange(minAge, maxAge, config.minAge(), config.maxAge());
+            int minAge = Math.max(config.validation().minAge(), age - 5);
+            int maxAge = Math.min(config.validation().maxAge(), age + 5);
+            newUser.setAgeRange(
+                    minAge,
+                    maxAge,
+                    config.validation().minAge(),
+                    config.validation().maxAge());
 
             // Set default distance preference
-            newUser.setMaxDistanceKm(50, config.maxDistanceKm());
+            newUser.setMaxDistanceKm(50, config.matching().maxDistanceKm());
 
             // Set default photo placeholder - required for profile completion
             newUser.setPhotoUrls(List.of("placeholder://default-avatar"));

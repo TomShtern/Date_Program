@@ -74,7 +74,7 @@ public class ActivityMetricsService {
         synchronized (lock) {
             Session session = getOrCreateSession(userId);
 
-            if (session.getSwipeCount() >= config.maxSwipesPerSession()) {
+            if (session.getSwipeCount() >= config.matching().maxSwipesPerSession()) {
                 return SwipeResult.blocked(session, "Session swipe limit reached. Take a break!");
             }
 
@@ -82,7 +82,8 @@ public class ActivityMetricsService {
             analyticsStorage.saveSession(session);
 
             String warning = null;
-            if (session.getSwipeCount() >= 10 && session.getSwipesPerMinute() > config.suspiciousSwipeVelocity()) {
+            if (session.getSwipeCount() >= 10
+                    && session.getSwipesPerMinute() > config.matching().suspiciousSwipeVelocity()) {
                 warning = "Unusually fast swiping detected. Take a moment to review profiles!";
             }
 
@@ -126,8 +127,8 @@ public class ActivityMetricsService {
     }
 
     public List<Session> getTodaysSessions(UUID userId) {
-        Instant startOfDay = AppClock.today(config.userTimeZone())
-                .atStartOfDay(config.userTimeZone())
+        Instant startOfDay = AppClock.today(config.safety().userTimeZone())
+                .atStartOfDay(config.safety().userTimeZone())
                 .toInstant();
         return analyticsStorage.getSessionsInRange(userId, startOfDay, AppClock.now());
     }
@@ -141,7 +142,7 @@ public class ActivityMetricsService {
     }
 
     public CleanupResult runCleanup() {
-        Instant cutoffDate = AppClock.now().minus(config.cleanupRetentionDays(), ChronoUnit.DAYS);
+        Instant cutoffDate = AppClock.now().minus(config.safety().cleanupRetentionDays(), ChronoUnit.DAYS);
         int dailyPicksDeleted = analyticsStorage.deleteExpiredDailyPickViews(cutoffDate);
         int sessionsDeleted = analyticsStorage.deleteExpiredSessions(cutoffDate);
         int standoutsDeleted = analyticsStorage.deleteExpiredStandouts(cutoffDate);

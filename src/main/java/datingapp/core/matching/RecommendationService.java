@@ -152,7 +152,7 @@ public final class RecommendationService {
 
         Instant startOfDay = getStartOfToday();
         int likesUsed = interactionStorage.countLikesToday(userId, startOfDay);
-        return canPerform(config.hasUnlimitedLikes(), config.dailyLikeLimit(), likesUsed);
+        return canPerform(config.hasUnlimitedLikes(), config.matching().dailyLikeLimit(), likesUsed);
     }
 
     /** Whether the user can perform a pass action today. */
@@ -160,7 +160,7 @@ public final class RecommendationService {
 
         Instant startOfDay = getStartOfToday();
         int passesUsed = interactionStorage.countPassesToday(userId, startOfDay);
-        return canPerform(config.hasUnlimitedPasses(), config.dailyPassLimit(), passesUsed);
+        return canPerform(config.hasUnlimitedPasses(), config.matching().dailyPassLimit(), passesUsed);
     }
 
     /** Current daily status including counts and time to reset. */
@@ -173,8 +173,10 @@ public final class RecommendationService {
         int likesUsed = interactionStorage.countLikesToday(userId, startOfDay);
         int passesUsed = interactionStorage.countPassesToday(userId, startOfDay);
 
-        int likesRemaining = remainingFor(config.hasUnlimitedLikes(), config.dailyLikeLimit(), likesUsed);
-        int passesRemaining = remainingFor(config.hasUnlimitedPasses(), config.dailyPassLimit(), passesUsed);
+        int likesRemaining =
+                remainingFor(config.hasUnlimitedLikes(), config.matching().dailyLikeLimit(), likesUsed);
+        int passesRemaining =
+                remainingFor(config.hasUnlimitedPasses(), config.matching().dailyPassLimit(), passesUsed);
 
         return new DailyStatus(likesUsed, likesRemaining, passesUsed, passesRemaining, today, resetTime);
     }
@@ -323,9 +325,9 @@ public final class RecommendationService {
             return;
         }
         double distance = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), picked.getLat(), picked.getLon());
-        if (distance < config.nearbyDistanceKm()) {
+        if (distance < config.algorithm().nearbyDistanceKm()) {
             reasons.add("Lives nearby!");
-        } else if (distance < config.closeDistanceKm()) {
+        } else if (distance < config.algorithm().closeDistanceKm()) {
             reasons.add("Close enough for coffee!");
         }
     }
@@ -333,9 +335,9 @@ public final class RecommendationService {
     private void addAgeReasons(List<String> reasons, User seeker, User picked) {
         ZoneId tz = config.safety().userTimeZone();
         int ageDiff = Math.abs(seeker.getAge(tz) - picked.getAge(tz));
-        if (ageDiff <= config.similarAgeDiff()) {
+        if (ageDiff <= config.algorithm().similarAgeDiff()) {
             reasons.add("Similar age");
-        } else if (ageDiff <= config.compatibleAgeDiff()) {
+        } else if (ageDiff <= config.algorithm().compatibleAgeDiff()) {
             reasons.add("Age-appropriate match");
         }
     }
@@ -359,7 +361,7 @@ public final class RecommendationService {
         long sharedInterests = seeker.getInterests().stream()
                 .filter(picked.getInterests()::contains)
                 .count();
-        if (sharedInterests >= config.minSharedInterests()) {
+        if (sharedInterests >= config.matching().minSharedInterests()) {
             reasons.add("Many shared interests!");
         } else if (sharedInterests >= 1) {
             reasons.add("Some shared interests");
@@ -399,7 +401,7 @@ public final class RecommendationService {
     /** Get today's standouts for a user. Returns cached if available. */
     public Result getStandouts(User seeker) {
 
-        LocalDate today = LocalDate.now(clock.withZone(config.userTimeZone()));
+        LocalDate today = LocalDate.now(clock.withZone(config.safety().userTimeZone()));
 
         List<Standout> cached = standoutStorage.getStandouts(seeker.getId(), today);
         if (!cached.isEmpty()) {
@@ -412,7 +414,7 @@ public final class RecommendationService {
     /** Mark a standout as interacted after like/pass. */
     public void markInteracted(UUID seekerId, UUID standoutUserId) {
 
-        LocalDate today = LocalDate.now(clock.withZone(config.userTimeZone()));
+        LocalDate today = LocalDate.now(clock.withZone(config.safety().userTimeZone()));
         standoutStorage.markInteracted(seekerId, standoutUserId, today);
     }
 
@@ -481,12 +483,12 @@ public final class RecommendationService {
         double completenessScore = profileService.calculate(candidate).score() / 100.0;
         double activityScore = calculateActivityScore(candidate);
 
-        double composite = distanceScore * config.standoutDistanceWeight()
-                + ageScore * config.standoutAgeWeight()
-                + interestScore * config.standoutInterestWeight()
-                + lifestyleScore * config.standoutLifestyleWeight()
-                + completenessScore * config.standoutCompletenessWeight()
-                + activityScore * config.standoutActivityWeight();
+        double composite = distanceScore * config.algorithm().standoutDistanceWeight()
+                + ageScore * config.algorithm().standoutAgeWeight()
+                + interestScore * config.algorithm().standoutInterestWeight()
+                + lifestyleScore * config.algorithm().standoutLifestyleWeight()
+                + completenessScore * config.algorithm().standoutCompletenessWeight()
+                + activityScore * config.algorithm().standoutActivityWeight();
 
         int score = (int) Math.round(composite * 100);
         String reason = generateStandoutReason(seeker, candidate, interests, distanceKm, lifestyleScore);
@@ -532,13 +534,13 @@ public final class RecommendationService {
             User seeker, User candidate, InterestMatcher.MatchResult interests, double distanceKm, double lifestyle) {
         List<String> reasons = new ArrayList<>();
 
-        if (interests.sharedCount() >= config.minSharedInterests()) {
+        if (interests.sharedCount() >= config.matching().minSharedInterests()) {
             reasons.add("Many shared interests");
         } else if (interests.sharedCount() >= 1) {
             reasons.add("Shared interests");
         }
 
-        if (distanceKm >= 0 && distanceKm < config.nearbyDistanceKm()) {
+        if (distanceKm >= 0 && distanceKm < config.algorithm().nearbyDistanceKm()) {
             reasons.add("Lives nearby");
         }
 

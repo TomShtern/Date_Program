@@ -57,8 +57,8 @@ class MatchQualityServiceTest {
         void closeDistanceGivesHighScore() {
             User alice = createUser("Alice", 25, 32.0, 34.0);
             User bob = createUser("Bob", 26, 32.01, 34.01); // ~1.4km
-            alice.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
-            bob.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+            alice.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
+            bob.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
 
             userStorage.save(alice);
             userStorage.save(bob);
@@ -253,8 +253,8 @@ class MatchQualityServiceTest {
         void closeDistanceGeneratesHighlight() {
             User alice = createUser("Alice", 25, 32.0, 34.0);
             User bob = createUser("Bob", 26, 32.01, 34.01); // Very close
-            alice.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
-            bob.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+            alice.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
+            bob.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
 
             userStorage.save(alice);
             userStorage.save(bob);
@@ -358,12 +358,12 @@ class MatchQualityServiceTest {
         void defaultConfigSumsToOne() {
             AppConfig config = AppConfig.defaults();
 
-            double total = config.distanceWeight()
-                    + config.ageWeight()
-                    + config.interestWeight()
-                    + config.lifestyleWeight()
-                    + config.paceWeight()
-                    + config.responseWeight();
+            double total = config.matching().distanceWeight()
+                    + config.matching().ageWeight()
+                    + config.matching().interestWeight()
+                    + config.matching().lifestyleWeight()
+                    + config.matching().paceWeight()
+                    + config.matching().responseWeight();
 
             assertEquals(1.0, total, 0.001);
         }
@@ -380,12 +380,12 @@ class MatchQualityServiceTest {
                     .responseWeight(0.1)
                     .build();
 
-            assertEquals(0.3, config.distanceWeight());
-            assertEquals(0.1, config.ageWeight());
-            assertEquals(0.2, config.interestWeight());
-            assertEquals(0.2, config.lifestyleWeight());
-            assertEquals(0.1, config.paceWeight());
-            assertEquals(0.1, config.responseWeight());
+            assertEquals(0.3, config.matching().distanceWeight());
+            assertEquals(0.1, config.matching().ageWeight());
+            assertEquals(0.2, config.matching().interestWeight());
+            assertEquals(0.2, config.matching().lifestyleWeight());
+            assertEquals(0.1, config.matching().paceWeight());
+            assertEquals(0.1, config.matching().responseWeight());
         }
 
         @Test
@@ -405,8 +405,8 @@ class MatchQualityServiceTest {
 
             User alice = createUser("Alice", 25, 32.0, 34.0);
             User bob = createUser("Bob", 26, 32.0, 34.0); // Very close
-            alice.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
-            bob.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+            alice.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
+            bob.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
 
             userStorage.save(alice);
             userStorage.save(bob);
@@ -560,9 +560,12 @@ class MatchQualityServiceTest {
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.of(Gender.OTHER));
         user.setLocation(lat, lon);
-        user.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+        user.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
         user.setAgeRange(
-                18, 60, AppConfig.defaults().minAge(), AppConfig.defaults().maxAge());
+                18,
+                60,
+                AppConfig.defaults().validation().minAge(),
+                AppConfig.defaults().validation().maxAge());
         user.addPhotoUrl("http://example.com/photo.jpg");
         user.setBio("Test bio");
         user.setPacePreferences(new PacePreferences(

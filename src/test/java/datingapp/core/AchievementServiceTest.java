@@ -65,7 +65,7 @@ class AchievementServiceTest {
     @DisplayName("unlocks FIRST_SPARK at match tier 1")
     void unlocksFirstSparkAtTierOne() {
         createActiveUser(userId);
-        addMatches(config.achievementMatchTier1());
+        addMatches(config.safety().achievementMatchTier1());
 
         List<UserAchievement> unlocked = service.checkAndUnlock(userId);
 
@@ -88,7 +88,7 @@ class AchievementServiceTest {
     @DisplayName("progress marks unlocked achievements")
     void progressMarksUnlockedAchievements() {
         createActiveUser(userId);
-        addMatches(config.achievementMatchTier1());
+        addMatches(config.safety().achievementMatchTier1());
         service.checkAndUnlock(userId);
 
         ProfileService.AchievementProgress firstSpark =
@@ -119,7 +119,7 @@ class AchievementServiceTest {
     @DisplayName("countUnlocked reflects stored unlock count")
     void countUnlockedReflectsStorage() {
         createActiveUser(userId);
-        addMatches(config.achievementMatchTier2());
+        addMatches(config.safety().achievementMatchTier2());
         service.checkAndUnlock(userId);
 
         assertTrue(service.countUnlocked(userId) >= 2);

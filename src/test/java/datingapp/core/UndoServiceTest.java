@@ -112,7 +112,7 @@ class UndoServiceTest {
             Like like = Like.create(userId, targetUserId, Like.Direction.LIKE);
             undoService.recordSwipe(userId, like, null);
 
-            clock.advanceSeconds(config.undoWindowSeconds());
+            clock.advanceSeconds(config.safety().undoWindowSeconds());
 
             assertTrue(undoService.canUndo(userId));
             assertEquals(0, undoService.getSecondsRemaining(userId));

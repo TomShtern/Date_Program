@@ -393,19 +393,19 @@ public class MatchQualityService {
         String paceSyncLevel = getPaceSyncLevel(paceScore);
 
         // === Calculate Overall Score ===
-        double totalWeight = config.distanceWeight()
-                + config.ageWeight()
-                + config.interestWeight()
-                + config.lifestyleWeight()
-                + config.paceWeight()
-                + config.responseWeight();
+        double totalWeight = config.matching().distanceWeight()
+                + config.matching().ageWeight()
+                + config.matching().interestWeight()
+                + config.matching().lifestyleWeight()
+                + config.matching().paceWeight()
+                + config.matching().responseWeight();
 
-        double weightedScore = distanceScore * config.distanceWeight()
-                + ageScore * config.ageWeight()
-                + interestScore * config.interestWeight()
-                + lifestyleScore * config.lifestyleWeight()
-                + paceScore * config.paceWeight()
-                + responseScore * config.responseWeight();
+        double weightedScore = distanceScore * config.matching().distanceWeight()
+                + ageScore * config.matching().ageWeight()
+                + interestScore * config.matching().interestWeight()
+                + lifestyleScore * config.matching().lifestyleWeight()
+                + paceScore * config.matching().paceWeight()
+                + responseScore * config.matching().responseWeight();
 
         double normalizedScore = totalWeight > 0 ? (weightedScore / totalWeight) : 0.0;
         int compatibilityScore = (int) Math.round(normalizedScore * 100);
@@ -558,23 +558,23 @@ public class MatchQualityService {
         long hours = timeBetween.toHours();
 
         // Within excellent threshold = excellent
-        if (hours < config.responseTimeExcellentHours()) {
+        if (hours < config.algorithm().responseTimeExcellentHours()) {
             return RESPONSE_SCORE_EXCELLENT;
         }
         // Within great threshold = great
-        if (hours < config.responseTimeGreatHours()) {
+        if (hours < config.algorithm().responseTimeGreatHours()) {
             return RESPONSE_SCORE_GREAT;
         }
         // Within good threshold = good
-        if (hours < config.responseTimeGoodHours()) {
+        if (hours < config.algorithm().responseTimeGoodHours()) {
             return RESPONSE_SCORE_GOOD;
         }
         // Within a week = okay
-        if (hours < config.responseTimeWeekHours()) {
+        if (hours < config.algorithm().responseTimeWeekHours()) {
             return RESPONSE_SCORE_OK;
         }
         // Within a month = low
-        if (hours < config.responseTimeMonthHours()) {
+        if (hours < config.algorithm().responseTimeMonthHours()) {
             return RESPONSE_SCORE_LOW;
         }
         // Longer = very low
@@ -724,7 +724,7 @@ public class MatchQualityService {
 
     /** Checks if a pace score is considered low compatibility. */
     public boolean isLowPaceCompatibility(int score) {
-        return score >= 0 && score < config.paceCompatibilityThreshold();
+        return score >= 0 && score < config.algorithm().paceCompatibilityThreshold();
     }
 
     /** Gets the warning message for low pace compatibility. */

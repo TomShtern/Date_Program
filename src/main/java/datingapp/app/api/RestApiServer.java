@@ -19,8 +19,11 @@ import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
 import io.javalin.json.JavalinJackson;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +70,7 @@ public class RestApiServer {
     private final MatchingService matchingService;
 
     private final ConnectionService messagingService;
+    private final ZoneId userTimeZone;
     private final int port;
     private Javalin app;
 
@@ -81,6 +85,7 @@ public class RestApiServer {
         this.candidateFinder = services.getCandidateFinder();
         this.matchingService = services.getMatchingService();
         this.messagingService = services.getConnectionService();
+        this.userTimeZone = services.getConfig().safety().userTimeZone();
         this.port = port;
     }
 
@@ -148,22 +153,23 @@ public class RestApiServer {
     // ── User Handlers ───────────────────────────────────────────────────
 
     private void listUsers(Context ctx) {
-        List<UserSummary> users =
-                profileService.listUsers().stream().map(UserSummary::from).toList();
+        List<UserSummary> users = profileService.listUsers().stream()
+                .map(user -> UserSummary.from(user, userTimeZone))
+                .toList();
         ctx.json(users);
     }
 
     private void getUser(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
         User user = profileService.getUserById(id).orElseThrow(() -> new NotFoundResponse("User not found"));
-        ctx.json(UserDetail.from(user));
+        ctx.json(UserDetail.from(user, userTimeZone));
     }
 
     private void getCandidates(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
         User user = profileService.getUserById(id).orElseThrow(() -> new NotFoundResponse("User not found"));
         List<UserSummary> candidates = candidateFinder.findCandidatesForUser(user).stream()
-                .map(UserSummary::from)
+                .map(candidate -> UserSummary.from(candidate, userTimeZone))
                 .toList();
         ctx.json(candidates);
     }
@@ -184,8 +190,14 @@ public class RestApiServer {
 
         // Use paginated query — prevents OOM for users with thousands of matches.
         var page = matchingService.getPageOfMatchesForUser(userId, offset, limit);
-        List<MatchSummary> items =
-                page.items().stream().map(m -> toMatchSummary(m, userId)).toList();
+        Set<UUID> otherUserIds = page.items().stream()
+                .map(match -> otherUserId(match, userId))
+                .collect(java.util.stream.Collectors.toSet());
+        Map<UUID, String> userNamesById = profileService.getUsersByIds(otherUserIds).values().stream()
+                .collect(java.util.stream.Collectors.toMap(User::getId, User::getName));
+        List<MatchSummary> items = page.items().stream()
+                .map(match -> toMatchSummary(match, userId, userNamesById))
+                .toList();
         ctx.json(new PagedMatchResponse(items, page.totalCount(), offset, limit, page.hasMore()));
     }
 
@@ -296,10 +308,13 @@ public class RestApiServer {
         }
     }
 
-    private MatchSummary toMatchSummary(Match match, UUID currentUserId) {
-        UUID otherUserId = match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
-        String otherUserName =
-                profileService.getUserById(otherUserId).map(User::getName).orElse(UNKNOWN_USER);
+    private UUID otherUserId(Match match, UUID currentUserId) {
+        return match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
+    }
+
+    private MatchSummary toMatchSummary(Match match, UUID currentUserId, Map<UUID, String> userNamesById) {
+        UUID otherUserId = otherUserId(match, currentUserId);
+        String otherUserName = userNamesById.getOrDefault(otherUserId, UNKNOWN_USER);
         return new MatchSummary(
                 match.getId(), otherUserId, otherUserName, match.getState().name(), match.getCreatedAt());
     }
@@ -386,14 +401,12 @@ public class RestApiServer {
     public static record UserSummary(UUID id, String name, int age, String state) {
         /**
          * Creates a UserSummary from a User entity.
-         * Uses system default timezone for age calculation (appropriate for API
-         * display).
+         * Uses the provided timezone for age calculation.
          */
-        public static UserSummary from(User user) {
+        public static UserSummary from(User user, ZoneId userTimeZone) {
             return new UserSummary(
                     user.getId(), user.getName(),
-                    user.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone()),
-                            user.getState().name());
+                    user.getAge(userTimeZone), user.getState().name());
         }
     }
 
@@ -412,14 +425,13 @@ public class RestApiServer {
             String state) {
         /**
          * Creates a UserDetail from a User entity.
-         * Uses system default timezone for age calculation (appropriate for API
-         * display).
+         * Uses the provided timezone for age calculation.
          */
-        public static UserDetail from(User user) {
+        public static UserDetail from(User user, ZoneId userTimeZone) {
             return new UserDetail(
                     user.getId(),
                     user.getName(),
-                    user.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone()),
+                    user.getAge(userTimeZone),
                     user.getBio(),
                     user.getGender() != null ? user.getGender().name() : null,
                     user.getInterestedIn().stream().map(Enum::name).toList(),

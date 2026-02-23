@@ -229,8 +229,11 @@ class ChatViewModelTest {
         user.setGender(Gender.MALE);
         user.setInterestedIn(EnumSet.of(Gender.FEMALE));
         user.setAgeRange(
-                18, 60, AppConfig.defaults().minAge(), AppConfig.defaults().maxAge());
-        user.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+                18,
+                60,
+                AppConfig.defaults().validation().minAge(),
+                AppConfig.defaults().validation().maxAge());
+        user.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
         user.setLocation(40.7128, -74.0060);
         user.addPhotoUrl("http://example.com/photo.jpg");
         user.setBio("Bio");

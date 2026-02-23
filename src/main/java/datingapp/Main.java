@@ -175,7 +175,7 @@ public final class Main {
                 logInfo(
                         "  💝 Daily Likes: {}/{} remaining",
                         dailyStatus.likesRemaining(),
-                        services.getConfig().dailyLikeLimit());
+                        services.getConfig().matching().dailyLikeLimit());
             }
 
         } else {

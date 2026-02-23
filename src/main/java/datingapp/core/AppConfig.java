@@ -5,8 +5,7 @@ import java.time.ZoneId;
 import java.util.Objects;
 
 /**
- * Application configuration. Decomposed into four logical sub-records for readability; all original
- * component-level accessors are preserved as delegating methods for backward compatibility.
+ * Application configuration grouped by concern into four sub-records.
  *
  * <p>Use {@link #defaults()} for the default configuration, or {@link #builder()} for a custom one.
  */
@@ -190,250 +189,6 @@ public record AppConfig(
     }
 
     // ========================================================================
-    // Backward-compatible delegate accessors — matching sub-record
-    // ========================================================================
-
-    public int dailyLikeLimit() {
-        return matching.dailyLikeLimit();
-    }
-
-    public int dailySuperLikeLimit() {
-        return matching.dailySuperLikeLimit();
-    }
-
-    public int dailyPassLimit() {
-        return matching.dailyPassLimit();
-    }
-
-    public int maxSwipesPerSession() {
-        return matching.maxSwipesPerSession();
-    }
-
-    public double suspiciousSwipeVelocity() {
-        return matching.suspiciousSwipeVelocity();
-    }
-
-    public double distanceWeight() {
-        return matching.distanceWeight();
-    }
-
-    public double ageWeight() {
-        return matching.ageWeight();
-    }
-
-    public double interestWeight() {
-        return matching.interestWeight();
-    }
-
-    public double lifestyleWeight() {
-        return matching.lifestyleWeight();
-    }
-
-    public double paceWeight() {
-        return matching.paceWeight();
-    }
-
-    public double responseWeight() {
-        return matching.responseWeight();
-    }
-
-    public int minSharedInterests() {
-        return matching.minSharedInterests();
-    }
-
-    public int maxDistanceKm() {
-        return matching.maxDistanceKm();
-    }
-
-    // ========================================================================
-    // Backward-compatible delegate accessors — validation sub-record
-    // ========================================================================
-
-    public int minAge() {
-        return validation.minAge();
-    }
-
-    public int maxAge() {
-        return validation.maxAge();
-    }
-
-    public int minHeightCm() {
-        return validation.minHeightCm();
-    }
-
-    public int maxHeightCm() {
-        return validation.maxHeightCm();
-    }
-
-    public int maxBioLength() {
-        return validation.maxBioLength();
-    }
-
-    public int maxReportDescLength() {
-        return validation.maxReportDescLength();
-    }
-
-    public int maxNameLength() {
-        return validation.maxNameLength();
-    }
-
-    public int minAgeRangeSpan() {
-        return validation.minAgeRangeSpan();
-    }
-
-    public int minDistanceKm() {
-        return validation.minDistanceKm();
-    }
-
-    public int maxInterests() {
-        return validation.maxInterests();
-    }
-
-    public int maxPhotos() {
-        return validation.maxPhotos();
-    }
-
-    public int messageMaxPageSize() {
-        return validation.messageMaxPageSize();
-    }
-
-    // ========================================================================
-    // Backward-compatible delegate accessors — algorithm sub-record
-    // ========================================================================
-
-    public int nearbyDistanceKm() {
-        return algorithm.nearbyDistanceKm();
-    }
-
-    public int closeDistanceKm() {
-        return algorithm.closeDistanceKm();
-    }
-
-    public int similarAgeDiff() {
-        return algorithm.similarAgeDiff();
-    }
-
-    public int compatibleAgeDiff() {
-        return algorithm.compatibleAgeDiff();
-    }
-
-    public int paceCompatibilityThreshold() {
-        return algorithm.paceCompatibilityThreshold();
-    }
-
-    public int responseTimeExcellentHours() {
-        return algorithm.responseTimeExcellentHours();
-    }
-
-    public int responseTimeGreatHours() {
-        return algorithm.responseTimeGreatHours();
-    }
-
-    public int responseTimeGoodHours() {
-        return algorithm.responseTimeGoodHours();
-    }
-
-    public int responseTimeWeekHours() {
-        return algorithm.responseTimeWeekHours();
-    }
-
-    public int responseTimeMonthHours() {
-        return algorithm.responseTimeMonthHours();
-    }
-
-    public double standoutDistanceWeight() {
-        return algorithm.standoutDistanceWeight();
-    }
-
-    public double standoutAgeWeight() {
-        return algorithm.standoutAgeWeight();
-    }
-
-    public double standoutInterestWeight() {
-        return algorithm.standoutInterestWeight();
-    }
-
-    public double standoutLifestyleWeight() {
-        return algorithm.standoutLifestyleWeight();
-    }
-
-    public double standoutCompletenessWeight() {
-        return algorithm.standoutCompletenessWeight();
-    }
-
-    public double standoutActivityWeight() {
-        return algorithm.standoutActivityWeight();
-    }
-
-    // ========================================================================
-    // Backward-compatible delegate accessors — safety sub-record
-    // ========================================================================
-
-    public int autoBanThreshold() {
-        return safety.autoBanThreshold();
-    }
-
-    public ZoneId userTimeZone() {
-        return safety.userTimeZone();
-    }
-
-    public int sessionTimeoutMinutes() {
-        return safety.sessionTimeoutMinutes();
-    }
-
-    public int undoWindowSeconds() {
-        return safety.undoWindowSeconds();
-    }
-
-    public int achievementMatchTier1() {
-        return safety.achievementMatchTier1();
-    }
-
-    public int achievementMatchTier2() {
-        return safety.achievementMatchTier2();
-    }
-
-    public int achievementMatchTier3() {
-        return safety.achievementMatchTier3();
-    }
-
-    public int achievementMatchTier4() {
-        return safety.achievementMatchTier4();
-    }
-
-    public int achievementMatchTier5() {
-        return safety.achievementMatchTier5();
-    }
-
-    public int minSwipesForBehaviorAchievement() {
-        return safety.minSwipesForBehaviorAchievement();
-    }
-
-    public double selectiveThreshold() {
-        return safety.selectiveThreshold();
-    }
-
-    public double openMindedThreshold() {
-        return safety.openMindedThreshold();
-    }
-
-    public int bioAchievementLength() {
-        return safety.bioAchievementLength();
-    }
-
-    public int lifestyleFieldTarget() {
-        return safety.lifestyleFieldTarget();
-    }
-
-    public int cleanupRetentionDays() {
-        return safety.cleanupRetentionDays();
-    }
-
-    public int softDeleteRetentionDays() {
-        return safety.softDeleteRetentionDays();
-    }
-
-    // ========================================================================
     // Utility methods
     // ========================================================================
 
@@ -484,7 +239,7 @@ public record AppConfig(
 
     // ========================================================================
     // Builder — flat setters for backward compatibility with existing call sites.
-    // build() assembles the four sub-records internally.
+    // build() assembles the four sub-records through named section builders.
     // ========================================================================
 
     public static class Builder {
@@ -836,7 +591,12 @@ public record AppConfig(
         }
 
         public AppConfig build() {
-            MatchingConfig matchingConfig = new MatchingConfig(
+            return new AppConfig(
+                    buildMatchingConfig(), buildValidationConfig(), buildAlgorithmConfig(), buildSafetyConfig());
+        }
+
+        private MatchingConfig buildMatchingConfig() {
+            return new MatchingConfig(
                     dailyLikeLimit,
                     dailySuperLikeLimit,
                     dailyPassLimit,
@@ -850,7 +610,10 @@ public record AppConfig(
                     responseWeight,
                     minSharedInterests,
                     maxDistanceKm);
-            ValidationConfig validationConfig = new ValidationConfig(
+        }
+
+        private ValidationConfig buildValidationConfig() {
+            return new ValidationConfig(
                     minAge,
                     maxAge,
                     minHeightCm,
@@ -863,7 +626,10 @@ public record AppConfig(
                     maxInterests,
                     maxPhotos,
                     messageMaxPageSize);
-            AlgorithmConfig algorithmConfig = new AlgorithmConfig(
+        }
+
+        private AlgorithmConfig buildAlgorithmConfig() {
+            return new AlgorithmConfig(
                     nearbyDistanceKm,
                     closeDistanceKm,
                     similarAgeDiff,
@@ -880,7 +646,10 @@ public record AppConfig(
                     standoutLifestyleWeight,
                     standoutCompletenessWeight,
                     standoutActivityWeight);
-            SafetyConfig safetyConfig = new SafetyConfig(
+        }
+
+        private SafetyConfig buildSafetyConfig() {
+            return new SafetyConfig(
                     autoBanThreshold,
                     userTimeZone,
                     sessionTimeoutMinutes,
@@ -897,7 +666,6 @@ public record AppConfig(
                     lifestyleFieldTarget,
                     cleanupRetentionDays,
                     softDeleteRetentionDays);
-            return new AppConfig(matchingConfig, validationConfig, algorithmConfig, safetyConfig);
         }
     }
 }

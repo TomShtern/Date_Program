@@ -47,7 +47,7 @@ public class UndoService {
      * @param matchCreated Match created by the swipe, or null if none
      */
     public void recordSwipe(UUID userId, Like like, Match matchCreated) {
-        Instant expiresAt = Instant.now(clock).plusSeconds(config.undoWindowSeconds());
+        Instant expiresAt = Instant.now(clock).plusSeconds(config.safety().undoWindowSeconds());
         String matchId = matchCreated != null ? matchCreated.getId() : null;
 
         Undo state = Undo.create(userId, like, matchId, expiresAt);

@@ -453,9 +453,12 @@ class TrustSafetyServiceTest {
         user.setGender(Gender.MALE);
         user.setInterestedIn(EnumSet.of(Gender.FEMALE));
         user.setLocation(32.0, 34.0);
-        user.setMaxDistanceKm(50, AppConfig.defaults().maxDistanceKm());
+        user.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
         user.setAgeRange(
-                18, 60, AppConfig.defaults().minAge(), AppConfig.defaults().maxAge());
+                18,
+                60,
+                AppConfig.defaults().validation().minAge(),
+                AppConfig.defaults().validation().maxAge());
         user.addPhotoUrl("photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,

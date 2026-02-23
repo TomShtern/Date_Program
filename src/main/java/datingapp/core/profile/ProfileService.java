@@ -86,6 +86,14 @@ public final class ProfileService {
         return userStorage.get(userId);
     }
 
+    public Map<UUID, User> getUsersByIds(Set<UUID> userIds) {
+        Objects.requireNonNull(userIds, "userIds cannot be null");
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        return userStorage.findByIds(userIds);
+    }
+
     // ========================================================================
     // Records
     // ========================================================================
@@ -541,8 +549,8 @@ public final class ProfileService {
         }
 
         totalPoints += PREFERENCES_FIELD_POINTS;
-        if (user.getMinAge() >= config.minAge()
-                && user.getMaxAge() <= config.maxAge()
+        if (user.getMinAge() >= config.validation().minAge()
+                && user.getMaxAge() <= config.validation().maxAge()
                 && user.getMinAge() <= user.getMaxAge()) {
             earnedPoints += PREFERENCES_FIELD_POINTS;
             prefsFilled.add("Age preferences");
@@ -721,11 +729,11 @@ public final class ProfileService {
 
     private boolean isEarned(UUID userId, User user, Achievement achievement) {
         return switch (achievement) {
-            case FIRST_SPARK -> getMatchCount(userId) >= config.achievementMatchTier1();
-            case SOCIAL_BUTTERFLY -> getMatchCount(userId) >= config.achievementMatchTier2();
-            case POPULAR -> getMatchCount(userId) >= config.achievementMatchTier3();
-            case SUPERSTAR -> getMatchCount(userId) >= config.achievementMatchTier4();
-            case LEGEND -> getMatchCount(userId) >= config.achievementMatchTier5();
+            case FIRST_SPARK -> getMatchCount(userId) >= config.safety().achievementMatchTier1();
+            case SOCIAL_BUTTERFLY -> getMatchCount(userId) >= config.safety().achievementMatchTier2();
+            case POPULAR -> getMatchCount(userId) >= config.safety().achievementMatchTier3();
+            case SUPERSTAR -> getMatchCount(userId) >= config.safety().achievementMatchTier4();
+            case LEGEND -> getMatchCount(userId) >= config.safety().achievementMatchTier5();
             case SELECTIVE -> isSelective(userId);
             case OPEN_MINDED -> isOpenMinded(userId);
             case COMPLETE_PACKAGE -> isProfileComplete(user);
@@ -738,15 +746,17 @@ public final class ProfileService {
     private int[] getProgressValues(UUID userId, User user, Achievement achievement) {
         int matchCount = getMatchCount(userId);
         return switch (achievement) {
-            case FIRST_SPARK -> new int[] {matchCount, config.achievementMatchTier1()};
-            case SOCIAL_BUTTERFLY -> new int[] {matchCount, config.achievementMatchTier2()};
-            case POPULAR -> new int[] {matchCount, config.achievementMatchTier3()};
-            case SUPERSTAR -> new int[] {matchCount, config.achievementMatchTier4()};
-            case LEGEND -> new int[] {matchCount, config.achievementMatchTier5()};
-            case SELECTIVE, OPEN_MINDED -> new int[] {getTotalSwipes(userId), config.minSwipesForBehaviorAchievement()};
+            case FIRST_SPARK -> new int[] {matchCount, config.safety().achievementMatchTier1()};
+            case SOCIAL_BUTTERFLY -> new int[] {matchCount, config.safety().achievementMatchTier2()};
+            case POPULAR -> new int[] {matchCount, config.safety().achievementMatchTier3()};
+            case SUPERSTAR -> new int[] {matchCount, config.safety().achievementMatchTier4()};
+            case LEGEND -> new int[] {matchCount, config.safety().achievementMatchTier5()};
+            case SELECTIVE, OPEN_MINDED ->
+                new int[] {getTotalSwipes(userId), config.safety().minSwipesForBehaviorAchievement()};
             case COMPLETE_PACKAGE -> new int[] {getProfileCompleteness(user), 100};
-            case STORYTELLER -> new int[] {getBioLength(user), config.bioAchievementLength()};
-            case LIFESTYLE_GURU -> new int[] {countLifestyleFields(user), config.lifestyleFieldTarget()};
+            case STORYTELLER -> new int[] {getBioLength(user), config.safety().bioAchievementLength()};
+            case LIFESTYLE_GURU ->
+                new int[] {countLifestyleFields(user), config.safety().lifestyleFieldTarget()};
             case GUARDIAN -> new int[] {getReportsGiven(userId), 1};
         };
     }
@@ -762,22 +772,22 @@ public final class ProfileService {
 
     private boolean isSelective(UUID userId) {
         int totalSwipes = getTotalSwipes(userId);
-        if (totalSwipes < config.minSwipesForBehaviorAchievement()) {
+        if (totalSwipes < config.safety().minSwipesForBehaviorAchievement()) {
             return false;
         }
         int likes = interactionStorage.countByDirection(userId, Like.Direction.LIKE);
         double likeRatio = (double) likes / totalSwipes;
-        return likeRatio < config.selectiveThreshold();
+        return likeRatio < config.safety().selectiveThreshold();
     }
 
     private boolean isOpenMinded(UUID userId) {
         int totalSwipes = getTotalSwipes(userId);
-        if (totalSwipes < config.minSwipesForBehaviorAchievement()) {
+        if (totalSwipes < config.safety().minSwipesForBehaviorAchievement()) {
             return false;
         }
         int likes = interactionStorage.countByDirection(userId, Like.Direction.LIKE);
         double likeRatio = (double) likes / totalSwipes;
-        return likeRatio > config.openMindedThreshold();
+        return likeRatio > config.safety().openMindedThreshold();
     }
 
     private boolean isProfileComplete(User user) {
@@ -790,7 +800,7 @@ public final class ProfileService {
     }
 
     private boolean hasBioOver100Chars(User user) {
-        return getBioLength(user) > config.bioAchievementLength();
+        return getBioLength(user) > config.safety().bioAchievementLength();
     }
 
     private int getBioLength(User user) {
@@ -798,7 +808,7 @@ public final class ProfileService {
     }
 
     private boolean hasAllLifestyleFields(User user) {
-        return countLifestyleFields(user) >= config.lifestyleFieldTarget();
+        return countLifestyleFields(user) >= config.safety().lifestyleFieldTarget();
     }
 
     private boolean hasReportedUser(UUID userId) {

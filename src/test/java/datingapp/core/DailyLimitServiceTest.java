@@ -271,8 +271,11 @@ class DailyLimitServiceTest {
         var analyticsStorage = new TestStorages.Analytics();
         var trustSafetyStorage = new TestStorages.TrustSafety();
         var standoutStorage = new TestStorages.Standouts();
-        var candidateFinder =
-                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, config.userTimeZone());
+        var candidateFinder = new CandidateFinder(
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                config.safety().userTimeZone());
         var profileService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
 
