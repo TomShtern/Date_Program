@@ -113,7 +113,7 @@ class SessionServiceTest {
         @Test
         @DisplayName("Recording swipe returns success result")
         void recordSwipeSuccess() {
-            ActivityMetricsService.SwipeResult result = service.recordSwipe(userId, Like.Direction.LIKE, false);
+            ActivityMetricsService.SwipeGateResult result = service.recordSwipe(userId, Like.Direction.LIKE, false);
 
             assertTrue(result.allowed());
             assertNull(result.blockedReason());
@@ -131,7 +131,7 @@ class SessionServiceTest {
             analyticsStorage.saveSession(session);
 
             // Try one more
-            ActivityMetricsService.SwipeResult result = service.recordSwipe(userId, Like.Direction.LIKE, false);
+            ActivityMetricsService.SwipeGateResult result = service.recordSwipe(userId, Like.Direction.LIKE, false);
 
             assertFalse(result.allowed());
             assertEquals("Session swipe limit reached. Take a break!", result.blockedReason());
@@ -140,7 +140,7 @@ class SessionServiceTest {
         @Test
         @DisplayName("Warns when swipe velocity is suspicious")
         void warnsOnSuspiciousVelocity() {
-            ActivityMetricsService.SwipeResult result = null;
+            ActivityMetricsService.SwipeGateResult result = null;
             for (int i = 0; i < 31; i++) {
                 result = service.recordSwipe(userId, Like.Direction.LIKE, false);
             }

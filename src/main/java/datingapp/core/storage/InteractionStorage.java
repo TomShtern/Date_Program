@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Consolidated storage for user interactions: likes, matches, and transactional
@@ -79,27 +80,29 @@ public interface InteractionStorage {
     default LikeMatchWriteResult saveLikeAndMaybeCreateMatch(Like like) {
         Objects.requireNonNull(like, "like cannot be null");
 
-        if (exists(like.whoLikes(), like.whoGotLiked())) {
-            return LikeMatchWriteResult.duplicateLike();
-        }
+        synchronized (this) {
+            if (exists(like.whoLikes(), like.whoGotLiked())) {
+                return LikeMatchWriteResult.duplicateLike();
+            }
 
-        save(like);
-        if (like.direction() != Like.Direction.LIKE) {
-            return LikeMatchWriteResult.likeOnly();
-        }
+            save(like);
+            if (like.direction() != Like.Direction.LIKE) {
+                return LikeMatchWriteResult.likeOnly();
+            }
 
-        if (!mutualLikeExists(like.whoLikes(), like.whoGotLiked())) {
-            return LikeMatchWriteResult.likeOnly();
-        }
+            if (!mutualLikeExists(like.whoLikes(), like.whoGotLiked())) {
+                return LikeMatchWriteResult.likeOnly();
+            }
 
-        String matchId = Match.generateId(like.whoLikes(), like.whoGotLiked());
-        if (exists(matchId)) {
-            return LikeMatchWriteResult.likeOnly();
-        }
+            String matchId = Match.generateId(like.whoLikes(), like.whoGotLiked());
+            if (exists(matchId)) {
+                return LikeMatchWriteResult.likeOnly();
+            }
 
-        Match match = Match.create(like.whoLikes(), like.whoGotLiked());
-        save(match);
-        return LikeMatchWriteResult.likeAndMatch(match);
+            Match match = Match.create(like.whoLikes(), like.whoGotLiked());
+            save(match);
+            return LikeMatchWriteResult.likeAndMatch(match);
+        }
     }
 
     // ═══ Match Operations ═══
@@ -116,6 +119,21 @@ public interface InteractionStorage {
 
     List<Match> getAllMatchesFor(UUID userId);
 
+    /**
+     * Returns the set of counterpart user IDs the given user has matched with
+     * (active and ended, excluding soft-deleted matches).
+     *
+     * <p>
+     * Default fallback derives IDs from {@link #getAllMatchesFor(UUID)}.
+     * Implementations should override with a UUID-only projection for efficiency.
+     */
+    default Set<UUID> getMatchedCounterpartIds(UUID userId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        return getAllMatchesFor(userId).stream()
+                .map(match -> match.getUserA().equals(userId) ? match.getUserB() : match.getUserA())
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
     default Optional<Match> getByUsers(UUID userA, UUID userB) {
         return get(Match.generateId(userA, userB));
     }
@@ -129,30 +147,18 @@ public interface InteractionStorage {
      * (active and ended).
      *
      * <p>
-     * Default delegates to {@link #getAllMatchesFor(UUID)} so existing
-     * implementations
-     * compile without changes. Override for better performance (e.g.
-     * {@code SELECT COUNT(*)}).
+     * Implementations should prefer a direct {@code SELECT COUNT(*)} query.
      */
-    default int countMatchesFor(UUID userId) {
-        Objects.requireNonNull(userId, "userId cannot be null");
-        return getAllMatchesFor(userId).size();
-    }
+    int countMatchesFor(UUID userId);
 
     /**
      * Returns the total number of active, non-deleted matches involving
      * {@code userId}.
      *
      * <p>
-     * Default delegates to {@link #getActiveMatchesFor(UUID)} so existing
-     * implementations compile without changes. Override for better performance
-     * (e.g.
-     * {@code SELECT COUNT(*)}).
+     * Implementations should prefer a direct {@code SELECT COUNT(*)} query.
      */
-    default int countActiveMatchesFor(UUID userId) {
-        Objects.requireNonNull(userId, "userId cannot be null");
-        return getActiveMatchesFor(userId).size();
-    }
+    int countActiveMatchesFor(UUID userId);
 
     /**
      * Returns a single page of <em>all</em> matches (active and ended) for

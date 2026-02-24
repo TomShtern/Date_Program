@@ -55,8 +55,14 @@ public final class ConnectionModels {
         }
     }
 
-    /** Represents a conversation between two matched users. */
-    public static class Conversation {
+    /**
+     * Mutable conversation aggregate between two users.
+     *
+     * <p>
+     * Equality and hash code are ID-based; mutable fields (timestamps, archive
+     * metadata, visibility flags) are intentionally excluded.
+     */
+    public static final class Conversation {
 
         private final String id;
         private final UUID userA;
@@ -73,7 +79,7 @@ public final class ConnectionModels {
         private boolean visibleToUserB;
 
         @SuppressWarnings("java:S107")
-        public Conversation(
+        Conversation(
                 String id,
                 UUID userA,
                 UUID userB,
@@ -113,6 +119,37 @@ public final class ConnectionModels {
             this.userBArchiveReason = userBArchiveReason;
             this.visibleToUserA = visibleToUserA;
             this.visibleToUserB = visibleToUserB;
+        }
+
+        @SuppressWarnings("java:S107")
+        public static Conversation fromStorage(
+                String id,
+                UUID userA,
+                UUID userB,
+                Instant createdAt,
+                Instant lastMessageAt,
+                Instant userAReadAt,
+                Instant userBReadAt,
+                Instant userAArchivedAt,
+                MatchArchiveReason userAArchiveReason,
+                Instant userBArchivedAt,
+                MatchArchiveReason userBArchiveReason,
+                boolean visibleToUserA,
+                boolean visibleToUserB) {
+            return new Conversation(
+                    id,
+                    userA,
+                    userB,
+                    createdAt,
+                    lastMessageAt,
+                    userAReadAt,
+                    userBReadAt,
+                    userAArchivedAt,
+                    userAArchiveReason,
+                    userBArchivedAt,
+                    userBArchiveReason,
+                    visibleToUserA,
+                    visibleToUserB);
         }
 
         public static Conversation create(UUID a, UUID b) {

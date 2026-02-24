@@ -88,7 +88,7 @@ datingapp/
   Main.java                           # CLI entry point
   app/
     bootstrap/ApplicationStartup.java # Shared initialization
-    cli/{CliTextAndInput, MatchingHandler, MessagingHandler, ProfileHandler, SafetyHandler, StatsHandler}.java
+    cli/{CliTextAndInput, MainMenuRegistry, MatchingHandler, MessagingHandler, ProfileHandler, SafetyHandler, StatsHandler}.java
     api/RestApiServer.java
   core/
     AppClock, AppConfig, AppSession, EnumSetUtil, LoggingSupport, PerformanceMonitor, ServiceRegistry, TextUtil
@@ -97,16 +97,16 @@ datingapp/
     connection/{ConnectionModels, ConnectionService}
     profile/{ProfileService, ValidationService, MatchPreferences}
     metrics/{ActivityMetricsService, EngagementDomain, SwipeState}
-    storage/{UserStorage, InteractionStorage, CommunicationStorage, AnalyticsStorage, TrustSafetyStorage}
+    storage/{UserStorage, InteractionStorage, CommunicationStorage, AnalyticsStorage, TrustSafetyStorage, PageData}
   storage/
     DatabaseManager, StorageFactory
     jdbi/{JdbiUserStorage, JdbiMatchmakingStorage, JdbiConnectionStorage, JdbiMetricsStorage, JdbiTrustSafetyStorage, JdbiTypeCodecs}
     schema/{SchemaInitializer, MigrationRunner}
   ui/
     DatingApp, NavigationService, UiComponents, UiFeedbackService, UiConstants, UiAnimations, ImageCache, UiUtils
-    screen/{BaseController + 10 screen controllers + MilestonePopupController}
+    screen/{BaseController, ChatController, DashboardController, LoginController, MatchesController, MatchingController, MilestonePopupController, PreferencesController, ProfileController, SocialController, StandoutsController, StatsController}
     popup/{MatchPopupController, MilestonePopupController}
-    viewmodel/{10 ViewModels + ViewModelFactory + ViewModelErrorSink + UiDataAdapters}
+    viewmodel/{ChatViewModel, DashboardViewModel, LoginViewModel, MatchesViewModel, MatchingViewModel, PreferencesViewModel, ProfileViewModel, SocialViewModel, StandoutsViewModel, StatsViewModel, ViewModelFactory, ViewModelErrorSink, UiDataAdapters}
 ```
 
 **Three-Layer Clean Architecture:**
@@ -352,5 +352,5 @@ try {
 - Recommendation daily-pick cache is in-memory LRU (`MAX_CACHED_PICKS=1000`)
 
 ---
-**Last Updated:** 2026-02-22 | **Java Files:** 87 main + 65 test (152 total)
-**LOC:** 48,494 total / 37,150 code | **Coverage Gate:** 60% minimum (JaCoCo)
+**Last Updated:** 2026-02-23 | **Java Files:** 89 main + 71 test (160 total)
+**LOC:** 51,081 total / 38,830 code | **Coverage Gate:** 60% minimum (JaCoCo)

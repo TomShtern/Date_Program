@@ -20,7 +20,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-public class MatchingService {
+public final class MatchingService {
 
     private static final String LIKE_REQUIRED = "like cannot be null";
 
@@ -162,11 +162,11 @@ public class MatchingService {
      * @return SwipeResult containing success status and match information
      */
     public SwipeResult processSwipe(User currentUser, User candidate, boolean liked) {
+        Objects.requireNonNull(currentUser, "currentUser cannot be null");
+        Objects.requireNonNull(candidate, "candidate cannot be null");
         if (dailyService == null || undoService == null) {
             return SwipeResult.configError("dailyService and undoService required for processSwipe");
         }
-        Objects.requireNonNull(currentUser, "currentUser cannot be null");
-        Objects.requireNonNull(candidate, "candidate cannot be null");
         if (liked && !dailyService.canLike(currentUser.getId())) {
             return SwipeResult.dailyLimitReached();
         }
@@ -205,11 +205,7 @@ public class MatchingService {
 
         Set<UUID> alreadyInteracted = interactionStorage.getLikedOrPassedUserIds(currentUserId);
         Set<UUID> blocked = trustSafetyStorage.getBlockedUserIds(currentUserId);
-
-        Set<UUID> matched = new HashSet<>();
-        for (Match match : interactionStorage.getAllMatchesFor(currentUserId)) {
-            matched.add(otherUserId(match, currentUserId));
-        }
+        Set<UUID> matched = interactionStorage.getMatchedCounterpartIds(currentUserId);
 
         Set<UUID> excluded = new HashSet<>(alreadyInteracted);
         excluded.addAll(blocked);
@@ -241,10 +237,6 @@ public class MatchingService {
 
         result.sort(Comparator.comparing(PendingLiker::likedAt).reversed());
         return result;
-    }
-
-    private static UUID otherUserId(Match match, UUID currentUserId) {
-        return match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
     }
 
     /**

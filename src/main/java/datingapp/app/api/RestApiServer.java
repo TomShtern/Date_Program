@@ -244,16 +244,22 @@ public class RestApiServer {
             throw new IllegalArgumentException("offset must be non-negative");
         }
         validateUserExists(userId);
-        List<ConversationSummary> conversations = messagingService.getConversations(userId, limit, offset).stream()
-                .map(this::toConversationSummary)
+        List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userId, limit, offset);
+        Set<String> conversationIds = previews.stream()
+                .map(preview -> preview.conversation().getId())
+                .collect(java.util.stream.Collectors.toSet());
+        Map<String, Integer> messageCounts = messagingService.countMessagesByConversationIds(conversationIds);
+
+        List<ConversationSummary> conversations = previews.stream()
+                .map(preview -> toConversationSummary(preview, messageCounts))
                 .toList();
         ctx.json(conversations);
     }
 
     private void getMessages(Context ctx) {
         String conversationId = ctx.pathParam("conversationId");
-        int limit = ctx.queryParamAsClass("limit", Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
-        int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
+        int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
+        int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be greater than 0");
         }
@@ -319,10 +325,11 @@ public class RestApiServer {
                 match.getId(), otherUserId, otherUserName, match.getState().name(), match.getCreatedAt());
     }
 
-    private ConversationSummary toConversationSummary(ConnectionService.ConversationPreview preview) {
+    private ConversationSummary toConversationSummary(
+            ConnectionService.ConversationPreview preview, Map<String, Integer> messageCounts) {
         Conversation conversation = preview.conversation();
         User otherUser = preview.otherUser();
-        int messageCount = messagingService.countMessages(conversation.getId());
+        int messageCount = messageCounts.getOrDefault(conversation.getId(), 0);
         return new ConversationSummary(
                 conversation.getId(),
                 otherUser.getId(),

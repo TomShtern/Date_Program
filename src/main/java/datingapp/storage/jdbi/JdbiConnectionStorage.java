@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;
@@ -114,6 +115,27 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     @Override
     public int countMessages(String conversationId) {
         return messagingDao.countMessages(conversationId);
+    }
+
+    @Override
+    public Map<String, Integer> countMessagesByConversationIds(Set<String> conversationIds) {
+        Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+        if (conversationIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return jdbi.withHandle(handle -> {
+            Map<String, Integer> counts = new java.util.HashMap<>();
+            handle.createQuery("SELECT conversation_id, COUNT(*) AS message_count FROM messages "
+                            + "WHERE conversation_id IN (<conversationIds>) GROUP BY conversation_id")
+                    .bindList("conversationIds", conversationIds)
+                    .map((rs, ctx) -> Map.entry(rs.getString("conversation_id"), rs.getInt("message_count")))
+                    .list()
+                    .forEach(entry -> counts.put(entry.getKey(), entry.getValue()));
+
+            conversationIds.forEach(id -> counts.putIfAbsent(id, 0));
+            return Map.copyOf(counts);
+        });
     }
 
     @Override
@@ -502,7 +524,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
             boolean visibleToUserA = rs.getBoolean("visible_to_user_a");
             boolean visibleToUserB = rs.getBoolean("visible_to_user_b");
 
-            return new Conversation(
+            return Conversation.fromStorage(
                     id,
                     userA,
                     userB,

@@ -69,13 +69,13 @@ public class ActivityMetricsService {
         return session;
     }
 
-    public SwipeResult recordSwipe(UUID userId, Like.Direction direction, boolean matched) {
+    public SwipeGateResult recordSwipe(UUID userId, Like.Direction direction, boolean matched) {
         Object lock = lockStripes[Math.floorMod(userId.hashCode(), LOCK_STRIPE_COUNT)];
         synchronized (lock) {
             Session session = getOrCreateSession(userId);
 
             if (session.getSwipeCount() >= config.matching().maxSwipesPerSession()) {
-                return SwipeResult.blocked(session, "Session swipe limit reached. Take a break!");
+                return SwipeGateResult.blocked(session, "Session swipe limit reached. Take a break!");
             }
 
             session.recordSwipe(direction, matched);
@@ -87,7 +87,7 @@ public class ActivityMetricsService {
                 warning = "Unusually fast swiping detected. Take a moment to review profiles!";
             }
 
-            return SwipeResult.success(session, warning);
+            return SwipeGateResult.success(session, warning);
         }
     }
 
@@ -266,13 +266,13 @@ public class ActivityMetricsService {
         }
     }
 
-    public static record SwipeResult(boolean allowed, Session session, String warning, String blockedReason) {
-        public static SwipeResult success(Session session, String warning) {
-            return new SwipeResult(true, session, warning, null);
+    public static record SwipeGateResult(boolean allowed, Session session, String warning, String blockedReason) {
+        public static SwipeGateResult success(Session session, String warning) {
+            return new SwipeGateResult(true, session, warning, null);
         }
 
-        public static SwipeResult blocked(Session session, String reason) {
-            return new SwipeResult(false, session, null, reason);
+        public static SwipeGateResult blocked(Session session, String reason) {
+            return new SwipeGateResult(false, session, null, reason);
         }
 
         public boolean hasWarning() {

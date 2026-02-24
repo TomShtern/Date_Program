@@ -249,6 +249,29 @@ class LikerBrowserServiceTest {
         }
 
         @Override
+        public Set<UUID> getMatchedCounterpartIds(UUID userId) {
+            return matches.values().stream()
+                    .filter(match -> match.involves(userId))
+                    .map(match -> match.getUserA().equals(userId) ? match.getUserB() : match.getUserA())
+                    .collect(java.util.stream.Collectors.toSet());
+        }
+
+        @Override
+        public int countMatchesFor(UUID userId) {
+            return (int) matches.values().stream()
+                    .filter(match -> match.involves(userId))
+                    .count();
+        }
+
+        @Override
+        public int countActiveMatchesFor(UUID userId) {
+            return (int) matches.values().stream()
+                    .filter(Match::isActive)
+                    .filter(match -> match.involves(userId))
+                    .count();
+        }
+
+        @Override
         public void delete(String matchId) {
             matches.remove(matchId);
         }

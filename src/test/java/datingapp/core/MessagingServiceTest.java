@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
@@ -508,6 +509,51 @@ class MessagingServiceTest {
             List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userA, 50, 0);
 
             assertTrue(previews.isEmpty());
+        }
+    }
+
+    @SuppressWarnings("unused") // JUnit 5 discovers via reflection
+    @Nested
+    @DisplayName("countMessagesByConversationIds")
+    class CountMessagesByConversationIds {
+
+        @Test
+        @DisplayName("returns batched counts for all requested conversation ids")
+        void returnsBatchedCounts() {
+            Match matchAB = Match.create(userA, userB);
+            Match matchAC = Match.create(userA, userC);
+            matchStorage.save(matchAB);
+            matchStorage.save(matchAC);
+
+            messagingService.sendMessage(userA, userB, "AB-1");
+            messagingService.sendMessage(userB, userA, "AB-2");
+            messagingService.sendMessage(userA, userC, "AC-1");
+
+            String conversationAB = Conversation.generateId(userA, userB);
+            String conversationAC = Conversation.generateId(userA, userC);
+
+            Map<String, Integer> counts =
+                    messagingService.countMessagesByConversationIds(Set.of(conversationAB, conversationAC));
+
+            assertEquals(2, counts.get(conversationAB));
+            assertEquals(1, counts.get(conversationAC));
+        }
+
+        @Test
+        @DisplayName("includes zero counts for conversations without messages")
+        void includesZeroForConversationsWithoutMessages() {
+            Conversation emptyConversation = messagingService.getOrCreateConversation(userA, userB);
+
+            Map<String, Integer> counts =
+                    messagingService.countMessagesByConversationIds(Set.of(emptyConversation.getId()));
+
+            assertEquals(0, counts.get(emptyConversation.getId()));
+        }
+
+        @Test
+        @DisplayName("returns empty map for empty input")
+        void returnsEmptyForEmptyInput() {
+            assertTrue(messagingService.countMessagesByConversationIds(Set.of()).isEmpty());
         }
     }
 

@@ -10,6 +10,7 @@ import datingapp.core.model.User.UserState;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -176,6 +177,32 @@ class MatchingServiceTest {
     class ProcessSwipeGuard {
 
         @Test
+        @DisplayName("processSwipe validates current user before config check")
+        void processSwipeValidatesCurrentUserBeforeConfigCheck() {
+            User candidate = User.StorageBuilder.create(UUID.randomUUID(), "Bob", AppClock.now())
+                    .state(UserState.ACTIVE)
+                    .build();
+
+            NullPointerException error =
+                    assertThrows(NullPointerException.class, () -> matchingService.processSwipe(null, candidate, true));
+
+            assertEquals("currentUser cannot be null", error.getMessage());
+        }
+
+        @Test
+        @DisplayName("processSwipe validates candidate before config check")
+        void processSwipeValidatesCandidateBeforeConfigCheck() {
+            User user = User.StorageBuilder.create(UUID.randomUUID(), "Alice", AppClock.now())
+                    .state(UserState.ACTIVE)
+                    .build();
+
+            NullPointerException error =
+                    assertThrows(NullPointerException.class, () -> matchingService.processSwipe(user, null, true));
+
+            assertEquals("candidate cannot be null", error.getMessage());
+        }
+
+        @Test
         @DisplayName("processSwipe returns config error when services are missing")
         void processSwipeReturnsConfigErrorWithoutServices() {
             // Builder without dailyService/undoService
@@ -192,5 +219,45 @@ class MatchingServiceTest {
             assertEquals(
                     "dailyService and undoService required for processSwipe", result.message(), "Unexpected message");
         }
+    }
+
+    @Nested
+    @DisplayName("Pending liker filtering")
+    class PendingLikerFiltering {
+
+        @Test
+        @DisplayName("excludes users already matched including ended matches")
+        void excludesAlreadyMatchedUsersIncludingEndedMatches() {
+            UUID currentUserId = UUID.randomUUID();
+            UUID activeMatchedLikerId = UUID.randomUUID();
+            UUID endedMatchedLikerId = UUID.randomUUID();
+            UUID pendingLikerId = UUID.randomUUID();
+
+            interactionStorage.save(Like.create(activeMatchedLikerId, currentUserId, Like.Direction.LIKE));
+            interactionStorage.save(Like.create(endedMatchedLikerId, currentUserId, Like.Direction.LIKE));
+            interactionStorage.save(Like.create(pendingLikerId, currentUserId, Like.Direction.LIKE));
+
+            Match activeMatch = Match.create(currentUserId, activeMatchedLikerId);
+            interactionStorage.save(activeMatch);
+
+            Match endedMatch = Match.create(currentUserId, endedMatchedLikerId);
+            endedMatch.unmatch(currentUserId);
+            interactionStorage.save(endedMatch);
+
+            userStorage.save(activeUser(activeMatchedLikerId, "ActiveMatched"));
+            userStorage.save(activeUser(endedMatchedLikerId, "EndedMatched"));
+            userStorage.save(activeUser(pendingLikerId, "Pending"));
+
+            List<User> pendingLikers = matchingService.findPendingLikers(currentUserId);
+
+            assertEquals(1, pendingLikers.size());
+            assertEquals(pendingLikerId, pendingLikers.getFirst().getId());
+        }
+    }
+
+    private static User activeUser(UUID id, String name) {
+        return User.StorageBuilder.create(id, name, AppClock.now())
+                .state(UserState.ACTIVE)
+                .build();
     }
 }

@@ -324,6 +324,16 @@ public final class TestStorages {
                     .toList();
         }
 
+        @Override
+        public Set<UUID> getMatchedCounterpartIds(UUID userId) {
+            Objects.requireNonNull(userId, "userId cannot be null");
+            return matches.values().stream()
+                    .filter(match -> match.getDeletedAt() == null)
+                    .filter(match -> match.involves(userId))
+                    .map(match -> match.getUserA().equals(userId) ? match.getUserB() : match.getUserA())
+                    .collect(Collectors.toSet());
+        }
+
         /**
          * In-memory count: number of non-deleted matches for {@code userId} (active and
          * ended).
@@ -561,6 +571,17 @@ public final class TestStorages {
             return messagesByConversation
                     .getOrDefault(conversationId, List.of())
                     .size();
+        }
+
+        @Override
+        public Map<String, Integer> countMessagesByConversationIds(Set<String> conversationIds) {
+            Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+            if (conversationIds.isEmpty()) {
+                return Map.of();
+            }
+            return conversationIds.stream()
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toMap(id -> id, this::countMessages));
         }
 
         @Override

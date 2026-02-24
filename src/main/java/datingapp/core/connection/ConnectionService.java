@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** Consolidated messaging + relationship transition service. */
@@ -146,6 +147,14 @@ public class ConnectionService {
             return 0;
         }
         return communicationStorage.countMessages(conversationId);
+    }
+
+    public Map<String, Integer> countMessagesByConversationIds(Set<String> conversationIds) {
+        Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+        if (conversationIds.isEmpty()) {
+            return Map.of();
+        }
+        return communicationStorage.countMessagesByConversationIds(conversationIds);
     }
 
     public List<ConversationPreview> getConversations(UUID userId, int limit, int offset) {

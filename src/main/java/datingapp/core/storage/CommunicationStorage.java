@@ -6,8 +6,12 @@ import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.model.Match.MatchArchiveReason;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -48,6 +52,30 @@ public interface CommunicationStorage {
     Optional<Message> getLatestMessage(String conversationId);
 
     int countMessages(String conversationId);
+
+    /**
+     * Returns message counts for each requested conversation ID.
+     *
+     * <p>
+     * Default implementation loops over {@link #countMessages(String)} for
+     * backward compatibility. Database-backed implementations should override this
+     * with a grouped query.
+     */
+    default Map<String, Integer> countMessagesByConversationIds(Set<String> conversationIds) {
+        Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+        if (conversationIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, Integer> counts = new HashMap<>();
+        for (String conversationId : conversationIds) {
+            if (conversationId == null || conversationId.isBlank()) {
+                continue;
+            }
+            counts.put(conversationId, countMessages(conversationId));
+        }
+        return Map.copyOf(counts);
+    }
 
     int countMessagesAfter(String conversationId, Instant after);
 

@@ -28,23 +28,6 @@ public class CandidateFinder implements LoggingSupport {
     private final java.time.ZoneId timezone;
 
     /**
-     * Constructs a CandidateFinder with the required storage dependencies.
-     * Uses system default timezone for age calculations.
-     *
-     * @param userStorage        the user storage implementation
-     * @param interactionStorage the interaction storage implementation
-     * @param trustSafetyStorage the trust safety storage implementation
-     * @throws NullPointerException if any parameter is null
-     * @deprecated Use
-     *             {@link #CandidateFinder(UserStorage, InteractionStorage, TrustSafetyStorage, java.time.ZoneId)}
-     */
-    @Deprecated
-    public CandidateFinder(
-            UserStorage userStorage, InteractionStorage interactionStorage, TrustSafetyStorage trustSafetyStorage) {
-        this(userStorage, interactionStorage, trustSafetyStorage, java.time.ZoneId.systemDefault());
-    }
-
-    /**
      * Constructs a CandidateFinder with the required storage dependencies and
      * timezone.
      *
@@ -170,12 +153,21 @@ public class CandidateFinder implements LoggingSupport {
      */
     public List<User> findCandidatesForUser(User currentUser) {
         try (PerformanceMonitor.Timer timer = PerformanceMonitor.startTimer("CandidateFinder.findCandidatesForUser")) {
+            if (!currentUser.hasLocationSet()) {
+                if (logger.isTraceEnabled()) {
+                    logger.trace(
+                            "CandidateFinder.findCandidatesForUser skipped for {} due to missing location",
+                            currentUser.getId());
+                }
+                timer.markSuccess();
+                return List.of();
+            }
+
             Set<UUID> excluded = new HashSet<>(interactionStorage.getLikedOrPassedUserIds(currentUser.getId()));
             excluded.addAll(trustSafetyStorage.getBlockedUserIds(currentUser.getId()));
 
             // Use SQL pre-filtering for primary criteria to reduce the candidate set
             // before the more-expensive in-memory filters run.
-            int distanceKm = currentUser.hasLocationSet() ? currentUser.getMaxDistanceKm() : 50_000;
             List<User> preFiltered = userStorage.findCandidates(
                     currentUser.getId(),
                     currentUser.getInterestedIn(),
@@ -183,7 +175,7 @@ public class CandidateFinder implements LoggingSupport {
                     currentUser.getMaxAge(),
                     currentUser.getLat(),
                     currentUser.getLon(),
-                    distanceKm);
+                    currentUser.getMaxDistanceKm());
 
             List<User> candidates = findCandidates(currentUser, preFiltered, excluded);
             if (logger.isTraceEnabled()) {

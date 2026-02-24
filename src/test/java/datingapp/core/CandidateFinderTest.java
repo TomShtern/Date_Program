@@ -146,6 +146,16 @@ class CandidateFinderTest {
         assertTrue(result.isEmpty(), "Distance filtering should apply when (0,0) is explicitly set");
     }
 
+    @Test
+    @DisplayName("findCandidatesForUser returns empty when seeker location is missing")
+    void findCandidatesForUserReturnsEmptyWhenSeekerLocationMissing() {
+        User noLocationSeeker = createUserWithoutLocation("NoLocation", Gender.MALE, EnumSet.of(Gender.FEMALE), 30);
+
+        List<User> result = finder.findCandidatesForUser(noLocationSeeker);
+
+        assertTrue(result.isEmpty());
+    }
+
     private User createUser(String name, Gender gender, Set<Gender> interestedIn, int age, double lat, double lon) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Bio");
@@ -153,6 +163,25 @@ class CandidateFinderTest {
         user.setGender(gender);
         user.setInterestedIn(interestedIn);
         user.setLocation(lat, lon);
+        user.setMaxDistanceKm(100, CONFIG.matching().maxDistanceKm());
+        user.setAgeRange(
+                18, 60, CONFIG.validation().minAge(), CONFIG.validation().maxAge());
+        user.addPhotoUrl("photo.jpg");
+        user.setPacePreferences(new PacePreferences(
+                MessagingFrequency.OFTEN,
+                TimeToFirstDate.FEW_DAYS,
+                CommunicationStyle.TEXT_ONLY,
+                DepthPreference.DEEP_CHAT));
+        user.activate();
+        return user;
+    }
+
+    private User createUserWithoutLocation(String name, Gender gender, Set<Gender> interestedIn, int age) {
+        User user = new User(UUID.randomUUID(), name);
+        user.setBio("Bio");
+        user.setBirthDate(AppClock.today().minusYears(age));
+        user.setGender(gender);
+        user.setInterestedIn(interestedIn);
         user.setMaxDistanceKm(100, CONFIG.matching().maxDistanceKm());
         user.setAgeRange(
                 18, 60, CONFIG.validation().minAge(), CONFIG.validation().maxAge());

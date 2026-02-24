@@ -306,6 +306,12 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         return matchDao.getAllMatchesFor(userId);
     }
 
+    @Override
+    public Set<UUID> getMatchedCounterpartIds(UUID userId) {
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
+        return matchDao.getMatchedCounterpartIds(userId);
+    }
+
     /**
      * Returns the total number of non-deleted matches for {@code userId} via a
      * single
@@ -761,6 +767,10 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         @SqlQuery("SELECT " + MATCH_COLUMNS + " FROM matches WHERE (user_a = :userId OR user_b = :userId) "
                 + "AND deleted_at IS NULL")
         List<Match> getAllMatchesFor(@Bind("userId") UUID userId);
+
+        @SqlQuery("SELECT CASE WHEN user_a = :userId THEN user_b ELSE user_a END AS counterpart_id "
+                + "FROM matches WHERE (user_a = :userId OR user_b = :userId) AND deleted_at IS NULL")
+        Set<UUID> getMatchedCounterpartIds(@Bind("userId") UUID userId);
 
         /**
          * Counts all non-deleted matches for the user (active + ended). Used as the

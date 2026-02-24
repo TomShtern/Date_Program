@@ -3,6 +3,7 @@ package datingapp;
 import datingapp.app.bootstrap.ApplicationStartup;
 import datingapp.app.cli.CliTextAndInput;
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.cli.MainMenuRegistry;
 import datingapp.app.cli.MatchingHandler;
 import datingapp.app.cli.MessagingHandler;
 import datingapp.app.cli.ProfileHandler;
@@ -22,6 +23,7 @@ import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Scanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,49 +84,33 @@ public final class Main {
             SafetyHandler safetyHandler = SafetyHandler.fromServices(services, session, inputReader);
             StatsHandler statsHandler = StatsHandler.fromServices(services, session, inputReader);
             MessagingHandler messagingHandler = MessagingHandler.fromServices(services, session, inputReader);
+            MainMenuRegistry menuRegistry = createMainMenuRegistry(
+                    inputReader,
+                    session,
+                    matchingHandler,
+                    profileHandler,
+                    safetyHandler,
+                    statsHandler,
+                    messagingHandler);
 
             logInfo("\n🌹 Welcome to Dating App 🌹\n");
 
             boolean running = true;
             while (running) {
-                printMenu(services, messagingHandler, session);
+                MainMenuRegistry.MenuRenderContext menuRenderContext =
+                        new MainMenuRegistry.MenuRenderContext(messagingHandler.getTotalUnreadCount());
+                printMenu(services, session, menuRegistry, menuRenderContext);
                 String choice = inputReader.readLine("Choose an option: ");
 
-                // Guard: options 3–20 require a logged-in user
-                if (!"0".equals(choice)
-                        && !"1".equals(choice)
-                        && !"2".equals(choice)
-                        && session.getCurrentUser() == null) {
+                var option = menuRegistry.findOption(choice);
+                if (option.isEmpty()) {
+                    logInfo(CliTextAndInput.INVALID_SELECTION);
+                } else if (option.orElseThrow().requiresLogin() && session.getCurrentUser() == null) {
                     logInfo("Please select a user first (option 1 or 2).");
-                    continue;
-                }
-
-                switch (choice) {
-                    case "1" -> safeExecute(profileHandler::createUser);
-                    case "2" -> safeExecute(profileHandler::selectUser);
-                    case "3" -> safeExecute(profileHandler::completeProfile);
-                    case "4" -> safeExecute(matchingHandler::browseCandidates);
-                    case "5" -> safeExecute(matchingHandler::viewMatches);
-                    case "6" -> safeExecute(safetyHandler::blockUser);
-                    case "7" -> safeExecute(safetyHandler::reportUser);
-                    case "8" -> safeExecute(safetyHandler::manageBlockedUsers);
-                    case "9" -> safeExecute(profileHandler::setDealbreakers);
-                    case "10" -> safeExecute(statsHandler::viewStatistics);
-                    case "11" -> safeExecute(profileHandler::previewProfile);
-                    case "12" -> safeExecute(statsHandler::viewAchievements);
-                    case "13" -> safeExecute(profileHandler::viewAllNotes);
-                    case "14" -> safeExecute(profileHandler::viewProfileScore);
-                    case "15" -> safeExecute(safetyHandler::verifyProfile);
-                    case "16" -> safeExecute(matchingHandler::browseWhoLikedMe);
-                    case "17" -> safeExecute(messagingHandler::showConversations);
-                    case "18" -> safeExecute(matchingHandler::viewNotifications);
-                    case "19" -> safeExecute(matchingHandler::viewPendingRequests);
-                    case "20" -> safeExecute(matchingHandler::viewStandouts);
-                    case "0" -> {
-                        running = false;
-                        logInfo("\n👋 Goodbye!\n");
-                    }
-                    default -> logInfo(CliTextAndInput.INVALID_SELECTION);
+                } else {
+                    MainMenuRegistry.DispatchResult dispatchResult =
+                            option.orElseThrow().action().execute();
+                    running = dispatchResult != MainMenuRegistry.DispatchResult.EXIT;
                 }
             }
 
@@ -145,7 +131,86 @@ public final class Main {
         }
     }
 
-    private static void printMenu(ServiceRegistry services, MessagingHandler messagingHandler, AppSession session) {
+    private static MainMenuRegistry.DispatchResult safeDispatch(Runnable action) {
+        safeExecute(action);
+        return MainMenuRegistry.DispatchResult.CONTINUE;
+    }
+
+    private static MainMenuRegistry createMainMenuRegistry(
+            InputReader inputReader,
+            AppSession session,
+            MatchingHandler matchingHandler,
+            ProfileHandler profileHandler,
+            SafetyHandler safetyHandler,
+            StatsHandler statsHandler,
+            MessagingHandler messagingHandler) {
+        return MainMenuRegistry.createDefault(Map.ofEntries(
+                Map.entry("1", () -> safeDispatch(profileHandler::createUser)),
+                Map.entry("2", () -> safeDispatch(profileHandler::selectUser)),
+                Map.entry("3", () -> safeDispatch(profileHandler::completeProfile)),
+                Map.entry(
+                        "4",
+                        () -> browseCandidatesWithLocationGate(inputReader, session, matchingHandler, profileHandler)),
+                Map.entry("5", () -> safeDispatch(matchingHandler::viewMatches)),
+                Map.entry("6", () -> safeDispatch(safetyHandler::blockUser)),
+                Map.entry("7", () -> safeDispatch(safetyHandler::reportUser)),
+                Map.entry("8", () -> safeDispatch(safetyHandler::manageBlockedUsers)),
+                Map.entry("9", () -> safeDispatch(profileHandler::setDealbreakers)),
+                Map.entry("10", () -> safeDispatch(statsHandler::viewStatistics)),
+                Map.entry("11", () -> safeDispatch(profileHandler::previewProfile)),
+                Map.entry("12", () -> safeDispatch(statsHandler::viewAchievements)),
+                Map.entry("13", () -> safeDispatch(profileHandler::viewAllNotes)),
+                Map.entry("14", () -> safeDispatch(profileHandler::viewProfileScore)),
+                Map.entry("15", () -> safeDispatch(safetyHandler::verifyProfile)),
+                Map.entry("16", () -> safeDispatch(matchingHandler::browseWhoLikedMe)),
+                Map.entry("17", () -> safeDispatch(messagingHandler::showConversations)),
+                Map.entry("18", () -> safeDispatch(matchingHandler::viewNotifications)),
+                Map.entry("19", () -> safeDispatch(matchingHandler::viewPendingRequests)),
+                Map.entry("20", () -> safeDispatch(matchingHandler::viewStandouts)),
+                Map.entry("0", () -> {
+                    logInfo("\n👋 Goodbye!\n");
+                    return MainMenuRegistry.DispatchResult.EXIT;
+                })));
+    }
+
+    private static MainMenuRegistry.DispatchResult browseCandidatesWithLocationGate(
+            InputReader inputReader,
+            AppSession session,
+            MatchingHandler matchingHandler,
+            ProfileHandler profileHandler) {
+        User currentUser = session.getCurrentUser();
+        if (currentUser == null) {
+            logInfo("Please select a user first (option 1 or 2).");
+            return MainMenuRegistry.DispatchResult.CONTINUE;
+        }
+
+        if (!currentUser.hasLocationSet()) {
+            logInfo("\n⚠️  Browsing candidates requires a profile location.");
+            logInfo("Set your location in your profile so distance matching can work correctly.");
+            String response = inputReader.readLine("Open profile completion now? (y/N): ");
+            if (isAffirmative(response)) {
+                return safeDispatch(profileHandler::completeProfile);
+            }
+            logInfo("Browse canceled. You can set location later via option 3 (Complete my profile).");
+            return MainMenuRegistry.DispatchResult.CONTINUE;
+        }
+
+        return safeDispatch(matchingHandler::browseCandidates);
+    }
+
+    private static boolean isAffirmative(String value) {
+        if (value == null) {
+            return false;
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return "y".equals(normalized) || "yes".equals(normalized);
+    }
+
+    private static void printMenu(
+            ServiceRegistry services,
+            AppSession session,
+            MainMenuRegistry menuRegistry,
+            MainMenuRegistry.MenuRenderContext menuRenderContext) {
         logInfo(CliTextAndInput.SEPARATOR_LINE);
         logInfo("         DATING APP - PHASE 0.5");
         logInfo(CliTextAndInput.SEPARATOR_LINE);
@@ -182,29 +247,9 @@ public final class Main {
             logInfo("  Current User: [None]");
         }
         logInfo("───────────────────────────────────────");
-        logInfo("  1. Create new user");
-        logInfo("  2. Select existing user");
-        logInfo("  3. Complete my profile");
-        logInfo("  4. Browse candidates");
-        logInfo("  5. View my matches");
-        logInfo("  6. 🚫 Block a user");
-        logInfo("  7. ⚠️  Report a user");
-        logInfo("  8. 🔓 Manage blocked users");
-        logInfo("  9. 🎯 Set dealbreakers");
-        logInfo("  10. 📊 View my statistics");
-        logInfo("  11. 👤 Preview my profile");
-        logInfo("  12. 🏆 View achievements");
-        logInfo("  13. 📝 My profile notes");
-        logInfo("  14. 📊 Profile completion score");
-        logInfo("  15. ✅ Verify my profile");
-        logInfo("  16. 💌 Who liked me");
-        int unreadCount = messagingHandler.getTotalUnreadCount();
-        String unreadStr = unreadCount > 0 ? " (" + unreadCount + " new)" : "";
-        logInfo("  17. 💬 Conversations{}", unreadStr);
-        logInfo("  18. 🔔 Notifications");
-        logInfo("  19. 🤝 Friend Requests");
-        logInfo("  20. 🌟 View Standouts");
-        logInfo("  0. Exit");
+        for (String line : menuRegistry.renderOptionLines(menuRenderContext)) {
+            logInfo(line);
+        }
         logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
     }
 }

@@ -346,29 +346,8 @@ public final class NavigationService {
         return rootStack;
     }
 
-    /**
-     * @deprecated Prefer {@link #setNavigationContext(ViewType, Object)} to scope context by target
-     *     view and prevent accidental cross-screen consumption.
-     */
-    @SuppressWarnings("java:S1133")
-    @Deprecated(forRemoval = false)
-    public void setNavigationContext(Object context) {
-        setNavigationContext(null, context);
-    }
-
     public void setNavigationContext(ViewType targetView, Object context) {
         this.navigationContext.set(new NavigationContextEnvelope(targetView, context));
-    }
-
-    /**
-     * @deprecated Prefer {@link #consumeNavigationContext(ViewType, Class)} for type-safe,
-     *     target-scoped context consumption.
-     */
-    @SuppressWarnings("java:S1133")
-    @Deprecated(forRemoval = false)
-    public Object consumeNavigationContext() {
-        NavigationContextEnvelope envelope = navigationContext.getAndSet(null);
-        return envelope != null ? envelope.payload : null;
     }
 
     public <T> Optional<T> consumeNavigationContext(ViewType consumerView, Class<T> expectedType) {
