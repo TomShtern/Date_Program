@@ -87,8 +87,8 @@
         <StackPane>
           <FontIcon iconLiteral="mdi2m-magnify-close" iconSize="72" iconColor="#64748b"/>
         </StackPane>
-        <Label styleClass="empty-state-heading" text="No more people around you!"/>
-        <Label styleClass="empty-state-body" wrapText="true" maxWidth="350"
+        <Label fx:id="noCandidatesHeading" styleClass="empty-state-heading" text="No more people around you!"/>
+        <Label fx:id="noCandidatesBody" styleClass="empty-state-body" wrapText="true" maxWidth="350"
                                                        text="You've seen everyone nearby. Try expanding your search or check back later!"/>
         <!-- Separator -->
         <Region styleClass="matches-separator" prefHeight="1" prefWidth="200">

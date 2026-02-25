@@ -105,7 +105,8 @@ class RelationshipHandlerTest {
                 recService,
                 communicationStorage,
                 session,
-                inputReader);
+                inputReader,
+                null); // profileCompleteCallback is optional (nullable) — not needed in tests
         return new MatchingHandler(deps);
     }
 

@@ -80,6 +80,12 @@ public class MatchingController extends BaseController implements Initializable 
     private VBox noCandidatesContainer;
 
     @FXML
+    private Label noCandidatesHeading;
+
+    @FXML
+    private Label noCandidatesBody;
+
+    @FXML
     private Button undoButton;
 
     @FXML
@@ -137,6 +143,17 @@ public class MatchingController extends BaseController implements Initializable 
         addSubscription(viewModel.matchedUserProperty().subscribe(user -> {
             if (user != null) {
                 showMatchPopup(user, viewModel.lastMatchProperty().get());
+            }
+        }));
+
+        // Update empty-state text when location is missing vs. genuinely no candidates
+        addSubscription(viewModel.locationMissingProperty().subscribe(locationMissing -> {
+            if (locationMissing) {
+                noCandidatesHeading.setText("Location not set");
+                noCandidatesBody.setText("Add your location in your profile to discover people near you.");
+            } else {
+                noCandidatesHeading.setText("No more people around you!");
+                noCandidatesBody.setText("You've seen everyone nearby. Try expanding your search or check back later!");
             }
         }));
 

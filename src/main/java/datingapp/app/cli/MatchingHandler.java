@@ -63,6 +63,7 @@ public class MatchingHandler implements LoggingSupport {
     private final CommunicationStorage communicationStorage;
     private final AppSession session;
     private final InputReader inputReader;
+    private final Runnable profileCompleteCallback; // nullable; invoked when location is missing
 
     public MatchingHandler(Dependencies dependencies) {
         this.candidateFinderService = dependencies.candidateFinderService();
@@ -80,6 +81,7 @@ public class MatchingHandler implements LoggingSupport {
         this.communicationStorage = dependencies.communicationStorage();
         this.session = dependencies.userSession();
         this.inputReader = dependencies.inputReader();
+        this.profileCompleteCallback = dependencies.profileCompleteCallback();
     }
 
     @Override
@@ -102,7 +104,8 @@ public class MatchingHandler implements LoggingSupport {
             RecommendationService standoutsService,
             CommunicationStorage communicationStorage,
             AppSession userSession,
-            InputReader inputReader) {
+            InputReader inputReader,
+            Runnable profileCompleteCallback) {
 
         public Dependencies {
             Objects.requireNonNull(candidateFinderService);
@@ -122,7 +125,11 @@ public class MatchingHandler implements LoggingSupport {
             Objects.requireNonNull(inputReader);
         }
 
-        public static Dependencies fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
+        public static Dependencies fromServices(
+                ServiceRegistry services,
+                AppSession session,
+                InputReader inputReader,
+                Runnable profileCompleteCallback) {
             Objects.requireNonNull(services);
             return new Dependencies(
                     services.getCandidateFinder(),
@@ -139,7 +146,12 @@ public class MatchingHandler implements LoggingSupport {
                     services.getRecommendationService(),
                     services.getCommunicationStorage(),
                     session,
-                    inputReader);
+                    inputReader,
+                    profileCompleteCallback);
+        }
+
+        public static Dependencies fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
+            return fromServices(services, session, inputReader, null);
         }
     }
 
@@ -153,6 +165,20 @@ public class MatchingHandler implements LoggingSupport {
             User currentUser = session.getCurrentUser();
             if (currentUser.getState() != UserState.ACTIVE) {
                 logInfo("\n⚠️  You must be ACTIVE to browse candidates. Complete your profile first.\n");
+                return;
+            }
+
+            if (!currentUser.hasLocationSet()) {
+                logInfo("\n⚠️  Your profile location is not set.");
+                logInfo("   Distance-based candidate matching requires your location to find nearby people.\n");
+                if (profileCompleteCallback != null) {
+                    String response = inputReader.readLine("   Would you like to complete your profile now? (y/N): ");
+                    if ("y".equalsIgnoreCase(response.trim())) {
+                        profileCompleteCallback.run();
+                        return;
+                    }
+                }
+                logInfo("   → Go to 'Complete my profile' from the main menu to add your location.\n");
                 return;
             }
 

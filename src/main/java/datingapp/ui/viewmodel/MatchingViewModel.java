@@ -51,6 +51,7 @@ public class MatchingViewModel {
     private final ObjectProperty<User> currentCandidate = new SimpleObjectProperty<>();
     private final BooleanProperty hasMoreCandidates = new SimpleBooleanProperty(false);
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
+    private final BooleanProperty locationMissing = new SimpleBooleanProperty(false);
 
     private final ObjectProperty<List<String>> currentCandidatePhotoUrls = new SimpleObjectProperty<>(List.of());
     private final IntegerProperty currentCandidatePhotoIndex = new SimpleIntegerProperty(0);
@@ -150,6 +151,7 @@ public class MatchingViewModel {
 
         Thread thread = Thread.ofVirtual().name("candidate-refresh").start(() -> {
             List<User> candidates = List.of();
+            boolean locationMissingLocal = false;
             try {
                 logDebug(
                         "Refreshing candidates for user: {} (state={}, isComplete={}, gender={}, interestedIn={})",
@@ -167,6 +169,10 @@ public class MatchingViewModel {
                             user.getState(),
                             user.isComplete());
                     candidates = List.of();
+                } else if (!user.hasLocationSet()) {
+                    logWarn("Current user {} has no location set. Cannot browse candidates.", user.getName());
+                    locationMissingLocal = true;
+                    candidates = List.of();
                 } else {
                     candidates = candidateFinder.findCandidatesForUser(user);
                 }
@@ -181,11 +187,13 @@ public class MatchingViewModel {
             }
 
             List<User> finalCandidates = candidates;
+            boolean finalLocationMissing = locationMissingLocal;
             runOnFx(() -> {
                 if (disposed.get() || refreshGeneration.get() != localGeneration) {
                     return;
                 }
 
+                locationMissing.set(finalLocationMissing);
                 candidateQueue.clear();
                 candidateQueue.addAll(finalCandidates);
                 nextCandidate();
@@ -365,6 +373,10 @@ public class MatchingViewModel {
 
     public BooleanProperty loadingProperty() {
         return loading;
+    }
+
+    public BooleanProperty locationMissingProperty() {
+        return locationMissing;
     }
 
     public ObjectProperty<Match> lastMatchProperty() {

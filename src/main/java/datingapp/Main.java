@@ -78,20 +78,14 @@ public final class Main {
             InputReader inputReader = new InputReader(scanner);
             AppSession session = AppSession.getInstance();
 
-            MatchingHandler matchingHandler =
-                    new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
             ProfileHandler profileHandler = ProfileHandler.fromServices(services, session, inputReader);
+            MatchingHandler matchingHandler = new MatchingHandler(MatchingHandler.Dependencies.fromServices(
+                    services, session, inputReader, profileHandler::completeProfile));
             SafetyHandler safetyHandler = SafetyHandler.fromServices(services, session, inputReader);
             StatsHandler statsHandler = StatsHandler.fromServices(services, session, inputReader);
             MessagingHandler messagingHandler = MessagingHandler.fromServices(services, session, inputReader);
             MainMenuRegistry menuRegistry = createMainMenuRegistry(
-                    inputReader,
-                    session,
-                    matchingHandler,
-                    profileHandler,
-                    safetyHandler,
-                    statsHandler,
-                    messagingHandler);
+                    matchingHandler, profileHandler, safetyHandler, statsHandler, messagingHandler);
 
             logInfo("\n🌹 Welcome to Dating App 🌹\n");
 
@@ -137,8 +131,6 @@ public final class Main {
     }
 
     private static MainMenuRegistry createMainMenuRegistry(
-            InputReader inputReader,
-            AppSession session,
             MatchingHandler matchingHandler,
             ProfileHandler profileHandler,
             SafetyHandler safetyHandler,
@@ -148,9 +140,7 @@ public final class Main {
                 Map.entry("1", () -> safeDispatch(profileHandler::createUser)),
                 Map.entry("2", () -> safeDispatch(profileHandler::selectUser)),
                 Map.entry("3", () -> safeDispatch(profileHandler::completeProfile)),
-                Map.entry(
-                        "4",
-                        () -> browseCandidatesWithLocationGate(inputReader, session, matchingHandler, profileHandler)),
+                Map.entry("4", () -> safeDispatch(matchingHandler::browseCandidates)),
                 Map.entry("5", () -> safeDispatch(matchingHandler::viewMatches)),
                 Map.entry("6", () -> safeDispatch(safetyHandler::blockUser)),
                 Map.entry("7", () -> safeDispatch(safetyHandler::reportUser)),
@@ -171,39 +161,6 @@ public final class Main {
                     logInfo("\n👋 Goodbye!\n");
                     return MainMenuRegistry.DispatchResult.EXIT;
                 })));
-    }
-
-    private static MainMenuRegistry.DispatchResult browseCandidatesWithLocationGate(
-            InputReader inputReader,
-            AppSession session,
-            MatchingHandler matchingHandler,
-            ProfileHandler profileHandler) {
-        User currentUser = session.getCurrentUser();
-        if (currentUser == null) {
-            logInfo("Please select a user first (option 1 or 2).");
-            return MainMenuRegistry.DispatchResult.CONTINUE;
-        }
-
-        if (!currentUser.hasLocationSet()) {
-            logInfo("\n⚠️  Browsing candidates requires a profile location.");
-            logInfo("Set your location in your profile so distance matching can work correctly.");
-            String response = inputReader.readLine("Open profile completion now? (y/N): ");
-            if (isAffirmative(response)) {
-                return safeDispatch(profileHandler::completeProfile);
-            }
-            logInfo("Browse canceled. You can set location later via option 3 (Complete my profile).");
-            return MainMenuRegistry.DispatchResult.CONTINUE;
-        }
-
-        return safeDispatch(matchingHandler::browseCandidates);
-    }
-
-    private static boolean isAffirmative(String value) {
-        if (value == null) {
-            return false;
-        }
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-        return "y".equals(normalized) || "yes".equals(normalized);
     }
 
     private static void printMenu(
