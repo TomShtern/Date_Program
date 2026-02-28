@@ -78,38 +78,58 @@ You are operating in an environment where ast-grep is installed. For any code se
 
 ```text
 datingapp/
-  Main.java                         # CLI entry point
+  Main.java
   app/
-    bootstrap/ApplicationStartup.java
-    cli/{CliTextAndInput, MatchingHandler, MessagingHandler, ProfileHandler, SafetyHandler, StatsHandler}.java
     api/RestApiServer.java
+    bootstrap/ApplicationStartup.java
+    cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
+    usecase/
+      common/{UseCaseError,UseCaseResult,UserContext}.java
+      matching/MatchingUseCases.java
+      messaging/MessagingUseCases.java
+      profile/ProfileUseCases.java
+      social/SocialUseCases.java
   core/
-    AppClock, AppConfig, AppSession, EnumSetUtil, LoggingSupport, PerformanceMonitor, ServiceRegistry, TextUtil
-    model/{User, Match, ProfileNote}
-    matching/{CandidateFinder, CompatibilityScoring, MatchingService, MatchQualityService, RecommendationService, TrustSafetyService, UndoService, Standout, LifestyleMatcher}
-    connection/{ConnectionModels, ConnectionService}
-    profile/{ProfileService, ValidationService, MatchPreferences}
-    metrics/{ActivityMetricsService, EngagementDomain, SwipeState}
-    storage/{UserStorage, InteractionStorage, CommunicationStorage, AnalyticsStorage, TrustSafetyStorage}
+    AppClock,AppConfig,AppSession,EnumSetUtil,LoggingSupport,PerformanceMonitor,ServiceRegistry,TextUtil
+    model/{User,Match,ProfileNote}
+    connection/{ConnectionModels,ConnectionService}
+    matching/{CandidateFinder,CompatibilityScoring,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}
+    metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
+    profile/{MatchPreferences,ProfileService,ValidationService}
+    storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
   storage/
-    DatabaseManager, StorageFactory
-    jdbi/{JdbiUserStorage, JdbiMatchmakingStorage, JdbiConnectionStorage, JdbiMetricsStorage, JdbiTrustSafetyStorage, JdbiTypeCodecs}
-    schema/{SchemaInitializer, MigrationRunner}
+    DatabaseManager.java
+    StorageFactory.java
+    jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
+    schema/{MigrationRunner,SchemaInitializer}.java
   ui/
-    DatingApp, NavigationService, UiComponents, UiFeedbackService, UiConstants, UiAnimations, ImageCache, UiUtils
-    screen/{BaseController + 10 screen controllers + MilestonePopupController}
-    popup/{MatchPopupController, MilestonePopupController}
-    viewmodel/{10 ViewModels + ViewModelFactory + ViewModelErrorSink + UiDataAdapters}
+    DatingApp,NavigationService,ImageCache,UiAnimations,UiComponents,UiConstants,UiFeedbackService,UiUtils
+    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
+    popup/{MatchPopupController,MilestonePopupController}
+    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,PreferencesController,ProfileController,SocialController,StandoutsController,StatsController}
+    viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,PreferencesViewModel,ProfileViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
 ```
 
-## Entry Points (current)
+## Critical correctness rules
+
+1. Use nested model enums from owners:
+   - `User.Gender`, `User.UserState`, `User.VerificationMethod`
+   - `Match.MatchState`, `Match.MatchArchiveReason`
+2. `ProfileNote` is standalone: `datingapp.core.model.ProfileNote`.
+3. Use `AppClock.now()` in domain/service logic (not `Instant.now()`).
+4. Use deterministic pair IDs (`generateId(UUID a, UUID b)`) for two-user aggregates.
+5. Service business failures should return result records when provided (do not throw flow exceptions).
+6. ViewModels should use shared async abstractions in `ui/async` instead of ad-hoc thread/lifecycle patterns.
+7. ViewModels must use `UiDataAdapters` interfaces (avoid direct `core.storage` imports).
+
+## Entrypoint wiring
 
 ```java
-// Shared initialization for CLI + JavaFX
+// Shared bootstrap
 ServiceRegistry services = ApplicationStartup.initialize();
 AppSession session = AppSession.getInstance();
 
-// CLI wiring in Main.java (service-based helper construction)
+// CLI in Main.java
 InputReader inputReader = new CliTextAndInput.InputReader(scanner);
 MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
 ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
@@ -117,182 +137,45 @@ SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader
 StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
 MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);
 
-// JavaFX wiring in DatingApp.java
+// JavaFX in DatingApp.java
 ViewModelFactory vmFactory = new ViewModelFactory(services);
 NavigationService nav = NavigationService.getInstance();
 nav.setViewModelFactory(vmFactory);
 nav.initialize(primaryStage);
 ```
 
-## Domain Model Reality Check
-
-| Model / Enum                                               | Location                                | Notes                                                                                 |
-|------------------------------------------------------------|-----------------------------------------|---------------------------------------------------------------------------------------|
-| `User`                                                     | `core/model/User.java`                  | Mutable entity + `StorageBuilder` + `touch()` + soft-delete + nested enums            |
-| `Match`                                                    | `core/model/Match.java`                 | Mutable entity + deterministic ID + state transitions + nested enums                  |
-| `ProfileNote`                                              | `core/model/ProfileNote.java`           | Standalone immutable record (not nested in `User`)                                    |
-| `User.Gender`, `User.UserState`, `User.VerificationMethod` | `core/model/User.java`                  | Public nested user domain types                                                       |
-| `Match.MatchState`, `Match.MatchArchiveReason`             | `core/model/Match.java`                 | Public nested match domain types                                                      |
-| `ConnectionModels.*`                                       | `core/connection/ConnectionModels.java` | `Message`, `Conversation`, `Like`, `Block`, `Report`, `FriendRequest`, `Notification` |
-
-**Deterministic ID rule (always):**
-```java
-public static String generateId(UUID a, UUID b) {
-    return a.toString().compareTo(b.toString()) < 0 ? a + "_" + b : b + "_" + a;
-}
-```
-
-## JavaFX + MVVM Patterns You Should Follow
-
-### ViewModel creation and caching
-- `ui/viewmodel/ViewModelFactory.java` owns lazy singleton ViewModels.
-- FXML controller creation flows through `createController(...)` factory mapping.
-
-### Error propagation pattern
-```java
-// ViewModel side
-private ViewModelErrorSink errorHandler;
-public void setErrorHandler(ViewModelErrorSink handler) { this.errorHandler = handler; }
-
-// Controller side
-viewModel.setErrorHandler(UiFeedbackService::showError);
-```
-
-### Base controller lifecycle
-- All screen controllers extend `ui/screen/BaseController`.
-- Register listeners via `addSubscription(...)`.
-- Register overlays via `registerOverlay(...)`.
-- Track long-running animations via `trackAnimation(...)`.
-- Cleanup is centralized in `cleanup()`.
-
-### Navigation context handoff
-```java
-navigationService.setNavigationContext(payload);
-navigationService.navigateTo(ViewType.CHAT);
-
-Object context = navigationService.consumeNavigationContext();
-```
-
-### Threading in ViewModels
-- Use `Thread.ofVirtual()` for background work.
-- Use `Platform.runLater(...)` for UI-bound property updates.
-
-## Build / Test / Quality Commands
+## Build / test / quality commands
 
 ```bash
 mvn compile && mvn exec:exec
 mvn javafx:run
-
-# test workflow
 mvn test
 mvn -Ptest-output-verbose test
-mvn -Ptest-output-verbose -Dtest=StatsHandlerTest test
-mvn -Ptest-output-verbose -Dtest="StatsHandlerTest#displaysUnlockedAchievements" test
-
-# required pre-commit gate
-mvn spotless:apply && mvn verify
+mvn spotless:apply verify
 ```
 
-## Maven / Tooling Facts That Matter
+## Build constraints from pom.xml
 
-- Compiler release: `25` with `--enable-preview`.
-- Surefire argLine includes preview + native access flags.
-- JavaFX plugin runs `datingapp.ui.DatingApp` with preview/native-access options.
-- Spotless uses **Palantir Java Format** (`2.85.0`) and runs check in `verify`.
-- Checkstyle is enforced in `validate` (140-char limit + strict naming/braces rules).
-- PMD check runs in `verify` using `pmd-rules.xml`.
-- JaCoCo check in `verify` enforces bundle line coverage >= `0.60`.
+- Java release 25 + preview enabled
+- Spotless (Palantir Java Format) checked on `verify`
+- Checkstyle in `validate`
+- PMD in `verify`
+- JaCoCo line coverage check in `verify` (minimum 0.60)
 
-## Test Patterns (current)
+## Never do these
 
-Use `TestStorages` (no Mockito):
-```java
-var userStorage = new TestStorages.Users();
-var interactionStorage = new TestStorages.Interactions();
-var commStorage = new TestStorages.Communications();
-var analyticsStorage = new TestStorages.Analytics();
-var trustSafetyStorage = new TestStorages.TrustSafety();
-```
+- Import framework/DB APIs into `core/`
+- Use removed names (`AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`)
+- Import removed standalone enums (`core.model.Gender`, etc.)
+- Return mutable internal collections directly
+- Forget `touch()` behavior on mutable domain setter updates
+- Use `Instant.now()` for domain/service timestamps
 
-Utilities:
-- `TestClock.setFixed(...)` / `TestClock.reset()` for deterministic time.
-- `TestUserFactory` for quick user fixture creation.
+## Tooling preference
 
-## Core Patterns You Should Prefer
+You are operating in an environment where ast-grep is installed.
+For syntax/structure code search, default to:
 
-### Storage reconstruction
-```java
-User user = User.StorageBuilder.create(id, name, createdAt)
-    .bio(bio)
-    .birthDate(birthDate)
-    .gender(gender)
-    .build();
-```
+`ast-grep --lang java -p '<pattern>'`
 
-### Services return structured results
-```java
-return SendResult.failure("Cannot message: no active match", SendResult.ErrorCode.NO_ACTIVE_MATCH);
-```
-
-### EnumSet defensive handling
-```java
-this.interestedIn = EnumSetUtil.safeCopy(interestedIn, Gender.class);
-return EnumSetUtil.safeCopy(interestedIn, Gender.class);
-```
-
-### Mutable entity touch pattern
-```java
-private void touch() { this.updatedAt = AppClock.now(); }
-```
-
-### ViewModel storage decoupling
-- ViewModels depend on `UiDataAdapters` interfaces (`UiUserStore`, `UiMatchDataAccess`, `UiSocialDataAccess`).
-- Adapter implementations bridge to `core.storage` in `ViewModelFactory`.
-
-## JDBI Layer Conventions
-
-- Prefer `JdbiTypeCodecs.SqlRowReaders.*` for null-safe ResultSet reads.
-- `JdbiUserStorage.ALL_COLUMNS` style constants reduce SQL column drift.
-- Build domain objects through storage builders (e.g., `User.StorageBuilder`) in mappers.
-
-## VS Code Java LS Stability (Important)
-
-- Keep `target/**` excluded from file/search/watch noise, but not from Java project resource filters.
-- `.vscode/tasks.json` includes:
-  - `Set UTF-8 Console`
-  - `Ensure Maven Output Dirs` (runs on folder open)
-- If diagnostics look stale but Maven compiles:
-  1. Run `mvn compile`
-  2. Run **Java: Clean Java Language Server Workspace**
-  3. Restart VS Code Java LS
-
-## NEVER Do These
-
-- ❌ Import framework/DB APIs into `core/` domain/service code.
-- ❌ Use removed architecture names (`AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`, `ScoringConstants`).
-- ❌ Import removed standalone model enums (`core.model.Gender`, `UserState`, `VerificationMethod`, `MatchState`, `MatchArchiveReason`).
-- ❌ Throw business-flow exceptions from service operations when result records exist.
-- ❌ Return mutable internal collections directly.
-- ❌ Forget `touch()` in mutable entity setters.
-- ❌ Use `Instant.now()` in domain logic where `AppClock.now()` is expected.
-- ❌ Import `core.storage.*` directly into ViewModels (use `UiDataAdapters` interfaces).
-
-## Known Limitations (intentional / accepted)
-
-- Cross-storage writes in parts of `ConnectionService` are not fully transactional.
-- Undo state is in-memory and does not survive restart.
-- ViewModel instances are cached singletons within `ViewModelFactory` by design.
-- Recommendation daily picks use in-memory LRU caching (`MAX_CACHED_PICKS=1000`).
-
-## Docs Worth Consulting
-
-> Docs may lag. Always verify against `src/main/java` and `pom.xml` first.
-
-| Doc                                    | Purpose                                    |
-|----------------------------------------|--------------------------------------------|
-| `AGENTS.md`                            | Comprehensive standards and patterns       |
-| `CLAUDE.md`                            | Project-specific rules and updated gotchas |
-| `docs/architecture.md`                 | High-level architecture diagrams           |
-| `docs/core-module-overview.md`         | Core module orientation                    |
-| `docs/storage-module-overview.md`      | Storage + schema details                   |
-| `CONSOLIDATED_CODE_REVIEW_FINDINGS.md` | Historical review findings                 |
+Use plain text search only when text-level search is explicitly needed.

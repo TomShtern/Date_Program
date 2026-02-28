@@ -10,156 +10,127 @@
 # 6) if uncertain to auto-edit, append TODO+ChangeStamp next to nearest heading.
 <!--/AGENT-DOCSYNC-->
 
-
-
 # Dating App
 
-A modern dating application built with **Clean Architecture** principles, featuring both a JavaFX graphical interface and a command-line interface.
+A Java 25 dating application with shared domain logic and three adapters:
 
-## ✨ Features
+- CLI (`Main.java` + `app/cli/*`)
+- JavaFX desktop UI (`ui/*`)
+- REST API (`app/api/RestApiServer.java`)
 
-- **User Profiles** — Complete profile management with state machine (Incomplete → Active ↔ Paused → Banned)
-- **Smart Matching** — Bidirectional preference filtering with distance, age, and dealbreaker support
-- **Match System** — Deterministic match IDs, match quality scoring, and relationship transitions
-- **Messaging** — Real-time chat between matched users with read receipts and archival support
-- **Connection Models** — Unified handling of Messages, Likes, Blocks, Reports, and Friend Requests
-- **Statistics & Achievements** — Track activity metrics and unlock achievements
-- **Undo Actions** — Reverse accidental swipes within a configurable window
-- **Daily Picks** — Seeded-random daily recommendations
+## Verified snapshot (source-only)
 
-## 🛠 Tech Stack
+- Java files: **102 main + 77 test = 179 total**
+- Java LOC (`tokei`): **55,616 total / 42,154 code / 11,776 blank / 1,686 comments**
+- Latest full gate run in this repo state: **BUILD SUCCESS**, tests **899/0/0/0**
 
-| Category            | Technology                 | Version                       |
-|---------------------|----------------------------|-------------------------------|
-| **Language**        | Java                       | 25 (preview features enabled) |
-| **UI Framework**    | JavaFX                     | 25.0.2                        |
-| **UI Theme**        | AtlantaFX (Primer-based)   | 2.1.0                         |
-| **Icons**           | Ikonli (Material Design 2) | 12.4.0                        |
-| **Database Access** | JDBI 3 (Declarative SQL)   | 3.51.0                        |
-| **Database**        | H2 (embedded)              | 2.4.240                       |
-| **JSON**            | Jackson                    | 2.21.0                        |
-| **Testing**         | JUnit 5                    | 5.14.2                        |
-| **Logging**         | SLF4J + Logback            | 2.0.17 / 1.5.28               |
-| **Build**           | Maven                      | 3.9+                          |
+## Tech stack
 
-## 🚀 Getting Started
+- Java 25 (preview enabled)
+- JavaFX 25.0.2
+- Maven
+- H2 + JDBI
+- SLF4J + Logback
+- Spotless (Palantir Java Format), Checkstyle, PMD, JaCoCo
 
-### Prerequisites
-
-- **Java 25** (JDK with preview features support)
-- **Maven 3.9+**
-- **Windows 11**: Enable UTF-8 encoding (see [Windows Setup](#-windows-setup))
-
-### Running the Application
-
-#### GUI Mode (JavaFX) — *Recommended*
+## Run locally
 
 ```bash
-mvn javafx:run
-```
-
-#### CLI Mode
-
-```bash
+# CLI
 mvn compile && mvn exec:exec
+
+# JavaFX GUI
+mvn javafx:run
+
+# Tests
+mvn test
+mvn -Ptest-output-verbose test
+
+# Full quality gate
+mvn spotless:apply verify
 ```
 
-## 🧪 Testing
+## Architecture (code-verified)
 
-Run the full test suite:
-
-```bash
-mvn clean test
-```
-
-**800+ tests** covering core domain, services, and storage layers.
-
-## 🛡 Code Quality
-
-| Tool           | Purpose                                | Enforcement          |
-|----------------|----------------------------------------|----------------------|
-| **Spotless**   | Code formatting (Palantir Java Format) | Blocking on `verify` |
-| **Checkstyle** | Style validation                       | Blocking on `verify` |
-| **PMD**        | Bug & code smell detection             | Blocking on `verify` |
-| **JaCoCo**     | Test coverage (60% min on `core/`)     | Blocking on `verify` |
-
-### Commands
-
-```bash
-# Format code
-mvn spotless:apply
-
-# Run all checks + tests
-mvn verify
-```
-
-## 🏗 Architecture
-
-```
+```text
 datingapp/
-├── core/           # Pure domain models & business logic (no framework deps)
-│   ├── connection/ # ConnectionModels (Message, Like, Block, etc.)
-│   └── storage/    # Storage interfaces (dependency inversion)
-├── storage/        # JDBI-based persistence (H2 database)
-│   └── jdbi/       # SQLObject implementations
-├── ui/             # JavaFX GUI (MVVM pattern)
-│   ├── controller/ # FXML controllers
-│   └── viewmodel/  # UI state management
-└── app/cli/        # Command-line interface handlers
+  Main.java
+  app/
+    api/RestApiServer.java
+    bootstrap/ApplicationStartup.java
+    cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
+    usecase/
+      common/{UseCaseError,UseCaseResult,UserContext}.java
+      matching/MatchingUseCases.java
+      messaging/MessagingUseCases.java
+      profile/ProfileUseCases.java
+      social/SocialUseCases.java
+  core/
+    AppClock,AppConfig,AppSession,EnumSetUtil,LoggingSupport,PerformanceMonitor,ServiceRegistry,TextUtil
+    model/{User,Match,ProfileNote}
+    connection/{ConnectionModels,ConnectionService}
+    matching/{CandidateFinder,CompatibilityScoring,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}
+    metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
+    profile/{MatchPreferences,ProfileService,ValidationService}
+    storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
+  storage/
+    DatabaseManager.java
+    StorageFactory.java
+    jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
+    schema/{MigrationRunner,SchemaInitializer}.java
+  ui/
+    DatingApp,NavigationService,ImageCache,UiAnimations,UiComponents,UiConstants,UiFeedbackService,UiUtils
+    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
+    popup/{MatchPopupController,MilestonePopupController}
+    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,PreferencesController,ProfileController,SocialController,StandoutsController,StatsController}
+    viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,PreferencesViewModel,ProfileViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
 ```
 
-**Key Principles:**
-- **Core stays pure** — Only `java.*` imports in domain layer.
-- **Manual DI** — `ServiceRegistry` pattern (no Spring/framework annotations).
-- **Fail-fast validation** — Constructor validation with `Objects.requireNonNull`.
-- **Phase 2.1 Architecture** — Consolidated domain models and streamlined storage interfaces.
+## Entrypoint wiring
 
-## 💾 Database
+```java
+// shared bootstrap
+ServiceRegistry services = ApplicationStartup.initialize();
+AppSession session = AppSession.getInstance();
 
-Embedded H2 database stored at `./data/dating.mv.db`
+// CLI
+InputReader inputReader = new CliTextAndInput.InputReader(scanner);
+MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
+ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
+SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
+StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
+MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);
 
-| Setting      | Value                                                           |
-|--------------|-----------------------------------------------------------------|
-| **User**     | `sa`                                                            |
-| **Password** | Environment variable `DATING_APP_DB_PASSWORD` or default: `dev` |
-
-> **Note:** In production, use the environment variable for password management.
-
-## 📚 Documentation
-
-| Document               | Description                                     |
-|------------------------|-------------------------------------------------|
-| [GEMINI.md](GEMINI.md) | AI agent operational context & coding standards |
-| [STATUS.md](STATUS.md) | Implementation status vs Product Requirements   |
-| [docs/](docs/)         | Additional documentation and completed plans    |
-
-## 📈 Project Statistics
-
-| Metric            | Value                            |
-|-------------------|----------------------------------|
-| **Java Files**    | ~139 (Main + Test)               |
-| **Lines of Code** | ~45K total (~34K code)           |
-| **Test Cases**    | ~802                             |
-| **Core Services** | 9 (+ CandidateFinder utility)    |
-| **GUI Views**     | 10 FXML screens                  |
-| **CLI Handlers**  | 8 command handlers               |
-
-## 🪟 Windows Setup
-
-Enable UTF-8 encoding in PowerShell/CMD for proper emoji display:
-
-```powershell
-chcp 65001
+// JavaFX
+ViewModelFactory vmFactory = new ViewModelFactory(services);
+NavigationService nav = NavigationService.getInstance();
+nav.setViewModelFactory(vmFactory);
+nav.initialize(primaryStage);
 ```
 
-**Permanent fix:**
-1. Run `intl.cpl`
-2. Administrative → Change system locale
-3. Check "Beta: Use Unicode UTF-8 for worldwide language support"
-4. Restart
+## Build constraints (`pom.xml`)
 
+- Java release 25 + preview flags enabled
+- Spotless check in `verify`
+- Checkstyle in `validate`
+- PMD in `verify`
+- JaCoCo line coverage check in `verify` with minimum `0.60`
 
+## Core domain ownership rules
 
+- Use nested enums from owner models:
+  - `User.Gender`, `User.UserState`, `User.VerificationMethod`
+  - `Match.MatchState`, `Match.MatchArchiveReason`
+- `ProfileNote` is standalone: `datingapp.core.model.ProfileNote`
+- Use `AppClock.now()` in domain/service code, not `Instant.now()`
+- Use deterministic pair IDs (`generateId(UUID a, UUID b)`) for two-user aggregates
+
+## Related docs
+
+- `AGENTS.md` - development standards
+- `CLAUDE.md` - coding and architecture guardrails
+- `.github/copilot-instructions.md` - Copilot repository guidance
+- `architecture.md` - detailed architecture overview
 
 ## Agent Changelog (append-only)
 ---AGENT-LOG-START---
@@ -169,4 +140,5 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 1|2026-01-30 20:45:00|agent:antigravity|docs|Complete README rewrite: updated title, tech stack, architecture, test count (99→576), formatting tool (Google→Palantir), added GUI docs, removed stale Recent Changes|README.md
 2|2026-02-08 11:15:00|agent:claude_code|docs|Fixed stale CLI commands (removed shade/fat JAR), updated stats (182 files, 820 tests, 8 handlers), Checkstyle+PMD now blocking|README.md
 3|2026-02-19 20:30:00|agent:gemini|docs|Updated README to reflect Java 25, Phase 2.1 architecture, and latest file counts|README.md
+4|2026-02-28 13:35:00|agent:github_copilot|docs-source-truth-sync|Rewrote README from current source: 179 Java files, ui/async + app/usecase layers, updated entry wiring and quality gates|README.md
 ---AGENT-LOG-END---
