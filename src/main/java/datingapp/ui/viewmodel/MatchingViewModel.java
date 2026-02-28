@@ -2,6 +2,14 @@ package datingapp.ui.viewmodel;
 
 import static datingapp.core.matching.CandidateFinder.GeoUtils.distanceKm;
 
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.matching.MatchingUseCases;
+import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.UndoSwipeCommand;
+import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
+import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.matching.CandidateFinder;
@@ -45,6 +53,8 @@ public class MatchingViewModel {
     private final MatchingService matchingService;
     private final UndoService undoService;
     private final TrustSafetyService trustSafetyService;
+    private final MatchingUseCases matchingUseCases;
+    private final SocialUseCases socialUseCases;
     private final AppSession session;
 
     private final Queue<User> candidateQueue = new ConcurrentLinkedQueue<>();
@@ -82,6 +92,8 @@ public class MatchingViewModel {
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
         this.undoService = Objects.requireNonNull(undoService, "undoService cannot be null");
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
+        this.matchingUseCases = new MatchingUseCases(this.candidateFinder, this.matchingService, this.undoService);
+        this.socialUseCases = new SocialUseCases(this.trustSafetyService);
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
@@ -161,20 +173,23 @@ public class MatchingViewModel {
                         user.getGender(),
                         user.getInterestedIn());
 
-                // Check if current user is ACTIVE - otherwise they cannot browse
-                if (user.getState() != UserState.ACTIVE) {
-                    logWarn(
-                            "Current user {} is NOT ACTIVE (state={}). Cannot browse candidates. Profile complete: {}",
-                            user.getName(),
-                            user.getState(),
-                            user.isComplete());
-                    candidates = List.of();
-                } else if (!user.hasLocationSet()) {
-                    logWarn("Current user {} has no location set. Cannot browse candidates.", user.getName());
-                    locationMissingLocal = true;
-                    candidates = List.of();
+                var browseResult = matchingUseCases.browseCandidates(
+                        new BrowseCandidatesCommand(UserContext.ui(user.getId()), user));
+                if (browseResult.success()) {
+                    candidates = browseResult.data().candidates();
+                    locationMissingLocal = browseResult.data().locationMissing();
                 } else {
-                    candidates = candidateFinder.findCandidatesForUser(user);
+                    if (user.getState() != UserState.ACTIVE) {
+                        logWarn(
+                                "Current user {} is NOT ACTIVE (state={}). Cannot browse candidates. Profile complete: {}",
+                                user.getName(),
+                                user.getState(),
+                                user.isComplete());
+                    } else {
+                        logWarn(
+                                "Failed to refresh candidates: {}",
+                                browseResult.error().message());
+                    }
                 }
                 logDebug("Found {} candidates after filtering", candidates.size());
 
@@ -242,20 +257,22 @@ public class MatchingViewModel {
 
         logInfo("User {} {} candidate {}", currentUser.getName(), liked ? "liked" : "passed", candidate.getName());
 
-        MatchingService.SwipeResult result = matchingService.processSwipe(currentUser, candidate, liked);
+        var result = matchingUseCases.processSwipe(
+                new ProcessSwipeCommand(UserContext.ui(currentUser.getId()), currentUser, candidate, liked, false));
 
         if (!result.success()) {
-            logWarn("Swipe failed: {}", result.message());
+            logWarn("Swipe failed: {}", result.error().message());
             // UI handles daily limit messaging elsewhere; no further action here.
             return;
         }
+        MatchingService.SwipeResult swipeResult = result.data();
 
         lastSwipedCandidate = candidate;
 
         // Check for a match and notify UI
-        if (result.matched()) {
+        if (swipeResult.matched()) {
             logInfo("IT'S A MATCH! {} matched with {}", currentUser.getName(), candidate.getName());
-            lastMatch.set(result.match());
+            lastMatch.set(swipeResult.match());
             matchedUser.set(candidate);
         }
 
@@ -271,7 +288,7 @@ public class MatchingViewModel {
             logInfo(
                     "Undoing swipe on {}",
                     lastSwipedCandidate != null ? lastSwipedCandidate.getName() : "previous candidate");
-            UndoService.UndoResult result = undoService.undo(currentUser.getId());
+            var result = matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.ui(currentUser.getId())));
 
             if (result.success()) {
                 // Return last candidate to view
@@ -421,7 +438,7 @@ public class MatchingViewModel {
         }
         Thread.ofVirtual().start(() -> {
             try {
-                trustSafetyService.block(user.getId(), targetId);
+                socialUseCases.blockUser(new RelationshipCommand(UserContext.ui(user.getId()), targetId));
                 // After blocking, advance to next candidate
                 runOnFx(this::nextCandidate);
             } catch (Exception e) {
@@ -437,7 +454,8 @@ public class MatchingViewModel {
         }
         Thread.ofVirtual().start(() -> {
             try {
-                trustSafetyService.report(user.getId(), targetId, reason, description, blockUser);
+                socialUseCases.reportUser(
+                        new ReportCommand(UserContext.ui(user.getId()), targetId, reason, description, blockUser));
                 if (blockUser) {
                     runOnFx(this::nextCandidate);
                 }

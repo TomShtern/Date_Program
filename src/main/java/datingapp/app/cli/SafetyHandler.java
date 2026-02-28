@@ -1,6 +1,10 @@
 package datingapp.app.cli;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
+import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
@@ -29,6 +33,7 @@ public class SafetyHandler implements LoggingSupport {
 
     private final UserStorage userStorage;
     private final TrustSafetyService trustSafetyService;
+    private final SocialUseCases socialUseCases;
     private final AppSession session;
     private final InputReader inputReader;
 
@@ -37,15 +42,30 @@ public class SafetyHandler implements LoggingSupport {
             TrustSafetyService trustSafetyService,
             AppSession session,
             InputReader inputReader) {
+        this(userStorage, trustSafetyService, new SocialUseCases(trustSafetyService), session, inputReader);
+    }
+
+    public SafetyHandler(
+            UserStorage userStorage,
+            TrustSafetyService trustSafetyService,
+            SocialUseCases socialUseCases,
+            AppSession session,
+            InputReader inputReader) {
         this.userStorage = Objects.requireNonNull(userStorage);
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
+        this.socialUseCases = Objects.requireNonNull(socialUseCases);
         this.session = Objects.requireNonNull(session);
         this.inputReader = Objects.requireNonNull(inputReader);
     }
 
     public static SafetyHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
         Objects.requireNonNull(services, "services cannot be null");
-        return new SafetyHandler(services.getUserStorage(), services.getTrustSafetyService(), session, inputReader);
+        return new SafetyHandler(
+                services.getUserStorage(),
+                services.getTrustSafetyService(),
+                services.getSocialUseCases(),
+                session,
+                inputReader);
     }
 
     @Override
@@ -73,11 +93,12 @@ public class SafetyHandler implements LoggingSupport {
             String confirm = inputReader.readLine(
                     CliTextAndInput.BLOCK_PREFIX + toBlock.getName() + CliTextAndInput.CONFIRM_SUFFIX);
             if ("y".equalsIgnoreCase(confirm)) {
-                TrustSafetyService.BlockResult result = trustSafetyService.block(currentUser.getId(), toBlock.getId());
+                var result = socialUseCases.blockUser(
+                        new RelationshipCommand(UserContext.cli(currentUser.getId()), toBlock.getId()));
                 if (result.success()) {
                     logInfo("🚫 Blocked {}.\n", toBlock.getName());
                 } else {
-                    logInfo("❌ {}\n", result.errorMessage());
+                    logInfo("❌ {}\n", result.error().message());
                 }
             } else {
                 logInfo(CliTextAndInput.CANCELLED);
@@ -121,8 +142,8 @@ public class SafetyHandler implements LoggingSupport {
                     .toLowerCase(Locale.ROOT);
             boolean blockUser = "y".equals(blockResponse) || "yes".equals(blockResponse);
 
-            TrustSafetyService.ReportResult result =
-                    trustSafetyService.report(currentUser.getId(), toReport.getId(), reason, description, blockUser);
+            var result = socialUseCases.reportUser(new ReportCommand(
+                    UserContext.cli(currentUser.getId()), toReport.getId(), reason, description, blockUser));
 
             handleReportResult(result, toReport);
         });
@@ -219,16 +240,19 @@ public class SafetyHandler implements LoggingSupport {
         return normalized.length() > 500 ? normalized.substring(0, 500) : normalized;
     }
 
-    private void handleReportResult(TrustSafetyService.ReportResult result, User reportedUser) {
-        if (result.success()) {
-            logInfo("\n✅ Report submitted. {} has been blocked.", reportedUser.getName());
-            if (result.userWasBanned()) {
-                logInfo("⚠️  This user has been automatically BANNED due to multiple reports.");
-            }
-            logInfo("");
-        } else {
-            logInfo("\n❌ {}\n", result.errorMessage());
+    private void handleReportResult(
+            datingapp.app.usecase.common.UseCaseResult<TrustSafetyService.ReportResult> result, User reportedUser) {
+        if (!result.success()) {
+            logInfo("\n❌ {}\n", result.error().message());
+            return;
         }
+
+        TrustSafetyService.ReportResult reportResult = result.data();
+        logInfo("\n✅ Report submitted. {} has been blocked.", reportedUser.getName());
+        if (reportResult.userWasBanned()) {
+            logInfo("⚠️  This user has been automatically BANNED due to multiple reports.");
+        }
+        logInfo("");
     }
 
     @Nullable

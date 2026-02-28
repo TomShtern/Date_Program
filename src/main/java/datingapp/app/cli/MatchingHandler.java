@@ -1,6 +1,22 @@
 package datingapp.app.cli;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.matching.MatchingUseCases;
+import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.PendingLikersQuery;
+import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.StandoutInteractionCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.StandoutsQuery;
+import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.FriendRequestAction;
+import datingapp.app.usecase.social.SocialUseCases.FriendRequestsQuery;
+import datingapp.app.usecase.social.SocialUseCases.MarkNotificationReadCommand;
+import datingapp.app.usecase.social.SocialUseCases.NotificationsQuery;
+import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
+import datingapp.app.usecase.social.SocialUseCases.RespondFriendRequestCommand;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
@@ -48,40 +64,44 @@ public class MatchingHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(MatchingHandler.class);
     private static final String ERR_FAILED = "❌ Failed: {}\n";
 
-    private final CandidateFinder candidateFinderService;
     private final MatchingService matchingService;
-    private final InteractionStorage interactionStorage;
     private final RecommendationService dailyService;
     private final UndoService undoService;
     private final MatchQualityService matchQualityService;
     private final UserStorage userStorage;
     private final ProfileService achievementService;
     private final AnalyticsStorage analyticsStorage;
-    private final TrustSafetyService trustSafetyService;
-    private final ConnectionService transitionService;
     private final RecommendationService standoutsService;
-    private final CommunicationStorage communicationStorage;
     private final AppSession session;
     private final InputReader inputReader;
     private final Runnable profileCompleteCallback; // nullable; invoked when location is missing
+    private final MatchingUseCases matchingUseCases;
+    private final SocialUseCases socialUseCases;
 
     public MatchingHandler(Dependencies dependencies) {
-        this.candidateFinderService = dependencies.candidateFinderService();
         this.matchingService = dependencies.matchingService();
-        this.interactionStorage = dependencies.interactionStorage();
         this.dailyService = dependencies.dailyService();
         this.undoService = dependencies.undoService();
         this.matchQualityService = dependencies.matchQualityService();
         this.userStorage = dependencies.userStorage();
         this.achievementService = dependencies.achievementService();
         this.analyticsStorage = dependencies.analyticsStorage();
-        this.trustSafetyService = dependencies.trustSafetyService();
-        this.transitionService = dependencies.transitionService();
         this.standoutsService = dependencies.standoutsService();
-        this.communicationStorage = dependencies.communicationStorage();
         this.session = dependencies.userSession();
         this.inputReader = dependencies.inputReader();
         this.profileCompleteCallback = dependencies.profileCompleteCallback();
+        this.matchingUseCases = new MatchingUseCases(
+                dependencies.candidateFinderService(),
+                this.matchingService,
+                this.dailyService,
+                this.undoService,
+                dependencies.interactionStorage(),
+                this.userStorage,
+                this.matchQualityService);
+        this.socialUseCases = new SocialUseCases(
+                dependencies.transitionService(),
+                dependencies.trustSafetyService(),
+                dependencies.communicationStorage());
     }
 
     @Override
@@ -182,15 +202,21 @@ public class MatchingHandler implements LoggingSupport {
                 return;
             }
 
-            // Check for daily pick first
-            Optional<DailyPick> dailyPick = dailyService.getDailyPick(currentUser);
-            if (dailyPick.isPresent() && !dailyService.hasViewedDailyPick(currentUser.getId())) {
-                showDailyPick(dailyPick.get(), currentUser);
+            var browseResult = matchingUseCases.browseCandidates(
+                    new BrowseCandidatesCommand(UserContext.cli(currentUser.getId()), currentUser));
+            if (!browseResult.success()) {
+                logInfo(ERR_FAILED, browseResult.error().message());
+                return;
+            }
+
+            var browseData = browseResult.data();
+            if (browseData.dailyPick().isPresent() && !browseData.dailyPickViewed()) {
+                showDailyPick(browseData.dailyPick().get(), currentUser);
             }
 
             logInfo("\n" + CliTextAndInput.HEADER_BROWSE_CANDIDATES + "\n");
 
-            List<User> candidates = candidateFinderService.findCandidatesForUser(currentUser);
+            List<User> candidates = browseData.candidates();
 
             if (candidates.isEmpty()) {
                 logInfo("😔 No candidates found. Try again later!\n");
@@ -224,12 +250,13 @@ public class MatchingHandler implements LoggingSupport {
             return false;
         }
 
-        MatchingService.SwipeResult result = matchingService.processSwipe(currentUser, candidate, "l".equals(action));
+        var result = matchingUseCases.processSwipe(new ProcessSwipeCommand(
+                UserContext.cli(currentUser.getId()), currentUser, candidate, "l".equals(action), false));
         if (!result.success()) {
             showDailyLimitReached(currentUser);
             return false;
         }
-        displaySwipeResult(result, candidate, currentUser);
+        displaySwipeResult(result.data(), candidate, currentUser);
         promptUndo(candidate.getName(), currentUser);
         return true;
     }
@@ -292,7 +319,14 @@ public class MatchingHandler implements LoggingSupport {
             logInfo("         YOUR MATCHES");
             logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
 
-            List<Match> matches = interactionStorage.getActiveMatchesFor(currentUser.getId());
+            var matchesResult = matchingUseCases.listActiveMatches(
+                    new MatchingUseCases.ListActiveMatchesQuery(UserContext.cli(currentUser.getId())));
+            if (!matchesResult.success()) {
+                logInfo(ERR_FAILED, matchesResult.error().message());
+                return;
+            }
+            var matchesPayload = matchesResult.data();
+            List<Match> matches = matchesPayload.matches();
 
             if (matches.isEmpty()) {
                 logInfo("😢 No matches yet. Keep swiping!\n");
@@ -304,31 +338,28 @@ public class MatchingHandler implements LoggingSupport {
             for (int i = 0; i < matches.size(); i++) {
                 Match match = matches.get(i);
                 UUID otherUserId = match.getOtherUser(currentUser.getId());
-                User otherUser = userStorage.get(otherUserId).orElse(null);
+                User otherUser = matchesPayload.usersById().get(otherUserId);
                 final int displayIndex = i + 1;
 
                 if (otherUser != null && logger.isInfoEnabled()) {
-                    matchQualityService
-                            .computeQuality(match, currentUser.getId())
-                            .ifPresent(quality -> {
-                                String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
-                                int age = otherUser.getAge(datingapp.core.AppConfig.defaults()
-                                        .safety()
-                                        .userTimeZone());
-                                logInfo(
-                                        "  {}. {} {}{}, {}         {} {}%",
-                                        displayIndex,
-                                        quality.getStarDisplay(),
-                                        otherUser.getName(),
-                                        verifiedBadge,
-                                        age,
-                                        " "
-                                                .repeat(Math.max(
-                                                        0,
-                                                        10 - otherUser.getName().length())),
-                                        quality.compatibilityScore());
-                                logInfo("     \"{}\"", quality.getShortSummary());
-                            });
+                    var qualityResult = matchingUseCases.matchQuality(
+                            new MatchingUseCases.MatchQualityQuery(UserContext.cli(currentUser.getId()), match));
+                    if (qualityResult.success()) {
+                        MatchQuality quality = qualityResult.data();
+                        String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
+                        int age = otherUser.getAge(
+                                datingapp.core.AppConfig.defaults().safety().userTimeZone());
+                        logInfo(
+                                "  {}. {} {}{}, {}         {} {}%",
+                                displayIndex,
+                                quality.getStarDisplay(),
+                                otherUser.getName(),
+                                verifiedBadge,
+                                age,
+                                " ".repeat(Math.max(0, 10 - otherUser.getName().length())),
+                                quality.compatibilityScore());
+                        logInfo("     \"{}\"", quality.getShortSummary());
+                    }
                 }
             }
 
@@ -363,13 +394,13 @@ public class MatchingHandler implements LoggingSupport {
                 logInfo("  Other user not found — user may have been removed.");
                 return;
             }
-            MatchQuality quality = matchQualityService
-                    .computeQuality(match, currentUser.getId())
-                    .orElse(null);
-            if (quality == null) {
+            var qualityResult = matchingUseCases.matchQuality(
+                    new MatchingUseCases.MatchQualityQuery(UserContext.cli(currentUser.getId()), match));
+            if (!qualityResult.success()) {
                 logInfo("  Match quality unavailable — user may have been removed.");
                 return;
             }
+            MatchQuality quality = qualityResult.data();
 
             displayMatchQuality(otherUser, quality);
 
@@ -469,7 +500,8 @@ public class MatchingHandler implements LoggingSupport {
                 String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
                 if ("y".equalsIgnoreCase(confirm)) {
                     logTransitionResult(
-                            transitionService.unmatch(currentUser.getId(), otherUserId),
+                            socialUseCases.unmatch(
+                                    new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUserId)),
                             "✅ Unmatched with " + otherUser.getName() + ".\n");
                 }
             }
@@ -477,25 +509,28 @@ public class MatchingHandler implements LoggingSupport {
                 String confirm = inputReader.readLine(
                         CliTextAndInput.BLOCK_PREFIX + otherUser.getName() + CliTextAndInput.CONFIRM_SUFFIX);
                 if ("y".equalsIgnoreCase(confirm)) {
-                    TrustSafetyService.BlockResult result = trustSafetyService.block(currentUser.getId(), otherUserId);
+                    var result = socialUseCases.blockUser(
+                            new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUserId));
                     if (result.success()) {
                         logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
                     } else {
-                        logInfo("❌ {}\n", result.errorMessage());
+                        logInfo("❌ {}\n", result.error().message());
                     }
                 }
             }
             case "f" -> {
                 logInfo("\nSending Friend Zone request to {}...", otherUser.getName());
                 logTransitionResult(
-                        transitionService.requestFriendZone(currentUser.getId(), otherUserId),
+                        socialUseCases.requestFriendZone(
+                                new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUserId)),
                         "✅ Friend request sent!\n");
             }
             case "g" -> {
                 String confirm = inputReader.readLine("Are you sure you want to exit gracefully? (y/n): ");
                 if ("y".equalsIgnoreCase(confirm)) {
                     logTransitionResult(
-                            transitionService.gracefulExit(currentUser.getId(), otherUserId),
+                            socialUseCases.gracefulExit(
+                                    new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUserId)),
                             "🕊️ Graceful exit successful. Match ended.\n");
                 }
             }
@@ -504,11 +539,11 @@ public class MatchingHandler implements LoggingSupport {
         }
     }
 
-    private void logTransitionResult(ConnectionService.TransitionResult result, String successMessage) {
+    private void logTransitionResult(UseCaseResult<ConnectionService.TransitionResult> result, String successMessage) {
         if (result.success()) {
             logInfo(successMessage);
         } else {
-            logInfo(ERR_FAILED, result.errorMessage());
+            logInfo(ERR_FAILED, result.error().message());
         }
     }
 
@@ -531,11 +566,12 @@ public class MatchingHandler implements LoggingSupport {
 
             String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
             if ("y".equalsIgnoreCase(confirm)) {
-                ConnectionService.TransitionResult result = transitionService.unmatch(currentUser.getId(), otherUserId);
+                var result = socialUseCases.unmatch(
+                        new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUserId));
                 if (result.success()) {
                     logInfo("✅ Unmatched with {}.\n", otherUser.getName());
                 } else {
-                    logInfo(ERR_FAILED, result.errorMessage());
+                    logInfo(ERR_FAILED, result.error().message());
                 }
             } else {
                 logInfo(CliTextAndInput.CANCELLED);
@@ -565,11 +601,12 @@ public class MatchingHandler implements LoggingSupport {
             String confirm = inputReader.readLine(
                     CliTextAndInput.BLOCK_PREFIX + otherUser.getName() + "? This will end your match. (y/n): ");
             if ("y".equalsIgnoreCase(confirm)) {
-                TrustSafetyService.BlockResult result = trustSafetyService.block(currentUser.getId(), otherUserId);
+                var result = socialUseCases.blockUser(
+                        new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUserId));
                 if (result.success()) {
                     logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
                 } else {
-                    logInfo("❌ {}\n", result.errorMessage());
+                    logInfo("❌ {}\n", result.error().message());
                 }
             } else {
                 logInfo(CliTextAndInput.CANCELLED);
@@ -654,16 +691,16 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private void processDailyPickSwipe(DailyPick pick, User currentUser, String action) {
-        dailyService.markDailyPickViewed(currentUser.getId());
         User candidate = pick.user();
-        MatchingService.SwipeResult result = matchingService.processSwipe(currentUser, candidate, "l".equals(action));
+        var result = matchingUseCases.processSwipe(new ProcessSwipeCommand(
+                UserContext.cli(currentUser.getId()), currentUser, candidate, "l".equals(action), true));
         if (!result.success()) {
             showDailyLimitReached(currentUser);
             return;
         }
-        if (result.matched()) {
+        if (result.data().matched()) {
             logInfo("\n🎉🎉🎉 IT'S A MATCH WITH YOUR DAILY PICK! 🎉🎉🎉\n");
-        } else if (result.like().direction() == Like.Direction.LIKE) {
+        } else if (result.data().like().direction() == Like.Direction.LIKE) {
             logInfo("❤️  Liked your daily pick!\n");
         } else {
             logInfo("👋 Passed on daily pick.\n");
@@ -742,7 +779,13 @@ public class MatchingHandler implements LoggingSupport {
                 return;
             }
             logInfo("\n🌟 === TODAY'S STANDOUTS === 🌟\n");
-            RecommendationService.Result result = standoutsService.getStandouts(currentUser);
+            var standoutResult =
+                    matchingUseCases.standouts(new StandoutsQuery(UserContext.cli(currentUser.getId()), currentUser));
+            if (!standoutResult.success()) {
+                logInfo("{}\n", standoutResult.error().message());
+                return;
+            }
+            RecommendationService.Result result = standoutResult.data().result();
             if (result.isEmpty()) {
                 logInfo(result.message() != null ? result.message() : "No standouts available today.");
                 logInfo("\n");
@@ -752,7 +795,10 @@ public class MatchingHandler implements LoggingSupport {
                 logInfo("(Cached from earlier today - refreshes at midnight)\n");
             }
             List<Standout> standouts = result.standouts();
-            Map<UUID, User> users = standoutsService.resolveUsers(standouts);
+            Map<UUID, User> users = standoutResult.data().usersById();
+            if (users.isEmpty()) {
+                users = standoutsService.resolveUsers(standouts);
+            }
             displayStandoutCandidates(standouts, users, result.totalCandidates());
             logInfo("\n[L] Like a standout  [P] Pass  [B] Back to menu");
             String input = inputReader.readLine("\nYour choice: ").toUpperCase(Locale.ROOT);
@@ -801,17 +847,18 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private void processStandoutInteraction(User currentUser, User candidate, boolean isLike) {
-        if (isLike && !dailyService.canLike(currentUser.getId())) {
+        Like.Direction direction = isLike ? Like.Direction.LIKE : Like.Direction.PASS;
+        var likeResult = matchingUseCases.recordLike(
+                new RecordLikeCommand(UserContext.cli(currentUser.getId()), candidate.getId(), direction, true));
+        if (!likeResult.success()) {
             showDailyLimitReached(currentUser);
             return;
         }
-        Like.Direction direction = isLike ? Like.Direction.LIKE : Like.Direction.PASS;
-        Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
-        Optional<Match> matchResult = matchingService.recordLike(like);
 
-        standoutsService.markInteracted(currentUser.getId(), candidate.getId());
+        matchingUseCases.markStandoutInteracted(
+                new StandoutInteractionCommand(UserContext.cli(currentUser.getId()), candidate.getId()));
 
-        if (matchResult.isPresent()) {
+        if (likeResult.data().match().isPresent()) {
             logInfo("\n🎉 IT'S A MATCH with {}! 🎉\n", candidate.getName());
         } else if (isLike) {
             logInfo("✅ Liked {}!\n", candidate.getName());
@@ -839,7 +886,14 @@ public class MatchingHandler implements LoggingSupport {
             return;
         }
 
-        List<FriendRequest> requests = transitionService.getPendingRequestsFor(currentUser.getId());
+        var requestsResult =
+                socialUseCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.cli(currentUser.getId())));
+        if (!requestsResult.success()) {
+            logInfo("{}\n", requestsResult.error().message());
+            return;
+        }
+
+        List<FriendRequest> requests = requestsResult.data();
         if (requests.isEmpty()) {
             logInfo("\nNo pending friend requests.\n");
             return;
@@ -881,11 +935,13 @@ public class MatchingHandler implements LoggingSupport {
 
             if ("a".equals(action)) {
                 logTransitionResult(
-                        transitionService.acceptFriendZone(req.id(), currentUser.getId()),
+                        socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
+                                UserContext.cli(currentUser.getId()), req.id(), FriendRequestAction.ACCEPT)),
                         "✅ You are now friends with " + fromName + "! You can find them in your matches.\n");
             } else if ("d".equals(action)) {
                 logTransitionResult(
-                        transitionService.declineFriendZone(req.id(), currentUser.getId()),
+                        socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
+                                UserContext.cli(currentUser.getId()), req.id(), FriendRequestAction.DECLINE)),
                         "Declined friend request from " + fromName + ".\n");
             }
         } catch (NumberFormatException e) {
@@ -901,7 +957,14 @@ public class MatchingHandler implements LoggingSupport {
             return;
         }
 
-        List<Notification> notifications = communicationStorage.getNotificationsForUser(currentUser.getId(), false);
+        var notificationsResult =
+                socialUseCases.notifications(new NotificationsQuery(UserContext.cli(currentUser.getId()), false));
+        if (!notificationsResult.success()) {
+            logInfo("{}\n", notificationsResult.error().message());
+            return;
+        }
+
+        List<Notification> notifications = notificationsResult.data();
         if (notifications.isEmpty()) {
             logInfo("\nNo notifications.\n");
             return;
@@ -912,7 +975,8 @@ public class MatchingHandler implements LoggingSupport {
             String status = n.isRead() ? "  " : "🆕";
             logInfo("{} [{}] {}: {}", status, n.createdAt(), n.title(), n.message());
             if (!n.isRead()) {
-                communicationStorage.markNotificationAsRead(n.id());
+                socialUseCases.markNotificationRead(
+                        new MarkNotificationReadCommand(UserContext.cli(currentUser.getId()), n.id()));
             }
         }
 
@@ -926,7 +990,14 @@ public class MatchingHandler implements LoggingSupport {
     public void browseWhoLikedMe() {
         CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
-            List<PendingLiker> likers = matchingService.findPendingLikersWithTimes(currentUser.getId());
+            var likersResult =
+                    matchingUseCases.pendingLikers(new PendingLikersQuery(UserContext.cli(currentUser.getId())));
+            if (!likersResult.success()) {
+                logInfo(ERR_FAILED, likersResult.error().message());
+                return;
+            }
+
+            List<PendingLiker> likers = likersResult.data();
 
             if (likers.isEmpty()) {
                 logInfo("\nNo new likes yet.\n");
@@ -976,7 +1047,12 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private void recordLikerSwipe(User currentUser, User other, Like.Direction direction) {
-        matchingService.recordLike(Like.create(currentUser.getId(), other.getId(), direction));
-        logInfo("✅ Saved.\n");
+        var result = matchingUseCases.recordLike(
+                new RecordLikeCommand(UserContext.cli(currentUser.getId()), other.getId(), direction, false));
+        if (result.success()) {
+            logInfo("✅ Saved.\n");
+        } else {
+            logInfo(ERR_FAILED, result.error().message());
+        }
     }
 }

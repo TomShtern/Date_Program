@@ -1,5 +1,9 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.matching.MatchingUseCases;
+import datingapp.app.usecase.matching.MatchingUseCases.StandoutInteractionCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.StandoutsQuery;
 import datingapp.core.AppSession;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
@@ -29,6 +33,7 @@ public class StandoutsViewModel {
     private static final Logger logger = LoggerFactory.getLogger(StandoutsViewModel.class);
 
     private final RecommendationService recommendationService;
+    private final MatchingUseCases matchingUseCases;
     private final AppSession session;
 
     private final ObservableList<StandoutEntry> standouts = FXCollections.observableArrayList();
@@ -65,8 +70,14 @@ public class StandoutsViewModel {
     }
 
     public StandoutsViewModel(RecommendationService recommendationService, AppSession session) {
+        this(recommendationService, null, session);
+    }
+
+    public StandoutsViewModel(
+            RecommendationService recommendationService, MatchingUseCases matchingUseCases, AppSession session) {
         this.recommendationService =
                 Objects.requireNonNull(recommendationService, "recommendationService cannot be null");
+        this.matchingUseCases = matchingUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
@@ -93,9 +104,24 @@ public class StandoutsViewModel {
             List<StandoutEntry> entries = List.of();
             String message = "";
             try {
-                RecommendationService.Result result = recommendationService.getStandouts(user);
+                RecommendationService.Result result;
+                Map<UUID, User> resolved;
+                if (matchingUseCases != null) {
+                    var useCaseResult =
+                            matchingUseCases.standouts(new StandoutsQuery(UserContext.ui(user.getId()), user));
+                    if (useCaseResult.success()) {
+                        result = useCaseResult.data().result();
+                        resolved = useCaseResult.data().usersById();
+                    } else {
+                        result = recommendationService.getStandouts(user);
+                        resolved = recommendationService.resolveUsers(result.standouts());
+                    }
+                } else {
+                    result = recommendationService.getStandouts(user);
+                    resolved = recommendationService.resolveUsers(result.standouts());
+                }
+
                 if (!result.isEmpty()) {
-                    Map<UUID, User> resolved = recommendationService.resolveUsers(result.standouts());
                     entries = result.standouts().stream()
                             .filter(s -> resolved.containsKey(s.standoutUserId()))
                             .map(s -> new StandoutEntry(s, resolved.get(s.standoutUserId())))
@@ -132,7 +158,12 @@ public class StandoutsViewModel {
         }
         Thread.ofVirtual().name("standouts-interact").start(() -> {
             try {
-                recommendationService.markInteracted(user.getId(), entry.userId());
+                if (matchingUseCases != null) {
+                    matchingUseCases.markStandoutInteracted(
+                            new StandoutInteractionCommand(UserContext.ui(user.getId()), entry.userId()));
+                } else {
+                    recommendationService.markInteracted(user.getId(), entry.userId());
+                }
             } catch (Exception e) {
                 logWarn("Failed to mark standout as interacted", e);
             }

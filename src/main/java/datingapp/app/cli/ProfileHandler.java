@@ -2,6 +2,9 @@ package datingapp.app.cli;
 
 import datingapp.app.cli.CliTextAndInput.EnumMenu;
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.EnumSetUtil;
@@ -12,7 +15,6 @@ import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -47,13 +49,14 @@ public class ProfileHandler implements LoggingSupport {
     private static final String INDENTED_LINE = "    {}";
     private static final String INDENTED_BULLET = "    - {}";
     private static final String ERROR_MESSAGE_FORMAT = "❌ {}\n";
+    private static final String ERROR_WITH_GAP_FORMAT = "\n❌ {}\n";
+    private static final String PRESS_ENTER_MENU_PROMPT = "  [Press Enter to return to menu]";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final UserStorage userStorage;
-    private final ProfileService profileCompletionService;
-    private final ProfileService achievementService;
     private final ValidationService validationService;
     private final AppConfig config;
+    private final ProfileUseCases profileUseCases;
     private final AppSession session;
     private final InputReader inputReader;
 
@@ -68,11 +71,11 @@ public class ProfileHandler implements LoggingSupport {
             AppSession session,
             InputReader inputReader) {
         this.userStorage = userStorage;
-        this.profileCompletionService = profileCompletionService;
-        this.achievementService = achievementService;
         this.validationService =
                 java.util.Objects.requireNonNull(validationService, "validationService cannot be null");
         this.config = java.util.Objects.requireNonNull(config, "config cannot be null");
+        ProfileService profileService = achievementService != null ? achievementService : profileCompletionService;
+        this.profileUseCases = new ProfileUseCases(userStorage, profileService, validationService, null, this.config);
         this.session = session;
         this.inputReader = inputReader;
     }
@@ -115,18 +118,21 @@ public class ProfileHandler implements LoggingSupport {
             promptLifestyle(currentUser);
             promptPacePreferences(currentUser);
 
-            // Try to activate if complete
-            if (currentUser.isComplete() && currentUser.getState() == UserState.INCOMPLETE) {
-                currentUser.activate();
+            var saveResult = profileUseCases.saveProfile(
+                    new SaveProfileCommand(UserContext.cli(currentUser.getId()), currentUser));
+            if (!saveResult.success()) {
+                logInfo(ERROR_WITH_GAP_FORMAT, saveResult.error().message());
+                return;
+            }
+
+            if (saveResult.data().activated()) {
                 logInfo("\n🎉 Profile complete! Status changed to ACTIVE.");
             } else if (!currentUser.isComplete()) {
                 logInfo("\n⚠️  Profile still incomplete. Missing required fields.");
             }
 
-            userStorage.save(currentUser);
             logInfo("✅ Profile saved!\n");
-
-            checkAndDisplayNewAchievements(currentUser);
+            displayNewAchievements(saveResult.data().newlyUnlocked());
         });
     }
 
@@ -138,7 +144,13 @@ public class ProfileHandler implements LoggingSupport {
     public void previewProfile() {
         CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
-            ProfileService.ProfilePreview preview = profileCompletionService.generatePreview(currentUser);
+            var previewResult = profileUseCases.generatePreview(currentUser);
+            if (!previewResult.success()) {
+                logInfo(ERROR_WITH_GAP_FORMAT, previewResult.error().message());
+                inputReader.readLine(PRESS_ENTER_MENU_PROMPT);
+                return;
+            }
+            ProfileService.ProfilePreview preview = previewResult.data();
 
             logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
             logInfo("      👤 YOUR PROFILE PREVIEW");
@@ -189,7 +201,7 @@ public class ProfileHandler implements LoggingSupport {
             }
 
             logInfo("");
-            inputReader.readLine("  [Press Enter to return to menu]");
+            inputReader.readLine(PRESS_ENTER_MENU_PROMPT);
         });
     }
 
@@ -226,8 +238,7 @@ public class ProfileHandler implements LoggingSupport {
      *
      * @param currentUser The user to check achievements for
      */
-    private void checkAndDisplayNewAchievements(User currentUser) {
-        List<UserAchievement> newAchievements = achievementService.checkAndUnlock(currentUser.getId());
+    private void displayNewAchievements(List<UserAchievement> newAchievements) {
         if (!newAchievements.isEmpty()) {
             logInfo("\n🏆 NEW ACHIEVEMENTS UNLOCKED! 🏆");
             for (UserAchievement ua : newAchievements) {
@@ -959,7 +970,13 @@ public class ProfileHandler implements LoggingSupport {
     public void viewProfileScore() {
         CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
-            ProfileService.CompletionResult result = profileCompletionService.calculate(currentUser);
+            var completionResult = profileUseCases.calculateCompletion(currentUser);
+            if (!completionResult.success()) {
+                logInfo(ERROR_WITH_GAP_FORMAT, completionResult.error().message());
+                inputReader.readLine(PRESS_ENTER_MENU_PROMPT);
+                return;
+            }
+            ProfileService.CompletionResult result = completionResult.data();
 
             logInfo("\n───────────────────────────────────────");
             logInfo("      📊 PROFILE COMPLETION SCORE");
@@ -991,7 +1008,7 @@ public class ProfileHandler implements LoggingSupport {
             }
 
             logInfo("");
-            inputReader.readLine("  [Press Enter to return to menu]");
+            inputReader.readLine(PRESS_ENTER_MENU_PROMPT);
         });
     }
 }

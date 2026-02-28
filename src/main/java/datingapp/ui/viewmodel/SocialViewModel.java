@@ -1,10 +1,16 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.FriendRequestAction;
+import datingapp.app.usecase.social.SocialUseCases.FriendRequestsQuery;
+import datingapp.app.usecase.social.SocialUseCases.MarkNotificationReadCommand;
+import datingapp.app.usecase.social.SocialUseCases.NotificationsQuery;
+import datingapp.app.usecase.social.SocialUseCases.RespondFriendRequestCommand;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionService;
-import datingapp.core.connection.ConnectionService.TransitionResult;
 import datingapp.core.model.User;
 import datingapp.ui.viewmodel.UiDataAdapters.UiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
@@ -47,6 +53,7 @@ public class SocialViewModel {
     private final ConnectionService connectionService;
     private final UiSocialDataAccess socialDataAccess;
     private final UiUserStore userStore;
+    private final SocialUseCases socialUseCases;
     private final AppSession session;
 
     private final ObservableList<Notification> notifications = FXCollections.observableArrayList();
@@ -66,6 +73,7 @@ public class SocialViewModel {
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
         this.socialDataAccess = Objects.requireNonNull(socialDataAccess, "socialDataAccess cannot be null");
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
+        this.socialUseCases = new SocialUseCases(this.connectionService, null);
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
@@ -92,8 +100,17 @@ public class SocialViewModel {
             List<Notification> notifs = List.of();
             List<FriendRequestEntry> entries = List.of();
             try {
-                notifs = socialDataAccess.getNotifications(user.getId(), false);
-                List<FriendRequest> requests = connectionService.getPendingRequestsFor(user.getId());
+                var notificationsResult =
+                        socialUseCases.notifications(new NotificationsQuery(UserContext.ui(user.getId()), false));
+                notifs = notificationsResult.success()
+                        ? notificationsResult.data()
+                        : socialDataAccess.getNotifications(user.getId(), false);
+
+                var requestsResult =
+                        socialUseCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.ui(user.getId())));
+                List<FriendRequest> requests = requestsResult.success()
+                        ? requestsResult.data()
+                        : connectionService.getPendingRequestsFor(user.getId());
                 entries = resolveRequestEntries(requests);
             } catch (Exception e) {
                 logError("Failed to load social data", e);
@@ -136,9 +153,10 @@ public class SocialViewModel {
         }
         Thread.ofVirtual().name("social-accept").start(() -> {
             try {
-                TransitionResult result = connectionService.acceptFriendZone(entry.requestId(), user.getId());
+                var result = socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
+                        UserContext.ui(user.getId()), entry.requestId(), FriendRequestAction.ACCEPT));
                 if (!result.success()) {
-                    notifyError("Could not accept request: " + result.errorMessage());
+                    notifyError("Could not accept request: " + result.error().message());
                 }
             } catch (Exception e) {
                 logError("Failed to accept friend request", e);
@@ -156,9 +174,10 @@ public class SocialViewModel {
         }
         Thread.ofVirtual().name("social-decline").start(() -> {
             try {
-                TransitionResult result = connectionService.declineFriendZone(entry.requestId(), user.getId());
+                var result = socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
+                        UserContext.ui(user.getId()), entry.requestId(), FriendRequestAction.DECLINE));
                 if (!result.success()) {
-                    notifyError("Could not decline request: " + result.errorMessage());
+                    notifyError("Could not decline request: " + result.error().message());
                 }
             } catch (Exception e) {
                 logError("Failed to decline friend request", e);
@@ -170,12 +189,17 @@ public class SocialViewModel {
 
     /** Marks a notification as read and refreshes the list. */
     public void markNotificationRead(Notification notification) {
-        if (notification == null || notification.isRead()) {
+        User user = ensureCurrentUser();
+        if (user == null || notification == null || notification.isRead()) {
             return;
         }
         Thread.ofVirtual().name("social-mark-read").start(() -> {
             try {
-                socialDataAccess.markNotificationRead(notification.id());
+                var result = socialUseCases.markNotificationRead(
+                        new MarkNotificationReadCommand(UserContext.ui(user.getId()), notification.id()));
+                if (!result.success()) {
+                    socialDataAccess.markNotificationRead(notification.id());
+                }
                 runOnFx(this::refresh);
             } catch (Exception e) {
                 logWarn("Failed to mark notification as read", e);

@@ -159,7 +159,11 @@ public class ViewModelFactory {
     public synchronized ProfileViewModel getProfileViewModel() {
         if (profileViewModel == null) {
             profileViewModel = new ProfileViewModel(
-                    createUiUserStore(), services.getProfileService(), services.getConfig(), session);
+                    createUiUserStore(),
+                    services.getProfileService(),
+                    services.getProfileUseCases(),
+                    services.getConfig(),
+                    session);
         }
         return profileViewModel;
     }
@@ -183,6 +187,7 @@ public class ViewModelFactory {
                     createUiUserStore(),
                     services.getMatchingService(),
                     services.getRecommendationService(),
+                    services.getMatchingUseCases(),
                     session);
         }
         return matchesViewModel;
@@ -198,22 +203,27 @@ public class ViewModelFactory {
 
     public synchronized StatsViewModel getStatsViewModel() {
         if (statsViewModel == null) {
-            statsViewModel =
-                    new StatsViewModel(services.getProfileService(), services.getActivityMetricsService(), session);
+            statsViewModel = new StatsViewModel(
+                    services.getProfileService(),
+                    services.getActivityMetricsService(),
+                    services.getProfileUseCases(),
+                    session);
         }
         return statsViewModel;
     }
 
     public synchronized PreferencesViewModel getPreferencesViewModel() {
         if (preferencesViewModel == null) {
-            preferencesViewModel = new PreferencesViewModel(createUiUserStore(), services.getConfig(), session);
+            preferencesViewModel = new PreferencesViewModel(
+                    createUiUserStore(), services.getProfileUseCases(), services.getConfig(), session);
         }
         return preferencesViewModel;
     }
 
     public synchronized StandoutsViewModel getStandoutsViewModel() {
         if (standoutsViewModel == null) {
-            standoutsViewModel = new StandoutsViewModel(services.getRecommendationService(), session);
+            standoutsViewModel = new StandoutsViewModel(
+                    services.getRecommendationService(), services.getMatchingUseCases(), session);
         }
         return standoutsViewModel;
     }

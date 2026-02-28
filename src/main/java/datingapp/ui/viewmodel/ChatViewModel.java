@@ -1,7 +1,15 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.messaging.MessagingUseCases;
+import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
+import datingapp.app.usecase.messaging.MessagingUseCases.LoadConversationQuery;
+import datingapp.app.usecase.messaging.MessagingUseCases.OpenConversationCommand;
+import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
+import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
+import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.core.AppSession;
-import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionService;
@@ -39,6 +47,8 @@ public class ChatViewModel {
 
     private final ConnectionService messagingService;
     private final TrustSafetyService trustSafetyService;
+    private final MessagingUseCases messagingUseCases;
+    private final SocialUseCases socialUseCases;
     private final AppSession session;
     private final ObservableList<ConversationPreview> conversations = FXCollections.observableArrayList();
     private final ObservableList<Message> activeMessages = FXCollections.observableArrayList();
@@ -69,6 +79,8 @@ public class ChatViewModel {
             ConnectionService messagingService, TrustSafetyService trustSafetyService, AppSession session) {
         this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
+        this.messagingUseCases = new MessagingUseCases(this.messagingService);
+        this.socialUseCases = new SocialUseCases(this.messagingService, this.trustSafetyService);
         this.session = Objects.requireNonNull(session, "session cannot be null");
 
         // Listen for selection changes to load messages
@@ -136,8 +148,12 @@ public class ChatViewModel {
             int unread = initialUnread;
             try {
                 logInfo("Refreshing conversations for user: {}", user.getName());
-                previews = messagingService.getConversations(user.getId(), 50, 0);
-                unread = computeUnreadCount(previews);
+                var result = messagingUseCases.listConversations(
+                        new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0));
+                if (result.success()) {
+                    previews = result.data().conversations();
+                    unread = result.data().totalUnreadCount();
+                }
             } catch (Exception e) {
                 logError("Failed to refresh conversations", e);
             }
@@ -168,13 +184,16 @@ public class ChatViewModel {
             ConversationPreview preview = null;
             boolean loaded = false;
             try {
-                Conversation conversation = messagingService.getOrCreateConversation(user.getId(), otherUserId);
-                previews = messagingService.getConversations(user.getId(), 50, 0);
-                preview = previews.stream()
-                        .filter(p -> p.conversation().getId().equals(conversation.getId()))
-                        .findFirst()
-                        .orElse(null);
-                loaded = true;
+                var result = messagingUseCases.openConversation(
+                        new OpenConversationCommand(UserContext.ui(user.getId()), otherUserId, 50, 0));
+                if (result.success()) {
+                    previews = messagingUseCases
+                            .listConversations(new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0))
+                            .data()
+                            .conversations();
+                    preview = result.data().preview();
+                    loaded = true;
+                }
             } catch (Exception e) {
                 logError("Failed to open conversation", e);
             }
@@ -240,16 +259,18 @@ public class ChatViewModel {
         Integer unread = null;
         try {
             logInfo("Loading messages for conversation: {}", otherUserId);
-            var result = messagingService.getMessages(user.getId(), otherUserId, 100, 0);
+            var result = messagingUseCases.loadConversation(
+                    new LoadConversationQuery(UserContext.ui(user.getId()), otherUserId, 100, 0, true));
             if (result.success()) {
-                messages = result.messages();
+                messages = result.data().messages();
+                var conversationsResult = messagingUseCases.listConversations(
+                        new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0));
+                if (conversationsResult.success()) {
+                    unread = conversationsResult.data().totalUnreadCount();
+                }
             } else {
-                logError("Failed to load messages: " + result.errorMessage(), null);
+                logError("Failed to load messages: " + result.error().message(), null);
             }
-            messagingService.markAsRead(user.getId(), conversationId);
-
-            List<ConversationPreview> previews = messagingService.getConversations(user.getId(), 50, 0);
-            unread = computeUnreadCount(previews);
         } catch (Exception e) {
             logError("Failed to load messages", e);
         }
@@ -303,20 +324,26 @@ public class ChatViewModel {
             ConversationPreview conversation, UUID senderId, UUID otherUserId, String trimmedText) {
         Thread.ofVirtual().name("chat-send").start(() -> {
             try {
-                SendResult result = messagingService.sendMessage(senderId, otherUserId, trimmedText);
-                runOnFx(() -> handleSendResult(conversation, result));
+                var result = messagingUseCases.sendMessage(
+                        new SendMessageCommand(UserContext.ui(senderId), otherUserId, trimmedText));
+                runOnFx(() -> handleSendResult(
+                        conversation,
+                        result.success() ? result.data() : null,
+                        result.success() ? null : result.error().message()));
             } catch (Exception e) {
                 runOnFx(() -> reportSendFailure("Failed to send message: " + e.getMessage(), e));
             }
         });
     }
 
-    private void handleSendResult(ConversationPreview conversation, SendResult result) {
+    private void handleSendResult(
+            ConversationPreview conversation, @Nullable SendResult result, @Nullable String errorMessage) {
         if (disposed.get()) {
             return;
         }
-        if (!result.success()) {
-            reportSendFailure("Failed to send message: " + result.errorMessage(), null);
+        if (result == null || !result.success()) {
+            reportSendFailure(
+                    "Failed to send message: " + (errorMessage == null ? "Unknown error" : errorMessage), null);
             return;
         }
 
@@ -438,7 +465,7 @@ public class ChatViewModel {
         }
         Thread.ofVirtual().start(() -> {
             try {
-                trustSafetyService.block(user.getId(), targetId);
+                socialUseCases.blockUser(new RelationshipCommand(UserContext.ui(user.getId()), targetId));
                 runOnFx(this::refreshConversations);
             } catch (Exception e) {
                 logError("Failed to block user", e);
@@ -453,7 +480,8 @@ public class ChatViewModel {
         }
         Thread.ofVirtual().start(() -> {
             try {
-                trustSafetyService.report(user.getId(), targetId, reason, description, blockUser);
+                socialUseCases.reportUser(
+                        new ReportCommand(UserContext.ui(user.getId()), targetId, reason, description, blockUser));
                 if (blockUser) {
                     runOnFx(this::refreshConversations);
                 }

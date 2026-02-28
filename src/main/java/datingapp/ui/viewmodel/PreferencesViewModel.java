@@ -1,5 +1,8 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.ProfileUseCases.UpdateDiscoveryPreferencesCommand;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
@@ -26,6 +29,7 @@ public class PreferencesViewModel {
     private final AppConfig config;
     private final AppSession session;
     private final UiUserStore userStore;
+    private final ProfileUseCases profileUseCases;
     private User currentUser;
 
     // UI-specific enum for single-selection preference
@@ -45,7 +49,13 @@ public class PreferencesViewModel {
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public PreferencesViewModel(UiUserStore userStore, AppConfig config, AppSession session) {
+        this(userStore, null, config, session);
+    }
+
+    public PreferencesViewModel(
+            UiUserStore userStore, ProfileUseCases profileUseCases, AppConfig config, AppSession session) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
+        this.profileUseCases = profileUseCases;
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
@@ -143,8 +153,18 @@ public class PreferencesViewModel {
         }
         currentUser.setInterestedIn(newInterests);
 
-        // Persist
-        userStore.save(currentUser);
+        if (profileUseCases != null) {
+            var result = profileUseCases.updateDiscoveryPreferences(new UpdateDiscoveryPreferencesCommand(
+                    UserContext.ui(currentUser.getId()), minAgeVal, maxAgeVal, maxDistVal, newInterests));
+            if (!result.success()) {
+                logWarn(
+                        "Failed to save preferences via use-case: {}",
+                        result.error().message());
+            }
+        } else {
+            // Persist (legacy fallback path)
+            userStore.save(currentUser);
+        }
     }
 
     private void logInfo(String message, Object... args) {

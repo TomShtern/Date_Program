@@ -1,5 +1,9 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
+import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.core.AppSession;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
@@ -32,6 +36,7 @@ public class StatsViewModel {
 
     private final ProfileService achievementService;
     private final ActivityMetricsService statsService;
+    private final ProfileUseCases profileUseCases;
     private final AppSession session;
 
     private final ObservableList<Achievement> achievements = FXCollections.observableArrayList();
@@ -56,8 +61,17 @@ public class StatsViewModel {
     }
 
     public StatsViewModel(ProfileService achievementService, ActivityMetricsService statsService, AppSession session) {
+        this(achievementService, statsService, null, session);
+    }
+
+    public StatsViewModel(
+            ProfileService achievementService,
+            ActivityMetricsService statsService,
+            ProfileUseCases profileUseCases,
+            AppSession session) {
         this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
         this.statsService = Objects.requireNonNull(statsService, "statsService cannot be null");
+        this.profileUseCases = profileUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
@@ -129,12 +143,24 @@ public class StatsViewModel {
     }
 
     private List<Achievement> fetchAchievements(java.util.UUID userId) {
-        List<UserAchievement> earned = achievementService.getUnlocked(userId);
+        List<UserAchievement> earned;
+        if (profileUseCases != null) {
+            var result = profileUseCases.getAchievements(new AchievementsQuery(UserContext.ui(userId), false));
+            earned = result.success() ? result.data().unlocked() : List.of();
+        } else {
+            earned = achievementService.getUnlocked(userId);
+        }
         return earned.stream().map(UserAchievement::achievement).toList();
     }
 
     private StatsData fetchStats(java.util.UUID userId) {
-        UserStats stats = statsService.getOrComputeStats(userId);
+        UserStats stats;
+        if (profileUseCases != null) {
+            var result = profileUseCases.getOrComputeStats(new StatsQuery(UserContext.ui(userId)));
+            stats = result.success() ? result.data() : statsService.getOrComputeStats(userId);
+        } else {
+            stats = statsService.getOrComputeStats(userId);
+        }
 
         int likesGiven = stats.likesGiven();
         int likesReceived = stats.likesReceived();

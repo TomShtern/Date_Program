@@ -1,6 +1,13 @@
 package datingapp.app.cli;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.messaging.MessagingUseCases;
+import datingapp.app.usecase.messaging.MessagingUseCases.LoadConversationQuery;
+import datingapp.app.usecase.messaging.MessagingUseCases.MarkConversationReadCommand;
+import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
+import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
@@ -9,9 +16,7 @@ import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
-import datingapp.core.connection.ConnectionService.SendResult;
 import datingapp.core.matching.TrustSafetyService;
-import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.storage.InteractionStorage;
 import java.time.ZoneId;
@@ -19,7 +24,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,14 +31,15 @@ import org.slf4j.LoggerFactory;
 public class MessagingHandler implements LoggingSupport {
 
     private static final Logger logger = LoggerFactory.getLogger(MessagingHandler.class);
+    private static final String ERROR_TEMPLATE = "\n❌ {}";
     private static final int MESSAGES_PER_PAGE = 20;
     private static final int PREVIEW_MAX_LENGTH = 28;
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
 
     private final ConnectionService messagingService;
-    private final InteractionStorage interactionStorage;
-    private final TrustSafetyService trustSafetyService;
+    private final MessagingUseCases messagingUseCases;
+    private final SocialUseCases socialUseCases;
     private final InputReader input;
     private final AppSession session;
 
@@ -44,9 +49,24 @@ public class MessagingHandler implements LoggingSupport {
             TrustSafetyService trustSafetyService,
             InputReader input,
             AppSession session) {
+        Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+        Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
         this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
-        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
-        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
+        this.messagingUseCases = new MessagingUseCases(this.messagingService);
+        this.socialUseCases = new SocialUseCases(this.messagingService, trustSafetyService);
+        this.input = Objects.requireNonNull(input, "input cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
+    }
+
+    public MessagingHandler(
+            ConnectionService messagingService,
+            MessagingUseCases messagingUseCases,
+            SocialUseCases socialUseCases,
+            InputReader input,
+            AppSession session) {
+        this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
+        this.messagingUseCases = Objects.requireNonNull(messagingUseCases, "messagingUseCases cannot be null");
+        this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
         this.input = Objects.requireNonNull(input, "input cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
@@ -55,8 +75,8 @@ public class MessagingHandler implements LoggingSupport {
         Objects.requireNonNull(services, "services cannot be null");
         return new MessagingHandler(
                 services.getConnectionService(),
-                services.getInteractionStorage(),
-                services.getTrustSafetyService(),
+                services.getMessagingUseCases(),
+                services.getSocialUseCases(),
                 input,
                 session);
     }
@@ -74,7 +94,7 @@ public class MessagingHandler implements LoggingSupport {
             return;
         }
 
-        List<ConversationPreview> previews = messagingService.getConversations(currentUser.getId(), 50, 0);
+        List<ConversationPreview> previews = loadConversationPreviews(currentUser);
 
         while (true) {
             printConversationListHeader();
@@ -145,7 +165,7 @@ public class MessagingHandler implements LoggingSupport {
             int idx = Integer.parseInt(choice) - 1;
             if (idx >= 0 && idx < previews.size()) {
                 showConversation(currentUser, previews.get(idx));
-                return messagingService.getConversations(currentUser.getId(), 50, 0);
+                return loadConversationPreviews(currentUser);
             } else {
                 logInfo(CliTextAndInput.INVALID_SELECTION);
             }
@@ -175,24 +195,22 @@ public class MessagingHandler implements LoggingSupport {
         Conversation conversation = preview.conversation();
         User otherUser = preview.otherUser();
 
-        messagingService.markAsRead(currentUser.getId(), conversation.getId());
+        messagingUseCases.markConversationRead(
+                new MarkConversationReadCommand(UserContext.cli(currentUser.getId()), conversation.getId()));
 
         int offset = 0;
         boolean showOlder = false;
 
         boolean active = true;
         while (active) {
-            var result =
-                    messagingService.getMessages(currentUser.getId(), otherUser.getId(), MESSAGES_PER_PAGE + offset, 0);
+            var result = messagingUseCases.loadConversation(new LoadConversationQuery(
+                    UserContext.cli(currentUser.getId()), otherUser.getId(), MESSAGES_PER_PAGE + offset, 0, false));
             if (!result.success()) {
-                logInfo("\n❌ Failed to load messages: {}", result.errorMessage());
+                logInfo("\n❌ Failed to load messages: {}", result.error().message());
                 active = false;
             } else {
-                List<Message> messages = result.messages();
-
-                String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-                Optional<Match> matchOpt = interactionStorage.get(matchId);
-                boolean canMessage = matchOpt.isPresent() && matchOpt.get().isActive();
+                List<Message> messages = result.data().messages();
+                boolean canMessage = result.data().canMessage();
 
                 printConversationHeader(otherUser.getName(), canMessage);
                 printMessages(messages, currentUser, showOlder);
@@ -332,14 +350,15 @@ public class MessagingHandler implements LoggingSupport {
     }
 
     private ConversationAction sendConversationMessage(User currentUser, User otherUser, String userInput) {
-        SendResult result = messagingService.sendMessage(currentUser.getId(), otherUser.getId(), userInput);
+        var result = messagingUseCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(currentUser.getId()), otherUser.getId(), userInput));
 
         if (result.success()) {
             logInfo("\n✓ Message sent");
             return ConversationAction.REFRESH;
         }
 
-        logInfo("\n❌ {}", result.errorMessage());
+        logInfo(ERROR_TEMPLATE, result.error().message());
         return ConversationAction.CONTINUE;
     }
 
@@ -389,30 +408,23 @@ public class MessagingHandler implements LoggingSupport {
 
     /** Blocks another user. */
     private void blockUser(User currentUser, User otherUser) {
-        TrustSafetyService.BlockResult result = trustSafetyService.block(currentUser.getId(), otherUser.getId());
+        var result = socialUseCases.blockUser(
+                new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUser.getId()));
         if (result.success()) {
             logInfo("\n✓ {} has been blocked.", otherUser.getName());
         } else {
-            logInfo("\n❌ {}", result.errorMessage());
+            logInfo(ERROR_TEMPLATE, result.error().message());
         }
     }
 
     /** Unmatches from another user. */
     private void unmatchUser(User currentUser, User otherUser) {
-        String matchId = Match.generateId(currentUser.getId(), otherUser.getId());
-        Optional<Match> matchOpt = interactionStorage.get(matchId);
-
-        if (matchOpt.isPresent()) {
-            Match match = matchOpt.get();
-            if (match.isActive()) {
-                match.unmatch(currentUser.getId());
-                interactionStorage.update(match);
-                logInfo("\n✓ Unmatched from {}.", otherUser.getName());
-            } else {
-                logInfo("\n⚠️  Match is already ended.");
-            }
+        var result = socialUseCases.unmatch(
+                new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUser.getId()));
+        if (result.success()) {
+            logInfo("\n✓ Unmatched from {}.", otherUser.getName());
         } else {
-            logInfo("\n❌ No active match found.");
+            logInfo(ERROR_TEMPLATE, result.error().message());
         }
     }
 
@@ -425,6 +437,13 @@ public class MessagingHandler implements LoggingSupport {
     }
 
     private int getTotalUnreadCount(User currentUser) {
-        return messagingService.getTotalUnreadCount(currentUser.getId());
+        var result = messagingUseCases.totalUnreadCount(UserContext.cli(currentUser.getId()));
+        return result.success() ? result.data() : 0;
+    }
+
+    private List<ConversationPreview> loadConversationPreviews(User currentUser) {
+        var result = messagingUseCases.listConversations(
+                new MessagingUseCases.ListConversationsQuery(UserContext.cli(currentUser.getId()), 50, 0));
+        return result.success() ? result.data().conversations() : List.of();
     }
 }

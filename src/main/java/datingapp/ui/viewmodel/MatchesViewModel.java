@@ -1,5 +1,10 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.matching.MatchingUseCases;
+import datingapp.app.usecase.matching.MatchingUseCases.PendingLikersQuery;
+import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.RemoveLikeCommand;
 import datingapp.core.AppSession;
 import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.Like;
@@ -57,6 +62,7 @@ public class MatchesViewModel {
     private final UiUserStore userStore;
     private final MatchingService matchingService;
     private final RecommendationService dailyService;
+    private final MatchingUseCases matchingUseCases;
     private final AppSession session;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesReceived = FXCollections.observableArrayList();
@@ -97,10 +103,21 @@ public class MatchesViewModel {
             MatchingService matchingService,
             RecommendationService dailyService,
             AppSession session) {
+        this(matchData, userStore, matchingService, dailyService, null, session);
+    }
+
+    public MatchesViewModel(
+            UiMatchDataAccess matchData,
+            UiUserStore userStore,
+            MatchingService matchingService,
+            RecommendationService dailyService,
+            MatchingUseCases matchingUseCases,
+            AppSession session) {
         this.matchData = Objects.requireNonNull(matchData, "matchData cannot be null");
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
         this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
+        this.matchingUseCases = matchingUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
@@ -292,7 +309,13 @@ public class MatchesViewModel {
 
     private List<LikeCardData> fetchReceivedLikesFromStorage(UUID userId) {
         List<LikeCardData> received = new ArrayList<>();
-        List<PendingLiker> pendingLikers = matchingService.findPendingLikersWithTimes(userId);
+        List<PendingLiker> pendingLikers;
+        if (matchingUseCases != null) {
+            var result = matchingUseCases.pendingLikers(new PendingLikersQuery(UserContext.ui(userId)));
+            pendingLikers = result.success() ? result.data() : matchingService.findPendingLikersWithTimes(userId);
+        } else {
+            pendingLikers = matchingService.findPendingLikersWithTimes(userId);
+        }
 
         for (PendingLiker pending : pendingLikers) {
             User liker = pending.user();
@@ -455,7 +478,12 @@ public class MatchesViewModel {
                         });
                         return;
                     }
-                    matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.LIKE));
+                    if (matchingUseCases != null) {
+                        matchingUseCases.recordLike(new RecordLikeCommand(
+                                UserContext.ui(userId), like.userId(), Like.Direction.LIKE, true));
+                    } else {
+                        matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.LIKE));
+                    }
                     javafx.application.Platform.runLater(this::refreshAll);
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> {
@@ -472,7 +500,12 @@ public class MatchesViewModel {
                     loading.set(false);
                     return;
                 }
-                matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.LIKE));
+                if (matchingUseCases != null) {
+                    matchingUseCases.recordLike(
+                            new RecordLikeCommand(UserContext.ui(userId), like.userId(), Like.Direction.LIKE, true));
+                } else {
+                    matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.LIKE));
+                }
                 refreshAll();
             } catch (Exception e) {
                 logWarn("Failed to like back: {}", e.getMessage(), e);
@@ -496,7 +529,12 @@ public class MatchesViewModel {
         if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
             Thread.ofVirtual().name("matches-pass-on").start(() -> {
                 try {
-                    matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.PASS));
+                    if (matchingUseCases != null) {
+                        matchingUseCases.recordLike(new RecordLikeCommand(
+                                UserContext.ui(userId), like.userId(), Like.Direction.PASS, false));
+                    } else {
+                        matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.PASS));
+                    }
                     javafx.application.Platform.runLater(this::refreshAll);
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> {
@@ -508,7 +546,12 @@ public class MatchesViewModel {
             });
         } else {
             try {
-                matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.PASS));
+                if (matchingUseCases != null) {
+                    matchingUseCases.recordLike(
+                            new RecordLikeCommand(UserContext.ui(userId), like.userId(), Like.Direction.PASS, false));
+                } else {
+                    matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.PASS));
+                }
                 refreshAll();
             } catch (Exception e) {
                 logWarn("Failed to pass: {}", e.getMessage(), e);
@@ -529,7 +572,12 @@ public class MatchesViewModel {
         if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
             Thread.ofVirtual().name("matches-withdraw").start(() -> {
                 try {
-                    matchData.deleteLike(like.likeId());
+                    User user = resolveCurrentUser();
+                    if (matchingUseCases != null && user != null) {
+                        matchingUseCases.removeLike(new RemoveLikeCommand(UserContext.ui(user.getId()), like.likeId()));
+                    } else {
+                        matchData.deleteLike(like.likeId());
+                    }
                     javafx.application.Platform.runLater(this::refreshAll);
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> {
@@ -541,7 +589,12 @@ public class MatchesViewModel {
             });
         } else {
             try {
-                matchData.deleteLike(like.likeId());
+                User user = resolveCurrentUser();
+                if (matchingUseCases != null && user != null) {
+                    matchingUseCases.removeLike(new RemoveLikeCommand(UserContext.ui(user.getId()), like.likeId()));
+                } else {
+                    matchData.deleteLike(like.likeId());
+                }
                 refreshAll();
             } catch (Exception e) {
                 logWarn("Failed to withdraw like {}", like.likeId(), e);

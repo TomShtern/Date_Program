@@ -4,9 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import datingapp.app.bootstrap.ApplicationStartup;
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.matching.MatchingUseCases;
+import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
+import datingapp.app.usecase.messaging.MessagingUseCases;
+import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
+import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.Conversation;
-import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
@@ -58,6 +63,7 @@ public class RestApiServer {
     private static final int DEFAULT_MATCHES_LIMIT = 20;
     private static final String UNKNOWN_USER = "Unknown";
     private static final String BAD_REQUEST = "BAD_REQUEST";
+    private static final String CONFLICT = "CONFLICT";
     /**
      * Pagination query-parameter names shared by match and future list endpoints.
      */
@@ -70,6 +76,8 @@ public class RestApiServer {
     private final MatchingService matchingService;
 
     private final ConnectionService messagingService;
+    private final MatchingUseCases matchingUseCases;
+    private final MessagingUseCases messagingUseCases;
     private final ZoneId userTimeZone;
     private final int port;
     private Javalin app;
@@ -85,6 +93,8 @@ public class RestApiServer {
         this.candidateFinder = services.getCandidateFinder();
         this.matchingService = services.getMatchingService();
         this.messagingService = services.getConnectionService();
+        this.matchingUseCases = services.getMatchingUseCases();
+        this.messagingUseCases = services.getMessagingUseCases();
         this.userTimeZone = services.getConfig().safety().userTimeZone();
         this.port = port;
     }
@@ -207,8 +217,18 @@ public class RestApiServer {
         validateUserExists(userId);
         validateUserExists(targetId);
 
-        Like like = Like.create(userId, targetId, Like.Direction.LIKE);
-        Optional<Match> match = matchingService.recordLike(like);
+        var result = matchingUseCases.recordLike(new RecordLikeCommand(
+                UserContext.api(userId),
+                targetId,
+                datingapp.core.connection.ConnectionModels.Like.Direction.LIKE,
+                true));
+        if (!result.success()) {
+            ctx.status(409);
+            ctx.json(new ErrorResponse(CONFLICT, result.error().message()));
+            return;
+        }
+
+        Optional<Match> match = result.data().match();
 
         if (match.isPresent()) {
             ctx.status(201);
@@ -225,8 +245,16 @@ public class RestApiServer {
         validateUserExists(userId);
         validateUserExists(targetId);
 
-        Like pass = Like.create(userId, targetId, Like.Direction.PASS);
-        matchingService.recordLike(pass);
+        var result = matchingUseCases.recordLike(new RecordLikeCommand(
+                UserContext.api(userId),
+                targetId,
+                datingapp.core.connection.ConnectionModels.Like.Direction.PASS,
+                false));
+        if (!result.success()) {
+            ctx.status(409);
+            ctx.json(new ErrorResponse(CONFLICT, result.error().message()));
+            return;
+        }
         ctx.status(200);
         ctx.json(new PassResponse("Passed"));
     }
@@ -244,7 +272,14 @@ public class RestApiServer {
             throw new IllegalArgumentException("offset must be non-negative");
         }
         validateUserExists(userId);
-        List<ConnectionService.ConversationPreview> previews = messagingService.getConversations(userId, limit, offset);
+        var listResult =
+                messagingUseCases.listConversations(new ListConversationsQuery(UserContext.api(userId), limit, offset));
+        if (!listResult.success()) {
+            ctx.status(409);
+            ctx.json(new ErrorResponse(CONFLICT, listResult.error().message()));
+            return;
+        }
+        List<ConnectionService.ConversationPreview> previews = listResult.data().conversations();
         Set<String> conversationIds = previews.stream()
                 .map(preview -> preview.conversation().getId())
                 .collect(java.util.stream.Collectors.toSet());
@@ -287,14 +322,15 @@ public class RestApiServer {
         }
 
         UUID recipientId = extractRecipientFromConversation(conversationId, request.senderId());
-        var result = messagingService.sendMessage(request.senderId(), recipientId, request.content());
+        var result = messagingUseCases.sendMessage(
+                new SendMessageCommand(UserContext.api(request.senderId()), recipientId, request.content()));
 
         if (result.success()) {
             ctx.status(201);
-            ctx.json(MessageDto.from(result.message()));
+            ctx.json(MessageDto.from(result.data().message()));
         } else {
-            ctx.status(400);
-            ctx.json(new ErrorResponse(result.errorCode().name(), result.errorMessage()));
+            ctx.status(409);
+            ctx.json(new ErrorResponse(CONFLICT, result.error().message()));
         }
     }
 
@@ -374,7 +410,7 @@ public class RestApiServer {
 
         app.exception(IllegalStateException.class, (e, ctx) -> {
             ctx.status(409);
-            ctx.json(new ErrorResponse("CONFLICT", e.getMessage()));
+            ctx.json(new ErrorResponse(CONFLICT, e.getMessage()));
         });
 
         app.exception(java.util.NoSuchElementException.class, (e, ctx) -> {

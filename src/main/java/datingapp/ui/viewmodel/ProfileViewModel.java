@@ -1,5 +1,8 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -49,6 +52,7 @@ public class ProfileViewModel {
 
     private final UiUserStore userStore;
     private final ProfileService profileCompletionService;
+    private final ProfileUseCases profileUseCases;
     private final AppSession session;
 
     // Observable properties for form binding - Basic Info
@@ -100,9 +104,19 @@ public class ProfileViewModel {
 
     public ProfileViewModel(
             UiUserStore userStore, ProfileService profileCompletionService, AppConfig config, AppSession session) {
+        this(userStore, profileCompletionService, null, config, session);
+    }
+
+    public ProfileViewModel(
+            UiUserStore userStore,
+            ProfileService profileCompletionService,
+            ProfileUseCases profileUseCases,
+            AppConfig config,
+            AppSession session) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.profileCompletionService =
                 Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
+        this.profileUseCases = profileUseCases;
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
@@ -238,7 +252,16 @@ public class ProfileViewModel {
 
     private void updateCompletion(User user) {
         try {
-            CompletionResult result = profileCompletionService.calculate(user);
+            CompletionResult result;
+            if (profileUseCases != null) {
+                var useCaseResult = profileUseCases.calculateCompletion(user);
+                if (!useCaseResult.success()) {
+                    throw new IllegalStateException(useCaseResult.error().message());
+                }
+                result = useCaseResult.data();
+            } else {
+                result = profileCompletionService.calculate(user);
+            }
             completionStatus.set(result.getDisplayString());
             completionDetails.set(buildCompletionDetails(result));
         } catch (Exception e) {
@@ -312,6 +335,29 @@ public class ProfileViewModel {
                 if (disposed.get() || Thread.currentThread().isInterrupted()) {
                     return;
                 }
+
+                if (profileUseCases != null) {
+                    var saveResult =
+                            profileUseCases.saveProfile(new SaveProfileCommand(UserContext.ui(user.getId()), user));
+                    if (!saveResult.success()) {
+                        throw new IllegalStateException(saveResult.error().message());
+                    }
+
+                    User savedUser = saveResult.data().user();
+                    boolean activated = saveResult.data().activated();
+                    Platform.runLater(() -> {
+                        if (disposed.get()) {
+                            return;
+                        }
+                        updateSessionAndCompletion(savedUser);
+                        if (activated) {
+                            UiFeedbackService.showSuccess("Profile complete! You're now active!");
+                        }
+                        logInfo("Profile saved successfully");
+                    });
+                    return;
+                }
+
                 persistUser(user);
 
                 if (disposed.get() || Thread.currentThread().isInterrupted()) {

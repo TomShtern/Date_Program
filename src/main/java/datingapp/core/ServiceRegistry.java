@@ -1,5 +1,9 @@
 package datingapp.core;
 
+import datingapp.app.usecase.matching.MatchingUseCases;
+import datingapp.app.usecase.messaging.MessagingUseCases;
+import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchQualityService;
@@ -41,6 +45,11 @@ public class ServiceRegistry {
 
     private final ConnectionService connectionService;
 
+    private final MessagingUseCases messagingUseCases;
+    private final MatchingUseCases matchingUseCases;
+    private final ProfileUseCases profileUseCases;
+    private final SocialUseCases socialUseCases;
+
     @SuppressWarnings("java:S107")
     public ServiceRegistry(
             AppConfig config,
@@ -75,6 +84,24 @@ public class ServiceRegistry {
         this.undoService = Objects.requireNonNull(undoService);
         this.connectionService = Objects.requireNonNull(connectionService);
         this.validationService = Objects.requireNonNull(validationService);
+
+        this.messagingUseCases = new MessagingUseCases(this.connectionService);
+        this.matchingUseCases = new MatchingUseCases(
+                this.candidateFinder,
+                this.matchingService,
+                this.recommendationService,
+                this.undoService,
+                this.interactionStorage,
+                this.userStorage,
+                this.matchQualityService);
+        this.profileUseCases = new ProfileUseCases(
+                this.userStorage,
+                this.profileService,
+                this.validationService,
+                this.activityMetricsService,
+                this.config);
+        this.socialUseCases =
+                new SocialUseCases(this.connectionService, this.trustSafetyService, this.communicationStorage);
     }
 
     public AppConfig getConfig() {
@@ -139,5 +166,21 @@ public class ServiceRegistry {
 
     public ValidationService getValidationService() {
         return validationService;
+    }
+
+    public MessagingUseCases getMessagingUseCases() {
+        return messagingUseCases;
+    }
+
+    public MatchingUseCases getMatchingUseCases() {
+        return matchingUseCases;
+    }
+
+    public ProfileUseCases getProfileUseCases() {
+        return profileUseCases;
+    }
+
+    public SocialUseCases getSocialUseCases() {
+        return socialUseCases;
     }
 }
