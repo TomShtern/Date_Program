@@ -63,8 +63,15 @@ class SocialViewModelTest {
         ConnectionService connectionService = new ConnectionService(config, communications, interactions, users);
         UiSocialDataAccess socialDataAccess = new StorageUiSocialDataAccess(communications);
         UiUserStore userStore = new StorageUiUserStore(users);
+        var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, null, communications);
 
-        viewModel = new SocialViewModel(connectionService, socialDataAccess, userStore, AppSession.getInstance());
+        viewModel = new SocialViewModel(
+                connectionService,
+                socialDataAccess,
+                userStore,
+                socialUseCases,
+                AppSession.getInstance(),
+                new datingapp.ui.async.JavaFxUiThreadDispatcher());
 
         currentUser = TestUserFactory.createActiveUser("Mia");
         users.save(currentUser);

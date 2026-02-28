@@ -1,7 +1,7 @@
 # GEMINI.md — AI Agent Operational Context
 
-> **Verified against source code:** 2026-02-28
-> **Codebase snapshot:** 102 main + 77 test Java files (179 total), 55,616 Java LOC (42,154 code)
+> **Verified against source code:** 2026-03-01
+> **Codebase snapshot:** 116 main + 88 test Java files (204 total), 56,468 Java LOC (43,313 code)
 
 ---
 
@@ -31,6 +31,8 @@ datingapp/
     api/RestApiServer.java
     bootstrap/ApplicationStartup.java
     cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
+    error/{AppError,AppResult}.java
+    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
     usecase/
       common/{UseCaseError,UseCaseResult,UserContext}.java
       matching/MatchingUseCases.java
@@ -45,6 +47,8 @@ datingapp/
     metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
     profile/{MatchPreferences,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
+    time/{DefaultTimePolicy,TimePolicy}
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
   storage/
     DatabaseManager.java
     StorageFactory.java
@@ -82,8 +86,9 @@ AppSession session = AppSession.getInstance();
 
 // CLI wiring in Main.java
 InputReader inputReader = new CliTextAndInput.InputReader(scanner);
-MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
 ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
+MatchingHandler matching = new MatchingHandler(
+  MatchingHandler.Dependencies.fromServices(services, session, inputReader, profile::completeProfile));
 SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
 StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
 MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);

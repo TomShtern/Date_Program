@@ -51,6 +51,7 @@ class MatchesViewModelTest {
     private UiUserStore userStore;
     private MatchingService matchingService;
     private RecommendationService dailyService;
+    private AppConfig config;
     private MatchesViewModel viewModel;
     private User currentUser;
 
@@ -63,7 +64,7 @@ class MatchesViewModelTest {
         trustSafetyStorage = new TestStorages.TrustSafety();
         TestClock.setFixed(FIXED_INSTANT);
 
-        AppConfig config = AppConfig.defaults();
+        config = AppConfig.defaults();
 
         // Create dependencies for RecommendationService
         var analyticsStorage = new TestStorages.Analytics();
@@ -91,7 +92,18 @@ class MatchesViewModelTest {
                 .userStorage(users)
                 .build();
 
-        viewModel = new MatchesViewModel(matchData, userStore, matchingService, dailyService, AppSession.getInstance());
+        var undoService = new datingapp.core.matching.UndoService(interactions, new TestStorages.Undos(), config);
+        var matchingUseCases = new datingapp.app.usecase.matching.MatchingUseCases(
+                candidateFinder, matchingService, dailyService, undoService, interactions, users, null);
+
+        viewModel = new MatchesViewModel(
+                matchData,
+                userStore,
+                matchingService,
+                dailyService,
+                matchingUseCases,
+                config,
+                AppSession.getInstance());
         currentUser = createActiveUser("Current");
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
@@ -128,7 +140,17 @@ class MatchesViewModelTest {
                 .build();
 
         MatchesViewModel limitViewModel = new MatchesViewModel(
-                matchData, userStore, matchingService, zeroLimitRecommendationService, AppSession.getInstance());
+                matchData,
+                userStore,
+                matchingService,
+                zeroLimitRecommendationService,
+                new datingapp.app.usecase.matching.MatchingUseCases(
+                        candidateFinder,
+                        matchingService,
+                        new datingapp.core.matching.UndoService(
+                                interactions, new TestStorages.Undos(), zeroLimitConfig)),
+                zeroLimitConfig,
+                AppSession.getInstance());
 
         User otherUser = createActiveUser("Other");
         users.save(otherUser);
@@ -334,8 +356,8 @@ class MatchesViewModelTest {
             }
         };
 
-        MatchesViewModel raceViewModel =
-                new MatchesViewModel(raceMatchData, userStore, matchingService, dailyService, AppSession.getInstance());
+        MatchesViewModel raceViewModel = new MatchesViewModel(
+                raceMatchData, userStore, matchingService, dailyService, config, AppSession.getInstance());
         vmRef.set(raceViewModel);
 
         // 1. Trigger the race via initialize -> refreshAll -> fetchMatchesFromStorage

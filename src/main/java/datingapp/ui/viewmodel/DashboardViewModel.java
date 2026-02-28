@@ -43,6 +43,7 @@ public class DashboardViewModel {
     private final ProfileService achievementService;
     private final ConnectionService messagingService;
     private final ProfileService profileCompletionService;
+    private final AppConfig config;
     private final AppSession session;
     private final ViewModelAsyncScope asyncScope;
 
@@ -67,6 +68,7 @@ public class DashboardViewModel {
             ProfileService achievementService,
             ConnectionService messagingService,
             ProfileService profileCompletionService,
+            AppConfig config,
             AppSession session) {
         this(
                 dailyService,
@@ -74,6 +76,7 @@ public class DashboardViewModel {
                 achievementService,
                 messagingService,
                 profileCompletionService,
+                config,
                 session,
                 new JavaFxUiThreadDispatcher());
     }
@@ -84,6 +87,7 @@ public class DashboardViewModel {
             ProfileService achievementService,
             ConnectionService messagingService,
             ProfileService profileCompletionService,
+            AppConfig config,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
         this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
@@ -92,6 +96,7 @@ public class DashboardViewModel {
         this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
         this.profileCompletionService =
                 Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
     }
@@ -231,7 +236,7 @@ public class DashboardViewModel {
             }
 
             User pickedUser = pick.get().user();
-            java.time.ZoneId timezone = AppConfig.defaults().safety().userTimeZone();
+            java.time.ZoneId timezone = config.safety().userTimeZone();
             int ageVal = pickedUser.getAge(timezone);
             String age = ageVal > 0 ? String.valueOf(ageVal) : "?";
             return pickedUser.getName() + ", " + age;

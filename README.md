@@ -20,9 +20,9 @@ A Java 25 dating application with shared domain logic and three adapters:
 
 ## Verified snapshot (source-only)
 
-- Java files: **102 main + 77 test = 179 total**
-- Java LOC (`tokei`): **55,616 total / 42,154 code / 11,776 blank / 1,686 comments**
-- Latest full gate run in this repo state: **BUILD SUCCESS**, tests **899/0/0/0**
+- Java files: **116 main + 88 test = 204 total**
+- Java LOC (`tokei`): **56,468 total / 43,313 code / 8,502 blank / 4,653 comments**
+- Latest full gate run in this repo state: **BUILD SUCCESS**, tests **983 run / 0 failed / 0 errors / 2 skipped**
 
 ## Tech stack
 
@@ -59,6 +59,8 @@ datingapp/
     api/RestApiServer.java
     bootstrap/ApplicationStartup.java
     cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
+    error/{AppError,AppResult}.java
+    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
     usecase/
       common/{UseCaseError,UseCaseResult,UserContext}.java
       matching/MatchingUseCases.java
@@ -73,6 +75,8 @@ datingapp/
     metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
     profile/{MatchPreferences,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
+    time/{DefaultTimePolicy,TimePolicy}
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
   storage/
     DatabaseManager.java
     StorageFactory.java
@@ -95,8 +99,9 @@ AppSession session = AppSession.getInstance();
 
 // CLI
 InputReader inputReader = new CliTextAndInput.InputReader(scanner);
-MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
 ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
+MatchingHandler matching = new MatchingHandler(
+  MatchingHandler.Dependencies.fromServices(services, session, inputReader, profile::completeProfile));
 SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
 StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
 MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);
@@ -141,4 +146,5 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 2|2026-02-08 11:15:00|agent:claude_code|docs|Fixed stale CLI commands (removed shade/fat JAR), updated stats (182 files, 820 tests, 8 handlers), Checkstyle+PMD now blocking|README.md
 3|2026-02-19 20:30:00|agent:gemini|docs|Updated README to reflect Java 25, Phase 2.1 architecture, and latest file counts|README.md
 4|2026-02-28 13:35:00|agent:github_copilot|docs-source-truth-sync|Rewrote README from current source: 179 Java files, ui/async + app/usecase layers, updated entry wiring and quality gates|README.md
+5|2026-03-01 01:21:00|agent:github_copilot|docs-source-truth-sync|Updated README snapshot, package tree, and Main wiring callback using current source and verify results|README.md
 ---AGENT-LOG-END---

@@ -9,12 +9,12 @@ import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
-import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User;
-import datingapp.core.model.User.UserState;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.workflow.RelationshipWorkflowPolicy;
+import datingapp.core.workflow.WorkflowDecision;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -38,7 +38,7 @@ public class ConnectionService {
     private final CommunicationStorage communicationStorage;
     private final InteractionStorage interactionStorage;
     private final UserStorage userStorage;
-    private final ActivityMetricsService activityMetricsService;
+    private final RelationshipWorkflowPolicy workflowPolicy;
 
     /** Compatibility constructor for tests. */
     public ConnectionService(
@@ -49,38 +49,52 @@ public class ConnectionService {
         this(config, communicationStorage, interactionStorage, userStorage, null);
     }
 
-    /**
-     * Full constructor — all dependencies are required except
-     * activityMetricsService.
-     */
+    /** Constructor without workflow policy — uses default. */
     public ConnectionService(
             AppConfig config,
             CommunicationStorage communicationStorage,
             InteractionStorage interactionStorage,
             UserStorage userStorage,
             ActivityMetricsService activityMetricsService) {
+        this(
+                config,
+                communicationStorage,
+                interactionStorage,
+                userStorage,
+                activityMetricsService,
+                new RelationshipWorkflowPolicy());
+    }
+
+    /** Canonical constructor — all dependencies explicit. */
+    public ConnectionService(
+            AppConfig config,
+            CommunicationStorage communicationStorage,
+            InteractionStorage interactionStorage,
+            UserStorage userStorage,
+            ActivityMetricsService activityMetricsService,
+            RelationshipWorkflowPolicy workflowPolicy) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.communicationStorage = Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
-        this.activityMetricsService = activityMetricsService;
+        this.workflowPolicy = Objects.requireNonNull(workflowPolicy, "workflowPolicy cannot be null");
     }
 
     public SendResult sendMessage(UUID senderId, UUID recipientId, String content) {
         User sender = userStorage.get(senderId).orElse(null);
-        if (sender == null || sender.getState() != UserState.ACTIVE) {
-            return SendResult.failure(SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
-        }
-
         User recipient = userStorage.get(recipientId).orElse(null);
-        if (recipient == null || recipient.getState() != UserState.ACTIVE) {
-            return SendResult.failure(RECIPIENT_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
-        }
-
         String matchId = Match.generateId(senderId, recipientId);
-        Optional<Match> matchOpt = interactionStorage.get(matchId);
-        if (matchOpt.isEmpty() || !matchOpt.get().canMessage()) {
-            return SendResult.failure(NO_ACTIVE_MATCH, SendResult.ErrorCode.NO_ACTIVE_MATCH);
+        Match match = interactionStorage.get(matchId).orElse(null);
+
+        WorkflowDecision decision = workflowPolicy.canSendMessage(match, sender, recipient);
+        if (decision.isDenied()) {
+            String reasonCode = ((WorkflowDecision.Denied) decision).reasonCode();
+            return switch (reasonCode) {
+                case "SENDER_NOT_ACTIVE" -> SendResult.failure(SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
+                case "RECIPIENT_NOT_ACTIVE" ->
+                    SendResult.failure(RECIPIENT_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
+                default -> SendResult.failure(NO_ACTIVE_MATCH, SendResult.ErrorCode.NO_ACTIVE_MATCH);
+            };
         }
 
         if (content == null || content.isBlank()) {
@@ -101,10 +115,6 @@ public class ConnectionService {
         Message message = Message.create(conversationId, senderId, content);
         communicationStorage.saveMessage(message);
         communicationStorage.updateConversationLastMessageAt(conversationId, message.createdAt());
-
-        if (activityMetricsService != null) {
-            activityMetricsService.recordActivity(senderId);
-        }
 
         return SendResult.success(message);
     }
@@ -249,7 +259,8 @@ public class ConnectionService {
         String matchId = Match.generateId(fromUserId, targetUserId);
         Optional<Match> matchOpt = interactionStorage.get(matchId);
 
-        if (matchOpt.isEmpty() || !matchOpt.get().isActive()) {
+        WorkflowDecision decision = workflowPolicy.canRequestFriendZone(matchOpt.orElse(null));
+        if (decision.isDenied()) {
             return TransitionResult.failure("An active match is required to request the Friend Zone.");
         }
 
@@ -309,21 +320,13 @@ public class ConnectionService {
                 FriendRequest.Status.ACCEPTED,
                 AppClock.now());
 
-        Notification acceptedNotification = Notification.create(
-                request.fromUserId(),
-                Notification.Type.FRIEND_REQUEST_ACCEPTED,
-                "Friend Request Accepted",
-                "Your match with the other user has successfully transitioned to the Friend Zone.",
-                Map.of("responderId", responderId.toString()));
-
         if (interactionStorage.supportsAtomicRelationshipTransitions()) {
             try {
-                boolean transitioned =
-                        interactionStorage.acceptFriendZoneTransition(match, updated, acceptedNotification);
+                boolean transitioned = interactionStorage.acceptFriendZoneTransition(match, updated, null);
                 if (!transitioned) {
                     return TransitionResult.failure("Failed to persist friend-zone acceptance.");
                 }
-                return TransitionResult.ok();
+                return TransitionResult.okWithRequest(updated);
             } catch (Exception e) {
                 return TransitionResult.failure("Failed to persist friend-zone acceptance: " + e.getMessage());
             }
@@ -340,9 +343,7 @@ public class ConnectionService {
             interactionStorage.update(match);
             return TransitionResult.failure("Failed to update friend request status: " + e.getMessage());
         }
-        // Notifications are informational-only for non-transactional storages.
-        communicationStorage.saveNotification(acceptedNotification);
-        return TransitionResult.ok();
+        return TransitionResult.okWithRequest(updated);
     }
 
     public TransitionResult declineFriendZone(UUID requestId, UUID responderId) {
@@ -379,7 +380,8 @@ public class ConnectionService {
         }
         Match match = matchOpt.get();
 
-        if (!match.isActive() && match.getState() != MatchState.FRIENDS) {
+        WorkflowDecision decision = workflowPolicy.canGracefulExit(match);
+        if (decision.isDenied()) {
             return TransitionResult.failure("Relationship has already ended.");
         }
 
@@ -391,17 +393,9 @@ public class ConnectionService {
             convo.archive(convo.getUserB(), MatchArchiveReason.GRACEFUL_EXIT);
         });
 
-        Notification gracefulExitNotification = Notification.create(
-                targetUserId,
-                Notification.Type.GRACEFUL_EXIT,
-                "Relationship Ended",
-                "The other user has gracefully moved on from this relationship.",
-                Map.of("initiatorId", initiatorId.toString()));
-
         if (interactionStorage.supportsAtomicRelationshipTransitions()) {
             try {
-                boolean transitioned =
-                        interactionStorage.gracefulExitTransition(match, convoOpt, gracefulExitNotification);
+                boolean transitioned = interactionStorage.gracefulExitTransition(match, convoOpt, null);
                 if (!transitioned) {
                     return TransitionResult.failure("Failed to persist graceful exit transition.");
                 }
@@ -421,8 +415,6 @@ public class ConnectionService {
             communicationStorage.archiveConversation(convo.getId(), convo.getUserA(), MatchArchiveReason.GRACEFUL_EXIT);
             communicationStorage.archiveConversation(convo.getId(), convo.getUserB(), MatchArchiveReason.GRACEFUL_EXIT);
         });
-        // Notification is informational-only — best-effort, not reverted on failure.
-        communicationStorage.saveNotification(gracefulExitNotification);
         return TransitionResult.ok();
     }
 
@@ -444,7 +436,8 @@ public class ConnectionService {
         }
         Match match = matchOpt.get();
 
-        if (!match.isActive() && match.getState() != MatchState.FRIENDS) {
+        WorkflowDecision decision = workflowPolicy.canUnmatch(match);
+        if (decision.isDenied()) {
             return TransitionResult.failure("Match cannot be unmatched from its current state.");
         }
 

@@ -104,6 +104,7 @@ class RelationshipHandlerTest {
                 transitionService,
                 recService,
                 communicationStorage,
+                config,
                 session,
                 inputReader,
                 null); // profileCompleteCallback is optional (nullable) — not needed in tests

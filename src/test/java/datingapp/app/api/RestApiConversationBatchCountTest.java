@@ -3,6 +3,7 @@ package datingapp.app.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
@@ -25,6 +26,7 @@ import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.time.DefaultTimePolicy;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -151,7 +153,9 @@ class RestApiConversationBatchCountTest {
                 recommendationService,
                 undoService,
                 connectionService,
-                validationService);
+                validationService,
+                new DefaultTimePolicy(ZoneId.of("UTC")),
+                new InProcessAppEventBus());
     }
 
     private static User activeUser(UUID id, String name) {

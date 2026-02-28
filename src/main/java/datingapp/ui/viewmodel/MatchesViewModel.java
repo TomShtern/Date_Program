@@ -5,6 +5,7 @@ import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.PendingLikersQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.RemoveLikeCommand;
+import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.Like;
@@ -68,6 +69,7 @@ public class MatchesViewModel {
     private final MatchingService matchingService;
     private final RecommendationService dailyService;
     private final MatchingUseCases matchingUseCases;
+    private final AppConfig config;
     private final AppSession session;
     private final ViewModelAsyncScope asyncScope;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
@@ -108,23 +110,15 @@ public class MatchesViewModel {
             UiUserStore userStore,
             MatchingService matchingService,
             RecommendationService dailyService,
-            AppSession session) {
-        this(matchData, userStore, matchingService, dailyService, null, session, new JavaFxUiThreadDispatcher());
-    }
-
-    public MatchesViewModel(
-            UiMatchDataAccess matchData,
-            UiUserStore userStore,
-            MatchingService matchingService,
-            RecommendationService dailyService,
-            MatchingUseCases matchingUseCases,
+            AppConfig config,
             AppSession session) {
         this(
                 matchData,
                 userStore,
                 matchingService,
                 dailyService,
-                matchingUseCases,
+                null,
+                config,
                 session,
                 new JavaFxUiThreadDispatcher());
     }
@@ -135,6 +129,26 @@ public class MatchesViewModel {
             MatchingService matchingService,
             RecommendationService dailyService,
             MatchingUseCases matchingUseCases,
+            AppConfig config,
+            AppSession session) {
+        this(
+                matchData,
+                userStore,
+                matchingService,
+                dailyService,
+                matchingUseCases,
+                config,
+                session,
+                new JavaFxUiThreadDispatcher());
+    }
+
+    public MatchesViewModel(
+            UiMatchDataAccess matchData,
+            UiUserStore userStore,
+            MatchingService matchingService,
+            RecommendationService dailyService,
+            MatchingUseCases matchingUseCases,
+            AppConfig config,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
         this.matchData = Objects.requireNonNull(matchData, "matchData cannot be null");
@@ -142,6 +156,7 @@ public class MatchesViewModel {
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
         this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
         this.matchingUseCases = matchingUseCases;
+        this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
     }
@@ -297,7 +312,7 @@ public class MatchesViewModel {
         List<PendingLiker> pendingLikers;
         if (matchingUseCases != null) {
             var result = matchingUseCases.pendingLikers(new PendingLikersQuery(UserContext.ui(userId)));
-            pendingLikers = result.success() ? result.data() : matchingService.findPendingLikersWithTimes(userId);
+            pendingLikers = result.success() ? result.data() : List.of();
         } else {
             pendingLikers = matchingService.findPendingLikersWithTimes(userId);
         }
@@ -307,8 +322,7 @@ public class MatchesViewModel {
             if (liker != null && liker.getState() == UserState.ACTIVE) {
                 Like like = matchData.getLike(liker.getId(), userId).orElse(null);
                 if (like != null) {
-                    int age = liker.getAge(
-                            datingapp.core.AppConfig.defaults().safety().userTimeZone());
+                    int age = liker.getAge(config.safety().userTimeZone());
                     received.add(new LikeCardData(
                             liker.getId(),
                             like.id(),
@@ -341,8 +355,7 @@ public class MatchesViewModel {
             if (like != null && like.direction() == Like.Direction.LIKE) {
                 User otherUser = potentialUsers.get(otherUserId);
                 if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
-                    int age = otherUser.getAge(
-                            datingapp.core.AppConfig.defaults().safety().userTimeZone());
+                    int age = otherUser.getAge(config.safety().userTimeZone());
                     sent.add(new LikeCardData(
                             otherUser.getId(),
                             like.id(),
@@ -553,30 +566,20 @@ public class MatchesViewModel {
         if (!dailyService.canLike(userId)) {
             throw new IllegalStateException("Daily like limit reached");
         }
-        if (matchingUseCases != null) {
-            matchingUseCases.recordLike(
-                    new RecordLikeCommand(UserContext.ui(userId), targetUserId, Like.Direction.LIKE, true));
-            return;
-        }
-        matchingService.recordLike(Like.create(userId, targetUserId, Like.Direction.LIKE));
+        matchingUseCases.recordLike(
+                new RecordLikeCommand(UserContext.ui(userId), targetUserId, Like.Direction.LIKE, true));
     }
 
     private void performPassOn(UUID userId, UUID targetUserId) {
-        if (matchingUseCases != null) {
-            matchingUseCases.recordLike(
-                    new RecordLikeCommand(UserContext.ui(userId), targetUserId, Like.Direction.PASS, false));
-            return;
-        }
-        matchingService.recordLike(Like.create(userId, targetUserId, Like.Direction.PASS));
+        matchingUseCases.recordLike(
+                new RecordLikeCommand(UserContext.ui(userId), targetUserId, Like.Direction.PASS, false));
     }
 
     private void performWithdrawLike(UUID likeId) {
         User user = resolveCurrentUser();
-        if (matchingUseCases != null && user != null) {
+        if (user != null) {
             matchingUseCases.removeLike(new RemoveLikeCommand(UserContext.ui(user.getId()), likeId));
-            return;
         }
-        matchData.deleteLike(likeId);
     }
 
     private void executeActionSync(

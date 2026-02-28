@@ -1,13 +1,17 @@
 package datingapp.app.usecase.social;
 
+import datingapp.app.event.AppEvent;
+import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.TrustSafetyService;
+import datingapp.core.model.Match;
 import datingapp.core.storage.CommunicationStorage;
 import java.util.List;
 import java.util.UUID;
@@ -21,22 +25,32 @@ public class SocialUseCases {
     private final ConnectionService connectionService;
     private final TrustSafetyService trustSafetyService;
     private final CommunicationStorage communicationStorage;
+    private final AppEventBus eventBus;
 
     public SocialUseCases(ConnectionService connectionService, TrustSafetyService trustSafetyService) {
-        this(connectionService, trustSafetyService, null);
+        this(connectionService, trustSafetyService, null, null);
     }
 
     public SocialUseCases(TrustSafetyService trustSafetyService) {
-        this(null, trustSafetyService, null);
+        this(null, trustSafetyService, null, null);
     }
 
     public SocialUseCases(
             ConnectionService connectionService,
             TrustSafetyService trustSafetyService,
             CommunicationStorage communicationStorage) {
+        this(connectionService, trustSafetyService, communicationStorage, null);
+    }
+
+    public SocialUseCases(
+            ConnectionService connectionService,
+            TrustSafetyService trustSafetyService,
+            CommunicationStorage communicationStorage,
+            AppEventBus eventBus) {
         this.connectionService = connectionService;
         this.trustSafetyService = trustSafetyService;
         this.communicationStorage = communicationStorage;
+        this.eventBus = eventBus;
     }
 
     public UseCaseResult<TrustSafetyService.BlockResult> blockUser(RelationshipCommand command) {
@@ -97,6 +111,16 @@ public class SocialUseCases {
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
+            if (eventBus != null) {
+                String matchId = Match.generateId(command.context().userId(), command.targetUserId());
+                eventBus.publish(new AppEvent.RelationshipTransitioned(
+                        matchId,
+                        command.context().userId(),
+                        command.targetUserId(),
+                        "MATCHED",
+                        "UNMATCHED",
+                        AppClock.now()));
+            }
             return UseCaseResult.success(result);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to unmatch users: " + e.getMessage()));
@@ -115,6 +139,16 @@ public class SocialUseCases {
                     connectionService.requestFriendZone(command.context().userId(), command.targetUserId());
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+            }
+            if (eventBus != null) {
+                String matchId = Match.generateId(command.context().userId(), command.targetUserId());
+                eventBus.publish(new AppEvent.RelationshipTransitioned(
+                        matchId,
+                        command.context().userId(),
+                        command.targetUserId(),
+                        "MATCHED",
+                        "FRIEND_ZONE_REQUESTED",
+                        AppClock.now()));
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {
@@ -135,6 +169,16 @@ public class SocialUseCases {
                     connectionService.gracefulExit(command.context().userId(), command.targetUserId());
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+            }
+            if (eventBus != null) {
+                String matchId = Match.generateId(command.context().userId(), command.targetUserId());
+                eventBus.publish(new AppEvent.RelationshipTransitioned(
+                        matchId,
+                        command.context().userId(),
+                        command.targetUserId(),
+                        "ACTIVE",
+                        "GRACEFUL_EXIT",
+                        AppClock.now()));
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {
@@ -179,6 +223,12 @@ public class SocialUseCases {
                     };
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+            }
+            if (eventBus != null && command.action() == FriendRequestAction.ACCEPT && result.friendRequest() != null) {
+                var req = result.friendRequest();
+                String matchId = Match.generateId(req.fromUserId(), req.toUserId());
+                eventBus.publish(new AppEvent.FriendRequestAccepted(
+                        req.id(), req.fromUserId(), req.toUserId(), matchId, AppClock.now()));
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {

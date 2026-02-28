@@ -8,6 +8,9 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.workflow.ProfileActivationPolicy;
+import datingapp.core.workflow.ProfileActivationPolicy.ActivationResult;
+import datingapp.core.workflow.WorkflowDecision;
 import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
@@ -40,6 +43,7 @@ public class LoginViewModel {
     private final AppConfig config;
     private final AppSession session;
     private final UiUserStore userStore;
+    private final ProfileActivationPolicy activationPolicy;
     private final ViewModelAsyncScope asyncScope;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final ObservableList<User> filteredUsers = FXCollections.observableArrayList();
@@ -60,14 +64,24 @@ public class LoginViewModel {
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public LoginViewModel(UiUserStore userStore, AppConfig config, AppSession session) {
-        this(userStore, config, session, new JavaFxUiThreadDispatcher());
+        this(userStore, config, session, new JavaFxUiThreadDispatcher(), new ProfileActivationPolicy());
     }
 
     public LoginViewModel(
             UiUserStore userStore, AppConfig config, AppSession session, UiThreadDispatcher uiDispatcher) {
+        this(userStore, config, session, uiDispatcher, new ProfileActivationPolicy());
+    }
+
+    public LoginViewModel(
+            UiUserStore userStore,
+            AppConfig config,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher,
+            ProfileActivationPolicy activationPolicy) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
         this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
         loadUsers();
@@ -188,15 +202,11 @@ public class LoginViewModel {
         if (selectedUser.getState() == UserState.INCOMPLETE) {
             autoCompleteUserProfile(selectedUser);
 
-            // Try to activate if now complete
-            if (selectedUser.isComplete() && selectedUser.getState() == UserState.INCOMPLETE) {
-                try {
-                    selectedUser.activate();
-                    userStore.save(selectedUser);
-                    logInfo("Auto-activated user {} after completing profile", selectedUser.getName());
-                } catch (IllegalStateException e) {
-                    logWarn("Could not auto-activate user {}: {}", selectedUser.getName(), e.getMessage());
-                }
+            // Try to activate if now complete (delegated to policy)
+            ActivationResult activation = activationPolicy.tryActivate(selectedUser);
+            if (activation.activated()) {
+                userStore.save(selectedUser);
+                logInfo("Auto-activated user {} after completing profile", selectedUser.getName());
             }
         }
 
@@ -332,14 +342,14 @@ public class LoginViewModel {
             newUser.setDealbreakers(Dealbreakers.none());
 
             // Now attempt to activate the user since profile is complete
-            if (newUser.isComplete()) {
-                newUser.activate();
+            ActivationResult activation = activationPolicy.tryActivate(newUser);
+            if (activation.activated()) {
                 logInfo("User {} is complete and activated. MatchState: {}", newUser.getName(), newUser.getState());
-            } else {
+            } else if (activation.decision() instanceof WorkflowDecision.Denied denied) {
                 logWarn(
-                        "User {} created but not complete. MatchState: {} (isComplete={})",
+                        "User {} created but not activated: {} (isComplete={})",
                         newUser.getName(),
-                        newUser.getState(),
+                        denied.message(),
                         newUser.isComplete());
             }
             userStore.save(newUser);

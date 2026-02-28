@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -189,6 +190,142 @@ public final class JdbiUserStorage implements UserStorage {
     @Override
     public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
         return dao.deleteProfileNote(authorId, subjectId);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Normalized table DAO methods (V3 schema)
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Replaces all photo URLs for a user in the normalized {@code user_photos}
+     * table. Uses delete-then-insert within a transaction to ensure atomicity.
+     */
+    public void saveUserPhotos(UUID userId, List<String> urls) {
+        jdbi.useTransaction(handle -> {
+            handle.execute("DELETE FROM user_photos WHERE user_id = ?", userId);
+            if (urls != null) {
+                var batch = handle.prepareBatch(
+                        "INSERT INTO user_photos (user_id, position, url) VALUES (:userId, :position, :url)");
+                for (int i = 0; i < urls.size(); i++) {
+                    batch.bind("userId", userId)
+                            .bind("position", i)
+                            .bind("url", urls.get(i))
+                            .add();
+                }
+                if (!urls.isEmpty()) {
+                    batch.execute();
+                }
+            }
+        });
+    }
+
+    /**
+     * Loads all photo URLs for a user from the normalized table, ordered by
+     * position.
+     */
+    public List<String> loadUserPhotos(UUID userId) {
+        return jdbi.withHandle(
+                handle -> handle.createQuery("SELECT url FROM user_photos WHERE user_id = :userId ORDER BY position")
+                        .bind("userId", userId)
+                        .mapTo(String.class)
+                        .list());
+    }
+
+    /**
+     * Replaces all interests for a user in the normalized {@code user_interests}
+     * table.
+     */
+    public void saveUserInterests(UUID userId, Set<String> interests) {
+        jdbi.useTransaction(handle -> {
+            handle.execute("DELETE FROM user_interests WHERE user_id = ?", userId);
+            if (interests != null && !interests.isEmpty()) {
+                var batch = handle.prepareBatch(
+                        "INSERT INTO user_interests (user_id, interest) VALUES (:userId, :interest)");
+                for (String interest : interests) {
+                    batch.bind("userId", userId).bind("interest", interest).add();
+                }
+                batch.execute();
+            }
+        });
+    }
+
+    /** Loads all interests for a user from the normalized table. */
+    public Set<String> loadUserInterests(UUID userId) {
+        return jdbi.withHandle(handle ->
+                new HashSet<>(handle.createQuery("SELECT interest FROM user_interests WHERE user_id = :userId")
+                        .bind("userId", userId)
+                        .mapTo(String.class)
+                        .list()));
+    }
+
+    /**
+     * Replaces all gender preferences for a user in the normalized
+     * {@code user_interested_in} table.
+     */
+    public void saveUserInterestedIn(UUID userId, Set<String> genders) {
+        jdbi.useTransaction(handle -> {
+            handle.execute("DELETE FROM user_interested_in WHERE user_id = ?", userId);
+            if (genders != null && !genders.isEmpty()) {
+                var batch = handle.prepareBatch(
+                        "INSERT INTO user_interested_in (user_id, gender) VALUES (:userId, :gender)");
+                for (String gender : genders) {
+                    batch.bind("userId", userId).bind("gender", gender).add();
+                }
+                batch.execute();
+            }
+        });
+    }
+
+    /** Loads all gender preferences for a user from the normalized table. */
+    public Set<String> loadUserInterestedIn(UUID userId) {
+        return jdbi.withHandle(handle ->
+                new HashSet<>(handle.createQuery("SELECT gender FROM user_interested_in WHERE user_id = :userId")
+                        .bind("userId", userId)
+                        .mapTo(String.class)
+                        .list()));
+    }
+
+    /**
+     * Replaces all values for a single dealbreaker dimension in its normalized
+     * table. The {@code tableName} must be one of: {@code user_db_smoking},
+     * {@code user_db_drinking}, {@code user_db_wants_kids},
+     * {@code user_db_looking_for}, {@code user_db_education}.
+     */
+    public void saveDealbreaker(UUID userId, String tableName, Set<String> values) {
+        validateNormalizedTable(tableName);
+        jdbi.useTransaction(handle -> {
+            handle.execute("DELETE FROM " + tableName + " WHERE user_id = ?", userId);
+            if (values != null && !values.isEmpty()) {
+                var batch = handle.prepareBatch(
+                        "INSERT INTO " + tableName + " (user_id, \"value\") VALUES (:userId, :value)");
+                for (String value : values) {
+                    batch.bind("userId", userId).bind("value", value).add();
+                }
+                batch.execute();
+            }
+        });
+    }
+
+    /**
+     * Loads all values for a single dealbreaker dimension from its normalized
+     * table.
+     */
+    public Set<String> loadDealbreaker(UUID userId, String tableName) {
+        validateNormalizedTable(tableName);
+        return jdbi.withHandle(handle ->
+                new HashSet<>(handle.createQuery("SELECT \"value\" FROM " + tableName + " WHERE user_id = :userId")
+                        .bind("userId", userId)
+                        .mapTo(String.class)
+                        .list()));
+    }
+
+    private static final Set<String> VALID_DEALBREAKER_TABLES = Set.of(
+            "user_db_smoking", "user_db_drinking", "user_db_wants_kids", "user_db_looking_for", "user_db_education");
+
+    private static void validateNormalizedTable(String tableName) {
+        if (!VALID_DEALBREAKER_TABLES.contains(tableName)) {
+            throw new IllegalArgumentException("Invalid dealbreaker table: " + tableName);
+        }
     }
 
     @RegisterRowMapper(Mapper.class)

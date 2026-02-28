@@ -103,6 +103,7 @@ class LikerBrowserHandlerTest {
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage),
                 recService,
                 communicationStorage,
+                config,
                 session,
                 inputReader,
                 null); // profileCompleteCallback is optional (nullable) — not needed in tests

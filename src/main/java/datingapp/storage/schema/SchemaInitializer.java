@@ -57,6 +57,7 @@ public final class SchemaInitializer {
         createProfileSchema(stmt);
         createStandoutsSchema(stmt);
         createUndoStateSchema(stmt);
+        createNormalizedProfileSchema(stmt);
 
         // Indexes & FKs
         createCoreIndexes(stmt);
@@ -419,6 +420,94 @@ public final class SchemaInitializer {
 
         stmt.execute(
                 "CREATE INDEX IF NOT EXISTS idx_standouts_seeker_date ON standouts(seeker_id, featured_date DESC)");
+    }
+
+    /**
+     * Creates normalized junction tables for multi-value profile fields (photos,
+     * interests, gender preferences, dealbreakers). These replace the VARCHAR
+     * columns that previously stored JSON arrays.
+     *
+     * <p>Created by V3 migration and also during fresh install via
+     * {@link #createAllTables(Statement)}.
+     */
+    static void createNormalizedProfileSchema(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS user_photos (
+                    user_id UUID NOT NULL,
+                    position INT NOT NULL,
+                    url VARCHAR(500) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, position),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS user_interests (
+                    user_id UUID NOT NULL,
+                    interest VARCHAR(50) NOT NULL,
+                    PRIMARY KEY (user_id, interest),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS user_interested_in (
+                    user_id UUID NOT NULL,
+                    gender VARCHAR(30) NOT NULL,
+                    PRIMARY KEY (user_id, gender),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS user_db_smoking (
+                    user_id UUID NOT NULL,
+                    "value" VARCHAR(50) NOT NULL,
+                    PRIMARY KEY (user_id, "value"),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS user_db_drinking (
+                    user_id UUID NOT NULL,
+                    "value" VARCHAR(50) NOT NULL,
+                    PRIMARY KEY (user_id, "value"),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS user_db_wants_kids (
+                    user_id UUID NOT NULL,
+                    "value" VARCHAR(50) NOT NULL,
+                    PRIMARY KEY (user_id, "value"),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS user_db_looking_for (
+                    user_id UUID NOT NULL,
+                    "value" VARCHAR(50) NOT NULL,
+                    PRIMARY KEY (user_id, "value"),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS user_db_education (
+                    user_id UUID NOT NULL,
+                    "value" VARCHAR(50) NOT NULL,
+                    PRIMARY KEY (user_id, "value"),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        // Reverse lookup indexes
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_user_interests_interest ON user_interests(interest)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_user_interested_in_gender ON user_interested_in(gender)");
     }
 
     /** Creates undo states table for persisting undo operations across restarts. */

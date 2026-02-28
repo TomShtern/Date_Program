@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 public final class ProfileService {
 
@@ -186,6 +187,45 @@ public final class ProfileService {
             int totalCount,
             CategoryBreakdown breakdown,
             List<String> nextSteps) {}
+
+    private record FieldCheck(String name, int points, Predicate<User> isComplete, String nextStep) {
+        FieldCheck(String name, int points, Predicate<User> isComplete) {
+            this(name, points, isComplete, null);
+        }
+    }
+
+    private static final List<FieldCheck> BASIC_FIELDS = List.of(
+            new FieldCheck(
+                    "Name",
+                    BASIC_NAME_POINTS,
+                    u -> u.getName() != null && !u.getName().isBlank()),
+            new FieldCheck(
+                    "Bio",
+                    BASIC_BIO_POINTS,
+                    u -> u.getBio() != null && !u.getBio().isBlank(),
+                    "📝 Add a bio to tell others about yourself"),
+            new FieldCheck(
+                    "Birth date",
+                    BASIC_BIRTHDATE_POINTS,
+                    u -> u.getBirthDate() != null,
+                    "Add your birth date to complete your profile"),
+            new FieldCheck("Gender", BASIC_GENDER_POINTS, u -> u.getGender() != null),
+            new FieldCheck(
+                    "Interested in",
+                    BASIC_INTERESTED_POINTS,
+                    u -> u.getInterestedIn() != null && !u.getInterestedIn().isEmpty()),
+            new FieldCheck(
+                    "Photo",
+                    BASIC_PHOTO_POINTS,
+                    u -> u.getPhotoUrls() != null && !u.getPhotoUrls().isEmpty(),
+                    "📸 Add a photo - profiles with photos get 10x more matches!"));
+
+    private static final List<FieldCheck> LIFESTYLE_FIELDS = List.of(
+            new FieldCheck("Height", LIFESTYLE_FIELD_POINTS, u -> u.getHeightCm() != null),
+            new FieldCheck("Smoking", LIFESTYLE_FIELD_POINTS, u -> u.getSmoking() != null),
+            new FieldCheck("Drinking", LIFESTYLE_FIELD_POINTS, u -> u.getDrinking() != null),
+            new FieldCheck("Kids preference", LIFESTYLE_FIELD_POINTS, u -> u.getWantsKids() != null),
+            new FieldCheck("Looking for", LIFESTYLE_FIELD_POINTS, u -> u.getLookingFor() != null));
 
     // ========================================================================
     // Detailed completion analysis (category-based scoring)
@@ -362,75 +402,34 @@ public final class ProfileService {
     // Private helpers
     // ========================================================================
 
-    private CategoryResult scoreBasicInfo(User user) {
+    private CategoryResult scoreCategory(String name, List<FieldCheck> fields, User user) {
         int totalPoints = 0;
         int earnedPoints = 0;
-        List<String> basicFilled = new ArrayList<>();
-        List<String> basicMissing = new ArrayList<>();
+        List<String> filled = new ArrayList<>();
+        List<String> missing = new ArrayList<>();
         List<String> nextSteps = new ArrayList<>();
 
-        totalPoints += BASIC_NAME_POINTS;
-        if (user.getName() != null && !user.getName().isBlank()) {
-            earnedPoints += BASIC_NAME_POINTS;
-            basicFilled.add("Name");
-        } else {
-            basicMissing.add("Name");
+        for (FieldCheck field : fields) {
+            totalPoints += field.points();
+            if (field.isComplete().test(user)) {
+                earnedPoints += field.points();
+                filled.add(field.name());
+            } else {
+                missing.add(field.name());
+                if (field.nextStep() != null) {
+                    nextSteps.add(field.nextStep());
+                }
+            }
         }
 
-        totalPoints += BASIC_BIO_POINTS;
-        if (user.getBio() != null && !user.getBio().isBlank()) {
-            earnedPoints += BASIC_BIO_POINTS;
-            basicFilled.add("Bio");
-        } else {
-            basicMissing.add("Bio");
-            nextSteps.add("📝 Add a bio to tell others about yourself");
-        }
-
-        totalPoints += BASIC_BIRTHDATE_POINTS;
-        if (user.getBirthDate() != null) {
-            earnedPoints += BASIC_BIRTHDATE_POINTS;
-            basicFilled.add("Birth date");
-        } else {
-            basicMissing.add("Birth date");
-            nextSteps.add("Add your birth date to complete your profile");
-        }
-
-        totalPoints += BASIC_GENDER_POINTS;
-        if (user.getGender() != null) {
-            earnedPoints += BASIC_GENDER_POINTS;
-            basicFilled.add("Gender");
-        } else {
-            basicMissing.add("Gender");
-        }
-
-        totalPoints += BASIC_INTERESTED_POINTS;
-        if (user.getInterestedIn() != null && !user.getInterestedIn().isEmpty()) {
-            earnedPoints += BASIC_INTERESTED_POINTS;
-            basicFilled.add("Interested in");
-        } else {
-            basicMissing.add("Interested in");
-        }
-
-        totalPoints += BASIC_PHOTO_POINTS;
-        if (user.getPhotoUrls() != null && !user.getPhotoUrls().isEmpty()) {
-            earnedPoints += BASIC_PHOTO_POINTS;
-            basicFilled.add("Photo");
-        } else {
-            basicMissing.add("Photo");
-            nextSteps.add("📸 Add a photo - profiles with photos get 10x more matches!");
-        }
-
-        int basicScore =
-                basicFilled.isEmpty() ? 0 : basicFilled.size() * 100 / (basicFilled.size() + basicMissing.size());
-        CategoryBreakdown breakdown = new CategoryBreakdown("Basic Info", basicScore, basicFilled, basicMissing);
-
+        int score = filled.isEmpty() ? 0 : filled.size() * 100 / (filled.size() + missing.size());
+        CategoryBreakdown breakdown = new CategoryBreakdown(name, score, filled, missing);
         return new CategoryResult(
-                earnedPoints,
-                totalPoints,
-                basicFilled.size(),
-                basicFilled.size() + basicMissing.size(),
-                breakdown,
-                nextSteps);
+                earnedPoints, totalPoints, filled.size(), filled.size() + missing.size(), breakdown, nextSteps);
+    }
+
+    private CategoryResult scoreBasicInfo(User user) {
+        return scoreCategory("Basic Info", BASIC_FIELDS, user);
     }
 
     private CategoryResult scoreInterests(User user) {
@@ -469,69 +468,21 @@ public final class ProfileService {
     }
 
     private CategoryResult scoreLifestyle(User user) {
-        int totalPoints = 0;
-        int earnedPoints = 0;
-        List<String> lifestyleFilled = new ArrayList<>();
-        List<String> lifestyleMissing = new ArrayList<>();
-        List<String> nextSteps = new ArrayList<>();
-
-        totalPoints += LIFESTYLE_FIELD_POINTS;
-        if (user.getHeightCm() != null) {
-            earnedPoints += LIFESTYLE_FIELD_POINTS;
-            lifestyleFilled.add("Height");
-        } else {
-            lifestyleMissing.add("Height");
+        CategoryResult result = scoreCategory("Lifestyle", LIFESTYLE_FIELDS, user);
+        // Lifestyle adds a single "complete the section" tip when any field is missing,
+        // rather than per-field tips — append it if missing items exist.
+        if (!result.breakdown().missingItems().isEmpty()) {
+            List<String> steps = new ArrayList<>(result.nextSteps());
+            steps.add("💫 Complete your lifestyle section for better matches");
+            return new CategoryResult(
+                    result.earnedPoints(),
+                    result.totalPoints(),
+                    result.filledCount(),
+                    result.totalCount(),
+                    result.breakdown(),
+                    steps);
         }
-
-        totalPoints += LIFESTYLE_FIELD_POINTS;
-        if (user.getSmoking() != null) {
-            earnedPoints += LIFESTYLE_FIELD_POINTS;
-            lifestyleFilled.add("Smoking");
-        } else {
-            lifestyleMissing.add("Smoking");
-        }
-
-        totalPoints += LIFESTYLE_FIELD_POINTS;
-        if (user.getDrinking() != null) {
-            earnedPoints += LIFESTYLE_FIELD_POINTS;
-            lifestyleFilled.add("Drinking");
-        } else {
-            lifestyleMissing.add("Drinking");
-        }
-
-        totalPoints += LIFESTYLE_FIELD_POINTS;
-        if (user.getWantsKids() != null) {
-            earnedPoints += LIFESTYLE_FIELD_POINTS;
-            lifestyleFilled.add("Kids preference");
-        } else {
-            lifestyleMissing.add("Kids preference");
-        }
-
-        totalPoints += LIFESTYLE_FIELD_POINTS;
-        if (user.getLookingFor() != null) {
-            earnedPoints += LIFESTYLE_FIELD_POINTS;
-            lifestyleFilled.add("Looking for");
-        } else {
-            lifestyleMissing.add("Looking for");
-        }
-
-        if (!lifestyleMissing.isEmpty()) {
-            nextSteps.add("💫 Complete your lifestyle section for better matches");
-        }
-
-        int lifestyleScore = lifestyleFilled.isEmpty()
-                ? 0
-                : lifestyleFilled.size() * 100 / (lifestyleFilled.size() + lifestyleMissing.size());
-        CategoryBreakdown breakdown =
-                new CategoryBreakdown("Lifestyle", lifestyleScore, lifestyleFilled, lifestyleMissing);
-
-        return new CategoryResult(
-                earnedPoints,
-                totalPoints,
-                lifestyleFilled.size(),
-                lifestyleFilled.size() + lifestyleMissing.size(),
-                breakdown,
-                nextSteps);
+        return result;
     }
 
     private CategoryResult scorePreferences(User user) {

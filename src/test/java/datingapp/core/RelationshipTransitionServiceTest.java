@@ -148,12 +148,10 @@ class RelationshipTransitionServiceTest {
         assertEquals(MatchArchiveReason.GRACEFUL_EXIT, archived.getUserAArchiveReason());
         assertEquals(MatchArchiveReason.GRACEFUL_EXIT, archived.getUserBArchiveReason());
 
-        // Check notification
+        // Notifications are now created by event handlers (NotificationEventHandler),
+        // not directly by ConnectionService. Verify none are created at the service level.
         List<ConnectionModels.Notification> notifications = communicationStorage.getNotificationsForUser(bobId, true);
-        assertEquals(1, notifications.size());
-        assertEquals(
-                ConnectionModels.Notification.Type.GRACEFUL_EXIT,
-                notifications.get(0).type());
+        assertEquals(0, notifications.size(), "ConnectionService no longer creates notifications directly");
     }
 
     @Test

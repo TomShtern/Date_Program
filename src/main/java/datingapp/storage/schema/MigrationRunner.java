@@ -73,10 +73,9 @@ public final class MigrationRunner {
             new VersionedMigration(
                     2,
                     "Backfill FKs, indexes, and constraints for databases migrated under old V1",
-                    MigrationRunner::applyV2)
-            // Future: new VersionedMigration(3, "Describe change here",
-            // MigrationRunner::applyV3)
-            );
+                    MigrationRunner::applyV2),
+            new VersionedMigration(
+                    3, "Normalize multi-value profile fields into junction tables", MigrationRunner::applyV3));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -163,6 +162,20 @@ public final class MigrationRunner {
         migrateSchemaColumns(stmt);
         addMissingForeignKeys(stmt);
         ensureAllIndexes(stmt);
+    }
+
+    /**
+     * V3 migration: creates normalized junction tables for multi-value profile
+     * fields (photos, interests, gender preferences, dealbreakers). No data
+     * migration — that is handled by WU-12 dual-write/read logic.
+     *
+     * <p>
+     * On fresh databases these tables already exist (created by
+     * {@link SchemaInitializer#createNormalizedProfileSchema}); all DDL uses
+     * {@code IF NOT EXISTS} so this is a safe no-op.
+     */
+    private static void applyV3(Statement stmt) throws SQLException {
+        SchemaInitializer.createNormalizedProfileSchema(stmt);
     }
 
     // ═══════════════════════════════════════════════════════════════

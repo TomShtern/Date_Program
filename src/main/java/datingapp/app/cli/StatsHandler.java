@@ -5,15 +5,12 @@ import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
-import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.User;
-import datingapp.core.profile.ProfileService;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -32,16 +29,6 @@ public class StatsHandler implements LoggingSupport {
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
     private final InputReader inputReader;
-
-    public StatsHandler(
-            ActivityMetricsService statsService,
-            ProfileService achievementService,
-            AppSession session,
-            InputReader inputReader) {
-        this.profileUseCases = new ProfileUseCases(null, achievementService, null, statsService, AppConfig.defaults());
-        this.session = session;
-        this.inputReader = inputReader;
-    }
 
     public StatsHandler(ProfileUseCases profileUseCases, AppSession session, InputReader inputReader) {
         this.profileUseCases = java.util.Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");

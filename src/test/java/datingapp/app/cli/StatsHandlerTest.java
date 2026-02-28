@@ -3,6 +3,7 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.metrics.ActivityMetricsService;
@@ -11,7 +12,7 @@ import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender; // Added this import
+import datingapp.core.model.User.Gender;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
@@ -54,7 +55,9 @@ class StatsHandlerTest {
                 interactionStorage, trustSafetyStorage, analyticsStorage, AppConfig.defaults());
         ProfileService achievementService = new ProfileService(
                 AppConfig.defaults(), analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
-        return new StatsHandler(statsService, achievementService, session, inputReader);
+        ProfileUseCases profileUseCases =
+                new ProfileUseCases(userStorage, achievementService, null, statsService, AppConfig.defaults());
+        return new StatsHandler(profileUseCases, session, inputReader);
     }
 
     @SuppressWarnings("unused")

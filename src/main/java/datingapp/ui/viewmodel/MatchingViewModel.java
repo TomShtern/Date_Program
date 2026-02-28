@@ -13,7 +13,7 @@ import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.matching.CandidateFinder;
-import datingapp.core.matching.MatchQualityService;
+import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
@@ -301,9 +301,9 @@ public class MatchingViewModel {
             return "--";
         }
 
-        // Use MatchQualityService's InterestMatcher for more accurate calculation
-        MatchQualityService.InterestMatcher.MatchResult interestMatch =
-                MatchQualityService.InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
+        // Use InterestMatcher for more accurate calculation
+        InterestMatcher.MatchResult interestMatch =
+                InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
 
         // Simplified pre-match compatibility formula
         // (Full MatchQuality calculation requires a Match object)

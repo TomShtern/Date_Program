@@ -9,6 +9,9 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 /**
  * Container for user match preferences, interests, lifestyle choices, and
@@ -617,6 +620,50 @@ public final class MatchPreferences {
             }
 
             /**
+             * Data-driven descriptor for a single lifestyle dealbreak dimension.
+             *
+             * @param hasFilter      returns true when the seeker has set this filter
+             * @param passes         returns true when the candidate satisfies the filter
+             * @param failureMessage builds the human-readable failure string
+             */
+            private record LifestyleDimension(
+                    Predicate<Dealbreakers> hasFilter,
+                    BiPredicate<Dealbreakers, User> passes,
+                    BiFunction<Dealbreakers, User, String> failureMessage) {}
+
+            private static final List<LifestyleDimension> LIFESTYLE_DIMENSIONS = List.of(
+                    new LifestyleDimension(
+                            db -> !db.acceptableSmoking().isEmpty(),
+                            (db, c) -> LifestyleMatcher.isAcceptable(c.getSmoking(), db.acceptableSmoking()),
+                            (db, c) -> c.getSmoking() == null
+                                    ? "Smoking status not specified"
+                                    : "Smoking: " + c.getSmoking().getDisplayName()),
+                    new LifestyleDimension(
+                            db -> !db.acceptableDrinking().isEmpty(),
+                            (db, c) -> LifestyleMatcher.isAcceptable(c.getDrinking(), db.acceptableDrinking()),
+                            (db, c) -> c.getDrinking() == null
+                                    ? "Drinking status not specified"
+                                    : "Drinking: " + c.getDrinking().getDisplayName()),
+                    new LifestyleDimension(
+                            db -> !db.acceptableKidsStance().isEmpty(),
+                            (db, c) -> LifestyleMatcher.isAcceptable(c.getWantsKids(), db.acceptableKidsStance()),
+                            (db, c) -> c.getWantsKids() == null
+                                    ? "Kids stance not specified"
+                                    : "Kids: " + c.getWantsKids().getDisplayName()),
+                    new LifestyleDimension(
+                            db -> !db.acceptableLookingFor().isEmpty(),
+                            (db, c) -> LifestyleMatcher.isAcceptable(c.getLookingFor(), db.acceptableLookingFor()),
+                            (db, c) -> c.getLookingFor() == null
+                                    ? "Relationship goal not specified"
+                                    : "Looking for: " + c.getLookingFor().getDisplayName()),
+                    new LifestyleDimension(
+                            db -> !db.acceptableEducation().isEmpty(),
+                            (db, c) -> LifestyleMatcher.isAcceptable(c.getEducation(), db.acceptableEducation()),
+                            (db, c) -> c.getEducation() == null
+                                    ? "Education not specified"
+                                    : "Education: " + c.getEducation().getDisplayName()));
+
+            /**
              * Evaluates whether a candidate passes all of a seeker's dealbreakers.
              * Uses system default timezone for age calculations.
              *
@@ -640,15 +687,16 @@ public final class MatchPreferences {
              */
             public static boolean passes(User seeker, User candidate, java.time.ZoneId timezone) {
                 Dealbreakers db = seeker.getDealbreakers();
+                if (!db.hasAnyDealbreaker()) {
+                    return true;
+                }
 
-                return !db.hasAnyDealbreaker()
-                        || (passesSmoking(db, candidate)
-                                && passesDrinking(db, candidate)
-                                && passesKids(db, candidate)
-                                && passesLookingFor(db, candidate)
-                                && passesEducation(db, candidate)
-                                && passesHeight(db, candidate)
-                                && passesAgeDifference(db, seeker, candidate, timezone));
+                for (LifestyleDimension dim : LIFESTYLE_DIMENSIONS) {
+                    if (dim.hasFilter().test(db) && !dim.passes().test(db, candidate)) {
+                        return false;
+                    }
+                }
+                return passesHeight(db, candidate) && passesAgeDifference(db, seeker, candidate, timezone);
             }
 
             /**
@@ -677,40 +725,15 @@ public final class MatchPreferences {
                 List<String> failures = new ArrayList<>();
                 Dealbreakers db = seeker.getDealbreakers();
 
-                addSmokingFailure(db, candidate, failures);
-                addDrinkingFailure(db, candidate, failures);
-                addKidsFailure(db, candidate, failures);
-                addLookingForFailure(db, candidate, failures);
-                addEducationFailure(db, candidate, failures);
+                for (LifestyleDimension dim : LIFESTYLE_DIMENSIONS) {
+                    if (dim.hasFilter().test(db) && !dim.passes().test(db, candidate)) {
+                        failures.add(dim.failureMessage().apply(db, candidate));
+                    }
+                }
                 addHeightFailure(db, candidate, failures);
                 addAgeFailure(db, seeker, candidate, timezone, failures);
 
                 return failures;
-            }
-
-            private static boolean passesSmoking(Dealbreakers db, User candidate) {
-                return !db.hasSmokingDealbreaker()
-                        || LifestyleMatcher.isAcceptable(candidate.getSmoking(), db.acceptableSmoking());
-            }
-
-            private static boolean passesDrinking(Dealbreakers db, User candidate) {
-                return !db.hasDrinkingDealbreaker()
-                        || LifestyleMatcher.isAcceptable(candidate.getDrinking(), db.acceptableDrinking());
-            }
-
-            private static boolean passesKids(Dealbreakers db, User candidate) {
-                return !db.hasKidsDealbreaker()
-                        || LifestyleMatcher.isAcceptable(candidate.getWantsKids(), db.acceptableKidsStance());
-            }
-
-            private static boolean passesLookingFor(Dealbreakers db, User candidate) {
-                return !db.hasLookingForDealbreaker()
-                        || LifestyleMatcher.isAcceptable(candidate.getLookingFor(), db.acceptableLookingFor());
-            }
-
-            private static boolean passesEducation(Dealbreakers db, User candidate) {
-                return !db.hasEducationDealbreaker()
-                        || LifestyleMatcher.isAcceptable(candidate.getEducation(), db.acceptableEducation());
             }
 
             private static boolean passesHeight(Dealbreakers db, User candidate) {
@@ -740,65 +763,6 @@ public final class MatchPreferences {
                     return true;
                 }
                 return Math.abs(seekerAge - candidateAge) <= db.maxAgeDifference();
-            }
-
-            private static void addSmokingFailure(Dealbreakers db, User candidate, List<String> failures) {
-                if (!db.hasSmokingDealbreaker()) {
-                    return;
-                }
-                Lifestyle.Smoking smoking = candidate.getSmoking();
-                if (!LifestyleMatcher.isAcceptable(smoking, db.acceptableSmoking())) {
-                    failures.add(
-                            smoking == null ? "Smoking status not specified" : "Smoking: " + smoking.getDisplayName());
-                }
-            }
-
-            private static void addDrinkingFailure(Dealbreakers db, User candidate, List<String> failures) {
-                if (!db.hasDrinkingDealbreaker()) {
-                    return;
-                }
-                Lifestyle.Drinking drinking = candidate.getDrinking();
-                if (!LifestyleMatcher.isAcceptable(drinking, db.acceptableDrinking())) {
-                    failures.add(
-                            drinking == null
-                                    ? "Drinking status not specified"
-                                    : "Drinking: " + drinking.getDisplayName());
-                }
-            }
-
-            private static void addKidsFailure(Dealbreakers db, User candidate, List<String> failures) {
-                if (!db.hasKidsDealbreaker()) {
-                    return;
-                }
-                Lifestyle.WantsKids wantsKids = candidate.getWantsKids();
-                if (!LifestyleMatcher.isAcceptable(wantsKids, db.acceptableKidsStance())) {
-                    failures.add(
-                            wantsKids == null ? "Kids stance not specified" : "Kids: " + wantsKids.getDisplayName());
-                }
-            }
-
-            private static void addLookingForFailure(Dealbreakers db, User candidate, List<String> failures) {
-                if (!db.hasLookingForDealbreaker()) {
-                    return;
-                }
-                Lifestyle.LookingFor lookingFor = candidate.getLookingFor();
-                if (!LifestyleMatcher.isAcceptable(lookingFor, db.acceptableLookingFor())) {
-                    failures.add(
-                            lookingFor == null
-                                    ? "Relationship goal not specified"
-                                    : "Looking for: " + lookingFor.getDisplayName());
-                }
-            }
-
-            private static void addEducationFailure(Dealbreakers db, User candidate, List<String> failures) {
-                if (!db.hasEducationDealbreaker()) {
-                    return;
-                }
-                Lifestyle.Education education = candidate.getEducation();
-                if (!LifestyleMatcher.isAcceptable(education, db.acceptableEducation())) {
-                    failures.add(
-                            education == null ? "Education not specified" : "Education: " + education.getDisplayName());
-                }
             }
 
             private static void addHeightFailure(Dealbreakers db, User candidate, List<String> failures) {

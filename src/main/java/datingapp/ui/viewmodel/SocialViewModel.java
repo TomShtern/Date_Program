@@ -71,7 +71,7 @@ public class SocialViewModel {
             UiSocialDataAccess socialDataAccess,
             UiUserStore userStore,
             AppSession session) {
-        this(connectionService, socialDataAccess, userStore, session, new JavaFxUiThreadDispatcher());
+        this(connectionService, socialDataAccess, userStore, null, session, new JavaFxUiThreadDispatcher());
     }
 
     public SocialViewModel(
@@ -80,10 +80,21 @@ public class SocialViewModel {
             UiUserStore userStore,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
+        this(connectionService, socialDataAccess, userStore, null, session, uiDispatcher);
+    }
+
+    public SocialViewModel(
+            ConnectionService connectionService,
+            UiSocialDataAccess socialDataAccess,
+            UiUserStore userStore,
+            SocialUseCases socialUseCases,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
         this.socialDataAccess = Objects.requireNonNull(socialDataAccess, "socialDataAccess cannot be null");
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
-        this.socialUseCases = new SocialUseCases(this.connectionService, null);
+        this.socialUseCases =
+                socialUseCases != null ? socialUseCases : new SocialUseCases(this.connectionService, null);
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
     }
@@ -200,11 +211,8 @@ public class SocialViewModel {
         }
         asyncScope.runFireAndForget("mark notification read", () -> {
             try {
-                var result = socialUseCases.markNotificationRead(
+                socialUseCases.markNotificationRead(
                         new MarkNotificationReadCommand(UserContext.ui(user.getId()), notification.id()));
-                if (!result.success()) {
-                    socialDataAccess.markNotificationRead(notification.id());
-                }
                 asyncScope.dispatchToUi(this::refresh);
             } catch (Exception e) {
                 logWarn("Failed to mark notification as read", e);

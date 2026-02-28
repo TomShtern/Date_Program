@@ -141,7 +141,8 @@ public class ViewModelFactory {
 
     public synchronized LoginViewModel getLoginViewModel() {
         if (loginViewModel == null) {
-            loginViewModel = new LoginViewModel(createUiUserStore(), services.getConfig(), session, uiDispatcher);
+            loginViewModel = new LoginViewModel(
+                    createUiUserStore(), services.getConfig(), session, uiDispatcher, services.getActivationPolicy());
         }
         return loginViewModel;
     }
@@ -154,6 +155,7 @@ public class ViewModelFactory {
                     services.getProfileService(),
                     services.getConnectionService(),
                     services.getProfileService(),
+                    services.getConfig(),
                     session,
                     uiDispatcher);
         }
@@ -168,7 +170,8 @@ public class ViewModelFactory {
                     services.getProfileUseCases(),
                     services.getConfig(),
                     session,
-                    uiDispatcher);
+                    uiDispatcher,
+                    services.getActivationPolicy());
         }
         return profileViewModel;
     }
@@ -194,6 +197,7 @@ public class ViewModelFactory {
                     services.getMatchingService(),
                     services.getRecommendationService(),
                     services.getMatchingUseCases(),
+                    services.getConfig(),
                     session,
                     uiDispatcher);
         }

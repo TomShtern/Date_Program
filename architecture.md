@@ -1,8 +1,8 @@
 # Dating App Architecture
 
-> **Last verified against source code:** 2026-02-28
-> **Java files:** 102 main + 77 test = 179
-> **Java LOC (`tokei`):** 55,616 total / 42,154 code / 11,776 blank / 1,686 comments
+> **Last verified against source code:** 2026-03-01
+> **Java files:** 116 main + 88 test = 204
+> **Java LOC (`tokei`):** 56,468 total / 43,313 code / 8,502 blank / 4,653 comments
 
 This document describes current architecture from source (`src/main/java`, `src/test/java`, `pom.xml`).
 
@@ -43,6 +43,8 @@ datingapp/
     api/RestApiServer.java
     bootstrap/ApplicationStartup.java
     cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
+    error/{AppError,AppResult}.java
+    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
     usecase/
       common/{UseCaseError,UseCaseResult,UserContext}.java
       matching/MatchingUseCases.java
@@ -57,6 +59,8 @@ datingapp/
     metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
     profile/{MatchPreferences,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
+    time/{DefaultTimePolicy,TimePolicy}
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
   storage/
     DatabaseManager.java
     StorageFactory.java
@@ -85,8 +89,9 @@ AppSession session = AppSession.getInstance();
 
 ```java
 InputReader inputReader = new CliTextAndInput.InputReader(scanner);
-MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
 ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
+MatchingHandler matching = new MatchingHandler(
+  MatchingHandler.Dependencies.fromServices(services, session, inputReader, profile::completeProfile));
 SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
 StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
 MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);

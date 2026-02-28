@@ -51,7 +51,7 @@ You are operating in an environment where ast-grep is installed. For any code se
 # Dating App - AI Agent Instructions
 
 **Platform:** Windows 11 | PowerShell 7.5.x | VS Code Insiders | Java 25 (preview enabled) | JavaFX 25.0.2
-**Verified snapshot (2026-02-22):** 87 main + 65 test Java files (152 total) | 48,494 LOC / 37,150 code | JaCoCo line coverage gate: 60%
+**Verified snapshot (2026-03-01):** 116 main + 88 test Java files (204 total) | 56,468 LOC / 43,313 code | JaCoCo line coverage gate: 60%
 
 ## ⚠️ Critical Gotchas (Compilation / Runtime / Agent Accuracy)
 
@@ -68,7 +68,7 @@ You are operating in an environment where ast-grep is installed. For any code se
 | Legacy bootstrap references | `AppBootstrap`, `HandlerFactory`                | `ApplicationStartup` + service-based `fromServices(...)` handler wiring |
 | Legacy UI references        | `ui/controller`, `Toast`, `UiSupport`           | `ui/screen`, `ui/popup`, `UiFeedbackService`, `UiComponents`            |
 
-**Config access pattern:** `private static final AppConfig CONFIG = AppConfig.defaults();`
+**Config access pattern:** use injected `AppConfig` from `ServiceRegistry` for runtime behavior; keep `AppConfig.defaults()` at composition/bootstrap/test boundaries only.
 
 **Config JSON loading:** `ApplicationStartup.applyJsonConfig()` uses Jackson databinding (`readerForUpdating(builder).readValue(json)`) via a `BuilderMixin` — no annotations in `core/`. Adding a new config property only requires a field + setter in `AppConfig.Builder` and an entry in `app-config.json`. No `ApplicationStartup` edits needed.
 
@@ -83,6 +83,8 @@ datingapp/
     api/RestApiServer.java
     bootstrap/ApplicationStartup.java
     cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
+    error/{AppError,AppResult}.java
+    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
     usecase/
       common/{UseCaseError,UseCaseResult,UserContext}.java
       matching/MatchingUseCases.java
@@ -97,6 +99,8 @@ datingapp/
     metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
     profile/{MatchPreferences,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
+    time/{DefaultTimePolicy,TimePolicy}
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
   storage/
     DatabaseManager.java
     StorageFactory.java
@@ -131,8 +135,9 @@ AppSession session = AppSession.getInstance();
 
 // CLI in Main.java
 InputReader inputReader = new CliTextAndInput.InputReader(scanner);
-MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
 ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
+MatchingHandler matching = new MatchingHandler(
+  MatchingHandler.Dependencies.fromServices(services, session, inputReader, profile::completeProfile));
 SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
 StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
 MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);

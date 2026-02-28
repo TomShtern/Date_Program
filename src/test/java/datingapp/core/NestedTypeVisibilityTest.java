@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.connection.ConnectionModels;
 import datingapp.core.connection.ConnectionService;
+import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
@@ -56,9 +57,8 @@ class NestedTypeVisibilityTest {
         assertTrue(
                 Modifier.isStatic(MatchQualityService.MatchQuality.class.getModifiers()),
                 "MatchQualityService.MatchQuality must be static");
-        assertTrue(
-                Modifier.isStatic(MatchQualityService.InterestMatcher.class.getModifiers()),
-                "MatchQualityService.InterestMatcher must be static");
+        assertTrue(Modifier.isPublic(InterestMatcher.class.getModifiers()), "InterestMatcher must be public");
+        assertTrue(Modifier.isFinal(InterestMatcher.class.getModifiers()), "InterestMatcher must be final");
         assertTrue(
                 Modifier.isStatic(MatchingService.SwipeResult.class.getModifiers()),
                 "MatchingService.SwipeResult must be static");

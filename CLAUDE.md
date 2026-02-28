@@ -20,10 +20,10 @@ Guidance for AI coding agents working in this repository.
 - Java 25 + JavaFX 25
 - Maven
 
-## Verified Source Snapshot (2026-02-28)
+## Verified Source Snapshot (2026-03-01)
 
-- Java files: **102 main + 77 test = 179 total**
-- Java LOC (`tokei`): **55,616 total / 42,154 code / 11,776 blank / 1,686 comments**
+- Java files: **116 main + 88 test = 204 total**
+- Java LOC (`tokei`): **56,468 total / 43,313 code / 8,502 blank / 4,653 comments**
 
 ## Architecture (code-verified)
 
@@ -34,6 +34,8 @@ datingapp/
     api/RestApiServer.java
     bootstrap/ApplicationStartup.java
     cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
+    error/{AppError,AppResult}.java
+    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
     usecase/
       common/{UseCaseError,UseCaseResult,UserContext}.java
       matching/MatchingUseCases.java
@@ -48,6 +50,8 @@ datingapp/
     metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
     profile/{MatchPreferences,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
+    time/{DefaultTimePolicy,TimePolicy}
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
   storage/
     DatabaseManager.java
     StorageFactory.java
@@ -83,8 +87,8 @@ AppSession session = AppSession.getInstance();
 
 // CLI wiring (Main.java)
 InputReader inputReader = new CliTextAndInput.InputReader(scanner);
-MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader));
 ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
+MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader, profile::completeProfile));
 SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
 StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
 MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);
@@ -158,4 +162,5 @@ mvn spotless:apply verify
 24|2026-02-21 16:30:00|agent:github_copilot|scope:docs-source-truth-refresh|Refreshed stats and wiring snippets|CLAUDE.md
 25|2026-02-22 04:08:00|agent:gemini|scope:config-jackson-databinding|Documented AppConfig Jackson databinding strategy|CLAUDE.md
 26|2026-02-28 13:35:00|agent:github_copilot|scope:source-truth-doc-sync|Rewrote CLAUDE.md from current code snapshot including app/usecase and ui/async architecture|CLAUDE.md
+27|2026-03-01 01:20:00|agent:github_copilot|scope:source-truth-doc-sync|Updated counts, package tree, and CLI wiring callback from current source|CLAUDE.md
 ---AGENT-LOG-END---

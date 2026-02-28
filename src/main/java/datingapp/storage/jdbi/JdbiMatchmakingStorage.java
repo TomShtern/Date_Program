@@ -386,7 +386,6 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
             Match updatedMatch, FriendRequest acceptedRequest, Notification notification) {
         Objects.requireNonNull(updatedMatch, "updatedMatch cannot be null");
         Objects.requireNonNull(acceptedRequest, "acceptedRequest cannot be null");
-        Objects.requireNonNull(notification, "notification cannot be null");
 
         try {
             return jdbi.inTransaction(handle -> {
@@ -415,7 +414,9 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     throw new StorageException("Failed to persist friend request acceptance atomically");
                 }
 
-                saveNotification(handle, notification);
+                if (notification != null) {
+                    saveNotification(handle, notification);
+                }
                 return true;
             });
         } catch (StorageException e) {
@@ -430,7 +431,6 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
             Match updatedMatch, Optional<Conversation> archivedConversation, Notification notification) {
         Objects.requireNonNull(updatedMatch, "updatedMatch cannot be null");
         Objects.requireNonNull(archivedConversation, "archivedConversation cannot be null");
-        Objects.requireNonNull(notification, "notification cannot be null");
 
         try {
             return jdbi.inTransaction(handle -> {
@@ -464,7 +464,9 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     }
                 }
 
-                saveNotification(handle, notification);
+                if (notification != null) {
+                    saveNotification(handle, notification);
+                }
                 return true;
             });
         } catch (StorageException e) {

@@ -5,13 +5,13 @@ import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.model.Match.MatchArchiveReason;
-import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -33,6 +33,7 @@ public class TrustSafetyService {
     private final CommunicationStorage communicationStorage; // nullable
     private final Duration verificationTtl;
     private final Random random;
+    private final RelationshipWorkflowPolicy workflowPolicy;
 
     /** Convenience constructor without communication storage (for tests and simple setups). */
     public TrustSafetyService(
@@ -71,7 +72,7 @@ public class TrustSafetyService {
         this(trustSafetyStorage, interactionStorage, userStorage, config, null, verificationTtl, random);
     }
 
-    /** Canonical constructor — all dependencies explicit. */
+    /** Backward-compatible canonical constructor — delegates to full constructor. */
     public TrustSafetyService(
             TrustSafetyStorage trustSafetyStorage,
             InteractionStorage interactionStorage,
@@ -80,6 +81,28 @@ public class TrustSafetyService {
             CommunicationStorage communicationStorage,
             Duration verificationTtl,
             Random random) {
+        this(
+                trustSafetyStorage,
+                interactionStorage,
+                userStorage,
+                config,
+                communicationStorage,
+                verificationTtl,
+                random,
+                new RelationshipWorkflowPolicy());
+    }
+
+    /** Full canonical constructor with workflow policy. */
+    @SuppressWarnings("java:S107")
+    public TrustSafetyService(
+            TrustSafetyStorage trustSafetyStorage,
+            InteractionStorage interactionStorage,
+            UserStorage userStorage,
+            AppConfig config,
+            CommunicationStorage communicationStorage,
+            Duration verificationTtl,
+            Random random,
+            RelationshipWorkflowPolicy workflowPolicy) {
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
@@ -87,6 +110,7 @@ public class TrustSafetyService {
         this.communicationStorage = communicationStorage;
         this.verificationTtl = Objects.requireNonNull(verificationTtl, "verificationTtl cannot be null");
         this.random = Objects.requireNonNull(random, "random cannot be null");
+        this.workflowPolicy = Objects.requireNonNull(workflowPolicy, "workflowPolicy cannot be null");
     }
 
     /** Generates a six-digit verification code. */
@@ -206,7 +230,7 @@ public class TrustSafetyService {
             return;
         }
         interactionStorage.getByUsers(blockerId, blockedId).ifPresent(match -> {
-            if (match.getState() != MatchState.BLOCKED) {
+            if (workflowPolicy.canBlock(match).isAllowed()) {
                 match.block(blockerId);
                 interactionStorage.update(match);
                 if (logger.isInfoEnabled()) {

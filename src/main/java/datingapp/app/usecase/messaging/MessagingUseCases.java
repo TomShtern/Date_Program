@@ -1,8 +1,11 @@
 package datingapp.app.usecase.messaging;
 
+import datingapp.app.event.AppEvent;
+import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
@@ -17,9 +20,15 @@ public class MessagingUseCases {
     private static final int DEFAULT_LIMIT = 50;
 
     private final ConnectionService connectionService;
+    private final AppEventBus eventBus;
 
     public MessagingUseCases(ConnectionService connectionService) {
+        this(connectionService, null);
+    }
+
+    public MessagingUseCases(ConnectionService connectionService, AppEventBus eventBus) {
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
+        this.eventBus = eventBus;
     }
 
     public UseCaseResult<ConversationListResult> listConversations(ListConversationsQuery query) {
@@ -99,6 +108,13 @@ public class MessagingUseCases {
                     connectionService.sendMessage(command.context().userId(), command.recipientId(), command.content());
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+            }
+            if (eventBus != null) {
+                eventBus.publish(new AppEvent.MessageSent(
+                        command.context().userId(),
+                        command.recipientId(),
+                        result.message().id(),
+                        AppClock.now()));
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {

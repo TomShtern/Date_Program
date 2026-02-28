@@ -8,12 +8,13 @@ import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ProfileService.CompletionResult;
+import datingapp.core.workflow.ProfileActivationPolicy;
+import datingapp.core.workflow.ProfileActivationPolicy.ActivationResult;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
@@ -56,6 +57,7 @@ public class ProfileViewModel {
     private final ProfileService profileCompletionService;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
+    private final ProfileActivationPolicy activationPolicy;
     private final ViewModelAsyncScope asyncScope;
 
     // Observable properties for form binding - Basic Info
@@ -104,7 +106,14 @@ public class ProfileViewModel {
 
     public ProfileViewModel(
             UiUserStore userStore, ProfileService profileCompletionService, AppConfig config, AppSession session) {
-        this(userStore, profileCompletionService, null, config, session, new JavaFxUiThreadDispatcher());
+        this(
+                userStore,
+                profileCompletionService,
+                null,
+                config,
+                session,
+                new JavaFxUiThreadDispatcher(),
+                new ProfileActivationPolicy());
     }
 
     public ProfileViewModel(
@@ -113,7 +122,14 @@ public class ProfileViewModel {
             ProfileUseCases profileUseCases,
             AppConfig config,
             AppSession session) {
-        this(userStore, profileCompletionService, profileUseCases, config, session, new JavaFxUiThreadDispatcher());
+        this(
+                userStore,
+                profileCompletionService,
+                profileUseCases,
+                config,
+                session,
+                new JavaFxUiThreadDispatcher(),
+                new ProfileActivationPolicy());
     }
 
     public ProfileViewModel(
@@ -123,12 +139,31 @@ public class ProfileViewModel {
             AppConfig config,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
+        this(
+                userStore,
+                profileCompletionService,
+                profileUseCases,
+                config,
+                session,
+                uiDispatcher,
+                new ProfileActivationPolicy());
+    }
+
+    public ProfileViewModel(
+            UiUserStore userStore,
+            ProfileService profileCompletionService,
+            ProfileUseCases profileUseCases,
+            AppConfig config,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher,
+            ProfileActivationPolicy activationPolicy) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.profileCompletionService =
                 Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
         this.profileUseCases = profileUseCases;
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
@@ -495,15 +530,11 @@ public class ProfileViewModel {
     }
 
     private void attemptActivation(User user) {
-        if (user.isComplete() && user.getState() == UserState.INCOMPLETE) {
-            try {
-                user.activate();
-                userStore.save(user);
-                logInfo("User {} activated after profile completion", user.getName());
-                asyncScope.dispatchToUi(() -> UiFeedbackService.showSuccess("Profile complete! You're now active!"));
-            } catch (IllegalStateException e) {
-                logWarn("Could not activate user: {}", e.getMessage());
-            }
+        ActivationResult activation = activationPolicy.tryActivate(user);
+        if (activation.activated()) {
+            userStore.save(user);
+            logInfo("User {} activated after profile completion", user.getName());
+            asyncScope.dispatchToUi(() -> UiFeedbackService.showSuccess("Profile complete! You're now active!"));
         }
     }
 

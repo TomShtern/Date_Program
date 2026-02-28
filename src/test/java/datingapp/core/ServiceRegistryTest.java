@@ -181,4 +181,21 @@ class ServiceRegistryTest {
             assertNotNull(config);
         }
     }
+
+    @Nested
+    @DisplayName("Foundation Getters")
+    class FoundationGetters {
+
+        @Test
+        @DisplayName("getTimePolicy returns non-null")
+        void getTimePolicy() {
+            assertNotNull(registry.getTimePolicy());
+        }
+
+        @Test
+        @DisplayName("getEventBus returns non-null")
+        void getEventBus() {
+            assertNotNull(registry.getEventBus());
+        }
+    }
 }

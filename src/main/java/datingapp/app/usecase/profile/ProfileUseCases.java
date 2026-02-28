@@ -1,18 +1,21 @@
 package datingapp.app.usecase.profile;
 
+import datingapp.app.event.AppEvent;
+import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -29,18 +32,51 @@ public class ProfileUseCases {
     private final ValidationService validationService;
     private final ActivityMetricsService activityMetricsService;
     private final AppConfig config;
+    private final ProfileActivationPolicy activationPolicy;
+    private final AppEventBus eventBus;
 
+    /** Backward-compatible constructor — uses default activation policy, no event bus. */
     public ProfileUseCases(
             UserStorage userStorage,
             ProfileService profileService,
             ValidationService validationService,
             ActivityMetricsService activityMetricsService,
             AppConfig config) {
+        this(
+                userStorage,
+                profileService,
+                validationService,
+                activityMetricsService,
+                config,
+                new ProfileActivationPolicy(),
+                null);
+    }
+
+    public ProfileUseCases(
+            UserStorage userStorage,
+            ProfileService profileService,
+            ValidationService validationService,
+            ActivityMetricsService activityMetricsService,
+            AppConfig config,
+            ProfileActivationPolicy activationPolicy) {
+        this(userStorage, profileService, validationService, activityMetricsService, config, activationPolicy, null);
+    }
+
+    public ProfileUseCases(
+            UserStorage userStorage,
+            ProfileService profileService,
+            ValidationService validationService,
+            ActivityMetricsService activityMetricsService,
+            AppConfig config,
+            ProfileActivationPolicy activationPolicy,
+            AppEventBus eventBus) {
         this.userStorage = userStorage;
         this.profileService = profileService;
         this.validationService = validationService;
         this.activityMetricsService = activityMetricsService;
         this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
+        this.eventBus = eventBus;
     }
 
     public UseCaseResult<ProfileSaveResult> saveProfile(SaveProfileCommand command) {
@@ -55,14 +91,14 @@ public class ProfileUseCases {
         }
 
         try {
-            boolean activated = false;
             User user = command.user();
-            if (user.isComplete() && user.getState() == UserState.INCOMPLETE) {
-                user.activate();
-                activated = true;
-            }
+            var activation = activationPolicy.tryActivate(user);
+            boolean activated = activation.activated();
             userStorage.save(user);
             List<UserAchievement> newAchievements = profileService.checkAndUnlock(user.getId());
+            if (eventBus != null) {
+                eventBus.publish(new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()));
+            }
             return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to save profile: " + e.getMessage()));

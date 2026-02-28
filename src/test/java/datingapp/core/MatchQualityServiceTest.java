@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
-import datingapp.core.matching.MatchQualityService.InterestMatcher;
+import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchQualityService.MatchQuality;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;

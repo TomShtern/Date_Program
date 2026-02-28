@@ -17,6 +17,7 @@ import datingapp.app.usecase.social.SocialUseCases.MarkNotificationReadCommand;
 import datingapp.app.usecase.social.SocialUseCases.NotificationsQuery;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.app.usecase.social.SocialUseCases.RespondFriendRequestCommand;
+import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
@@ -27,8 +28,8 @@ import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
+import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchQualityService;
-import datingapp.core.matching.MatchQualityService.InterestMatcher;
 import datingapp.core.matching.MatchQualityService.MatchQuality;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.MatchingService.PendingLiker;
@@ -37,7 +38,6 @@ import datingapp.core.matching.RecommendationService.DailyPick;
 import datingapp.core.matching.Standout;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
-import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
@@ -69,9 +69,9 @@ public class MatchingHandler implements LoggingSupport {
     private final UndoService undoService;
     private final MatchQualityService matchQualityService;
     private final UserStorage userStorage;
-    private final ProfileService achievementService;
     private final AnalyticsStorage analyticsStorage;
     private final RecommendationService standoutsService;
+    private final AppConfig config;
     private final AppSession session;
     private final InputReader inputReader;
     private final Runnable profileCompleteCallback; // nullable; invoked when location is missing
@@ -84,9 +84,9 @@ public class MatchingHandler implements LoggingSupport {
         this.undoService = dependencies.undoService();
         this.matchQualityService = dependencies.matchQualityService();
         this.userStorage = dependencies.userStorage();
-        this.achievementService = dependencies.achievementService();
         this.analyticsStorage = dependencies.analyticsStorage();
         this.standoutsService = dependencies.standoutsService();
+        this.config = dependencies.config();
         this.session = dependencies.userSession();
         this.inputReader = dependencies.inputReader();
         this.profileCompleteCallback = dependencies.profileCompleteCallback();
@@ -123,6 +123,7 @@ public class MatchingHandler implements LoggingSupport {
             ConnectionService transitionService,
             RecommendationService standoutsService,
             CommunicationStorage communicationStorage,
+            AppConfig config,
             AppSession userSession,
             InputReader inputReader,
             Runnable profileCompleteCallback) {
@@ -141,6 +142,7 @@ public class MatchingHandler implements LoggingSupport {
             Objects.requireNonNull(transitionService);
             Objects.requireNonNull(standoutsService);
             Objects.requireNonNull(communicationStorage);
+            Objects.requireNonNull(config);
             Objects.requireNonNull(userSession);
             Objects.requireNonNull(inputReader);
         }
@@ -165,6 +167,7 @@ public class MatchingHandler implements LoggingSupport {
                     services.getConnectionService(),
                     services.getRecommendationService(),
                     services.getCommunicationStorage(),
+                    services.getConfig(),
                     session,
                     inputReader,
                     profileCompleteCallback);
@@ -256,7 +259,7 @@ public class MatchingHandler implements LoggingSupport {
             showDailyLimitReached(currentUser);
             return false;
         }
-        displaySwipeResult(result.data(), candidate, currentUser);
+        displaySwipeResult(result.data(), candidate);
         promptUndo(candidate.getName(), currentUser);
         return true;
     }
@@ -264,7 +267,7 @@ public class MatchingHandler implements LoggingSupport {
     private void displayCandidateProfile(User candidate, User currentUser, double distance) {
         logInfo(CliTextAndInput.BOX_TOP);
         boolean verified = candidate.isVerified();
-        int age = candidate.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone());
+        int age = candidate.getAge(config.safety().userTimeZone());
         logInfo(
                 "│ 💝 {}{}{}, {} years old",
                 candidate.getName(),
@@ -279,11 +282,11 @@ public class MatchingHandler implements LoggingSupport {
         logInfo(CliTextAndInput.BOX_BOTTOM);
     }
 
-    private void displaySwipeResult(MatchingService.SwipeResult result, User candidate, User currentUser) {
+    private void displaySwipeResult(MatchingService.SwipeResult result, User candidate) {
         if (result.matched()) {
             logInfo("\n🎉🎉🎉 IT'S A MATCH! 🎉🎉🎉");
             logInfo("You and {} like each other!\n", candidate.getName());
-            checkAndDisplayNewAchievements(currentUser);
+            // Achievement unlock is handled by AchievementEventHandler via event bus
         } else if (result.like().direction() == Like.Direction.LIKE) {
             logInfo("❤️  Liked!\n");
         } else {
@@ -347,8 +350,7 @@ public class MatchingHandler implements LoggingSupport {
                     if (qualityResult.success()) {
                         MatchQuality quality = qualityResult.data();
                         String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
-                        int age = otherUser.getAge(
-                                datingapp.core.AppConfig.defaults().safety().userTimeZone());
+                        int age = otherUser.getAge(config.safety().userTimeZone());
                         logInfo(
                                 "  {}. {} {}{}, {}         {} {}%",
                                 displayIndex,
@@ -421,7 +423,7 @@ public class MatchingHandler implements LoggingSupport {
         logInfo("         MATCH WITH {}", nameUpper);
         logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
 
-        int age = otherUser.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone());
+        int age = otherUser.getAge(config.safety().userTimeZone());
         logInfo("  👤 {}, {}", otherUser.getName(), age);
         if (otherUser.getBio() != null) {
             logInfo("  📝 {}", otherUser.getBio());
@@ -673,7 +675,7 @@ public class MatchingHandler implements LoggingSupport {
         logInfo("");
         User candidate = pick.user();
         logInfo(CliTextAndInput.BOX_TOP);
-        int age = candidate.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone());
+        int age = candidate.getAge(config.safety().userTimeZone());
         logInfo("│ 🎁 {}, {} years old", candidate.getName(), age);
         if (logger.isInfoEnabled()) {
             logInfo("│ 📍 {} km away", String.format("%.1f", distance));
@@ -733,22 +735,6 @@ public class MatchingHandler implements LoggingSupport {
                 logInfo("\n❌ {}\n", result.message());
             }
         }
-    }
-
-    private void checkAndDisplayNewAchievements(User currentUser) {
-        List<Achievement.UserAchievement> newAchievements = achievementService.checkAndUnlock(currentUser.getId());
-        if (newAchievements.isEmpty()) {
-            return;
-        }
-
-        logInfo("\n🏆 NEW ACHIEVEMENTS UNLOCKED! 🏆");
-        for (Achievement.UserAchievement ua : newAchievements) {
-            logInfo(
-                    "  ✨ {} - {}",
-                    ua.achievement().getDisplayName(),
-                    ua.achievement().getDescription());
-        }
-        logInfo("");
     }
 
     /**
@@ -817,8 +803,7 @@ public class MatchingHandler implements LoggingSupport {
             logInfo(
                     "{}. {} {} (Score: {}%){}",
                     s.rank(), getStandoutEmoji(s.rank()), candidate.getName(), s.score(), interacted);
-            int age = candidate.getAge(
-                    datingapp.core.AppConfig.defaults().safety().userTimeZone());
+            int age = candidate.getAge(config.safety().userTimeZone());
             logInfo("   {} - {}", s.reason(), age + "yo");
         }
     }
@@ -1032,7 +1017,7 @@ public class MatchingHandler implements LoggingSupport {
         String likedAgo = TextUtil.formatTimeAgo(pending.likedAt());
 
         logInfo(CliTextAndInput.BOX_TOP);
-        int age = user.getAge(datingapp.core.AppConfig.defaults().safety().userTimeZone());
+        int age = user.getAge(config.safety().userTimeZone());
         logInfo("│ 💝 {}, {} years old{}", user.getName(), age, verifiedBadge);
         logInfo("│ 🕒 Liked you {}", likedAgo);
         logInfo("│ 📍 Location: {}, {}", user.getLat(), user.getLon());

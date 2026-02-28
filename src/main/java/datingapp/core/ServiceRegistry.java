@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.messaging.MessagingUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
@@ -19,6 +20,9 @@ import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.time.TimePolicy;
+import datingapp.core.workflow.ProfileActivationPolicy;
+import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import java.util.Objects;
 
 @SuppressWarnings("java:S6539")
@@ -45,6 +49,11 @@ public class ServiceRegistry {
 
     private final ConnectionService connectionService;
 
+    private final TimePolicy timePolicy;
+    private final AppEventBus eventBus;
+    private final ProfileActivationPolicy activationPolicy;
+    private final RelationshipWorkflowPolicy workflowPolicy;
+
     private final MessagingUseCases messagingUseCases;
     private final MatchingUseCases matchingUseCases;
     private final ProfileUseCases profileUseCases;
@@ -67,7 +76,54 @@ public class ServiceRegistry {
             RecommendationService recommendationService,
             UndoService undoService,
             ConnectionService connectionService,
-            ValidationService validationService) {
+            ValidationService validationService,
+            TimePolicy timePolicy,
+            AppEventBus eventBus) {
+        this(
+                config,
+                userStorage,
+                interactionStorage,
+                communicationStorage,
+                analyticsStorage,
+                trustSafetyStorage,
+                candidateFinder,
+                matchingService,
+                trustSafetyService,
+                activityMetricsService,
+                matchQualityService,
+                profileService,
+                recommendationService,
+                undoService,
+                connectionService,
+                validationService,
+                timePolicy,
+                eventBus,
+                new ProfileActivationPolicy(),
+                new RelationshipWorkflowPolicy());
+    }
+
+    @SuppressWarnings("java:S107")
+    public ServiceRegistry(
+            AppConfig config,
+            UserStorage userStorage,
+            InteractionStorage interactionStorage,
+            CommunicationStorage communicationStorage,
+            AnalyticsStorage analyticsStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            CandidateFinder candidateFinder,
+            MatchingService matchingService,
+            TrustSafetyService trustSafetyService,
+            ActivityMetricsService activityMetricsService,
+            MatchQualityService matchQualityService,
+            ProfileService profileService,
+            RecommendationService recommendationService,
+            UndoService undoService,
+            ConnectionService connectionService,
+            ValidationService validationService,
+            TimePolicy timePolicy,
+            AppEventBus eventBus,
+            ProfileActivationPolicy activationPolicy,
+            RelationshipWorkflowPolicy workflowPolicy) {
         this.config = Objects.requireNonNull(config);
         this.userStorage = Objects.requireNonNull(userStorage);
         this.interactionStorage = Objects.requireNonNull(interactionStorage);
@@ -84,8 +140,12 @@ public class ServiceRegistry {
         this.undoService = Objects.requireNonNull(undoService);
         this.connectionService = Objects.requireNonNull(connectionService);
         this.validationService = Objects.requireNonNull(validationService);
+        this.timePolicy = Objects.requireNonNull(timePolicy);
+        this.eventBus = Objects.requireNonNull(eventBus);
+        this.activationPolicy = Objects.requireNonNull(activationPolicy);
+        this.workflowPolicy = Objects.requireNonNull(workflowPolicy);
 
-        this.messagingUseCases = new MessagingUseCases(this.connectionService);
+        this.messagingUseCases = new MessagingUseCases(this.connectionService, this.eventBus);
         this.matchingUseCases = new MatchingUseCases(
                 this.candidateFinder,
                 this.matchingService,
@@ -93,15 +153,18 @@ public class ServiceRegistry {
                 this.undoService,
                 this.interactionStorage,
                 this.userStorage,
-                this.matchQualityService);
+                this.matchQualityService,
+                this.eventBus);
         this.profileUseCases = new ProfileUseCases(
                 this.userStorage,
                 this.profileService,
                 this.validationService,
                 this.activityMetricsService,
-                this.config);
-        this.socialUseCases =
-                new SocialUseCases(this.connectionService, this.trustSafetyService, this.communicationStorage);
+                this.config,
+                this.activationPolicy,
+                this.eventBus);
+        this.socialUseCases = new SocialUseCases(
+                this.connectionService, this.trustSafetyService, this.communicationStorage, this.eventBus);
     }
 
     public AppConfig getConfig() {
@@ -182,5 +245,21 @@ public class ServiceRegistry {
 
     public SocialUseCases getSocialUseCases() {
         return socialUseCases;
+    }
+
+    public TimePolicy getTimePolicy() {
+        return timePolicy;
+    }
+
+    public AppEventBus getEventBus() {
+        return eventBus;
+    }
+
+    public ProfileActivationPolicy getActivationPolicy() {
+        return activationPolicy;
+    }
+
+    public RelationshipWorkflowPolicy getWorkflowPolicy() {
+        return workflowPolicy;
     }
 }

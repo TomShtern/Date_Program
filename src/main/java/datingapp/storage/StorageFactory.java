@@ -1,5 +1,10 @@
 package datingapp.storage;
 
+import datingapp.app.event.AppEventBus;
+import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.event.handlers.AchievementEventHandler;
+import datingapp.app.event.handlers.MetricsEventHandler;
+import datingapp.app.event.handlers.NotificationEventHandler;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionService;
@@ -19,6 +24,10 @@ import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.time.DefaultTimePolicy;
+import datingapp.core.time.TimePolicy;
+import datingapp.core.workflow.ProfileActivationPolicy;
+import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import datingapp.storage.jdbi.JdbiConnectionStorage;
 import datingapp.storage.jdbi.JdbiMatchmakingStorage;
 import datingapp.storage.jdbi.JdbiMetricsStorage;
@@ -107,6 +116,16 @@ public final class StorageFactory {
 
         ValidationService validationService = new ValidationService(config);
 
+        TimePolicy timePolicy = new DefaultTimePolicy(config.safety().userTimeZone());
+        AppEventBus eventBus = new InProcessAppEventBus();
+
+        new AchievementEventHandler(profileService).register(eventBus);
+        new MetricsEventHandler(activityMetricsService).register(eventBus);
+        new NotificationEventHandler(communicationStorage).register(eventBus);
+
+        ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
+        RelationshipWorkflowPolicy workflowPolicy = new RelationshipWorkflowPolicy();
+
         return new ServiceRegistry(
                 config,
                 userStorage,
@@ -123,7 +142,11 @@ public final class StorageFactory {
                 recommendationService,
                 undoService,
                 connectionService,
-                validationService);
+                validationService,
+                timePolicy,
+                eventBus,
+                activationPolicy,
+                workflowPolicy);
     }
 
     public static ServiceRegistry buildH2(DatabaseManager dbManager) {

@@ -3,7 +3,6 @@ package datingapp.core.matching;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
-import datingapp.core.matching.MatchQualityService.InterestMatcher;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.AnalyticsStorage;

@@ -1,8 +1,11 @@
 package datingapp.app.usecase.matching;
 
+import datingapp.app.event.AppEvent;
+import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchQualityService;
@@ -35,9 +38,10 @@ public class MatchingUseCases {
     private final InteractionStorage interactionStorage;
     private final UserStorage userStorage;
     private final MatchQualityService matchQualityService;
+    private final AppEventBus eventBus;
 
     public MatchingUseCases(CandidateFinder candidateFinder, MatchingService matchingService, UndoService undoService) {
-        this(candidateFinder, matchingService, null, undoService, null, null, null);
+        this(candidateFinder, matchingService, null, undoService, null, null, null, null);
     }
 
     public MatchingUseCases(
@@ -48,6 +52,26 @@ public class MatchingUseCases {
             InteractionStorage interactionStorage,
             UserStorage userStorage,
             MatchQualityService matchQualityService) {
+        this(
+                candidateFinder,
+                matchingService,
+                recommendationService,
+                undoService,
+                interactionStorage,
+                userStorage,
+                matchQualityService,
+                null);
+    }
+
+    public MatchingUseCases(
+            CandidateFinder candidateFinder,
+            MatchingService matchingService,
+            RecommendationService recommendationService,
+            UndoService undoService,
+            InteractionStorage interactionStorage,
+            UserStorage userStorage,
+            MatchQualityService matchQualityService,
+            AppEventBus eventBus) {
         this.candidateFinder = candidateFinder;
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
         this.recommendationService = recommendationService;
@@ -55,6 +79,7 @@ public class MatchingUseCases {
         this.interactionStorage = interactionStorage;
         this.userStorage = userStorage;
         this.matchQualityService = matchQualityService;
+        this.eventBus = eventBus;
     }
 
     public UseCaseResult<BrowseCandidatesResult> browseCandidates(BrowseCandidatesCommand command) {
@@ -103,6 +128,14 @@ public class MatchingUseCases {
                     matchingService.processSwipe(command.currentUser(), command.candidate(), command.liked());
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.message()));
+            }
+            if (eventBus != null) {
+                eventBus.publish(new AppEvent.SwipeRecorded(
+                        command.context().userId(),
+                        command.candidate().getId(),
+                        result.like().direction().name(),
+                        result.matched(),
+                        AppClock.now()));
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {
@@ -216,6 +249,19 @@ public class MatchingUseCases {
         try {
             Like like = Like.create(command.context().userId(), command.targetUserId(), command.direction());
             Optional<Match> match = matchingService.recordLike(like);
+            if (eventBus != null) {
+                eventBus.publish(new AppEvent.SwipeRecorded(
+                        like.whoLikes(),
+                        like.whoGotLiked(),
+                        like.direction().name(),
+                        match.isPresent(),
+                        AppClock.now()));
+                if (match.isPresent()) {
+                    Match m = match.get();
+                    eventBus.publish(
+                            new AppEvent.MatchCreated(m.getId(), like.whoLikes(), like.whoGotLiked(), AppClock.now()));
+                }
+            }
             return UseCaseResult.success(new RecordLikeResult(like, match));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to record like interaction: " + e.getMessage()));

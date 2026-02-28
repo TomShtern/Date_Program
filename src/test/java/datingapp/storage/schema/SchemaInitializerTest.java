@@ -88,6 +88,16 @@ class SchemaInitializerTest {
             // Standouts & Undo
             assertTrue(tables.contains("STANDOUTS"), "Missing table: standouts");
             assertTrue(tables.contains("UNDO_STATES"), "Missing table: undo_states");
+
+            // Normalized profile tables (V3)
+            assertTrue(tables.contains("USER_PHOTOS"), "Missing table: user_photos");
+            assertTrue(tables.contains("USER_INTERESTS"), "Missing table: user_interests");
+            assertTrue(tables.contains("USER_INTERESTED_IN"), "Missing table: user_interested_in");
+            assertTrue(tables.contains("USER_DB_SMOKING"), "Missing table: user_db_smoking");
+            assertTrue(tables.contains("USER_DB_DRINKING"), "Missing table: user_db_drinking");
+            assertTrue(tables.contains("USER_DB_WANTS_KIDS"), "Missing table: user_db_wants_kids");
+            assertTrue(tables.contains("USER_DB_LOOKING_FOR"), "Missing table: user_db_looking_for");
+            assertTrue(tables.contains("USER_DB_EDUCATION"), "Missing table: user_db_education");
         }
 
         @Test
@@ -125,6 +135,11 @@ class SchemaInitializerTest {
             // Additional indexes
             assertTrue(indexes.contains("IDX_ACHIEVEMENTS_USER_ID"), "Missing index: idx_achievements_user_id");
             assertTrue(indexes.contains("IDX_MESSAGES_SENDER_ID"), "Missing index: idx_messages_sender_id");
+
+            // Normalized profile table indexes (V3)
+            assertTrue(indexes.contains("IDX_USER_INTERESTS_INTEREST"), "Missing index: idx_user_interests_interest");
+            assertTrue(
+                    indexes.contains("IDX_USER_INTERESTED_IN_GENDER"), "Missing index: idx_user_interested_in_gender");
         }
     }
 
