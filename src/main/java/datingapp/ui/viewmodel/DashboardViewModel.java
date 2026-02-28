@@ -9,15 +9,14 @@ import datingapp.core.matching.RecommendationService.DailyStatus;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
+import datingapp.ui.async.AsyncErrorRouter;
+import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -35,6 +34,9 @@ import org.slf4j.LoggerFactory;
  */
 public class DashboardViewModel {
     private static final Logger logger = LoggerFactory.getLogger(DashboardViewModel.class);
+    private static final String UNKNOWN_VALUE = "--";
+    private static final String DEFAULT_LIKES_TEXT = "Likes: --/50";
+    private static final String DEFAULT_PICK_TEXT = "No pick available";
 
     private final RecommendationService dailyService;
     private final UiMatchDataAccess matchData;
@@ -42,6 +44,7 @@ public class DashboardViewModel {
     private final ConnectionService messagingService;
     private final ProfileService profileCompletionService;
     private final AppSession session;
+    private final ViewModelAsyncScope asyncScope;
 
     // Observable properties for data binding
     private final StringProperty userName = new SimpleStringProperty("Not Logged In");
@@ -57,24 +60,6 @@ public class DashboardViewModel {
     private final ObservableList<String> recentAchievements = FXCollections.observableArrayList();
 
     private ViewModelErrorSink errorHandler;
-    private final AtomicInteger activeLoads = new AtomicInteger(0);
-    private final AtomicInteger refreshGeneration = new AtomicInteger(0);
-
-    /** Track all in-flight background threads for cleanup and cancellation. */
-    private final Set<Thread> backgroundThreads = ConcurrentHashMap.newKeySet();
-
-    /**
-     * Track disposed state to prevent operations after cleanup.
-     *
-     * <p>
-     * Uses {@link AtomicBoolean} instead of a volatile flag to make the threading
-     * semantics explicit and consistent with other atomics (e.g.
-     * {@link #activeLoads}).
-     * This allows safe, lock-free checks and updates from background threads and
-     * keeps the option open for compound atomic operations if the lifecycle logic
-     * becomes more complex.
-     */
-    private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public DashboardViewModel(
             RecommendationService dailyService,
@@ -83,6 +68,24 @@ public class DashboardViewModel {
             ConnectionService messagingService,
             ProfileService profileCompletionService,
             AppSession session) {
+        this(
+                dailyService,
+                matchData,
+                achievementService,
+                messagingService,
+                profileCompletionService,
+                session,
+                new JavaFxUiThreadDispatcher());
+    }
+
+    public DashboardViewModel(
+            RecommendationService dailyService,
+            UiMatchDataAccess matchData,
+            ProfileService achievementService,
+            ConnectionService messagingService,
+            ProfileService profileCompletionService,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
         this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
         this.matchData = Objects.requireNonNull(matchData, "matchData cannot be null");
         this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
@@ -90,6 +93,7 @@ public class DashboardViewModel {
         this.profileCompletionService =
                 Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
     /**
@@ -106,20 +110,11 @@ public class DashboardViewModel {
         User user = getCurrentUser();
         if (user == null) {
             logWarn("Cannot refresh dashboard - no user logged in");
-            activeLoads.set(0);
             setLoadingState(false);
             return;
         }
 
-        beginLoading();
-        int generation = refreshGeneration.incrementAndGet();
-        cancelInFlightRefreshes();
-
-        // Run data fetching in background to prevent UI freeze
-        Thread thread = Thread.ofVirtual()
-                .name("dashboard-refresh-" + generation)
-                .start(() -> performRefresh(user, generation));
-        backgroundThreads.add(thread);
+        asyncScope.runLatest("dashboard-refresh", "refresh dashboard", () -> loadDashboardData(user), this::applyData);
     }
 
     /**
@@ -127,10 +122,7 @@ public class DashboardViewModel {
      * Should be called when the ViewModel is no longer needed.
      */
     public void dispose() {
-        disposed.set(true);
-        refreshGeneration.incrementAndGet();
-        cancelInFlightRefreshes();
-        activeLoads.set(0);
+        asyncScope.dispose();
         setLoadingState(false);
     }
 
@@ -142,155 +134,163 @@ public class DashboardViewModel {
         this.errorHandler = handler;
     }
 
-    private void performRefresh(User user, int generation) {
+    private DashboardData loadDashboardData(User user) {
+        logInfo("Performing dashboard refresh for user: {}", user.getName());
+
+        String name = user.getName();
+        if (Thread.currentThread().isInterrupted()) {
+            return DashboardData.empty(name);
+        }
+        ErrorCollector errors = new ErrorCollector();
+
+        String completionText = loadCompletionText(user, errors);
+        if (Thread.currentThread().isInterrupted()) {
+            return DashboardData.empty(name);
+        }
+        String likesText = loadLikesText(user, errors);
+        if (Thread.currentThread().isInterrupted()) {
+            return DashboardData.empty(name);
+        }
+        String matchCount = loadMatchCount(user, errors);
+        if (Thread.currentThread().isInterrupted()) {
+            return DashboardData.empty(name);
+        }
+        String pickName = loadPickName(user, errors);
+        if (Thread.currentThread().isInterrupted()) {
+            return DashboardData.empty(name);
+        }
+        List<UserAchievement> achievements = loadAchievements(user, errors);
+        if (Thread.currentThread().isInterrupted()) {
+            return DashboardData.empty(name);
+        }
+        NotificationSnapshot notificationSnapshot = loadNotifications(user, errors);
+
+        return new DashboardData(
+                name,
+                completionText,
+                likesText,
+                matchCount,
+                pickName,
+                achievements,
+                notificationSnapshot.unreadCount(),
+                notificationSnapshot.pendingRequests(),
+                notificationSnapshot.unreadNotifications(),
+                errors.firstError());
+    }
+
+    private String loadCompletionText(User user, ErrorCollector errors) {
+        if (Thread.currentThread().isInterrupted()) {
+            return UNKNOWN_VALUE;
+        }
         try {
-            if (isRefreshInvalid(generation)) {
-                endLoading();
-                return;
-            }
-
-            logInfo("Performing dashboard refresh for user: {}", user.getName());
-
-            // 1. Data that doesn't need DB can be set immediately or just captured
-            String name = user.getName();
-
-            // 2. Fetch DB data
-            String completionText = "--";
-            Exception firstError = null;
-            try {
-                completionText = profileCompletionService.calculate(user).getDisplayString();
-            } catch (Exception e) {
-                logError("Completion count error", e);
-                if (firstError == null) {
-                    firstError = e;
-                }
-            }
-
-            String likesText = "Likes: --/50";
-            try {
-                DailyStatus status = dailyService.getStatus(user.getId());
-                likesText = status.hasUnlimitedLikes()
-                        ? "Likes: ∞"
-                        : "Likes: " + status.likesUsed() + "/" + (status.likesUsed() + status.likesRemaining());
-            } catch (Exception e) {
-                logError("Likes reload error", e);
-                if (firstError == null) {
-                    firstError = e;
-                }
-            }
-
-            String matchCount = "--";
-            try {
-                matchCount = String.valueOf(matchData.countActiveMatchesFor(user.getId()));
-            } catch (Exception e) {
-                logError("Match count error", e);
-                if (firstError == null) {
-                    firstError = e;
-                }
-            }
-
-            String pickName = "No pick available";
-            try {
-                Optional<DailyPick> pick = dailyService.getDailyPick(user);
-                if (pick.isPresent()) {
-                    User pickedUser = pick.get().user();
-                    java.time.ZoneId timezone = AppConfig.defaults().safety().userTimeZone();
-                    int ageVal = pickedUser.getAge(timezone);
-                    String age = ageVal > 0 ? String.valueOf(ageVal) : "?";
-                    pickName = pickedUser.getName() + ", " + age;
-                }
-            } catch (Exception e) {
-                logError("Daily pick error", e);
-                if (firstError == null) {
-                    firstError = e;
-                }
-            }
-
-            List<UserAchievement> achievements = List.of();
-            try {
-                achievements = achievementService.getUnlocked(user.getId());
-            } catch (Exception e) {
-                logError("Achievements error", e);
-                if (firstError == null) {
-                    firstError = e;
-                }
-            }
-
-            int unreadCount = 0;
-            int pendingRequests = 0;
-            int unreadNotifications = 0;
-            try {
-                unreadCount = messagingService.getTotalUnreadCount(user.getId());
-                pendingRequests = messagingService.countPendingRequestsFor(user.getId());
-                unreadNotifications = messagingService.getUnreadNotificationCount(user.getId());
-            } catch (Exception e) {
-                logError("Notifications/Messages error", e);
-                if (firstError == null) {
-                    firstError = e;
-                }
-            }
-
-            // 3. Update UI on FX Thread
-            final String finalCompletion = completionText;
-            final String finalLikes = likesText;
-            final String finalMatches = matchCount;
-            final String finalPick = pickName;
-            final List<UserAchievement> finalAchievements = achievements;
-            final int finalUnreadCount = unreadCount;
-            final int finalPendingRequests = pendingRequests;
-            final int finalUnreadNotifications = unreadNotifications;
-
-            final Exception finalError = firstError;
-            if (isRefreshInvalid(generation)) {
-                endLoading();
-                return;
-            }
-
-            Platform.runLater(() -> {
-                if (disposed.get() || generation != refreshGeneration.get()) {
-                    endLoading();
-                    return;
-                }
-
-                userName.set(name);
-                profileCompletion.set(finalCompletion);
-                dailyLikesStatus.set(finalLikes);
-                totalMatches.set(finalMatches);
-                dailyPickName.set(finalPick);
-                unreadMessages.set(finalUnreadCount);
-                friendRequestsCount.set(finalPendingRequests);
-                notificationCount.set(finalUnreadCount + finalPendingRequests + finalUnreadNotifications);
-
-                recentAchievements.clear();
-                finalAchievements.stream()
-                        .sorted((a, b) -> b.unlockedAt().compareTo(a.unlockedAt()))
-                        .limit(3)
-                        .forEach(ua -> recentAchievements.add(ua.achievement().getIcon() + " "
-                                + ua.achievement().getDisplayName()));
-
-                // Loading complete
-                endLoading();
-
-                if (finalError != null) {
-                    notifyError("Some dashboard data failed to load", finalError);
-                }
-            });
-        } finally {
-            backgroundThreads.remove(Thread.currentThread());
+            return profileCompletionService.calculate(user).getDisplayString();
+        } catch (Exception e) {
+            logError("Completion count error", e);
+            errors.capture(e);
+            return UNKNOWN_VALUE;
         }
     }
 
-    private boolean isRefreshInvalid(int generation) {
-        return disposed.get() || Thread.currentThread().isInterrupted() || generation != refreshGeneration.get();
+    private String loadLikesText(User user, ErrorCollector errors) {
+        if (Thread.currentThread().isInterrupted()) {
+            return DEFAULT_LIKES_TEXT;
+        }
+        try {
+            DailyStatus status = dailyService.getStatus(user.getId());
+            return status.hasUnlimitedLikes()
+                    ? "Likes: ∞"
+                    : "Likes: " + status.likesUsed() + "/" + (status.likesUsed() + status.likesRemaining());
+        } catch (Exception e) {
+            logError("Likes reload error", e);
+            errors.capture(e);
+            return DEFAULT_LIKES_TEXT;
+        }
     }
 
-    private void cancelInFlightRefreshes() {
-        for (Thread thread : backgroundThreads) {
-            if (thread != null && thread.isAlive()) {
-                thread.interrupt();
-            }
+    private String loadMatchCount(User user, ErrorCollector errors) {
+        if (Thread.currentThread().isInterrupted()) {
+            return UNKNOWN_VALUE;
         }
-        backgroundThreads.clear();
+        try {
+            return String.valueOf(matchData.countActiveMatchesFor(user.getId()));
+        } catch (Exception e) {
+            logError("Match count error", e);
+            errors.capture(e);
+            return UNKNOWN_VALUE;
+        }
+    }
+
+    private String loadPickName(User user, ErrorCollector errors) {
+        if (Thread.currentThread().isInterrupted()) {
+            return DEFAULT_PICK_TEXT;
+        }
+        try {
+            Optional<DailyPick> pick = dailyService.getDailyPick(user);
+            if (pick.isEmpty()) {
+                return DEFAULT_PICK_TEXT;
+            }
+
+            User pickedUser = pick.get().user();
+            java.time.ZoneId timezone = AppConfig.defaults().safety().userTimeZone();
+            int ageVal = pickedUser.getAge(timezone);
+            String age = ageVal > 0 ? String.valueOf(ageVal) : "?";
+            return pickedUser.getName() + ", " + age;
+        } catch (Exception e) {
+            logError("Daily pick error", e);
+            errors.capture(e);
+            return DEFAULT_PICK_TEXT;
+        }
+    }
+
+    private List<UserAchievement> loadAchievements(User user, ErrorCollector errors) {
+        if (Thread.currentThread().isInterrupted()) {
+            return List.of();
+        }
+        try {
+            return achievementService.getUnlocked(user.getId());
+        } catch (Exception e) {
+            logError("Achievements error", e);
+            errors.capture(e);
+            return List.of();
+        }
+    }
+
+    private NotificationSnapshot loadNotifications(User user, ErrorCollector errors) {
+        if (Thread.currentThread().isInterrupted()) {
+            return new NotificationSnapshot(0, 0, 0);
+        }
+        try {
+            int unreadCount = messagingService.getTotalUnreadCount(user.getId());
+            int pendingRequests = messagingService.countPendingRequestsFor(user.getId());
+            int unreadNotifications = messagingService.getUnreadNotificationCount(user.getId());
+            return new NotificationSnapshot(unreadCount, pendingRequests, unreadNotifications);
+        } catch (Exception e) {
+            logError("Notifications/Messages error", e);
+            errors.capture(e);
+            return new NotificationSnapshot(0, 0, 0);
+        }
+    }
+
+    private void applyData(DashboardData data) {
+        userName.set(data.name());
+        profileCompletion.set(data.completionText());
+        dailyLikesStatus.set(data.likesText());
+        totalMatches.set(data.matchCount());
+        dailyPickName.set(data.pickName());
+        unreadMessages.set(data.unreadCount());
+        friendRequestsCount.set(data.pendingRequests());
+        notificationCount.set(data.unreadCount() + data.pendingRequests() + data.unreadNotifications());
+
+        recentAchievements.clear();
+        data.achievements().stream()
+                .sorted((a, b) -> b.unlockedAt().compareTo(a.unlockedAt()))
+                .limit(3)
+                .forEach(ua -> recentAchievements.add(
+                        ua.achievement().getIcon() + " " + ua.achievement().getDisplayName()));
+
+        if (data.error() != null) {
+            notifyError("Some dashboard data failed to load", data.error());
+        }
     }
 
     private void notifyError(String userMessage, Exception e) {
@@ -299,40 +299,62 @@ public class DashboardViewModel {
         }
         String detail = e.getMessage();
         String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
-        if (Platform.isFxApplicationThread()) {
-            errorHandler.onError(message);
-        } else {
-            Platform.runLater(() -> errorHandler.onError(message));
-        }
-    }
-
-    private void beginLoading() {
-        if (activeLoads.incrementAndGet() == 1) {
-            setLoadingState(true);
-        }
-    }
-
-    private void endLoading() {
-        int remaining = activeLoads.decrementAndGet();
-        if (remaining <= 0) {
-            activeLoads.set(0);
-            setLoadingState(false);
-        }
+        asyncScope.dispatchToUi(() -> errorHandler.onError(message));
     }
 
     private void setLoadingState(boolean isLoading) {
-        runOnFx(() -> {
-            if (loading.get() != isLoading) {
-                loading.set(isLoading);
-            }
-        });
+        if (loading.get() != isLoading) {
+            loading.set(isLoading);
+        }
     }
 
-    private void runOnFx(Runnable action) {
-        if (Platform.isFxApplicationThread()) {
-            action.run();
-        } else {
-            Platform.runLater(action);
+    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
+        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
+        ViewModelAsyncScope scope = new ViewModelAsyncScope(
+                "dashboard", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
+        scope.setLoadingStateConsumer(this::setLoadingState);
+        return scope;
+    }
+
+    private record DashboardData(
+            String name,
+            String completionText,
+            String likesText,
+            String matchCount,
+            String pickName,
+            List<UserAchievement> achievements,
+            int unreadCount,
+            int pendingRequests,
+            int unreadNotifications,
+            Exception error) {
+        private static DashboardData empty(String name) {
+            return new DashboardData(
+                    name,
+                    UNKNOWN_VALUE,
+                    DEFAULT_LIKES_TEXT,
+                    UNKNOWN_VALUE,
+                    DEFAULT_PICK_TEXT,
+                    List.of(),
+                    0,
+                    0,
+                    0,
+                    null);
+        }
+    }
+
+    private record NotificationSnapshot(int unreadCount, int pendingRequests, int unreadNotifications) {}
+
+    private static final class ErrorCollector {
+        private Exception firstError;
+
+        private void capture(Exception error) {
+            if (firstError == null) {
+                firstError = error;
+            }
+        }
+
+        private Exception firstError() {
+            return firstError;
         }
     }
 

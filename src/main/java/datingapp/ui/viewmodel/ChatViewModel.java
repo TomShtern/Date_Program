@@ -17,15 +17,14 @@ import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.connection.ConnectionService.SendResult;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.User;
+import datingapp.ui.async.AsyncErrorRouter;
+import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.async.ViewModelAsyncScope;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
-import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
@@ -50,15 +49,13 @@ public class ChatViewModel {
     private final MessagingUseCases messagingUseCases;
     private final SocialUseCases socialUseCases;
     private final AppSession session;
+    private final ViewModelAsyncScope asyncScope;
     private final ObservableList<ConversationPreview> conversations = FXCollections.observableArrayList();
     private final ObservableList<Message> activeMessages = FXCollections.observableArrayList();
 
     private final ObjectProperty<ConversationPreview> selectedConversation = new SimpleObjectProperty<>();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final IntegerProperty totalUnreadCount = new SimpleIntegerProperty(0);
-    private final AtomicInteger activeLoads = new AtomicInteger(0);
-    private final AtomicLong messageLoadToken = new AtomicLong(0);
-    private final AtomicInteger refreshGeneration = new AtomicInteger(0);
 
     private User currentUser;
 
@@ -69,19 +66,25 @@ public class ChatViewModel {
         this.errorHandler = handler;
     }
 
-    /** Track disposed state to prevent operations after cleanup. */
-    private final AtomicBoolean disposed = new AtomicBoolean(false);
-
     /** Keep reference to listener for cleanup. */
     private final javafx.beans.value.ChangeListener<ConversationPreview> selectionListener;
 
     public ChatViewModel(
             ConnectionService messagingService, TrustSafetyService trustSafetyService, AppSession session) {
+        this(messagingService, trustSafetyService, session, new JavaFxUiThreadDispatcher());
+    }
+
+    public ChatViewModel(
+            ConnectionService messagingService,
+            TrustSafetyService trustSafetyService,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
         this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
         this.messagingUseCases = new MessagingUseCases(this.messagingService);
         this.socialUseCases = new SocialUseCases(this.messagingService, this.trustSafetyService);
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.asyncScope = createAsyncScope(uiDispatcher);
 
         // Listen for selection changes to load messages
         selectionListener = (obs, oldVal, newVal) -> {
@@ -99,11 +102,10 @@ public class ChatViewModel {
      * Should be called when the ViewModel is no longer needed.
      */
     public void dispose() {
-        disposed.set(true);
+        asyncScope.dispose();
         selectedConversation.removeListener(selectionListener);
         conversations.clear();
         activeMessages.clear();
-        activeLoads.set(0);
         setLoadingState(false);
     }
 
@@ -134,83 +136,74 @@ public class ChatViewModel {
 
     public void refreshConversations() {
         User user = ensureCurrentUser();
-        if (disposed.get() || user == null) {
-            activeLoads.set(0);
+        if (asyncScope.isDisposed() || user == null) {
             setLoadingState(false);
             return;
         }
 
-        beginLoading();
-        int generation = refreshGeneration.incrementAndGet();
-        int initialUnread = readTotalUnreadOnFxThread();
-        Thread.ofVirtual().name("chat-refresh").start(() -> {
-            List<ConversationPreview> previews = List.of();
-            int unread = initialUnread;
-            try {
-                logInfo("Refreshing conversations for user: {}", user.getName());
-                var result = messagingUseCases.listConversations(
-                        new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0));
-                if (result.success()) {
-                    previews = result.data().conversations();
-                    unread = result.data().totalUnreadCount();
-                }
-            } catch (Exception e) {
-                logError("Failed to refresh conversations", e);
-            }
+        asyncScope.runLatest(
+                "chat-refresh",
+                "refresh conversations",
+                () -> refreshConversationData(user),
+                data -> updateConversations(data.previews(), data.unreadCount()));
+    }
 
-            List<ConversationPreview> finalPreviews = previews;
-            int finalUnread = unread;
-            runOnFx(() -> {
-                if (!disposed.get() && generation == refreshGeneration.get()) {
-                    updateConversations(finalPreviews, finalUnread);
-                }
-                endLoading();
-            });
-        });
+    private ConversationRefreshData refreshConversationData(User user) {
+        List<ConversationPreview> previews = List.of();
+        int unread = totalUnreadCount.get();
+        try {
+            logInfo("Refreshing conversations for user: {}", user.getName());
+            var result = messagingUseCases.listConversations(
+                    new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0));
+            if (result.success()) {
+                previews = result.data().conversations();
+                unread = result.data().totalUnreadCount();
+            }
+        } catch (Exception e) {
+            logError("Failed to refresh conversations", e);
+        }
+        return new ConversationRefreshData(previews, unread);
     }
 
     public void openConversationWithUser(UUID otherUserId, Consumer<ConversationPreview> onReady) {
         User user = ensureCurrentUser();
-        if (disposed.get() || user == null || otherUserId == null) {
+        if (asyncScope.isDisposed() || user == null || otherUserId == null) {
             if (onReady != null) {
-                Platform.runLater(() -> onReady.accept(null));
+                asyncScope.dispatchToUi(() -> onReady.accept(null));
             }
             return;
         }
 
-        beginLoading();
-        Thread.ofVirtual().name("chat-open").start(() -> {
-            List<ConversationPreview> previews = List.of();
-            ConversationPreview preview = null;
-            boolean loaded = false;
-            try {
-                var result = messagingUseCases.openConversation(
-                        new OpenConversationCommand(UserContext.ui(user.getId()), otherUserId, 50, 0));
-                if (result.success()) {
-                    previews = messagingUseCases
-                            .listConversations(new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0))
-                            .data()
-                            .conversations();
-                    preview = result.data().preview();
-                    loaded = true;
-                }
-            } catch (Exception e) {
-                logError("Failed to open conversation", e);
+        asyncScope.runLatest("chat-open", "open conversation", () -> loadOpenConversation(user, otherUserId), data -> {
+            if (data.loaded()) {
+                updateConversations(data.previews(), computeUnreadCount(data.previews()));
             }
-
-            ConversationPreview finalPreview = preview;
-            List<ConversationPreview> finalPreviews = previews;
-            boolean finalLoaded = loaded;
-            runOnFx(() -> {
-                if (!disposed.get() && finalLoaded) {
-                    updateConversations(finalPreviews, computeUnreadCount(finalPreviews));
-                }
-                if (onReady != null) {
-                    onReady.accept(finalPreview);
-                }
-                endLoading();
-            });
+            if (onReady != null) {
+                onReady.accept(data.preview());
+            }
         });
+    }
+
+    private OpenConversationData loadOpenConversation(User user, UUID otherUserId) {
+        List<ConversationPreview> previews = List.of();
+        ConversationPreview preview = null;
+        boolean loaded = false;
+        try {
+            var result = messagingUseCases.openConversation(
+                    new OpenConversationCommand(UserContext.ui(user.getId()), otherUserId, 50, 0));
+            if (result.success()) {
+                previews = messagingUseCases
+                        .listConversations(new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0))
+                        .data()
+                        .conversations();
+                preview = result.data().preview();
+                loaded = true;
+            }
+        } catch (Exception e) {
+            logError("Failed to open conversation", e);
+            asyncScope.onError("open conversation", e);
+        }
+        return new OpenConversationData(loaded, preview, previews);
     }
 
     /**
@@ -225,18 +218,18 @@ public class ChatViewModel {
      */
     private void loadMessages(ConversationPreview conversation) {
         User user = currentUser;
-        if (disposed.get() || user == null || conversation == null) {
+        if (asyncScope.isDisposed() || user == null || conversation == null) {
             return;
         }
 
-        long token = messageLoadToken.incrementAndGet();
         String conversationId = conversation.conversation().getId();
         UUID otherUserId = conversation.otherUser().getId();
 
-        beginLoading();
-        Thread.ofVirtual()
-                .name("chat-messages-load")
-                .start(() -> loadMessagesInBackground(token, conversationId, otherUserId, user));
+        asyncScope.runLatest(
+                "chat-messages",
+                "load messages",
+                () -> loadMessagesInBackground(conversationId, otherUserId, user),
+                this::updateMessagesOnFx);
     }
 
     /**
@@ -248,13 +241,7 @@ public class ChatViewModel {
      * @param otherUserId    the other user in the conversation
      * @param user           the current user
      */
-    private void loadMessagesInBackground(long token, String conversationId, UUID otherUserId, User user) {
-        // Early check: if token is stale, skip database work immediately
-        if (messageLoadToken.get() != token) {
-            runOnFx(this::endLoading);
-            return;
-        }
-
+    private MessageLoadData loadMessagesInBackground(String conversationId, UUID otherUserId, User user) {
         List<Message> messages = null;
         Integer unread = null;
         try {
@@ -273,11 +260,10 @@ public class ChatViewModel {
             }
         } catch (Exception e) {
             logError("Failed to load messages", e);
+            asyncScope.onError("load messages", e);
         }
 
-        List<Message> finalMessages = messages;
-        Integer finalUnread = unread;
-        runOnFx(() -> updateMessagesOnFx(token, conversationId, finalMessages, finalUnread));
+        return new MessageLoadData(conversationId, messages, unread);
     }
 
     /**
@@ -288,21 +274,19 @@ public class ChatViewModel {
      * @param messages       the loaded messages (or null if load failed)
      * @param unread         the new unread count (or null if computation failed)
      */
-    private void updateMessagesOnFx(long token, String conversationId, List<Message> messages, Integer unread) {
+    private void updateMessagesOnFx(MessageLoadData messageData) {
         ConversationPreview selected = selectedConversation.get();
         // Final defensive check before updating UI
-        if (!disposed.get()
+        if (!asyncScope.isDisposed()
                 && selected != null
-                && selected.conversation().getId().equals(conversationId)
-                && token == messageLoadToken.get()) {
-            if (messages != null) {
-                activeMessages.setAll(messages);
+                && selected.conversation().getId().equals(messageData.conversationId())) {
+            if (messageData.messages() != null) {
+                activeMessages.setAll(messageData.messages());
             }
-            if (unread != null) {
-                totalUnreadCount.set(unread);
+            if (messageData.unreadCount() != null) {
+                totalUnreadCount.set(messageData.unreadCount());
             }
         }
-        endLoading();
     }
 
     public boolean sendMessage(String text) {
@@ -322,23 +306,23 @@ public class ChatViewModel {
 
     private void dispatchSendMessage(
             ConversationPreview conversation, UUID senderId, UUID otherUserId, String trimmedText) {
-        Thread.ofVirtual().name("chat-send").start(() -> {
+        asyncScope.runFireAndForget("send message", () -> {
             try {
                 var result = messagingUseCases.sendMessage(
                         new SendMessageCommand(UserContext.ui(senderId), otherUserId, trimmedText));
-                runOnFx(() -> handleSendResult(
+                asyncScope.dispatchToUi(() -> handleSendResult(
                         conversation,
                         result.success() ? result.data() : null,
                         result.success() ? null : result.error().message()));
             } catch (Exception e) {
-                runOnFx(() -> reportSendFailure("Failed to send message: " + e.getMessage(), e));
+                asyncScope.dispatchToUi(() -> reportSendFailure("Failed to send message: " + e.getMessage(), e));
             }
         });
     }
 
     private void handleSendResult(
             ConversationPreview conversation, @Nullable SendResult result, @Nullable String errorMessage) {
-        if (disposed.get()) {
+        if (asyncScope.isDisposed()) {
             return;
         }
         if (result == null || !result.success()) {
@@ -384,7 +368,7 @@ public class ChatViewModel {
     }
 
     private void updateConversations(List<ConversationPreview> previews, int unread) {
-        if (disposed.get()) {
+        if (asyncScope.isDisposed()) {
             return;
         }
         conversations.setAll(previews);
@@ -395,54 +379,9 @@ public class ChatViewModel {
         return previews.stream().mapToInt(ConversationPreview::unreadCount).sum();
     }
 
-    private void beginLoading() {
-        if (activeLoads.incrementAndGet() == 1) {
-            setLoadingState(true);
-        }
-    }
-
-    private int readTotalUnreadOnFxThread() {
-        if (Platform.isFxApplicationThread()) {
-            return totalUnreadCount.get();
-        }
-
-        AtomicInteger snapshot = new AtomicInteger(0);
-        CountDownLatch latch = new CountDownLatch(1);
-        Platform.runLater(() -> {
-            snapshot.set(totalUnreadCount.get());
-            latch.countDown();
-        });
-
-        try {
-            latch.await();
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return totalUnreadCount.get();
-        }
-        return snapshot.get();
-    }
-
-    private void endLoading() {
-        int remaining = activeLoads.decrementAndGet();
-        if (remaining <= 0) {
-            activeLoads.set(0);
-            setLoadingState(false);
-        }
-    }
-
     private void setLoadingState(boolean isLoading) {
-        runOnFx(() -> {
-            if (loading.get() != isLoading) {
-                loading.set(isLoading);
-            }
-        });
-    }
-
-    private void runOnFx(Runnable action) {
-        if (Platform.isFxApplicationThread()) {
-            action.run();
-        } else {
-            Platform.runLater(action);
+        if (loading.get() != isLoading) {
+            loading.set(isLoading);
         }
     }
 
@@ -463,10 +402,10 @@ public class ChatViewModel {
         if (user == null || targetId == null) {
             return;
         }
-        Thread.ofVirtual().start(() -> {
+        asyncScope.runFireAndForget("block user", () -> {
             try {
                 socialUseCases.blockUser(new RelationshipCommand(UserContext.ui(user.getId()), targetId));
-                runOnFx(this::refreshConversations);
+                asyncScope.dispatchToUi(this::refreshConversations);
             } catch (Exception e) {
                 logError("Failed to block user", e);
             }
@@ -478,12 +417,12 @@ public class ChatViewModel {
         if (user == null || targetId == null || reason == null) {
             return;
         }
-        Thread.ofVirtual().start(() -> {
+        asyncScope.runFireAndForget("report user", () -> {
             try {
                 socialUseCases.reportUser(
                         new ReportCommand(UserContext.ui(user.getId()), targetId, reason, description, blockUser));
                 if (blockUser) {
-                    runOnFx(this::refreshConversations);
+                    asyncScope.dispatchToUi(this::refreshConversations);
                 }
             } catch (Exception e) {
                 logError("Failed to report user", e);
@@ -511,4 +450,19 @@ public class ChatViewModel {
     public IntegerProperty totalUnreadCountProperty() {
         return totalUnreadCount;
     }
+
+    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
+        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
+        ViewModelAsyncScope scope = new ViewModelAsyncScope(
+                "chat", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
+        scope.setLoadingStateConsumer(this::setLoadingState);
+        return scope;
+    }
+
+    private record ConversationRefreshData(List<ConversationPreview> previews, int unreadCount) {}
+
+    private record OpenConversationData(
+            boolean loaded, ConversationPreview preview, List<ConversationPreview> previews) {}
+
+    private record MessageLoadData(String conversationId, List<Message> messages, Integer unreadCount) {}
 }

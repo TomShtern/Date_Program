@@ -15,6 +15,10 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.PageData;
+import datingapp.ui.async.AsyncErrorRouter;
+import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.Instant;
@@ -30,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -64,6 +69,7 @@ public class MatchesViewModel {
     private final RecommendationService dailyService;
     private final MatchingUseCases matchingUseCases;
     private final AppSession session;
+    private final ViewModelAsyncScope asyncScope;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesReceived = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesSent = FXCollections.observableArrayList();
@@ -103,7 +109,7 @@ public class MatchesViewModel {
             MatchingService matchingService,
             RecommendationService dailyService,
             AppSession session) {
-        this(matchData, userStore, matchingService, dailyService, null, session);
+        this(matchData, userStore, matchingService, dailyService, null, session, new JavaFxUiThreadDispatcher());
     }
 
     public MatchesViewModel(
@@ -113,12 +119,31 @@ public class MatchesViewModel {
             RecommendationService dailyService,
             MatchingUseCases matchingUseCases,
             AppSession session) {
+        this(
+                matchData,
+                userStore,
+                matchingService,
+                dailyService,
+                matchingUseCases,
+                session,
+                new JavaFxUiThreadDispatcher());
+    }
+
+    public MatchesViewModel(
+            UiMatchDataAccess matchData,
+            UiUserStore userStore,
+            MatchingService matchingService,
+            RecommendationService dailyService,
+            MatchingUseCases matchingUseCases,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
         this.matchData = Objects.requireNonNull(matchData, "matchData cannot be null");
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
         this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
         this.matchingUseCases = matchingUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
     /** Initialize and load matches for current user. */
@@ -145,6 +170,7 @@ public class MatchesViewModel {
      * Should be called when the ViewModel is no longer needed.
      */
     public void dispose() {
+        asyncScope.dispose();
         matches.clear();
         likesReceived.clear();
         likesSent.clear();
@@ -163,58 +189,17 @@ public class MatchesViewModel {
         }
 
         long capturedEpoch = refreshEpoch.incrementAndGet();
-        loading.set(true);
         // Reset pagination state so we always start from the first page on a full
         // refresh.
         currentMatchOffset.set(0);
         UUID userId = user.getId();
         String userName = user.getName();
 
-        // Run async only when invoked from FX thread; otherwise keep deterministic
-        // synchronous behavior for background/test callers.
-        boolean runAsync = isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread();
-
-        if (runAsync) {
-            // Execute blocking storage calls on virtual thread to avoid FX thread blocking
-            // (H-12)
-            Thread.ofVirtual().name("matches-refresh").start(() -> {
-                try {
-                    MatchFetchResult matchResult = fetchMatchesFromStorage(userId, capturedEpoch);
-                    List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
-                    List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
-
-                    javafx.application.Platform.runLater(() -> {
-                        if (refreshEpoch.get() == capturedEpoch) {
-                            updateObservableLists(matchResult, received, sent, userName);
-                            loading.set(false);
-                        }
-                    });
-                } catch (Exception e) {
-                    javafx.application.Platform.runLater(() -> {
-                        if (refreshEpoch.get() == capturedEpoch) {
-                            logWarn("Failed to refresh matches: {}", e.getMessage(), e);
-                            notifyError("Failed to refresh matches", e);
-                            loading.set(false);
-                        }
-                    });
-                }
-            });
-        } else {
-            // Synchronous execution for tests (no FX toolkit available)
-            try {
-                MatchFetchResult matchResult = fetchMatchesFromStorage(userId, capturedEpoch);
-                List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
-                List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
-                updateObservableLists(matchResult, received, sent, userName);
-            } catch (Exception e) {
-                logWarn("Failed to refresh matches: {}", e.getMessage(), e);
-                notifyError("Failed to refresh matches", e);
-            } finally {
-                if (refreshEpoch.get() == capturedEpoch) {
-                    loading.set(false);
-                }
-            }
+        if (shouldRunAsync()) {
+            refreshAllAsync(userId, userName, capturedEpoch);
+            return;
         }
+        refreshAllSync(userId, userName, capturedEpoch);
     }
 
     /**
@@ -223,10 +208,10 @@ public class MatchesViewModel {
      */
     private boolean isFxToolkitAvailable() {
         try {
-            if (javafx.application.Platform.isFxApplicationThread()) {
+            if (Platform.isFxApplicationThread()) {
                 return true;
             }
-            javafx.application.Platform.runLater(() -> {
+            Platform.runLater(() -> {
                 // probe only
             });
             return true;
@@ -404,28 +389,23 @@ public class MatchesViewModel {
 
         UUID userId = user.getId();
         long capturedEpoch = refreshEpoch.get();
-        loading.set(true);
 
-        if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
-            Thread.ofVirtual().name("matches-load-more").start(() -> {
-                try {
-                    MatchFetchResult result = fetchMatchesFromStorage(userId, capturedEpoch);
-                    javafx.application.Platform.runLater(() -> updateMatchesList(result, capturedEpoch));
-                } catch (Exception e) {
-                    javafx.application.Platform.runLater(() -> handleLoadError(e, capturedEpoch));
-                } finally {
-                    isFetchingNextPage.set(false);
-                }
-            });
-        } else {
-            try {
-                MatchFetchResult result = fetchMatchesFromStorage(userId, capturedEpoch);
-                updateMatchesList(result, capturedEpoch);
-            } catch (Exception e) {
-                handleLoadError(e, capturedEpoch);
-            } finally {
-                isFetchingNextPage.set(false);
-            }
+        if (shouldRunAsync()) {
+            asyncScope.run(
+                    "load more matches",
+                    () -> fetchNextPagePayload(userId, capturedEpoch),
+                    payload -> updateMatchesList(payload.result(), payload.epoch()));
+            return;
+        }
+
+        setLoadingState(true);
+        try {
+            LoadMorePayload payload = fetchNextPagePayload(userId, capturedEpoch);
+            updateMatchesList(payload.result(), payload.epoch());
+        } catch (Exception e) {
+            handleLoadError(e, capturedEpoch);
+        } finally {
+            setLoadingState(false);
         }
     }
 
@@ -437,7 +417,6 @@ public class MatchesViewModel {
         matchCount.set(matches.size());
         totalMatchCount.set(result.totalCount());
         hasMoreMatches.set(result.hasMore());
-        loading.set(false);
     }
 
     private void handleLoadError(Exception e, long capturedEpoch) {
@@ -446,7 +425,6 @@ public class MatchesViewModel {
         }
         logWarn("Failed to load next match page: {}", e.getMessage(), e);
         notifyError("Failed to load more matches", e);
-        loading.set(false);
     }
 
     /**
@@ -465,54 +443,20 @@ public class MatchesViewModel {
             return;
         }
 
-        loading.set(true);
         UUID userId = user.getId();
 
-        if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
-            Thread.ofVirtual().name("matches-like-back").start(() -> {
-                try {
-                    if (!dailyService.canLike(userId)) {
-                        javafx.application.Platform.runLater(() -> {
-                            notifyError("Daily like limit reached", new IllegalStateException("Daily limit reached"));
-                            loading.set(false);
-                        });
-                        return;
-                    }
-                    if (matchingUseCases != null) {
-                        matchingUseCases.recordLike(new RecordLikeCommand(
-                                UserContext.ui(userId), like.userId(), Like.Direction.LIKE, true));
-                    } else {
-                        matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.LIKE));
-                    }
-                    javafx.application.Platform.runLater(this::refreshAll);
-                } catch (Exception e) {
-                    javafx.application.Platform.runLater(() -> {
-                        logWarn("Failed to like back: {}", e.getMessage(), e);
-                        notifyError("Failed to like back", e);
-                        loading.set(false);
-                    });
-                }
-            });
-        } else {
-            try {
-                if (!dailyService.canLike(userId)) {
-                    notifyError("Daily like limit reached", new IllegalStateException("Daily limit reached"));
-                    loading.set(false);
-                    return;
-                }
-                if (matchingUseCases != null) {
-                    matchingUseCases.recordLike(
-                            new RecordLikeCommand(UserContext.ui(userId), like.userId(), Like.Direction.LIKE, true));
-                } else {
-                    matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.LIKE));
-                }
-                refreshAll();
-            } catch (Exception e) {
-                logWarn("Failed to like back: {}", e.getMessage(), e);
-                notifyError("Failed to like back", e);
-                loading.set(false);
-            }
+        if (shouldRunAsync()) {
+            asyncScope.run(
+                    "like back",
+                    () -> {
+                        performLikeBack(userId, like.userId());
+                        return Boolean.TRUE;
+                    },
+                    _ -> refreshAll());
+            return;
         }
+
+        executeActionSync("Failed to like back", () -> performLikeBack(userId, like.userId()), this::refreshAll);
     }
 
     public void passOn(LikeCardData like) {
@@ -523,42 +467,20 @@ public class MatchesViewModel {
             return;
         }
 
-        loading.set(true);
         UUID userId = user.getId();
 
-        if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
-            Thread.ofVirtual().name("matches-pass-on").start(() -> {
-                try {
-                    if (matchingUseCases != null) {
-                        matchingUseCases.recordLike(new RecordLikeCommand(
-                                UserContext.ui(userId), like.userId(), Like.Direction.PASS, false));
-                    } else {
-                        matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.PASS));
-                    }
-                    javafx.application.Platform.runLater(this::refreshAll);
-                } catch (Exception e) {
-                    javafx.application.Platform.runLater(() -> {
-                        logWarn("Failed to pass: {}", e.getMessage(), e);
-                        notifyError("Failed to pass", e);
-                        loading.set(false);
-                    });
-                }
-            });
-        } else {
-            try {
-                if (matchingUseCases != null) {
-                    matchingUseCases.recordLike(
-                            new RecordLikeCommand(UserContext.ui(userId), like.userId(), Like.Direction.PASS, false));
-                } else {
-                    matchingService.recordLike(Like.create(userId, like.userId(), Like.Direction.PASS));
-                }
-                refreshAll();
-            } catch (Exception e) {
-                logWarn("Failed to pass: {}", e.getMessage(), e);
-                notifyError("Failed to pass", e);
-                loading.set(false);
-            }
+        if (shouldRunAsync()) {
+            asyncScope.run(
+                    "pass on like",
+                    () -> {
+                        performPassOn(userId, like.userId());
+                        return Boolean.TRUE;
+                    },
+                    _ -> refreshAll());
+            return;
         }
+
+        executeActionSync("Failed to pass", () -> performPassOn(userId, like.userId()), this::refreshAll);
     }
 
     public void withdrawLike(LikeCardData like) {
@@ -567,42 +489,136 @@ public class MatchesViewModel {
             return;
         }
 
-        loading.set(true);
+        if (shouldRunAsync()) {
+            asyncScope.run(
+                    "withdraw like",
+                    () -> {
+                        performWithdrawLike(like.likeId());
+                        return Boolean.TRUE;
+                    },
+                    _ -> refreshAll());
+            return;
+        }
 
-        if (isFxToolkitAvailable() && javafx.application.Platform.isFxApplicationThread()) {
-            Thread.ofVirtual().name("matches-withdraw").start(() -> {
-                try {
-                    User user = resolveCurrentUser();
-                    if (matchingUseCases != null && user != null) {
-                        matchingUseCases.removeLike(new RemoveLikeCommand(UserContext.ui(user.getId()), like.likeId()));
-                    } else {
-                        matchData.deleteLike(like.likeId());
+        executeActionSync("Failed to withdraw like", () -> performWithdrawLike(like.likeId()), this::refreshAll);
+    }
+
+    private void refreshAllAsync(UUID userId, String userName, long capturedEpoch) {
+        asyncScope.runLatest(
+                "matches-refresh",
+                "refresh matches",
+                () -> fetchRefreshPayload(userId, userName, capturedEpoch),
+                payload -> {
+                    if (refreshEpoch.get() == payload.epoch()) {
+                        updateObservableLists(
+                                payload.matchResult(), payload.received(), payload.sent(), payload.userName());
                     }
-                    javafx.application.Platform.runLater(this::refreshAll);
-                } catch (Exception e) {
-                    javafx.application.Platform.runLater(() -> {
-                        logWarn("Failed to withdraw like {}", like.likeId(), e);
-                        notifyError("Failed to withdraw like", e);
-                        loading.set(false);
-                    });
-                }
-            });
-        } else {
-            try {
-                User user = resolveCurrentUser();
-                if (matchingUseCases != null && user != null) {
-                    matchingUseCases.removeLike(new RemoveLikeCommand(UserContext.ui(user.getId()), like.likeId()));
-                } else {
-                    matchData.deleteLike(like.likeId());
-                }
-                refreshAll();
-            } catch (Exception e) {
-                logWarn("Failed to withdraw like {}", like.likeId(), e);
-                notifyError("Failed to withdraw like", e);
-                loading.set(false);
+                });
+    }
+
+    private void refreshAllSync(UUID userId, String userName, long capturedEpoch) {
+        setLoadingState(true);
+        try {
+            RefreshPayload payload = fetchRefreshPayload(userId, userName, capturedEpoch);
+            if (refreshEpoch.get() == payload.epoch()) {
+                updateObservableLists(payload.matchResult(), payload.received(), payload.sent(), payload.userName());
+            }
+        } catch (Exception e) {
+            logWarn("Failed to refresh matches: {}", e.getMessage(), e);
+            notifyError("Failed to refresh matches", e);
+        } finally {
+            if (refreshEpoch.get() == capturedEpoch) {
+                setLoadingState(false);
             }
         }
     }
+
+    private RefreshPayload fetchRefreshPayload(UUID userId, String userName, long capturedEpoch) {
+        MatchFetchResult matchResult = fetchMatchesFromStorage(userId, capturedEpoch);
+        List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
+        List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
+        return new RefreshPayload(capturedEpoch, matchResult, received, sent, userName);
+    }
+
+    private LoadMorePayload fetchNextPagePayload(UUID userId, long capturedEpoch) {
+        try {
+            MatchFetchResult result = fetchMatchesFromStorage(userId, capturedEpoch);
+            return new LoadMorePayload(capturedEpoch, result);
+        } finally {
+            isFetchingNextPage.set(false);
+        }
+    }
+
+    private void performLikeBack(UUID userId, UUID targetUserId) {
+        if (!dailyService.canLike(userId)) {
+            throw new IllegalStateException("Daily like limit reached");
+        }
+        if (matchingUseCases != null) {
+            matchingUseCases.recordLike(
+                    new RecordLikeCommand(UserContext.ui(userId), targetUserId, Like.Direction.LIKE, true));
+            return;
+        }
+        matchingService.recordLike(Like.create(userId, targetUserId, Like.Direction.LIKE));
+    }
+
+    private void performPassOn(UUID userId, UUID targetUserId) {
+        if (matchingUseCases != null) {
+            matchingUseCases.recordLike(
+                    new RecordLikeCommand(UserContext.ui(userId), targetUserId, Like.Direction.PASS, false));
+            return;
+        }
+        matchingService.recordLike(Like.create(userId, targetUserId, Like.Direction.PASS));
+    }
+
+    private void performWithdrawLike(UUID likeId) {
+        User user = resolveCurrentUser();
+        if (matchingUseCases != null && user != null) {
+            matchingUseCases.removeLike(new RemoveLikeCommand(UserContext.ui(user.getId()), likeId));
+            return;
+        }
+        matchData.deleteLike(likeId);
+    }
+
+    private void executeActionSync(
+            String userMessage, ViewModelAsyncScope.ThrowingRunnable action, Runnable onSuccess) {
+        setLoadingState(true);
+        try {
+            action.run();
+            onSuccess.run();
+        } catch (Exception e) {
+            logWarn("{}: {}", userMessage, e.getMessage(), e);
+            notifyError(userMessage, e);
+        } finally {
+            setLoadingState(false);
+        }
+    }
+
+    private boolean shouldRunAsync() {
+        return isFxToolkitAvailable() && Platform.isFxApplicationThread();
+    }
+
+    private void setLoadingState(boolean isLoading) {
+        if (loading.get() != isLoading) {
+            loading.set(isLoading);
+        }
+    }
+
+    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
+        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
+        ViewModelAsyncScope scope = new ViewModelAsyncScope(
+                "matches", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
+        scope.setLoadingStateConsumer(this::setLoadingState);
+        return scope;
+    }
+
+    private record RefreshPayload(
+            long epoch,
+            MatchFetchResult matchResult,
+            List<LikeCardData> received,
+            List<LikeCardData> sent,
+            String userName) {}
+
+    private record LoadMorePayload(long epoch, MatchFetchResult result) {}
 
     private void logWarn(String message, Object... args) {
         if (logger.isWarnEnabled()) {

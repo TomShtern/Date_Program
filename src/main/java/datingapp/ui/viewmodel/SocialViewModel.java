@@ -12,6 +12,10 @@ import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.model.User;
+import datingapp.ui.async.AsyncErrorRouter;
+import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.util.List;
@@ -19,9 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.FXCollections;
@@ -55,12 +57,11 @@ public class SocialViewModel {
     private final UiUserStore userStore;
     private final SocialUseCases socialUseCases;
     private final AppSession session;
+    private final ViewModelAsyncScope asyncScope;
 
     private final ObservableList<Notification> notifications = FXCollections.observableArrayList();
     private final ObservableList<FriendRequestEntry> pendingRequests = FXCollections.observableArrayList();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
-
-    private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     private User currentUser;
     private ViewModelErrorSink errorHandler;
@@ -70,11 +71,21 @@ public class SocialViewModel {
             UiSocialDataAccess socialDataAccess,
             UiUserStore userStore,
             AppSession session) {
+        this(connectionService, socialDataAccess, userStore, session, new JavaFxUiThreadDispatcher());
+    }
+
+    public SocialViewModel(
+            ConnectionService connectionService,
+            UiSocialDataAccess socialDataAccess,
+            UiUserStore userStore,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
         this.socialDataAccess = Objects.requireNonNull(socialDataAccess, "socialDataAccess cannot be null");
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.socialUseCases = new SocialUseCases(this.connectionService, null);
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
     public void setErrorHandler(ViewModelErrorSink handler) {
@@ -91,42 +102,36 @@ public class SocialViewModel {
     /** Loads both notifications and pending friend requests from the background. */
     public void refresh() {
         User user = ensureCurrentUser();
-        if (disposed.get() || user == null) {
+        if (asyncScope.isDisposed() || user == null) {
             return;
         }
 
-        setLoadingState(true);
-        Thread.ofVirtual().name("social-refresh").start(() -> {
-            List<Notification> notifs = List.of();
-            List<FriendRequestEntry> entries = List.of();
-            try {
-                var notificationsResult =
-                        socialUseCases.notifications(new NotificationsQuery(UserContext.ui(user.getId()), false));
-                notifs = notificationsResult.success()
-                        ? notificationsResult.data()
-                        : socialDataAccess.getNotifications(user.getId(), false);
-
-                var requestsResult =
-                        socialUseCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.ui(user.getId())));
-                List<FriendRequest> requests = requestsResult.success()
-                        ? requestsResult.data()
-                        : connectionService.getPendingRequestsFor(user.getId());
-                entries = resolveRequestEntries(requests);
-            } catch (Exception e) {
-                logError("Failed to load social data", e);
-                notifyError("Could not load social data. Please try again.");
-            }
-
-            List<Notification> finalNotifs = notifs;
-            List<FriendRequestEntry> finalEntries = entries;
-            runOnFx(() -> {
-                if (!disposed.get()) {
-                    notifications.setAll(finalNotifs);
-                    pendingRequests.setAll(finalEntries);
-                }
-                setLoadingState(false);
-            });
+        asyncScope.runLatest("social-refresh", "refresh social data", () -> loadSocialData(user), data -> {
+            notifications.setAll(data.notifications());
+            pendingRequests.setAll(data.pendingRequests());
         });
+    }
+
+    private SocialData loadSocialData(User user) {
+        try {
+            var notificationsResult =
+                    socialUseCases.notifications(new NotificationsQuery(UserContext.ui(user.getId()), false));
+            List<Notification> notifs = notificationsResult.success()
+                    ? notificationsResult.data()
+                    : socialDataAccess.getNotifications(user.getId(), false);
+
+            var requestsResult =
+                    socialUseCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.ui(user.getId())));
+            List<FriendRequest> requests = requestsResult.success()
+                    ? requestsResult.data()
+                    : connectionService.getPendingRequestsFor(user.getId());
+            List<FriendRequestEntry> entries = resolveRequestEntries(requests);
+            return new SocialData(notifs, entries);
+        } catch (Exception e) {
+            logError("Failed to load social data", e);
+            notifyError("Could not load social data. Please try again.");
+            return new SocialData(List.of(), List.of());
+        }
     }
 
     private List<FriendRequestEntry> resolveRequestEntries(List<FriendRequest> requests) {
@@ -151,7 +156,7 @@ public class SocialViewModel {
         if (user == null || entry == null) {
             return;
         }
-        Thread.ofVirtual().name("social-accept").start(() -> {
+        asyncScope.runFireAndForget("accept friend request", () -> {
             try {
                 var result = socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
                         UserContext.ui(user.getId()), entry.requestId(), FriendRequestAction.ACCEPT));
@@ -162,7 +167,7 @@ public class SocialViewModel {
                 logError("Failed to accept friend request", e);
                 notifyError("Failed to accept request.");
             }
-            runOnFx(this::refresh);
+            asyncScope.dispatchToUi(this::refresh);
         });
     }
 
@@ -172,7 +177,7 @@ public class SocialViewModel {
         if (user == null || entry == null) {
             return;
         }
-        Thread.ofVirtual().name("social-decline").start(() -> {
+        asyncScope.runFireAndForget("decline friend request", () -> {
             try {
                 var result = socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
                         UserContext.ui(user.getId()), entry.requestId(), FriendRequestAction.DECLINE));
@@ -183,7 +188,7 @@ public class SocialViewModel {
                 logError("Failed to decline friend request", e);
                 notifyError("Failed to decline request.");
             }
-            runOnFx(this::refresh);
+            asyncScope.dispatchToUi(this::refresh);
         });
     }
 
@@ -193,14 +198,14 @@ public class SocialViewModel {
         if (user == null || notification == null || notification.isRead()) {
             return;
         }
-        Thread.ofVirtual().name("social-mark-read").start(() -> {
+        asyncScope.runFireAndForget("mark notification read", () -> {
             try {
                 var result = socialUseCases.markNotificationRead(
                         new MarkNotificationReadCommand(UserContext.ui(user.getId()), notification.id()));
                 if (!result.success()) {
                     socialDataAccess.markNotificationRead(notification.id());
                 }
-                runOnFx(this::refresh);
+                asyncScope.dispatchToUi(this::refresh);
             } catch (Exception e) {
                 logWarn("Failed to mark notification as read", e);
             }
@@ -209,7 +214,7 @@ public class SocialViewModel {
 
     /** Disposes resources. Should be called when the ViewModel is no longer needed. */
     public void dispose() {
-        disposed.set(true);
+        asyncScope.dispose();
         notifications.clear();
         pendingRequests.clear();
         setLoadingState(false);
@@ -224,24 +229,22 @@ public class SocialViewModel {
 
     private void notifyError(String message) {
         if (errorHandler != null) {
-            runOnFx(() -> errorHandler.onError(message));
+            asyncScope.dispatchToUi(() -> errorHandler.onError(message));
         }
     }
 
     private void setLoadingState(boolean isLoading) {
-        runOnFx(() -> {
-            if (loading.get() != isLoading) {
-                loading.set(isLoading);
-            }
-        });
+        if (loading.get() != isLoading) {
+            loading.set(isLoading);
+        }
     }
 
-    private void runOnFx(Runnable action) {
-        if (Platform.isFxApplicationThread()) {
-            action.run();
-        } else {
-            Platform.runLater(action);
-        }
+    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
+        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
+        ViewModelAsyncScope scope = new ViewModelAsyncScope(
+                "social", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
+        scope.setLoadingStateConsumer(this::setLoadingState);
+        return scope;
     }
 
     private void logError(String message, Throwable error) {
@@ -269,4 +272,6 @@ public class SocialViewModel {
     public BooleanProperty loadingProperty() {
         return loading;
     }
+
+    private record SocialData(List<Notification> notifications, List<FriendRequestEntry> pendingRequests) {}
 }

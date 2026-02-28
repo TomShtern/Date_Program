@@ -8,6 +8,10 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.ui.async.AsyncErrorRouter;
+import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -16,7 +20,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -37,6 +40,7 @@ public class LoginViewModel {
     private final AppConfig config;
     private final AppSession session;
     private final UiUserStore userStore;
+    private final ViewModelAsyncScope asyncScope;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final ObservableList<User> filteredUsers = FXCollections.observableArrayList();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
@@ -56,9 +60,15 @@ public class LoginViewModel {
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public LoginViewModel(UiUserStore userStore, AppConfig config, AppSession session) {
+        this(userStore, config, session, new JavaFxUiThreadDispatcher());
+    }
+
+    public LoginViewModel(
+            UiUserStore userStore, AppConfig config, AppSession session, UiThreadDispatcher uiDispatcher) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.asyncScope = createAsyncScope(uiDispatcher);
         this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
         loadUsers();
     }
@@ -69,6 +79,7 @@ public class LoginViewModel {
      */
     public void dispose() {
         disposed.set(true);
+        asyncScope.dispose();
         users.clear();
         filteredUsers.clear();
     }
@@ -84,31 +95,15 @@ public class LoginViewModel {
         if (disposed.get()) {
             return;
         }
-        loading.set(true);
-        Thread.ofVirtual().start(() -> {
-            try {
-                List<User> allUsers = userStore.findAll();
-                if (disposed.get()) {
-                    return;
-                }
-                Platform.runLater(() -> {
-                    users.clear();
-                    users.addAll(allUsers);
-                    applyFilter(filterText.get());
-                    loading.set(false);
-                    logInfo("Loaded {} users for login selection.", users.size());
-                });
-            } catch (Exception e) {
-                if (!disposed.get()) {
-                    Platform.runLater(() -> {
-                        if (!disposed.get()) {
-                            loading.set(false);
-                        }
-                    });
-                }
-                logError("Failed to load users for login: {}", e.getMessage(), e);
-                notifyError("Failed to load users", e);
+
+        asyncScope.runLatest("login-users", "load users", userStore::findAll, allUsers -> {
+            if (disposed.get()) {
+                return;
             }
+            users.clear();
+            users.addAll(allUsers);
+            applyFilter(filterText.get());
+            logInfo("Loaded {} users for login selection.", users.size());
         });
     }
 
@@ -406,11 +401,21 @@ public class LoginViewModel {
         }
         String detail = e.getMessage();
         String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
-        if (Platform.isFxApplicationThread()) {
-            errorHandler.onError(message);
-        } else {
-            Platform.runLater(() -> errorHandler.onError(message));
+        asyncScope.dispatchToUi(() -> errorHandler.onError(message));
+    }
+
+    private void setLoadingState(boolean isLoading) {
+        if (loading.get() != isLoading) {
+            loading.set(isLoading);
         }
+    }
+
+    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
+        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
+        ViewModelAsyncScope scope = new ViewModelAsyncScope(
+                "login", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
+        scope.setLoadingStateConsumer(this::setLoadingState);
+        return scope;
     }
 
     private void applyFilter(String text) {

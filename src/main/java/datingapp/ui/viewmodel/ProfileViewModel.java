@@ -15,6 +15,10 @@ import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ProfileService.CompletionResult;
 import datingapp.ui.UiFeedbackService;
+import datingapp.ui.async.AsyncErrorRouter;
+import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.io.File;
 import java.io.IOException;
@@ -27,9 +31,7 @@ import java.time.Period;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -54,6 +56,7 @@ public class ProfileViewModel {
     private final ProfileService profileCompletionService;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
+    private final ViewModelAsyncScope asyncScope;
 
     // Observable properties for form binding - Basic Info
     private final StringProperty name = new SimpleStringProperty("");
@@ -97,14 +100,11 @@ public class ProfileViewModel {
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
 
-    /** Track all background threads for cleanup on dispose. */
-    private final java.util.Set<Thread> backgroundThreads = ConcurrentHashMap.newKeySet();
-
     private ViewModelErrorSink errorHandler;
 
     public ProfileViewModel(
             UiUserStore userStore, ProfileService profileCompletionService, AppConfig config, AppSession session) {
-        this(userStore, profileCompletionService, null, config, session);
+        this(userStore, profileCompletionService, null, config, session, new JavaFxUiThreadDispatcher());
     }
 
     public ProfileViewModel(
@@ -113,12 +113,23 @@ public class ProfileViewModel {
             ProfileUseCases profileUseCases,
             AppConfig config,
             AppSession session) {
+        this(userStore, profileCompletionService, profileUseCases, config, session, new JavaFxUiThreadDispatcher());
+    }
+
+    public ProfileViewModel(
+            UiUserStore userStore,
+            ProfileService profileCompletionService,
+            ProfileUseCases profileUseCases,
+            AppConfig config,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.profileCompletionService =
                 Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
         this.profileUseCases = profileUseCases;
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
     /**
@@ -127,12 +138,7 @@ public class ProfileViewModel {
      */
     public void dispose() {
         disposed.set(true);
-        for (Thread thread : backgroundThreads) {
-            if (thread != null && thread.isAlive()) {
-                thread.interrupt();
-            }
-        }
-        backgroundThreads.clear();
+        asyncScope.dispose();
         selectedInterests.clear();
         photoUrls.clear();
     }
@@ -330,56 +336,64 @@ public class ProfileViewModel {
     }
 
     private void saveInBackground(User user) {
-        startTrackedThread("profile-save", () -> {
-            try {
-                if (disposed.get() || Thread.currentThread().isInterrupted()) {
-                    return;
-                }
+        asyncScope.runFireAndForget("profile-save", () -> persistProfile(user));
+    }
 
-                if (profileUseCases != null) {
-                    var saveResult =
-                            profileUseCases.saveProfile(new SaveProfileCommand(UserContext.ui(user.getId()), user));
-                    if (!saveResult.success()) {
-                        throw new IllegalStateException(saveResult.error().message());
-                    }
-
-                    User savedUser = saveResult.data().user();
-                    boolean activated = saveResult.data().activated();
-                    Platform.runLater(() -> {
-                        if (disposed.get()) {
-                            return;
-                        }
-                        updateSessionAndCompletion(savedUser);
-                        if (activated) {
-                            UiFeedbackService.showSuccess("Profile complete! You're now active!");
-                        }
-                        logInfo("Profile saved successfully");
-                    });
-                    return;
-                }
-
-                persistUser(user);
-
-                if (disposed.get() || Thread.currentThread().isInterrupted()) {
-                    return;
-                }
-                attemptActivation(user);
-
-                if (disposed.get() || Thread.currentThread().isInterrupted()) {
-                    return;
-                }
-
-                Platform.runLater(() -> {
-                    if (disposed.get()) {
-                        return;
-                    }
-                    updateSessionAndCompletion(user);
-                    logInfo("Profile saved successfully");
-                });
-            } catch (Exception e) {
-                logError("Failed to save profile: {}", e.getMessage(), e);
-                notifyError("Failed to save profile", e);
+    private void persistProfile(User user) {
+        try {
+            if (disposed.get()) {
+                return;
             }
+
+            if (profileUseCases != null) {
+                persistProfileViaUseCase(user);
+                return;
+            }
+
+            persistProfileLegacy(user);
+        } catch (Exception e) {
+            logError("Failed to save profile: {}", e.getMessage(), e);
+            notifyError("Failed to save profile", e);
+        }
+    }
+
+    private void persistProfileViaUseCase(User user) {
+        var saveResult = profileUseCases.saveProfile(new SaveProfileCommand(UserContext.ui(user.getId()), user));
+        if (!saveResult.success()) {
+            throw new IllegalStateException(saveResult.error().message());
+        }
+
+        User savedUser = saveResult.data().user();
+        boolean activated = saveResult.data().activated();
+        asyncScope.dispatchToUi(() -> {
+            if (disposed.get()) {
+                return;
+            }
+            updateSessionAndCompletion(savedUser);
+            if (activated) {
+                UiFeedbackService.showSuccess("Profile complete! You're now active!");
+            }
+            logInfo("Profile saved successfully");
+        });
+    }
+
+    private void persistProfileLegacy(User user) {
+        persistUser(user);
+        if (disposed.get()) {
+            return;
+        }
+
+        attemptActivation(user);
+        if (disposed.get()) {
+            return;
+        }
+
+        asyncScope.dispatchToUi(() -> {
+            if (disposed.get()) {
+                return;
+            }
+            updateSessionAndCompletion(user);
+            logInfo("Profile saved successfully");
         });
     }
 
@@ -486,7 +500,7 @@ public class ProfileViewModel {
                 user.activate();
                 userStore.save(user);
                 logInfo("User {} activated after profile completion", user.getName());
-                Platform.runLater(() -> UiFeedbackService.showSuccess("Profile complete! You're now active!"));
+                asyncScope.dispatchToUi(() -> UiFeedbackService.showSuccess("Profile complete! You're now active!"));
             } catch (IllegalStateException e) {
                 logWarn("Could not activate user: {}", e.getMessage());
             }
@@ -538,11 +552,7 @@ public class ProfileViewModel {
         }
         String detail = e.getMessage();
         String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
-        if (Platform.isFxApplicationThread()) {
-            errorHandler.onError(message);
-        } else {
-            Platform.runLater(() -> errorHandler.onError(message));
-        }
+        asyncScope.dispatchToUi(() -> errorHandler.onError(message));
     }
 
     // --- Properties for data binding ---
@@ -786,12 +796,12 @@ public class ProfileViewModel {
             return;
         }
 
-        startTrackedThread("photo-save", () -> processPhotoUpload(user, photoFile));
+        asyncScope.runFireAndForget("photo-save", () -> processPhotoUpload(user, photoFile));
     }
 
     private void processPhotoUpload(User user, File photoFile) {
         try {
-            if (disposed.get() || Thread.currentThread().isInterrupted()) {
+            if (disposed.get()) {
                 return;
             }
 
@@ -822,7 +832,7 @@ public class ProfileViewModel {
             userStore.save(user);
 
             // 5. Update UI on FX thread
-            Platform.runLater(() -> {
+            asyncScope.dispatchToUi(() -> {
                 if (disposed.get()) {
                     return;
                 }
@@ -839,17 +849,6 @@ public class ProfileViewModel {
             logError("Failed to save profile photo", e);
             notifyError("Failed to save profile photo", e);
         }
-    }
-
-    private void startTrackedThread(String name, Runnable task) {
-        Thread thread = Thread.ofVirtual().name(name).start(() -> {
-            try {
-                task.run();
-            } finally {
-                backgroundThreads.remove(Thread.currentThread());
-            }
-        });
-        backgroundThreads.add(thread);
     }
 
     /**
@@ -904,5 +903,11 @@ public class ProfileViewModel {
             return;
         }
         user.setBirthDate(selected);
+    }
+
+    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
+        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
+        return new ViewModelAsyncScope(
+                "profile", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
     }
 }

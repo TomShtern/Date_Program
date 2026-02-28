@@ -20,16 +20,15 @@ import datingapp.core.matching.UndoService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
+import datingapp.ui.async.AsyncErrorRouter;
+import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.async.ViewModelAsyncScope;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
@@ -56,6 +55,7 @@ public class MatchingViewModel {
     private final MatchingUseCases matchingUseCases;
     private final SocialUseCases socialUseCases;
     private final AppSession session;
+    private final ViewModelAsyncScope asyncScope;
 
     private final Queue<User> candidateQueue = new ConcurrentLinkedQueue<>();
     private final ObjectProperty<User> currentCandidate = new SimpleObjectProperty<>();
@@ -71,14 +71,6 @@ public class MatchingViewModel {
     private final ObjectProperty<Match> lastMatch = new SimpleObjectProperty<>();
     private final ObjectProperty<User> matchedUser = new SimpleObjectProperty<>();
 
-    /** Track background thread for cleanup on dispose. */
-    private final AtomicReference<Thread> backgroundThread = new AtomicReference<>();
-
-    private final AtomicLong refreshGeneration = new AtomicLong(0);
-
-    private final AtomicBoolean disposed = new AtomicBoolean(false);
-    private final AtomicInteger activeLoads = new AtomicInteger(0);
-
     private User lastSwipedCandidate;
     private User currentUser;
 
@@ -88,6 +80,22 @@ public class MatchingViewModel {
             UndoService undoService,
             TrustSafetyService trustSafetyService,
             AppSession session) {
+        this(
+                candidateFinder,
+                matchingService,
+                undoService,
+                trustSafetyService,
+                session,
+                new JavaFxUiThreadDispatcher());
+    }
+
+    public MatchingViewModel(
+            CandidateFinder candidateFinder,
+            MatchingService matchingService,
+            UndoService undoService,
+            TrustSafetyService trustSafetyService,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
         this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
         this.undoService = Objects.requireNonNull(undoService, "undoService cannot be null");
@@ -95,6 +103,7 @@ public class MatchingViewModel {
         this.matchingUseCases = new MatchingUseCases(this.candidateFinder, this.matchingService, this.undoService);
         this.socialUseCases = new SocialUseCases(this.trustSafetyService);
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
     /**
@@ -127,13 +136,7 @@ public class MatchingViewModel {
      * Should be called when the ViewModel is no longer needed.
      */
     public void dispose() {
-        disposed.set(true);
-        refreshGeneration.incrementAndGet();
-        Thread thread = backgroundThread.getAndSet(null);
-        if (thread != null && thread.isAlive()) {
-            thread.interrupt();
-        }
-        activeLoads.set(0);
+        asyncScope.dispose();
         setLoadingState(false);
     }
 
@@ -141,81 +144,55 @@ public class MatchingViewModel {
      * Fetches a new list of candidates for the current user.
      */
     public void refreshCandidates() {
-        if (disposed.get()) {
+        if (asyncScope.isDisposed()) {
             return;
         }
         User user = ensureCurrentUser();
         if (user == null) {
             logWarn("Cannot refresh candidates: no current user set");
-            activeLoads.set(0);
             setLoadingState(false);
             return;
         }
 
-        Thread existingThread = backgroundThread.getAndSet(null);
-        if (existingThread != null && existingThread.isAlive()) {
-            existingThread.interrupt();
-        }
-        long localGeneration = refreshGeneration.incrementAndGet();
+        asyncScope.runLatest("matching-refresh", "refresh candidates", () -> fetchCandidates(user), result -> {
+            locationMissing.set(result.locationMissing());
+            candidateQueue.clear();
+            candidateQueue.addAll(result.candidates());
+            nextCandidate();
+        });
+    }
 
-        activeLoads.set(0);
-        beginLoading();
+    private RefreshResult fetchCandidates(User user) {
+        List<User> candidates = List.of();
+        boolean locationMissingLocal = false;
+        try {
+            logDebug(
+                    "Refreshing candidates for user: {} (state={}, isComplete={}, gender={}, interestedIn={})",
+                    user.getName(),
+                    user.getState(),
+                    user.isComplete(),
+                    user.getGender(),
+                    user.getInterestedIn());
 
-        Thread thread = Thread.ofVirtual().name("candidate-refresh").start(() -> {
-            List<User> candidates = List.of();
-            boolean locationMissingLocal = false;
-            try {
-                logDebug(
-                        "Refreshing candidates for user: {} (state={}, isComplete={}, gender={}, interestedIn={})",
+            var browseResult =
+                    matchingUseCases.browseCandidates(new BrowseCandidatesCommand(UserContext.ui(user.getId()), user));
+            if (browseResult.success()) {
+                candidates = browseResult.data().candidates();
+                locationMissingLocal = browseResult.data().locationMissing();
+            } else if (user.getState() != UserState.ACTIVE) {
+                logWarn(
+                        "Current user {} is NOT ACTIVE (state={}). Cannot browse candidates. Profile complete: {}",
                         user.getName(),
                         user.getState(),
-                        user.isComplete(),
-                        user.getGender(),
-                        user.getInterestedIn());
-
-                var browseResult = matchingUseCases.browseCandidates(
-                        new BrowseCandidatesCommand(UserContext.ui(user.getId()), user));
-                if (browseResult.success()) {
-                    candidates = browseResult.data().candidates();
-                    locationMissingLocal = browseResult.data().locationMissing();
-                } else {
-                    if (user.getState() != UserState.ACTIVE) {
-                        logWarn(
-                                "Current user {} is NOT ACTIVE (state={}). Cannot browse candidates. Profile complete: {}",
-                                user.getName(),
-                                user.getState(),
-                                user.isComplete());
-                    } else {
-                        logWarn(
-                                "Failed to refresh candidates: {}",
-                                browseResult.error().message());
-                    }
-                }
-                logDebug("Found {} candidates after filtering", candidates.size());
-
-            } catch (Exception e) {
-                logWarn("Failed to refresh candidates", e);
+                        user.isComplete());
+            } else {
+                logWarn("Failed to refresh candidates: {}", browseResult.error().message());
             }
-
-            if (Thread.currentThread().isInterrupted()) {
-                return;
-            }
-
-            List<User> finalCandidates = candidates;
-            boolean finalLocationMissing = locationMissingLocal;
-            runOnFx(() -> {
-                if (disposed.get() || refreshGeneration.get() != localGeneration) {
-                    return;
-                }
-
-                locationMissing.set(finalLocationMissing);
-                candidateQueue.clear();
-                candidateQueue.addAll(finalCandidates);
-                nextCandidate();
-                endLoading();
-            });
-        });
-        backgroundThread.set(thread);
+            logDebug("Found {} candidates after filtering", candidates.size());
+        } catch (Exception e) {
+            logWarn("Failed to refresh candidates", e);
+        }
+        return new RefreshResult(candidates, locationMissingLocal);
     }
 
     /**
@@ -224,7 +201,7 @@ public class MatchingViewModel {
      * with {@link #refreshCandidates()} which clears/refills the queue on FX.
      */
     public void nextCandidate() {
-        runOnFx(() -> {
+        asyncScope.dispatchToUi(() -> {
             User next = candidateQueue.poll();
             currentCandidate.set(next);
             if (next != null) {
@@ -436,11 +413,11 @@ public class MatchingViewModel {
         if (user == null || targetId == null) {
             return;
         }
-        Thread.ofVirtual().start(() -> {
+        asyncScope.runFireAndForget("block candidate", () -> {
             try {
                 socialUseCases.blockUser(new RelationshipCommand(UserContext.ui(user.getId()), targetId));
                 // After blocking, advance to next candidate
-                runOnFx(this::nextCandidate);
+                asyncScope.dispatchToUi(this::nextCandidate);
             } catch (Exception e) {
                 logWarn("Failed to block user", e);
             }
@@ -452,12 +429,12 @@ public class MatchingViewModel {
         if (user == null || targetId == null || reason == null) {
             return;
         }
-        Thread.ofVirtual().start(() -> {
+        asyncScope.runFireAndForget("report candidate", () -> {
             try {
                 socialUseCases.reportUser(
                         new ReportCommand(UserContext.ui(user.getId()), targetId, reason, description, blockUser));
                 if (blockUser) {
-                    runOnFx(this::nextCandidate);
+                    asyncScope.dispatchToUi(this::nextCandidate);
                 }
             } catch (Exception e) {
                 logWarn("Failed to report user", e);
@@ -491,33 +468,19 @@ public class MatchingViewModel {
         }
     }
 
-    private void beginLoading() {
-        if (activeLoads.incrementAndGet() == 1) {
-            setLoadingState(true);
-        }
-    }
-
-    private void endLoading() {
-        int remaining = activeLoads.decrementAndGet();
-        if (remaining <= 0) {
-            activeLoads.set(0);
-            setLoadingState(false);
-        }
-    }
-
     private void setLoadingState(boolean isLoading) {
-        runOnFx(() -> {
-            if (loading.get() != isLoading) {
-                loading.set(isLoading);
-            }
-        });
-    }
-
-    private void runOnFx(Runnable action) {
-        if (Platform.isFxApplicationThread()) {
-            action.run();
-        } else {
-            Platform.runLater(action);
+        if (loading.get() != isLoading) {
+            loading.set(isLoading);
         }
     }
+
+    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
+        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
+        ViewModelAsyncScope scope =
+                new ViewModelAsyncScope("matching", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> null));
+        scope.setLoadingStateConsumer(this::setLoadingState);
+        return scope;
+    }
+
+    private record RefreshResult(List<User> candidates, boolean locationMissing) {}
 }

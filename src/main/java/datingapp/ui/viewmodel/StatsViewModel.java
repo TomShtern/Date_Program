@@ -11,11 +11,13 @@ import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
+import datingapp.ui.async.AsyncErrorRouter;
+import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.async.ViewModelAsyncScope;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -38,6 +40,7 @@ public class StatsViewModel {
     private final ActivityMetricsService statsService;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
+    private final ViewModelAsyncScope asyncScope;
 
     private final ObservableList<Achievement> achievements = FXCollections.observableArrayList();
 
@@ -50,9 +53,6 @@ public class StatsViewModel {
 
     private final AtomicReference<User> currentUser = new AtomicReference<>();
 
-    /** Track disposed state to prevent operations after cleanup. */
-    private final AtomicBoolean disposed = new AtomicBoolean(false);
-
     /** Error handler for ViewModel→Controller error communication (M-22). */
     private final AtomicReference<ViewModelErrorSink> errorHandler = new AtomicReference<>();
 
@@ -61,7 +61,7 @@ public class StatsViewModel {
     }
 
     public StatsViewModel(ProfileService achievementService, ActivityMetricsService statsService, AppSession session) {
-        this(achievementService, statsService, null, session);
+        this(achievementService, statsService, null, session, new JavaFxUiThreadDispatcher());
     }
 
     public StatsViewModel(
@@ -69,10 +69,20 @@ public class StatsViewModel {
             ActivityMetricsService statsService,
             ProfileUseCases profileUseCases,
             AppSession session) {
+        this(achievementService, statsService, profileUseCases, session, new JavaFxUiThreadDispatcher());
+    }
+
+    public StatsViewModel(
+            ProfileService achievementService,
+            ActivityMetricsService statsService,
+            ProfileUseCases profileUseCases,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
         this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
         this.statsService = Objects.requireNonNull(statsService, "statsService cannot be null");
         this.profileUseCases = profileUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
     /**
@@ -105,41 +115,25 @@ public class StatsViewModel {
 
     public void refresh() {
         User user = ensureCurrentUser();
-        if (disposed.get() || user == null) {
+        if (asyncScope.isDisposed() || user == null) {
             return;
         }
 
         java.util.UUID userId = user.getId();
-        loading.set(true);
-        Thread.ofVirtual().start(() -> {
-            try {
-                List<Achievement> achievementList = fetchAchievements(userId);
-                StatsData stats = fetchStats(userId);
-
-                Platform.runLater(() -> {
-                    if (disposed.get()) {
-                        return;
-                    }
-                    achievements.setAll(achievementList);
-                    totalLikesGiven.set(stats.likesGiven());
-                    totalLikesReceived.set(stats.likesReceived());
-                    totalMatches.set(stats.matchesCount());
-                    responseRate.set(stats.rateText());
-                    loading.set(false);
+        asyncScope.runLatest(
+                "stats-refresh",
+                "refresh stats",
+                () -> new StatsRefreshData(fetchAchievements(userId), fetchStats(userId), user),
+                data -> {
+                    achievements.setAll(data.achievements());
+                    totalLikesGiven.set(data.stats().likesGiven());
+                    totalLikesReceived.set(data.stats().likesReceived());
+                    totalMatches.set(data.stats().matchesCount());
+                    responseRate.set(data.stats().rateText());
                     if (logger.isInfoEnabled()) {
-                        logger.info("Refreshed stats for user: {}", maskUserIdentifier(user));
+                        logger.info("Refreshed stats for user: {}", maskUserIdentifier(data.user()));
                     }
                 });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    loading.set(false);
-                    notifyError("Failed to refresh stats", e);
-                });
-                if (logger.isWarnEnabled()) {
-                    logger.warn("Failed to refresh stats: {}", e.getMessage(), e);
-                }
-            }
-        });
     }
 
     private List<Achievement> fetchAchievements(java.util.UUID userId) {
@@ -202,32 +196,30 @@ public class StatsViewModel {
         return responseRate;
     }
 
-    private void notifyError(String userMessage, Exception e) {
-        ViewModelErrorSink handler = errorHandler.get();
-        if (handler == null) {
-            return;
-        }
-        String detail = e.getMessage();
-        String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
-        if (Platform.isFxApplicationThread()) {
-            handler.onError(message);
-        } else {
-            Platform.runLater(() -> handler.onError(message));
-        }
-    }
-
     /**
      * Disposes resources held by this ViewModel.
      * Should be called when the ViewModel is no longer needed.
      */
     public void dispose() {
-        disposed.set(true);
-        if (Platform.isFxApplicationThread()) {
-            achievements.clear();
-        } else {
-            Platform.runLater(achievements::clear);
+        asyncScope.dispose();
+        asyncScope.dispatchToUi(achievements::clear);
+    }
+
+    private void setLoadingState(boolean isLoading) {
+        if (loading.get() != isLoading) {
+            loading.set(isLoading);
         }
     }
+
+    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
+        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
+        ViewModelAsyncScope scope = new ViewModelAsyncScope(
+                "stats", dispatcher, new AsyncErrorRouter(logger, dispatcher, errorHandler::get));
+        scope.setLoadingStateConsumer(this::setLoadingState);
+        return scope;
+    }
+
+    private record StatsRefreshData(List<Achievement> achievements, StatsData stats, User user) {}
 
     private String maskUserIdentifier(User user) {
         if (user == null || user.getId() == null) {

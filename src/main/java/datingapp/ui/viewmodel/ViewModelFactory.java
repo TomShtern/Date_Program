@@ -3,6 +3,8 @@ package datingapp.ui.viewmodel;
 import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.model.User;
+import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.screen.ChatController;
 import datingapp.ui.screen.DashboardController;
 import datingapp.ui.screen.LoginController;
@@ -25,7 +27,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import org.slf4j.Logger;
@@ -42,6 +43,7 @@ public class ViewModelFactory {
 
     private final ServiceRegistry services;
     private final AppSession session;
+    private final UiThreadDispatcher uiDispatcher;
 
     /**
      * JavaFX-compatible wrapper for AppSession.
@@ -72,6 +74,7 @@ public class ViewModelFactory {
     public ViewModelFactory(ServiceRegistry services, AppSession session) {
         this.services = Objects.requireNonNull(services, "services cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.uiDispatcher = new JavaFxUiThreadDispatcher();
         this.controllerFactories = buildControllerFactories();
         initializeSessionBinding();
     }
@@ -82,7 +85,7 @@ public class ViewModelFactory {
      */
     private void initializeSessionBinding() {
         // Listen to AppSession changes and update UI property on JavaFX thread
-        sessionListener = user -> Platform.runLater(() -> currentUserProperty.set(user));
+        sessionListener = user -> uiDispatcher.dispatch(() -> currentUserProperty.set(user));
         session.addListener(sessionListener);
         // Sync initial state
         currentUserProperty.set(session.getCurrentUser());
@@ -138,7 +141,7 @@ public class ViewModelFactory {
 
     public synchronized LoginViewModel getLoginViewModel() {
         if (loginViewModel == null) {
-            loginViewModel = new LoginViewModel(createUiUserStore(), services.getConfig(), session);
+            loginViewModel = new LoginViewModel(createUiUserStore(), services.getConfig(), session, uiDispatcher);
         }
         return loginViewModel;
     }
@@ -151,7 +154,8 @@ public class ViewModelFactory {
                     services.getProfileService(),
                     services.getConnectionService(),
                     services.getProfileService(),
-                    session);
+                    session,
+                    uiDispatcher);
         }
         return dashboardViewModel;
     }
@@ -163,7 +167,8 @@ public class ViewModelFactory {
                     services.getProfileService(),
                     services.getProfileUseCases(),
                     services.getConfig(),
-                    session);
+                    session,
+                    uiDispatcher);
         }
         return profileViewModel;
     }
@@ -175,7 +180,8 @@ public class ViewModelFactory {
                     services.getMatchingService(),
                     services.getUndoService(),
                     services.getTrustSafetyService(),
-                    session);
+                    session,
+                    uiDispatcher);
         }
         return matchingViewModel;
     }
@@ -188,15 +194,16 @@ public class ViewModelFactory {
                     services.getMatchingService(),
                     services.getRecommendationService(),
                     services.getMatchingUseCases(),
-                    session);
+                    session,
+                    uiDispatcher);
         }
         return matchesViewModel;
     }
 
     public synchronized ChatViewModel getChatViewModel() {
         if (chatViewModel == null) {
-            chatViewModel =
-                    new ChatViewModel(services.getConnectionService(), services.getTrustSafetyService(), session);
+            chatViewModel = new ChatViewModel(
+                    services.getConnectionService(), services.getTrustSafetyService(), session, uiDispatcher);
         }
         return chatViewModel;
     }
@@ -207,7 +214,8 @@ public class ViewModelFactory {
                     services.getProfileService(),
                     services.getActivityMetricsService(),
                     services.getProfileUseCases(),
-                    session);
+                    session,
+                    uiDispatcher);
         }
         return statsViewModel;
     }
@@ -223,7 +231,7 @@ public class ViewModelFactory {
     public synchronized StandoutsViewModel getStandoutsViewModel() {
         if (standoutsViewModel == null) {
             standoutsViewModel = new StandoutsViewModel(
-                    services.getRecommendationService(), services.getMatchingUseCases(), session);
+                    services.getRecommendationService(), services.getMatchingUseCases(), session, uiDispatcher);
         }
         return standoutsViewModel;
     }
@@ -234,7 +242,8 @@ public class ViewModelFactory {
                     services.getConnectionService(),
                     new StorageUiSocialDataAccess(services.getCommunicationStorage()),
                     createUiUserStore(),
-                    session);
+                    session,
+                    uiDispatcher);
         }
         return socialViewModel;
     }
@@ -266,6 +275,7 @@ public class ViewModelFactory {
         preferencesViewModel = quietly(preferencesViewModel, PreferencesViewModel::dispose);
         standoutsViewModel = quietly(standoutsViewModel, StandoutsViewModel::dispose);
         socialViewModel = quietly(socialViewModel, SocialViewModel::dispose);
+        initializeSessionBinding();
         logDebug("All ViewModels disposed and reset");
     }
 

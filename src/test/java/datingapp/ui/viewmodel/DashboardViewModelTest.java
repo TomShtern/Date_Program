@@ -25,6 +25,7 @@ import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import javafx.application.Platform;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -114,15 +115,24 @@ class DashboardViewModelTest {
         }
     }
 
+    private boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
+        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+        while (System.nanoTime() < deadlineNanos) {
+            waitForFxEvents();
+            if (condition.getAsBoolean()) {
+                return true;
+            }
+        }
+        waitForFxEvents();
+        return condition.getAsBoolean();
+    }
+
     @Test
     @DisplayName("refresh() fetches dashboard data and updates properties on FX thread")
     void shouldRefreshDashboardData() throws InterruptedException {
         viewModel.refresh();
 
-        // Give virtual thread some time to complete DB fetching and dispatch to FX
-        // thread
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertEquals(currentUser.getName(), viewModel.userNameProperty().get());
         assertTrue(viewModel.dailyLikesStatusProperty().get().contains("Likes:"));
@@ -139,8 +149,14 @@ class DashboardViewModelTest {
             Thread.ofVirtual().start(() -> viewModel.refresh());
         }
 
-        Thread.sleep(1000); // Allow virtual threads to run
-        waitForFxEvents(); // Wait for any queued FX operations to finish
+        assertTrue(
+                waitUntil(
+                        () -> !viewModel.loadingProperty().get()
+                                && currentUser
+                                        .getName()
+                                        .equals(viewModel.userNameProperty().get()),
+                        5000),
+                "Dashboard refresh did not converge to expected latest state in time");
 
         // Even with multiple refreshes, the UI state shouldn't be broken or stuck
         // loading forever
@@ -154,8 +170,7 @@ class DashboardViewModelTest {
         viewModel.refresh();
         viewModel.dispose();
 
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         // If disposed properly, the user name should be what it initially was,
         // because the FX update is aborted if 'disposed' is true.
