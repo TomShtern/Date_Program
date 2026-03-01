@@ -208,7 +208,7 @@ public final class ProfileService {
                     "Birth date",
                     BASIC_BIRTHDATE_POINTS,
                     u -> u.getBirthDate() != null,
-                    "Add your birth date to complete your profile"),
+                    "📅 Add your birth date to complete your profile"),
             new FieldCheck("Gender", BASIC_GENDER_POINTS, u -> u.getGender() != null),
             new FieldCheck(
                     "Interested in",

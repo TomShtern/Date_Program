@@ -527,7 +527,8 @@ class MatchQualityServiceTest {
         void threeInterests_joinsWithCommaAnd() {
             Set<Interest> shared = new LinkedHashSet<>(List.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL));
             String formatted = InterestMatcher.formatSharedInterests(shared);
-            assertEquals("Hiking, Coffee, and Travel", formatted);
+            // Sorted alphabetically by display name: Coffee, Hiking, Travel
+            assertEquals("Coffee, Hiking, and Travel", formatted);
         }
 
         @Test
@@ -535,8 +536,8 @@ class MatchQualityServiceTest {
         void fourPlusInterests_showsAndXMore() {
             Set<Interest> shared = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL, Interest.MOVIES);
             String formatted = InterestMatcher.formatSharedInterests(shared);
-            // EnumSet iterates by ordinal: HIKING(0), MOVIES(6), COFFEE(18), TRAVEL(31)
-            assertEquals("Hiking, Movies, Coffee, and 1 more", formatted);
+            // Sorted alphabetically: Coffee, Hiking, Movies (3 shown), and 1 more (Travel)
+            assertEquals("Coffee, Hiking, Movies, and 1 more", formatted);
         }
 
         @Test

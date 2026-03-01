@@ -111,6 +111,9 @@ public final class MatchingService {
     public Optional<Match> recordLike(Like like) {
         Objects.requireNonNull(like, LIKE_REQUIRED);
         InteractionStorage.LikeMatchWriteResult writeResult = interactionStorage.saveLikeAndMaybeCreateMatch(like);
+        if (activityMetricsService != null && writeResult.createdMatch().isPresent()) {
+            activityMetricsService.recordSwipe(like.whoLikes(), like.direction(), true);
+        }
         return writeResult.createdMatch();
     }
 

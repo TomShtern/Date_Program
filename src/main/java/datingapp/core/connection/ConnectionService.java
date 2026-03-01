@@ -6,7 +6,6 @@ import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
-import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
@@ -46,23 +45,7 @@ public class ConnectionService {
             CommunicationStorage communicationStorage,
             InteractionStorage interactionStorage,
             UserStorage userStorage) {
-        this(config, communicationStorage, interactionStorage, userStorage, null);
-    }
-
-    /** Constructor without workflow policy — uses default. */
-    public ConnectionService(
-            AppConfig config,
-            CommunicationStorage communicationStorage,
-            InteractionStorage interactionStorage,
-            UserStorage userStorage,
-            ActivityMetricsService activityMetricsService) {
-        this(
-                config,
-                communicationStorage,
-                interactionStorage,
-                userStorage,
-                activityMetricsService,
-                new RelationshipWorkflowPolicy());
+        this(config, communicationStorage, interactionStorage, userStorage, new RelationshipWorkflowPolicy());
     }
 
     /** Canonical constructor — all dependencies explicit. */
@@ -71,7 +54,6 @@ public class ConnectionService {
             CommunicationStorage communicationStorage,
             InteractionStorage interactionStorage,
             UserStorage userStorage,
-            ActivityMetricsService activityMetricsService,
             RelationshipWorkflowPolicy workflowPolicy) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.communicationStorage = Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");

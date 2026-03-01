@@ -20,10 +20,13 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Profile and user-progress application use-cases shared across adapters. */
 public class ProfileUseCases {
 
+    private static final Logger logger = LoggerFactory.getLogger(ProfileUseCases.class);
     private static final String CONTEXT_REQUIRED = "Context is required";
     private static final String PROFILE_SERVICE_REQUIRED = "ProfileService is required";
 
@@ -90,19 +93,27 @@ public class ProfileUseCases {
             return UseCaseResult.failure(UseCaseError.forbidden("User context does not match profile user"));
         }
 
+        User user = command.user();
+        var activation = activationPolicy.tryActivate(user);
+        boolean activated = activation.activated();
         try {
-            User user = command.user();
-            var activation = activationPolicy.tryActivate(user);
-            boolean activated = activation.activated();
             userStorage.save(user);
-            List<UserAchievement> newAchievements = profileService.checkAndUnlock(user.getId());
-            if (eventBus != null) {
-                eventBus.publish(new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()));
-            }
-            return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to save profile: " + e.getMessage()));
         }
+
+        List<UserAchievement> newAchievements = List.of();
+        try {
+            newAchievements = profileService.checkAndUnlock(user.getId());
+            if (eventBus != null) {
+                eventBus.publish(new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()));
+            }
+        } catch (Exception e) {
+            if (logger.isWarnEnabled()) {
+                logger.warn("Post-save action failed for user {}: {}", user.getId(), e.getMessage(), e);
+            }
+        }
+        return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
     }
 
     public UseCaseResult<User> updateDiscoveryPreferences(UpdateDiscoveryPreferencesCommand command) {

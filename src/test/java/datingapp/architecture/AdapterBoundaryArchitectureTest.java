@@ -1,6 +1,7 @@
 package datingapp.architecture;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -35,7 +36,8 @@ class AdapterBoundaryArchitectureTest {
         Path vmRoot = SOURCE_ROOT.resolve("datingapp/ui/viewmodel");
         List<String> violations = new ArrayList<>();
         if (!Files.isDirectory(vmRoot)) {
-            return;
+            fail("Expected ViewModel directory does not exist: " + vmRoot
+                    + ". If the directory was renamed/moved or SOURCE_ROOT is incorrect, update this test.");
         }
         try (Stream<Path> paths = Files.walk(vmRoot)) {
             paths.filter(p -> p.toString().endsWith(".java")).forEach(path -> {
@@ -69,9 +71,10 @@ class AdapterBoundaryArchitectureTest {
     void corePackageDoesNotImportFrameworks() throws IOException {
         Path coreRoot = SOURCE_ROOT.resolve("datingapp/core");
         List<String> violations = new ArrayList<>();
-        if (!Files.isDirectory(coreRoot)) {
-            return;
-        }
+        assertTrue(
+                Files.isDirectory(coreRoot),
+                "Expected core directory does not exist: " + coreRoot
+                        + ". If the package was intentionally removed/renamed, update this test.");
         try (Stream<Path> paths = Files.walk(coreRoot)) {
             paths.filter(p -> p.toString().endsWith(".java")).forEach(path -> {
                 try {

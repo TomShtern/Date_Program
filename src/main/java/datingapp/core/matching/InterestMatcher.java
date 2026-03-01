@@ -2,6 +2,7 @@ package datingapp.core.matching;
 
 import datingapp.core.EnumSetUtil;
 import datingapp.core.profile.MatchPreferences.Interest;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -104,6 +105,7 @@ public final class InterestMatcher {
         }
 
         List<String> names = shared.stream()
+                .sorted(Comparator.comparing(Interest::getDisplayName))
                 .limit(SHARED_INTERESTS_PREVIEW_COUNT)
                 .map(Interest::getDisplayName)
                 .toList();

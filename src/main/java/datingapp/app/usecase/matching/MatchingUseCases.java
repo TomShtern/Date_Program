@@ -136,6 +136,10 @@ public class MatchingUseCases {
                         result.like().direction().name(),
                         result.matched(),
                         AppClock.now()));
+                if (result.matched()) {
+                    Match m = result.match();
+                    eventBus.publish(new AppEvent.MatchCreated(m.getId(), m.getUserA(), m.getUserB(), AppClock.now()));
+                }
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {

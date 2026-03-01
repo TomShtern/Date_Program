@@ -58,13 +58,7 @@ public final class RelationshipWorkflowPolicy {
     }
 
     public WorkflowDecision canBlock(Match match) {
-        if (match == null) {
-            return WorkflowDecision.deny("MATCH_NOT_FOUND", "Match cannot be null");
-        }
-        if (match.getState() == MatchState.BLOCKED) {
-            return WorkflowDecision.deny("ALREADY_BLOCKED", "Match is already blocked");
-        }
-        return WorkflowDecision.allow();
+        return canTransition(match, MatchState.BLOCKED);
     }
 
     public WorkflowDecision canSendMessage(Match match, User sender, User recipient) {

@@ -108,8 +108,8 @@ public final class StorageFactory {
                 .build();
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
 
-        ConnectionService connectionService = new ConnectionService(
-                config, communicationStorage, interactionStorage, userStorage, activityMetricsService);
+        ConnectionService connectionService =
+                new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
 
         TrustSafetyService trustSafetyService = new TrustSafetyService(
                 trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage);

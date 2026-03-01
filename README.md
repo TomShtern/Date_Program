@@ -75,9 +75,8 @@ datingapp/
     metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
     profile/{MatchPreferences,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
-    time/{DefaultTimePolicy,TimePolicy}
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
-  storage/
+    time/{DefaultTimePolicy,TimePolicy}.java
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}.java  storage/
     DatabaseManager.java
     StorageFactory.java
     jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java

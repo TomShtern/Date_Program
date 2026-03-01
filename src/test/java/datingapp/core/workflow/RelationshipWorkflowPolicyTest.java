@@ -189,7 +189,7 @@ class RelationshipWorkflowPolicyTest {
         void cannotBlockAlreadyBlocked() {
             WorkflowDecision d = policy.canBlock(blockedMatch());
             assertTrue(d.isDenied());
-            assertEquals("ALREADY_BLOCKED", ((WorkflowDecision.Denied) d).reasonCode());
+            assertEquals("SAME_STATE", ((WorkflowDecision.Denied) d).reasonCode());
         }
     }
 

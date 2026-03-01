@@ -13,10 +13,13 @@ import datingapp.core.connection.ConnectionService.ConversationPreview;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Messaging application-use-case bundle shared by CLI, JavaFX, and REST adapters. */
 public class MessagingUseCases {
 
+    private static final Logger logger = LoggerFactory.getLogger(MessagingUseCases.class);
     private static final int DEFAULT_LIMIT = 50;
 
     private final ConnectionService connectionService;
@@ -110,11 +113,22 @@ public class MessagingUseCases {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
             if (eventBus != null) {
-                eventBus.publish(new AppEvent.MessageSent(
-                        command.context().userId(),
-                        command.recipientId(),
-                        result.message().id(),
-                        AppClock.now()));
+                try {
+                    eventBus.publish(new AppEvent.MessageSent(
+                            command.context().userId(),
+                            command.recipientId(),
+                            result.message().id(),
+                            AppClock.now()));
+                } catch (Exception publishEx) {
+                    if (logger.isWarnEnabled()) {
+                        logger.warn(
+                                "Event publish failed for message {} from {} to {}: {}",
+                                result.message().id(),
+                                command.context().userId(),
+                                command.recipientId(),
+                                publishEx.getMessage());
+                    }
+                }
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {

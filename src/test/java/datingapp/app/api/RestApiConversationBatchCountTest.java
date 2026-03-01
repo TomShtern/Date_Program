@@ -132,8 +132,8 @@ class RestApiConversationBatchCountTest {
                 .build();
         TrustSafetyService trustSafetyService = new TrustSafetyService(
                 trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage);
-        ConnectionService connectionService = new ConnectionService(
-                config, communicationStorage, interactionStorage, userStorage, activityMetricsService);
+        ConnectionService connectionService =
+                new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
         ValidationService validationService = new ValidationService(config);
 
