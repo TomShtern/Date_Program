@@ -15,8 +15,8 @@
 - `src/test/java`: **88** Java files
 - **Total Java files:** **204**
 - `tokei` (Java only):
-  - **Total lines:** 56,468
-  - **Code lines:** 43,313
+  - **Total lines:** 56,482
+  - **Code lines:** 43,327
   - **Blank lines:** 8,502
   - **Comment lines:** 4,653
 

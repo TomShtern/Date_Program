@@ -138,7 +138,9 @@ public class MatchingUseCases {
                         AppClock.now()));
                 if (result.matched()) {
                     Match m = result.match();
-                    eventBus.publish(new AppEvent.MatchCreated(m.getId(), m.getUserA(), m.getUserB(), AppClock.now()));
+                    Objects.requireNonNull(m, "match cannot be null when matched() is true");
+                    eventBus.publish(new AppEvent.MatchCreated(
+                            m.getId(), result.like().whoLikes(), result.like().whoGotLiked(), AppClock.now()));
                 }
             }
             return UseCaseResult.success(result);

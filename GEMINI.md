@@ -1,7 +1,7 @@
 # GEMINI.md — AI Agent Operational Context
 
 > **Verified against source code:** 2026-03-01
-> **Codebase snapshot:** 116 main + 88 test Java files (204 total), 56,468 Java LOC (43,313 code)
+> **Codebase snapshot:** 116 main + 88 test Java files (204 total), 56,482 Java LOC (43,327 code)
 
 ---
 

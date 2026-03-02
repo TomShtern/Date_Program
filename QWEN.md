@@ -13,8 +13,8 @@
   - `ui/DatingApp.java` (JavaFX)
   - `app/api/RestApiServer.java` (REST)
 - Bootstrap: `ApplicationStartup.initialize()`
-- Java files: `102` main + `77` test = `179`
-- Java LOC (`tokei`): `55,616 total / 42,154 code`
+- Java files: `116` main + `88` test = `204`
+- Java LOC (`tokei`): `56,482 total / 43,327 code`
 
 ---
 
@@ -116,4 +116,5 @@ mvn spotless:apply verify
 # Append-only. Do not edit past entries. If SEQ conflict after 3 retries append ":CONFLICT".
 1|2026-02-22 00:00:00|agent:qwen_code|docs|Complete QWEN.md rewrite from SOURCE CODE: 87 main files (22,325 LOC), 65 tests (14,825 LOC), 18 tables, 10 services, 5 storage interfaces, Java 25, verified package structure, actual nested types, bootstrap flow|QWEN.md
 2|2026-02-28 13:35:00|agent:github_copilot|docs-source-truth-sync|Rewrote QWEN.md from current source snapshot (179 Java files, app/usecase layer, ui/async layer, updated wiring)|QWEN.md
+3|2026-03-01 03:20:00|agent:github_copilot|docs-metrics-refresh|Updated QWEN.md snapshot metrics to current source counts and LOC|QWEN.md
 ---AGENT-LOG-END---

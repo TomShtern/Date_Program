@@ -21,7 +21,7 @@ A Java 25 dating application with shared domain logic and three adapters:
 ## Verified snapshot (source-only)
 
 - Java files: **116 main + 88 test = 204 total**
-- Java LOC (`tokei`): **56,468 total / 43,313 code / 8,502 blank / 4,653 comments**
+- Java LOC (`tokei`): **56,482 total / 43,327 code / 8,502 blank / 4,653 comments**
 - Latest full gate run in this repo state: **BUILD SUCCESS**, tests **983 run / 0 failed / 0 errors / 2 skipped**
 
 ## Tech stack
@@ -76,8 +76,7 @@ datingapp/
     profile/{MatchPreferences,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
     time/{DefaultTimePolicy,TimePolicy}.java
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}.java  storage/
-    DatabaseManager.java
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}.java    DatabaseManager.java
     StorageFactory.java
     jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
     schema/{MigrationRunner,SchemaInitializer}.java
@@ -146,4 +145,5 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 3|2026-02-19 20:30:00|agent:gemini|docs|Updated README to reflect Java 25, Phase 2.1 architecture, and latest file counts|README.md
 4|2026-02-28 13:35:00|agent:github_copilot|docs-source-truth-sync|Rewrote README from current source: 179 Java files, ui/async + app/usecase layers, updated entry wiring and quality gates|README.md
 5|2026-03-01 01:21:00|agent:github_copilot|docs-source-truth-sync|Updated README snapshot, package tree, and Main wiring callback using current source and verify results|README.md
+6|2026-03-01 03:20:00|agent:github_copilot|docs-metrics-refresh|Updated README LOC snapshot to current tokei values|README.md
 ---AGENT-LOG-END---

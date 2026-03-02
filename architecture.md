@@ -2,7 +2,7 @@
 
 > **Last verified against source code:** 2026-03-01
 > **Java files:** 116 main + 88 test = 204
-> **Java LOC (`tokei`):** 56,468 total / 43,313 code / 8,502 blank / 4,653 comments
+> **Java LOC (`tokei`):** 56,482 total / 43,327 code / 8,502 blank / 4,653 comments
 
 This document describes current architecture from source (`src/main/java`, `src/test/java`, `pom.xml`).
 

@@ -23,7 +23,7 @@ Guidance for AI coding agents working in this repository.
 ## Verified Source Snapshot (2026-03-01)
 
 - Java files: **116 main + 88 test = 204 total**
-- Java LOC (`tokei`): **56,468 total / 43,313 code / 8,502 blank / 4,653 comments**
+- Java LOC (`tokei`): **56,482 total / 43,327 code / 8,502 blank / 4,653 comments**
 
 ## Architecture (code-verified)
 
@@ -163,4 +163,5 @@ mvn spotless:apply verify
 25|2026-02-22 04:08:00|agent:gemini|scope:config-jackson-databinding|Documented AppConfig Jackson databinding strategy|CLAUDE.md
 26|2026-02-28 13:35:00|agent:github_copilot|scope:source-truth-doc-sync|Rewrote CLAUDE.md from current code snapshot including app/usecase and ui/async architecture|CLAUDE.md
 27|2026-03-01 01:20:00|agent:github_copilot|scope:source-truth-doc-sync|Updated counts, package tree, and CLI wiring callback from current source|CLAUDE.md
+28|2026-03-01 03:20:00|agent:github_copilot|scope:docs-metrics-refresh|Updated LOC snapshot values to current tokei output|CLAUDE.md
 ---AGENT-LOG-END---
