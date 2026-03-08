@@ -444,7 +444,7 @@ public class ProfileViewModel {
         if (!interestedInGenders.isEmpty()) {
             user.setInterestedIn(EnumSet.copyOf(interestedInGenders));
         }
-        applyBirthDate(user);
+        applyBirthDate(user, true);
     }
 
     private void applyLocation(User user) {
@@ -488,6 +488,10 @@ public class ProfileViewModel {
     }
 
     private void applySearchPreferences(User user) {
+        applySearchPreferences(user, true);
+    }
+
+    private void applySearchPreferences(User user, boolean notifyUser) {
         try {
             int min = Integer.parseInt(minAge.get());
             int max = Integer.parseInt(maxAge.get());
@@ -501,11 +505,15 @@ public class ProfileViewModel {
                         config.validation().maxAge());
             } else {
                 logWarn("Invalid age range values: {}-{}", min, max);
-                UiFeedbackService.showWarning("Please enter valid ages");
+                if (notifyUser) {
+                    UiFeedbackService.showWarning("Please enter valid ages");
+                }
             }
         } catch (NumberFormatException _) {
             logWarn("Invalid age range values");
-            UiFeedbackService.showWarning("Please enter valid ages");
+            if (notifyUser) {
+                UiFeedbackService.showWarning("Please enter valid ages");
+            }
         }
 
         try {
@@ -514,11 +522,15 @@ public class ProfileViewModel {
                 user.setMaxDistanceKm(dist, config.matching().maxDistanceKm());
             } else {
                 logWarn("Invalid max distance value: {}", dist);
-                UiFeedbackService.showWarning("Please enter a valid distance");
+                if (notifyUser) {
+                    UiFeedbackService.showWarning("Please enter a valid distance");
+                }
             }
         } catch (NumberFormatException _) {
             logWarn("Invalid max distance value");
-            UiFeedbackService.showWarning("Please enter a valid distance");
+            if (notifyUser) {
+                UiFeedbackService.showWarning("Please enter a valid distance");
+            }
         }
     }
 
@@ -946,7 +958,7 @@ public class ProfileViewModel {
         return "Missing: " + summary;
     }
 
-    private void applyBirthDate(User user) {
+    private void applyBirthDate(User user, boolean notifyUser) {
         LocalDate selected = birthDate.get();
         if (selected == null) {
             return;
@@ -954,19 +966,122 @@ public class ProfileViewModel {
         LocalDate today = AppClock.today();
         if (selected.isAfter(today)) {
             logWarn("Birth date cannot be in the future: {}", selected);
-            UiFeedbackService.showWarning("Birth date cannot be in the future");
+            if (notifyUser) {
+                UiFeedbackService.showWarning("Birth date cannot be in the future");
+            }
             return;
         }
         int age = Period.between(selected, today).getYears();
         if (age < config.validation().minAge() || age > config.validation().maxAge()) {
             logWarn("Birth date outside allowed age range: {}", selected);
-            UiFeedbackService.showWarning("Birth date must be for ages "
-                    + config.validation().minAge()
-                    + "-"
-                    + config.validation().maxAge());
+            if (notifyUser) {
+                UiFeedbackService.showWarning("Birth date must be for ages "
+                        + config.validation().minAge()
+                        + "-"
+                        + config.validation().maxAge());
+            }
             return;
         }
         user.setBirthDate(selected);
+    }
+
+    public ProfilePreviewSnapshot buildPreviewSnapshot() {
+        User draftUser = createDraftUser();
+        return new ProfilePreviewSnapshot(
+                draftUser.getName(),
+                draftUser.getAge(config.safety().userTimeZone()),
+                draftUser.getBio() == null || draftUser.getBio().isBlank()
+                        ? "No bio provided yet."
+                        : draftUser.getBio(),
+                formatLocationLabel(draftUser),
+                draftUser.getInterests().stream()
+                        .map(Interest::getDisplayName)
+                        .sorted()
+                        .toList(),
+                draftUser.getLookingFor() != null
+                        ? draftUser.getLookingFor().getDisplayName()
+                        : "Open to meeting people",
+                List.copyOf(draftUser.getPhotoUrls()),
+                completionStatus.get());
+    }
+
+    public ProfileService.CompletionResult calculateCurrentCompletion() {
+        User draftUser = createDraftUser();
+        if (profileUseCases != null) {
+            var result = profileUseCases.calculateCompletion(draftUser);
+            if (!result.success()) {
+                throw new IllegalStateException(result.error().message());
+            }
+            return result.data();
+        }
+        return profileCompletionService.calculate(draftUser);
+    }
+
+    private User createDraftUser() {
+        User currentUser = session.getCurrentUser();
+        if (currentUser == null) {
+            throw new IllegalStateException("No current user available for preview.");
+        }
+
+        User draftUser = User.StorageBuilder.create(
+                        currentUser.getId(), currentUser.getName(), currentUser.getCreatedAt())
+                .bio(currentUser.getBio())
+                .birthDate(currentUser.getBirthDate())
+                .gender(currentUser.getGender())
+                .interestedIn(currentUser.getInterestedIn())
+                .location(currentUser.getLat(), currentUser.getLon())
+                .hasLocationSet(currentUser.hasLocationSet())
+                .maxDistanceKm(currentUser.getMaxDistanceKm())
+                .ageRange(currentUser.getMinAge(), currentUser.getMaxAge())
+                .photoUrls(currentUser.getPhotoUrls())
+                .state(currentUser.getState())
+                .updatedAt(currentUser.getUpdatedAt())
+                .interests(currentUser.getInterests())
+                .smoking(currentUser.getSmoking())
+                .drinking(currentUser.getDrinking())
+                .wantsKids(currentUser.getWantsKids())
+                .lookingFor(currentUser.getLookingFor())
+                .education(currentUser.getEducation())
+                .heightCm(currentUser.getHeightCm())
+                .email(currentUser.getEmail())
+                .phone(currentUser.getPhone())
+                .verified(currentUser.isVerified())
+                .verificationMethod(currentUser.getVerificationMethod())
+                .verificationCode(currentUser.getVerificationCode())
+                .verificationSentAt(currentUser.getVerificationSentAt())
+                .verifiedAt(currentUser.getVerifiedAt())
+                .pacePreferences(currentUser.getPacePreferences())
+                .build();
+
+        applyBasicFields(draftUser);
+        applyLocation(draftUser);
+        applyInterests(draftUser);
+        applyLifestyleFields(draftUser);
+        applySearchPreferences(draftUser, false);
+        applyDealbreakers(draftUser);
+        return draftUser;
+    }
+
+    private String formatLocationLabel(User user) {
+        if (user == null || !user.hasLocation()) {
+            return "Location not set";
+        }
+        return formatLocation(user.getLat(), user.getLon());
+    }
+
+    public record ProfilePreviewSnapshot(
+            String name,
+            int age,
+            String bio,
+            String location,
+            List<String> interests,
+            String lookingFor,
+            List<String> photoUrls,
+            String completionText) {
+        public ProfilePreviewSnapshot {
+            interests = interests != null ? List.copyOf(interests) : List.of();
+            photoUrls = photoUrls != null ? List.copyOf(photoUrls) : List.of();
+        }
     }
 
     private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {

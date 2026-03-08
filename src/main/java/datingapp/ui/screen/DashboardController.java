@@ -7,11 +7,18 @@ import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
+import javafx.animation.PauseTransition;
+import javafx.animation.RotateTransition;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.Node;
+import javafx.scene.canvas.Canvas;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
+import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +60,9 @@ public class DashboardController extends BaseController
     private Button logoutButton;
 
     @FXML
+    private Button refreshButton;
+
+    @FXML
     private Button browseButton;
 
     @FXML
@@ -76,6 +86,21 @@ public class DashboardController extends BaseController
     @FXML
     private Button socialButton;
 
+    @FXML
+    private Button safetyButton;
+
+    @FXML
+    private Button notesButton;
+
+    @FXML
+    private Label profileNudgeLabel;
+
+    @FXML
+    private HBox profileNudgeBanner;
+
+    @FXML
+    private Button editProfileNudgeButton;
+
     private final DashboardViewModel viewModel;
 
     public DashboardController(DashboardViewModel viewModel) {
@@ -92,6 +117,8 @@ public class DashboardController extends BaseController
         addSubscription(viewModel.dailyPickNameProperty().subscribe(dailyPickLabel::setText));
         addSubscription(viewModel.totalMatchesProperty().subscribe(totalMatchesLabel::setText));
         addSubscription(viewModel.profileCompletionProperty().subscribe(completionLabel::setText));
+        addSubscription(viewModel.profileNudgeMessageProperty().subscribe(this::updateProfileNudge));
+        addSubscription(viewModel.newAchievementsAvailableProperty().subscribe(this::handleAchievementCelebration));
         addSubscription(viewModel.notificationCountProperty().subscribe(count -> {
             if (count != null && count.intValue() > 0) {
                 unreadBadgeLabel.setText(String.valueOf(count));
@@ -109,6 +136,7 @@ public class DashboardController extends BaseController
         dailyPickLabel.setText(viewModel.dailyPickNameProperty().get());
         totalMatchesLabel.setText(viewModel.totalMatchesProperty().get());
         completionLabel.setText(viewModel.profileCompletionProperty().get());
+        updateProfileNudge(viewModel.profileNudgeMessageProperty().get());
 
         // Bind achievements list
         if (achievementsListView != null) {
@@ -116,7 +144,7 @@ public class DashboardController extends BaseController
         }
 
         // Load initial data (will trigger loading skeleton)
-        viewModel.refresh();
+        viewModel.performRefresh();
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
@@ -194,6 +222,31 @@ public class DashboardController extends BaseController
                 handleSocial();
             });
         }
+        if (safetyButton != null) {
+            safetyButton.setOnAction(event -> {
+                event.consume();
+                handleSafety();
+            });
+        }
+        if (notesButton != null) {
+            notesButton.setOnAction(event -> {
+                event.consume();
+                handleNotes();
+            });
+        }
+        if (refreshButton != null) {
+            refreshButton.setOnAction(event -> {
+                event.consume();
+                animateRefreshButton();
+                viewModel.performRefresh();
+            });
+        }
+        if (editProfileNudgeButton != null) {
+            editProfileNudgeButton.setOnAction(event -> {
+                event.consume();
+                handleProfile();
+            });
+        }
         if (logoutButton != null) {
             logoutButton.setOnAction(event -> {
                 event.consume();
@@ -257,6 +310,18 @@ public class DashboardController extends BaseController
     }
 
     @FXML
+    private void handleSafety() {
+        logger.info("Navigating to Safety screen");
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.SAFETY);
+    }
+
+    @FXML
+    private void handleNotes() {
+        logger.info("Navigating to Notes screen");
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.NOTES);
+    }
+
+    @FXML
     private void handleLogout() {
         UiDialogs.confirmAndExecute(
                 "Confirm Logout",
@@ -293,5 +358,64 @@ public class DashboardController extends BaseController
                 totalMatchesLabel.getParent().setManaged(true);
             }
         }
+    }
+
+    private void animateRefreshButton() {
+        if (refreshButton == null) {
+            return;
+        }
+        Node graphic = refreshButton.getGraphic();
+        if (graphic == null) {
+            return;
+        }
+        RotateTransition rotate = new RotateTransition(Duration.millis(600), graphic);
+        rotate.setByAngle(360);
+        rotate.play();
+    }
+
+    private void updateProfileNudge(String message) {
+        if (profileNudgeLabel == null) {
+            return;
+        }
+        String resolvedMessage = message == null ? "" : message.trim();
+        profileNudgeLabel.setText(resolvedMessage);
+        boolean visible = !resolvedMessage.isEmpty();
+        if (profileNudgeBanner != null) {
+            profileNudgeBanner.setVisible(visible);
+            profileNudgeBanner.setManaged(visible);
+        }
+        profileNudgeLabel.setVisible(visible);
+        profileNudgeLabel.setManaged(visible);
+        if (editProfileNudgeButton != null) {
+            editProfileNudgeButton.setVisible(visible);
+            editProfileNudgeButton.setManaged(visible);
+        }
+    }
+
+    private void handleAchievementCelebration(Boolean shouldCelebrate) {
+        if (!Boolean.TRUE.equals(shouldCelebrate)) {
+            return;
+        }
+        StackPane rootStack = NavigationService.getInstance().getRootStack();
+        if (rootStack == null || rootPane == null) {
+            return;
+        }
+
+        Canvas canvas = new Canvas();
+        canvas.setMouseTransparent(true);
+        canvas.widthProperty().bind(rootStack.widthProperty());
+        canvas.heightProperty().bind(rootStack.heightProperty());
+        registerOverlay(canvas);
+
+        UiAnimations.ConfettiAnimation confettiAnimation = new UiAnimations.ConfettiAnimation();
+        confettiAnimation.play(canvas);
+
+        PauseTransition removalDelay = new PauseTransition(Duration.seconds(3));
+        removalDelay.setOnFinished(event -> {
+            confettiAnimation.stop();
+            rootStack.getChildren().remove(canvas);
+            viewModel.markAchievementsSeen();
+        });
+        removalDelay.play();
     }
 }

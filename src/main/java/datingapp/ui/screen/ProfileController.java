@@ -26,15 +26,19 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
+import javafx.stage.Modality;
 import javafx.util.StringConverter;
 import org.kordamp.ikonli.javafx.FontIcon;
 import org.slf4j.Logger;
@@ -59,6 +63,7 @@ public class ProfileController extends BaseController implements Initializable {
     private void wireAuxiliaryActions() {
         wirePhotoActions();
         wireDealbreakersAction();
+        wirePreviewActions();
     }
 
     private void wirePhotoActions() {
@@ -93,6 +98,21 @@ public class ProfileController extends BaseController implements Initializable {
             editDealbreakersBtn.setOnAction(event -> {
                 event.consume();
                 handleEditDealbreakers();
+            });
+        }
+    }
+
+    private void wirePreviewActions() {
+        if (previewButton != null) {
+            previewButton.setOnAction(event -> {
+                event.consume();
+                handlePreview();
+            });
+        }
+        if (profileScoreButton != null) {
+            profileScoreButton.setOnAction(event -> {
+                event.consume();
+                handleProfileScore();
             });
         }
     }
@@ -196,6 +216,12 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private Button editDealbreakersBtn;
+
+    @FXML
+    private Button previewButton;
+
+    @FXML
+    private Button profileScoreButton;
 
     private static final int BIO_MAX_LENGTH = 500;
     private static final int BIO_WARNING_THRESHOLD = 400;
@@ -867,7 +893,7 @@ public class ProfileController extends BaseController implements Initializable {
         content.getChildren().add(clearAllBtn);
 
         // Wrap in ScrollPane
-        javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane(content);
+        ScrollPane scrollPane = new ScrollPane(content);
         scrollPane.setFitToWidth(true);
         scrollPane.setPrefHeight(400);
         scrollPane.setStyle(DARK_PANEL_STYLE);
@@ -919,5 +945,164 @@ public class ProfileController extends BaseController implements Initializable {
         if (logger.isErrorEnabled()) {
             logger.error(message, error);
         }
+    }
+
+    @FXML
+    private void handlePreview() {
+        try {
+            ProfileViewModel.ProfilePreviewSnapshot snapshot = viewModel.buildPreviewSnapshot();
+
+            Dialog<ButtonType> dialog = createThemedDialog("Profile Preview", "How your profile appears to others");
+            VBox content = new VBox(18);
+            content.setPadding(new Insets(24));
+            content.setPrefWidth(420);
+
+            StackPane photoContainer = new StackPane();
+            photoContainer.getStyleClass().add("card-photo-placeholder");
+            photoContainer.setPrefHeight(220);
+
+            if (!snapshot.photoUrls().isEmpty()) {
+                ImageView imageView =
+                        new ImageView(ImageCache.getImage(snapshot.photoUrls().getFirst(), 360, 220));
+                imageView.setFitWidth(360);
+                imageView.setFitHeight(220);
+                imageView.setPreserveRatio(true);
+                photoContainer.getChildren().add(imageView);
+            } else {
+                FontIcon placeholderIcon = new FontIcon("mdi2a-account-circle");
+                placeholderIcon.setIconSize(72);
+                placeholderIcon.setIconColor(Color.web("#94a3b8"));
+                photoContainer.getChildren().add(placeholderIcon);
+            }
+
+            Label nameAndAgeLabel = new Label(snapshot.name() + ", " + snapshot.age());
+            nameAndAgeLabel.getStyleClass().add("card-name");
+            Label completionChip = new Label(snapshot.completionText());
+            completionChip.getStyleClass().add("notification-badge");
+
+            HBox titleRow = new HBox(12, nameAndAgeLabel, completionChip);
+            titleRow.setFillHeight(true);
+
+            Label locationLabel = new Label("📍 " + snapshot.location());
+            locationLabel.getStyleClass().add("card-distance");
+
+            Label lookingForLabel = new Label("Looking for: " + snapshot.lookingFor());
+            lookingForLabel.getStyleClass().add("text-secondary");
+
+            Label bioPreviewLabel = new Label(snapshot.bio());
+            bioPreviewLabel.setWrapText(true);
+            bioPreviewLabel.getStyleClass().add("text-secondary");
+
+            FlowPane interestPane = new FlowPane(8, 8);
+            interestPane.getStyleClass().add("interests-container");
+            if (snapshot.interests().isEmpty()) {
+                Label placeholderChip = new Label("No interests added yet");
+                placeholderChip.getStyleClass().add("interest-chip");
+                interestPane.getChildren().add(placeholderChip);
+            } else {
+                snapshot.interests().forEach(interest -> {
+                    Label chip = new Label(interest);
+                    chip.getStyleClass().add("interest-chip");
+                    interestPane.getChildren().add(chip);
+                });
+            }
+
+            content.getChildren()
+                    .addAll(photoContainer, titleRow, locationLabel, lookingForLabel, bioPreviewLabel, interestPane);
+
+            dialog.getDialogPane().setContent(content);
+            dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            UiAnimations.fadeIn(content, 300);
+            dialog.showAndWait();
+        } catch (Exception e) {
+            logError("Failed to build profile preview", e);
+            UiFeedbackService.showError("Unable to build profile preview: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handleProfileScore() {
+        try {
+            var completion = viewModel.calculateCurrentCompletion();
+
+            Dialog<ButtonType> dialog = createThemedDialog("Profile Score", "Your profile quality breakdown");
+            VBox scoreContent = new VBox(16);
+            scoreContent.setPadding(new Insets(24));
+            scoreContent.setPrefWidth(460);
+
+            Label scoreLabel =
+                    new Label(completion.getTierEmoji() + " " + completion.score() + "% " + completion.tier());
+            scoreLabel.getStyleClass().add("subheading");
+
+            ProgressBar totalProgress = new ProgressBar(completion.score() / 100.0);
+            totalProgress.setPrefWidth(380);
+
+            VBox breakdownBox = new VBox(12);
+            completion.breakdown().forEach(category -> {
+                VBox categoryBox = new VBox(6);
+                Label categoryLabel = new Label(category.category() + " • " + category.score() + "%");
+                categoryLabel.getStyleClass().add("stat-label-primary");
+                ProgressBar categoryProgress = new ProgressBar(category.score() / 100.0);
+                categoryProgress.setPrefWidth(360);
+                VBox missingItems = new VBox(4);
+                if (category.missingItems().isEmpty()) {
+                    Label doneLabel = new Label("Fully completed");
+                    doneLabel.getStyleClass().add("text-secondary");
+                    missingItems.getChildren().add(doneLabel);
+                } else {
+                    category.missingItems().forEach(item -> {
+                        Label itemLabel = new Label("• " + item);
+                        itemLabel.getStyleClass().add("text-secondary");
+                        missingItems.getChildren().add(itemLabel);
+                    });
+                }
+                categoryBox.getChildren().addAll(categoryLabel, categoryProgress, missingItems);
+                breakdownBox.getChildren().add(categoryBox);
+            });
+
+            VBox nextStepsBox = new VBox(6);
+            if (!completion.nextSteps().isEmpty()) {
+                Label nextStepsTitle = new Label("Next steps");
+                nextStepsTitle.getStyleClass().add("stat-label-primary");
+                nextStepsBox.getChildren().add(nextStepsTitle);
+                completion.nextSteps().forEach(step -> {
+                    Label stepLabel = new Label("• " + step);
+                    stepLabel.setWrapText(true);
+                    stepLabel.getStyleClass().add("text-secondary");
+                    nextStepsBox.getChildren().add(stepLabel);
+                });
+            }
+
+            VBox rootBox = new VBox(18, scoreLabel, totalProgress, breakdownBox, nextStepsBox);
+            ScrollPane scrollPane = new ScrollPane(rootBox);
+            scrollPane.setFitToWidth(true);
+            scrollPane.getStyleClass().add("transparent-scroll");
+
+            dialog.getDialogPane().setContent(scrollPane);
+            dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            dialog.showAndWait();
+        } catch (Exception e) {
+            logError("Failed to calculate profile score", e);
+            UiFeedbackService.showError("Unable to calculate profile score: " + e.getMessage());
+        }
+    }
+
+    private Dialog<ButtonType> createThemedDialog(String title, String headerText) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle(title);
+        dialog.setHeaderText(headerText);
+        dialog.initModality(Modality.WINDOW_MODAL);
+        if (rootPane != null
+                && rootPane.getScene() != null
+                && rootPane.getScene().getWindow() != null) {
+            dialog.initOwner(rootPane.getScene().getWindow());
+            dialog.getDialogPane().getStylesheets().setAll(rootPane.getScene().getStylesheets());
+        } else {
+            URL themeUrl = getClass().getResource("/css/theme.css");
+            if (themeUrl != null) {
+                dialog.getDialogPane().getStylesheets().add(themeUrl.toExternalForm());
+            }
+        }
+        return dialog;
     }
 }

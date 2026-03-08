@@ -12,10 +12,12 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 
 /**
  * Controller for the Stats screen (stats.fxml).
@@ -37,6 +39,18 @@ public class StatsController extends BaseController implements Initializable {
 
     @FXML
     private Label responseRateLabel;
+
+    @FXML
+    private Label totalLikesReceivedLabel;
+
+    @FXML
+    private Label messagesExchangedLabel;
+
+    @FXML
+    private Label loginStreakLabel;
+
+    @FXML
+    private GridPane statsGrid;
 
     private final StatsViewModel viewModel;
 
@@ -68,9 +82,37 @@ public class StatsController extends BaseController implements Initializable {
         if (responseRateLabel != null) {
             responseRateLabel.textProperty().bind(viewModel.responseRateProperty());
         }
+        if (totalLikesReceivedLabel != null) {
+            totalLikesReceivedLabel
+                    .textProperty()
+                    .bind(viewModel.totalLikesReceivedProperty().asString());
+        }
+        if (messagesExchangedLabel != null) {
+            messagesExchangedLabel
+                    .textProperty()
+                    .bind(viewModel.messagesExchangedProperty().asString());
+        }
+        if (loginStreakLabel != null) {
+            loginStreakLabel.textProperty().bind(viewModel.loginStreakProperty().asString());
+        }
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
+        animateStatCards();
+    }
+
+    private void animateStatCards() {
+        if (statsGrid == null) {
+            return;
+        }
+        for (int index = 0; index < statsGrid.getChildren().size(); index++) {
+            javafx.scene.Node card = statsGrid.getChildren().get(index);
+            card.setOpacity(0);
+            card.setTranslateY(20);
+            javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(Duration.millis(index * 80L));
+            delay.setOnFinished(event -> UiAnimations.slideUp(card, 320, 20));
+            delay.play();
+        }
     }
 
     private static class AchievementListCell extends ListCell<Achievement> {

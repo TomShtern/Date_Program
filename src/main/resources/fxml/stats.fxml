@@ -6,6 +6,8 @@
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
@@ -41,33 +43,55 @@
             <FontIcon iconLiteral="mdi2c-chart-arc" iconSize="24" iconColor="#667eea"/>
             <Label text="Your Progress" styleClass="stats-section-header"/>
           </HBox>
-          <!-- Stats Cards Row -->
-          <HBox spacing="20">
-            <!-- Total Likes Card -->
-            <VBox styleClass="stats-card, stats-card-likes" HBox.hgrow="ALWAYS">
+          <GridPane fx:id="statsGrid" hgap="20" vgap="20">
+            <columnConstraints>
+              <ColumnConstraints percentWidth="33.33"/>
+              <ColumnConstraints percentWidth="33.33"/>
+              <ColumnConstraints percentWidth="33.33"/>
+            </columnConstraints>
+            <VBox styleClass="stats-card, stats-card-likes" GridPane.columnIndex="0" GridPane.rowIndex="0">
               <StackPane styleClass="stats-icon-container, stats-icon-likes">
                 <FontIcon iconLiteral="mdi2h-heart" iconSize="32" iconColor="#f43f5e"/>
               </StackPane>
               <Label fx:id="totalLikesLabel" styleClass="stats-value" text="0"/>
-              <Label styleClass="stats-label" text="Total Likes"/>
+              <Label styleClass="stats-label" text="Likes Given"/>
             </VBox>
-            <!-- Matches Card -->
-            <VBox styleClass="stats-card, stats-card-matches" HBox.hgrow="ALWAYS">
+            <VBox styleClass="stats-card, stats-card-profile" GridPane.columnIndex="1" GridPane.rowIndex="0">
+              <StackPane styleClass="stats-icon-container, stats-icon-rate">
+                <FontIcon iconLiteral="mdi2h-heart-multiple" iconSize="32" iconColor="#ec4899"/>
+              </StackPane>
+              <Label fx:id="totalLikesReceivedLabel" styleClass="stats-value" text="0"/>
+              <Label styleClass="stats-label" text="Likes Received"/>
+            </VBox>
+            <VBox styleClass="stats-card, stats-card-matches" GridPane.columnIndex="2" GridPane.rowIndex="0">
               <StackPane styleClass="stats-icon-container, stats-icon-matches">
                 <FontIcon iconLiteral="mdi2a-account-group" iconSize="32" iconColor="#10b981"/>
               </StackPane>
               <Label fx:id="totalMatchesLabel" styleClass="stats-value" text="0"/>
               <Label styleClass="stats-label" text="Matches"/>
             </VBox>
-            <!-- Match Rate Card -->
-            <VBox styleClass="stats-card, stats-card-rate" HBox.hgrow="ALWAYS">
+            <VBox styleClass="stats-card, stats-card-rate" GridPane.columnIndex="0" GridPane.rowIndex="1">
               <StackPane styleClass="stats-icon-container, stats-icon-rate">
                 <FontIcon iconLiteral="mdi2c-chart-line" iconSize="32" iconColor="#f59e0b"/>
               </StackPane>
               <Label fx:id="responseRateLabel" styleClass="stats-value" text="--"/>
               <Label styleClass="stats-label" text="Match Rate"/>
             </VBox>
-          </HBox>
+            <VBox styleClass="stats-card, stats-card-chat" GridPane.columnIndex="1" GridPane.rowIndex="1">
+              <StackPane styleClass="stats-icon-container, stats-icon-matches">
+                <FontIcon iconLiteral="mdi2m-message-text" iconSize="32" iconColor="#38bdf8"/>
+              </StackPane>
+              <Label fx:id="messagesExchangedLabel" styleClass="stats-value" text="0"/>
+              <Label styleClass="stats-label" text="Messages"/>
+            </VBox>
+            <VBox styleClass="stats-card, stats-card-browse" GridPane.columnIndex="2" GridPane.rowIndex="1">
+              <StackPane styleClass="stats-icon-container, stats-icon-likes">
+                <FontIcon iconLiteral="mdi2f-fire" iconSize="32" iconColor="#fb923c"/>
+              </StackPane>
+              <Label fx:id="loginStreakLabel" styleClass="stats-value" text="0"/>
+              <Label styleClass="stats-label" text="Login Streak"/>
+            </VBox>
+          </GridPane>
         </VBox>
         <!-- Decorative Separator -->
         <Region styleClass="profile-separator" prefHeight="1"/>

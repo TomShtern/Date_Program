@@ -14,12 +14,16 @@ import javafx.animation.ParallelTransition;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.kordamp.ikonli.javafx.FontIcon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,8 +42,11 @@ public final class NavigationService {
     private Stage primaryStage;
     private BorderPane rootLayout;
     private StackPane rootStack;
+    private StackPane themeToggleOverlay;
+    private ToggleButton themeToggleButton;
+    private FontIcon themeToggleIcon;
     private ViewModelFactory viewModelFactory;
-    private final UiPreferencesStore uiPreferencesStore = new UiPreferencesStore();
+    private UiPreferencesStore uiPreferencesStore = new UiPreferencesStore();
     private UiPreferencesStore.ThemeMode currentThemeMode = UiPreferencesStore.ThemeMode.DARK;
 
     private final java.util.concurrent.atomic.AtomicReference<NavigationContextEnvelope> navigationContext =
@@ -75,7 +82,9 @@ public final class NavigationService {
         STATS("/fxml/stats.fxml"),
         PREFERENCES("/fxml/preferences.fxml"),
         STANDOUTS("/fxml/standouts.fxml"),
-        SOCIAL("/fxml/social.fxml");
+        SOCIAL("/fxml/social.fxml"),
+        SAFETY("/fxml/safety.fxml"),
+        NOTES("/fxml/notes.fxml");
 
         private final String fxmlPath;
 
@@ -110,6 +119,20 @@ public final class NavigationService {
         this.viewModelFactory = viewModelFactory;
     }
 
+    public void setPreferencesStore(UiPreferencesStore store) {
+        this.uiPreferencesStore = store != null ? store : new UiPreferencesStore();
+        currentThemeMode = uiPreferencesStore.loadThemeMode();
+        Scene scene = primaryStage != null ? primaryStage.getScene() : null;
+        if (scene != null) {
+            applyTheme(scene, currentThemeMode);
+        }
+        refreshThemeToggleUi();
+    }
+
+    public UiPreferencesStore getPreferencesStore() {
+        return uiPreferencesStore;
+    }
+
     /**
      * Initializes the service with the primary stage.
      * Sets up the root layout (BorderPane) which acts as a wrapper for all screens.
@@ -119,10 +142,13 @@ public final class NavigationService {
         this.rootLayout = new BorderPane();
 
         this.rootStack = new StackPane(rootLayout);
+        buildThemeToggleOverlay();
+        this.rootStack.getChildren().add(themeToggleOverlay);
 
         Scene scene = new Scene(rootStack, 900, 760);
         currentThemeMode = uiPreferencesStore.loadThemeMode();
         applyTheme(scene, currentThemeMode);
+        refreshThemeToggleUi();
 
         UiFeedbackService.setContainer(rootStack);
 
@@ -136,10 +162,12 @@ public final class NavigationService {
     public void setThemeMode(UiPreferencesStore.ThemeMode themeMode) {
         UiPreferencesStore.ThemeMode resolvedThemeMode = Objects.requireNonNull(themeMode, "themeMode cannot be null");
         currentThemeMode = resolvedThemeMode;
+        uiPreferencesStore.saveThemeMode(resolvedThemeMode);
         Scene scene = primaryStage != null ? primaryStage.getScene() : null;
         if (scene != null) {
             applyTheme(scene, resolvedThemeMode);
         }
+        refreshThemeToggleUi();
     }
 
     /**
@@ -427,5 +455,42 @@ public final class NavigationService {
                 && !scene.getStylesheets().contains(lightTheme)) {
             scene.getStylesheets().add(lightTheme);
         }
+    }
+
+    private void buildThemeToggleOverlay() {
+        themeToggleIcon = new FontIcon();
+        themeToggleIcon.setIconSize(16);
+
+        themeToggleButton = new ToggleButton();
+        themeToggleButton.setFocusTraversable(false);
+        themeToggleButton.setGraphic(themeToggleIcon);
+        themeToggleButton.getStyleClass().add("theme-toggle");
+        themeToggleButton.setOnAction(event -> {
+            event.consume();
+            UiPreferencesStore.ThemeMode nextMode = themeToggleButton.isSelected()
+                    ? UiPreferencesStore.ThemeMode.LIGHT
+                    : UiPreferencesStore.ThemeMode.DARK;
+            setThemeMode(nextMode);
+        });
+
+        themeToggleOverlay = new StackPane(themeToggleButton);
+        themeToggleOverlay.setPickOnBounds(false);
+        themeToggleOverlay.setMouseTransparent(false);
+        themeToggleOverlay.setPadding(new Insets(18, 22, 0, 0));
+        StackPane.setAlignment(themeToggleOverlay, Pos.TOP_RIGHT);
+    }
+
+    private void refreshThemeToggleUi() {
+        if (themeToggleButton == null || themeToggleIcon == null) {
+            return;
+        }
+        boolean lightMode = currentThemeMode == UiPreferencesStore.ThemeMode.LIGHT;
+        themeToggleButton.setSelected(lightMode);
+        themeToggleButton.getStyleClass().remove("theme-toggle-light");
+        if (lightMode) {
+            themeToggleButton.getStyleClass().add("theme-toggle-light");
+        }
+        themeToggleIcon.setIconLiteral(lightMode ? "mdi2w-weather-sunny" : "mdi2w-weather-night");
+        themeToggleButton.setAccessibleText(lightMode ? "Switch to dark theme" : "Switch to light theme");
     }
 }

@@ -34,13 +34,23 @@
         </tooltip>
       </Button>
       <Label styleClass="subheading" text="Edit Profile"/>
+      <Button fx:id="previewButton" onAction="#handlePreview" styleClass="button-secondary" text="Preview">
+        <graphic>
+          <FontIcon iconLiteral="mdi2e-eye" iconSize="16" iconColor="white"/>
+        </graphic>
+      </Button>
+      <Button fx:id="profileScoreButton" onAction="#handleProfileScore" styleClass="button-secondary" text="Profile Score">
+        <graphic>
+          <FontIcon iconLiteral="mdi2c-chart-line" iconSize="16" iconColor="white"/>
+        </graphic>
+      </Button>
       <Region HBox.hgrow="ALWAYS"/>
       <!-- Profile Completion Badge -->
       <VBox alignment="CENTER" spacing="2">
         <Label fx:id="completionLabel" styleClass="notification-badge profile-completion-percent" text="20%"/>
         <Label styleClass="profile-completion-text" text="complete"/>
         <Label fx:id="completionDetailsLabel" maxWidth="180" styleClass="text-secondary" text="Missing: --"
-                                       wrapText="true"/>
+                                               wrapText="true"/>
       </VBox>
     </HBox>
   </top>
@@ -120,7 +130,7 @@
             <Label fx:id="charCountLabel" styleClass="char-counter" text="0/500"/>
           </HBox>
           <TextArea fx:id="bioArea" prefHeight="100" promptText="Tell others about yourself..."
-                                                                                    wrapText="true" styleClass="bio-textarea"/>
+                                                                                              wrapText="true" styleClass="bio-textarea"/>
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Birth date:" prefWidth="120"/>
             <DatePicker fx:id="birthDatePicker" promptText="YYYY-MM-DD" prefWidth="180"/>
@@ -137,7 +147,7 @@
           <HBox spacing="12" alignment="CENTER_LEFT">
             <FontIcon iconLiteral="mdi2m-map-marker-outline" iconSize="20" iconColor="#64748b"/>
             <TextField fx:id="locationField" promptText="e.g. 40.7128, -74.0060"
-                                                                                                    HBox.hgrow="ALWAYS"/>
+                                                                                                                HBox.hgrow="ALWAYS"/>
           </HBox>
         </VBox>
         <!-- Gender &amp; Preferences Section - CRITICAL for matching -->

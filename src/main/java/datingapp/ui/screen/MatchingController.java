@@ -123,6 +123,8 @@ public class MatchingController extends BaseController implements Initializable 
 
     // Swipe gesture state
     private double dragStartX;
+    private boolean cardTransitionInProgress;
+    private boolean firstCandidateRendered;
 
     private static final double DRAG_THRESHOLD = 150;
 
@@ -172,6 +174,11 @@ public class MatchingController extends BaseController implements Initializable 
 
     private void bindViewModelState() {
         addSubscription(viewModel.currentCandidateProperty().subscribe(this::updateCandidateUI));
+        addSubscription(viewModel.hasMoreCandidatesProperty().subscribe(hasMore -> {
+            if (!Boolean.TRUE.equals(hasMore)) {
+                finishCardTransition();
+            }
+        }));
         bindNoteState();
         addSubscription(viewModel.infoMessageProperty().subscribe(this::showInfoMessage));
         addSubscription(viewModel.matchedUserProperty().subscribe(this::showMatchPopupIfPresent));
@@ -341,6 +348,11 @@ public class MatchingController extends BaseController implements Initializable 
     }
 
     private void animateCardExit(boolean toRight, Runnable onComplete) {
+        if (cardTransitionInProgress) {
+            return;
+        }
+        cardTransitionInProgress = true;
+        setCardInteractionEnabled(false);
         double targetX = toRight ? 800 : -800;
         double targetRotation = toRight ? 30 : -30;
 
@@ -384,6 +396,8 @@ public class MatchingController extends BaseController implements Initializable 
         candidateCard.setTranslateX(0);
         candidateCard.setRotate(0);
         candidateCard.setOpacity(1);
+        candidateCard.setScaleX(1);
+        candidateCard.setScaleY(1);
     }
 
     private void performLike() {
@@ -477,6 +491,16 @@ public class MatchingController extends BaseController implements Initializable 
         bioLabel.setText(user.getBio() != null ? user.getBio() : "No bio provided.");
         distanceLabel.setText("📍 " + viewModel.getDistanceDisplay(user));
         matchScoreLabel.setText("⭐ " + viewModel.getCompatibilityDisplay(user));
+
+        if (!firstCandidateRendered) {
+            firstCandidateRendered = true;
+            finishCardTransition();
+            return;
+        }
+
+        if (cardTransitionInProgress) {
+            playCardEntranceAnimation();
+        }
     }
 
     /**
@@ -545,16 +569,12 @@ public class MatchingController extends BaseController implements Initializable 
 
     @FXML
     private void handleLike() {
-        // Pulse the card for micro-interaction feedback
-        UiAnimations.pulseScale(candidateCard);
-        viewModel.like();
+        animateCardExit(true, this::performLike);
     }
 
     @FXML
     private void handlePass() {
-        // Pulse the card for micro-interaction feedback
-        UiAnimations.pulseScale(candidateCard);
-        viewModel.pass();
+        animateCardExit(false, this::performPass);
     }
 
     @SuppressWarnings("unused")
@@ -659,5 +679,38 @@ public class MatchingController extends BaseController implements Initializable 
         if (logger.isDebugEnabled()) {
             logger.debug(message, args);
         }
+    }
+
+    private void playCardEntranceAnimation() {
+        candidateCard.setOpacity(0);
+        candidateCard.setScaleX(0.85);
+        candidateCard.setScaleY(0.85);
+
+        FadeTransition fade = new FadeTransition(Duration.millis(400), candidateCard);
+        fade.setFromValue(0);
+        fade.setToValue(1);
+
+        javafx.animation.ScaleTransition scale =
+                new javafx.animation.ScaleTransition(Duration.millis(400), candidateCard);
+        scale.setFromX(0.85);
+        scale.setFromY(0.85);
+        scale.setToX(1.0);
+        scale.setToY(1.0);
+        scale.setInterpolator(Interpolator.EASE_OUT);
+
+        ParallelTransition entrance = new ParallelTransition(fade, scale);
+        entrance.setOnFinished(event -> finishCardTransition());
+        entrance.play();
+    }
+
+    private void finishCardTransition() {
+        cardTransitionInProgress = false;
+        setCardInteractionEnabled(true);
+        resetCardPosition();
+    }
+
+    private void setCardInteractionEnabled(boolean enabled) {
+        candidateCard.setDisable(!enabled);
+        actionButtonsContainer.setDisable(!enabled);
     }
 }

@@ -11,8 +11,10 @@ import datingapp.ui.screen.DashboardController;
 import datingapp.ui.screen.LoginController;
 import datingapp.ui.screen.MatchesController;
 import datingapp.ui.screen.MatchingController;
+import datingapp.ui.screen.NotesController;
 import datingapp.ui.screen.PreferencesController;
 import datingapp.ui.screen.ProfileController;
+import datingapp.ui.screen.SafetyController;
 import datingapp.ui.screen.SocialController;
 import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
@@ -112,7 +114,13 @@ public class ViewModelFactory {
         map.put(PreferencesController.class, () -> new PreferencesController(getPreferencesViewModel()));
         map.put(StandoutsController.class, () -> new StandoutsController(getStandoutsViewModel()));
         map.put(SocialController.class, () -> new SocialController(getSocialViewModel()));
+        map.put(SafetyController.class, () -> new SafetyController(getSafetyViewModel()));
+        map.put(NotesController.class, () -> new NotesController(getNotesViewModel()));
         return Collections.unmodifiableMap(map);
+    }
+
+    public UiPreferencesStore getPreferencesStore() {
+        return uiPreferencesStore;
     }
 
     public Object createController(Class<?> controllerClass) {
@@ -156,7 +164,10 @@ public class ViewModelFactory {
         return getViewModel(
                 DashboardViewModel.class,
                 () -> new DashboardViewModel(
-                        DashboardViewModel.Dependencies.fromServices(services), session, uiDispatcher));
+                        DashboardViewModel.Dependencies.fromServices(services),
+                        session,
+                        uiDispatcher,
+                        uiPreferencesStore));
     }
 
     public ProfileViewModel getProfileViewModel() {
@@ -223,6 +234,7 @@ public class ViewModelFactory {
                 () -> new StatsViewModel(
                         services.getAchievementService(),
                         services.getActivityMetricsService(),
+                        services.getConnectionService(),
                         services.getProfileUseCases(),
                         session,
                         uiDispatcher));
@@ -256,6 +268,18 @@ public class ViewModelFactory {
                         createUiUserStore(),
                         session,
                         uiDispatcher));
+    }
+
+    public SafetyViewModel getSafetyViewModel() {
+        return getViewModel(
+                SafetyViewModel.class,
+                () -> new SafetyViewModel(services.getTrustSafetyService(), session, uiDispatcher));
+    }
+
+    public NotesViewModel getNotesViewModel() {
+        return getViewModel(
+                NotesViewModel.class,
+                () -> new NotesViewModel(services.getProfileUseCases(), createUiUserStore(), session, uiDispatcher));
     }
 
     /**

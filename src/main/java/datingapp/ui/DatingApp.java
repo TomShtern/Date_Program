@@ -35,6 +35,7 @@ public class DatingApp extends Application {
         logger.debug("Setting up NavigationService...");
         this.navigationService = NavigationService.getInstance();
         this.navigationService.setViewModelFactory(viewModelFactory);
+        this.navigationService.setPreferencesStore(viewModelFactory.getPreferencesStore());
         logger.debug("NavigationService ready.");
 
         logger.info("Application services and UI foundation initialized.");

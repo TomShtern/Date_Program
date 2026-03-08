@@ -19,4 +19,17 @@ class NavigationServiceRouteTest {
                 NavigationService.class.getResource(NavigationService.ViewType.PREFERENCES.getFxmlPath()),
                 "Preferences FXML resource should exist");
     }
+
+    @Test
+    @DisplayName("safety and notes routes point at real fxml resources")
+    void safetyAndNotesRoutesPointAtRealFxml() {
+        assertEquals("/fxml/safety.fxml", NavigationService.ViewType.SAFETY.getFxmlPath());
+        assertEquals("/fxml/notes.fxml", NavigationService.ViewType.NOTES.getFxmlPath());
+        assertNotNull(
+                NavigationService.class.getResource(NavigationService.ViewType.SAFETY.getFxmlPath()),
+                "Safety FXML resource should exist");
+        assertNotNull(
+                NavigationService.class.getResource(NavigationService.ViewType.NOTES.getFxmlPath()),
+                "Notes FXML resource should exist");
+    }
 }

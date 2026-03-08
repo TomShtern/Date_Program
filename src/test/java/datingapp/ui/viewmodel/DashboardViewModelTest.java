@@ -132,7 +132,7 @@ class DashboardViewModelTest {
     @Test
     @DisplayName("refresh() fetches dashboard data and updates properties on FX thread")
     void shouldRefreshDashboardData() throws InterruptedException {
-        viewModel.refresh();
+        viewModel.performRefresh();
 
         assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
@@ -141,6 +141,18 @@ class DashboardViewModelTest {
         assertEquals("0", viewModel.totalMatchesProperty().get());
         assertFalse(viewModel.loadingProperty().get());
         assertEquals(0, viewModel.unreadMessagesProperty().get());
+    }
+
+    @Test
+    @DisplayName("performRefresh remains re-callable without getting stuck")
+    void performRefreshRemainsRecallable() throws InterruptedException {
+        viewModel.performRefresh();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
+
+        viewModel.performRefresh();
+
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
+        assertEquals(currentUser.getName(), viewModel.userNameProperty().get());
     }
 
     @Test

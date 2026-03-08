@@ -5,18 +5,24 @@ import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.core.AppSession;
+import datingapp.core.connection.ConnectionService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
+import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.model.User;
 import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.async.ViewModelAsyncScope;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
@@ -38,6 +44,7 @@ public class StatsViewModel {
 
     private final AchievementService achievementService;
     private final ActivityMetricsService statsService;
+    private final ConnectionService connectionService;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
     private final ViewModelAsyncScope asyncScope;
@@ -48,6 +55,8 @@ public class StatsViewModel {
     private final IntegerProperty totalLikesGiven = new SimpleIntegerProperty(0);
     private final IntegerProperty totalLikesReceived = new SimpleIntegerProperty(0);
     private final IntegerProperty totalMatches = new SimpleIntegerProperty(0);
+    private final IntegerProperty messagesExchanged = new SimpleIntegerProperty(0);
+    private final IntegerProperty loginStreak = new SimpleIntegerProperty(0);
     private final StringProperty responseRate = new SimpleStringProperty("--");
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
 
@@ -61,26 +70,38 @@ public class StatsViewModel {
     }
 
     public StatsViewModel(
-            AchievementService achievementService, ActivityMetricsService statsService, AppSession session) {
-        this(achievementService, statsService, null, session, new JavaFxUiThreadDispatcher());
+            AchievementService achievementService,
+            ActivityMetricsService statsService,
+            ConnectionService connectionService,
+            AppSession session) {
+        this(achievementService, statsService, connectionService, null, session, new JavaFxUiThreadDispatcher());
     }
 
     public StatsViewModel(
             AchievementService achievementService,
             ActivityMetricsService statsService,
+            ConnectionService connectionService,
             ProfileUseCases profileUseCases,
             AppSession session) {
-        this(achievementService, statsService, profileUseCases, session, new JavaFxUiThreadDispatcher());
+        this(
+                achievementService,
+                statsService,
+                connectionService,
+                profileUseCases,
+                session,
+                new JavaFxUiThreadDispatcher());
     }
 
     public StatsViewModel(
             AchievementService achievementService,
             ActivityMetricsService statsService,
+            ConnectionService connectionService,
             ProfileUseCases profileUseCases,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
         this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
         this.statsService = Objects.requireNonNull(statsService, "statsService cannot be null");
+        this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
         this.profileUseCases = profileUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
@@ -130,6 +151,8 @@ public class StatsViewModel {
                     totalLikesGiven.set(data.stats().likesGiven());
                     totalLikesReceived.set(data.stats().likesReceived());
                     totalMatches.set(data.stats().matchesCount());
+                    messagesExchanged.set(data.stats().messagesExchanged());
+                    loginStreak.set(data.stats().loginStreak());
                     responseRate.set(data.stats().rateText());
                     if (logger.isInfoEnabled()) {
                         logger.info("Refreshed stats for user: {}", maskUserIdentifier(data.user()));
@@ -160,6 +183,8 @@ public class StatsViewModel {
         int likesGiven = stats.likesGiven();
         int likesReceived = stats.likesReceived();
         int matchesCount = stats.activeMatches();
+        int messageCount = fetchMessagesExchanged(userId);
+        int streakDays = computeLoginStreak(userId);
 
         String rateText = "--";
         if (likesReceived > 0) {
@@ -167,10 +192,59 @@ public class StatsViewModel {
             rateText = String.format("%.0f%%", Math.min(rate, 100));
         }
 
-        return new StatsData(likesGiven, likesReceived, matchesCount, rateText);
+        return new StatsData(likesGiven, likesReceived, matchesCount, messageCount, streakDays, rateText);
     }
 
-    private record StatsData(int likesGiven, int likesReceived, int matchesCount, String rateText) {}
+    private int fetchMessagesExchanged(java.util.UUID userId) {
+        Set<String> conversationIds = new HashSet<>();
+        int offset = 0;
+        int batchSize = 100;
+        while (true) {
+            List<ConnectionService.ConversationPreview> conversations =
+                    connectionService.getConversations(userId, batchSize, offset);
+            if (conversations.isEmpty()) {
+                break;
+            }
+            conversations.stream()
+                    .map(preview -> preview.conversation().getId())
+                    .forEach(conversationIds::add);
+            if (conversations.size() < batchSize) {
+                break;
+            }
+            offset += batchSize;
+        }
+        return connectionService.countMessagesByConversationIds(conversationIds).values().stream()
+                .mapToInt(Integer::intValue)
+                .sum();
+    }
+
+    private int computeLoginStreak(java.util.UUID userId) {
+        List<Session> sessions = statsService.getSessionHistory(userId, 60);
+        if (sessions.isEmpty()) {
+            return 0;
+        }
+
+        Set<LocalDate> activeDays = sessions.stream()
+                .map(session ->
+                        session.getStartedAt().atZone(ZoneId.systemDefault()).toLocalDate())
+                .collect(java.util.stream.Collectors.toSet());
+
+        LocalDate cursor = LocalDate.now();
+        int streak = 0;
+        while (activeDays.contains(cursor)) {
+            streak++;
+            cursor = cursor.minusDays(1);
+        }
+        return streak;
+    }
+
+    private record StatsData(
+            int likesGiven,
+            int likesReceived,
+            int matchesCount,
+            int messagesExchanged,
+            int loginStreak,
+            String rateText) {}
 
     // --- Properties ---
     public ObservableList<Achievement> getAchievements() {
@@ -191,6 +265,14 @@ public class StatsViewModel {
 
     public IntegerProperty totalMatchesProperty() {
         return totalMatches;
+    }
+
+    public IntegerProperty messagesExchangedProperty() {
+        return messagesExchanged;
+    }
+
+    public IntegerProperty loginStreakProperty() {
+        return loginStreak;
     }
 
     public StringProperty responseRateProperty() {

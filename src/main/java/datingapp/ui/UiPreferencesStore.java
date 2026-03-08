@@ -1,9 +1,13 @@
 package datingapp.ui;
 
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,6 +20,7 @@ public final class UiPreferencesStore {
     private static final Logger logger = LoggerFactory.getLogger(UiPreferencesStore.class);
     private static final String DEFAULT_NODE_PATH = "/datingapp/ui";
     private static final String THEME_MODE_KEY = "themeMode";
+    private static final String SEEN_ACHIEVEMENT_IDS_KEY = "seenAchievementIds";
 
     private final Preferences preferences;
 
@@ -37,7 +42,7 @@ public final class UiPreferencesStore {
             }
             try {
                 return ThemeMode.valueOf(value.trim().toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException ex) {
+            } catch (IllegalArgumentException _) {
                 return DARK;
             }
         }
@@ -62,6 +67,29 @@ public final class UiPreferencesStore {
     public void saveThemeMode(ThemeMode themeMode) {
         ThemeMode resolvedThemeMode = Objects.requireNonNull(themeMode, "themeMode cannot be null");
         preferences.put(THEME_MODE_KEY, resolvedThemeMode.name());
+        flushQuietly();
+    }
+
+    public Set<String> loadSeenAchievementIds() {
+        String raw = preferences.get(SEEN_ACHIEVEMENT_IDS_KEY, "");
+        if (raw == null || raw.isBlank()) {
+            return Set.of();
+        }
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    public void saveSeenAchievementIds(Set<String> achievementIds) {
+        Set<String> resolvedIds = achievementIds == null ? Set.of() : achievementIds;
+        String raw = resolvedIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .sorted()
+                .collect(Collectors.joining(","));
+        preferences.put(SEEN_ACHIEVEMENT_IDS_KEY, raw);
         flushQuietly();
     }
 

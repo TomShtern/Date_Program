@@ -110,6 +110,45 @@ class MatchingControllerTest {
         AppSession.getInstance().reset();
     }
 
+    @Test
+    @DisplayName("like button still advances to the next candidate after animated exit")
+    void likeButtonStillAdvancesAfterAnimation() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+
+        MatchingViewModel viewModel = fixture.createViewModel();
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/matching.fxml", () -> new MatchingController(viewModel));
+        Parent root = loaded.root();
+        Button likeButton = JavaFxTestSupport.lookup(root, "#likeButton", Button.class);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> viewModel.currentCandidateProperty().get() != null
+                        && fixture.prioritizedCandidate
+                                .getId()
+                                .equals(viewModel
+                                        .currentCandidateProperty()
+                                        .get()
+                                        .getId()),
+                5000));
+
+        JavaFxTestSupport.runOnFxAndWait(likeButton::fire);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> viewModel.currentCandidateProperty().get() != null
+                        && fixture.fallbackCandidate
+                                .getId()
+                                .equals(viewModel
+                                        .currentCandidateProperty()
+                                        .get()
+                                        .getId()),
+                5000));
+
+        viewModel.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
     private static final class Fixture {
         private final TestStorages.Users users = new TestStorages.Users();
         private final TestStorages.Interactions interactions = new TestStorages.Interactions();

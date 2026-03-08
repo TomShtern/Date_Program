@@ -108,6 +108,23 @@
     -fx-text-fill: #0f172a;
 }
 
+.button-icon:hover {
+    -fx-background-color: rgba(15, 23, 42, 0.06);
+}
+
+.theme-toggle {
+    -fx-background-color: rgba(255, 255, 255, 0.95);
+    -fx-border-color: #e2e8f0;
+}
+
+.theme-toggle:hover {
+    -fx-background-color: #f8fafc;
+}
+
+.theme-toggle-light {
+    -fx-background-color: rgba(251, 191, 36, 0.18);
+}
+
 /* Scroll bars */
 .scroll-bar .thumb {
     -fx-background-color: #cbd5e1;
@@ -149,4 +166,13 @@
 /* Empty states */
 .matches-empty-container {
     -fx-background-color: rgba(0, 0, 0, 0.02);
+}
+
+.dashboard-nudge-banner {
+    -fx-background-color: rgba(255, 255, 255, 0.95);
+    -fx-border-color: rgba(251, 191, 36, 0.35);
+}
+
+.dashboard-nudge-text {
+    -fx-text-fill: #334155;
 }

@@ -4,6 +4,7 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
@@ -30,6 +31,14 @@
         <FontIcon iconLiteral="mdi2h-heart-pulse" iconSize="16" iconColor="#10b981"/>
         <Label fx:id="statusLabel" styleClass="likes-counter-text" text="0/50"/>
       </HBox>
+      <Button fx:id="refreshButton" styleClass="button-icon">
+        <graphic>
+          <FontIcon iconLiteral="mdi2r-refresh" iconSize="18" iconColor="#94a3b8"/>
+        </graphic>
+        <tooltip>
+          <Tooltip text="Refresh dashboard"/>
+        </tooltip>
+      </Button>
       <Button fx:id="logoutButton" onAction="#handleLogout" styleClass="button-danger" text="Logout">
         <tooltip>
           <Tooltip text="Sign out of your account"/>
@@ -45,6 +54,11 @@
         <Insets bottom="40.0" left="40.0" right="40.0" top="30.0"/>
       </padding>
       <Label styleClass="heading" text="Dashboard"/>
+      <HBox fx:id="profileNudgeBanner" alignment="CENTER_LEFT" spacing="12" styleClass="dashboard-nudge-banner" managed="false" visible="false">
+        <FontIcon iconLiteral="mdi2l-lightbulb-on-outline" iconSize="18" iconColor="#fbbf24"/>
+        <Label fx:id="profileNudgeLabel" managed="false" visible="false" styleClass="dashboard-nudge-text" text="Add a bio to boost your profile!" HBox.hgrow="ALWAYS"/>
+        <Button fx:id="editProfileNudgeButton" managed="false" visible="false" styleClass="button-transparent button-accent-text" text="Edit Profile"/>
+      </HBox>
       <!-- Color-Coded Navigation Cards Grid -->
       <GridPane hgap="24" vgap="24" alignment="CENTER">
         <columnConstraints>
@@ -53,8 +67,8 @@
         </columnConstraints>
         <!-- Browse Card - Amber -->
         <Button fx:id="browseButton" onAction="#handleBrowse" maxHeight="160" maxWidth="Infinity"
-                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
-                                                                            GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
+                                                                                            GridPane.columnIndex="0" GridPane.rowIndex="0">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -66,8 +80,8 @@
         </Button>
         <!-- Matches Card - Rose -->
         <Button fx:id="matchesButton" onAction="#handleMatches" maxHeight="160" maxWidth="Infinity"
-                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-matches"
-                                                                            GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-matches"
+                                                                                            GridPane.columnIndex="1" GridPane.rowIndex="0">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -78,8 +92,8 @@
           </graphic>
         </Button>
         <Button fx:id="chatButton" onAction="#handleChat" maxHeight="160" maxWidth="Infinity"
-                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-chat"
-                                                                            GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-chat"
+                                                                                            GridPane.columnIndex="0" GridPane.rowIndex="1">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -92,8 +106,8 @@
         </Button>
         <!-- Profile Card - Purple -->
         <Button fx:id="profileButton" onAction="#handleProfile" maxHeight="160" maxWidth="Infinity"
-                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
-                                                                            GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
+                                                                                            GridPane.columnIndex="1" GridPane.rowIndex="1">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -105,8 +119,8 @@
         </Button>
         <!-- Standouts Card - Teal -->
         <Button fx:id="standoutsButton" onAction="#handleStandouts" maxHeight="160" maxWidth="Infinity"
-                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
-                                                                            GridPane.columnIndex="0" GridPane.rowIndex="2">
+                                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-browse"
+                                                                                            GridPane.columnIndex="0" GridPane.rowIndex="2">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
@@ -118,14 +132,38 @@
         </Button>
         <!-- Social Card - Indigo -->
         <Button fx:id="socialButton" onAction="#handleSocial" maxHeight="160" maxWidth="Infinity"
-                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
-                                                                            GridPane.columnIndex="1" GridPane.rowIndex="2">
+                                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-profile"
+                                                                                            GridPane.columnIndex="1" GridPane.rowIndex="2">
           <graphic>
             <VBox alignment="CENTER" spacing="12">
               <StackPane styleClass="dashboard-icon-container">
                 <FontIcon iconLiteral="mdi2a-account-group" iconSize="32" iconColor="#6366f1"/>
               </StackPane>
               <Label text="Social" styleClass="dashboard-card-label"/>
+            </VBox>
+          </graphic>
+        </Button>
+        <Button fx:id="safetyButton" onAction="#handleSafety" maxHeight="160" maxWidth="Infinity"
+                                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-safety"
+                                                                                            GridPane.columnIndex="0" GridPane.rowIndex="3">
+          <graphic>
+            <VBox alignment="CENTER" spacing="12">
+              <StackPane styleClass="dashboard-icon-container">
+                <FontIcon iconLiteral="mdi2s-shield-check" iconSize="32" iconColor="#22c55e"/>
+              </StackPane>
+              <Label text="Safety &amp; Privacy" styleClass="dashboard-card-label"/>
+            </VBox>
+          </graphic>
+        </Button>
+        <Button fx:id="notesButton" onAction="#handleNotes" maxHeight="160" maxWidth="Infinity"
+                                                                                            prefHeight="160" styleClass="dashboard-card dashboard-card-notes"
+                                                                                            GridPane.columnIndex="1" GridPane.rowIndex="3">
+          <graphic>
+            <VBox alignment="CENTER" spacing="12">
+              <StackPane styleClass="dashboard-icon-container">
+                <FontIcon iconLiteral="mdi2n-note-text-outline" iconSize="32" iconColor="#38bdf8"/>
+              </StackPane>
+              <Label text="My Notes" styleClass="dashboard-card-label"/>
             </VBox>
           </graphic>
         </Button>
@@ -137,7 +175,7 @@
           <Label text="DAILY PICK" styleClass="daily-pick-title"/>
         </HBox>
         <Label fx:id="dailyPickLabel" styleClass="text-secondary"
-                                                                            text="Loading your daily pick..."/>
+                                                                                            text="Loading your daily pick..."/>
         <Button fx:id="dailyPickButton" onAction="#handleViewDailyPick" styleClass="matches-browse-btn" text="View Profile">
           <graphic>
             <FontIcon iconLiteral="mdi2e-eye" iconSize="16" iconColor="white"/>

@@ -163,6 +163,45 @@
     -fx-background-color: rgba(255, 255, 255, 0.05);
 }
 
+.button-icon {
+    -fx-background-color: transparent;
+    -fx-background-radius: 16;
+    -fx-padding: 6;
+    -fx-cursor: hand;
+    -fx-min-width: 34;
+    -fx-min-height: 34;
+}
+
+.button-icon:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+.button-icon .ikonli-font-icon {
+    -fx-icon-color: -fx-text-secondary;
+}
+
+.theme-toggle {
+    -fx-background-color: rgba(15, 23, 42, 0.88);
+    -fx-background-radius: 999;
+    -fx-padding: 8 10;
+    -fx-border-color: rgba(148, 163, 184, 0.25);
+    -fx-border-radius: 999;
+    -fx-cursor: hand;
+}
+
+.theme-toggle:hover {
+    -fx-background-color: rgba(30, 41, 59, 0.95);
+}
+
+.theme-toggle-light {
+    -fx-background-color: rgba(245, 158, 11, 0.18);
+    -fx-border-color: rgba(251, 191, 36, 0.45);
+}
+
+.theme-toggle .ikonli-font-icon {
+    -fx-icon-color: -fx-text-primary;
+}
+
 /* ============================================
    Form Controls - Sleek & Focused
    ============================================ */
@@ -1650,6 +1689,53 @@
 
 .dashboard-card-profile .ikonli-font-icon {
     -fx-icon-color: #a855f7;
+}
+
+.dashboard-card-safety {
+    -fx-background-color: linear-gradient(to bottom right, rgba(34, 197, 94, 0.14), rgba(16, 185, 129, 0.08)), #1e1e2e;
+    -fx-border-color: rgba(34, 197, 94, 0.38);
+    -fx-border-radius: 20;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.22), 12, 0, 0, 4);
+}
+
+.dashboard-card-safety:hover {
+    -fx-background-color: linear-gradient(to bottom right, rgba(34, 197, 94, 0.24), rgba(16, 185, 129, 0.16)), #252538;
+    -fx-border-color: rgba(34, 197, 94, 0.7);
+    -fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.45), 25, 0.2, 0, 8);
+    -fx-scale-x: 1.03;
+    -fx-scale-y: 1.03;
+}
+
+.dashboard-card-notes {
+    -fx-background-color: linear-gradient(to bottom right, rgba(56, 189, 248, 0.14), rgba(59, 130, 246, 0.08)), #1e1e2e;
+    -fx-border-color: rgba(56, 189, 248, 0.4);
+    -fx-border-radius: 20;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(56, 189, 248, 0.22), 12, 0, 0, 4);
+}
+
+.dashboard-card-notes:hover {
+    -fx-background-color: linear-gradient(to bottom right, rgba(56, 189, 248, 0.24), rgba(59, 130, 246, 0.16)), #252538;
+    -fx-border-color: rgba(56, 189, 248, 0.7);
+    -fx-effect: dropshadow(gaussian, rgba(56, 189, 248, 0.45), 25, 0.2, 0, 8);
+    -fx-scale-x: 1.03;
+    -fx-scale-y: 1.03;
+}
+
+.dashboard-nudge-banner {
+    -fx-background-color: rgba(51, 65, 85, 0.7);
+    -fx-background-radius: 18;
+    -fx-border-color: rgba(251, 191, 36, 0.25);
+    -fx-border-radius: 18;
+    -fx-padding: 12 16;
+    -fx-max-width: 680;
+}
+
+.dashboard-nudge-text {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
 }
 
 /* Dashboard Card Icon Container */
