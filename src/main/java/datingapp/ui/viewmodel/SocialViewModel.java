@@ -70,17 +70,9 @@ public class SocialViewModel {
             ConnectionService connectionService,
             UiSocialDataAccess socialDataAccess,
             UiUserStore userStore,
+            SocialUseCases socialUseCases,
             AppSession session) {
-        this(connectionService, socialDataAccess, userStore, null, session, new JavaFxUiThreadDispatcher());
-    }
-
-    public SocialViewModel(
-            ConnectionService connectionService,
-            UiSocialDataAccess socialDataAccess,
-            UiUserStore userStore,
-            AppSession session,
-            UiThreadDispatcher uiDispatcher) {
-        this(connectionService, socialDataAccess, userStore, null, session, uiDispatcher);
+        this(connectionService, socialDataAccess, userStore, socialUseCases, session, new JavaFxUiThreadDispatcher());
     }
 
     public SocialViewModel(
@@ -93,8 +85,7 @@ public class SocialViewModel {
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
         this.socialDataAccess = Objects.requireNonNull(socialDataAccess, "socialDataAccess cannot be null");
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
-        this.socialUseCases =
-                socialUseCases != null ? socialUseCases : new SocialUseCases(this.connectionService, null);
+        this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
     }

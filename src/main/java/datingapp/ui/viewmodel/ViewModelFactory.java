@@ -219,8 +219,8 @@ public class ViewModelFactory {
         return getViewModel(
                 ChatViewModel.class,
                 () -> new ChatViewModel(
-                        services.getConnectionService(),
-                        services.getTrustSafetyService(),
+                        services.getMessagingUseCases(),
+                        services.getSocialUseCases(),
                         session,
                         uiDispatcher,
                         java.time.Duration.ofSeconds(15),
@@ -266,6 +266,7 @@ public class ViewModelFactory {
                         services.getConnectionService(),
                         new StorageUiSocialDataAccess(services.getCommunicationStorage()),
                         createUiUserStore(),
+                        services.getSocialUseCases(),
                         session,
                         uiDispatcher));
     }

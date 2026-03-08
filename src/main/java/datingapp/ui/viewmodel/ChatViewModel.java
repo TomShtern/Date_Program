@@ -15,7 +15,6 @@ import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.connection.ConnectionService.SendResult;
-import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.ui.async.AsyncErrorRouter;
@@ -56,8 +55,6 @@ public class ChatViewModel {
     private static final String TASK_LOAD_MESSAGES = "load messages";
     private static final String TASK_REFRESH_CONVERSATIONS = "refresh conversations";
 
-    private final ConnectionService messagingService;
-    private final TrustSafetyService trustSafetyService;
     private final MessagingUseCases messagingUseCases;
     private final SocialUseCases socialUseCases;
     private final UiProfileNoteDataAccess noteDataAccess;
@@ -90,19 +87,18 @@ public class ChatViewModel {
     /** Keep reference to listener for cleanup. */
     private final javafx.beans.value.ChangeListener<ConversationPreview> selectionListener;
 
-    public ChatViewModel(
-            ConnectionService messagingService, TrustSafetyService trustSafetyService, AppSession session) {
-        this(messagingService, trustSafetyService, session, new JavaFxUiThreadDispatcher());
+    public ChatViewModel(MessagingUseCases messagingUseCases, SocialUseCases socialUseCases, AppSession session) {
+        this(messagingUseCases, socialUseCases, session, new JavaFxUiThreadDispatcher());
     }
 
     public ChatViewModel(
-            ConnectionService messagingService,
-            TrustSafetyService trustSafetyService,
+            MessagingUseCases messagingUseCases,
+            SocialUseCases socialUseCases,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
         this(
-                messagingService,
-                trustSafetyService,
+                messagingUseCases,
+                socialUseCases,
                 session,
                 uiDispatcher,
                 DEFAULT_CONVERSATION_POLL_INTERVAL,
@@ -111,15 +107,15 @@ public class ChatViewModel {
     }
 
     public ChatViewModel(
-            ConnectionService messagingService,
-            TrustSafetyService trustSafetyService,
+            MessagingUseCases messagingUseCases,
+            SocialUseCases socialUseCases,
             AppSession session,
             UiThreadDispatcher uiDispatcher,
             Duration conversationPollInterval,
             Duration activeConversationPollInterval) {
         this(
-                messagingService,
-                trustSafetyService,
+                messagingUseCases,
+                socialUseCases,
                 session,
                 uiDispatcher,
                 conversationPollInterval,
@@ -128,17 +124,15 @@ public class ChatViewModel {
     }
 
     public ChatViewModel(
-            ConnectionService messagingService,
-            TrustSafetyService trustSafetyService,
+            MessagingUseCases messagingUseCases,
+            SocialUseCases socialUseCases,
             AppSession session,
             UiThreadDispatcher uiDispatcher,
             Duration conversationPollInterval,
             Duration activeConversationPollInterval,
             UiProfileNoteDataAccess noteDataAccess) {
-        this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
-        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
-        this.messagingUseCases = new MessagingUseCases(this.messagingService);
-        this.socialUseCases = new SocialUseCases(this.messagingService, this.trustSafetyService);
+        this.messagingUseCases = Objects.requireNonNull(messagingUseCases, "messagingUseCases cannot be null");
+        this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
         this.conversationPollInterval =

@@ -21,9 +21,7 @@ import datingapp.core.model.Match;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
-import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import java.util.ArrayList;
 import java.util.List;
@@ -95,41 +93,6 @@ public class MatchingViewModel extends BaseViewModel {
             Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
             Objects.requireNonNull(noteDataAccess, "noteDataAccess cannot be null");
         }
-    }
-
-    public MatchingViewModel(
-            CandidateFinder candidateFinder,
-            MatchingService matchingService,
-            UndoService undoService,
-            TrustSafetyService trustSafetyService,
-            AppSession session) {
-        this(
-                candidateFinder,
-                matchingService,
-                undoService,
-                trustSafetyService,
-                session,
-                new JavaFxUiThreadDispatcher());
-    }
-
-    public MatchingViewModel(
-            CandidateFinder candidateFinder,
-            MatchingService matchingService,
-            UndoService undoService,
-            TrustSafetyService trustSafetyService,
-            AppSession session,
-            UiThreadDispatcher uiDispatcher) {
-        this(
-                new Dependencies(
-                        candidateFinder,
-                        matchingService,
-                        undoService,
-                        trustSafetyService,
-                        new MatchingUseCases(candidateFinder, matchingService, undoService),
-                        new SocialUseCases(trustSafetyService),
-                        new NoOpUiProfileNoteDataAccess()),
-                session,
-                uiDispatcher);
     }
 
     public MatchingViewModel(Dependencies dependencies, AppSession session, UiThreadDispatcher uiDispatcher) {

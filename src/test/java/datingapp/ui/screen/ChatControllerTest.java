@@ -138,9 +138,11 @@ class ChatControllerTest {
             ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
             var noteUseCases =
                     new datingapp.app.usecase.profile.ProfileUseCases(users, profileService, null, null, config);
+            var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService);
+            var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, trustSafetyService);
             this.viewModel = new ChatViewModel(
-                    connectionService,
-                    trustSafetyService,
+                    messagingUseCases,
+                    socialUseCases,
                     AppSession.getInstance(),
                     new datingapp.ui.async.JavaFxUiThreadDispatcher(),
                     Duration.ofMillis(75),
