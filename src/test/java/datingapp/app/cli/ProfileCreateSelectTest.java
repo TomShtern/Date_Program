@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.ProfileNote;
@@ -57,11 +58,11 @@ class ProfileCreateSelectTest {
         // ProfileService and ProfileService can be null for create/select
         // tests
         // since they aren't used by these methods
+        ProfileUseCases profileUseCases = new ProfileUseCases(userStorage, null, null, null, AppConfig.defaults());
         return new ProfileHandler(
                 userStorage,
-                null,
-                null,
                 new ValidationService(AppConfig.defaults()),
+                profileUseCases,
                 AppConfig.defaults(),
                 userSession,
                 inputReader);

@@ -8,10 +8,14 @@ import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.DailyLimitService;
+import datingapp.core.matching.DailyPickService;
+import datingapp.core.matching.DailyPickService.DailyPick;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
-import datingapp.core.matching.RecommendationService.DailyPick;
+import datingapp.core.matching.Standout;
+import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
@@ -33,7 +37,9 @@ public class MatchingUseCases {
 
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
-    private final RecommendationService recommendationService;
+    private final DailyLimitService dailyLimitService;
+    private final DailyPickService dailyPickService;
+    private final StandoutService standoutService;
     private final UndoService undoService;
     private final InteractionStorage interactionStorage;
     private final UserStorage userStorage;
@@ -41,7 +47,7 @@ public class MatchingUseCases {
     private final AppEventBus eventBus;
 
     public MatchingUseCases(CandidateFinder candidateFinder, MatchingService matchingService, UndoService undoService) {
-        this(candidateFinder, matchingService, null, undoService, null, null, null, null);
+        this(candidateFinder, matchingService, null, null, null, undoService, null, null, null, null);
     }
 
     public MatchingUseCases(
@@ -55,7 +61,9 @@ public class MatchingUseCases {
         this(
                 candidateFinder,
                 matchingService,
-                recommendationService,
+                wrapDailyLimitService(recommendationService),
+                wrapDailyPickService(recommendationService),
+                wrapStandoutService(recommendationService),
                 undoService,
                 interactionStorage,
                 userStorage,
@@ -72,9 +80,58 @@ public class MatchingUseCases {
             UserStorage userStorage,
             MatchQualityService matchQualityService,
             AppEventBus eventBus) {
+        this(
+                candidateFinder,
+                matchingService,
+                wrapDailyLimitService(recommendationService),
+                wrapDailyPickService(recommendationService),
+                wrapStandoutService(recommendationService),
+                undoService,
+                interactionStorage,
+                userStorage,
+                matchQualityService,
+                eventBus);
+    }
+
+    public MatchingUseCases(
+            CandidateFinder candidateFinder,
+            MatchingService matchingService,
+            DailyLimitService dailyLimitService,
+            DailyPickService dailyPickService,
+            StandoutService standoutService,
+            UndoService undoService,
+            InteractionStorage interactionStorage,
+            UserStorage userStorage,
+            MatchQualityService matchQualityService) {
+        this(
+                candidateFinder,
+                matchingService,
+                dailyLimitService,
+                dailyPickService,
+                standoutService,
+                undoService,
+                interactionStorage,
+                userStorage,
+                matchQualityService,
+                null);
+    }
+
+    public MatchingUseCases(
+            CandidateFinder candidateFinder,
+            MatchingService matchingService,
+            DailyLimitService dailyLimitService,
+            DailyPickService dailyPickService,
+            StandoutService standoutService,
+            UndoService undoService,
+            InteractionStorage interactionStorage,
+            UserStorage userStorage,
+            MatchQualityService matchQualityService,
+            AppEventBus eventBus) {
         this.candidateFinder = candidateFinder;
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
-        this.recommendationService = recommendationService;
+        this.dailyLimitService = dailyLimitService;
+        this.dailyPickService = dailyPickService;
+        this.standoutService = standoutService;
         this.undoService = undoService;
         this.interactionStorage = interactionStorage;
         this.userStorage = userStorage;
@@ -97,9 +154,9 @@ public class MatchingUseCases {
         try {
             Optional<DailyPick> dailyPick = Optional.empty();
             boolean dailyPickViewed = true;
-            if (recommendationService != null) {
-                dailyPick = recommendationService.getDailyPick(currentUser);
-                dailyPickViewed = recommendationService.hasViewedDailyPick(currentUser.getId());
+            if (dailyPickService != null) {
+                dailyPick = dailyPickService.getDailyPick(currentUser);
+                dailyPickViewed = dailyPickService.hasViewedDailyPick(currentUser.getId());
             }
 
             if (!currentUser.hasLocationSet()) {
@@ -121,8 +178,8 @@ public class MatchingUseCases {
             return UseCaseResult.failure(UseCaseError.validation("Context, current user and candidate are required"));
         }
         try {
-            if (command.markDailyPickViewed() && recommendationService != null) {
-                recommendationService.markDailyPickViewed(command.context().userId());
+            if (command.markDailyPickViewed() && dailyPickService != null) {
+                dailyPickService.markDailyPickViewed(command.context().userId());
             }
             MatchingService.SwipeResult result =
                     matchingService.processSwipe(command.currentUser(), command.candidate(), command.liked());
@@ -210,12 +267,12 @@ public class MatchingUseCases {
         if (query == null || query.context() == null || query.currentUser() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and current user are required"));
         }
-        if (recommendationService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("RecommendationService is not configured"));
+        if (standoutService == null) {
+            return UseCaseResult.failure(UseCaseError.dependency("StandoutService is not configured"));
         }
         try {
-            RecommendationService.Result result = recommendationService.getStandouts(query.currentUser());
-            Map<UUID, User> users = recommendationService.resolveUsers(result.standouts());
+            StandoutService.Result result = standoutService.getStandouts(query.currentUser());
+            Map<UUID, User> users = standoutService.resolveUsers(result.standouts());
             return UseCaseResult.success(new StandoutsResult(result, users));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to load standouts: " + e.getMessage()));
@@ -226,11 +283,11 @@ public class MatchingUseCases {
         if (command == null || command.context() == null || command.standoutUserId() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and standout user are required"));
         }
-        if (recommendationService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("RecommendationService is not configured"));
+        if (standoutService == null) {
+            return UseCaseResult.failure(UseCaseError.dependency("StandoutService is not configured"));
         }
         try {
-            recommendationService.markInteracted(command.context().userId(), command.standoutUserId());
+            standoutService.markInteracted(command.context().userId(), command.standoutUserId());
             return UseCaseResult.success(null);
         } catch (Exception e) {
             return UseCaseResult.failure(
@@ -247,8 +304,8 @@ public class MatchingUseCases {
         }
         if (command.enforceDailyLimit()
                 && command.direction() == Like.Direction.LIKE
-                && recommendationService != null
-                && !recommendationService.canLike(command.context().userId())) {
+                && dailyLimitService != null
+                && !dailyLimitService.canLike(command.context().userId())) {
             return UseCaseResult.failure(UseCaseError.conflict("Daily like limit reached"));
         }
 
@@ -326,7 +383,7 @@ public class MatchingUseCases {
 
     public static record StandoutsQuery(UserContext context, User currentUser) {}
 
-    public static record StandoutsResult(RecommendationService.Result result, Map<UUID, User> usersById) {}
+    public static record StandoutsResult(StandoutService.Result result, Map<UUID, User> usersById) {}
 
     public static record StandoutInteractionCommand(UserContext context, UUID standoutUserId) {}
 
@@ -338,4 +395,95 @@ public class MatchingUseCases {
     public static record RemoveLikeCommand(UserContext context, UUID likeId) {}
 
     public static record MatchQualityQuery(UserContext context, Match match) {}
+
+    private static DailyLimitService wrapDailyLimitService(RecommendationService recommendationService) {
+        if (recommendationService == null) {
+            return null;
+        }
+        return new DailyLimitService() {
+            @Override
+            public boolean canLike(UUID userId) {
+                return recommendationService.canLike(userId);
+            }
+
+            @Override
+            public boolean canPass(UUID userId) {
+                return recommendationService.canPass(userId);
+            }
+
+            @Override
+            public DailyStatus getStatus(UUID userId) {
+                RecommendationService.DailyStatus status = recommendationService.getStatus(userId);
+                return new DailyStatus(
+                        status.likesUsed(),
+                        status.likesRemaining(),
+                        status.passesUsed(),
+                        status.passesRemaining(),
+                        status.date(),
+                        status.resetsAt());
+            }
+
+            @Override
+            public java.time.Duration getTimeUntilReset() {
+                return recommendationService.getTimeUntilReset();
+            }
+
+            @Override
+            public String formatDuration(java.time.Duration duration) {
+                return RecommendationService.formatDuration(duration);
+            }
+        };
+    }
+
+    private static DailyPickService wrapDailyPickService(RecommendationService recommendationService) {
+        if (recommendationService == null) {
+            return null;
+        }
+        return new DailyPickService() {
+            @Override
+            public Optional<DailyPick> getDailyPick(User seeker) {
+                return recommendationService
+                        .getDailyPick(seeker)
+                        .map(pick -> new DailyPick(pick.user(), pick.date(), pick.reason(), pick.alreadySeen()));
+            }
+
+            @Override
+            public boolean hasViewedDailyPick(UUID userId) {
+                return recommendationService.hasViewedDailyPick(userId);
+            }
+
+            @Override
+            public void markDailyPickViewed(UUID userId) {
+                recommendationService.markDailyPickViewed(userId);
+            }
+
+            @Override
+            public int cleanupOldDailyPickViews(java.time.LocalDate before) {
+                return recommendationService.cleanupOldDailyPickViews(before);
+            }
+        };
+    }
+
+    private static StandoutService wrapStandoutService(RecommendationService recommendationService) {
+        if (recommendationService == null) {
+            return null;
+        }
+        return new StandoutService() {
+            @Override
+            public Result getStandouts(User seeker) {
+                RecommendationService.Result result = recommendationService.getStandouts(seeker);
+                return new Result(result.standouts(), result.totalCandidates(), result.fromCache(), result.message());
+            }
+
+            @Override
+            public void markInteracted(UUID seekerId, UUID standoutUserId) {
+                recommendationService.markInteracted(seekerId, standoutUserId);
+            }
+
+            @Override
+            public Map<UUID, User> resolveUsers(List<Standout> standouts) {
+                return recommendationService.resolveUsers(standouts);
+            }
+        };
+    }
 }

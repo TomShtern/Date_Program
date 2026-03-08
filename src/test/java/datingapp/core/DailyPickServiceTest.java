@@ -320,10 +320,15 @@ class DailyPickServiceTest {
             service.getDailyPick(seeker);
         }
 
-        java.lang.reflect.Field cacheField = RecommendationService.class.getDeclaredField("cachedDailyPicks");
+        java.lang.reflect.Field dailyPickServiceField =
+                RecommendationService.class.getDeclaredField("dailyPickService");
+        dailyPickServiceField.setAccessible(true);
+        Object dailyPickService = dailyPickServiceField.get(service);
+
+        java.lang.reflect.Field cacheField = dailyPickService.getClass().getDeclaredField("cachedDailyPicks");
         cacheField.setAccessible(true);
         @SuppressWarnings("unchecked")
-        java.util.Map<String, UUID> cache = (java.util.Map<String, UUID>) cacheField.get(service);
+        java.util.Map<String, UUID> cache = (java.util.Map<String, UUID>) cacheField.get(dailyPickService);
 
         assertTrue(cache.size() <= 1000, "Cache size should not exceed 1000, but was " + cache.size());
     }

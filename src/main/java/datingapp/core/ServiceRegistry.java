@@ -7,11 +7,16 @@ import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.CompatibilityCalculator;
+import datingapp.core.matching.DailyLimitService;
+import datingapp.core.matching.DailyPickService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
+import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
@@ -20,7 +25,6 @@ import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
-import datingapp.core.time.TimePolicy;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import java.util.Objects;
@@ -41,15 +45,18 @@ public class ServiceRegistry {
     private final ActivityMetricsService activityMetricsService;
     private final MatchQualityService matchQualityService;
     private final RecommendationService recommendationService;
+    private final DailyLimitService dailyLimitService;
+    private final DailyPickService dailyPickService;
+    private final StandoutService standoutService;
     private final UndoService undoService;
+    private final CompatibilityCalculator compatibilityCalculator;
 
     private final TrustSafetyService trustSafetyService;
     private final ProfileService profileService;
     private final ValidationService validationService;
+    private final AchievementService achievementService;
 
     private final ConnectionService connectionService;
-
-    private final TimePolicy timePolicy;
     private final AppEventBus eventBus;
     private final ProfileActivationPolicy activationPolicy;
     private final RelationshipWorkflowPolicy workflowPolicy;
@@ -74,10 +81,14 @@ public class ServiceRegistry {
             MatchQualityService matchQualityService,
             ProfileService profileService,
             RecommendationService recommendationService,
+            DailyLimitService dailyLimitService,
+            DailyPickService dailyPickService,
+            StandoutService standoutService,
             UndoService undoService,
+            CompatibilityCalculator compatibilityCalculator,
+            AchievementService achievementService,
             ConnectionService connectionService,
             ValidationService validationService,
-            TimePolicy timePolicy,
             AppEventBus eventBus) {
         this(
                 config,
@@ -93,10 +104,14 @@ public class ServiceRegistry {
                 matchQualityService,
                 profileService,
                 recommendationService,
+                dailyLimitService,
+                dailyPickService,
+                standoutService,
                 undoService,
+                compatibilityCalculator,
+                achievementService,
                 connectionService,
                 validationService,
-                timePolicy,
                 eventBus,
                 new ProfileActivationPolicy(),
                 new RelationshipWorkflowPolicy());
@@ -117,10 +132,14 @@ public class ServiceRegistry {
             MatchQualityService matchQualityService,
             ProfileService profileService,
             RecommendationService recommendationService,
+            DailyLimitService dailyLimitService,
+            DailyPickService dailyPickService,
+            StandoutService standoutService,
             UndoService undoService,
+            CompatibilityCalculator compatibilityCalculator,
+            AchievementService achievementService,
             ConnectionService connectionService,
             ValidationService validationService,
-            TimePolicy timePolicy,
             AppEventBus eventBus,
             ProfileActivationPolicy activationPolicy,
             RelationshipWorkflowPolicy workflowPolicy) {
@@ -137,10 +156,14 @@ public class ServiceRegistry {
         this.matchQualityService = Objects.requireNonNull(matchQualityService);
         this.profileService = Objects.requireNonNull(profileService);
         this.recommendationService = Objects.requireNonNull(recommendationService);
+        this.dailyLimitService = Objects.requireNonNull(dailyLimitService);
+        this.dailyPickService = Objects.requireNonNull(dailyPickService);
+        this.standoutService = Objects.requireNonNull(standoutService);
         this.undoService = Objects.requireNonNull(undoService);
+        this.compatibilityCalculator = Objects.requireNonNull(compatibilityCalculator);
         this.connectionService = Objects.requireNonNull(connectionService);
         this.validationService = Objects.requireNonNull(validationService);
-        this.timePolicy = Objects.requireNonNull(timePolicy);
+        this.achievementService = Objects.requireNonNull(achievementService);
         this.eventBus = Objects.requireNonNull(eventBus);
         this.activationPolicy = Objects.requireNonNull(activationPolicy);
         this.workflowPolicy = Objects.requireNonNull(workflowPolicy);
@@ -160,6 +183,7 @@ public class ServiceRegistry {
                 this.profileService,
                 this.validationService,
                 this.activityMetricsService,
+                this.achievementService,
                 this.config,
                 this.activationPolicy,
                 this.eventBus);
@@ -211,8 +235,24 @@ public class ServiceRegistry {
         return recommendationService;
     }
 
+    public DailyLimitService getDailyLimitService() {
+        return dailyLimitService;
+    }
+
+    public DailyPickService getDailyPickService() {
+        return dailyPickService;
+    }
+
+    public StandoutService getStandoutService() {
+        return standoutService;
+    }
+
     public UndoService getUndoService() {
         return undoService;
+    }
+
+    public CompatibilityCalculator getCompatibilityCalculator() {
+        return compatibilityCalculator;
     }
 
     public TrustSafetyService getTrustSafetyService() {
@@ -231,6 +271,10 @@ public class ServiceRegistry {
         return validationService;
     }
 
+    public AchievementService getAchievementService() {
+        return achievementService;
+    }
+
     public MessagingUseCases getMessagingUseCases() {
         return messagingUseCases;
     }
@@ -245,10 +289,6 @@ public class ServiceRegistry {
 
     public SocialUseCases getSocialUseCases() {
         return socialUseCases;
-    }
-
-    public TimePolicy getTimePolicy() {
-        return timePolicy;
     }
 
     public AppEventBus getEventBus() {

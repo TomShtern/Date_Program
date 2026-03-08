@@ -58,17 +58,9 @@ public class ViewModelFactory {
 
     private Consumer<User> sessionListener;
 
-    // Cached ViewModels (lazy-initialized singletons within UI context)
-    private LoginViewModel loginViewModel;
-    private DashboardViewModel dashboardViewModel;
-    private ProfileViewModel profileViewModel;
-    private MatchingViewModel matchingViewModel;
-    private MatchesViewModel matchesViewModel;
-    private ChatViewModel chatViewModel;
-    private StatsViewModel statsViewModel;
-    private PreferencesViewModel preferencesViewModel;
-    private StandoutsViewModel standoutsViewModel;
-    private SocialViewModel socialViewModel;
+    // Generic cache for ViewModels (lazy-initialized singletons within UI context)
+    private final Map<Class<?>, Object> viewModelCache = new HashMap<>();
+
     private final Map<Class<?>, Supplier<Object>> controllerFactories;
 
     public ViewModelFactory(ServiceRegistry services) {
@@ -144,166 +136,155 @@ public class ViewModelFactory {
 
     // --- ViewModel Accessors (lazy initialization) ---
 
-    public synchronized LoginViewModel getLoginViewModel() {
-        if (loginViewModel == null) {
-            loginViewModel = new LoginViewModel(
-                    createUiUserStore(), services.getConfig(), session, uiDispatcher, services.getActivationPolicy());
-        }
-        return loginViewModel;
+    @SuppressWarnings("unchecked")
+    private synchronized <T> T getViewModel(Class<T> type, Supplier<T> factory) {
+        return (T) viewModelCache.computeIfAbsent(type, k -> factory.get());
     }
 
-    public synchronized DashboardViewModel getDashboardViewModel() {
-        if (dashboardViewModel == null) {
-            dashboardViewModel = new DashboardViewModel(
-                    new DashboardViewModel.Dependencies(
-                            services.getRecommendationService(),
-                            createUiMatchDataAccess(),
-                            services.getProfileService(),
-                            services.getConnectionService(),
-                            services.getProfileService(),
-                            services.getConfig()),
-                    session,
-                    uiDispatcher);
-        }
-        return dashboardViewModel;
+    public LoginViewModel getLoginViewModel() {
+        return getViewModel(
+                LoginViewModel.class,
+                () -> new LoginViewModel(
+                        createUiUserStore(),
+                        services.getConfig(),
+                        session,
+                        uiDispatcher,
+                        services.getActivationPolicy()));
     }
 
-    public synchronized ProfileViewModel getProfileViewModel() {
-        if (profileViewModel == null) {
-            profileViewModel = new ProfileViewModel(
-                    createUiUserStore(),
-                    services.getProfileService(),
-                    services.getProfileUseCases(),
-                    services.getConfig(),
-                    session,
-                    uiDispatcher,
-                    services.getActivationPolicy());
-        }
-        return profileViewModel;
+    public DashboardViewModel getDashboardViewModel() {
+        return getViewModel(
+                DashboardViewModel.class,
+                () -> new DashboardViewModel(
+                        DashboardViewModel.Dependencies.fromServices(services), session, uiDispatcher));
     }
 
-    public synchronized MatchingViewModel getMatchingViewModel() {
-        if (matchingViewModel == null) {
-            matchingViewModel = new MatchingViewModel(
-                    new MatchingViewModel.Dependencies(
-                            services.getCandidateFinder(),
-                            services.getMatchingService(),
-                            services.getUndoService(),
-                            services.getTrustSafetyService(),
-                            services.getMatchingUseCases(),
-                            services.getSocialUseCases(),
-                            createUiProfileNoteDataAccess()),
-                    session,
-                    uiDispatcher);
-        }
-        return matchingViewModel;
+    public ProfileViewModel getProfileViewModel() {
+        return getViewModel(
+                ProfileViewModel.class,
+                () -> new ProfileViewModel(
+                        createUiUserStore(),
+                        services.getProfileService(),
+                        services.getProfileUseCases(),
+                        services.getConfig(),
+                        session,
+                        uiDispatcher,
+                        services.getActivationPolicy()));
     }
 
-    public synchronized MatchesViewModel getMatchesViewModel() {
-        if (matchesViewModel == null) {
-            matchesViewModel = new MatchesViewModel(
-                    new MatchesViewModel.Dependencies(
-                            createUiMatchDataAccess(),
-                            createUiUserStore(),
-                            services.getMatchingService(),
-                            services.getRecommendationService(),
-                            services.getMatchingUseCases(),
-                            services.getSocialUseCases(),
-                            services.getConfig()),
-                    session,
-                    uiDispatcher);
-        }
-        return matchesViewModel;
+    public MatchingViewModel getMatchingViewModel() {
+        return getViewModel(
+                MatchingViewModel.class,
+                () -> new MatchingViewModel(
+                        new MatchingViewModel.Dependencies(
+                                services.getCandidateFinder(),
+                                services.getMatchingService(),
+                                services.getUndoService(),
+                                services.getTrustSafetyService(),
+                                services.getMatchingUseCases(),
+                                services.getSocialUseCases(),
+                                createUiProfileNoteDataAccess()),
+                        session,
+                        uiDispatcher));
     }
 
-    public synchronized ChatViewModel getChatViewModel() {
-        if (chatViewModel == null) {
-            chatViewModel = new ChatViewModel(
-                    services.getConnectionService(),
-                    services.getTrustSafetyService(),
-                    session,
-                    uiDispatcher,
-                    java.time.Duration.ofSeconds(15),
-                    java.time.Duration.ofSeconds(5),
-                    createUiProfileNoteDataAccess());
-        }
-        return chatViewModel;
+    public MatchesViewModel getMatchesViewModel() {
+        return getViewModel(
+                MatchesViewModel.class,
+                () -> new MatchesViewModel(
+                        new MatchesViewModel.Dependencies(
+                                createUiMatchDataAccess(),
+                                createUiUserStore(),
+                                services.getMatchingService(),
+                                services.getRecommendationService(),
+                                services.getMatchingUseCases(),
+                                services.getSocialUseCases(),
+                                services.getConfig()),
+                        session,
+                        uiDispatcher));
     }
 
-    public synchronized StatsViewModel getStatsViewModel() {
-        if (statsViewModel == null) {
-            statsViewModel = new StatsViewModel(
-                    services.getProfileService(),
-                    services.getActivityMetricsService(),
-                    services.getProfileUseCases(),
-                    session,
-                    uiDispatcher);
-        }
-        return statsViewModel;
+    public ChatViewModel getChatViewModel() {
+        return getViewModel(
+                ChatViewModel.class,
+                () -> new ChatViewModel(
+                        services.getConnectionService(),
+                        services.getTrustSafetyService(),
+                        session,
+                        uiDispatcher,
+                        java.time.Duration.ofSeconds(15),
+                        java.time.Duration.ofSeconds(5),
+                        createUiProfileNoteDataAccess()));
     }
 
-    public synchronized PreferencesViewModel getPreferencesViewModel() {
-        if (preferencesViewModel == null) {
-            preferencesViewModel = new PreferencesViewModel(
-                    createUiUserStore(),
-                    services.getProfileUseCases(),
-                    uiPreferencesStore,
-                    services.getConfig(),
-                    session,
-                    uiDispatcher);
-        }
-        return preferencesViewModel;
+    public StatsViewModel getStatsViewModel() {
+        return getViewModel(
+                StatsViewModel.class,
+                () -> new StatsViewModel(
+                        services.getAchievementService(),
+                        services.getActivityMetricsService(),
+                        services.getProfileUseCases(),
+                        session,
+                        uiDispatcher));
     }
 
-    public synchronized StandoutsViewModel getStandoutsViewModel() {
-        if (standoutsViewModel == null) {
-            standoutsViewModel = new StandoutsViewModel(
-                    services.getRecommendationService(), services.getMatchingUseCases(), session, uiDispatcher);
-        }
-        return standoutsViewModel;
+    public PreferencesViewModel getPreferencesViewModel() {
+        return getViewModel(
+                PreferencesViewModel.class,
+                () -> new PreferencesViewModel(
+                        createUiUserStore(),
+                        services.getProfileUseCases(),
+                        uiPreferencesStore,
+                        services.getConfig(),
+                        session,
+                        uiDispatcher));
     }
 
-    public synchronized SocialViewModel getSocialViewModel() {
-        if (socialViewModel == null) {
-            socialViewModel = new SocialViewModel(
-                    services.getConnectionService(),
-                    new StorageUiSocialDataAccess(services.getCommunicationStorage()),
-                    createUiUserStore(),
-                    session,
-                    uiDispatcher);
-        }
-        return socialViewModel;
+    public StandoutsViewModel getStandoutsViewModel() {
+        return getViewModel(
+                StandoutsViewModel.class,
+                () -> new StandoutsViewModel(
+                        services.getRecommendationService(), services.getMatchingUseCases(), session, uiDispatcher));
+    }
+
+    public SocialViewModel getSocialViewModel() {
+        return getViewModel(
+                SocialViewModel.class,
+                () -> new SocialViewModel(
+                        services.getConnectionService(),
+                        new StorageUiSocialDataAccess(services.getCommunicationStorage()),
+                        createUiUserStore(),
+                        session,
+                        uiDispatcher));
     }
 
     /**
      * Resets all cached ViewModels. Useful when logging out.
      * Disposes each ViewModel before clearing to prevent memory leaks (UI-04).
      */
-    private static <T> T quietly(T vm, Consumer<T> disposer) {
-        if (vm != null) {
-            disposer.accept(vm);
-        }
-        return null;
-    }
-
     public synchronized void reset() {
         if (sessionListener != null) {
             session.removeListener(sessionListener);
             sessionListener = null;
         }
 
-        loginViewModel = quietly(loginViewModel, LoginViewModel::dispose);
-        dashboardViewModel = quietly(dashboardViewModel, DashboardViewModel::dispose);
-        profileViewModel = quietly(profileViewModel, ProfileViewModel::dispose);
-        matchingViewModel = quietly(matchingViewModel, MatchingViewModel::dispose);
-        matchesViewModel = quietly(matchesViewModel, MatchesViewModel::dispose);
-        chatViewModel = quietly(chatViewModel, ChatViewModel::dispose);
-        statsViewModel = quietly(statsViewModel, StatsViewModel::dispose);
-        preferencesViewModel = quietly(preferencesViewModel, PreferencesViewModel::dispose);
-        standoutsViewModel = quietly(standoutsViewModel, StandoutsViewModel::dispose);
-        socialViewModel = quietly(socialViewModel, SocialViewModel::dispose);
+        // Dispose all ViewModels that have a dispose() method
+        viewModelCache.values().forEach(vm -> {
+            try {
+                if (vm instanceof BaseViewModel bvm) {
+                    bvm.dispose();
+                } else {
+                    // Fallback for ViewModels not yet migrated to BaseViewModel
+                    vm.getClass().getMethod("dispose").invoke(vm);
+                }
+            } catch (Exception e) {
+                logWarn("Failed to dispose ViewModel: {}", vm.getClass().getSimpleName(), e);
+            }
+        });
+
+        viewModelCache.clear();
         initializeSessionBinding();
-        logDebug("All ViewModels disposed and reset");
+        logDebug("All ViewModels disposed and cache cleared");
     }
 
     private UiUserStore createUiUserStore() {
@@ -327,6 +308,12 @@ public class ViewModelFactory {
     private void logError(String message, Object... args) {
         if (logger.isErrorEnabled()) {
             logger.error(message, args);
+        }
+    }
+
+    private void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
         }
     }
 }

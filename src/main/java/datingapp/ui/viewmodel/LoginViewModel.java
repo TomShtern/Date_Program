@@ -11,10 +11,8 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.ProfileActivationPolicy.ActivationResult;
 import datingapp.core.workflow.WorkflowDecision;
-import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -22,7 +20,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -30,24 +27,19 @@ import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Login screen.
  * Handles user listing, selection, login, and account creation.
  */
-public class LoginViewModel {
-    private static final Logger logger = LoggerFactory.getLogger(LoginViewModel.class);
+public class LoginViewModel extends BaseViewModel {
 
     private final AppConfig config;
     private final AppSession session;
     private final UiUserStore userStore;
     private final ProfileActivationPolicy activationPolicy;
-    private final ViewModelAsyncScope asyncScope;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final ObservableList<User> filteredUsers = FXCollections.observableArrayList();
-    private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loginDisabled = new SimpleBooleanProperty(true);
     private final StringProperty filterText = new SimpleStringProperty("");
 
@@ -56,12 +48,7 @@ public class LoginViewModel {
     private final StringProperty newUserAge = new SimpleStringProperty("");
     private final StringProperty errorMessage = new SimpleStringProperty("");
 
-    private ViewModelErrorSink errorHandler;
-
     private User selectedUser;
-
-    /** Track disposed state to prevent operations after cleanup. */
-    private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public LoginViewModel(UiUserStore userStore, AppConfig config, AppSession session) {
         this(userStore, config, session, new JavaFxUiThreadDispatcher(), new ProfileActivationPolicy());
@@ -78,40 +65,31 @@ public class LoginViewModel {
             AppSession session,
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {
+        super("login", uiDispatcher);
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
-        this.asyncScope = createAsyncScope(uiDispatcher);
+
         this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
         loadUsers();
     }
 
-    /**
-     * Disposes resources held by this ViewModel.
-     * Should be called when the ViewModel is no longer needed.
-     */
-    public void dispose() {
-        disposed.set(true);
-        asyncScope.dispose();
-        users.clear();
-        filteredUsers.clear();
-    }
-
     public void setErrorHandler(ViewModelErrorSink handler) {
-        this.errorHandler = handler;
+        // Intentionally retained for API compatibility with controllers.
+        // LoginViewModel currently reports inline validation through errorMessageProperty().
     }
 
     /**
      * Loads the list of available users from storage.
      */
     private void loadUsers() {
-        if (disposed.get()) {
+        if (isDisposed()) {
             return;
         }
 
         asyncScope.runLatest("login-users", "load users", userStore::findAll, allUsers -> {
-            if (disposed.get()) {
+            if (isDisposed()) {
                 return;
             }
             users.clear();
@@ -134,10 +112,6 @@ public class LoginViewModel {
 
     public ObservableList<User> getFilteredUsers() {
         return filteredUsers;
-    }
-
-    public BooleanProperty loadingProperty() {
-        return loading;
     }
 
     public BooleanProperty loginDisabledProperty() {
@@ -227,21 +201,18 @@ public class LoginViewModel {
         if (user.getBio() == null || user.getBio().isBlank()) {
             user.setBio("New to the app! 👋");
             modified = true;
-            logDebug("Auto-filled bio for user {}", user.getName());
         }
 
         // Photo URL default
         if (user.getPhotoUrls() == null || user.getPhotoUrls().isEmpty()) {
             user.setPhotoUrls(List.of("placeholder://default-avatar"));
             modified = true;
-            logDebug("Auto-filled photo URL for user {}", user.getName());
         }
 
         // Location default (Tel Aviv)
         if (!user.hasLocation()) {
             user.setLocation(32.0853, 34.7818);
             modified = true;
-            logDebug("Auto-filled location for user {}", user.getName());
         }
 
         // Pace preferences default
@@ -253,14 +224,12 @@ public class LoginViewModel {
                     PacePreferences.DepthPreference.DEPENDS_ON_VIBE);
             user.setPacePreferences(pacePrefs);
             modified = true;
-            logDebug("Auto-filled pace preferences for user {}", user.getName());
         }
 
         // Dealbreakers default (none) - marks section as reviewed
         if (user.getDealbreakers() == null) {
             user.setDealbreakers(Dealbreakers.none());
             modified = true;
-            logDebug("Auto-filled dealbreakers (none) for user {}", user.getName());
         }
 
         if (modified) {
@@ -337,8 +306,7 @@ public class LoginViewModel {
                     PacePreferences.DepthPreference.DEPENDS_ON_VIBE);
             newUser.setPacePreferences(pacePrefs);
 
-            // Set default dealbreakers (none) - marks section as reviewed for profile
-            // completion
+            // Set default dealbreakers (none) - marks section as reviewed for profile completion
             newUser.setDealbreakers(Dealbreakers.none());
 
             // Now attempt to activate the user since profile is complete
@@ -365,9 +333,8 @@ public class LoginViewModel {
 
             return newUser;
         } catch (Exception e) {
-            logError("Failed to create user: {}", e.getMessage(), e);
+            logError("Failed to create user: {}", e);
             errorMessage.set("Failed to create user: " + e.getMessage());
-            notifyError("Failed to create user", e);
             return null;
         }
     }
@@ -381,51 +348,10 @@ public class LoginViewModel {
         errorMessage.set("");
     }
 
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logDebug(String message, Object... args) {
-        if (logger.isDebugEnabled()) {
-            logger.debug(message, args);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
-        }
-    }
-
-    private void logError(String message, Object... args) {
-        if (logger.isErrorEnabled()) {
-            logger.error(message, args);
-        }
-    }
-
-    private void notifyError(String userMessage, Exception e) {
-        if (errorHandler == null) {
-            return;
-        }
-        String detail = e.getMessage();
-        String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
-        asyncScope.dispatchToUi(() -> errorHandler.onError(message));
-    }
-
-    private void setLoadingState(boolean isLoading) {
-        if (loading.get() != isLoading) {
-            loading.set(isLoading);
-        }
-    }
-
-    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
-        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
-        ViewModelAsyncScope scope = new ViewModelAsyncScope(
-                "login", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
-        scope.setLoadingStateConsumer(this::setLoadingState);
-        return scope;
+    @Override
+    protected void onDispose() {
+        users.clear();
+        filteredUsers.clear();
     }
 
     private void applyFilter(String text) {
@@ -436,8 +362,6 @@ public class LoginViewModel {
         }
 
         // Pass the injected config's timezone so age calculation is consistent
-        // with the rest of the application and never falls back to
-        // AppConfig.defaults().
         java.time.ZoneId zone = config.safety().userTimeZone();
         List<User> matches = users.stream()
                 .filter(user -> matchesFilter(user, normalized, zone))
@@ -460,11 +384,6 @@ public class LoginViewModel {
 
     /**
      * Builds a lowercase searchable string for the given user.
-     *
-     * @param user the user to index
-     * @param zone the timezone to use for age calculation — must come from the
-     *             injected {@code config} so we never silently fall back to
-     *             {@code AppConfig.defaults()}
      */
     private static String buildSearchable(User user, java.time.ZoneId zone) {
         String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);

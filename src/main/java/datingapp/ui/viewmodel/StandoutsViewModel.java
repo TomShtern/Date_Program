@@ -119,29 +119,39 @@ public class StandoutsViewModel {
         List<StandoutEntry> entries = List.of();
         String message = "";
         try {
-            RecommendationService.Result result;
+            List<Standout> standoutItems;
             Map<UUID, User> resolved;
+            boolean empty;
+            String resultMessage;
             if (matchingUseCases != null) {
                 var useCaseResult = matchingUseCases.standouts(new StandoutsQuery(UserContext.ui(user.getId()), user));
                 if (useCaseResult.success()) {
-                    result = useCaseResult.data().result();
+                    standoutItems = useCaseResult.data().result().standouts();
                     resolved = useCaseResult.data().usersById();
+                    empty = useCaseResult.data().result().isEmpty();
+                    resultMessage = useCaseResult.data().result().message();
                 } else {
-                    result = recommendationService.getStandouts(user);
-                    resolved = recommendationService.resolveUsers(result.standouts());
+                    RecommendationService.Result result = recommendationService.getStandouts(user);
+                    standoutItems = result.standouts();
+                    resolved = recommendationService.resolveUsers(standoutItems);
+                    empty = result.isEmpty();
+                    resultMessage = result.message();
                 }
             } else {
-                result = recommendationService.getStandouts(user);
-                resolved = recommendationService.resolveUsers(result.standouts());
+                RecommendationService.Result result = recommendationService.getStandouts(user);
+                standoutItems = result.standouts();
+                resolved = recommendationService.resolveUsers(standoutItems);
+                empty = result.isEmpty();
+                resultMessage = result.message();
             }
 
-            if (!result.isEmpty()) {
-                entries = result.standouts().stream()
+            if (!empty) {
+                entries = standoutItems.stream()
                         .filter(s -> resolved.containsKey(s.standoutUserId()))
                         .map(s -> new StandoutEntry(s, resolved.get(s.standoutUserId())))
                         .toList();
             } else {
-                message = result.message() != null ? result.message() : "No standouts today. Check back tomorrow!";
+                message = resultMessage != null ? resultMessage : "No standouts today. Check back tomorrow!";
             }
         } catch (Exception e) {
             logWarn("Failed to load standouts", e);

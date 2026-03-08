@@ -3,6 +3,7 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.*;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Report;
@@ -51,7 +52,8 @@ class SafetyHandlerTest {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         TrustSafetyService trustSafetyService =
                 new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, AppConfig.defaults());
-        return new SafetyHandler(userStorage, trustSafetyService, session, inputReader);
+        return new SafetyHandler(
+                userStorage, trustSafetyService, new SocialUseCases(trustSafetyService), session, inputReader);
     }
 
     @SuppressWarnings("unused")

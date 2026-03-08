@@ -9,13 +9,23 @@ import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.CompatibilityCalculator;
+import datingapp.core.matching.DailyLimitService;
+import datingapp.core.matching.DailyPickService;
+import datingapp.core.matching.DefaultCompatibilityCalculator;
+import datingapp.core.matching.DefaultDailyLimitService;
+import datingapp.core.matching.DefaultDailyPickService;
+import datingapp.core.matching.DefaultStandoutService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
+import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
@@ -24,8 +34,6 @@ import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
-import datingapp.core.time.DefaultTimePolicy;
-import datingapp.core.time.TimePolicy;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import datingapp.storage.jdbi.JdbiConnectionStorage;
@@ -76,6 +84,8 @@ public final class StorageFactory {
         Undo.Storage undoStorage = matchmakingStorage.undoStorage();
         Standout.Storage standoutStorage = metricsStorage;
 
+        CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
+
         CandidateFinder candidateFinder = new CandidateFinder(
                 userStorage,
                 interactionStorage,
@@ -83,17 +93,18 @@ public final class StorageFactory {
                 config.safety().userTimeZone());
         ProfileService profileService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
-        RecommendationService recommendationService = RecommendationService.builder()
-                .userStorage(userStorage)
-                .interactionStorage(interactionStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .analyticsStorage(analyticsStorage)
-                .candidateFinder(candidateFinder)
-                .standoutStorage(standoutStorage)
-                .profileService(profileService)
-                .config(config)
-                .clock(java.time.Clock.systemUTC())
-                .build();
+
+        AchievementService achievementService = new DefaultAchievementService(
+                config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
+
+        DailyLimitService dailyLimitService = new DefaultDailyLimitService(interactionStorage, config);
+        DailyPickService dailyPickService =
+                new DefaultDailyPickService(userStorage, interactionStorage, analyticsStorage, candidateFinder, config);
+        StandoutService standoutService = new DefaultStandoutService(
+                compatibilityCalculator, userStorage, candidateFinder, standoutStorage, profileService, config);
+
+        RecommendationService recommendationService =
+                new RecommendationService(dailyLimitService, dailyPickService, standoutService);
         UndoService undoService = new UndoService(interactionStorage, undoStorage, config);
         ActivityMetricsService activityMetricsService =
                 new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
@@ -106,7 +117,9 @@ public final class StorageFactory {
                 .undoService(undoService)
                 .dailyService(recommendationService)
                 .build();
-        MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
+
+        MatchQualityService matchQualityService =
+                new MatchQualityService(userStorage, interactionStorage, config, compatibilityCalculator);
 
         ConnectionService connectionService =
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
@@ -116,10 +129,9 @@ public final class StorageFactory {
 
         ValidationService validationService = new ValidationService(config);
 
-        TimePolicy timePolicy = new DefaultTimePolicy(config.safety().userTimeZone());
         AppEventBus eventBus = new InProcessAppEventBus();
 
-        new AchievementEventHandler(profileService).register(eventBus);
+        new AchievementEventHandler(achievementService).register(eventBus);
         new MetricsEventHandler(activityMetricsService).register(eventBus);
         new NotificationEventHandler(communicationStorage).register(eventBus);
 
@@ -140,10 +152,14 @@ public final class StorageFactory {
                 matchQualityService,
                 profileService,
                 recommendationService,
+                dailyLimitService,
+                dailyPickService,
+                standoutService,
                 undoService,
+                compatibilityCalculator,
+                achievementService,
                 connectionService,
                 validationService,
-                timePolicy,
                 eventBus,
                 activationPolicy,
                 workflowPolicy);

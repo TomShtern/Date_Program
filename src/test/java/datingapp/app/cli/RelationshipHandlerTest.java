@@ -3,6 +3,8 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.matching.MatchingUseCases;
+import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.*;
 import datingapp.core.connection.*;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
@@ -90,24 +92,32 @@ class RelationshipHandlerTest {
                 .config(config)
                 .build();
 
-        MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
+        UndoService undoService = new UndoService(interactionStorage, new TestStorages.Undos(), config);
+        MatchingUseCases matchingUseCases = new MatchingUseCases(
                 candidateFinder,
                 matchingService,
-                interactionStorage,
                 dailyService,
-                new UndoService(interactionStorage, new TestStorages.Undos(), config),
+                undoService,
+                interactionStorage,
+                userStorage,
+                matchQualityService);
+        SocialUseCases socialUseCases = new SocialUseCases(transitionService, trustSafetyService, communicationStorage);
+
+        MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
+                matchingService,
+                dailyService,
+                undoService,
                 matchQualityService,
                 userStorage,
                 profileCompletionService,
                 analyticsStorage,
-                trustSafetyService,
-                transitionService,
                 recService,
-                communicationStorage,
                 config,
                 session,
                 inputReader,
-                null); // profileCompleteCallback is optional (nullable) — not needed in tests
+                null,
+                matchingUseCases,
+                socialUseCases); // profileCompleteCallback is optional (nullable) — not needed in tests
         return new MatchingHandler(deps);
     }
 

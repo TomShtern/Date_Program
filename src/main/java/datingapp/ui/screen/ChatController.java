@@ -1,14 +1,13 @@
 package datingapp.ui.screen;
 
 import datingapp.core.connection.ConnectionModels.Message;
-import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.model.User;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
 import datingapp.ui.UiConstants;
+import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
-import datingapp.ui.UiUtils;
 import datingapp.ui.viewmodel.ChatViewModel;
 import java.net.URL;
 import java.time.ZoneId;
@@ -20,10 +19,6 @@ import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.ChoiceBox;
-import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -366,14 +361,12 @@ public class ChatController extends BaseController implements Initializable {
             return;
         }
         User otherUser = selected.otherUser();
-        boolean confirmed = UiFeedbackService.showConfirmation(
+        UiDialogs.confirmAndExecute(
                 "Block User",
                 "Block " + otherUser.getName() + "?",
-                "Your conversation will end and they cannot contact you.");
-        if (confirmed) {
-            viewModel.blockUser(otherUser.getId());
-            UiFeedbackService.showSuccess(otherUser.getName() + " has been blocked.");
-        }
+                "Your conversation will end and they cannot contact you.",
+                () -> viewModel.blockUser(otherUser.getId()),
+                otherUser.getName() + " has been blocked.");
     }
 
     @SuppressWarnings("unused")
@@ -383,32 +376,9 @@ public class ChatController extends BaseController implements Initializable {
         if (selected == null) {
             return;
         }
-        showReportDialog(selected.otherUser());
-    }
-
-    private void showReportDialog(User otherUser) {
-        Dialog<Report.Reason> dialog = new Dialog<>();
-        dialog.setTitle("Report User");
-        dialog.setHeaderText("Report " + otherUser.getName());
-
-        ChoiceBox<Report.Reason> reasonBox = new ChoiceBox<>();
-        reasonBox.getItems().addAll(Report.Reason.values());
-        reasonBox.setConverter(UiUtils.createEnumStringConverter(r -> r.name().replace('_', ' ')));
-        reasonBox.setValue(Report.Reason.INAPPROPRIATE_CONTENT);
-
-        VBox content = new VBox(10);
-        content.setStyle("-fx-padding: 20;");
-        content.getChildren().addAll(new Label("Select a reason:"), reasonBox);
-        dialog.getDialogPane().setContent(content);
-
-        ButtonType reportBtn = new ButtonType("Report", ButtonBar.ButtonData.OK_DONE);
-        ButtonType cancelBtn = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
-        dialog.getDialogPane().getButtonTypes().addAll(reportBtn, cancelBtn);
-
-        dialog.setResultConverter(
-                bt -> bt == reportBtn ? reasonBox.getValue() : null); // NOPMD CompareObjectsWithEquals
-        dialog.showAndWait().ifPresent(reason -> {
-            viewModel.reportUser(otherUser.getId(), reason, null, true);
+        User otherUser = selected.otherUser();
+        UiDialogs.showReportDialog(otherUser.getName(), (reason, desc) -> {
+            viewModel.reportUser(otherUser.getId(), reason, desc, true);
             UiFeedbackService.showSuccess(otherUser.getName() + " has been reported.");
         });
     }
@@ -433,13 +403,12 @@ public class ChatController extends BaseController implements Initializable {
             return;
         }
         User otherUser = selected.otherUser();
-        if (UiFeedbackService.showConfirmation(
+        UiDialogs.confirmAndExecute(
                 "Request Friend Zone",
                 "Ask " + otherUser.getName() + " to continue as friends?",
-                "They will receive a friend-zone request.")) {
-            viewModel.requestFriendZoneForSelectedConversation();
-            UiFeedbackService.showSuccess("Friend-zone request sent.");
-        }
+                "They will receive a friend-zone request.",
+                viewModel::requestFriendZoneForSelectedConversation,
+                "Friend-zone request sent.");
     }
 
     @SuppressWarnings("unused")
@@ -450,13 +419,12 @@ public class ChatController extends BaseController implements Initializable {
             return;
         }
         User otherUser = selected.otherUser();
-        if (UiFeedbackService.showConfirmation(
+        UiDialogs.confirmAndExecute(
                 "Graceful Exit",
                 "End things kindly with " + otherUser.getName() + "?",
-                "Your conversation will be archived for both of you.")) {
-            viewModel.gracefulExitSelectedConversation();
-            UiFeedbackService.showSuccess("Graceful exit completed.");
-        }
+                "Your conversation will be archived for both of you.",
+                viewModel::gracefulExitSelectedConversation,
+                "Graceful exit completed.");
     }
 
     @SuppressWarnings("unused")
@@ -467,12 +435,11 @@ public class ChatController extends BaseController implements Initializable {
             return;
         }
         User otherUser = selected.otherUser();
-        if (UiFeedbackService.showConfirmation(
+        UiDialogs.confirmAndExecute(
                 "Unmatch",
                 "Unmatch with " + otherUser.getName() + "?",
-                "This removes the relationship and archives the conversation.")) {
-            viewModel.unmatchSelectedConversation();
-            UiFeedbackService.showSuccess(otherUser.getName() + " has been unmatched.");
-        }
+                "This removes the relationship and archives the conversation.",
+                viewModel::unmatchSelectedConversation,
+                otherUser.getName() + " has been unmatched.");
     }
 }

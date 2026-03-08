@@ -62,11 +62,7 @@ class MessagingHandlerTest {
     private MessagingHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         return new MessagingHandler(
-                registry.getConnectionService(),
-                registry.getInteractionStorage(),
-                registry.getTrustSafetyService(),
-                inputReader,
-                session);
+                registry.getMessagingUseCases(), registry.getSocialUseCases(), inputReader, session);
     }
 
     @SuppressWarnings("unused")

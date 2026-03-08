@@ -28,6 +28,7 @@ public class MatchQualityService {
     private final UserStorage userStorage;
     private final InteractionStorage interactionStorage;
     private final AppConfig config;
+    private final CompatibilityCalculator calculator;
 
     // ── Match quality thresholds (inlined from deleted ScoringConstants) ──
     private static final int STAR_EXCELLENT_THRESHOLD = 90;
@@ -42,27 +43,10 @@ public class MatchQualityService {
     private static final int SUMMARY_MAX_LENGTH = 40;
     private static final int SUMMARY_TRUNCATE_LENGTH = 37;
     private static final int HIGHLIGHT_MAX_COUNT = 5;
-    private static final int VERY_CLOSE_DISTANCE_KM = 1;
     private static final int NEARBY_DISTANCE_KM = 5;
     private static final int MID_DISTANCE_KM = 15;
     private static final int AGE_SIMILAR_YEARS = 2;
     private static final int QUICK_MUTUAL_INTEREST_HOURS = 24;
-    private static final double NEUTRAL_SCORE = 0.5;
-    private static final double INTEREST_MISSING_SCORE = 0.3;
-    private static final double PACE_SYNC_PERFECT = 0.95;
-    private static final double PACE_SYNC_GOOD = 0.8;
-    private static final double PACE_SYNC_FAIR = 0.6;
-    private static final double PACE_SYNC_LAG = 0.4;
-    private static final double RESPONSE_SCORE_EXCELLENT = 1.0;
-    private static final double RESPONSE_SCORE_GREAT = 0.9;
-    private static final double RESPONSE_SCORE_GOOD = 0.7;
-    private static final double RESPONSE_SCORE_OK = 0.5;
-    private static final double RESPONSE_SCORE_LOW = 0.3;
-    private static final double RESPONSE_SCORE_VERY_LOW = 0.1;
-    private static final int WILDCARD_SCORE = 20;
-    private static final int PACE_SCORE_EXACT = 25;
-    private static final int PACE_SCORE_CLOSE = 15;
-    private static final int PACE_SCORE_FAR = 5;
 
     /**
      * Immutable record representing the quality/compatibility of a match. Computed
@@ -194,9 +178,18 @@ public class MatchQualityService {
     // === Constructor ===
 
     public MatchQualityService(UserStorage userStorage, InteractionStorage interactionStorage, AppConfig config) {
+        this(userStorage, interactionStorage, config, new DefaultCompatibilityCalculator(config));
+    }
+
+    public MatchQualityService(
+            UserStorage userStorage,
+            InteractionStorage interactionStorage,
+            AppConfig config,
+            CompatibilityCalculator calculator) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.calculator = Objects.requireNonNull(calculator, "calculator cannot be null");
     }
 
     // === Public API ===
@@ -229,28 +222,28 @@ public class MatchQualityService {
             distanceKm = -1;
         }
         double distanceScore =
-                distanceKm >= 0 ? calculateDistanceScore(distanceKm, me.getMaxDistanceKm()) : NEUTRAL_SCORE;
+                distanceKm >= 0 ? calculator.calculateDistanceScore(distanceKm, me.getMaxDistanceKm()) : 0.5; // Neutral
 
         // Age Score
         int ageDiff = Math.abs(me.getAge(config.safety().userTimeZone())
                 - them.getAge(config.safety().userTimeZone()));
-        double ageScore = calculateAgeScore(ageDiff, me, them);
+        double ageScore = calculator.calculateAgeScore(me, them);
 
         // Interest Score
         InterestMatcher.MatchResult interestMatch = InterestMatcher.compare(me.getInterests(), them.getInterests());
-        double interestScore = calculateInterestScore(interestMatch, me, them);
+        double interestScore = calculator.calculateInterestScore(me, them);
         List<String> sharedInterests = InterestMatcher.formatAsList(interestMatch.shared());
 
         // Lifestyle Score
         List<String> lifestyleMatches = findLifestyleMatches(me, them);
-        double lifestyleScore = calculateLifestyleScore(me, them);
+        double lifestyleScore = calculator.calculateLifestyleScore(me, them);
 
         // Response Score
         Duration timeBetweenLikes = calculateTimeBetweenLikes(perspectiveUserId, otherUserId);
-        double responseScore = calculateResponseScore(timeBetweenLikes);
+        double responseScore = calculator.calculateResponseScore(timeBetweenLikes);
 
         // Pace Score (Phase 2)
-        double paceScore = calculatePaceScore(me.getPacePreferences(), them.getPacePreferences());
+        double paceScore = calculator.calculatePaceScore(me.getPacePreferences(), them.getPacePreferences());
         String paceSyncLevel = getPaceSyncLevel(paceScore);
 
         // === Calculate Overall Score ===
@@ -298,42 +291,17 @@ public class MatchQualityService {
 
     // === Score Calculation Methods ===
 
-    private double calculateDistanceScore(double distanceKm, int maxDistanceKm) {
-        if (distanceKm <= VERY_CLOSE_DISTANCE_KM) {
-            return 1.0; // Very close
-        }
-        if (distanceKm >= maxDistanceKm) {
-            return 0.0; // At limit
-        }
-
-        // Linear decay from 1.0 to 0.0
-        return 1.0 - (distanceKm / maxDistanceKm);
-    }
-
-    private double calculateAgeScore(int ageDiff, User me, User them) {
-        return CompatibilityScoring.ageScore(ageDiff, me, them, AGE_SIMILAR_YEARS);
-    }
-
-    private double calculateInterestScore(InterestMatcher.MatchResult match, User me, User them) {
-        return CompatibilityScoring.interestScore(
-                me.getInterests(), them.getInterests(), match.overlapRatio(), NEUTRAL_SCORE, INTEREST_MISSING_SCORE);
-    }
-
-    private double calculateLifestyleScore(User me, User them) {
-        return CompatibilityScoring.lifestyleScore(me, them, NEUTRAL_SCORE);
-    }
-
     private String getPaceSyncLevel(double score) {
-        if (score >= PACE_SYNC_PERFECT) {
+        if (score >= 0.95) { // PACE_SYNC_PERFECT
             return "Perfect Sync";
         }
-        if (score >= PACE_SYNC_GOOD) {
+        if (score >= 0.8) { // PACE_SYNC_GOOD
             return "Good Sync";
         }
-        if (score >= PACE_SYNC_FAIR) {
+        if (score >= 0.6) { // PACE_SYNC_FAIR
             return "Fair Sync";
         }
-        if (score >= PACE_SYNC_LAG) {
+        if (score >= 0.4) { // PACE_SYNC_LAG
             return "Pace Lag";
         }
         return "Mismatched Pace";
@@ -407,35 +375,11 @@ public class MatchQualityService {
         return Duration.between(first, second);
     }
 
-    private double calculateResponseScore(Duration timeBetween) {
-        if (timeBetween == null || timeBetween.isZero()) {
-            return NEUTRAL_SCORE; // Unknown
+    public int calculatePaceCompatibility(PacePreferences first, PacePreferences second) {
+        if (first == null || second == null || !first.isComplete() || !second.isComplete()) {
+            return -1;
         }
-
-        long hours = timeBetween.toHours();
-
-        // Within excellent threshold = excellent
-        if (hours < config.algorithm().responseTimeExcellentHours()) {
-            return RESPONSE_SCORE_EXCELLENT;
-        }
-        // Within great threshold = great
-        if (hours < config.algorithm().responseTimeGreatHours()) {
-            return RESPONSE_SCORE_GREAT;
-        }
-        // Within good threshold = good
-        if (hours < config.algorithm().responseTimeGoodHours()) {
-            return RESPONSE_SCORE_GOOD;
-        }
-        // Within a week = okay
-        if (hours < config.algorithm().responseTimeWeekHours()) {
-            return RESPONSE_SCORE_OK;
-        }
-        // Within a month = low
-        if (hours < config.algorithm().responseTimeMonthHours()) {
-            return RESPONSE_SCORE_LOW;
-        }
-        // Longer = very low
-        return RESPONSE_SCORE_VERY_LOW;
+        return (int) Math.round(calculator.calculatePaceScore(first, second) * 100);
     }
 
     // === Highlight Generation ===
@@ -488,9 +432,9 @@ public class MatchQualityService {
     }
 
     private void addPaceHighlight(List<String> highlights, double paceScore) {
-        if (paceScore >= PACE_SYNC_PERFECT) {
+        if (paceScore >= 0.95) { // PACE_SYNC_PERFECT
             highlights.add("Total Pace Sync! ⚡");
-        } else if (paceScore >= PACE_SYNC_GOOD) {
+        } else if (paceScore >= 0.8) { // PACE_SYNC_GOOD
             highlights.add("Great communication sync");
         }
     }
@@ -505,78 +449,6 @@ public class MatchQualityService {
         if (ageDiff <= AGE_SIMILAR_YEARS) {
             highlights.add("Similar age");
         }
-    }
-
-    // === Pace Compatibility Methods (formerly PaceCompatibilityService) ===
-
-    /**
-     * Calculates a compatibility score (0-100) between two users' pace
-     * MatchPreferences.
-     *
-     * @param a first user's preferences
-     * @param b second user's preferences
-     * @return score from 0 to 100, or -1 if either is null/incomplete
-     */
-    public int calculatePaceCompatibility(PacePreferences a, PacePreferences b) {
-        if (a == null || b == null || !a.isComplete() || !b.isComplete()) {
-            return -1; // Compatibility unknown
-        }
-
-        int score = 0;
-
-        // Dimension 1: Messaging Frequency
-        score += dimensionScore(a.messagingFrequency(), b.messagingFrequency(), false);
-
-        // Dimension 2: Time to First Date
-        score += dimensionScore(a.timeToFirstDate(), b.timeToFirstDate(), false);
-
-        // Dimension 3: Communication Style (Wildcard: MIX_OF_EVERYTHING)
-        boolean commStyleWildcard = isCommunicationStyleWildcard(a.communicationStyle())
-                || isCommunicationStyleWildcard(b.communicationStyle());
-        score += dimensionScore(a.communicationStyle(), b.communicationStyle(), commStyleWildcard);
-
-        // Dimension 4: Depth Preference (Wildcard: DEPENDS_ON_VIBE)
-        boolean depthWildcard =
-                isDepthPreferenceWildcard(a.depthPreference()) || isDepthPreferenceWildcard(b.depthPreference());
-        score += dimensionScore(a.depthPreference(), b.depthPreference(), depthWildcard);
-
-        return score;
-    }
-
-    /**
-     * Calculates a pace compatibility score as a normalized double (0.0-1.0).
-     *
-     * @param a first user's preferences
-     * @param b second user's preferences
-     * @return score from 0.0 to 1.0, or 0.5 (neutral) if unknown
-     */
-    public double calculatePaceScore(PacePreferences a, PacePreferences b) {
-        int comp = calculatePaceCompatibility(a, b);
-        if (comp == -1) {
-            return NEUTRAL_SCORE; // Neutral
-        }
-        return comp / 100.0;
-    }
-
-    private int dimensionScore(Enum<?> a, Enum<?> b, boolean hasWildcard) {
-        if (hasWildcard) {
-            return WILDCARD_SCORE;
-        }
-
-        int distance = Math.abs(a.ordinal() - b.ordinal());
-        return switch (distance) {
-            case 0 -> PACE_SCORE_EXACT; // Perfect match
-            case 1 -> PACE_SCORE_CLOSE; // Close enough
-            default -> PACE_SCORE_FAR; // Quite different
-        };
-    }
-
-    private boolean isCommunicationStyleWildcard(PacePreferences.CommunicationStyle style) {
-        return style == PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING;
-    }
-
-    private boolean isDepthPreferenceWildcard(PacePreferences.DepthPreference preference) {
-        return preference == PacePreferences.DepthPreference.DEPENDS_ON_VIBE;
     }
 
     /** Checks if a pace score is considered low compatibility. */

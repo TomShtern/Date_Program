@@ -2,6 +2,7 @@ package datingapp.ui.screen;
 
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.net.URL;
@@ -257,14 +258,17 @@ public class DashboardController extends BaseController
 
     @FXML
     private void handleLogout() {
-        boolean confirmed = UiFeedbackService.showConfirmation(
-                "Confirm Logout", "Are you sure you want to log out?", "You will need to log in again to continue.");
-        if (confirmed) {
-            logger.info("Logging out");
-            viewModel.logout();
-            NavigationService.getInstance().getViewModelFactory().reset();
-            NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
-        }
+        UiDialogs.confirmAndExecute(
+                "Confirm Logout",
+                "Are you sure you want to log out?",
+                "You will need to log in again to continue.",
+                () -> {
+                    logger.info("Logging out");
+                    viewModel.logout();
+                    NavigationService.getInstance().getViewModelFactory().reset();
+                    NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
+                },
+                null);
     }
 
     @Override

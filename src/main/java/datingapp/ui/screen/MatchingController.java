@@ -1,13 +1,12 @@
 package datingapp.ui.screen;
 
-import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.ui.ImageCache;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
-import datingapp.ui.UiUtils;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
 import java.util.Objects;
@@ -26,7 +25,6 @@ import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
@@ -583,12 +581,12 @@ public class MatchingController extends BaseController implements Initializable 
         if (candidate == null) {
             return;
         }
-        boolean confirmed = UiFeedbackService.showConfirmation(
-                "Block User", "Block " + candidate.getName() + "?", "They will no longer appear in your feed.");
-        if (confirmed) {
-            viewModel.blockCandidate(candidate.getId());
-            UiFeedbackService.showSuccess(candidate.getName() + " has been blocked.");
-        }
+        UiDialogs.confirmAndExecute(
+                "Block User",
+                "Block " + candidate.getName() + "?",
+                "They will no longer appear in your feed.",
+                () -> viewModel.blockCandidate(candidate.getId()),
+                candidate.getName() + " has been blocked.");
     }
 
     @SuppressWarnings("unused")
@@ -598,38 +596,8 @@ public class MatchingController extends BaseController implements Initializable 
         if (candidate == null) {
             return;
         }
-        showReportDialog(candidate);
-    }
-
-    private void showReportDialog(User candidate) {
-        Dialog<Report.Reason> dialog = new Dialog<>();
-        dialog.setTitle("Report User");
-        dialog.setHeaderText("Report " + candidate.getName());
-
-        String themeStylesheet = resolveStylesheet("/css/theme.css");
-        if (themeStylesheet != null) {
-            dialog.getDialogPane().getStylesheets().add(themeStylesheet);
-        }
-        dialog.getDialogPane().getStyleClass().add("dialog-pane");
-
-        ChoiceBox<Report.Reason> reasonBox = new ChoiceBox<>();
-        reasonBox.getItems().addAll(Report.Reason.values());
-        reasonBox.setConverter(UiUtils.createEnumStringConverter(r -> r.name().replace('_', ' ')));
-        reasonBox.setValue(Report.Reason.INAPPROPRIATE_CONTENT);
-
-        VBox content = new VBox(10);
-        content.setStyle("-fx-padding: 20;");
-        content.getChildren().addAll(new Label("Select a reason:"), reasonBox);
-        dialog.getDialogPane().setContent(content);
-
-        ButtonType reportBtn = new ButtonType("Report", ButtonBar.ButtonData.OK_DONE);
-        ButtonType cancelBtn = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
-        dialog.getDialogPane().getButtonTypes().addAll(reportBtn, cancelBtn);
-
-        dialog.setResultConverter(
-                bt -> bt == reportBtn ? reasonBox.getValue() : null); // NOPMD CompareObjectsWithEquals
-        dialog.showAndWait().ifPresent(reason -> {
-            viewModel.reportCandidate(candidate.getId(), reason, null, true);
+        UiDialogs.showReportDialog(candidate, (reason, desc) -> {
+            viewModel.reportCandidate(candidate.getId(), reason, desc, true);
             UiFeedbackService.showSuccess(candidate.getName() + " has been reported.");
         });
     }

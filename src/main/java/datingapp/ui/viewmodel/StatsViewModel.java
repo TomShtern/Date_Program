@@ -5,12 +5,12 @@ import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.core.AppSession;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.User;
-import datingapp.core.profile.ProfileService;
 import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 public class StatsViewModel {
     private static final Logger logger = LoggerFactory.getLogger(StatsViewModel.class);
 
-    private final ProfileService achievementService;
+    private final AchievementService achievementService;
     private final ActivityMetricsService statsService;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
@@ -60,12 +60,13 @@ public class StatsViewModel {
         this.errorHandler.set(handler);
     }
 
-    public StatsViewModel(ProfileService achievementService, ActivityMetricsService statsService, AppSession session) {
+    public StatsViewModel(
+            AchievementService achievementService, ActivityMetricsService statsService, AppSession session) {
         this(achievementService, statsService, null, session, new JavaFxUiThreadDispatcher());
     }
 
     public StatsViewModel(
-            ProfileService achievementService,
+            AchievementService achievementService,
             ActivityMetricsService statsService,
             ProfileUseCases profileUseCases,
             AppSession session) {
@@ -73,7 +74,7 @@ public class StatsViewModel {
     }
 
     public StatsViewModel(
-            ProfileService achievementService,
+            AchievementService achievementService,
             ActivityMetricsService statsService,
             ProfileUseCases profileUseCases,
             AppSession session,

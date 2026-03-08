@@ -80,8 +80,17 @@ class ChatControllerTest {
                     try {
                         return JavaFxTestSupport.callOnFxAndWait(chatContainer::isVisible)
                                 && !JavaFxTestSupport.callOnFxAndWait(emptyStateContainer::isVisible)
-                                && "Known chat note".equals(JavaFxTestSupport.callOnFxAndWait(profileNoteArea::getText))
                                 && !JavaFxTestSupport.callOnFxAndWait(friendZoneButton::isDisabled);
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return "Known chat note".equals(JavaFxTestSupport.callOnFxAndWait(profileNoteArea::getText));
                     } catch (InterruptedException e) {
                         throw new IllegalStateException(e);
                     }

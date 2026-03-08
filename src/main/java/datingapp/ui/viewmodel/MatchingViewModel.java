@@ -21,10 +21,8 @@ import datingapp.core.model.Match;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
-import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import java.util.ArrayList;
@@ -42,16 +40,13 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Matching screen.
  * Handles the logic for browsing candidates, liking/passing, undoing swipes,
  * and detecting matches.
  */
-public class MatchingViewModel {
-    private static final Logger logger = LoggerFactory.getLogger(MatchingViewModel.class);
+public class MatchingViewModel extends BaseViewModel {
 
     private final CandidateFinder candidateFinder;
     private final UndoService undoService;
@@ -59,12 +54,10 @@ public class MatchingViewModel {
     private final SocialUseCases socialUseCases;
     private final UiProfileNoteDataAccess noteDataAccess;
     private final AppSession session;
-    private final ViewModelAsyncScope asyncScope;
 
     private final Queue<User> candidateQueue = new ConcurrentLinkedQueue<>();
     private final ObjectProperty<User> currentCandidate = new SimpleObjectProperty<>();
     private final BooleanProperty hasMoreCandidates = new SimpleBooleanProperty(false);
-    private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty locationMissing = new SimpleBooleanProperty(false);
     private final StringProperty infoMessage = new SimpleStringProperty();
 
@@ -140,6 +133,7 @@ public class MatchingViewModel {
     }
 
     public MatchingViewModel(Dependencies dependencies, AppSession session, UiThreadDispatcher uiDispatcher) {
+        super("matching", uiDispatcher);
         Dependencies resolvedDependencies = Objects.requireNonNull(dependencies, "dependencies cannot be null");
         this.candidateFinder = resolvedDependencies.candidateFinder();
         this.undoService = resolvedDependencies.undoService();
@@ -147,7 +141,6 @@ public class MatchingViewModel {
         this.socialUseCases = resolvedDependencies.socialUseCases();
         this.noteDataAccess = resolvedDependencies.noteDataAccess();
         this.session = Objects.requireNonNull(session, "session cannot be null");
-        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
     /**
@@ -181,19 +174,10 @@ public class MatchingViewModel {
     }
 
     /**
-     * Disposes resources held by this ViewModel.
-     * Should be called when the ViewModel is no longer needed.
-     */
-    public void dispose() {
-        asyncScope.dispose();
-        setLoadingState(false);
-    }
-
-    /**
      * Fetches a new list of candidates for the current user.
      */
     public void refreshCandidates() {
-        if (asyncScope.isDisposed()) {
+        if (isDisposed()) {
             return;
         }
         User user = ensureCurrentUser();
@@ -563,10 +547,6 @@ public class MatchingViewModel {
         return hasMoreCandidates;
     }
 
-    public BooleanProperty loadingProperty() {
-        return loading;
-    }
-
     public BooleanProperty locationMissingProperty() {
         return locationMissing;
     }
@@ -668,36 +648,11 @@ public class MatchingViewModel {
         infoMessage.set(null);
     }
 
-    private void logDebug(String message, Object... args) {
-        if (logger.isDebugEnabled()) {
-            logger.debug(message, args);
-        }
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
-        }
-    }
-
-    private void setLoadingState(boolean isLoading) {
-        if (loading.get() != isLoading) {
-            loading.set(isLoading);
-        }
-    }
-
-    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
-        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
-        ViewModelAsyncScope scope =
-                new ViewModelAsyncScope("matching", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> null));
-        scope.setLoadingStateConsumer(this::setLoadingState);
-        return scope;
+    @Override
+    protected void onDispose() {
+        candidateQueue.clear();
+        matchedUser.set(null);
+        lastMatch.set(null);
     }
 
     private record RefreshResult(

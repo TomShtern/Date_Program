@@ -1,7 +1,7 @@
 package datingapp.core.profile;
 
 import datingapp.core.AppConfig;
-import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
@@ -11,7 +11,6 @@ import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,9 +27,8 @@ public final class ProfileService {
     private final TrustSafetyStorage trustSafetyStorage;
     private final UserStorage userStorage;
 
-    // ── Profile completion thresholds (inlined from deleted ScoringConstants) ──
+    // ── Profile completion thresholds ──
     private static final int BIO_TIP_MIN_LENGTH = 50;
-    private static final int BIO_TIP_BOOST_LENGTH = 100;
     private static final int PHOTO_TIP_MIN_COUNT = 2;
     private static final int LIFESTYLE_FIELDS_MIN = 3;
     private static final int DISTANCE_TIP_MAX_KM = 10;
@@ -44,15 +42,12 @@ public final class ProfileService {
     private static final int BASIC_PHOTO_POINTS = 10;
     private static final int INTERESTS_TOTAL_POINTS = 20;
     private static final int INTERESTS_FULL_COUNT = 5;
-    private static final int INTERESTS_PARTIAL_HIGH_COUNT = 3;
-    private static final int INTERESTS_PARTIAL_HIGH_POINTS = 15;
-    private static final int INTERESTS_PARTIAL_LOW_POINTS = 10;
     private static final int LIFESTYLE_FIELD_POINTS = 5;
     private static final int PREFERENCES_FIELD_POINTS = 5;
     private static final int TIER_DIAMOND_THRESHOLD = 95;
     private static final int TIER_GOLD_THRESHOLD = 85;
     private static final int TIER_SILVER_THRESHOLD = 70;
-    private static final int TIER_BRONZE_THRESHOLD = 50;
+    private static final int TIER_BRONZE_THRESHOLD = 40;
     private static final String TIER_DIAMOND = "Diamond";
     private static final String TIER_GOLD = "Gold";
     private static final String TIER_SILVER = "Silver";
@@ -63,8 +58,8 @@ public final class ProfileService {
     private static final String TIER_SILVER_EMOJI = "🥈";
     private static final String TIER_BRONZE_EMOJI = "🥉";
     private static final String TIER_STARTER_EMOJI = "🌱";
+    private static final String FIELD_LOCATION = "Location";
 
-    /** Canonical constructor — all dependencies are required. */
     public ProfileService(
             AppConfig config,
             AnalyticsStorage analyticsStorage,
@@ -95,11 +90,6 @@ public final class ProfileService {
         return userStorage.findByIds(userIds);
     }
 
-    // ========================================================================
-    // Records
-    // ========================================================================
-
-    /** Result of detailed completion analysis with category breakdowns. */
     public static record CompletionResult(
             int score,
             String tier,
@@ -107,20 +97,16 @@ public final class ProfileService {
             int totalFields,
             List<CategoryBreakdown> breakdown,
             List<String> nextSteps) {
-
         public CompletionResult {
             if (score < 0 || score > 100) {
                 throw new IllegalArgumentException("score must be 0-100, got: " + score);
-            }
-            if (filledFields < 0 || totalFields < 0) {
-                throw new IllegalArgumentException("field counts must be non-negative");
             }
             Objects.requireNonNull(tier, "tier cannot be null");
             breakdown = breakdown != null ? List.copyOf(breakdown) : List.of();
             nextSteps = nextSteps != null ? List.copyOf(nextSteps) : List.of();
         }
 
-        public int getPercentage() {
+        public int percentage() {
             return score;
         }
 
@@ -137,46 +123,49 @@ public final class ProfileService {
         }
     }
 
-    /** Breakdown of completion by category. */
+    public static record AchievementProgress(Achievement achievement, int current, int target, boolean unlocked) {
+        public int getProgressPercent() {
+            if (unlocked || target <= 0) {
+                return 100;
+            }
+            return Math.min(100, current * 100 / target);
+        }
+
+        public String getProgressDisplay() {
+            if (unlocked) {
+                return "✓ Unlocked";
+            }
+            int displayCurrent = Math.min(current, target);
+            return displayCurrent + "/" + target;
+        }
+    }
+
     public static record CategoryBreakdown(
             String category, int score, List<String> filledItems, List<String> missingItems) {
-
         public CategoryBreakdown {
             Objects.requireNonNull(category, "category cannot be null");
-            if (score < 0 || score > 100) {
-                throw new IllegalArgumentException("score must be 0-100, got: " + score);
-            }
             filledItems = filledItems != null ? List.copyOf(filledItems) : List.of();
             missingItems = missingItems != null ? List.copyOf(missingItems) : List.of();
         }
     }
 
-    /** Result of simple profile completeness calculation. */
     public static record ProfileCompleteness(int percentage, List<String> filledFields, List<String> missingFields) {
-
         public ProfileCompleteness {
-            if (percentage < 0 || percentage > 100) {
-                throw new IllegalArgumentException("percentage must be 0-100, got: " + percentage);
-            }
             filledFields = filledFields != null ? List.copyOf(filledFields) : List.of();
             missingFields = missingFields != null ? List.copyOf(missingFields) : List.of();
         }
     }
 
-    /** Full profile preview result. */
     public static record ProfilePreview(
             User user,
             ProfileCompleteness completeness,
             List<String> improvementTips,
             String displayBio,
             String displayLookingFor) {
-
         public ProfilePreview {
             Objects.requireNonNull(user);
             Objects.requireNonNull(completeness);
             improvementTips = improvementTips != null ? List.copyOf(improvementTips) : List.of();
-            displayBio = displayBio != null ? displayBio.trim() : null;
-            displayLookingFor = displayLookingFor != null ? displayLookingFor.trim() : null;
         }
     }
 
@@ -205,10 +194,7 @@ public final class ProfileService {
                     u -> u.getBio() != null && !u.getBio().isBlank(),
                     "📝 Add a bio to tell others about yourself"),
             new FieldCheck(
-                    "Birth date",
-                    BASIC_BIRTHDATE_POINTS,
-                    u -> u.getBirthDate() != null,
-                    "📅 Add your birth date to complete your profile"),
+                    "Birth date", BASIC_BIRTHDATE_POINTS, u -> u.getBirthDate() != null, "📅 Add your birth date"),
             new FieldCheck("Gender", BASIC_GENDER_POINTS, u -> u.getGender() != null),
             new FieldCheck(
                     "Interested in",
@@ -218,7 +204,7 @@ public final class ProfileService {
                     "Photo",
                     BASIC_PHOTO_POINTS,
                     u -> u.getPhotoUrls() != null && !u.getPhotoUrls().isEmpty(),
-                    "📸 Add a photo - profiles with photos get 10x more matches!"));
+                    "📸 Add a photo"));
 
     private static final List<FieldCheck> LIFESTYLE_FIELDS = List.of(
             new FieldCheck("Height", LIFESTYLE_FIELD_POINTS, u -> u.getHeightCm() != null),
@@ -227,16 +213,7 @@ public final class ProfileService {
             new FieldCheck("Kids preference", LIFESTYLE_FIELD_POINTS, u -> u.getWantsKids() != null),
             new FieldCheck("Looking for", LIFESTYLE_FIELD_POINTS, u -> u.getLookingFor() != null));
 
-    // ========================================================================
-    // Detailed completion analysis (category-based scoring)
-    // ========================================================================
-
-    /**
-     * Calculate the detailed completion result for a user with category breakdowns.
-     */
     public CompletionResult calculate(User user) {
-        Objects.requireNonNull(user, "user cannot be null");
-
         CategoryResult basic = scoreBasicInfo(user);
         CategoryResult interests = scoreInterests(user);
         CategoryResult lifestyle = scoreLifestyle(user);
@@ -267,14 +244,7 @@ public final class ProfileService {
         return new CompletionResult(finalScore, tier, filledCount, totalCount, breakdown, nextSteps);
     }
 
-    // ========================================================================
-    // Simple completeness + preview
-    // ========================================================================
-
-    /** Generate a complete profile preview for a user. */
     public ProfilePreview generatePreview(User user) {
-        Objects.requireNonNull(user, "user cannot be null");
-
         ProfileCompleteness completeness = calculateCompleteness(user);
         List<String> tips = generateTips(user);
         String displayBio = user.getBio() != null ? user.getBio() : "(no bio)";
@@ -284,14 +254,12 @@ public final class ProfileService {
         return new ProfilePreview(user, completeness, tips, displayBio, displayLookingFor);
     }
 
-    /** Calculate how complete a user's profile is (simple field-based check). */
     public ProfileCompleteness calculateCompleteness(User user) {
         List<String> filled = new ArrayList<>();
         List<String> missing = new ArrayList<>();
         List<String> photoUrls = user.getPhotoUrls() != null ? user.getPhotoUrls() : List.of();
         Set<Interest> interests = user.getInterests() != null ? user.getInterests() : Set.of();
 
-        // Required fields (core profile)
         checkField("Name", user.getName() != null && !user.getName().isBlank(), filled, missing);
         checkField("Bio", user.getBio() != null && !user.getBio().isBlank(), filled, missing);
         checkField("Birth Date", user.getBirthDate() != null, filled, missing);
@@ -301,10 +269,9 @@ public final class ProfileService {
                 user.getInterestedIn() != null && !user.getInterestedIn().isEmpty(),
                 filled,
                 missing);
-        checkField("Location", user.getLat() != 0.0 || user.getLon() != 0.0, filled, missing);
+        checkField(FIELD_LOCATION, user.getLat() != 0.0 || user.getLon() != 0.0, filled, missing);
         checkField("Photo", !photoUrls.isEmpty(), filled, missing);
 
-        // Lifestyle fields (optional but encouraged)
         checkField("Height", user.getHeightCm() != null, filled, missing);
         checkField("Smoking", user.getSmoking() != null, filled, missing);
         checkField("Drinking", user.getDrinking() != null, filled, missing);
@@ -318,62 +285,55 @@ public final class ProfileService {
         return new ProfileCompleteness(percentage, filled, missing);
     }
 
-    /** Generate improvement tips based on profile state. */
     public List<String> generateTips(User user) {
         List<String> tips = new ArrayList<>();
         List<String> photoUrls = user.getPhotoUrls() != null ? user.getPhotoUrls() : List.of();
         Set<Interest> interests = user.getInterests() != null ? user.getInterests() : Set.of();
 
-        // Bio tips
         if (user.getBio() == null || user.getBio().isBlank()) {
             tips.add("📝 Add a bio to tell others about yourself");
         } else if (user.getBio().length() < BIO_TIP_MIN_LENGTH) {
-            tips.add("💡 Expand your bio - profiles with " + BIO_TIP_BOOST_LENGTH + "+ chars get 2x more likes");
+            tips.add("💡 Expand your bio");
         }
 
-        // Photo tips
         if (photoUrls.isEmpty()) {
-            tips.add("📸 Add a photo - it's required for browsing");
+            tips.add("📸 Add a photo");
         } else if (photoUrls.size() < PHOTO_TIP_MIN_COUNT) {
-            tips.add("📸 Add a second photo - users with 2 photos get 40% more matches");
+            tips.add("📸 Add a second photo");
         }
 
-        // Lifestyle tips
         if (user.getLookingFor() == null) {
-            tips.add("💝 Share what you're looking for - helps find compatible matches");
+            tips.add("💝 Share what you're looking for");
         }
         if (user.getHeightCm() == null) {
-            tips.add("📏 Add your height - many users filter by height");
+            tips.add("📏 Add your height");
         }
         if (countLifestyleFields(user) < LIFESTYLE_FIELDS_MIN) {
-            tips.add("🧘 Complete more lifestyle fields for better match quality");
+            tips.add("🧘 Complete more lifestyle fields");
         }
 
-        // Distance tips
         if (user.getMaxDistanceKm() < DISTANCE_TIP_MAX_KM) {
-            tips.add("📍 Consider expanding your distance for more options");
+            tips.add("📍 Expand your distance");
         }
 
-        // Age range tips
         if (user.getMaxAge() - user.getMinAge() < AGE_RANGE_TIP_MIN_YEARS) {
-            tips.add("🎂 A wider age range gives you more potential matches");
+            tips.add("🎂 Use a wider age range");
         }
 
-        // Interest tips
-        int interestCount = interests.size();
-        if (interestCount == 0) {
-            tips.add("🎯 Add at least "
-                    + Interest.MIN_FOR_COMPLETE
-                    + " interests - profiles with shared interests get more matches");
-        } else if (interestCount < Interest.MIN_FOR_COMPLETE) {
-            int needed = Interest.MIN_FOR_COMPLETE - interestCount;
-            tips.add("🎯 Add " + needed + " more interest(s) to complete your profile");
-        }
+        appendInterestTips(tips, interests);
 
         return tips;
     }
 
-    /** Count how many lifestyle fields the user has set. */
+    private static void appendInterestTips(List<String> tips, Set<Interest> interests) {
+        if (interests.isEmpty()) {
+            tips.add("🎯 Add at least " + Interest.MIN_FOR_COMPLETE + " interests");
+        } else if (interests.size() < Interest.MIN_FOR_COMPLETE) {
+            int remaining = Interest.MIN_FOR_COMPLETE - interests.size();
+            tips.add("🎯 Add " + remaining + " more interest" + (remaining == 1 ? "" : "s"));
+        }
+    }
+
     public int countLifestyleFields(User user) {
         int count = 0;
         if (user.getSmoking() != null) {
@@ -393,14 +353,6 @@ public final class ProfileService {
         }
         return count;
     }
-
-    // ========================================================================
-    // Progress bars
-    // ========================================================================
-
-    // ========================================================================
-    // Private helpers
-    // ========================================================================
 
     private CategoryResult scoreCategory(String name, List<FieldCheck> fields, User user) {
         int totalPoints = 0;
@@ -423,9 +375,13 @@ public final class ProfileService {
         }
 
         int score = filled.isEmpty() ? 0 : filled.size() * 100 / (filled.size() + missing.size());
-        CategoryBreakdown breakdown = new CategoryBreakdown(name, score, filled, missing);
         return new CategoryResult(
-                earnedPoints, totalPoints, filled.size(), filled.size() + missing.size(), breakdown, nextSteps);
+                earnedPoints,
+                totalPoints,
+                filled.size(),
+                filled.size() + missing.size(),
+                new CategoryBreakdown(name, score, filled, missing),
+                nextSteps);
     }
 
     private CategoryResult scoreBasicInfo(User user) {
@@ -433,104 +389,54 @@ public final class ProfileService {
     }
 
     private CategoryResult scoreInterests(User user) {
-        int totalPoints = INTERESTS_TOTAL_POINTS;
-        int earnedPoints = 0;
-        List<String> interestsFilled = new ArrayList<>();
-        List<String> interestsMissing = new ArrayList<>();
-        List<String> nextSteps = new ArrayList<>();
-
         int interestCount = user.getInterests() != null ? user.getInterests().size() : 0;
-        if (interestCount >= INTERESTS_FULL_COUNT) {
-            earnedPoints += INTERESTS_TOTAL_POINTS;
-            interestsFilled.add(INTERESTS_FULL_COUNT + "+ interests selected");
-        } else if (interestCount >= INTERESTS_PARTIAL_HIGH_COUNT) {
-            earnedPoints += INTERESTS_PARTIAL_HIGH_POINTS;
-            interestsFilled.add(interestCount + " interests selected");
-            interestsMissing.add("Add " + (INTERESTS_FULL_COUNT - interestCount) + " more interests for full score");
-            nextSteps.add("🎯 Add more interests to improve match quality");
-        } else if (interestCount >= 1) {
-            earnedPoints += INTERESTS_PARTIAL_LOW_POINTS;
-            interestsFilled.add(interestCount + " interest(s) selected");
-            interestsMissing.add("Add " + (INTERESTS_FULL_COUNT - interestCount) + " more interests for full score");
-            nextSteps.add("🎯 Add more interests to improve match quality");
-        } else {
-            interestsMissing.add("No interests selected");
-            nextSteps.add("🎯 Add your interests to find compatible matches");
-        }
+        int earnedPoints =
+                Math.min(INTERESTS_TOTAL_POINTS, interestCount * (INTERESTS_TOTAL_POINTS / INTERESTS_FULL_COUNT));
+        int score = Math.min(100, interestCount * 100 / INTERESTS_FULL_COUNT);
 
-        int interestsScore =
-                (interestCount >= INTERESTS_FULL_COUNT) ? 100 : (interestCount * 100 / INTERESTS_FULL_COUNT);
-        CategoryBreakdown breakdown =
-                new CategoryBreakdown("Interests", interestsScore, interestsFilled, interestsMissing);
-
-        int filledCount = interestCount > 0 ? 1 : 0;
-        return new CategoryResult(earnedPoints, totalPoints, filledCount, 1, breakdown, nextSteps);
-    }
-
-    private CategoryResult scoreLifestyle(User user) {
-        CategoryResult result = scoreCategory("Lifestyle", LIFESTYLE_FIELDS, user);
-        // Lifestyle adds a single "complete the section" tip when any field is missing,
-        // rather than per-field tips — append it if missing items exist.
-        if (!result.breakdown().missingItems().isEmpty()) {
-            List<String> steps = new ArrayList<>(result.nextSteps());
-            steps.add("💫 Complete your lifestyle section for better matches");
-            return new CategoryResult(
-                    result.earnedPoints(),
-                    result.totalPoints(),
-                    result.filledCount(),
-                    result.totalCount(),
-                    result.breakdown(),
-                    steps);
-        }
-        return result;
-    }
-
-    private CategoryResult scorePreferences(User user) {
-        int totalPoints = 0;
-        int earnedPoints = 0;
-        List<String> prefsFilled = new ArrayList<>();
-        List<String> prefsMissing = new ArrayList<>();
-
-        totalPoints += PREFERENCES_FIELD_POINTS;
-        if (user.getLat() != 0.0 || user.getLon() != 0.0) {
-            earnedPoints += PREFERENCES_FIELD_POINTS;
-            prefsFilled.add("Location");
-        } else {
-            prefsMissing.add("Location");
-        }
-
-        totalPoints += PREFERENCES_FIELD_POINTS;
-        if (user.getMinAge() >= config.validation().minAge()
-                && user.getMaxAge() <= config.validation().maxAge()
-                && user.getMinAge() <= user.getMaxAge()) {
-            earnedPoints += PREFERENCES_FIELD_POINTS;
-            prefsFilled.add("Age preferences");
-        } else {
-            prefsMissing.add("Age preferences (invalid range)");
-        }
-
-        totalPoints += PREFERENCES_FIELD_POINTS;
-        if (user.getDealbreakers() != null) {
-            earnedPoints += PREFERENCES_FIELD_POINTS;
-            if (user.getDealbreakers().hasAnyDealbreaker()) {
-                prefsFilled.add("Dealbreakers configured");
-            } else {
-                prefsFilled.add("Dealbreakers reviewed (none set)");
-            }
-        } else {
-            prefsMissing.add("Review dealbreakers");
-        }
-
-        int prefsScore =
-                prefsFilled.isEmpty() ? 0 : prefsFilled.size() * 100 / (prefsFilled.size() + prefsMissing.size());
-        CategoryBreakdown breakdown = new CategoryBreakdown("Preferences", prefsScore, prefsFilled, prefsMissing);
+        List<String> filled = interestCount > 0 ? List.of(interestCount + " interests") : List.of();
+        List<String> missing = interestCount < INTERESTS_FULL_COUNT ? List.of("More interests") : List.of();
+        List<String> steps = interestCount < INTERESTS_FULL_COUNT ? List.of("🎯 Add more interests") : List.of();
 
         return new CategoryResult(
                 earnedPoints,
-                totalPoints,
-                prefsFilled.size(),
-                prefsFilled.size() + prefsMissing.size(),
-                breakdown,
+                INTERESTS_TOTAL_POINTS,
+                interestCount > 0 ? 1 : 0,
+                1,
+                new CategoryBreakdown("Interests", score, filled, missing),
+                steps);
+    }
+
+    private CategoryResult scoreLifestyle(User user) {
+        return scoreCategory("Lifestyle", LIFESTYLE_FIELDS, user);
+    }
+
+    private CategoryResult scorePreferences(User user) {
+        int earnedPoints = 0;
+        List<String> filled = new ArrayList<>();
+        List<String> missing = new ArrayList<>();
+
+        if (user.getLat() != 0.0) {
+            earnedPoints += PREFERENCES_FIELD_POINTS;
+            filled.add(FIELD_LOCATION);
+        } else {
+            missing.add(FIELD_LOCATION);
+        }
+
+        if (user.getMinAge() > 0) {
+            earnedPoints += PREFERENCES_FIELD_POINTS;
+            filled.add("Age");
+        } else {
+            missing.add("Age");
+        }
+
+        int score = filled.isEmpty() ? 0 : filled.size() * 100 / (filled.size() + missing.size());
+        return new CategoryResult(
+                earnedPoints,
+                PREFERENCES_FIELD_POINTS * 2,
+                filled.size(),
+                2,
+                new CategoryBreakdown("Preferences", score, filled, missing),
                 List.of());
     }
 
@@ -583,190 +489,35 @@ public final class ProfileService {
         }
     }
 
-    // ========================================================================
-    // Achievement tracking
-    // ========================================================================
-
-    /** Progress towards an achievement. */
-    public static record AchievementProgress(Achievement achievement, int current, int target, boolean unlocked) {
-
-        public AchievementProgress {
-            Objects.requireNonNull(achievement, "achievement cannot be null");
-            if (current < 0 || target <= 0) {
-                throw new IllegalArgumentException("current and target must be positive");
-            }
-            if (unlocked && current < target) {
-                throw new IllegalArgumentException("unlocked achievements must meet target");
-            }
-        }
-
-        public int getProgressPercent() {
-            if (unlocked || target == 0) {
-                return 100;
-            }
-            return Math.min(100, current * 100 / target);
-        }
-
-        public String getProgressDisplay() {
-            if (unlocked) {
-                return "✓ Unlocked";
-            }
-            int displayCurrent = Math.min(current, target);
-            return displayCurrent + "/" + target;
-        }
-    }
-
-    /** Check all achievements for a user and unlock any newly earned ones. */
     public List<UserAchievement> checkAndUnlock(UUID userId) {
-        List<UserAchievement> newlyUnlocked = new ArrayList<>();
-        User user = userStorage.get(userId).orElse(null);
-        if (user == null) {
-            return newlyUnlocked;
-        }
-
-        for (Achievement achievement : Achievement.values()) {
-            if (!analyticsStorage.hasAchievement(userId, achievement) && isEarned(userId, user, achievement)) {
-                UserAchievement unlocked = UserAchievement.create(userId, achievement);
-                analyticsStorage.saveUserAchievement(unlocked);
-                newlyUnlocked.add(unlocked);
-            }
-        }
-
-        return newlyUnlocked;
+        return legacyAchievementService().checkAndUnlock(userId);
     }
 
-    /** Get all unlocked achievements for a user. */
     public List<UserAchievement> getUnlocked(UUID userId) {
-        return analyticsStorage.getUnlockedAchievements(userId);
+        return legacyAchievementService().getUnlocked(userId);
     }
 
-    /** Get progress for all achievements (both locked and unlocked). */
     public List<AchievementProgress> getProgress(UUID userId) {
-        List<AchievementProgress> progress = new ArrayList<>();
-        User user = userStorage.get(userId).orElse(null);
-        if (user == null) {
-            return progress;
-        }
-
-        for (Achievement achievement : Achievement.values()) {
-            boolean unlocked = analyticsStorage.hasAchievement(userId, achievement);
-            int[] currentAndTarget = getProgressValues(userId, user, achievement);
-            progress.add(new AchievementProgress(achievement, currentAndTarget[0], currentAndTarget[1], unlocked));
-        }
-
-        return progress;
+        return legacyAchievementService().getProgress(userId).stream()
+                .map(progress -> new AchievementProgress(
+                        progress.achievement(), progress.current(), progress.target(), progress.unlocked()))
+                .toList();
     }
 
-    /** Get progress grouped by category. */
     public Map<Achievement.Category, List<AchievementProgress>> getProgressByCategory(UUID userId) {
-        List<AchievementProgress> allProgress = getProgress(userId);
-        Map<Achievement.Category, List<AchievementProgress>> grouped = new EnumMap<>(Achievement.Category.class);
-
-        for (Achievement.Category category : Achievement.Category.values()) {
-            grouped.put(category, new ArrayList<>());
-        }
-
-        for (AchievementProgress progress : allProgress) {
-            grouped.get(progress.achievement().getCategory()).add(progress);
-        }
-
-        return grouped;
+        return legacyAchievementService().getProgressByCategory(userId).entrySet().stream()
+                .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().stream()
+                        .map(progress -> new AchievementProgress(
+                                progress.achievement(), progress.current(), progress.target(), progress.unlocked()))
+                        .toList()));
     }
 
-    /** Count total unlocked achievements. */
     public int countUnlocked(UUID userId) {
-        return analyticsStorage.countUnlockedAchievements(userId);
+        return legacyAchievementService().countUnlocked(userId);
     }
 
-    private boolean isEarned(UUID userId, User user, Achievement achievement) {
-        return switch (achievement) {
-            case FIRST_SPARK -> getMatchCount(userId) >= config.safety().achievementMatchTier1();
-            case SOCIAL_BUTTERFLY -> getMatchCount(userId) >= config.safety().achievementMatchTier2();
-            case POPULAR -> getMatchCount(userId) >= config.safety().achievementMatchTier3();
-            case SUPERSTAR -> getMatchCount(userId) >= config.safety().achievementMatchTier4();
-            case LEGEND -> getMatchCount(userId) >= config.safety().achievementMatchTier5();
-            case SELECTIVE -> isSelective(userId);
-            case OPEN_MINDED -> isOpenMinded(userId);
-            case COMPLETE_PACKAGE -> isProfileComplete(user);
-            case STORYTELLER -> hasBioOver100Chars(user);
-            case LIFESTYLE_GURU -> hasAllLifestyleFields(user);
-            case GUARDIAN -> hasReportedUser(userId);
-        };
-    }
-
-    private int[] getProgressValues(UUID userId, User user, Achievement achievement) {
-        int matchCount = getMatchCount(userId);
-        return switch (achievement) {
-            case FIRST_SPARK -> new int[] {matchCount, config.safety().achievementMatchTier1()};
-            case SOCIAL_BUTTERFLY -> new int[] {matchCount, config.safety().achievementMatchTier2()};
-            case POPULAR -> new int[] {matchCount, config.safety().achievementMatchTier3()};
-            case SUPERSTAR -> new int[] {matchCount, config.safety().achievementMatchTier4()};
-            case LEGEND -> new int[] {matchCount, config.safety().achievementMatchTier5()};
-            case SELECTIVE, OPEN_MINDED ->
-                new int[] {getTotalSwipes(userId), config.safety().minSwipesForBehaviorAchievement()};
-            case COMPLETE_PACKAGE -> new int[] {getProfileCompleteness(user), 100};
-            case STORYTELLER -> new int[] {getBioLength(user), config.safety().bioAchievementLength()};
-            case LIFESTYLE_GURU ->
-                new int[] {countLifestyleFields(user), config.safety().lifestyleFieldTarget()};
-            case GUARDIAN -> new int[] {getReportsGiven(userId), 1};
-        };
-    }
-
-    private int getMatchCount(UUID userId) {
-        return interactionStorage.getAllMatchesFor(userId).size();
-    }
-
-    private int getTotalSwipes(UUID userId) {
-        return interactionStorage.countByDirection(userId, Like.Direction.LIKE)
-                + interactionStorage.countByDirection(userId, Like.Direction.PASS);
-    }
-
-    private boolean isSelective(UUID userId) {
-        int totalSwipes = getTotalSwipes(userId);
-        if (totalSwipes < config.safety().minSwipesForBehaviorAchievement()) {
-            return false;
-        }
-        int likes = interactionStorage.countByDirection(userId, Like.Direction.LIKE);
-        double likeRatio = (double) likes / totalSwipes;
-        return likeRatio < config.safety().selectiveThreshold();
-    }
-
-    private boolean isOpenMinded(UUID userId) {
-        int totalSwipes = getTotalSwipes(userId);
-        if (totalSwipes < config.safety().minSwipesForBehaviorAchievement()) {
-            return false;
-        }
-        int likes = interactionStorage.countByDirection(userId, Like.Direction.LIKE);
-        double likeRatio = (double) likes / totalSwipes;
-        return likeRatio > config.safety().openMindedThreshold();
-    }
-
-    private boolean isProfileComplete(User user) {
-        return getProfileCompleteness(user) == 100;
-    }
-
-    private int getProfileCompleteness(User user) {
-        ProfileCompleteness completeness = calculateCompleteness(user);
-        return completeness.percentage();
-    }
-
-    private boolean hasBioOver100Chars(User user) {
-        return getBioLength(user) > config.safety().bioAchievementLength();
-    }
-
-    private int getBioLength(User user) {
-        return user.getBio() != null ? user.getBio().length() : 0;
-    }
-
-    private boolean hasAllLifestyleFields(User user) {
-        return countLifestyleFields(user) >= config.safety().lifestyleFieldTarget();
-    }
-
-    private boolean hasReportedUser(UUID userId) {
-        return getReportsGiven(userId) >= 1;
-    }
-
-    private int getReportsGiven(UUID userId) {
-        return trustSafetyStorage.countReportsBy(userId);
+    private DefaultAchievementService legacyAchievementService() {
+        return new DefaultAchievementService(
+                config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, this);
     }
 }

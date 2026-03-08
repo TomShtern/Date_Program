@@ -1,7 +1,6 @@
 package datingapp.core.matching;
 
 import datingapp.core.LoggingSupport;
-import datingapp.core.PerformanceMonitor;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
@@ -152,38 +151,34 @@ public class CandidateFinder implements LoggingSupport {
      * @return list of candidate users sorted by distance
      */
     public List<User> findCandidatesForUser(User currentUser) {
-        try (PerformanceMonitor.Timer timer = PerformanceMonitor.startTimer("CandidateFinder.findCandidatesForUser")) {
-            if (!currentUser.hasLocationSet()) {
-                if (logger.isTraceEnabled()) {
-                    logger.trace(
-                            "CandidateFinder.findCandidatesForUser skipped for {} due to missing location",
-                            currentUser.getId());
-                }
-                timer.markSuccess();
-                return List.of();
-            }
-
-            Set<UUID> excluded = new HashSet<>(interactionStorage.getLikedOrPassedUserIds(currentUser.getId()));
-            excluded.addAll(trustSafetyStorage.getBlockedUserIds(currentUser.getId()));
-
-            // Use SQL pre-filtering for primary criteria to reduce the candidate set
-            // before the more-expensive in-memory filters run.
-            List<User> preFiltered = userStorage.findCandidates(
-                    currentUser.getId(),
-                    currentUser.getInterestedIn(),
-                    currentUser.getMinAge(),
-                    currentUser.getMaxAge(),
-                    currentUser.getLat(),
-                    currentUser.getLon(),
-                    currentUser.getMaxDistanceKm());
-
-            List<User> candidates = findCandidates(currentUser, preFiltered, excluded);
+        long startTime = System.nanoTime();
+        if (!currentUser.hasLocationSet()) {
             if (logger.isTraceEnabled()) {
-                logger.trace("CandidateFinder.findCandidatesForUser completed in {}ms", timer.elapsedMs());
+                logger.trace(
+                        "CandidateFinder.findCandidatesForUser skipped for {} due to missing location",
+                        currentUser.getId());
             }
-            timer.markSuccess();
-            return candidates;
+            return List.of();
         }
+
+        Set<UUID> excluded = new HashSet<>(interactionStorage.getLikedOrPassedUserIds(currentUser.getId()));
+        excluded.addAll(trustSafetyStorage.getBlockedUserIds(currentUser.getId()));
+
+        List<User> preFiltered = userStorage.findCandidates(
+                currentUser.getId(),
+                currentUser.getInterestedIn(),
+                currentUser.getMinAge(),
+                currentUser.getMaxAge(),
+                currentUser.getLat(),
+                currentUser.getLon(),
+                currentUser.getMaxDistanceKm());
+
+        List<User> candidates = findCandidates(currentUser, preFiltered, excluded);
+        if (logger.isTraceEnabled()) {
+            long durationMs = (System.nanoTime() - startTime) / 1_000_000;
+            logger.trace("CandidateFinder.findCandidatesForUser completed in {}ms", durationMs);
+        }
+        return candidates;
     }
 
     private boolean isNotSelf(User seeker, User candidate) {

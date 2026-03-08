@@ -11,13 +11,23 @@ import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.CompatibilityCalculator;
+import datingapp.core.matching.DailyLimitService;
+import datingapp.core.matching.DailyPickService;
+import datingapp.core.matching.DefaultCompatibilityCalculator;
+import datingapp.core.matching.DefaultDailyLimitService;
+import datingapp.core.matching.DefaultDailyPickService;
+import datingapp.core.matching.DefaultStandoutService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
+import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
@@ -27,7 +37,6 @@ import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestStorages;
-import datingapp.core.time.DefaultTimePolicy;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -127,16 +136,20 @@ class RestApiNotesRoutesTest {
                 new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
         ProfileService profileService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
-        RecommendationService recommendationService = RecommendationService.builder()
-                .userStorage(userStorage)
-                .interactionStorage(interactionStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .analyticsStorage(analyticsStorage)
-                .candidateFinder(candidateFinder)
-                .standoutStorage(new InMemoryStandoutStorage())
-                .profileService(profileService)
-                .config(config)
-                .build();
+
+        CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
+        DailyLimitService dailyLimitService = new DefaultDailyLimitService(interactionStorage, config);
+        DailyPickService dailyPickService =
+                new DefaultDailyPickService(userStorage, interactionStorage, analyticsStorage, candidateFinder, config);
+        StandoutService standoutService = new DefaultStandoutService(
+                compatibilityCalculator,
+                userStorage,
+                candidateFinder,
+                new InMemoryStandoutStorage(),
+                profileService,
+                config);
+        RecommendationService recommendationService =
+                new RecommendationService(dailyLimitService, dailyPickService, standoutService);
         UndoService undoService = new UndoService(interactionStorage, new InMemoryUndoStorage(), config);
         MatchingService matchingService = MatchingService.builder()
                 .interactionStorage(interactionStorage)
@@ -150,8 +163,11 @@ class RestApiNotesRoutesTest {
                 trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage);
         ConnectionService connectionService =
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
-        MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
+        MatchQualityService matchQualityService =
+                new MatchQualityService(userStorage, interactionStorage, config, compatibilityCalculator);
         ValidationService validationService = new ValidationService(config);
+        AchievementService achievementService = new DefaultAchievementService(
+                config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
 
         return new ServiceRegistry(
                 config,
@@ -167,10 +183,14 @@ class RestApiNotesRoutesTest {
                 matchQualityService,
                 profileService,
                 recommendationService,
+                dailyLimitService,
+                dailyPickService,
+                standoutService,
                 undoService,
+                compatibilityCalculator,
+                achievementService,
                 connectionService,
                 validationService,
-                new DefaultTimePolicy(ZoneId.of("UTC")),
                 new InProcessAppEventBus());
     }
 

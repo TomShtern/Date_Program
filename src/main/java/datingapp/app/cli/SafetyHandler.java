@@ -40,14 +40,6 @@ public class SafetyHandler implements LoggingSupport {
     public SafetyHandler(
             UserStorage userStorage,
             TrustSafetyService trustSafetyService,
-            AppSession session,
-            InputReader inputReader) {
-        this(userStorage, trustSafetyService, new SocialUseCases(trustSafetyService), session, inputReader);
-    }
-
-    public SafetyHandler(
-            UserStorage userStorage,
-            TrustSafetyService trustSafetyService,
             SocialUseCases socialUseCases,
             AppSession session,
             InputReader inputReader) {

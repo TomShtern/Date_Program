@@ -3,6 +3,7 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.*;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
@@ -40,11 +41,11 @@ class ProfileNotesHandlerTest {
 
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
+        ProfileUseCases profileUseCases = new ProfileUseCases(userStorage, null, null, null, AppConfig.defaults());
         return new ProfileHandler(
                 userStorage,
-                null,
-                null,
                 new ValidationService(AppConfig.defaults()),
+                profileUseCases,
                 AppConfig.defaults(),
                 session,
                 inputReader);

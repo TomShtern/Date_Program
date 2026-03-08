@@ -14,11 +14,8 @@ import datingapp.core.ServiceRegistry;
 import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
-import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
-import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.User;
-import datingapp.core.storage.InteractionStorage;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -37,34 +34,13 @@ public class MessagingHandler implements LoggingSupport {
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
 
-    private final ConnectionService messagingService;
     private final MessagingUseCases messagingUseCases;
     private final SocialUseCases socialUseCases;
     private final InputReader input;
     private final AppSession session;
 
     public MessagingHandler(
-            ConnectionService messagingService,
-            InteractionStorage interactionStorage,
-            TrustSafetyService trustSafetyService,
-            InputReader input,
-            AppSession session) {
-        Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
-        Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
-        this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
-        this.messagingUseCases = new MessagingUseCases(this.messagingService);
-        this.socialUseCases = new SocialUseCases(this.messagingService, trustSafetyService);
-        this.input = Objects.requireNonNull(input, "input cannot be null");
-        this.session = Objects.requireNonNull(session, "session cannot be null");
-    }
-
-    public MessagingHandler(
-            ConnectionService messagingService,
-            MessagingUseCases messagingUseCases,
-            SocialUseCases socialUseCases,
-            InputReader input,
-            AppSession session) {
-        this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
+            MessagingUseCases messagingUseCases, SocialUseCases socialUseCases, InputReader input, AppSession session) {
         this.messagingUseCases = Objects.requireNonNull(messagingUseCases, "messagingUseCases cannot be null");
         this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
         this.input = Objects.requireNonNull(input, "input cannot be null");
@@ -73,12 +49,7 @@ public class MessagingHandler implements LoggingSupport {
 
     public static MessagingHandler fromServices(ServiceRegistry services, AppSession session, InputReader input) {
         Objects.requireNonNull(services, "services cannot be null");
-        return new MessagingHandler(
-                services.getConnectionService(),
-                services.getMessagingUseCases(),
-                services.getSocialUseCases(),
-                input,
-                session);
+        return new MessagingHandler(services.getMessagingUseCases(), services.getSocialUseCases(), input, session);
     }
 
     @Override

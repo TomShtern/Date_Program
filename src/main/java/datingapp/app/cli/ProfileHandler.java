@@ -32,6 +32,7 @@ import java.time.format.DateTimeParseException;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -64,29 +65,25 @@ public class ProfileHandler implements LoggingSupport {
 
     public ProfileHandler(
             UserStorage userStorage,
-            ProfileService profileCompletionService,
-            ProfileService achievementService,
             ValidationService validationService,
+            ProfileUseCases profileUseCases,
             AppConfig config,
             AppSession session,
             InputReader inputReader) {
-        this.userStorage = userStorage;
-        this.validationService =
-                java.util.Objects.requireNonNull(validationService, "validationService cannot be null");
-        this.config = java.util.Objects.requireNonNull(config, "config cannot be null");
-        ProfileService profileService = achievementService != null ? achievementService : profileCompletionService;
-        this.profileUseCases = new ProfileUseCases(userStorage, profileService, validationService, null, this.config);
+        this.userStorage = Objects.requireNonNull(userStorage);
+        this.validationService = Objects.requireNonNull(validationService, "validationService cannot be null");
+        this.profileUseCases = Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = session;
         this.inputReader = inputReader;
     }
 
     public static ProfileHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
-        java.util.Objects.requireNonNull(services, "services cannot be null");
+        Objects.requireNonNull(services, "services cannot be null");
         return new ProfileHandler(
                 services.getUserStorage(),
-                services.getProfileService(),
-                services.getProfileService(),
                 services.getValidationService(),
+                services.getProfileUseCases(),
                 services.getConfig(),
                 session,
                 inputReader);

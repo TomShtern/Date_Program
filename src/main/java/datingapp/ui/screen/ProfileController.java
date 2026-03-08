@@ -7,6 +7,7 @@ import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.ui.ImageCache;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.UiUtils;
 import datingapp.ui.viewmodel.ProfileViewModel;
@@ -586,13 +587,13 @@ public class ProfileController extends BaseController implements Initializable {
         if (viewModel.getPhotoUrls().isEmpty()) {
             return;
         }
-        boolean confirmed = UiFeedbackService.showConfirmation(
+        UiDialogs.confirmAndExecute(
                 "Remove Photo",
                 "Remove the current photo?",
-                "This deletes the local managed copy from your profile gallery.");
-        if (confirmed) {
-            viewModel.deletePhoto(viewModel.currentPhotoIndexProperty().get());
-        }
+                "This deletes the local managed copy from your profile gallery.",
+                () -> viewModel.deletePhoto(
+                        viewModel.currentPhotoIndexProperty().get()),
+                null);
     }
 
     /**

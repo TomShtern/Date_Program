@@ -2,7 +2,7 @@ package datingapp.app.event.handlers;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
-import datingapp.core.profile.ProfileService;
+import datingapp.core.metrics.AchievementService;
 import java.util.Objects;
 
 /**
@@ -11,10 +11,10 @@ import java.util.Objects;
  */
 public final class AchievementEventHandler {
 
-    private final ProfileService profileService;
+    private final AchievementService achievementService;
 
-    public AchievementEventHandler(ProfileService profileService) {
-        this.profileService = Objects.requireNonNull(profileService, "profileService");
+    public AchievementEventHandler(AchievementService achievementService) {
+        this.achievementService = Objects.requireNonNull(achievementService, "achievementService");
     }
 
     /** Subscribes this handler to the given event bus with BEST_EFFORT policy. */
@@ -24,7 +24,7 @@ public final class AchievementEventHandler {
 
     void onSwipeRecorded(AppEvent.SwipeRecorded event) {
         if (event.resultedInMatch()) {
-            profileService.checkAndUnlock(event.swiperId());
+            achievementService.checkAndUnlock(event.swiperId());
         }
     }
 }

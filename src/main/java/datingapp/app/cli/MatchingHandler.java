@@ -26,25 +26,22 @@ import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionService;
-import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
+import datingapp.core.matching.DailyPickService.DailyPick;
 import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchQualityService.MatchQuality;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.MatchingService.PendingLiker;
 import datingapp.core.matching.RecommendationService;
-import datingapp.core.matching.RecommendationService.DailyPick;
 import datingapp.core.matching.Standout;
-import datingapp.core.matching.TrustSafetyService;
+import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.AnalyticsStorage;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.List;
 import java.util.Locale;
@@ -64,10 +61,8 @@ public class MatchingHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(MatchingHandler.class);
     private static final String ERR_FAILED = "❌ Failed: {}\n";
 
-    private final MatchingService matchingService;
     private final RecommendationService dailyService;
     private final UndoService undoService;
-    private final MatchQualityService matchQualityService;
     private final UserStorage userStorage;
     private final AnalyticsStorage analyticsStorage;
     private final RecommendationService standoutsService;
@@ -79,10 +74,8 @@ public class MatchingHandler implements LoggingSupport {
     private final SocialUseCases socialUseCases;
 
     public MatchingHandler(Dependencies dependencies) {
-        this.matchingService = dependencies.matchingService();
         this.dailyService = dependencies.dailyService();
         this.undoService = dependencies.undoService();
-        this.matchQualityService = dependencies.matchQualityService();
         this.userStorage = dependencies.userStorage();
         this.analyticsStorage = dependencies.analyticsStorage();
         this.standoutsService = dependencies.standoutsService();
@@ -90,18 +83,8 @@ public class MatchingHandler implements LoggingSupport {
         this.session = dependencies.userSession();
         this.inputReader = dependencies.inputReader();
         this.profileCompleteCallback = dependencies.profileCompleteCallback();
-        this.matchingUseCases = new MatchingUseCases(
-                dependencies.candidateFinderService(),
-                this.matchingService,
-                this.dailyService,
-                this.undoService,
-                dependencies.interactionStorage(),
-                this.userStorage,
-                this.matchQualityService);
-        this.socialUseCases = new SocialUseCases(
-                dependencies.transitionService(),
-                dependencies.trustSafetyService(),
-                dependencies.communicationStorage());
+        this.matchingUseCases = dependencies.matchingUseCases();
+        this.socialUseCases = dependencies.socialUseCases();
     }
 
     @Override
@@ -110,41 +93,35 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     public static record Dependencies(
-            CandidateFinder candidateFinderService,
             MatchingService matchingService,
-            InteractionStorage interactionStorage,
             RecommendationService dailyService,
             UndoService undoService,
             MatchQualityService matchQualityService,
             UserStorage userStorage,
             ProfileService achievementService,
             AnalyticsStorage analyticsStorage,
-            TrustSafetyService trustSafetyService,
-            ConnectionService transitionService,
             RecommendationService standoutsService,
-            CommunicationStorage communicationStorage,
             AppConfig config,
             AppSession userSession,
             InputReader inputReader,
-            Runnable profileCompleteCallback) {
+            Runnable profileCompleteCallback,
+            MatchingUseCases matchingUseCases,
+            SocialUseCases socialUseCases) {
 
         public Dependencies {
-            Objects.requireNonNull(candidateFinderService);
             Objects.requireNonNull(matchingService);
-            Objects.requireNonNull(interactionStorage);
             Objects.requireNonNull(dailyService);
             Objects.requireNonNull(undoService);
             Objects.requireNonNull(matchQualityService);
             Objects.requireNonNull(userStorage);
             Objects.requireNonNull(achievementService);
             Objects.requireNonNull(analyticsStorage);
-            Objects.requireNonNull(trustSafetyService);
-            Objects.requireNonNull(transitionService);
             Objects.requireNonNull(standoutsService);
-            Objects.requireNonNull(communicationStorage);
             Objects.requireNonNull(config);
             Objects.requireNonNull(userSession);
             Objects.requireNonNull(inputReader);
+            Objects.requireNonNull(matchingUseCases);
+            Objects.requireNonNull(socialUseCases);
         }
 
         public static Dependencies fromServices(
@@ -154,23 +131,20 @@ public class MatchingHandler implements LoggingSupport {
                 Runnable profileCompleteCallback) {
             Objects.requireNonNull(services);
             return new Dependencies(
-                    services.getCandidateFinder(),
                     services.getMatchingService(),
-                    services.getInteractionStorage(),
                     services.getRecommendationService(),
                     services.getUndoService(),
                     services.getMatchQualityService(),
                     services.getUserStorage(),
                     services.getProfileService(),
                     services.getAnalyticsStorage(),
-                    services.getTrustSafetyService(),
-                    services.getConnectionService(),
                     services.getRecommendationService(),
-                    services.getCommunicationStorage(),
                     services.getConfig(),
                     session,
                     inputReader,
-                    profileCompleteCallback);
+                    profileCompleteCallback,
+                    services.getMatchingUseCases(),
+                    services.getSocialUseCases());
         }
 
         public static Dependencies fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
@@ -186,22 +160,7 @@ public class MatchingHandler implements LoggingSupport {
     public void browseCandidates() {
         CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
-            if (currentUser.getState() != UserState.ACTIVE) {
-                logInfo("\n⚠️  You must be ACTIVE to browse candidates. Complete your profile first.\n");
-                return;
-            }
-
-            if (!currentUser.hasLocationSet()) {
-                logInfo("\n⚠️  Your profile location is not set.");
-                logInfo("   Distance-based candidate matching requires your location to find nearby people.\n");
-                if (profileCompleteCallback != null) {
-                    String response = inputReader.readLine("   Would you like to complete your profile now? (y/N): ");
-                    if ("y".equalsIgnoreCase(response.trim())) {
-                        profileCompleteCallback.run();
-                        return;
-                    }
-                }
-                logInfo("   → Go to 'Complete my profile' from the main menu to add your location.\n");
+            if (!canBrowseCandidates(currentUser)) {
                 return;
             }
 
@@ -212,27 +171,51 @@ public class MatchingHandler implements LoggingSupport {
                 return;
             }
 
-            var browseData = browseResult.data();
-            if (browseData.dailyPick().isPresent() && !browseData.dailyPickViewed()) {
-                showDailyPick(browseData.dailyPick().get(), currentUser);
-            }
+            browseCandidateResults(currentUser, browseResult.data());
+        });
+    }
 
-            logInfo("\n" + CliTextAndInput.HEADER_BROWSE_CANDIDATES + "\n");
+    private boolean canBrowseCandidates(User currentUser) {
+        if (currentUser.getState() != UserState.ACTIVE) {
+            logInfo("\n⚠️  You must be ACTIVE to browse candidates. Complete your profile first.\n");
+            return false;
+        }
 
-            List<User> candidates = browseData.candidates();
-
-            if (candidates.isEmpty()) {
-                logInfo("😔 No candidates found. Try again later!\n");
-                return;
-            }
-
-            for (User candidate : candidates) {
-                boolean keepBrowsing = processCandidateInteraction(candidate, currentUser);
-                if (!keepBrowsing) {
-                    break;
+        if (!currentUser.hasLocationSet()) {
+            logInfo("\n⚠️  Your profile location is not set.");
+            logInfo("   Distance-based candidate matching requires your location to find nearby people.\n");
+            if (profileCompleteCallback != null) {
+                String response = inputReader.readLine("   Would you like to complete your profile now? (y/N): ");
+                if ("y".equalsIgnoreCase(response.trim())) {
+                    profileCompleteCallback.run();
                 }
             }
-        });
+            logInfo("   → Go to 'Complete my profile' from the main menu to add your location.\n");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void browseCandidateResults(User currentUser, MatchingUseCases.BrowseCandidatesResult browseData) {
+        Optional<DailyPick> dailyPick = browseData.dailyPick();
+        if (!browseData.dailyPickViewed() && dailyPick.isPresent()) {
+            showDailyPick(dailyPick.orElseThrow(), currentUser);
+        }
+
+        logInfo("\n" + CliTextAndInput.HEADER_BROWSE_CANDIDATES + "\n");
+        List<User> candidates = browseData.candidates();
+        if (candidates.isEmpty()) {
+            logInfo("😔 No candidates found. Try again later!\n");
+            return;
+        }
+
+        for (User candidate : candidates) {
+            boolean keepBrowsing = processCandidateInteraction(candidate, currentUser);
+            if (!keepBrowsing) {
+                break;
+            }
+        }
     }
 
     private boolean processCandidateInteraction(User candidate, User currentUser) {
@@ -322,14 +305,12 @@ public class MatchingHandler implements LoggingSupport {
             logInfo("         YOUR MATCHES");
             logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
 
-            var matchesResult = matchingUseCases.listActiveMatches(
-                    new MatchingUseCases.ListActiveMatchesQuery(UserContext.cli(currentUser.getId())));
-            if (!matchesResult.success()) {
-                logInfo(ERR_FAILED, matchesResult.error().message());
+            var matchesPayload = loadActiveMatches(currentUser);
+            if (matchesPayload.isEmpty()) {
                 return;
             }
-            var matchesPayload = matchesResult.data();
-            List<Match> matches = matchesPayload.matches();
+
+            List<Match> matches = matchesPayload.get().matches();
 
             if (matches.isEmpty()) {
                 logInfo("😢 No matches yet. Keep swiping!\n");
@@ -337,47 +318,65 @@ public class MatchingHandler implements LoggingSupport {
             }
 
             logInfo("💕 You have {} active match(es):\n", matches.size());
-
-            for (int i = 0; i < matches.size(); i++) {
-                Match match = matches.get(i);
-                UUID otherUserId = match.getOtherUser(currentUser.getId());
-                User otherUser = matchesPayload.usersById().get(otherUserId);
-                final int displayIndex = i + 1;
-
-                if (otherUser != null && logger.isInfoEnabled()) {
-                    var qualityResult = matchingUseCases.matchQuality(
-                            new MatchingUseCases.MatchQualityQuery(UserContext.cli(currentUser.getId()), match));
-                    if (qualityResult.success()) {
-                        MatchQuality quality = qualityResult.data();
-                        String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
-                        int age = otherUser.getAge(config.safety().userTimeZone());
-                        logInfo(
-                                "  {}. {} {}{}, {}         {} {}%",
-                                displayIndex,
-                                quality.getStarDisplay(),
-                                otherUser.getName(),
-                                verifiedBadge,
-                                age,
-                                " ".repeat(Math.max(0, 10 - otherUser.getName().length())),
-                                quality.compatibilityScore());
-                        logInfo("     \"{}\"", quality.getShortSummary());
-                    }
-                }
-            }
+            renderMatchesSummary(matches, matchesPayload.get().usersById(), currentUser);
 
             logInfo(CliTextAndInput.MENU_DIVIDER_WITH_NEWLINES);
             logInfo("  " + CliTextAndInput.PROMPT_VIEW_UNMATCH_BLOCK);
             String action = inputReader.readLine("\nYour choice: ").toLowerCase(Locale.ROOT);
+            handleMatchesAction(action, matches, currentUser);
+        });
+    }
 
-            switch (action) {
-                case "v" -> viewMatchDetails(matches, currentUser);
-                case "u" -> unmatchFromList(matches, currentUser);
-                case "b" -> blockFromMatches(matches, currentUser);
-                default -> {
-                    /* back */
+    private Optional<MatchingUseCases.ActiveMatchesResult> loadActiveMatches(User currentUser) {
+        var matchesResult = matchingUseCases.listActiveMatches(
+                new MatchingUseCases.ListActiveMatchesQuery(UserContext.cli(currentUser.getId())));
+        if (!matchesResult.success()) {
+            logInfo(ERR_FAILED, matchesResult.error().message());
+            return Optional.empty();
+        }
+        return Optional.of(matchesResult.data());
+    }
+
+    private void renderMatchesSummary(List<Match> matches, Map<UUID, User> usersById, User currentUser) {
+        if (!logger.isInfoEnabled()) {
+            return;
+        }
+        for (int i = 0; i < matches.size(); i++) {
+            Match match = matches.get(i);
+            UUID otherUserId = match.getOtherUser(currentUser.getId());
+            User otherUser = usersById.get(otherUserId);
+            if (otherUser != null) {
+                var qualityResult = matchingUseCases.matchQuality(
+                        new MatchingUseCases.MatchQualityQuery(UserContext.cli(currentUser.getId()), match));
+                if (qualityResult.success()) {
+                    MatchQuality quality = qualityResult.data();
+                    int displayIndex = i + 1;
+                    String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
+                    int age = otherUser.getAge(config.safety().userTimeZone());
+                    logInfo(
+                            "  {}. {} {}{}, {}         {} {}%",
+                            displayIndex,
+                            quality.getStarDisplay(),
+                            otherUser.getName(),
+                            verifiedBadge,
+                            age,
+                            " ".repeat(Math.max(0, 10 - otherUser.getName().length())),
+                            quality.compatibilityScore());
+                    logInfo("     \"{}\"", quality.getShortSummary());
                 }
             }
-        });
+        }
+    }
+
+    private void handleMatchesAction(String action, List<Match> matches, User currentUser) {
+        switch (action) {
+            case "v" -> viewMatchDetails(matches, currentUser);
+            case "u" -> unmatchFromList(matches, currentUser);
+            case "b" -> blockFromMatches(matches, currentUser);
+            default -> {
+                /* back */
+            }
+        }
     }
 
     private void viewMatchDetails(List<Match> matches, User currentUser) {
@@ -771,7 +770,7 @@ public class MatchingHandler implements LoggingSupport {
                 logInfo("{}\n", standoutResult.error().message());
                 return;
             }
-            RecommendationService.Result result = standoutResult.data().result();
+            StandoutService.Result result = standoutResult.data().result();
             if (result.isEmpty()) {
                 logInfo(result.message() != null ? result.message() : "No standouts available today.");
                 logInfo("\n");

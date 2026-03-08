@@ -17,9 +17,6 @@ class AchievementEventHandlerTest {
     private InProcessAppEventBus bus;
     private final List<UUID> checkedUserIds = new ArrayList<>();
 
-    /** Stub that records calls to checkAndUnlock. */
-    private datingapp.core.profile.ProfileService stubProfileService;
-
     @BeforeEach
     void setUp() {
         bus = new InProcessAppEventBus();

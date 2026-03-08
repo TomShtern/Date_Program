@@ -7,6 +7,7 @@ import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
@@ -39,6 +40,7 @@ public class ProfileUseCases {
     private final ProfileService profileService;
     private final ValidationService validationService;
     private final ActivityMetricsService activityMetricsService;
+    private final AchievementService achievementService;
     private final AppConfig config;
     private final ProfileActivationPolicy activationPolicy;
     private final AppEventBus eventBus;
@@ -55,6 +57,25 @@ public class ProfileUseCases {
                 profileService,
                 validationService,
                 activityMetricsService,
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                null);
+    }
+
+    public ProfileUseCases(
+            UserStorage userStorage,
+            ProfileService profileService,
+            ValidationService validationService,
+            ActivityMetricsService activityMetricsService,
+            AchievementService achievementService,
+            AppConfig config) {
+        this(
+                userStorage,
+                profileService,
+                validationService,
+                activityMetricsService,
+                achievementService,
                 config,
                 new ProfileActivationPolicy(),
                 null);
@@ -67,7 +88,15 @@ public class ProfileUseCases {
             ActivityMetricsService activityMetricsService,
             AppConfig config,
             ProfileActivationPolicy activationPolicy) {
-        this(userStorage, profileService, validationService, activityMetricsService, config, activationPolicy, null);
+        this(
+                userStorage,
+                profileService,
+                validationService,
+                activityMetricsService,
+                null,
+                config,
+                activationPolicy,
+                null);
     }
 
     public ProfileUseCases(
@@ -75,6 +104,26 @@ public class ProfileUseCases {
             ProfileService profileService,
             ValidationService validationService,
             ActivityMetricsService activityMetricsService,
+            AchievementService achievementService,
+            AppConfig config,
+            ProfileActivationPolicy activationPolicy) {
+        this(
+                userStorage,
+                profileService,
+                validationService,
+                activityMetricsService,
+                achievementService,
+                config,
+                activationPolicy,
+                null);
+    }
+
+    public ProfileUseCases(
+            UserStorage userStorage,
+            ProfileService profileService,
+            ValidationService validationService,
+            ActivityMetricsService activityMetricsService,
+            AchievementService achievementService,
             AppConfig config,
             ProfileActivationPolicy activationPolicy,
             AppEventBus eventBus) {
@@ -82,6 +131,7 @@ public class ProfileUseCases {
         this.profileService = profileService;
         this.validationService = validationService;
         this.activityMetricsService = activityMetricsService;
+        this.achievementService = achievementService;
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
         this.eventBus = eventBus;
@@ -109,7 +159,7 @@ public class ProfileUseCases {
 
         List<UserAchievement> newAchievements = List.of();
         try {
-            newAchievements = profileService.checkAndUnlock(user.getId());
+            newAchievements = unlockAchievements(user.getId());
             if (eventBus != null) {
                 eventBus.publish(new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()));
             }
@@ -178,11 +228,10 @@ public class ProfileUseCases {
         }
 
         try {
-            List<UserAchievement> newlyUnlocked = query.checkForNew()
-                    ? profileService.checkAndUnlock(query.context().userId())
-                    : List.of();
+            List<UserAchievement> newlyUnlocked =
+                    query.checkForNew() ? unlockAchievements(query.context().userId()) : List.of();
             List<UserAchievement> unlocked =
-                    profileService.getUnlocked(query.context().userId());
+                    getUnlockedAchievements(query.context().userId());
             return UseCaseResult.success(new AchievementSnapshot(unlocked, newlyUnlocked));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to load achievements: " + e.getMessage()));
@@ -346,4 +395,24 @@ public class ProfileUseCases {
     public static record UpsertProfileNoteCommand(UserContext context, UUID subjectId, String content) {}
 
     public static record DeleteProfileNoteCommand(UserContext context, UUID subjectId) {}
+
+    private List<UserAchievement> unlockAchievements(UUID userId) {
+        if (achievementService != null) {
+            return achievementService.checkAndUnlock(userId);
+        }
+        if (profileService != null) {
+            return profileService.checkAndUnlock(userId);
+        }
+        return List.of();
+    }
+
+    private List<UserAchievement> getUnlockedAchievements(UUID userId) {
+        if (achievementService != null) {
+            return achievementService.getUnlocked(userId);
+        }
+        if (profileService != null) {
+            return profileService.getUnlocked(userId);
+        }
+        return List.of();
+    }
 }

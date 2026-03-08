@@ -2,7 +2,6 @@ package datingapp.core.matching;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
-import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.AnalyticsStorage;
@@ -11,70 +10,30 @@ import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Composite service that delegates to specific recommendation and limit services.
+ * Maintains backward compatibility with existing callers.
+ */
 public final class RecommendationService {
 
-    private static final int MAX_STANDOUTS = 10;
-    private static final int DIVERSITY_DAYS = 3;
-
-    // ══════ ACTIVITY SCORE THRESHOLDS (hours since last active) ══════
-    private static final long ACTIVITY_VERY_RECENT_HOURS = 1;
-    private static final long ACTIVITY_RECENT_HOURS = 24;
-    private static final long ACTIVITY_MODERATE_HOURS = 72;
-    private static final long ACTIVITY_WEEKLY_HOURS = 168;
-    private static final long ACTIVITY_MONTHLY_HOURS = 720;
-
-    // ══════ ACTIVITY SCORE VALUES ══════
-    private static final double ACTIVITY_SCORE_VERY_RECENT = 1.0;
-    private static final double ACTIVITY_SCORE_RECENT = 0.9;
-    private static final double ACTIVITY_SCORE_MODERATE = 0.7;
-    private static final double ACTIVITY_SCORE_WEEKLY = 0.5;
-    private static final double ACTIVITY_SCORE_MONTHLY = 0.3;
-    private static final double ACTIVITY_SCORE_INACTIVE = 0.1;
-    private static final double ACTIVITY_SCORE_UNKNOWN = 0.5;
-
-    private final UserStorage userStorage;
-    private final InteractionStorage interactionStorage;
-    private final TrustSafetyStorage trustSafetyStorage;
-    private final AnalyticsStorage analyticsStorage;
-    private final CandidateFinder candidateFinder;
-    private final Standout.Storage standoutStorage;
-    private final ProfileService profileService;
-    private final AppConfig config;
-    private final Clock clock;
-
-    private static final int MAX_CACHED_PICKS = 1000;
-    private final Map<String, UUID> cachedDailyPicks =
-            Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, UUID> eldest) {
-                    return size() > MAX_CACHED_PICKS;
-                }
-            });
+    private final DailyLimitService dailyLimitService;
+    private final DailyPickService dailyPickService;
+    private final StandoutService standoutService;
 
     public static Builder builder() {
         return new Builder();
     }
 
-    public static class Builder {
+    public static final class Builder {
         private UserStorage userStorage;
         private InteractionStorage interactionStorage;
-        private TrustSafetyStorage trustSafetyStorage;
         private AnalyticsStorage analyticsStorage;
         private CandidateFinder candidateFinder;
         private Standout.Storage standoutStorage;
@@ -93,7 +52,7 @@ public final class RecommendationService {
         }
 
         public Builder trustSafetyStorage(TrustSafetyStorage trustSafetyStorage) {
-            this.trustSafetyStorage = trustSafetyStorage;
+            Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
             return this;
         }
 
@@ -128,462 +87,136 @@ public final class RecommendationService {
         }
 
         public RecommendationService build() {
-            return new RecommendationService(this);
+            AppConfig resolvedConfig = Objects.requireNonNull(config, "config cannot be null");
+            Clock resolvedClock = clock != null ? clock : AppClock.clock();
+            CompatibilityCalculator calculator = new DefaultCompatibilityCalculator(resolvedConfig, resolvedClock);
+            DailyLimitService dailyLimitService =
+                    new DefaultDailyLimitService(interactionStorage, resolvedConfig, resolvedClock);
+            DailyPickService dailyPickService = new DefaultDailyPickService(
+                    userStorage, interactionStorage, analyticsStorage, candidateFinder, resolvedConfig, resolvedClock);
+            StandoutService standoutService = new DefaultStandoutService(
+                    calculator,
+                    userStorage,
+                    candidateFinder,
+                    standoutStorage,
+                    profileService,
+                    resolvedConfig,
+                    resolvedClock);
+            return new RecommendationService(dailyLimitService, dailyPickService, standoutService);
         }
     }
 
-    private RecommendationService(Builder builder) {
-        this.config = Objects.requireNonNull(builder.config, "config cannot be null");
-        this.clock = builder.clock != null ? builder.clock : AppClock.clock();
-        this.userStorage = Objects.requireNonNull(builder.userStorage, "userStorage cannot be null");
-        this.interactionStorage =
-                Objects.requireNonNull(builder.interactionStorage, "interactionStorage cannot be null");
-        this.trustSafetyStorage =
-                Objects.requireNonNull(builder.trustSafetyStorage, "trustSafetyStorage cannot be null");
-        this.analyticsStorage = Objects.requireNonNull(builder.analyticsStorage, "analyticsStorage cannot be null");
-        this.candidateFinder = Objects.requireNonNull(builder.candidateFinder, "candidateFinder cannot be null");
-        this.standoutStorage = Objects.requireNonNull(builder.standoutStorage, "standoutStorage cannot be null");
-        this.profileService = Objects.requireNonNull(builder.profileService, "profileService cannot be null");
+    public RecommendationService(
+            DailyLimitService dailyLimitService, DailyPickService dailyPickService, StandoutService standoutService) {
+        this.dailyLimitService = Objects.requireNonNull(dailyLimitService, "dailyLimitService cannot be null");
+        this.dailyPickService = Objects.requireNonNull(dailyPickService, "dailyPickService cannot be null");
+        this.standoutService = Objects.requireNonNull(standoutService, "standoutService cannot be null");
     }
 
     /** Whether the user can perform a like action today. */
     public boolean canLike(UUID userId) {
-
-        Instant startOfDay = getStartOfToday();
-        int likesUsed = interactionStorage.countLikesToday(userId, startOfDay);
-        return canPerform(config.hasUnlimitedLikes(), config.matching().dailyLikeLimit(), likesUsed);
+        return dailyLimitService.canLike(userId);
     }
 
     /** Whether the user can perform a pass action today. */
     public boolean canPass(UUID userId) {
-
-        Instant startOfDay = getStartOfToday();
-        int passesUsed = interactionStorage.countPassesToday(userId, startOfDay);
-        return canPerform(config.hasUnlimitedPasses(), config.matching().dailyPassLimit(), passesUsed);
+        return dailyLimitService.canPass(userId);
     }
 
     /** Current daily status including counts and time to reset. */
     public DailyStatus getStatus(UUID userId) {
-
-        Instant startOfDay = getStartOfToday();
-        Instant resetTime = getResetTime();
-        LocalDate today = getToday();
-
-        int likesUsed = interactionStorage.countLikesToday(userId, startOfDay);
-        int passesUsed = interactionStorage.countPassesToday(userId, startOfDay);
-
-        int likesRemaining =
-                remainingFor(config.hasUnlimitedLikes(), config.matching().dailyLikeLimit(), likesUsed);
-        int passesRemaining =
-                remainingFor(config.hasUnlimitedPasses(), config.matching().dailyPassLimit(), passesUsed);
-
-        return new DailyStatus(likesUsed, likesRemaining, passesUsed, passesRemaining, today, resetTime);
+        DailyLimitService.DailyStatus status = dailyLimitService.getStatus(userId);
+        return new DailyStatus(
+                status.likesUsed(),
+                status.likesRemaining(),
+                status.passesUsed(),
+                status.passesRemaining(),
+                status.date(),
+                status.resetsAt());
     }
 
     /** Time remaining until next daily reset (midnight local time). */
     public Duration getTimeUntilReset() {
-        Instant now = Instant.now(clock);
-        Instant resetTime = getResetTime();
-        return Duration.between(now, resetTime);
+        return dailyLimitService.getTimeUntilReset();
     }
 
     /**
-     * Format duration as HH:mm:ss (with optional leading '-' for negative values).
+     * Format duration as HH:mm:ss.
      */
     public static String formatDuration(Duration duration) {
         if (duration == null) {
             return "00:00:00";
         }
-
         boolean negative = duration.isNegative();
         Duration normalized = negative ? duration.abs() : duration;
         long hours = normalized.toHours();
         int minutes = normalized.toMinutesPart();
         int seconds = normalized.toSecondsPart();
-
         String formatted = String.format("%02d:%02d:%02d", hours, minutes, seconds);
         return negative ? "-" + formatted : formatted;
     }
 
     /** Get the daily pick for a user if available. */
     public Optional<DailyPick> getDailyPick(User seeker) {
-
-        LocalDate today = getToday();
-
-        // Use CandidateFinder to get filtered candidates
-        // This filters by: self, active state, blocks, already-interacted, mutual
-        // gender,
-        // mutual age, distance, dealbreakers
-        List<User> candidates;
-        if (candidateFinder != null) {
-            candidates = candidateFinder.findCandidatesForUser(seeker);
-        } else {
-            // Fallback for tests/configurations without CandidateFinder
-            List<User> allActive = userStorage.findActive();
-            Set<UUID> alreadyInteracted = Set.copyOf(interactionStorage.getLikedOrPassedUserIds(seeker.getId()));
-            candidates = allActive.stream()
-                    .filter(u -> !u.getId().equals(seeker.getId()))
-                    .filter(u -> !isBlockedFallback(seeker.getId(), u.getId()))
-                    .filter(u -> !alreadyInteracted.contains(u.getId()))
-                    .toList();
-        }
-
-        if (candidates.isEmpty()) {
-            return Optional.empty();
-        }
-
-        // Deterministic random selection based on date + user ID (TS-006: atomic cache
-        // update)
-        long seed = today.toEpochDay() + seeker.getId().hashCode();
-        Random pickRandom = new Random(seed);
-
-        String cacheKey = seeker.getId() + "_" + today;
-
-        // Use computeIfAbsent for atomic check-and-populate (eliminates race condition)
-        UUID pickedId = cachedDailyPicks.computeIfAbsent(cacheKey, ignoredKey -> candidates
-                .get(pickRandom.nextInt(candidates.size()))
-                .getId());
-
-        // Find the cached user in current candidates (may have been filtered out since
-        // caching)
-        User picked = candidates.stream()
-                .filter(candidate -> candidate.getId().equals(pickedId))
-                .findFirst()
-                .orElse(null);
-
-        if (picked == null) {
-            // Cached pick no longer in candidate list (e.g., user was blocked since
-            // caching)
-            cachedDailyPicks.remove(cacheKey);
-            picked = candidates.get(pickRandom.nextInt(candidates.size()));
-            cachedDailyPicks.put(cacheKey, picked.getId());
-        }
-
-        long reasonSeed =
-                seed ^ picked.getId().getMostSignificantBits() ^ picked.getId().getLeastSignificantBits();
-        Random reasonRandom = new Random(reasonSeed);
-        String reason = generateReason(seeker, picked, reasonRandom);
-        boolean alreadySeen = hasViewedDailyPick(seeker.getId(), today);
-
-        return Optional.of(new DailyPick(picked, today, reason, alreadySeen));
+        return dailyPickService
+                .getDailyPick(seeker)
+                .map(pick -> new DailyPick(pick.user(), pick.date(), pick.reason(), pick.alreadySeen()));
     }
 
     /** Check whether user has viewed today's daily pick. */
     public boolean hasViewedDailyPick(UUID userId) {
-
-        return hasViewedDailyPick(userId, getToday());
+        return dailyPickService.hasViewedDailyPick(userId);
     }
 
     /** Mark today's daily pick as viewed for a user. */
     public void markDailyPickViewed(UUID userId) {
-
-        markDailyPickViewed(userId, getToday());
-    }
-
-    /** Internal: Check if user has viewed daily pick for a specific date. */
-    private boolean hasViewedDailyPick(UUID userId, LocalDate date) {
-        return analyticsStorage != null && analyticsStorage.isDailyPickViewed(userId, date);
-    }
-
-    /** Internal: Mark daily pick as viewed for a specific date. */
-    private void markDailyPickViewed(UUID userId, LocalDate date) {
-        if (analyticsStorage != null) {
-            analyticsStorage.markDailyPickAsViewed(userId, date);
-        }
+        dailyPickService.markDailyPickViewed(userId);
     }
 
     /** Cleanup old daily pick view records (for maintenance). */
     public int cleanupOldDailyPickViews(LocalDate before) {
-        int removed = 0;
-        if (analyticsStorage != null) {
-            removed = analyticsStorage.deleteDailyPickViewsOlderThan(before);
-        }
-        String todaySuffix = "_" + LocalDate.now(clock);
-        cachedDailyPicks.entrySet().removeIf(entry -> !entry.getKey().endsWith(todaySuffix));
-        return removed;
+        return dailyPickService.cleanupOldDailyPickViews(before);
     }
 
-    private String generateReason(User seeker, User picked, Random random) {
-        List<String> reasons = new ArrayList<>();
-        addLocationReasons(reasons, seeker, picked);
-        addAgeReasons(reasons, seeker, picked);
-        addCompatibilityReasons(reasons, seeker, picked);
-        addInterestReasons(reasons, seeker, picked);
-        if (reasons.isEmpty()) {
-            reasons.add("Our algorithm thinks you might click!");
-            reasons.add("Something different today!");
-            reasons.add("Expand your horizons!");
-            reasons.add("Why not give them a chance?");
-            reasons.add("Could be a pleasant surprise!");
-        }
-        return reasons.get(random.nextInt(reasons.size()));
-    }
-
-    private void addLocationReasons(List<String> reasons, User seeker, User picked) {
-        if (!seeker.hasLocationSet() || !picked.hasLocationSet()) {
-            return;
-        }
-        double distance = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), picked.getLat(), picked.getLon());
-        if (distance < config.algorithm().nearbyDistanceKm()) {
-            reasons.add("Lives nearby!");
-        } else if (distance < config.algorithm().closeDistanceKm()) {
-            reasons.add("Close enough for coffee!");
-        }
-    }
-
-    private void addAgeReasons(List<String> reasons, User seeker, User picked) {
-        ZoneId tz = config.safety().userTimeZone();
-        int ageDiff = Math.abs(seeker.getAge(tz) - picked.getAge(tz));
-        if (ageDiff <= config.algorithm().similarAgeDiff()) {
-            reasons.add("Similar age");
-        } else if (ageDiff <= config.algorithm().compatibleAgeDiff()) {
-            reasons.add("Age-appropriate match");
-        }
-    }
-
-    private void addCompatibilityReasons(List<String> reasons, User seeker, User picked) {
-        if (sameNonNull(seeker.getLookingFor(), picked.getLookingFor())) {
-            reasons.add("Looking for the same thing");
-        }
-        if (sameNonNull(seeker.getWantsKids(), picked.getWantsKids())) {
-            reasons.add("Same stance on kids");
-        }
-        if (sameNonNull(seeker.getDrinking(), picked.getDrinking())) {
-            reasons.add("Compatible drinking habits");
-        }
-        if (sameNonNull(seeker.getSmoking(), picked.getSmoking())) {
-            reasons.add("Compatible smoking habits");
-        }
-    }
-
-    private void addInterestReasons(List<String> reasons, User seeker, User picked) {
-        long sharedInterests = seeker.getInterests().stream()
-                .filter(picked.getInterests()::contains)
-                .count();
-        if (sharedInterests >= config.matching().minSharedInterests()) {
-            reasons.add("Many shared interests!");
-        } else if (sharedInterests >= 1) {
-            reasons.add("Some shared interests");
-        }
-    }
-
-    private int remainingFor(boolean unlimited, int limit, int used) {
-        return unlimited ? -1 : Math.max(0, limit - used);
-    }
-
-    private boolean canPerform(boolean unlimited, int limit, int used) {
-        return unlimited || used < limit;
-    }
-
-    private Instant getStartOfToday() {
-        ZoneId zone = clock.getZone();
-        return LocalDate.now(clock).atStartOfDay(zone).toInstant();
-    }
-
-    private Instant getResetTime() {
-        ZoneId zone = clock.getZone();
-        return LocalDate.now(clock).plusDays(1).atStartOfDay(zone).toInstant();
-    }
-
-    private LocalDate getToday() {
-        return LocalDate.now(clock);
-    }
-
-    private static <T> boolean sameNonNull(T left, T right) {
-        return left != null && left.equals(right);
-    }
-
-    private boolean isBlockedFallback(UUID seekerId, UUID candidateId) {
-        return trustSafetyStorage != null && trustSafetyStorage.isBlocked(seekerId, candidateId);
-    }
-
-    /** Get today's standouts for a user. Returns cached if available. */
+    /** Get today's standouts for a user. */
     public Result getStandouts(User seeker) {
-
-        LocalDate today = LocalDate.now(clock.withZone(config.safety().userTimeZone()));
-
-        List<Standout> cached = standoutStorage.getStandouts(seeker.getId(), today);
-        if (!cached.isEmpty()) {
-            return Result.of(cached, cached.size(), true);
-        }
-
-        return generateStandouts(seeker, today);
+        StandoutService.Result result = standoutService.getStandouts(seeker);
+        return new Result(result.standouts(), result.totalCandidates(), result.fromCache(), result.message());
     }
 
     /** Mark a standout as interacted after like/pass. */
     public void markInteracted(UUID seekerId, UUID standoutUserId) {
-
-        LocalDate today = LocalDate.now(clock.withZone(config.safety().userTimeZone()));
-        standoutStorage.markInteracted(seekerId, standoutUserId, today);
+        standoutService.markInteracted(seekerId, standoutUserId);
     }
 
     /** Resolve standout user IDs to User objects. */
     public Map<UUID, User> resolveUsers(List<Standout> standouts) {
-
-        List<UUID> ids = standouts.stream().map(Standout::standoutUserId).toList();
-        return userStorage.findByIds(Set.copyOf(ids));
+        return standoutService.resolveUsers(standouts);
     }
 
-    private Result generateStandouts(User seeker, LocalDate date) {
-        List<User> candidates = candidateFinder.findCandidatesForUser(seeker);
-
-        if (candidates.isEmpty()) {
-            return Result.empty("No standouts available. Try adjusting your preferences!");
-        }
-
-        Set<UUID> recentStandoutIds = getRecentStandoutIds(seeker.getId(), date);
-
-        List<ScoredCandidate> scored = candidates.stream()
-                .filter(candidate -> !recentStandoutIds.contains(candidate.getId()))
-                .map(candidate -> scoreCandidate(seeker, candidate))
-                .sorted(Comparator.comparingInt(ScoredCandidate::score).reversed())
-                .limit(MAX_STANDOUTS)
-                .toList();
-
-        if (scored.isEmpty()) {
-            return Result.empty("Check back tomorrow for fresh standouts!");
-        }
-
-        List<Standout> standouts = new ArrayList<>();
-        for (int i = 0; i < scored.size(); i++) {
-            ScoredCandidate scoredCandidate = scored.get(i);
-            standouts.add(Standout.create(
-                    seeker.getId(),
-                    scoredCandidate.user().getId(),
-                    date,
-                    i + 1,
-                    scoredCandidate.score(),
-                    scoredCandidate.reason()));
-        }
-
-        standoutStorage.saveStandouts(seeker.getId(), standouts, date);
-        return Result.of(standouts, candidates.size(), false);
-    }
-
-    private ScoredCandidate scoreCandidate(User seeker, User candidate) {
-        double distanceKm;
-        if (seeker.hasLocationSet() && candidate.hasLocationSet()) {
-            distanceKm = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), candidate.getLat(), candidate.getLon());
-        } else {
-            distanceKm = -1;
-        }
-        double distanceScore = distanceKm >= 0 && seeker.getMaxDistanceKm() > 0
-                ? Math.max(0, 1.0 - (distanceKm / seeker.getMaxDistanceKm()))
-                : 0.5;
-
-        ZoneId tz = config.safety().userTimeZone();
-        int ageDiff = Math.abs(seeker.getAge(tz) - candidate.getAge(tz));
-        double ageScore = CompatibilityScoring.ageScore(ageDiff, seeker, candidate, 0);
-
-        InterestMatcher.MatchResult interests =
-                InterestMatcher.compare(seeker.getInterests(), candidate.getInterests());
-        double interestScore = calculateInterestScore(interests, seeker, candidate);
-        double lifestyleScore = calculateLifestyleScore(seeker, candidate);
-        double completenessScore = profileService.calculate(candidate).score() / 100.0;
-        double activityScore = calculateActivityScore(candidate);
-
-        double composite = distanceScore * config.algorithm().standoutDistanceWeight()
-                + ageScore * config.algorithm().standoutAgeWeight()
-                + interestScore * config.algorithm().standoutInterestWeight()
-                + lifestyleScore * config.algorithm().standoutLifestyleWeight()
-                + completenessScore * config.algorithm().standoutCompletenessWeight()
-                + activityScore * config.algorithm().standoutActivityWeight();
-
-        int score = (int) Math.round(composite * 100);
-        String reason = generateStandoutReason(seeker, candidate, interests, distanceKm, lifestyleScore);
-
-        return new ScoredCandidate(candidate, score, reason);
-    }
-
-    private double calculateInterestScore(InterestMatcher.MatchResult match, User seeker, User candidate) {
-        return CompatibilityScoring.interestScore(
-                seeker.getInterests(), candidate.getInterests(), match.overlapRatio(), 0.5, 0.3);
-    }
-
-    private double calculateLifestyleScore(User seeker, User candidate) {
-        return CompatibilityScoring.lifestyleScore(seeker, candidate, 0.5);
-    }
-
-    private double calculateActivityScore(User candidate) {
-        if (candidate.getUpdatedAt() == null) {
-            return ACTIVITY_SCORE_UNKNOWN;
-        }
-        Duration sinceUpdate = Duration.between(candidate.getUpdatedAt(), clock.instant());
-        long hours = sinceUpdate.toHours();
-
-        if (hours < ACTIVITY_VERY_RECENT_HOURS) {
-            return ACTIVITY_SCORE_VERY_RECENT;
-        }
-        if (hours < ACTIVITY_RECENT_HOURS) {
-            return ACTIVITY_SCORE_RECENT;
-        }
-        if (hours < ACTIVITY_MODERATE_HOURS) {
-            return ACTIVITY_SCORE_MODERATE;
-        }
-        if (hours < ACTIVITY_WEEKLY_HOURS) {
-            return ACTIVITY_SCORE_WEEKLY;
-        }
-        if (hours < ACTIVITY_MONTHLY_HOURS) {
-            return ACTIVITY_SCORE_MONTHLY;
-        }
-        return ACTIVITY_SCORE_INACTIVE;
-    }
-
-    private String generateStandoutReason(
-            User seeker, User candidate, InterestMatcher.MatchResult interests, double distanceKm, double lifestyle) {
-        List<String> reasons = new ArrayList<>();
-
-        if (interests.sharedCount() >= config.matching().minSharedInterests()) {
-            reasons.add("Many shared interests");
-        } else if (interests.sharedCount() >= 1) {
-            reasons.add("Shared interests");
-        }
-
-        if (distanceKm >= 0 && distanceKm < config.algorithm().nearbyDistanceKm()) {
-            reasons.add("Lives nearby");
-        }
-
-        if (lifestyle >= 0.75) {
-            reasons.add("Compatible lifestyle");
-        }
-
-        if (seeker.getLookingFor() != null && seeker.getLookingFor() == candidate.getLookingFor()) {
-            reasons.add("Same relationship goals");
-        }
-
-        return reasons.isEmpty() ? "Top match for you" : reasons.getFirst();
-    }
-
-    private Set<UUID> getRecentStandoutIds(UUID seekerId, LocalDate today) {
-        Set<UUID> recent = new HashSet<>();
-        for (int i = 1; i <= DIVERSITY_DAYS; i++) {
-            standoutStorage.getStandouts(seekerId, today.minusDays(i)).stream()
-                    .map(Standout::standoutUserId)
-                    .forEach(recent::add);
-        }
-        return Set.copyOf(recent);
-    }
-
-    /** Daily pick payload. */
+    // Keep legacy records for backward compatibility if needed,
+    // but preferred to use the ones from the new services.
     public static record DailyPick(User user, LocalDate date, String reason, boolean alreadySeen) {
-
         public DailyPick {
             Objects.requireNonNull(user, "user cannot be null");
             Objects.requireNonNull(date, "date cannot be null");
             Objects.requireNonNull(reason, "reason cannot be null");
-            if (reason.isBlank()) {
-                throw new IllegalArgumentException("reason cannot be blank");
-            }
         }
     }
 
-    /** Status snapshot for daily limits. */
     public static record DailyStatus(
-            int likesUsed, int likesRemaining, int passesUsed, int passesRemaining, LocalDate date, Instant resetsAt) {
-
+            int likesUsed,
+            int likesRemaining,
+            int passesUsed,
+            int passesRemaining,
+            LocalDate date,
+            java.time.Instant resetsAt) {
         public DailyStatus {
-            if (likesUsed < 0 || passesUsed < 0) {
-                throw new IllegalArgumentException("Usage counts cannot be negative");
+            if (likesUsed < 0) {
+                throw new IllegalArgumentException("likesUsed cannot be negative");
+            }
+            if (passesUsed < 0) {
+                throw new IllegalArgumentException("passesUsed cannot be negative");
             }
             Objects.requireNonNull(date, "date cannot be null");
             Objects.requireNonNull(resetsAt, "resetsAt cannot be null");
@@ -598,9 +231,7 @@ public final class RecommendationService {
         }
     }
 
-    /** Result record for standouts query. */
     public static record Result(List<Standout> standouts, int totalCandidates, boolean fromCache, String message) {
-
         public boolean isEmpty() {
             return standouts == null || standouts.isEmpty();
         }
@@ -617,6 +248,4 @@ public final class RecommendationService {
             return new Result(standouts, total, cached, null);
         }
     }
-
-    private static record ScoredCandidate(User user, int score, String reason) {}
 }
