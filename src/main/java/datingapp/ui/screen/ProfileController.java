@@ -7,6 +7,7 @@ import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.ui.ImageCache;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiConstants;
 import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.UiUtils;
@@ -711,19 +712,19 @@ public class ProfileController extends BaseController implements Initializable {
         dialog.setHeaderText("Choose up to " + Interest.MAX_PER_USER + " interests");
 
         // Create content
-        VBox content = new VBox(16);
-        content.setPadding(new Insets(20));
+        VBox content = new VBox(UiConstants.SPACING_LARGE);
+        content.setPadding(new Insets(UiConstants.PADDING_XLARGE));
         content.setStyle(DARK_PANEL_STYLE);
 
         // Group interests by category
         for (Interest.Category category : Interest.Category.values()) {
-            VBox categoryBox = new VBox(8);
+            VBox categoryBox = new VBox(UiConstants.SPACING_SMALL);
 
             Label categoryLabel = new Label(category.getDisplayName());
             categoryLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: white; -fx-font-size: 14px;");
             categoryBox.getChildren().add(categoryLabel);
 
-            FlowPane interestPane = new FlowPane(8, 8);
+            FlowPane interestPane = new FlowPane(UiConstants.SPACING_SMALL, UiConstants.SPACING_SMALL);
             for (Interest interest : Interest.byCategory(category)) {
                 Button chipBtn = new Button(interest.getDisplayName());
                 boolean isSelected = viewModel.getSelectedInterests().contains(interest);
@@ -815,8 +816,8 @@ public class ProfileController extends BaseController implements Initializable {
         }
 
         // Create scrollable content
-        VBox content = new VBox(16);
-        content.setPadding(new Insets(20));
+        VBox content = new VBox(UiConstants.SPACING_LARGE);
+        content.setPadding(new Insets(UiConstants.PADDING_XLARGE));
         content.setStyle(DARK_PANEL_STYLE);
         content.setPrefWidth(450);
 
@@ -953,8 +954,8 @@ public class ProfileController extends BaseController implements Initializable {
             ProfileViewModel.ProfilePreviewSnapshot snapshot = viewModel.buildPreviewSnapshot();
 
             Dialog<ButtonType> dialog = createThemedDialog("Profile Preview", "How your profile appears to others");
-            VBox content = new VBox(18);
-            content.setPadding(new Insets(24));
+            VBox content = new VBox(UiConstants.SPACING_XLARGE - UiConstants.SPACING_XSMALL);
+            content.setPadding(new Insets(UiConstants.PADDING_XXLARGE));
             content.setPrefWidth(420);
 
             StackPane photoContainer = new StackPane();
@@ -980,7 +981,7 @@ public class ProfileController extends BaseController implements Initializable {
             Label completionChip = new Label(snapshot.completionText());
             completionChip.getStyleClass().add("notification-badge");
 
-            HBox titleRow = new HBox(12, nameAndAgeLabel, completionChip);
+            HBox titleRow = new HBox(UiConstants.SPACING_MEDIUM, nameAndAgeLabel, completionChip);
             titleRow.setFillHeight(true);
 
             Label locationLabel = new Label("📍 " + snapshot.location());
@@ -993,7 +994,7 @@ public class ProfileController extends BaseController implements Initializable {
             bioPreviewLabel.setWrapText(true);
             bioPreviewLabel.getStyleClass().add("text-secondary");
 
-            FlowPane interestPane = new FlowPane(8, 8);
+            FlowPane interestPane = new FlowPane(UiConstants.SPACING_SMALL, UiConstants.SPACING_SMALL);
             interestPane.getStyleClass().add("interests-container");
             if (snapshot.interests().isEmpty()) {
                 Label placeholderChip = new Label("No interests added yet");
@@ -1026,8 +1027,8 @@ public class ProfileController extends BaseController implements Initializable {
             var completion = viewModel.calculateCurrentCompletion();
 
             Dialog<ButtonType> dialog = createThemedDialog("Profile Score", "Your profile quality breakdown");
-            VBox scoreContent = new VBox(16);
-            scoreContent.setPadding(new Insets(24));
+            VBox scoreContent = new VBox(UiConstants.SPACING_LARGE);
+            scoreContent.setPadding(new Insets(UiConstants.PADDING_XXLARGE));
             scoreContent.setPrefWidth(460);
 
             Label scoreLabel =
@@ -1037,14 +1038,14 @@ public class ProfileController extends BaseController implements Initializable {
             ProgressBar totalProgress = new ProgressBar(completion.score() / 100.0);
             totalProgress.setPrefWidth(380);
 
-            VBox breakdownBox = new VBox(12);
+            VBox breakdownBox = new VBox(UiConstants.SPACING_MEDIUM);
             completion.breakdown().forEach(category -> {
-                VBox categoryBox = new VBox(6);
+                VBox categoryBox = new VBox(UiConstants.SPACING_SMALL - UiConstants.SPACING_XSMALL);
                 Label categoryLabel = new Label(category.category() + " • " + category.score() + "%");
                 categoryLabel.getStyleClass().add("stat-label-primary");
                 ProgressBar categoryProgress = new ProgressBar(category.score() / 100.0);
                 categoryProgress.setPrefWidth(360);
-                VBox missingItems = new VBox(4);
+                VBox missingItems = new VBox(UiConstants.SPACING_XSMALL);
                 if (category.missingItems().isEmpty()) {
                     Label doneLabel = new Label("Fully completed");
                     doneLabel.getStyleClass().add("text-secondary");
@@ -1060,7 +1061,7 @@ public class ProfileController extends BaseController implements Initializable {
                 breakdownBox.getChildren().add(categoryBox);
             });
 
-            VBox nextStepsBox = new VBox(6);
+            VBox nextStepsBox = new VBox(UiConstants.SPACING_SMALL - UiConstants.SPACING_XSMALL);
             if (!completion.nextSteps().isEmpty()) {
                 Label nextStepsTitle = new Label("Next steps");
                 nextStepsTitle.getStyleClass().add("stat-label-primary");
@@ -1073,7 +1074,12 @@ public class ProfileController extends BaseController implements Initializable {
                 });
             }
 
-            VBox rootBox = new VBox(18, scoreLabel, totalProgress, breakdownBox, nextStepsBox);
+            VBox rootBox = new VBox(
+                    UiConstants.SPACING_XLARGE - UiConstants.SPACING_XSMALL,
+                    scoreLabel,
+                    totalProgress,
+                    breakdownBox,
+                    nextStepsBox);
             ScrollPane scrollPane = new ScrollPane(rootBox);
             scrollPane.setFitToWidth(true);
             scrollPane.getStyleClass().add("transparent-scroll");

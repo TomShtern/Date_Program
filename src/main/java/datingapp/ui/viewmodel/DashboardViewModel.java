@@ -203,7 +203,7 @@ public class DashboardViewModel extends BaseViewModel {
             UUID pickUserId = null;
             if (dailyPick.isPresent()) {
                 User pickUser = dailyPick.get().user();
-                int age = pickUser.getAge(config.safety().userTimeZone());
+                int age = pickUser.getAge(config.safety().userTimeZone()).orElse(0);
                 pickName = pickUser.getName() + ", " + age;
                 pickUserId = pickUser.getId();
             }

@@ -102,8 +102,9 @@ public final class TestStorages {
                     .filter(u -> !u.getId().equals(excludeId))
                     .filter(u -> u.getState() == UserState.ACTIVE)
                     .filter(u -> genders == null || genders.isEmpty() || genders.contains(u.getGender()))
-                    .filter(u -> u.getAge(java.time.ZoneId.of("UTC")) >= minAge
-                            && u.getAge(java.time.ZoneId.of("UTC")) <= maxAge)
+                    .filter(u -> u.getAge(java.time.ZoneId.of("UTC"))
+                            .map(age -> age >= minAge && age <= maxAge)
+                            .orElse(false))
                     .toList();
         }
 
@@ -409,7 +410,7 @@ public final class TestStorages {
         public void delete(String matchId) {
             Match match = matches.get(matchId);
             if (match != null) {
-                match.restoreDeletedAt(AppClock.now());
+                match.markDeleted(AppClock.now());
             }
         }
 
@@ -706,6 +707,7 @@ public final class TestStorages {
         private final List<ProfileViewEvent> profileViews = new ArrayList<>();
         private final Map<UUID, List<UserAchievement>> achievements = new HashMap<>();
         private final Set<String> dailyPickViews = new HashSet<>();
+        private final Map<String, UUID> dailyPicks = new HashMap<>();
         private final Map<UUID, Session> sessions = new HashMap<>();
 
         @Override
@@ -859,6 +861,16 @@ public final class TestStorages {
         @Override
         public boolean isDailyPickViewed(UUID userId, LocalDate date) {
             return dailyPickViews.contains(dailyPickKey(userId, date));
+        }
+
+        @Override
+        public Optional<UUID> getDailyPickUser(UUID userId, LocalDate date) {
+            return Optional.ofNullable(dailyPicks.get(dailyPickKey(userId, date)));
+        }
+
+        @Override
+        public void saveDailyPickUser(UUID userId, UUID pickedUserId, LocalDate date) {
+            dailyPicks.put(dailyPickKey(userId, date), pickedUserId);
         }
 
         @Override

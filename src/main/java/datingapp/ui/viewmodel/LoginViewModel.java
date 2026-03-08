@@ -388,7 +388,7 @@ public class LoginViewModel extends BaseViewModel {
     private static String buildSearchable(User user, java.time.ZoneId zone) {
         String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);
         String state = user.getState() == null ? "" : user.getState().name().toLowerCase(Locale.ROOT);
-        int age = user.getAge(zone);
+        int age = user.getAge(zone).orElse(0);
         String ageText = age > 0 ? String.valueOf(age) : "";
         String verifiedTag = user.isVerified() ? "verified" : "";
         return String.join(" ", name, state, ageText, verifiedTag);

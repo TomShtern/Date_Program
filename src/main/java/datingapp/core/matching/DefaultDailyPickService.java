@@ -11,10 +11,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
@@ -29,15 +26,6 @@ public final class DefaultDailyPickService implements DailyPickService {
     private final CandidateFinder candidateFinder;
     private final AppConfig config;
     private final Clock clock;
-
-    private static final int MAX_CACHED_PICKS = 1000;
-    private final Map<String, UUID> cachedDailyPicks =
-            Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, UUID> eldest) {
-                    return size() > MAX_CACHED_PICKS;
-                }
-            });
 
     public DefaultDailyPickService(
             UserStorage userStorage,
@@ -76,22 +64,31 @@ public final class DefaultDailyPickService implements DailyPickService {
         long seed = today.toEpochDay() + seeker.getId().hashCode();
         Random pickRandom = new Random(seed);
 
-        String cacheKey = seeker.getId() + "_" + today;
-
-        UUID pickedId = cachedDailyPicks.computeIfAbsent(cacheKey, ignoredKey -> candidates
-                .get(pickRandom.nextInt(candidates.size()))
-                .getId());
+        UUID pickedId = analyticsStorage
+                .getDailyPickUser(seeker.getId(), today)
+                .filter(cachedId -> candidates.stream()
+                        .anyMatch(candidate -> candidate.getId().equals(cachedId)))
+                .orElseGet(() -> {
+                    UUID generatedPickId = candidates
+                            .get(pickRandom.nextInt(candidates.size()))
+                            .getId();
+                    analyticsStorage.saveDailyPickUser(seeker.getId(), generatedPickId, today);
+                    return generatedPickId;
+                });
 
         User picked = candidates.stream()
                 .filter(candidate -> candidate.getId().equals(pickedId))
                 .findFirst()
-                .orElse(null);
-
-        if (picked == null) {
-            cachedDailyPicks.remove(cacheKey);
-            picked = candidates.get(pickRandom.nextInt(candidates.size()));
-            cachedDailyPicks.put(cacheKey, picked.getId());
-        }
+                .orElseGet(() -> {
+                    UUID generatedPickId = candidates
+                            .get(pickRandom.nextInt(candidates.size()))
+                            .getId();
+                    analyticsStorage.saveDailyPickUser(seeker.getId(), generatedPickId, today);
+                    return candidates.stream()
+                            .filter(candidate -> candidate.getId().equals(generatedPickId))
+                            .findFirst()
+                            .orElseThrow();
+                });
 
         long reasonSeed =
                 seed ^ picked.getId().getMostSignificantBits() ^ picked.getId().getLeastSignificantBits();
@@ -122,10 +119,7 @@ public final class DefaultDailyPickService implements DailyPickService {
 
     @Override
     public int cleanupOldDailyPickViews(LocalDate before) {
-        int removed = analyticsStorage.deleteDailyPickViewsOlderThan(before);
-        String todaySuffix = "_" + LocalDate.now(clock);
-        cachedDailyPicks.entrySet().removeIf(entry -> !entry.getKey().endsWith(todaySuffix));
-        return removed;
+        return analyticsStorage.deleteDailyPickViewsOlderThan(before);
     }
 
     private String generateReason(User seeker, User picked, Random random) {
@@ -158,7 +152,11 @@ public final class DefaultDailyPickService implements DailyPickService {
 
     private void addAgeReasons(List<String> reasons, User seeker, User picked) {
         ZoneId tz = config.safety().userTimeZone();
-        int ageDiff = Math.abs(seeker.getAge(tz) - picked.getAge(tz));
+        if (seeker.getAge(tz).isEmpty() || picked.getAge(tz).isEmpty()) {
+            return;
+        }
+        int ageDiff =
+                Math.abs(seeker.getAge(tz).orElseThrow() - picked.getAge(tz).orElseThrow());
         if (ageDiff <= config.algorithm().similarAgeDiff()) {
             reasons.add("Similar age");
         } else if (ageDiff <= config.algorithm().compatibleAgeDiff()) {

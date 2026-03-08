@@ -239,7 +239,7 @@ public class RestApiServer {
         // Use paginated query — prevents OOM for users with thousands of matches.
         var page = matchingService.getPageOfMatchesForUser(userId, offset, limit);
         Set<UUID> otherUserIds = page.items().stream()
-                .map(match -> otherUserId(match, userId))
+                .map(match -> match.getOtherUser(userId))
                 .collect(java.util.stream.Collectors.toSet());
         Map<UUID, String> userNamesById = profileService.getUsersByIds(otherUserIds).values().stream()
                 .collect(java.util.stream.Collectors.toMap(User::getId, User::getName));
@@ -542,12 +542,8 @@ public class RestApiServer {
         }
     }
 
-    private UUID otherUserId(Match match, UUID currentUserId) {
-        return match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
-    }
-
     private MatchSummary toMatchSummary(Match match, UUID currentUserId, Map<UUID, String> userNamesById) {
-        UUID otherUserId = otherUserId(match, currentUserId);
+        UUID otherUserId = match.getOtherUser(currentUserId);
         String otherUserName = userNamesById.getOrDefault(otherUserId, UNKNOWN_USER);
         return new MatchSummary(
                 match.getId(), otherUserId, otherUserName, match.getState().name(), match.getCreatedAt());
@@ -667,7 +663,7 @@ public class RestApiServer {
         public static UserSummary from(User user, ZoneId userTimeZone) {
             return new UserSummary(
                     user.getId(), user.getName(),
-                    user.getAge(userTimeZone), user.getState().name());
+                    user.getAge(userTimeZone).orElse(0), user.getState().name());
         }
     }
 
@@ -692,7 +688,7 @@ public class RestApiServer {
             return new UserDetail(
                     user.getId(),
                     user.getName(),
-                    user.getAge(userTimeZone),
+                    user.getAge(userTimeZone).orElse(0),
                     user.getBio(),
                     user.getGender() != null ? user.getGender().name() : null,
                     user.getInterestedIn().stream().map(Enum::name).toList(),
@@ -708,7 +704,7 @@ public class RestApiServer {
     public static record MatchSummary(
             String matchId, UUID otherUserId, String otherUserName, String state, Instant createdAt) {
         public static MatchSummary from(Match match, UUID currentUserId) {
-            UUID otherUserId = match.getUserA().equals(currentUserId) ? match.getUserB() : match.getUserA();
+            UUID otherUserId = match.getOtherUser(currentUserId);
             return new MatchSummary(
                     match.getId(), otherUserId, UNKNOWN_USER, match.getState().name(), match.getCreatedAt());
         }

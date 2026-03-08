@@ -486,7 +486,7 @@ public class MatchingController extends BaseController implements Initializable 
         }
 
         @SuppressWarnings("deprecation") // UI display - system timezone appropriate
-        int age = user.getAge();
+        int age = user.getAge().orElse(0);
         nameLabel.setText(user.getName() + ", " + age);
         bioLabel.setText(user.getBio() != null ? user.getBio() : "No bio provided.");
         distanceLabel.setText("📍 " + viewModel.getDistanceDisplay(user));

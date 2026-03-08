@@ -300,8 +300,12 @@ public class LoginController extends BaseController implements Initializable {
         dialog.getDialogPane().getButtonTypes().addAll(createButtonType, ButtonType.CANCEL);
 
         // Create the form with VBox for better spacing
-        VBox content = new VBox(20);
-        content.setPadding(new Insets(30, 40, 20, 40));
+        VBox content = new VBox(UiConstants.SPACING_XLARGE);
+        content.setPadding(new Insets(
+                UiConstants.PADDING_DIALOG_TOP,
+                UiConstants.PADDING_DIALOG_HORIZONTAL,
+                UiConstants.PADDING_XLARGE,
+                UiConstants.PADDING_DIALOG_HORIZONTAL));
         content.setStyle(STYLE_SURFACE_DARK);
 
         // Title
@@ -533,7 +537,11 @@ public class LoginController extends BaseController implements Initializable {
 
                 textBox.getChildren().addAll(nameLabel, detailsLabel, badgeRow);
                 container.setAlignment(Pos.CENTER_LEFT);
-                container.setPadding(new Insets(8, 12, 8, 12));
+                container.setPadding(new Insets(
+                        UiConstants.PADDING_SMALL,
+                        UiConstants.PADDING_MEDIUM,
+                        UiConstants.PADDING_SMALL,
+                        UiConstants.PADDING_MEDIUM));
                 container.getChildren().addAll(avatarContainer, textBox);
 
                 selectedProperty().addListener((obs, oldVal, newVal) -> animateSelection(newVal));
@@ -550,7 +558,7 @@ public class LoginController extends BaseController implements Initializable {
                 } else {
                     setText(null);
                     @SuppressWarnings("deprecation") // UI display - system timezone appropriate
-                    int age = user.getAge();
+                    int age = user.getAge().orElse(0);
                     nameLabel.setText(user.getName() + ", " + age);
 
                     StringBuilder sb = new StringBuilder(formatState(user.getState()));

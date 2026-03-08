@@ -2,6 +2,7 @@ package datingapp.ui.screen;
 
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiConstants;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.SocialViewModel;
 import datingapp.ui.viewmodel.SocialViewModel.FriendRequestEntry;
@@ -105,7 +106,11 @@ public class SocialController extends BaseController implements Initializable {
             HBox.setHgrow(infoBox, Priority.ALWAYS);
 
             container.setAlignment(Pos.CENTER_LEFT);
-            container.setPadding(new Insets(12, 16, 12, 16));
+            container.setPadding(new Insets(
+                    UiConstants.PADDING_MEDIUM,
+                    UiConstants.PADDING_LARGE,
+                    UiConstants.PADDING_MEDIUM,
+                    UiConstants.PADDING_LARGE));
             container.getChildren().addAll(unreadDot, infoBox);
 
             // Tap to mark as read
@@ -167,7 +172,11 @@ public class SocialController extends BaseController implements Initializable {
 
             HBox.setHgrow(spacer, Priority.ALWAYS);
             container.setAlignment(Pos.CENTER_LEFT);
-            container.setPadding(new Insets(12, 16, 12, 16));
+            container.setPadding(new Insets(
+                    UiConstants.PADDING_MEDIUM,
+                    UiConstants.PADDING_LARGE,
+                    UiConstants.PADDING_MEDIUM,
+                    UiConstants.PADDING_LARGE));
             container.getChildren().addAll(fromLabel, spacer, acceptButton, declineButton);
         }
 

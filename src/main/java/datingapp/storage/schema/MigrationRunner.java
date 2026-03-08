@@ -97,7 +97,11 @@ public final class MigrationRunner {
             new VersionedMigration(
                     6,
                     "Reapply user-column backfills for databases that already recorded V5 before later user projections were added",
-                    MigrationRunner::applyV6));
+                    MigrationRunner::applyV6),
+            new VersionedMigration(
+                    7,
+                    "Add persistent daily_picks cache table for daily pick continuity across restarts",
+                    MigrationRunner::applyV7));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -219,6 +223,22 @@ public final class MigrationRunner {
      */
     private static void applyV6(Statement stmt) throws SQLException {
         migrateSchemaColumns(stmt);
+    }
+
+    private static void applyV7(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS daily_picks (
+                    user_id UUID NOT NULL,
+                    pick_date DATE NOT NULL,
+                    picked_user_id UUID NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    PRIMARY KEY (user_id, pick_date)
+                )
+                """);
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_daily_picks_pick_date ON daily_picks(pick_date)");
+        addForeignKeyIfPresent(stmt, "daily_picks", "fk_daily_picks_user", USER_ID_COLUMN, USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(
+                stmt, "daily_picks", "fk_daily_picks_picked_user", "picked_user_id", USERS_TABLE, ID_COLUMN);
     }
 
     static void backfillNormalizedProfileData(Statement stmt) throws SQLException {

@@ -284,7 +284,7 @@ class DailyPickServiceTest {
     }
 
     @Test
-    void getDailyPick_cachedPickSurvivesCandidateListChanges() {
+    void getDailyPick_replacesPersistedPickWhenCachedUserBecomesUnavailable() {
         User seeker = createActiveUser("Seeker", 25);
         User candidate1 = createActiveUser("Candidate1", 26);
         User candidate2 = createActiveUser("Candidate2", 27);
@@ -297,40 +297,41 @@ class DailyPickServiceTest {
 
         DailyPick firstPick = service.getDailyPick(seeker).orElseThrow();
         UUID pickedId = firstPick.user().getId();
-
-        if (!candidate1.getId().equals(pickedId)) {
-            userStorage.delete(candidate1.getId());
-        } else {
-            userStorage.delete(candidate2.getId());
-        }
+        userStorage.delete(pickedId);
+        candidateFinder.clearCache();
 
         DailyPick secondPick = service.getDailyPick(seeker).orElseThrow();
 
-        assertEquals(pickedId, secondPick.user().getId());
+        assertNotEquals(pickedId, secondPick.user().getId());
     }
 
     @Test
-    void getDailyPick_enforcesMaxCacheSize() throws Exception {
-        User candidate = createActiveUser("TargetCandidate", 25);
-        userStorage.save(candidate);
+    void getDailyPick_persistsAcrossServiceRestart() {
+        User seeker = createActiveUser("Seeker", 25);
+        User candidate1 = createActiveUser("Candidate1", 26);
+        User candidate2 = createActiveUser("Candidate2", 27);
 
-        for (int i = 0; i < 1005; i++) {
-            User seeker = createActiveUser("Seeker" + i, 25);
-            userStorage.save(seeker);
-            service.getDailyPick(seeker);
-        }
+        userStorage.save(seeker);
+        userStorage.save(candidate1);
+        userStorage.save(candidate2);
 
-        java.lang.reflect.Field dailyPickServiceField =
-                RecommendationService.class.getDeclaredField("dailyPickService");
-        dailyPickServiceField.setAccessible(true);
-        Object dailyPickService = dailyPickServiceField.get(service);
+        DailyPick first = service.getDailyPick(seeker).orElseThrow();
 
-        java.lang.reflect.Field cacheField = dailyPickService.getClass().getDeclaredField("cachedDailyPicks");
-        cacheField.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        java.util.Map<String, UUID> cache = (java.util.Map<String, UUID>) cacheField.get(dailyPickService);
+        RecommendationService restartedService = RecommendationService.builder()
+                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(new TestStorages.Standouts())
+                .profileService(new ProfileService(
+                        config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage))
+                .config(config)
+                .clock(AppClock.clock())
+                .build();
 
-        assertTrue(cache.size() <= 1000, "Cache size should not exceed 1000, but was " + cache.size());
+        DailyPick second = restartedService.getDailyPick(seeker).orElseThrow();
+        assertEquals(first.user().getId(), second.user().getId());
     }
 
     // Helper methods

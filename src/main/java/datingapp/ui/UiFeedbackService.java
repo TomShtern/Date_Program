@@ -109,7 +109,7 @@ public final class UiFeedbackService {
         HBox toast = createToast(message, level);
         toastContainer.getChildren().add(toast);
         StackPane.setAlignment(toast, Pos.BOTTOM_CENTER);
-        StackPane.setMargin(toast, new Insets(0, 0, 30, 0));
+        StackPane.setMargin(toast, new Insets(0, 0, UiConstants.TOAST_BOTTOM_MARGIN, 0));
 
         // Initial state for entrance animation
         toast.setOpacity(0);

@@ -17,6 +17,7 @@ public class DatingApp extends Application {
     private static final Logger logger = LoggerFactory.getLogger(DatingApp.class);
 
     private NavigationService navigationService;
+    private ViewModelFactory viewModelFactory;
 
     @Override
     public void init() throws Exception {
@@ -29,7 +30,7 @@ public class DatingApp extends Application {
 
         // Initialize UI framework components
         logger.debug("Creating ViewModelFactory...");
-        ViewModelFactory viewModelFactory = new ViewModelFactory(serviceRegistry);
+        this.viewModelFactory = new ViewModelFactory(serviceRegistry);
         logger.debug("ViewModelFactory created.");
 
         logger.debug("Setting up NavigationService...");
@@ -69,6 +70,9 @@ public class DatingApp extends Application {
     @Override
     public void stop() {
         logger.info("Shutting down Dating App GUI...");
+        if (viewModelFactory != null) {
+            viewModelFactory.dispose();
+        }
         ApplicationStartup.shutdown();
     }
 

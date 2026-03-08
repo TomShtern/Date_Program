@@ -247,8 +247,7 @@ class JdbiUserStorageMigrationTest {
             assertTrue(columnExists(stmt, "USERS", "VERIFIED_AT"));
             assertTrue(columnExists(stmt, "USERS", "PACE_COMMUNICATION_STYLE"));
             assertTrue(columnExists(stmt, "USERS", "PACE_DEPTH_PREFERENCE"));
-            assertDoesNotThrow(
-                    () -> stmt.executeQuery("SELECT " + JdbiUserStorage.ALL_COLUMNS + " FROM users WHERE 1 = 0"));
+            assertDoesNotThrow(() -> stmt.executeQuery("SELECT * FROM users WHERE 1 = 0"));
         }
     }
 

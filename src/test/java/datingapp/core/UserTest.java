@@ -117,7 +117,7 @@ class UserTest {
         User user = new User(UUID.randomUUID(), "Eve");
         user.setBirthDate(AppClock.today().minusYears(25).minusDays(10));
 
-        assertEquals(25, user.getAge(ZoneId.of("UTC")));
+        assertEquals(25, user.getAge(ZoneId.of("UTC")).orElseThrow());
     }
 
     @Test

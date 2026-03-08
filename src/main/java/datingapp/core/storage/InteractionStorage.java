@@ -130,7 +130,7 @@ public interface InteractionStorage {
     default Set<UUID> getMatchedCounterpartIds(UUID userId) {
         Objects.requireNonNull(userId, "userId cannot be null");
         return getAllMatchesFor(userId).stream()
-                .map(match -> match.getUserA().equals(userId) ? match.getUserB() : match.getUserA())
+                .map(match -> match.getOtherUser(userId))
                 .collect(Collectors.toUnmodifiableSet());
     }
 

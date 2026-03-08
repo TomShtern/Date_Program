@@ -4,6 +4,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +14,7 @@ public final class AppSession {
     private static final AppSession INSTANCE = new AppSession();
     private static final Logger LOGGER = LoggerFactory.getLogger(AppSession.class);
 
-    private User currentUser;
+    private final AtomicReference<User> currentUser = new AtomicReference<>();
     private final List<Consumer<User>> listeners = new CopyOnWriteArrayList<>();
 
     private AppSession() {}
@@ -22,21 +23,22 @@ public final class AppSession {
         return INSTANCE;
     }
 
-    public synchronized User getCurrentUser() {
-        return currentUser;
+    public User getCurrentUser() {
+        return currentUser.get();
     }
 
-    public synchronized void setCurrentUser(User user) {
-        this.currentUser = user;
+    public void setCurrentUser(User user) {
+        currentUser.set(user);
         notifyListeners(user);
     }
 
-    public synchronized boolean isLoggedIn() {
-        return currentUser != null;
+    public boolean isLoggedIn() {
+        return currentUser.get() != null;
     }
 
-    public synchronized boolean isActive() {
-        return currentUser != null && currentUser.getState() == UserState.ACTIVE;
+    public boolean isActive() {
+        User user = currentUser.get();
+        return user != null && user.getState() == UserState.ACTIVE;
     }
 
     public void logout() {
@@ -67,8 +69,8 @@ public final class AppSession {
     /**
      * Resets the session state. Used primarily for testing.
      */
-    public synchronized void reset() {
-        currentUser = null;
+    public void reset() {
+        currentUser.set(null);
         listeners.clear();
     }
 }

@@ -164,7 +164,7 @@ class MatchesViewModelTest {
                 otherUser.getId(),
                 UUID.randomUUID(),
                 otherUser.getName(),
-                otherUser.getAge(ZoneId.of("UTC")),
+                otherUser.getAge(ZoneId.of("UTC")).orElse(0),
                 "Bio",
                 "Just now",
                 null);

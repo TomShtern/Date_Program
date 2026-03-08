@@ -920,7 +920,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     public static class MatchMapper implements RowMapper<Match> {
         @Override
         public Match map(ResultSet rs, StatementContext ctx) throws SQLException {
-            Match match = new Match(
+            return new Match(
                     rs.getString("id"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_a"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_b"),
@@ -928,9 +928,8 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     JdbiTypeCodecs.SqlRowReaders.readEnum(rs, PARAM_STATE, MatchState.class),
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "ended_by"),
-                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "end_reason", MatchArchiveReason.class));
-            match.restoreDeletedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "deleted_at"));
-            return match;
+                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "end_reason", MatchArchiveReason.class),
+                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "deleted_at"));
         }
     }
 

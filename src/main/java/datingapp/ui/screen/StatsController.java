@@ -2,6 +2,7 @@ package datingapp.ui.screen;
 
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiConstants;
 import datingapp.ui.viewmodel.StatsViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -137,7 +138,7 @@ public class StatsController extends BaseController implements Initializable {
             descLabel.setStyle("-fx-font-size: 12px;");
             textBox.getChildren().addAll(nameLabel, descLabel);
             container.setAlignment(Pos.CENTER_LEFT);
-            container.setPadding(new Insets(12));
+            container.setPadding(new Insets(UiConstants.PADDING_MEDIUM));
             HBox.setHgrow(textBox, Priority.ALWAYS);
             container.getChildren().addAll(iconStack, textBox);
 

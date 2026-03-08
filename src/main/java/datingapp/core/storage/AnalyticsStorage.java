@@ -68,6 +68,10 @@ public interface AnalyticsStorage {
 
     boolean isDailyPickViewed(UUID userId, LocalDate date);
 
+    Optional<UUID> getDailyPickUser(UUID userId, LocalDate date);
+
+    void saveDailyPickUser(UUID userId, UUID pickedUserId, LocalDate date);
+
     int deleteDailyPickViewsOlderThan(LocalDate before);
 
     int deleteExpiredDailyPickViews(Instant cutoff);

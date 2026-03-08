@@ -60,8 +60,12 @@ public final class DefaultCompatibilityCalculator implements CompatibilityCalcul
 
     @Override
     public double calculateAgeScore(User me, User them) {
-        int ageDiff = Math.abs(me.getAge(config.safety().userTimeZone())
-                - them.getAge(config.safety().userTimeZone()));
+        if (me.getAge(config.safety().userTimeZone()).isEmpty()
+                || them.getAge(config.safety().userTimeZone()).isEmpty()) {
+            return NEUTRAL_SCORE;
+        }
+        int ageDiff = Math.abs(me.getAge(config.safety().userTimeZone()).orElseThrow()
+                - them.getAge(config.safety().userTimeZone()).orElseThrow());
         return calculateAgeScore(ageDiff, me, them, AGE_SIMILAR_YEARS);
     }
 

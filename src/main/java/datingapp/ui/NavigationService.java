@@ -476,7 +476,8 @@ public final class NavigationService {
         themeToggleOverlay = new StackPane(themeToggleButton);
         themeToggleOverlay.setPickOnBounds(false);
         themeToggleOverlay.setMouseTransparent(false);
-        themeToggleOverlay.setPadding(new Insets(18, 22, 0, 0));
+        themeToggleOverlay.setPadding(
+                new Insets(UiConstants.PADDING_OVERLAY_TOP, UiConstants.PADDING_OVERLAY_RIGHT, 0, 0));
         StackPane.setAlignment(themeToggleOverlay, Pos.TOP_RIGHT);
     }
 

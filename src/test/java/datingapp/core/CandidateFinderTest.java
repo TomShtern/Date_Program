@@ -3,7 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.matching.*;
+import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
@@ -28,6 +28,9 @@ import org.junit.jupiter.api.*;
 class CandidateFinderTest {
 
     private CandidateFinder finder;
+    private CountingUsers userStorage;
+    private TestStorages.Interactions interactionStorage;
+    private TestStorages.TrustSafety trustSafetyStorage;
     private User seeker;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
     private static final AppConfig CONFIG = AppConfig.defaults();
@@ -37,9 +40,9 @@ class CandidateFinderTest {
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
-        var userStorage = new TestStorages.Users();
-        var interactionStorage = new TestStorages.Interactions();
-        var trustSafetyStorage = new TestStorages.TrustSafety();
+        userStorage = new CountingUsers();
+        interactionStorage = new TestStorages.Interactions();
+        trustSafetyStorage = new TestStorages.TrustSafety();
 
         finder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZONE);
         seeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.0853, 34.7818);
@@ -154,6 +157,23 @@ class CandidateFinderTest {
         List<User> result = finder.findCandidatesForUser(noLocationSeeker);
 
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("findCandidatesForUser caches by seeker and invalidates on demand")
+    void findCandidatesForUserCachesAndInvalidates() {
+        User cachedSeeker = createUser("CachedSeeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.0853, 34.7818);
+        User candidate = createUser("Candidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.1, 34.8);
+        userStorage.save(cachedSeeker);
+        userStorage.save(candidate);
+
+        finder.findCandidatesForUser(cachedSeeker);
+        finder.findCandidatesForUser(cachedSeeker);
+        assertEquals(1, userStorage.findCandidatesCallCount());
+
+        finder.invalidateCacheFor(cachedSeeker.getId());
+        finder.findCandidatesForUser(cachedSeeker);
+        assertEquals(2, userStorage.findCandidatesCallCount());
     }
 
     private User createUser(String name, Gender gender, Set<Gender> interestedIn, int age, double lat, double lon) {
@@ -272,6 +292,27 @@ class CandidateFinderTest {
             // 1 degree latitude ≈ 111km, so 0.001 degrees ≈ 111m
             double distance = GeoUtils.distanceKm(32.0853, 34.7818, 32.0862, 34.7818);
             assertEquals(0.1, distance, 0.02); // 100m ± 20m
+        }
+    }
+
+    private static final class CountingUsers extends TestStorages.Users {
+        private int findCandidatesCallCount;
+
+        @Override
+        public List<User> findCandidates(
+                UUID excludeId,
+                Set<Gender> genders,
+                int minAge,
+                int maxAge,
+                double seekerLat,
+                double seekerLon,
+                int maxDistanceKm) {
+            findCandidatesCallCount++;
+            return super.findCandidates(excludeId, genders, minAge, maxAge, seekerLat, seekerLon, maxDistanceKm);
+        }
+
+        int findCandidatesCallCount() {
+            return findCandidatesCallCount;
         }
     }
 }

@@ -49,6 +49,7 @@ public final class ViewModelAsyncScope {
     private final Set<TaskHandle> activeHandles = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, AtomicLong> latestVersions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, TaskHandle> latestHandles = new ConcurrentHashMap<>();
+    private final Object keyedTaskRegistrationLock = new Object();
 
     private final AtomicReference<Consumer<Boolean>> loadingStateConsumer = new AtomicReference<>();
 
@@ -124,14 +125,10 @@ public final class ViewModelAsyncScope {
             return PollingTaskHandle.cancelled(safeTaskName, interval);
         }
 
-        long version = nextVersion(taskKey);
         PollingTaskHandle handle = new PollingTaskHandle(safeTaskName, interval);
         activeHandles.add(handle);
 
-        TaskHandle previous = latestHandles.put(taskKey, handle);
-        if (previous != null) {
-            previous.cancel();
-        }
+        long version = registerLatestTask(taskKey, handle);
 
         Runnable execution = () -> executePollingTask(handle, taskKey, version, safeTaskName, backgroundWork);
         Thread thread = Thread.ofVirtual().name(threadName(safeTaskName)).unstarted(execution);
@@ -167,16 +164,10 @@ public final class ViewModelAsyncScope {
             return ScopeTaskHandle.cancelled(safeTaskName, policy);
         }
 
-        long version = nextVersion(taskKey);
         ScopeTaskHandle handle = new ScopeTaskHandle(safeTaskName, policy);
         activeHandles.add(handle);
 
-        if (taskKey != null) {
-            TaskHandle previous = latestHandles.put(taskKey, handle);
-            if (previous != null) {
-                previous.cancel();
-            }
-        }
+        long version = registerLatestTask(taskKey, handle);
 
         if (policy.trackLoading()) {
             beginLoading();
@@ -188,6 +179,20 @@ public final class ViewModelAsyncScope {
         handle.bindThread(thread);
         thread.start();
         return handle;
+    }
+
+    private long registerLatestTask(String taskKey, TaskHandle handle) {
+        if (taskKey == null) {
+            return -1L;
+        }
+        synchronized (keyedTaskRegistrationLock) {
+            long version = nextVersion(taskKey);
+            TaskHandle previous = latestHandles.put(taskKey, handle);
+            if (previous != null) {
+                previous.cancel();
+            }
+            return version;
+        }
     }
 
     private <T> void executeTask(

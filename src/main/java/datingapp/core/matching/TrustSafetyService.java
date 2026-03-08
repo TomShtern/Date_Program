@@ -34,6 +34,7 @@ public class TrustSafetyService {
     private final Duration verificationTtl;
     private final Random random;
     private final RelationshipWorkflowPolicy workflowPolicy;
+    private CandidateFinder candidateFinder;
 
     /** Convenience constructor without communication storage (for tests and simple setups). */
     public TrustSafetyService(
@@ -245,6 +246,8 @@ public class TrustSafetyService {
                 communicationStorage.setConversationVisibility(convo.getId(), blockerId, false);
             });
         }
+
+        invalidateCandidateCaches(blockerId, blockedId);
     }
 
     /**
@@ -287,6 +290,18 @@ public class TrustSafetyService {
 
         logger.info("User {} blocked user {}", blockerId, blockedId);
         return new BlockResult(true, null);
+    }
+
+    public void setCandidateFinder(CandidateFinder candidateFinder) {
+        this.candidateFinder = candidateFinder;
+    }
+
+    private void invalidateCandidateCaches(UUID firstUserId, UUID secondUserId) {
+        if (candidateFinder == null) {
+            return;
+        }
+        candidateFinder.invalidateCacheFor(firstUserId);
+        candidateFinder.invalidateCacheFor(secondUserId);
     }
 
     /** Result of a block action. */

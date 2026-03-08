@@ -3,6 +3,7 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppSession;
@@ -14,9 +15,11 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyl
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;
 import datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency;
 import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -186,6 +189,36 @@ class UserSessionTest {
             userSession.setCurrentUser(finalUser);
             assertEquals(0, exceptions.get(), "Should have no concurrency exceptions");
             assertEquals(finalUser, userSession.getCurrentUser(), "Should cleanly accept final state");
+        }
+
+        @Test
+        @DisplayName("Reads stay responsive while listener work is in progress")
+        void readsStayResponsiveWhileListenerWorkIsInProgress() throws InterruptedException {
+            CountDownLatch listenerEntered = new CountDownLatch(1);
+            CountDownLatch releaseListener = new CountDownLatch(1);
+
+            userSession.addListener(_ -> {
+                listenerEntered.countDown();
+                try {
+                    releaseListener.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+
+            User user = new User(UUID.randomUUID(), "SlowListenerUser");
+            Thread writer = new Thread(() -> userSession.setCurrentUser(user));
+            writer.start();
+
+            assertTrue(listenerEntered.await(1, TimeUnit.SECONDS), "Listener did not start in time");
+
+            assertTimeoutPreemptively(Duration.ofMillis(200), () -> {
+                User current = userSession.getCurrentUser();
+                assertEquals(user, current, "Current user should be visible during listener work");
+            });
+
+            releaseListener.countDown();
+            writer.join(1000);
         }
     }
 

@@ -458,9 +458,13 @@ public class MatchingViewModel extends BaseViewModel {
         score += (int) (interestMatch.jaccardIndex() * 30);
 
         // Age compatibility (0-15 points)
-        int theirAge = candidate.getAge(candidateFinder.getTimezone());
-        if (theirAge >= currentUser.getMinAge() && theirAge <= currentUser.getMaxAge()) {
-            int currentUserAge = currentUser.getAge(candidateFinder.getTimezone());
+        Integer theirAge = candidate.getAge(candidateFinder.getTimezone()).orElse(null);
+        Integer currentUserAge =
+                currentUser.getAge(candidateFinder.getTimezone()).orElse(null);
+        if (theirAge != null
+                && currentUserAge != null
+                && theirAge >= currentUser.getMinAge()
+                && theirAge <= currentUser.getMaxAge()) {
             int ageDiff = Math.abs(theirAge - currentUserAge);
             score += Math.max(0, 15 - ageDiff); // Closer ages score higher
         }

@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -432,8 +433,9 @@ public class User {
      * @deprecated Use {@link #getAge(java.time.ZoneId)} to explicitly specify timezone.
      *             For business logic (matching, validation), always pass the configured timezone.
      */
-    @Deprecated
-    public int getAge() {
+    @Deprecated(since = "2026-03", forRemoval = false)
+    @SuppressWarnings("java:S1133")
+    public Optional<Integer> getAge() {
         return getAge(java.time.ZoneId.systemDefault());
     }
 
@@ -442,13 +444,13 @@ public class User {
      * timezone.
      *
      * @param timezone the timezone to use for age calculation
-     * @return the user's age in years, or 0 if birth date is not set
+     * @return the user's age in years, or empty if birth date is not set
      */
-    public int getAge(java.time.ZoneId timezone) {
+    public Optional<Integer> getAge(java.time.ZoneId timezone) {
         if (birthDate == null) {
-            return 0;
+            return Optional.empty();
         }
-        return Period.between(birthDate, AppClock.today(timezone)).getYears();
+        return Optional.of(Period.between(birthDate, AppClock.today(timezone)).getYears());
     }
 
     // Verification getters (Phase 2 feature)
@@ -568,7 +570,8 @@ public class User {
      *
      * @deprecated Use {@link #setMaxDistanceKm(int, int)} with explicit system limit
      */
-    @Deprecated
+    @Deprecated(since = "2026-03", forRemoval = false)
+    @SuppressWarnings("java:S1133")
     public void setMaxDistanceKm(int maxDistanceKm) {
         setMaxDistanceKm(maxDistanceKm, 500);
     }
@@ -594,7 +597,8 @@ public class User {
      *
      * @deprecated Use {@link #setAgeRange(int, int, int, int)} with explicit system limits
      */
-    @Deprecated
+    @Deprecated(since = "2026-03", forRemoval = false)
+    @SuppressWarnings("java:S1133")
     public void setAgeRange(int minAge, int maxAge) {
         setAgeRange(minAge, maxAge, 18, 120);
     }

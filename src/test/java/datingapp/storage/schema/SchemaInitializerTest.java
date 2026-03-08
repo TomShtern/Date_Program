@@ -158,6 +158,7 @@ class SchemaInitializerTest {
             Set<String> tables = getTableNames();
             assertTrue(tables.contains("USERS"), "Missing table: users");
             assertTrue(tables.contains("SCHEMA_VERSION"), "Missing table: schema_version");
+            assertTrue(tables.contains("DAILY_PICKS"), "Missing table: daily_picks");
 
             // Verify both V1 and V2 were recorded (new migration system applies both on
             // fresh DB)
@@ -179,6 +180,7 @@ class SchemaInitializerTest {
 
             Set<String> tables = getTableNames();
             assertTrue(tables.contains("USERS"));
+            assertTrue(tables.contains("DAILY_PICKS"));
         }
 
         @Test
@@ -199,6 +201,7 @@ class SchemaInitializerTest {
             assertTrue(tables.contains("USERS"));
             assertTrue(tables.contains("MATCHES"));
             assertTrue(tables.contains("CONVERSATIONS"));
+            assertTrue(tables.contains("DAILY_PICKS"));
         }
     }
 

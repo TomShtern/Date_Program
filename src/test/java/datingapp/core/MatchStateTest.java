@@ -99,7 +99,25 @@ class MatchStateTest {
 
             assertEquals(MatchState.FRIENDS, match.getState());
             assertTrue(match.canMessage());
+            assertNotNull(match.getEndedAt());
+            assertEquals(a, match.getEndedBy());
+            assertEquals(MatchArchiveReason.FRIEND_ZONE, match.getEndReason());
+        }
+
+        @Test
+        @DisplayName("Reverting from FRIENDS to ACTIVE clears audit fields")
+        void revertingFriendsToActiveClearsAuditFields() {
+            UUID a = UUID.randomUUID();
+            UUID b = UUID.randomUUID();
+            Match match = Match.create(a, b);
+
+            match.transitionToFriends(a);
+            match.revertToActive();
+
+            assertEquals(MatchState.ACTIVE, match.getState());
             assertNull(match.getEndedAt());
+            assertNull(match.getEndedBy());
+            assertNull(match.getEndReason());
         }
 
         @Test
@@ -243,7 +261,8 @@ class MatchStateTest {
             Instant createdAt = AppClock.now().minusSeconds(3600);
             Instant endedAt = AppClock.now();
 
-            Match match = new Match(id, a, b, createdAt, MatchState.UNMATCHED, endedAt, a, MatchArchiveReason.UNMATCH);
+            Match match =
+                    new Match(id, a, b, createdAt, MatchState.UNMATCHED, endedAt, a, MatchArchiveReason.UNMATCH, null);
 
             assertEquals(id, match.getId());
             assertEquals(a, match.getUserA());
@@ -265,7 +284,7 @@ class MatchStateTest {
             Instant now = AppClock.now();
             IllegalArgumentException ex = assertThrows(
                     IllegalArgumentException.class,
-                    () -> new Match(id, a, b, now, MatchState.ACTIVE, null, null, null),
+                    () -> new Match(id, a, b, now, MatchState.ACTIVE, null, null, null, null),
                     "Should throw when userA is not lexicographically smaller");
             assertNotNull(ex);
         }

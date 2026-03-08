@@ -3,6 +3,7 @@ package datingapp.ui.screen;
 import datingapp.core.AppClock;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiConstants;
 import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.MatchesViewModel;
@@ -527,7 +528,11 @@ public class MatchesController extends BaseController implements Initializable {
         card.getStyleClass().add("match-card");
         card.setAlignment(Pos.CENTER);
         card.setPrefWidth(220);
-        card.setPadding(new Insets(28, 20, 28, 20));
+        card.setPadding(new Insets(
+                UiConstants.PADDING_XXXLARGE,
+                UiConstants.PADDING_XLARGE,
+                UiConstants.PADDING_XXXLARGE,
+                UiConstants.PADDING_XLARGE));
 
         // Check if this is a new match (less than 24 hours old)
         boolean isNewMatch =
@@ -629,10 +634,10 @@ public class MatchesController extends BaseController implements Initializable {
             });
         });
 
-        HBox primaryActions = new HBox(8, messageBtn, friendZoneBtn);
+        HBox primaryActions = new HBox(UiConstants.SPACING_SMALL, messageBtn, friendZoneBtn);
         primaryActions.setAlignment(Pos.CENTER);
 
-        HBox secondaryActions = new HBox(8, gracefulExitBtn, unmatchBtn, blockBtn, reportBtn);
+        HBox secondaryActions = new HBox(UiConstants.SPACING_SMALL, gracefulExitBtn, unmatchBtn, blockBtn, reportBtn);
         secondaryActions.setAlignment(Pos.CENTER);
 
         card.getChildren().addAll(avatarContainer, nameLabel, timeLabel, primaryActions, secondaryActions);
@@ -848,7 +853,7 @@ public class MatchesController extends BaseController implements Initializable {
             viewModel.passOn(like);
         });
 
-        HBox actions = new HBox(10, likeBackBtn, passBtn);
+        HBox actions = new HBox(UiConstants.SPACING_STANDARD, likeBackBtn, passBtn);
         actions.getStyleClass().add("like-action-row");
 
         card.getChildren().add(actions);
@@ -873,7 +878,7 @@ public class MatchesController extends BaseController implements Initializable {
             viewModel.withdrawLike(like);
         });
 
-        HBox actions = new HBox(10, status, withdrawBtn);
+        HBox actions = new HBox(UiConstants.SPACING_STANDARD, status, withdrawBtn);
         actions.getStyleClass().add("like-action-row");
 
         card.getChildren().add(actions);
@@ -885,7 +890,11 @@ public class MatchesController extends BaseController implements Initializable {
         card.getStyleClass().add("like-card");
         card.setAlignment(Pos.CENTER);
         card.setPrefWidth(240);
-        card.setPadding(new Insets(24, 20, 24, 20));
+        card.setPadding(new Insets(
+                UiConstants.PADDING_XXLARGE,
+                UiConstants.PADDING_XLARGE,
+                UiConstants.PADDING_XXLARGE,
+                UiConstants.PADDING_XLARGE));
 
         StackPane avatarContainer = new StackPane();
         avatarContainer.getStyleClass().add("like-avatar-container");

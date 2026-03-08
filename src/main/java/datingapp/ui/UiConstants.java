@@ -23,6 +23,33 @@ public final class UiConstants {
     public static final int NAME_FORMAT_MAX_CHARS = 24;
     public static final int CONVERSATION_PREVIEW_CHARS = 35;
 
+    // ── Spacing and padding scale ────────────────────────────────────────────
+
+    public static final double SPACING_XSMALL = 4;
+    public static final double SPACING_SMALL = 8;
+    public static final double SPACING_STANDARD = 10;
+    public static final double SPACING_MEDIUM = 12;
+    public static final double SPACING_LARGE = 16;
+    public static final double SPACING_XLARGE = 20;
+    public static final double SPACING_XXLARGE = 24;
+    public static final double SPACING_XXXLARGE = 28;
+
+    public static final double PADDING_SMALL = 8;
+    public static final double PADDING_MEDIUM = 12;
+    public static final double PADDING_LARGE = 16;
+    public static final double PADDING_XLARGE = 20;
+    public static final double PADDING_XXLARGE = 24;
+    public static final double PADDING_XXXLARGE = 28;
+
+    public static final double PADDING_DIALOG_TOP = 30;
+    public static final double PADDING_DIALOG_HORIZONTAL = 40;
+    public static final double PADDING_OVERLAY_TOP = 18;
+    public static final double PADDING_OVERLAY_RIGHT = 22;
+    public static final double TOAST_BOTTOM_MARGIN = 30;
+
+    public static final double CHAT_LIST_HORIZONTAL_PADDING = 15;
+    public static final double CHAT_BUBBLE_HORIZONTAL_PADDING = 14;
+
     // ── Cache & resources ───────────────────────────────────────────────────
 
     /** Maximum number of images to cache before eviction. */

@@ -210,7 +210,11 @@ public class ChatController extends BaseController implements Initializable {
             textBox.getChildren().addAll(topRow, snippetLabel);
 
             container.setAlignment(Pos.CENTER_LEFT);
-            container.setPadding(new Insets(10, 15, 10, 15));
+            container.setPadding(new Insets(
+                    UiConstants.SPACING_STANDARD,
+                    UiConstants.CHAT_LIST_HORIZONTAL_PADDING,
+                    UiConstants.SPACING_STANDARD,
+                    UiConstants.CHAT_LIST_HORIZONTAL_PADDING));
             HBox.setHgrow(textBox, Priority.ALWAYS);
             container.getChildren().addAll(avatarStack, textBox);
         }
@@ -261,7 +265,11 @@ public class ChatController extends BaseController implements Initializable {
         public MessageListCell(ChatViewModel viewModel) {
             this.viewModel = viewModel;
             bubble.setMaxWidth(300);
-            bubble.setPadding(new Insets(10, 14, 10, 14));
+            bubble.setPadding(new Insets(
+                    UiConstants.SPACING_STANDARD,
+                    UiConstants.CHAT_BUBBLE_HORIZONTAL_PADDING,
+                    UiConstants.SPACING_STANDARD,
+                    UiConstants.CHAT_BUBBLE_HORIZONTAL_PADDING));
             contentLabel.setWrapText(true);
             contentLabel.setMaxWidth(280);
             timeLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.6);");
@@ -323,7 +331,11 @@ public class ChatController extends BaseController implements Initializable {
                     readReceiptIcon.setManaged(false);
                 }
 
-                container.setPadding(new Insets(4, 10, 4, 10));
+                container.setPadding(new Insets(
+                        UiConstants.SPACING_XSMALL,
+                        UiConstants.SPACING_STANDARD,
+                        UiConstants.SPACING_XSMALL,
+                        UiConstants.SPACING_STANDARD));
                 setGraphic(container);
                 setStyle("-fx-background-color: transparent;");
             }

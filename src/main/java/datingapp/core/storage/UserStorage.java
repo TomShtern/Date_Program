@@ -74,7 +74,8 @@ public interface UserStorage {
         return findActive().stream()
                 .filter(u -> !u.getId().equals(excludeId))
                 .filter(u -> genders.contains(u.getGender()))
-                .filter(u -> u.getAge() >= minAge && u.getAge() <= maxAge)
+                .filter(u ->
+                        u.getAge().map(age -> age >= minAge && age <= maxAge).orElse(false))
                 .filter(u -> !applyDistanceFilter || isWithinDistance(seekerLat, seekerLon, u, maxDistanceKm))
                 .toList();
     }

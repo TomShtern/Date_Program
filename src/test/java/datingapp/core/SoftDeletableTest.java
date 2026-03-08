@@ -127,26 +127,39 @@ class SoftDeletableTest {
         }
 
         @Test
-        @DisplayName("restoreDeletedAt allows null for storage reconstitution")
-        void restoreDeletedAtAllowsNull() {
-            UUID a = UUID.randomUUID();
-            UUID b = UUID.randomUUID();
-            Match match = Match.create(a, b);
+        @DisplayName("storage constructor allows null deletedAt")
+        void storageConstructorAllowsNullDeletedAt() {
+            Match base = Match.create(UUID.randomUUID(), UUID.randomUUID());
+            Match match = new Match(
+                    base.getId(),
+                    base.getUserA(),
+                    base.getUserB(),
+                    base.getCreatedAt(),
+                    base.getState(),
+                    base.getEndedAt(),
+                    base.getEndedBy(),
+                    base.getEndReason(),
+                    null);
 
-            match.restoreDeletedAt(null);
             assertNull(match.getDeletedAt());
             assertFalse(match.isDeleted());
         }
 
         @Test
-        @DisplayName("restoreDeletedAt round-trips from storage")
-        void restoreDeletedAtRoundTrips() {
+        @DisplayName("storage constructor round-trips deletedAt")
+        void storageConstructorRoundTripsDeletedAt() {
             Instant ts = Instant.parse("2026-03-01T08:00:00Z");
-            UUID a = UUID.randomUUID();
-            UUID b = UUID.randomUUID();
-            Match match = Match.create(a, b);
-
-            match.restoreDeletedAt(ts);
+            Match base = Match.create(UUID.randomUUID(), UUID.randomUUID());
+            Match match = new Match(
+                    base.getId(),
+                    base.getUserA(),
+                    base.getUserB(),
+                    base.getCreatedAt(),
+                    base.getState(),
+                    base.getEndedAt(),
+                    base.getEndedBy(),
+                    base.getEndReason(),
+                    ts);
 
             assertEquals(ts, match.getDeletedAt());
             assertTrue(match.isDeleted());

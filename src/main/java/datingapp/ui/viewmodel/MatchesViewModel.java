@@ -330,7 +330,7 @@ public class MatchesViewModel {
             if (liker != null && liker.getState() == UserState.ACTIVE) {
                 Like like = matchData.getLike(liker.getId(), userId).orElse(null);
                 if (like != null) {
-                    int age = liker.getAge(config.safety().userTimeZone());
+                    int age = liker.getAge(config.safety().userTimeZone()).orElse(0);
                     received.add(new LikeCardData(
                             liker.getId(),
                             like.id(),
@@ -363,7 +363,7 @@ public class MatchesViewModel {
             if (like != null && like.direction() == Like.Direction.LIKE) {
                 User otherUser = potentialUsers.get(otherUserId);
                 if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
-                    int age = otherUser.getAge(config.safety().userTimeZone());
+                    int age = otherUser.getAge(config.safety().userTimeZone()).orElse(0);
                     sent.add(new LikeCardData(
                             otherUser.getId(),
                             like.id(),

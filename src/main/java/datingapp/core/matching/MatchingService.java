@@ -30,6 +30,7 @@ public final class MatchingService {
     private ActivityMetricsService activityMetricsService; // Optional
     private UndoService undoService; // Optional
     private RecommendationService dailyService; // Optional
+    private CandidateFinder candidateFinder; // Optional
 
     /** Constructor with all dependencies (optional dependencies may be null). */
     public MatchingService(
@@ -39,12 +40,31 @@ public final class MatchingService {
             ActivityMetricsService activityMetricsService,
             UndoService undoService,
             RecommendationService dailyService) {
+        this(
+                interactionStorage,
+                trustSafetyStorage,
+                userStorage,
+                activityMetricsService,
+                undoService,
+                dailyService,
+                null);
+    }
+
+    public MatchingService(
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            UserStorage userStorage,
+            ActivityMetricsService activityMetricsService,
+            UndoService undoService,
+            RecommendationService dailyService,
+            CandidateFinder candidateFinder) {
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.activityMetricsService = activityMetricsService;
         this.undoService = undoService;
         this.dailyService = dailyService;
+        this.candidateFinder = candidateFinder;
     }
 
     public static Builder builder() {
@@ -58,6 +78,7 @@ public final class MatchingService {
         private ActivityMetricsService activityMetricsService;
         private UndoService undoService;
         private RecommendationService dailyService;
+        private CandidateFinder candidateFinder;
 
         public Builder interactionStorage(InteractionStorage storage) {
             this.interactionStorage = storage;
@@ -89,6 +110,11 @@ public final class MatchingService {
             return this;
         }
 
+        public Builder candidateFinder(CandidateFinder candidateFinder) {
+            this.candidateFinder = candidateFinder;
+            return this;
+        }
+
         public MatchingService build() {
             return new MatchingService(
                     interactionStorage,
@@ -96,7 +122,8 @@ public final class MatchingService {
                     userStorage,
                     activityMetricsService,
                     undoService,
-                    dailyService);
+                    dailyService,
+                    candidateFinder);
         }
     }
 
@@ -172,11 +199,20 @@ public final class MatchingService {
         Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
         Optional<Match> match = recordLike(like);
         undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
+        invalidateCandidateCaches(currentUser.getId(), candidate.getId());
 
         if (match.isPresent()) {
             return SwipeResult.matched(match.get(), like);
         }
         return liked ? SwipeResult.liked(like) : SwipeResult.passed(like);
+    }
+
+    private void invalidateCandidateCaches(UUID firstUserId, UUID secondUserId) {
+        if (candidateFinder == null) {
+            return;
+        }
+        candidateFinder.invalidateCacheFor(firstUserId);
+        candidateFinder.invalidateCacheFor(secondUserId);
     }
 
     // ================== Liker Browser Methods ==================

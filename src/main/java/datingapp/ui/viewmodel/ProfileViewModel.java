@@ -989,7 +989,7 @@ public class ProfileViewModel {
         User draftUser = createDraftUser();
         return new ProfilePreviewSnapshot(
                 draftUser.getName(),
-                draftUser.getAge(config.safety().userTimeZone()),
+                draftUser.getAge(config.safety().userTimeZone()).orElse(0),
                 draftUser.getBio() == null || draftUser.getBio().isBlank()
                         ? "No bio provided yet."
                         : draftUser.getBio(),

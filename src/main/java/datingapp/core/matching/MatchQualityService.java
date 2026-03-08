@@ -225,9 +225,10 @@ public class MatchQualityService {
                 distanceKm >= 0 ? calculator.calculateDistanceScore(distanceKm, me.getMaxDistanceKm()) : 0.5; // Neutral
 
         // Age Score
-        int ageDiff = Math.abs(me.getAge(config.safety().userTimeZone())
-                - them.getAge(config.safety().userTimeZone()));
-        double ageScore = calculator.calculateAgeScore(me, them);
+        Optional<Integer> meAge = me.getAge(config.safety().userTimeZone());
+        Optional<Integer> themAge = them.getAge(config.safety().userTimeZone());
+        int ageDiff = meAge.isPresent() && themAge.isPresent() ? Math.abs(meAge.get() - themAge.get()) : 0;
+        double ageScore = meAge.isPresent() && themAge.isPresent() ? calculator.calculateAgeScore(me, them) : 0.5;
 
         // Interest Score
         InterestMatcher.MatchResult interestMatch = InterestMatcher.compare(me.getInterests(), them.getInterests());
@@ -398,10 +399,13 @@ public class MatchQualityService {
         highlights.addAll(lifestyleMatches);
         addPaceHighlight(highlights, paceScore);
         addResponseHighlight(highlights, timeBetween);
-        addAgeHighlight(
-                highlights,
-                Math.abs(me.getAge(config.safety().userTimeZone())
-                        - them.getAge(config.safety().userTimeZone())));
+        if (me.getAge(config.safety().userTimeZone()).isPresent()
+                && them.getAge(config.safety().userTimeZone()).isPresent()) {
+            addAgeHighlight(
+                    highlights,
+                    Math.abs(me.getAge(config.safety().userTimeZone()).orElseThrow()
+                            - them.getAge(config.safety().userTimeZone()).orElseThrow()));
+        }
         if (highlights.size() > HIGHLIGHT_MAX_COUNT) {
             highlights = new ArrayList<>(highlights.subList(0, HIGHLIGHT_MAX_COUNT));
         }

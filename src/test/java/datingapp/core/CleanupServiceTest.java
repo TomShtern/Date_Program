@@ -298,6 +298,16 @@ class CleanupServiceTest {
         }
 
         @Override
+        public Optional<UUID> getDailyPickUser(UUID userId, LocalDate date) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void saveDailyPickUser(UUID userId, UUID pickedUserId, LocalDate date) {
+            // no-op for cleanup tests
+        }
+
+        @Override
         public int deleteDailyPickViewsOlderThan(LocalDate before) {
             return 0;
         }

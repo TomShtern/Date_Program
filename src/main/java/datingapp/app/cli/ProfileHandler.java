@@ -160,7 +160,7 @@ public class ProfileHandler implements LoggingSupport {
             logInfo(CliTextAndInput.BOX_TOP);
             String verifiedBadge = currentUser.isVerified() ? " ✅ Verified" : "";
             @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
-            int age = currentUser.getAge();
+            int age = currentUser.getAge().orElse(0);
             logInfo("│ 💝 {}, {} years old{}", currentUser.getName(), age, verifiedBadge);
             logInfo("│ 📍 Location: {}, {}", currentUser.getLat(), currentUser.getLon());
             String bio = preview.displayBio();

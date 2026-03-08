@@ -288,11 +288,33 @@ public class ViewModelFactory {
      * Disposes each ViewModel before clearing to prevent memory leaks (UI-04).
      */
     public synchronized void reset() {
+        unbindSessionListener();
+        disposeCachedViewModels();
+        initializeSessionBinding();
+        logDebug("All ViewModels disposed and cache cleared");
+    }
+
+    /**
+     * Permanently disposes this factory instance.
+     *
+     * <p>Removes the AppSession listener and disposes cached ViewModels without
+     * re-binding. Intended for application shutdown.
+     */
+    public synchronized void dispose() {
+        unbindSessionListener();
+        disposeCachedViewModels();
+        currentUserProperty.set(null);
+        logDebug("ViewModelFactory disposed");
+    }
+
+    private void unbindSessionListener() {
         if (sessionListener != null) {
             session.removeListener(sessionListener);
             sessionListener = null;
         }
+    }
 
+    private void disposeCachedViewModels() {
         // Dispose all ViewModels that have a dispose() method
         viewModelCache.values().forEach(vm -> {
             try {
@@ -308,8 +330,6 @@ public class ViewModelFactory {
         });
 
         viewModelCache.clear();
-        initializeSessionBinding();
-        logDebug("All ViewModels disposed and cache cleared");
     }
 
     private UiUserStore createUiUserStore() {

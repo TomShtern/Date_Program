@@ -99,8 +99,8 @@ class RestApiRoutesTest {
             RestApiServer.UserSummary utcSummary = RestApiServer.UserSummary.from(user, utc);
             RestApiServer.UserSummary laSummary = RestApiServer.UserSummary.from(user, losAngeles);
 
-            assertEquals(user.getAge(utc), utcSummary.age());
-            assertEquals(user.getAge(losAngeles), laSummary.age());
+            assertEquals(user.getAge(utc).orElseThrow(), utcSummary.age());
+            assertEquals(user.getAge(losAngeles).orElseThrow(), laSummary.age());
             assertEquals(26, utcSummary.age());
             assertEquals(25, laSummary.age());
         }
@@ -115,8 +115,8 @@ class RestApiRoutesTest {
             RestApiServer.UserDetail utcDetail = RestApiServer.UserDetail.from(user, utc);
             RestApiServer.UserDetail laDetail = RestApiServer.UserDetail.from(user, losAngeles);
 
-            assertEquals(user.getAge(utc), utcDetail.age());
-            assertEquals(user.getAge(losAngeles), laDetail.age());
+            assertEquals(user.getAge(utc).orElseThrow(), utcDetail.age());
+            assertEquals(user.getAge(losAngeles).orElseThrow(), laDetail.age());
             assertEquals(26, utcDetail.age());
             assertEquals(25, laDetail.age());
         }

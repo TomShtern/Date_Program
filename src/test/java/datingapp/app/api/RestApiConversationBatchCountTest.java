@@ -153,29 +153,30 @@ class RestApiConversationBatchCountTest {
         AchievementService achievementService = new DefaultAchievementService(
                 config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
 
-        return new ServiceRegistry(
-                config,
-                userStorage,
-                interactionStorage,
-                communicationStorage,
-                analyticsStorage,
-                trustSafetyStorage,
-                candidateFinder,
-                matchingService,
-                trustSafetyService,
-                activityMetricsService,
-                matchQualityService,
-                profileService,
-                recommendationService,
-                dailyLimitService,
-                dailyPickService,
-                standoutService,
-                undoService,
-                compatibilityCalculator,
-                achievementService,
-                connectionService,
-                validationService,
-                new InProcessAppEventBus());
+        return ServiceRegistry.builder()
+                .config(config)
+                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
+                .communicationStorage(communicationStorage)
+                .analyticsStorage(analyticsStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .candidateFinder(candidateFinder)
+                .matchingService(matchingService)
+                .trustSafetyService(trustSafetyService)
+                .activityMetricsService(activityMetricsService)
+                .matchQualityService(matchQualityService)
+                .profileService(profileService)
+                .recommendationService(recommendationService)
+                .dailyLimitService(dailyLimitService)
+                .dailyPickService(dailyPickService)
+                .standoutService(standoutService)
+                .undoService(undoService)
+                .compatibilityCalculator(compatibilityCalculator)
+                .achievementService(achievementService)
+                .connectionService(connectionService)
+                .validationService(validationService)
+                .eventBus(new InProcessAppEventBus())
+                .build();
     }
 
     private static User activeUser(UUID id, String name) {

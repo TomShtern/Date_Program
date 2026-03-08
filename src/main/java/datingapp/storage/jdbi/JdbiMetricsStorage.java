@@ -32,6 +32,8 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  */
 public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Storage {
 
+    private static final String USER_ID_COLUMN = "user_id";
+
     private final Jdbi jdbi;
     private final StatsDao statsDao;
     private final SessionDao sessionDao;
@@ -137,6 +139,16 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
     @Override
     public boolean isDailyPickViewed(UUID userId, LocalDate date) {
         return statsDao.isDailyPickViewed(userId, date);
+    }
+
+    @Override
+    public Optional<UUID> getDailyPickUser(UUID userId, LocalDate date) {
+        return statsDao.getDailyPickUser(userId, date);
+    }
+
+    @Override
+    public void saveDailyPickUser(UUID userId, UUID pickedUserId, LocalDate date) {
+        statsDao.saveDailyPickUser(userId, pickedUserId, date, AppClock.now());
     }
 
     @Override
@@ -417,6 +429,17 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         @SqlQuery("SELECT COUNT(*) > 0 FROM daily_pick_views WHERE user_id = :userId AND viewed_date = :date")
         boolean isDailyPickViewed(@Bind("userId") UUID userId, @Bind("date") LocalDate date);
 
+        @SqlQuery("SELECT picked_user_id FROM daily_picks WHERE user_id = :userId AND pick_date = :date")
+        Optional<UUID> getDailyPickUser(@Bind("userId") UUID userId, @Bind("date") LocalDate date);
+
+        @SqlUpdate("MERGE INTO daily_picks (user_id, pick_date, picked_user_id, created_at) "
+                + "KEY (user_id, pick_date) VALUES (:userId, :date, :pickedUserId, :createdAt)")
+        void saveDailyPickUser(
+                @Bind("userId") UUID userId,
+                @Bind("pickedUserId") UUID pickedUserId,
+                @Bind("date") LocalDate date,
+                @Bind("createdAt") Instant createdAt);
+
         @SqlUpdate("DELETE FROM daily_pick_views WHERE viewed_date < :before")
         int deleteDailyPickViewsOlderThan(@Bind("before") LocalDate before);
 
@@ -566,7 +589,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         public UserStats map(ResultSet rs, StatementContext ctx) throws SQLException {
             return new UserStats(
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_id"),
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, USER_ID_COLUMN),
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "computed_at"),
                     rs.getInt("total_swipes_given"),
                     rs.getInt("likes_given"),
@@ -607,7 +630,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         @Override
         public UserAchievement map(ResultSet rs, StatementContext ctx) throws SQLException {
             var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
-            var userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_id");
+            var userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, USER_ID_COLUMN);
             var achievement = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "achievement", Achievement.class);
             var unlockedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "unlocked_at");
             return UserAchievement.of(id, userId, achievement, unlockedAt);
@@ -618,7 +641,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         @Override
         public Session map(ResultSet rs, StatementContext ctx) throws SQLException {
             UUID id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
-            UUID userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_id");
+            UUID userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, USER_ID_COLUMN);
             var startedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "started_at");
             var lastActivityAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "last_activity_at");
             var endedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at");

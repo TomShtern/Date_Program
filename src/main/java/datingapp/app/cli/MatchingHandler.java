@@ -250,7 +250,7 @@ public class MatchingHandler implements LoggingSupport {
     private void displayCandidateProfile(User candidate, User currentUser, double distance) {
         logInfo(CliTextAndInput.BOX_TOP);
         boolean verified = candidate.isVerified();
-        int age = candidate.getAge(config.safety().userTimeZone());
+        int age = candidate.getAge(config.safety().userTimeZone()).orElse(0);
         logInfo(
                 "│ 💝 {}{}{}, {} years old",
                 candidate.getName(),
@@ -352,7 +352,7 @@ public class MatchingHandler implements LoggingSupport {
                     MatchQuality quality = qualityResult.data();
                     int displayIndex = i + 1;
                     String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
-                    int age = otherUser.getAge(config.safety().userTimeZone());
+                    int age = otherUser.getAge(config.safety().userTimeZone()).orElse(0);
                     logInfo(
                             "  {}. {} {}{}, {}         {} {}%",
                             displayIndex,
@@ -422,7 +422,7 @@ public class MatchingHandler implements LoggingSupport {
         logInfo("         MATCH WITH {}", nameUpper);
         logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
 
-        int age = otherUser.getAge(config.safety().userTimeZone());
+        int age = otherUser.getAge(config.safety().userTimeZone()).orElse(0);
         logInfo("  👤 {}, {}", otherUser.getName(), age);
         if (otherUser.getBio() != null) {
             logInfo("  📝 {}", otherUser.getBio());
@@ -674,7 +674,7 @@ public class MatchingHandler implements LoggingSupport {
         logInfo("");
         User candidate = pick.user();
         logInfo(CliTextAndInput.BOX_TOP);
-        int age = candidate.getAge(config.safety().userTimeZone());
+        int age = candidate.getAge(config.safety().userTimeZone()).orElse(0);
         logInfo("│ 🎁 {}, {} years old", candidate.getName(), age);
         if (logger.isInfoEnabled()) {
             logInfo("│ 📍 {} km away", String.format("%.1f", distance));
@@ -802,7 +802,7 @@ public class MatchingHandler implements LoggingSupport {
             logInfo(
                     "{}. {} {} (Score: {}%){}",
                     s.rank(), getStandoutEmoji(s.rank()), candidate.getName(), s.score(), interacted);
-            int age = candidate.getAge(config.safety().userTimeZone());
+            int age = candidate.getAge(config.safety().userTimeZone()).orElse(0);
             logInfo("   {} - {}", s.reason(), age + "yo");
         }
     }
@@ -1016,7 +1016,7 @@ public class MatchingHandler implements LoggingSupport {
         String likedAgo = TextUtil.formatTimeAgo(pending.likedAt());
 
         logInfo(CliTextAndInput.BOX_TOP);
-        int age = user.getAge(config.safety().userTimeZone());
+        int age = user.getAge(config.safety().userTimeZone()).orElse(0);
         logInfo("│ 💝 {}, {} years old{}", user.getName(), age, verifiedBadge);
         logInfo("│ 🕒 Liked you {}", likedAgo);
         logInfo("│ 📍 Location: {}, {}", user.getLat(), user.getLon());

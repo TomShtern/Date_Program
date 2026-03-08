@@ -116,6 +116,7 @@ public final class StorageFactory {
                 .activityMetricsService(activityMetricsService)
                 .undoService(undoService)
                 .dailyService(recommendationService)
+                .candidateFinder(candidateFinder)
                 .build();
 
         MatchQualityService matchQualityService =
@@ -126,6 +127,7 @@ public final class StorageFactory {
 
         TrustSafetyService trustSafetyService = new TrustSafetyService(
                 trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage);
+        trustSafetyService.setCandidateFinder(candidateFinder);
 
         ValidationService validationService = new ValidationService(config);
 
@@ -138,31 +140,32 @@ public final class StorageFactory {
         ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
         RelationshipWorkflowPolicy workflowPolicy = new RelationshipWorkflowPolicy();
 
-        return new ServiceRegistry(
-                config,
-                userStorage,
-                interactionStorage,
-                communicationStorage,
-                analyticsStorage,
-                trustSafetyStorage,
-                candidateFinder,
-                matchingService,
-                trustSafetyService,
-                activityMetricsService,
-                matchQualityService,
-                profileService,
-                recommendationService,
-                dailyLimitService,
-                dailyPickService,
-                standoutService,
-                undoService,
-                compatibilityCalculator,
-                achievementService,
-                connectionService,
-                validationService,
-                eventBus,
-                activationPolicy,
-                workflowPolicy);
+        return ServiceRegistry.builder()
+                .config(config)
+                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
+                .communicationStorage(communicationStorage)
+                .analyticsStorage(analyticsStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .candidateFinder(candidateFinder)
+                .matchingService(matchingService)
+                .trustSafetyService(trustSafetyService)
+                .activityMetricsService(activityMetricsService)
+                .matchQualityService(matchQualityService)
+                .profileService(profileService)
+                .recommendationService(recommendationService)
+                .dailyLimitService(dailyLimitService)
+                .dailyPickService(dailyPickService)
+                .standoutService(standoutService)
+                .undoService(undoService)
+                .compatibilityCalculator(compatibilityCalculator)
+                .achievementService(achievementService)
+                .connectionService(connectionService)
+                .validationService(validationService)
+                .eventBus(eventBus)
+                .activationPolicy(activationPolicy)
+                .workflowPolicy(workflowPolicy)
+                .build();
     }
 
     public static ServiceRegistry buildH2(DatabaseManager dbManager) {

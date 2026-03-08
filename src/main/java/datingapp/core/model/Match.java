@@ -56,6 +56,7 @@ public class Match {
     private Instant deletedAt; // Soft-delete timestamp (nullable)
 
     /** Full constructor for reconstitution from storage. */
+    @SuppressWarnings("java:S107") // Storage reconstitution constructor mirrors persisted columns.
     public Match(
             String id,
             UUID userA,
@@ -64,7 +65,8 @@ public class Match {
             MatchState state,
             Instant endedAt,
             UUID endedBy,
-            MatchArchiveReason endReason) {
+            MatchArchiveReason endReason,
+            Instant deletedAt) {
         Objects.requireNonNull(id, "id cannot be null");
         Objects.requireNonNull(userA, "userA cannot be null");
         Objects.requireNonNull(userB, "userB cannot be null");
@@ -88,6 +90,7 @@ public class Match {
         this.endedAt = endedAt;
         this.endedBy = endedBy;
         this.endReason = endReason;
+        this.deletedAt = deletedAt;
     }
 
     /**
@@ -120,7 +123,7 @@ public class Match {
         }
 
         String id = userA + "_" + userB;
-        return new Match(id, userA, userB, AppClock.now(), MatchState.ACTIVE, null, null, null);
+        return new Match(id, userA, userB, AppClock.now(), MatchState.ACTIVE, null, null, null, null);
     }
 
     /** Generates the deterministic match ID for two user UUIDs. */
@@ -177,8 +180,9 @@ public class Match {
             throw new IllegalArgumentException("User is not part of this match");
         }
         this.state = MatchState.FRIENDS;
-        // We don't set endedAt/endedBy because the relationship is still "active" in a
-        // new way
+        this.endedAt = AppClock.now();
+        this.endedBy = initiatorId;
+        this.endReason = MatchArchiveReason.FRIEND_ZONE;
     }
 
     /** Reverts match from FRIENDS back to ACTIVE. Used for compensating transactions only. */
@@ -187,6 +191,9 @@ public class Match {
             throw new IllegalStateException("Can only revert to ACTIVE from FRIENDS state, current: " + this.state);
         }
         this.state = MatchState.ACTIVE;
+        this.endedAt = null;
+        this.endedBy = null;
+        this.endReason = null;
     }
 
     /** gracefulExit - ends the match kindly. */
@@ -288,16 +295,6 @@ public class Match {
     /** Returns {@code true} if this match has been soft-deleted. */
     public boolean isDeleted() {
         return deletedAt != null;
-    }
-
-    /**
-     * Restores the deleted-at timestamp from storage. This method is for storage
-     * layer
-     * reconstitution only — production code should use
-     * {@link #markDeleted(Instant)}.
-     */
-    public void restoreDeletedAt(Instant deletedAt) {
-        this.deletedAt = deletedAt;
     }
 
     @Override

@@ -8,12 +8,16 @@ import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,6 +29,10 @@ public class CandidateFinder implements LoggingSupport {
     private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
     private final java.time.ZoneId timezone;
+    private final Clock clock;
+    private final ConcurrentHashMap<UUID, CacheEntry> candidateCache = new ConcurrentHashMap<>();
+
+    private static final Duration CANDIDATE_CACHE_TTL = Duration.ofMinutes(5);
 
     /**
      * Constructs a CandidateFinder with the required storage dependencies and
@@ -41,10 +49,20 @@ public class CandidateFinder implements LoggingSupport {
             InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
             java.time.ZoneId timezone) {
+        this(userStorage, interactionStorage, trustSafetyStorage, timezone, datingapp.core.AppClock.clock());
+    }
+
+    public CandidateFinder(
+            UserStorage userStorage,
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            java.time.ZoneId timezone,
+            Clock clock) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.timezone = Objects.requireNonNull(timezone, "timezone cannot be null");
+        this.clock = Objects.requireNonNull(clock, "clock cannot be null");
     }
 
     public java.time.ZoneId getTimezone() {
@@ -105,11 +123,11 @@ public class CandidateFinder implements LoggingSupport {
         Set<Gender> seekerInterestedIn = seeker.getInterestedIn();
         logDebug(
                 "Finding candidates for {} (state={}, gender={}, interestedIn={}, age={}, minAge={}, maxAge={})",
-                seeker.getName(),
+                userRef(seeker),
                 seeker.getState(),
                 seeker.getGender(),
                 seekerInterestedIn,
-                seeker.getAge(timezone),
+                seeker.getAge(timezone).orElse(null),
                 seeker.getMinAge(),
                 seeker.getMaxAge());
         logDebug("Total active users to filter: {}", allActive.size());
@@ -129,13 +147,13 @@ public class CandidateFinder implements LoggingSupport {
         if (candidates.isEmpty()) {
             logDebug(
                     "CandidateFinder: Found 0 candidates for {} (from {} active users)",
-                    seeker.getName(),
+                    userRef(seeker),
                     allActive.size());
         } else {
             logInfo(
                     "CandidateFinder: Found {} candidates for {} (from {} active users)",
                     candidates.size(),
-                    seeker.getName(),
+                    userRef(seeker),
                     allActive.size());
         }
 
@@ -164,6 +182,12 @@ public class CandidateFinder implements LoggingSupport {
         Set<UUID> excluded = new HashSet<>(interactionStorage.getLikedOrPassedUserIds(currentUser.getId()));
         excluded.addAll(trustSafetyStorage.getBlockedUserIds(currentUser.getId()));
 
+        int fingerprint = candidateFingerprint(currentUser, excluded);
+        CacheEntry cached = candidateCache.get(currentUser.getId());
+        if (cached != null && !cached.isExpired(clock.instant()) && cached.fingerprint() == fingerprint) {
+            return cached.candidates();
+        }
+
         List<User> preFiltered = userStorage.findCandidates(
                 currentUser.getId(),
                 currentUser.getInterestedIn(),
@@ -174,6 +198,7 @@ public class CandidateFinder implements LoggingSupport {
                 currentUser.getMaxDistanceKm());
 
         List<User> candidates = findCandidates(currentUser, preFiltered, excluded);
+        candidateCache.put(currentUser.getId(), new CacheEntry(clock.instant(), fingerprint, List.copyOf(candidates)));
         if (logger.isTraceEnabled()) {
             long durationMs = (System.nanoTime() - startTime) / 1_000_000;
             logger.trace("CandidateFinder.findCandidatesForUser completed in {}ms", durationMs);
@@ -181,10 +206,41 @@ public class CandidateFinder implements LoggingSupport {
         return candidates;
     }
 
+    public void invalidateCacheFor(UUID userId) {
+        if (userId == null) {
+            return;
+        }
+        candidateCache.remove(userId);
+    }
+
+    public void clearCache() {
+        candidateCache.clear();
+    }
+
+    private int candidateFingerprint(User currentUser, Set<UUID> excluded) {
+        return Objects.hash(
+                currentUser.getState(),
+                currentUser.getGender(),
+                currentUser.getInterestedIn(),
+                currentUser.getMinAge(),
+                currentUser.getMaxAge(),
+                currentUser.hasLocationSet(),
+                currentUser.getLat(),
+                currentUser.getLon(),
+                currentUser.getMaxDistanceKm(),
+                excluded);
+    }
+
+    private record CacheEntry(Instant createdAt, int fingerprint, List<User> candidates) {
+        private boolean isExpired(Instant now) {
+            return createdAt.plus(CANDIDATE_CACHE_TTL).isBefore(now);
+        }
+    }
+
     private boolean isNotSelf(User seeker, User candidate) {
         boolean notSelf = !candidate.getId().equals(seeker.getId());
         if (!notSelf) {
-            logTrace("Rejecting {}: IS SELF", candidate.getName());
+            logTrace("Rejecting {}: IS SELF", userRef(candidate));
         }
         return notSelf;
     }
@@ -192,11 +248,7 @@ public class CandidateFinder implements LoggingSupport {
     private boolean isActiveCandidate(User candidate) {
         boolean isActive = candidate.getState() == UserState.ACTIVE;
         if (!isActive) {
-            logDebug(
-                    "Rejecting {} ({}): NOT ACTIVE (state={})",
-                    candidate.getName(),
-                    candidate.getId(),
-                    candidate.getState());
+            logDebug("Rejecting {}: NOT ACTIVE (state={})", userRef(candidate), candidate.getState());
         }
         return isActive;
     }
@@ -204,7 +256,7 @@ public class CandidateFinder implements LoggingSupport {
     private boolean notAlreadyInteracted(User candidate, Set<UUID> alreadyInteracted) {
         boolean notInteracted = !alreadyInteracted.contains(candidate.getId());
         if (!notInteracted) {
-            logTrace("Rejecting {}: ALREADY INTERACTED", candidate.getName());
+            logTrace("Rejecting {}: ALREADY INTERACTED", userRef(candidate));
         }
         return notInteracted;
     }
@@ -213,9 +265,8 @@ public class CandidateFinder implements LoggingSupport {
         boolean genderMatch = hasMatchingGenderPreferences(seeker, candidate, seekerInterestedIn);
         if (!genderMatch) {
             logDebug(
-                    "Rejecting {} ({}): GENDER MISMATCH - seeker({})→interestedIn({}), candidate({})→interestedIn({})",
-                    candidate.getName(),
-                    candidate.getId(),
+                    "Rejecting {}: GENDER MISMATCH - seeker({})→interestedIn({}), candidate({})→interestedIn({})",
+                    userRef(candidate),
                     seeker.getGender(),
                     seekerInterestedIn,
                     candidate.getGender(),
@@ -228,13 +279,12 @@ public class CandidateFinder implements LoggingSupport {
         boolean ageMatch = hasMatchingAgePreferences(seeker, candidate);
         if (!ageMatch) {
             logDebug(
-                    "Rejecting {} ({}): AGE MISMATCH - seeker(age={}, range={}-{}), candidate(age={}, range={}-{})",
-                    candidate.getName(),
-                    candidate.getId(),
-                    seeker.getAge(timezone),
+                    "Rejecting {}: AGE MISMATCH - seeker(age={}, range={}-{}), candidate(age={}, range={}-{})",
+                    userRef(candidate),
+                    seeker.getAge(timezone).orElse(null),
                     seeker.getMinAge(),
                     seeker.getMaxAge(),
-                    candidate.getAge(timezone),
+                    candidate.getAge(timezone).orElse(null),
                     candidate.getMinAge(),
                     candidate.getMaxAge());
         }
@@ -246,9 +296,8 @@ public class CandidateFinder implements LoggingSupport {
         if (!inDistance && logger.isDebugEnabled()) {
             double dist = distanceTo(seeker, candidate);
             logDebug(
-                    "Rejecting {} ({}): TOO FAR - distance={}km, max={}km",
-                    candidate.getName(),
-                    candidate.getId(),
+                    "Rejecting {}: TOO FAR - distance={}km, max={}km",
+                    userRef(candidate),
                     String.format("%.1f", dist),
                     seeker.getMaxDistanceKm());
         }
@@ -258,7 +307,7 @@ public class CandidateFinder implements LoggingSupport {
     private boolean passesDealbreakers(User seeker, User candidate) {
         boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate, timezone);
         if (!passesDb) {
-            logDebug("Rejecting {} ({}): DEALBREAKER HIT", candidate.getName(), candidate.getId());
+            logDebug("Rejecting {}: DEALBREAKER HIT", userRef(candidate));
         }
         return passesDb;
     }
@@ -288,10 +337,10 @@ public class CandidateFinder implements LoggingSupport {
      * Seeker's age is within candidate's age range.
      */
     private boolean hasMatchingAgePreferences(User seeker, User candidate) {
-        int seekerAge = seeker.getAge(timezone);
-        int candidateAge = candidate.getAge(timezone);
+        Integer seekerAge = seeker.getAge(timezone).orElse(null);
+        Integer candidateAge = candidate.getAge(timezone).orElse(null);
 
-        if (seekerAge == 0 || candidateAge == 0) {
+        if (seekerAge == null || candidateAge == null) {
             return false; // Missing birth date
         }
 
@@ -306,8 +355,7 @@ public class CandidateFinder implements LoggingSupport {
         if (!hasLocation(seeker) || !hasLocation(candidate)) {
             logDebug(
                     "Skipping distance filter for {} ({}): missing location (seekerLatLon={}, candidateLatLon={}).",
-                    candidate.getName(),
-                    candidate.getId(),
+                    userRef(candidate),
                     formatLatLon(seeker),
                     formatLatLon(candidate));
             return true;
@@ -332,7 +380,12 @@ public class CandidateFinder implements LoggingSupport {
         if (!hasLocation(user)) {
             return "missing";
         }
-        return String.format("%.4f, %.4f", user.getLat(), user.getLon());
+        return String.format("%.1f, %.1f", user.getLat(), user.getLon());
+    }
+
+    private String userRef(User user) {
+        String id = user.getId().toString();
+        return "user-" + id.substring(0, 8);
     }
 
     @Override

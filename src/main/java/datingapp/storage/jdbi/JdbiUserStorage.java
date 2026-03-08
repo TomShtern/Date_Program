@@ -54,17 +54,6 @@ public final class JdbiUserStorage implements UserStorage {
     private static final String USER_DB_LOOKING_FOR = "user_db_looking_for";
     private static final String USER_DB_EDUCATION = "user_db_education";
 
-    public static final String ALL_COLUMNS = """
-            id, name, bio, birth_date, gender, interested_in, lat, lon,
-            has_location_set, max_distance_km, min_age, max_age, photo_urls, state, created_at,
-            updated_at, smoking, drinking, wants_kids, looking_for, education,
-            height_cm, db_smoking, db_drinking, db_wants_kids, db_looking_for,
-            db_education, db_min_height_cm, db_max_height_cm, db_max_age_diff,
-            interests, email, phone, is_verified, verification_method,
-            verification_code, verification_sent_at, verified_at,
-            pace_messaging_frequency, pace_time_to_first_date,
-            pace_communication_style, pace_depth_preference, deleted_at""";
-
     private final Jdbi jdbi;
     private final Dao dao;
 
@@ -110,9 +99,7 @@ public final class JdbiUserStorage implements UserStorage {
         List<String> genderNames = genders.stream().map(Enum::name).toList();
 
         return jdbi.withHandle(handle -> {
-            StringBuilder sql = new StringBuilder("SELECT ")
-                    .append(ALL_COLUMNS)
-                    .append(" FROM users WHERE id <> :excludeId")
+            StringBuilder sql = new StringBuilder("SELECT * FROM users WHERE id <> :excludeId")
                     .append(" AND state = 'ACTIVE'")
                     .append(" AND deleted_at IS NULL")
                     .append(" AND gender IN (<genders>)")
@@ -164,8 +151,7 @@ public final class JdbiUserStorage implements UserStorage {
         }
 
         return jdbi.withHandle(handle -> {
-            List<User> users = handle.createQuery(
-                            "SELECT " + ALL_COLUMNS + " FROM users WHERE id IN (<userIds>) AND deleted_at IS NULL")
+            List<User> users = handle.createQuery("SELECT * FROM users WHERE id IN (<userIds>) AND deleted_at IS NULL")
                     .bindList("userIds", new ArrayList<>(ids))
                     .map(new Mapper())
                     .list();
@@ -532,13 +518,13 @@ public final class JdbiUserStorage implements UserStorage {
                 """)
         void save(@BindBean UserSqlBindings helper);
 
-        @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE id = :id AND deleted_at IS NULL")
+        @SqlQuery("SELECT * FROM users WHERE id = :id AND deleted_at IS NULL")
         Optional<User> get(@Bind("id") UUID id);
 
-        @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE state = 'ACTIVE' AND deleted_at IS NULL")
+        @SqlQuery("SELECT * FROM users WHERE state = 'ACTIVE' AND deleted_at IS NULL")
         List<User> findActive();
 
-        @SqlQuery("SELECT " + ALL_COLUMNS + " FROM users WHERE deleted_at IS NULL")
+        @SqlQuery("SELECT * FROM users WHERE deleted_at IS NULL")
         List<User> findAll();
 
         @SqlUpdate("DELETE FROM users WHERE id = :id")

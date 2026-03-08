@@ -2,6 +2,7 @@ package datingapp.ui.screen;
 
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiConstants;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.StandoutsViewModel;
 import datingapp.ui.viewmodel.StandoutsViewModel.StandoutEntry;
@@ -110,7 +111,11 @@ public class StandoutsController extends BaseController implements Initializable
 
             HBox.setHgrow(spacer, Priority.ALWAYS);
             container.setAlignment(Pos.CENTER_LEFT);
-            container.setPadding(new Insets(12, 16, 12, 16));
+            container.setPadding(new Insets(
+                    UiConstants.PADDING_MEDIUM,
+                    UiConstants.PADDING_LARGE,
+                    UiConstants.PADDING_MEDIUM,
+                    UiConstants.PADDING_LARGE));
             container.getChildren().addAll(rankLabel, infoBox, spacer, viewButton);
         }
 
