@@ -10,6 +10,7 @@ import datingapp.core.AppConfig;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.ProfileService;
@@ -20,6 +21,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +31,9 @@ public class ProfileUseCases {
     private static final Logger logger = LoggerFactory.getLogger(ProfileUseCases.class);
     private static final String CONTEXT_REQUIRED = "Context is required";
     private static final String PROFILE_SERVICE_REQUIRED = "ProfileService is required";
+    private static final String USER_STORAGE_REQUIRED = "UserStorage is required";
+    private static final String AUTHOR_NOT_FOUND = "Author not found";
+    private static final String CONTEXT_AND_SUBJECT_REQUIRED = "Context and subjectId are required";
 
     private final UserStorage userStorage;
     private final ProfileService profileService;
@@ -121,7 +126,7 @@ public class ProfileUseCases {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
         if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("UserStorage is required"));
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
         }
 
         User user = userStorage.get(command.context().userId()).orElse(null);
@@ -229,6 +234,94 @@ public class ProfileUseCases {
         }
     }
 
+    public UseCaseResult<List<ProfileNote>> listProfileNotes(ProfileNotesQuery query) {
+        if (query == null || query.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+        if (userStorage.get(query.context().userId()).isEmpty()) {
+            return UseCaseResult.failure(UseCaseError.notFound(AUTHOR_NOT_FOUND));
+        }
+        try {
+            return UseCaseResult.success(
+                    userStorage.getProfileNotesByAuthor(query.context().userId()));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to load profile notes: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<ProfileNote> getProfileNote(ProfileNoteQuery query) {
+        if (query == null || query.context() == null || query.subjectId() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_SUBJECT_REQUIRED));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+        if (userStorage.get(query.context().userId()).isEmpty()) {
+            return UseCaseResult.failure(UseCaseError.notFound(AUTHOR_NOT_FOUND));
+        }
+        try {
+            return userStorage
+                    .getProfileNote(query.context().userId(), query.subjectId())
+                    .map(UseCaseResult::success)
+                    .orElseGet(() -> UseCaseResult.failure(UseCaseError.notFound("Profile note not found")));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to load profile note: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<ProfileNote> upsertProfileNote(UpsertProfileNoteCommand command) {
+        if (command == null || command.context() == null || command.subjectId() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_SUBJECT_REQUIRED));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+        if (userStorage.get(command.context().userId()).isEmpty()) {
+            return UseCaseResult.failure(UseCaseError.notFound(AUTHOR_NOT_FOUND));
+        }
+        if (userStorage.get(command.subjectId()).isEmpty()) {
+            return UseCaseResult.failure(UseCaseError.notFound("Subject user not found"));
+        }
+
+        try {
+            ProfileNote note = userStorage
+                    .getProfileNote(command.context().userId(), command.subjectId())
+                    .map(existing -> existing.withContent(command.content()))
+                    .orElseGet(() ->
+                            ProfileNote.create(command.context().userId(), command.subjectId(), command.content()));
+            userStorage.saveProfileNote(note);
+            return UseCaseResult.success(note);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to save profile note: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<Boolean> deleteProfileNote(DeleteProfileNoteCommand command) {
+        if (command == null || command.context() == null || command.subjectId() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_SUBJECT_REQUIRED));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+        if (userStorage.get(command.context().userId()).isEmpty()) {
+            return UseCaseResult.failure(UseCaseError.notFound(AUTHOR_NOT_FOUND));
+        }
+        try {
+            boolean deleted = userStorage.deleteProfileNote(command.context().userId(), command.subjectId());
+            if (!deleted) {
+                return UseCaseResult.failure(UseCaseError.notFound("Profile note not found"));
+            }
+            return UseCaseResult.success(true);
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to delete profile note: " + e.getMessage()));
+        }
+    }
+
     public ValidationService validationService() {
         return validationService;
     }
@@ -245,4 +338,12 @@ public class ProfileUseCases {
     public static record AchievementSnapshot(List<UserAchievement> unlocked, List<UserAchievement> newlyUnlocked) {}
 
     public static record StatsQuery(UserContext context) {}
+
+    public static record ProfileNotesQuery(UserContext context) {}
+
+    public static record ProfileNoteQuery(UserContext context, UUID subjectId) {}
+
+    public static record UpsertProfileNoteCommand(UserContext context, UUID subjectId, String content) {}
+
+    public static record DeleteProfileNoteCommand(UserContext context, UUID subjectId) {}
 }

@@ -6,7 +6,9 @@ package datingapp.ui.async;
 public enum TaskPolicy {
     STANDARD(true),
     LATEST_WINS(true),
-    FIRE_AND_FORGET(false);
+    LATEST_WINS_SILENT(false),
+    FIRE_AND_FORGET(false),
+    POLLING(false);
 
     private final boolean trackLoading;
 

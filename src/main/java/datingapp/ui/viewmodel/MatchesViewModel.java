@@ -5,10 +5,14 @@ import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.PendingLikersQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.RemoveLikeCommand;
+import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
+import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.MatchingService.PendingLiker;
 import datingapp.core.matching.RecommendationService;
@@ -60,6 +64,7 @@ import org.slf4j.LoggerFactory;
 public class MatchesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(MatchesViewModel.class);
     private static final String LIKE_REQUIRED = "like cannot be null";
+    private static final String MATCH_REQUIRED = "match cannot be null";
 
     /** Number of matches returned per page from storage. */
     private static final int PAGE_SIZE = 20;
@@ -69,6 +74,7 @@ public class MatchesViewModel {
     private final MatchingService matchingService;
     private final RecommendationService dailyService;
     private final MatchingUseCases matchingUseCases;
+    private final SocialUseCases socialUseCases;
     private final AppConfig config;
     private final AppSession session;
     private final ViewModelAsyncScope asyncScope;
@@ -105,6 +111,24 @@ public class MatchesViewModel {
 
     private final AtomicReference<User> currentUser = new AtomicReference<>();
 
+    public record Dependencies(
+            UiMatchDataAccess matchData,
+            UiUserStore userStore,
+            MatchingService matchingService,
+            RecommendationService dailyService,
+            MatchingUseCases matchingUseCases,
+            SocialUseCases socialUseCases,
+            AppConfig config) {
+
+        public Dependencies {
+            Objects.requireNonNull(matchData, "matchData cannot be null");
+            Objects.requireNonNull(userStore, "userStore cannot be null");
+            Objects.requireNonNull(matchingService, "matchingService cannot be null");
+            Objects.requireNonNull(dailyService, "dailyService cannot be null");
+            Objects.requireNonNull(config, "config cannot be null");
+        }
+    }
+
     public MatchesViewModel(
             UiMatchDataAccess matchData,
             UiUserStore userStore,
@@ -113,12 +137,7 @@ public class MatchesViewModel {
             AppConfig config,
             AppSession session) {
         this(
-                matchData,
-                userStore,
-                matchingService,
-                dailyService,
-                null,
-                config,
+                new Dependencies(matchData, userStore, matchingService, dailyService, null, null, config),
                 session,
                 new JavaFxUiThreadDispatcher());
     }
@@ -132,31 +151,20 @@ public class MatchesViewModel {
             AppConfig config,
             AppSession session) {
         this(
-                matchData,
-                userStore,
-                matchingService,
-                dailyService,
-                matchingUseCases,
-                config,
+                new Dependencies(matchData, userStore, matchingService, dailyService, matchingUseCases, null, config),
                 session,
                 new JavaFxUiThreadDispatcher());
     }
 
-    public MatchesViewModel(
-            UiMatchDataAccess matchData,
-            UiUserStore userStore,
-            MatchingService matchingService,
-            RecommendationService dailyService,
-            MatchingUseCases matchingUseCases,
-            AppConfig config,
-            AppSession session,
-            UiThreadDispatcher uiDispatcher) {
-        this.matchData = Objects.requireNonNull(matchData, "matchData cannot be null");
-        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
-        this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
-        this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
-        this.matchingUseCases = matchingUseCases;
-        this.config = Objects.requireNonNull(config, "config cannot be null");
+    public MatchesViewModel(Dependencies dependencies, AppSession session, UiThreadDispatcher uiDispatcher) {
+        Dependencies resolvedDependencies = Objects.requireNonNull(dependencies, "dependencies cannot be null");
+        this.matchData = resolvedDependencies.matchData();
+        this.userStore = resolvedDependencies.userStore();
+        this.matchingService = resolvedDependencies.matchingService();
+        this.dailyService = resolvedDependencies.dailyService();
+        this.matchingUseCases = resolvedDependencies.matchingUseCases();
+        this.socialUseCases = resolvedDependencies.socialUseCases();
+        this.config = resolvedDependencies.config();
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
     }
@@ -516,6 +524,37 @@ public class MatchesViewModel {
         executeActionSync("Failed to withdraw like", () -> performWithdrawLike(like.likeId()), this::refreshAll);
     }
 
+    public void requestFriendZone(MatchCardData match) {
+        Objects.requireNonNull(match, MATCH_REQUIRED);
+        performRelationshipAction(
+                "request friend zone", match.userId(), this::performFriendZoneRequest, this::refreshAll);
+    }
+
+    public void gracefulExit(MatchCardData match) {
+        Objects.requireNonNull(match, MATCH_REQUIRED);
+        performRelationshipAction("graceful exit", match.userId(), this::performGracefulExit, this::refreshAll);
+    }
+
+    public void unmatch(MatchCardData match) {
+        Objects.requireNonNull(match, MATCH_REQUIRED);
+        performRelationshipAction("unmatch", match.userId(), this::performUnmatch, this::refreshAll);
+    }
+
+    public void blockMatch(MatchCardData match) {
+        Objects.requireNonNull(match, MATCH_REQUIRED);
+        performRelationshipAction("block match", match.userId(), this::performBlockUser, this::refreshAll);
+    }
+
+    public void reportMatch(MatchCardData match, Report.Reason reason, String description, boolean blockUser) {
+        Objects.requireNonNull(match, MATCH_REQUIRED);
+        Objects.requireNonNull(reason, "reason cannot be null");
+        performRelationshipAction(
+                "report match",
+                match.userId(),
+                targetUserId -> performReportUser(targetUserId, reason, description, blockUser),
+                this::refreshAll);
+    }
+
     private void refreshAllAsync(UUID userId, String userName, long capturedEpoch) {
         asyncScope.runLatest(
                 "matches-refresh",
@@ -582,6 +621,80 @@ public class MatchesViewModel {
         }
     }
 
+    private void performRelationshipAction(
+            String actionName, UUID targetUserId, RelationshipAction action, Runnable onSuccess) {
+        User user = resolveCurrentUser();
+        if (user == null) {
+            logWarn("No current user, cannot {}", actionName);
+            return;
+        }
+        if (socialUseCases == null) {
+            notifyError("Relationship actions are not configured", null);
+            return;
+        }
+
+        if (shouldRunAsync()) {
+            asyncScope.run(
+                    actionName,
+                    () -> {
+                        action.run(targetUserId);
+                        return Boolean.TRUE;
+                    },
+                    _ -> onSuccess.run());
+            return;
+        }
+
+        executeActionSync("Failed to " + actionName, () -> action.run(targetUserId), onSuccess);
+    }
+
+    private void performFriendZoneRequest(UUID targetUserId) {
+        User user = resolveCurrentUser();
+        var result =
+                socialUseCases.requestFriendZone(new RelationshipCommand(UserContext.ui(user.getId()), targetUserId));
+        ensureSocialSuccess(
+                result.success(), result.error() != null ? result.error().message() : null);
+    }
+
+    private void performGracefulExit(UUID targetUserId) {
+        User user = resolveCurrentUser();
+        var result = socialUseCases.gracefulExit(new RelationshipCommand(UserContext.ui(user.getId()), targetUserId));
+        ensureSocialSuccess(
+                result.success(), result.error() != null ? result.error().message() : null);
+    }
+
+    private void performUnmatch(UUID targetUserId) {
+        User user = resolveCurrentUser();
+        var result = socialUseCases.unmatch(new RelationshipCommand(UserContext.ui(user.getId()), targetUserId));
+        ensureSocialSuccess(
+                result.success(), result.error() != null ? result.error().message() : null);
+    }
+
+    private void performBlockUser(UUID targetUserId) {
+        User user = resolveCurrentUser();
+        var result = socialUseCases.blockUser(new RelationshipCommand(UserContext.ui(user.getId()), targetUserId));
+        ensureSocialSuccess(
+                result.success(), result.error() != null ? result.error().message() : null);
+    }
+
+    private void performReportUser(UUID targetUserId, Report.Reason reason, String description, boolean blockUser) {
+        User user = resolveCurrentUser();
+        var result = socialUseCases.reportUser(
+                new ReportCommand(UserContext.ui(user.getId()), targetUserId, reason, description, blockUser));
+        ensureSocialSuccess(
+                result.success(), result.error() != null ? result.error().message() : null);
+    }
+
+    private static void ensureSocialSuccess(boolean success, String errorMessage) {
+        if (!success) {
+            throw new IllegalStateException(errorMessage == null ? "Relationship action failed" : errorMessage);
+        }
+    }
+
+    @FunctionalInterface
+    private interface RelationshipAction {
+        void run(UUID targetUserId);
+    }
+
     private void executeActionSync(
             String userMessage, ViewModelAsyncScope.ThrowingRunnable action, Runnable onSuccess) {
         setLoadingState(true);
@@ -633,7 +746,7 @@ public class MatchesViewModel {
         if (errorHandler == null) {
             return;
         }
-        String detail = e.getMessage();
+        String detail = e != null ? e.getMessage() : null;
         String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
         errorHandler.onError(message);
     }

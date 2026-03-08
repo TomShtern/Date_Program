@@ -91,12 +91,8 @@ class DashboardViewModelTest {
         ConnectionService messagingService = new ConnectionService(config, communications, interactions, users);
 
         viewModel = new DashboardViewModel(
-                dailyService,
-                matchData,
-                profileService,
-                messagingService,
-                profileService,
-                config,
+                new DashboardViewModel.Dependencies(
+                        dailyService, matchData, profileService, messagingService, profileService, config),
                 AppSession.getInstance());
 
         currentUser = createActiveUser("DashboardUser");

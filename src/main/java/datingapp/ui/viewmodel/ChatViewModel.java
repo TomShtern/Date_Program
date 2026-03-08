@@ -16,14 +16,20 @@ import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.connection.ConnectionService.SendResult;
 import datingapp.core.matching.TrustSafetyService;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.async.TaskHandle;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.async.ViewModelAsyncScope;
+import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
@@ -31,6 +37,8 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.jetbrains.annotations.Nullable;
@@ -43,21 +51,34 @@ import org.slf4j.LoggerFactory;
  */
 public class ChatViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ChatViewModel.class);
+    private static final Duration DEFAULT_CONVERSATION_POLL_INTERVAL = Duration.ofSeconds(15);
+    private static final Duration DEFAULT_ACTIVE_CONVERSATION_POLL_INTERVAL = Duration.ofSeconds(5);
+    private static final String TASK_LOAD_MESSAGES = "load messages";
+    private static final String TASK_REFRESH_CONVERSATIONS = "refresh conversations";
 
     private final ConnectionService messagingService;
     private final TrustSafetyService trustSafetyService;
     private final MessagingUseCases messagingUseCases;
     private final SocialUseCases socialUseCases;
+    private final UiProfileNoteDataAccess noteDataAccess;
     private final AppSession session;
     private final ViewModelAsyncScope asyncScope;
+    private final Duration conversationPollInterval;
+    private final Duration activeConversationPollInterval;
     private final ObservableList<ConversationPreview> conversations = FXCollections.observableArrayList();
     private final ObservableList<Message> activeMessages = FXCollections.observableArrayList();
 
     private final ObjectProperty<ConversationPreview> selectedConversation = new SimpleObjectProperty<>();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final IntegerProperty totalUnreadCount = new SimpleIntegerProperty(0);
+    private final StringProperty profileNoteContent = new SimpleStringProperty("");
+    private final StringProperty profileNoteStatusMessage = new SimpleStringProperty();
+    private final BooleanProperty profileNoteBusy = new SimpleBooleanProperty(false);
 
     private User currentUser;
+    private TaskHandle conversationsPollingHandle;
+    private TaskHandle messagesPollingHandle;
+    private final AtomicInteger noteLoadToken = new AtomicInteger();
 
     private ViewModelErrorSink errorHandler;
 
@@ -79,19 +100,63 @@ public class ChatViewModel {
             TrustSafetyService trustSafetyService,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
+        this(
+                messagingService,
+                trustSafetyService,
+                session,
+                uiDispatcher,
+                DEFAULT_CONVERSATION_POLL_INTERVAL,
+                DEFAULT_ACTIVE_CONVERSATION_POLL_INTERVAL,
+                new NoOpUiProfileNoteDataAccess());
+    }
+
+    public ChatViewModel(
+            ConnectionService messagingService,
+            TrustSafetyService trustSafetyService,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher,
+            Duration conversationPollInterval,
+            Duration activeConversationPollInterval) {
+        this(
+                messagingService,
+                trustSafetyService,
+                session,
+                uiDispatcher,
+                conversationPollInterval,
+                activeConversationPollInterval,
+                new NoOpUiProfileNoteDataAccess());
+    }
+
+    public ChatViewModel(
+            ConnectionService messagingService,
+            TrustSafetyService trustSafetyService,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher,
+            Duration conversationPollInterval,
+            Duration activeConversationPollInterval,
+            UiProfileNoteDataAccess noteDataAccess) {
         this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
         this.messagingUseCases = new MessagingUseCases(this.messagingService);
         this.socialUseCases = new SocialUseCases(this.messagingService, this.trustSafetyService);
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
+        this.conversationPollInterval =
+                Objects.requireNonNull(conversationPollInterval, "conversationPollInterval cannot be null");
+        this.activeConversationPollInterval =
+                Objects.requireNonNull(activeConversationPollInterval, "activeConversationPollInterval cannot be null");
+        this.noteDataAccess = Objects.requireNonNull(noteDataAccess, "noteDataAccess cannot be null");
 
         // Listen for selection changes to load messages
         selectionListener = (obs, oldVal, newVal) -> {
             if (newVal != null) {
                 loadMessages(newVal);
+                startMessagesPolling();
+                loadProfileNoteFor(newVal.otherUser());
             } else {
                 activeMessages.clear();
+                stopMessagesPolling();
+                clearProfileNoteState();
             }
         };
         selectedConversation.addListener(selectionListener);
@@ -103,10 +168,129 @@ public class ChatViewModel {
      */
     public void dispose() {
         asyncScope.dispose();
+        stopConversationsPolling();
+        stopMessagesPolling();
         selectedConversation.removeListener(selectionListener);
         conversations.clear();
         activeMessages.clear();
         setLoadingState(false);
+    }
+
+    private void loadProfileNoteFor(User otherUser) {
+        User user = ensureCurrentUser();
+        if (user == null || otherUser == null) {
+            clearProfileNoteState();
+            return;
+        }
+
+        int token = noteLoadToken.incrementAndGet();
+        profileNoteStatusMessage.set(null);
+        profileNoteBusy.set(true);
+        asyncScope.runFireAndForget("load profile note", () -> {
+            try {
+                ProfileNote note = noteDataAccess
+                        .getProfileNote(user.getId(), otherUser.getId())
+                        .orElse(null);
+                asyncScope.dispatchToUi(() -> applyLoadedProfileNote(otherUser.getId(), note, token));
+            } catch (Exception e) {
+                asyncScope.dispatchToUi(
+                        () -> applyProfileNoteFailure(otherUser.getId(), token, "Failed to load note", e));
+            }
+        });
+    }
+
+    public void saveSelectedProfileNote() {
+        User user = ensureCurrentUser();
+        ConversationPreview selected = selectedConversation.get();
+        if (user == null || selected == null) {
+            return;
+        }
+
+        UUID otherUserId = selected.otherUser().getId();
+        profileNoteBusy.set(true);
+        profileNoteStatusMessage.set(null);
+        String content = profileNoteContent.get();
+        asyncScope.runFireAndForget("save profile note", () -> {
+            try {
+                ProfileNote savedNote = noteDataAccess.upsertProfileNote(user.getId(), otherUserId, content);
+                int token = noteLoadToken.incrementAndGet();
+                asyncScope.dispatchToUi(() -> {
+                    if (!isSelectedConversation(otherUserId, token)) {
+                        return;
+                    }
+                    profileNoteContent.set(savedNote.content());
+                    profileNoteStatusMessage.set("Private note saved.");
+                    profileNoteBusy.set(false);
+                });
+            } catch (Exception e) {
+                asyncScope.dispatchToUi(
+                        () -> applyProfileNoteFailure(otherUserId, noteLoadToken.get(), "Failed to save note", e));
+            }
+        });
+    }
+
+    public void deleteSelectedProfileNote() {
+        User user = ensureCurrentUser();
+        ConversationPreview selected = selectedConversation.get();
+        if (user == null || selected == null) {
+            return;
+        }
+
+        UUID otherUserId = selected.otherUser().getId();
+        profileNoteBusy.set(true);
+        profileNoteStatusMessage.set(null);
+        asyncScope.runFireAndForget("delete profile note", () -> {
+            try {
+                noteDataAccess.deleteProfileNote(user.getId(), otherUserId);
+                int token = noteLoadToken.incrementAndGet();
+                asyncScope.dispatchToUi(() -> {
+                    if (!isSelectedConversation(otherUserId, token)) {
+                        return;
+                    }
+                    profileNoteContent.set("");
+                    profileNoteStatusMessage.set("Private note deleted.");
+                    profileNoteBusy.set(false);
+                });
+            } catch (Exception e) {
+                asyncScope.dispatchToUi(
+                        () -> applyProfileNoteFailure(otherUserId, noteLoadToken.get(), "Failed to delete note", e));
+            }
+        });
+    }
+
+    private void applyLoadedProfileNote(UUID otherUserId, ProfileNote note, int token) {
+        if (!isSelectedConversation(otherUserId, token)) {
+            return;
+        }
+        profileNoteContent.set(note != null ? note.content() : "");
+        profileNoteBusy.set(false);
+    }
+
+    private void applyProfileNoteFailure(UUID otherUserId, int token, String message, Exception error) {
+        if (!isSelectedConversation(otherUserId, token)) {
+            return;
+        }
+        profileNoteStatusMessage.set(
+                error != null
+                                && error.getMessage() != null
+                                && !error.getMessage().isBlank()
+                        ? message + ": " + error.getMessage()
+                        : message);
+        profileNoteBusy.set(false);
+    }
+
+    private boolean isSelectedConversation(UUID otherUserId, int token) {
+        ConversationPreview selected = selectedConversation.get();
+        return token == noteLoadToken.get()
+                && selected != null
+                && selected.otherUser().getId().equals(otherUserId);
+    }
+
+    private void clearProfileNoteState() {
+        noteLoadToken.incrementAndGet();
+        profileNoteContent.set("");
+        profileNoteStatusMessage.set(null);
+        profileNoteBusy.set(false);
     }
 
     /**
@@ -123,6 +307,12 @@ public class ChatViewModel {
     public void setCurrentUser(User user) {
         this.currentUser = user;
         refreshConversations();
+        if (user != null) {
+            startConversationsPolling();
+        } else {
+            stopConversationsPolling();
+            stopMessagesPolling();
+        }
     }
 
     /**
@@ -131,19 +321,33 @@ public class ChatViewModel {
     public void initialize() {
         if (ensureCurrentUser() != null) {
             refreshConversations();
+            startConversationsPolling();
         }
     }
 
     public void refreshConversations() {
+        refreshConversations(false);
+    }
+
+    private void refreshConversations(boolean silent) {
         User user = ensureCurrentUser();
         if (asyncScope.isDisposed() || user == null) {
             setLoadingState(false);
             return;
         }
 
+        if (silent) {
+            asyncScope.runLatestSilently(
+                    "chat-refresh",
+                    TASK_REFRESH_CONVERSATIONS,
+                    () -> refreshConversationData(user),
+                    data -> updateConversations(data.previews(), data.unreadCount()));
+            return;
+        }
+
         asyncScope.runLatest(
                 "chat-refresh",
-                "refresh conversations",
+                TASK_REFRESH_CONVERSATIONS,
                 () -> refreshConversationData(user),
                 data -> updateConversations(data.previews(), data.unreadCount()));
     }
@@ -217,6 +421,10 @@ public class ChatViewModel {
      * background work is skipped early (before database queries).
      */
     private void loadMessages(ConversationPreview conversation) {
+        loadMessages(conversation, false);
+    }
+
+    private void loadMessages(ConversationPreview conversation, boolean silent) {
         User user = currentUser;
         if (asyncScope.isDisposed() || user == null || conversation == null) {
             return;
@@ -225,9 +433,18 @@ public class ChatViewModel {
         String conversationId = conversation.conversation().getId();
         UUID otherUserId = conversation.otherUser().getId();
 
+        if (silent) {
+            asyncScope.runLatestSilently(
+                    "chat-messages",
+                    TASK_LOAD_MESSAGES,
+                    () -> loadMessagesInBackground(conversationId, otherUserId, user),
+                    this::updateMessagesOnFx);
+            return;
+        }
+
         asyncScope.runLatest(
                 "chat-messages",
-                "load messages",
+                TASK_LOAD_MESSAGES,
                 () -> loadMessagesInBackground(conversationId, otherUserId, user),
                 this::updateMessagesOnFx);
     }
@@ -260,7 +477,7 @@ public class ChatViewModel {
             }
         } catch (Exception e) {
             logError("Failed to load messages", e);
-            asyncScope.onError("load messages", e);
+            asyncScope.onError(TASK_LOAD_MESSAGES, e);
         }
 
         return new MessageLoadData(conversationId, messages, unread);
@@ -280,7 +497,7 @@ public class ChatViewModel {
         if (!asyncScope.isDisposed()
                 && selected != null
                 && selected.conversation().getId().equals(messageData.conversationId())) {
-            if (messageData.messages() != null) {
+            if (messageData.messages() != null && !sameMessages(activeMessages, messageData.messages())) {
                 activeMessages.setAll(messageData.messages());
             }
             if (messageData.unreadCount() != null) {
@@ -371,8 +588,125 @@ public class ChatViewModel {
         if (asyncScope.isDisposed()) {
             return;
         }
-        conversations.setAll(previews);
+        String selectedConversationId = selectedConversation.get() != null
+                ? selectedConversation.get().conversation().getId()
+                : null;
+
+        if (!sameConversationPreviews(conversations, previews)) {
+            conversations.setAll(previews);
+        }
         totalUnreadCount.set(unread);
+        restoreSelection(previews, selectedConversationId);
+    }
+
+    private void restoreSelection(List<ConversationPreview> previews, String selectedConversationId) {
+        if (selectedConversationId == null) {
+            return;
+        }
+        ConversationPreview restored = previews.stream()
+                .filter(preview -> preview.conversation().getId().equals(selectedConversationId))
+                .findFirst()
+                .orElse(null);
+        if (restored == null) {
+            selectedConversation.set(null);
+            activeMessages.clear();
+            return;
+        }
+        ConversationPreview currentlySelected = selectedConversation.get();
+        if (currentlySelected == null || !sameConversationPreview(currentlySelected, restored)) {
+            selectedConversation.set(restored);
+        }
+    }
+
+    private static boolean sameConversationPreview(ConversationPreview current, ConversationPreview candidate) {
+        if (current == null || candidate == null) {
+            return false;
+        }
+        if (!current.conversation().getId().equals(candidate.conversation().getId())) {
+            return false;
+        }
+        if (current.unreadCount() != candidate.unreadCount()) {
+            return false;
+        }
+        UUID currentMessageId = current.lastMessage().map(Message::id).orElse(null);
+        UUID candidateMessageId = candidate.lastMessage().map(Message::id).orElse(null);
+        return Objects.equals(currentMessageId, candidateMessageId);
+    }
+
+    private void startConversationsPolling() {
+        stopConversationsPolling();
+        conversationsPollingHandle = asyncScope.runPolling(
+                "chat-conversations-polling",
+                "poll conversations",
+                conversationPollInterval,
+                () -> refreshConversations(true));
+    }
+
+    private void stopConversationsPolling() {
+        if (conversationsPollingHandle != null) {
+            conversationsPollingHandle.cancel();
+            conversationsPollingHandle = null;
+        }
+    }
+
+    private void startMessagesPolling() {
+        stopMessagesPolling();
+        if (selectedConversation.get() == null) {
+            return;
+        }
+        messagesPollingHandle = asyncScope.runPolling(
+                "chat-messages-polling", "poll active conversation", activeConversationPollInterval, () -> {
+                    ConversationPreview conversation = selectedConversation.get();
+                    if (conversation != null) {
+                        loadMessages(conversation, true);
+                    }
+                });
+    }
+
+    private void stopMessagesPolling() {
+        if (messagesPollingHandle != null) {
+            messagesPollingHandle.cancel();
+            messagesPollingHandle = null;
+        }
+    }
+
+    private static boolean sameConversationPreviews(
+            List<ConversationPreview> current, List<ConversationPreview> incoming) {
+        if (current.size() != incoming.size()) {
+            return false;
+        }
+        for (int i = 0; i < current.size(); i++) {
+            ConversationPreview existing = current.get(i);
+            ConversationPreview candidate = incoming.get(i);
+            if (!existing.conversation().getId().equals(candidate.conversation().getId())) {
+                return false;
+            }
+            if (existing.unreadCount() != candidate.unreadCount()) {
+                return false;
+            }
+            UUID existingMessageId = existing.lastMessage().map(Message::id).orElse(null);
+            UUID candidateMessageId = candidate.lastMessage().map(Message::id).orElse(null);
+            if (!Objects.equals(existingMessageId, candidateMessageId)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameMessages(List<Message> current, List<Message> incoming) {
+        if (current.size() != incoming.size()) {
+            return false;
+        }
+        for (int i = 0; i < current.size(); i++) {
+            Message existing = current.get(i);
+            Message candidate = incoming.get(i);
+            if (!existing.id().equals(candidate.id())
+                    || !existing.content().equals(candidate.content())
+                    || !existing.createdAt().equals(candidate.createdAt())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int computeUnreadCount(List<ConversationPreview> previews) {
@@ -430,6 +764,68 @@ public class ChatViewModel {
         });
     }
 
+    public void requestFriendZoneForSelectedConversation() {
+        runRelationshipActionForSelectedConversation(
+                "request friend zone",
+                targetUserId -> socialUseCases.requestFriendZone(new RelationshipCommand(
+                        UserContext.ui(ensureCurrentUser().getId()), targetUserId)));
+    }
+
+    public void gracefulExitSelectedConversation() {
+        runRelationshipActionForSelectedConversation(
+                "graceful exit",
+                targetUserId -> socialUseCases.gracefulExit(new RelationshipCommand(
+                        UserContext.ui(ensureCurrentUser().getId()), targetUserId)));
+    }
+
+    public void unmatchSelectedConversation() {
+        runRelationshipActionForSelectedConversation(
+                "unmatch",
+                targetUserId -> socialUseCases.unmatch(new RelationshipCommand(
+                        UserContext.ui(ensureCurrentUser().getId()), targetUserId)));
+    }
+
+    private void runRelationshipActionForSelectedConversation(
+            String actionName,
+            java.util.function.Function<
+                            UUID, datingapp.app.usecase.common.UseCaseResult<ConnectionService.TransitionResult>>
+                    action) {
+        User user = ensureCurrentUser();
+        ConversationPreview selected = selectedConversation.get();
+        if (user == null || selected == null) {
+            return;
+        }
+        UUID otherUserId = selected.otherUser().getId();
+        asyncScope.runFireAndForget(actionName, () -> {
+            try {
+                var result = action.apply(otherUserId);
+                if (!result.success()) {
+                    reportActionError(actionName + " failed: " + result.error().message(), null);
+                    return;
+                }
+                asyncScope.dispatchToUi(() -> {
+                    selectedConversation.set(null);
+                    refreshConversations();
+                });
+            } catch (Exception e) {
+                logError("Failed to " + actionName, e);
+                reportActionError("Failed to " + actionName, e);
+            }
+        });
+    }
+
+    private void reportActionError(String message, Exception error) {
+        if (errorHandler != null) {
+            asyncScope.dispatchToUi(() -> errorHandler.onError(message));
+            return;
+        }
+        if (error != null) {
+            logger.warn(message, error);
+        } else {
+            logger.warn(message);
+        }
+    }
+
     // --- Properties ---
     public ObservableList<ConversationPreview> getConversations() {
         return conversations;
@@ -449,6 +845,18 @@ public class ChatViewModel {
 
     public IntegerProperty totalUnreadCountProperty() {
         return totalUnreadCount;
+    }
+
+    public StringProperty profileNoteContentProperty() {
+        return profileNoteContent;
+    }
+
+    public StringProperty profileNoteStatusMessageProperty() {
+        return profileNoteStatusMessage;
+    }
+
+    public BooleanProperty profileNoteBusyProperty() {
+        return profileNoteBusy;
     }
 
     private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {

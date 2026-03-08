@@ -49,6 +49,8 @@ public class ProfileController extends BaseController implements Initializable {
     private static final String GENDER_OTHER_LABEL = "Other / Non-binary";
     private static final String DEALBREAKER_HEADER = "Only show people who:";
     private static final String DARK_PANEL_STYLE = "-fx-background-color: #1e293b;";
+    private static final String PRIMARY_ACCENT_COLOR = "#667eea";
+    private static final String SUCCESS_ACCENT_COLOR = "#10b981";
 
     @FXML
     private javafx.scene.layout.BorderPane rootPane;
@@ -63,6 +65,18 @@ public class ProfileController extends BaseController implements Initializable {
             cameraButton.setOnAction(event -> {
                 event.consume();
                 handleUploadPhoto();
+            });
+        }
+        if (setPrimaryPhotoButton != null) {
+            setPrimaryPhotoButton.setOnAction(event -> {
+                event.consume();
+                handleSetPrimaryPhoto();
+            });
+        }
+        if (deletePhotoButton != null) {
+            deletePhotoButton.setOnAction(event -> {
+                event.consume();
+                handleDeletePhoto();
             });
         }
         if (avatarInner != null) {
@@ -114,6 +128,12 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private Button cameraButton;
+
+    @FXML
+    private Button setPrimaryPhotoButton;
+
+    @FXML
+    private Button deletePhotoButton;
 
     @FXML
     private StackPane avatarInner;
@@ -279,7 +299,7 @@ public class ProfileController extends BaseController implements Initializable {
         // Add pulsing glow to avatar container
         StackPane avatarContainer = (StackPane) rootPane.lookup(".profile-avatar-container");
         if (avatarContainer != null) {
-            UiAnimations.addPulsingGlow(avatarContainer, Color.web("#667eea"));
+            UiAnimations.addPulsingGlow(avatarContainer, Color.web(PRIMARY_ACCENT_COLOR));
         }
     }
 
@@ -553,6 +573,28 @@ public class ProfileController extends BaseController implements Initializable {
         viewModel.showNextPhoto();
     }
 
+    @FXML
+    private void handleSetPrimaryPhoto() {
+        if (viewModel.getPhotoUrls().isEmpty()) {
+            return;
+        }
+        viewModel.setPrimaryPhoto(viewModel.currentPhotoIndexProperty().get());
+    }
+
+    @FXML
+    private void handleDeletePhoto() {
+        if (viewModel.getPhotoUrls().isEmpty()) {
+            return;
+        }
+        boolean confirmed = UiFeedbackService.showConfirmation(
+                "Remove Photo",
+                "Remove the current photo?",
+                "This deletes the local managed copy from your profile gallery.");
+        if (confirmed) {
+            viewModel.deletePhoto(viewModel.currentPhotoIndexProperty().get());
+        }
+    }
+
     /**
      * Setup the character counter binding for the bio text area using Subscription
      * API.
@@ -658,12 +700,12 @@ public class ProfileController extends BaseController implements Initializable {
             for (Interest interest : Interest.byCategory(category)) {
                 Button chipBtn = new Button(interest.getDisplayName());
                 boolean isSelected = viewModel.getSelectedInterests().contains(interest);
-                UiUtils.updateChipStyle(chipBtn, isSelected, "#667eea");
+                UiUtils.updateChipStyle(chipBtn, isSelected, PRIMARY_ACCENT_COLOR);
 
                 chipBtn.setOnAction(event -> {
                     event.consume();
                     boolean nowSelected = viewModel.toggleInterest(interest);
-                    UiUtils.updateChipStyle(chipBtn, nowSelected, "#667eea");
+                    UiUtils.updateChipStyle(chipBtn, nowSelected, PRIMARY_ACCENT_COLOR);
                     updateInterestCountLabel();
                 });
 
@@ -678,7 +720,7 @@ public class ProfileController extends BaseController implements Initializable {
         dialog.getDialogPane().setStyle(DARK_PANEL_STYLE);
         dialog.getDialogPane()
                 .lookupButton(ButtonType.CLOSE)
-                .setStyle("-fx-background-color: #667eea; -fx-text-fill: white;");
+                .setStyle("-fx-background-color: " + PRIMARY_ACCENT_COLOR + "; -fx-text-fill: white;");
 
         dialog.showAndWait();
 
@@ -769,7 +811,7 @@ public class ProfileController extends BaseController implements Initializable {
                         Lifestyle.Smoking.values(),
                         selectedSmoking,
                         Lifestyle.Smoking::getDisplayName,
-                        "#10b981"));
+                        SUCCESS_ACCENT_COLOR));
 
         // --- Drinking Section ---
         content.getChildren()
@@ -779,7 +821,7 @@ public class ProfileController extends BaseController implements Initializable {
                         Lifestyle.Drinking.values(),
                         selectedDrinking,
                         Lifestyle.Drinking::getDisplayName,
-                        "#10b981"));
+                        SUCCESS_ACCENT_COLOR));
 
         // --- Kids Section ---
         content.getChildren()
@@ -789,7 +831,7 @@ public class ProfileController extends BaseController implements Initializable {
                         Lifestyle.WantsKids.values(),
                         selectedKids,
                         Lifestyle.WantsKids::getDisplayName,
-                        "#10b981"));
+                        SUCCESS_ACCENT_COLOR));
 
         // --- Looking For Section ---
         content.getChildren()
@@ -799,7 +841,7 @@ public class ProfileController extends BaseController implements Initializable {
                         Lifestyle.LookingFor.values(),
                         selectedLookingFor,
                         Lifestyle.LookingFor::getDisplayName,
-                        "#10b981"));
+                        SUCCESS_ACCENT_COLOR));
 
         // --- Clear All Button ---
         Button clearAllBtn = new Button("Clear All Dealbreakers");
@@ -835,7 +877,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         // Style buttons
         Button okBtn = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
-        okBtn.setStyle("-fx-background-color: #667eea; -fx-text-fill: white;");
+        okBtn.setStyle("-fx-background-color: " + PRIMARY_ACCENT_COLOR + "; -fx-text-fill: white;");
         okBtn.setText("Save");
 
         Button cancelBtn = (Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL);

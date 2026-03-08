@@ -3,6 +3,7 @@ package datingapp.ui.viewmodel;
 import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.model.User;
+import datingapp.ui.UiPreferencesStore;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.screen.ChatController;
@@ -19,7 +20,9 @@ import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
+import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,6 +47,7 @@ public class ViewModelFactory {
     private final ServiceRegistry services;
     private final AppSession session;
     private final UiThreadDispatcher uiDispatcher;
+    private final UiPreferencesStore uiPreferencesStore;
 
     /**
      * JavaFX-compatible wrapper for AppSession.
@@ -75,6 +79,7 @@ public class ViewModelFactory {
         this.services = Objects.requireNonNull(services, "services cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.uiDispatcher = new JavaFxUiThreadDispatcher();
+        this.uiPreferencesStore = new UiPreferencesStore();
         this.controllerFactories = buildControllerFactories();
         initializeSessionBinding();
     }
@@ -150,12 +155,13 @@ public class ViewModelFactory {
     public synchronized DashboardViewModel getDashboardViewModel() {
         if (dashboardViewModel == null) {
             dashboardViewModel = new DashboardViewModel(
-                    services.getRecommendationService(),
-                    createUiMatchDataAccess(),
-                    services.getProfileService(),
-                    services.getConnectionService(),
-                    services.getProfileService(),
-                    services.getConfig(),
+                    new DashboardViewModel.Dependencies(
+                            services.getRecommendationService(),
+                            createUiMatchDataAccess(),
+                            services.getProfileService(),
+                            services.getConnectionService(),
+                            services.getProfileService(),
+                            services.getConfig()),
                     session,
                     uiDispatcher);
         }
@@ -179,10 +185,14 @@ public class ViewModelFactory {
     public synchronized MatchingViewModel getMatchingViewModel() {
         if (matchingViewModel == null) {
             matchingViewModel = new MatchingViewModel(
-                    services.getCandidateFinder(),
-                    services.getMatchingService(),
-                    services.getUndoService(),
-                    services.getTrustSafetyService(),
+                    new MatchingViewModel.Dependencies(
+                            services.getCandidateFinder(),
+                            services.getMatchingService(),
+                            services.getUndoService(),
+                            services.getTrustSafetyService(),
+                            services.getMatchingUseCases(),
+                            services.getSocialUseCases(),
+                            createUiProfileNoteDataAccess()),
                     session,
                     uiDispatcher);
         }
@@ -192,12 +202,14 @@ public class ViewModelFactory {
     public synchronized MatchesViewModel getMatchesViewModel() {
         if (matchesViewModel == null) {
             matchesViewModel = new MatchesViewModel(
-                    createUiMatchDataAccess(),
-                    createUiUserStore(),
-                    services.getMatchingService(),
-                    services.getRecommendationService(),
-                    services.getMatchingUseCases(),
-                    services.getConfig(),
+                    new MatchesViewModel.Dependencies(
+                            createUiMatchDataAccess(),
+                            createUiUserStore(),
+                            services.getMatchingService(),
+                            services.getRecommendationService(),
+                            services.getMatchingUseCases(),
+                            services.getSocialUseCases(),
+                            services.getConfig()),
                     session,
                     uiDispatcher);
         }
@@ -207,7 +219,13 @@ public class ViewModelFactory {
     public synchronized ChatViewModel getChatViewModel() {
         if (chatViewModel == null) {
             chatViewModel = new ChatViewModel(
-                    services.getConnectionService(), services.getTrustSafetyService(), session, uiDispatcher);
+                    services.getConnectionService(),
+                    services.getTrustSafetyService(),
+                    session,
+                    uiDispatcher,
+                    java.time.Duration.ofSeconds(15),
+                    java.time.Duration.ofSeconds(5),
+                    createUiProfileNoteDataAccess());
         }
         return chatViewModel;
     }
@@ -227,7 +245,12 @@ public class ViewModelFactory {
     public synchronized PreferencesViewModel getPreferencesViewModel() {
         if (preferencesViewModel == null) {
             preferencesViewModel = new PreferencesViewModel(
-                    createUiUserStore(), services.getProfileUseCases(), services.getConfig(), session);
+                    createUiUserStore(),
+                    services.getProfileUseCases(),
+                    uiPreferencesStore,
+                    services.getConfig(),
+                    session,
+                    uiDispatcher);
         }
         return preferencesViewModel;
     }
@@ -289,6 +312,10 @@ public class ViewModelFactory {
 
     private UiMatchDataAccess createUiMatchDataAccess() {
         return new StorageUiMatchDataAccess(services.getInteractionStorage(), services.getTrustSafetyStorage());
+    }
+
+    private UiProfileNoteDataAccess createUiProfileNoteDataAccess() {
+        return new UseCaseUiProfileNoteDataAccess(services.getProfileUseCases());
     }
 
     private void logDebug(String message, Object... args) {

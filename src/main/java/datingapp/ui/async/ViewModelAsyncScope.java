@@ -1,5 +1,6 @@
 package datingapp.ui.async;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +26,9 @@ import java.util.function.Consumer;
  */
 public final class ViewModelAsyncScope {
 
+    private static final String ERR_BACKGROUND_WORK_NULL = "backgroundWork cannot be null";
+    private static final String ERR_TASK_KEY_NULL = "taskKey cannot be null";
+
     @FunctionalInterface
     public interface ThrowingSupplier<T> {
         T get();
@@ -42,9 +46,9 @@ public final class ViewModelAsyncScope {
     private final AtomicBoolean disposed = new AtomicBoolean(false);
     private final AtomicInteger loadingCount = new AtomicInteger(0);
 
-    private final Set<ScopeTaskHandle> activeHandles = ConcurrentHashMap.newKeySet();
+    private final Set<TaskHandle> activeHandles = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, AtomicLong> latestVersions = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, ScopeTaskHandle> latestHandles = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, TaskHandle> latestHandles = new ConcurrentHashMap<>();
 
     private final AtomicReference<Consumer<Boolean>> loadingStateConsumer = new AtomicReference<>();
 
@@ -82,12 +86,18 @@ public final class ViewModelAsyncScope {
 
     public <T> TaskHandle runLatest(
             String taskKey, String taskName, ThrowingSupplier<T> backgroundWork, Consumer<T> onSuccess) {
-        Objects.requireNonNull(taskKey, "taskKey cannot be null");
+        Objects.requireNonNull(taskKey, ERR_TASK_KEY_NULL);
         return launch(taskName, taskKey, TaskPolicy.LATEST_WINS, backgroundWork, onSuccess);
     }
 
+    public <T> TaskHandle runLatestSilently(
+            String taskKey, String taskName, ThrowingSupplier<T> backgroundWork, Consumer<T> onSuccess) {
+        Objects.requireNonNull(taskKey, ERR_TASK_KEY_NULL);
+        return launch(taskName, taskKey, TaskPolicy.LATEST_WINS_SILENT, backgroundWork, onSuccess);
+    }
+
     public TaskHandle runFireAndForget(String taskName, ThrowingRunnable backgroundWork) {
-        Objects.requireNonNull(backgroundWork, "backgroundWork cannot be null");
+        Objects.requireNonNull(backgroundWork, ERR_BACKGROUND_WORK_NULL);
         return launch(
                 taskName,
                 null,
@@ -101,13 +111,42 @@ public final class ViewModelAsyncScope {
                 });
     }
 
+    public TaskHandle runPolling(String taskKey, String taskName, Duration interval, ThrowingRunnable backgroundWork) {
+        Objects.requireNonNull(taskKey, ERR_TASK_KEY_NULL);
+        Objects.requireNonNull(interval, "interval cannot be null");
+        Objects.requireNonNull(backgroundWork, ERR_BACKGROUND_WORK_NULL);
+        if (interval.isZero() || interval.isNegative()) {
+            throw new IllegalArgumentException("interval must be positive");
+        }
+
+        String safeTaskName = normalizeTaskName(taskName);
+        if (isDisposed()) {
+            return PollingTaskHandle.cancelled(safeTaskName, interval);
+        }
+
+        long version = nextVersion(taskKey);
+        PollingTaskHandle handle = new PollingTaskHandle(safeTaskName, interval);
+        activeHandles.add(handle);
+
+        TaskHandle previous = latestHandles.put(taskKey, handle);
+        if (previous != null) {
+            previous.cancel();
+        }
+
+        Runnable execution = () -> executePollingTask(handle, taskKey, version, safeTaskName, backgroundWork);
+        Thread thread = Thread.ofVirtual().name(threadName(safeTaskName)).unstarted(execution);
+        handle.bindThread(thread);
+        thread.start();
+        return handle;
+    }
+
     public void dispose() {
         if (!disposed.compareAndSet(false, true)) {
             return;
         }
 
         latestVersions.values().forEach(AtomicLong::incrementAndGet);
-        activeHandles.forEach(ScopeTaskHandle::cancel);
+        activeHandles.forEach(TaskHandle::cancel);
         activeHandles.clear();
         latestHandles.clear();
         loadingCount.set(0);
@@ -120,7 +159,7 @@ public final class ViewModelAsyncScope {
             TaskPolicy policy,
             ThrowingSupplier<T> backgroundWork,
             Consumer<T> onSuccess) {
-        Objects.requireNonNull(backgroundWork, "backgroundWork cannot be null");
+        Objects.requireNonNull(backgroundWork, ERR_BACKGROUND_WORK_NULL);
         Objects.requireNonNull(onSuccess, "onSuccess cannot be null");
         String safeTaskName = normalizeTaskName(taskName);
 
@@ -133,7 +172,7 @@ public final class ViewModelAsyncScope {
         activeHandles.add(handle);
 
         if (taskKey != null) {
-            ScopeTaskHandle previous = latestHandles.put(taskKey, handle);
+            TaskHandle previous = latestHandles.put(taskKey, handle);
             if (previous != null) {
                 previous.cancel();
             }
@@ -196,6 +235,34 @@ public final class ViewModelAsyncScope {
         }
     }
 
+    private void executePollingTask(
+            PollingTaskHandle handle, String taskKey, long version, String taskName, ThrowingRunnable backgroundWork) {
+        try {
+            while (canDeliver(handle, taskKey, version)) {
+                try {
+                    backgroundWork.run();
+                } catch (RuntimeException error) {
+                    if (canDeliver(handle, taskKey, version)) {
+                        onError(taskName, error);
+                    }
+                }
+
+                if (canDeliver(handle, taskKey, version)) {
+                    try {
+                        Thread.sleep(handle.interval());
+                    } catch (InterruptedException _) {
+                        Thread.currentThread().interrupt();
+                        handle.cancel();
+                    }
+                }
+            }
+        } finally {
+            handle.markDone();
+            activeHandles.remove(handle);
+            latestHandles.remove(taskKey, handle);
+        }
+    }
+
     private long nextVersion(String taskKey) {
         if (taskKey == null) {
             return -1L;
@@ -204,7 +271,7 @@ public final class ViewModelAsyncScope {
         return version.incrementAndGet();
     }
 
-    private boolean canDeliver(ScopeTaskHandle handle, String taskKey, long expectedVersion) {
+    private boolean canDeliver(TaskHandle handle, String taskKey, long expectedVersion) {
         if (isDisposed() || handle.isCancelled()) {
             return false;
         }

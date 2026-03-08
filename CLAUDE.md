@@ -20,10 +20,10 @@ Guidance for AI coding agents working in this repository.
 - Java 25 + JavaFX 25
 - Maven
 
-## Verified Source Snapshot (2026-03-01)
+## Verified Source Snapshot (2026-03-07)
 
 - Java files: **116 main + 88 test = 204 total**
-- Java LOC (`tokei`): **56,482 total / 43,327 code / 8,502 blank / 4,653 comments**
+- Java LOC (`tokei`): **56,484 total / 43,329 code / 8,502 blank / 4,653 comments**
 
 ## Architecture (code-verified)
 
@@ -36,6 +36,7 @@ datingapp/
     cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
     error/{AppError,AppResult}.java
     event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
+    event/handlers/{AchievementEventHandler,MetricsEventHandler,NotificationEventHandler}.java
     usecase/
       common/{UseCaseError,UseCaseResult,UserContext}.java
       matching/MatchingUseCases.java
@@ -46,7 +47,7 @@ datingapp/
     AppClock,AppConfig,AppSession,EnumSetUtil,LoggingSupport,PerformanceMonitor,ServiceRegistry,TextUtil
     model/{User,Match,ProfileNote}
     connection/{ConnectionModels,ConnectionService}
-    matching/{CandidateFinder,CompatibilityScoring,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}
+    matching/{CandidateFinder,CompatibilityScoring,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}
     metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
     profile/{MatchPreferences,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
@@ -77,6 +78,8 @@ datingapp/
 | ViewModel threading        | ad-hoc `Thread.ofVirtual()` + `Platform.runLater()` everywhere | shared `ui/async` scope (`ViewModelAsyncScope`) |
 | ViewModel storage coupling | direct `core.storage.*` imports                                | `UiDataAdapters` interfaces                     |
 | Legacy bootstrap names     | `AppBootstrap`, `HandlerFactory`                               | `ApplicationStartup` + `fromServices(...)`      |
+| Use-case construction      | `new MatchingUseCases(...)` in callers                         | `services.getMatchingUseCases()` from registry  |
+| Config access              | `AppConfig.defaults()` in runtime code                         | injected `AppConfig` via `ServiceRegistry`      |
 
 ## Entrypoints and wiring
 
@@ -99,6 +102,17 @@ NavigationService nav = NavigationService.getInstance();
 nav.setViewModelFactory(vmFactory);
 nav.initialize(primaryStage);
 ```
+
+## Use-Case Layer and Event Bus
+
+`ServiceRegistry` internally constructs use-case instances from its core services:
+- `getMatchingUseCases()`, `getMessagingUseCases()`, `getProfileUseCases()`, `getSocialUseCases()`
+
+Callers (CLI handlers, REST API, ViewModels) should obtain use cases from the registry — never construct them directly.
+
+`RestApiServer` delegates business operations (like/pass, send message, list conversations) through the use-case layer, not core services directly.
+
+`AppEventBus` / `InProcessAppEventBus` provides in-process domain event dispatching. Event handlers live in `app/event/handlers/` and handle cross-cutting concerns (achievements, metrics, notifications).
 
 ## Async ViewModel Standard (current)
 
@@ -140,6 +154,8 @@ mvn spotless:apply verify
 - Forget `touch()` updates on mutable entities
 - Use `Instant.now()` in domain/service code
 - Bypass `ui/async` abstractions in ViewModels for routine async flows
+- Construct use-case classes directly — obtain them from `ServiceRegistry`
+- Use `AppConfig.defaults()` in runtime service code — inject via `ServiceRegistry`
 
 ## Agent Changelog (append-only)
 ---AGENT-LOG-START---
@@ -164,4 +180,5 @@ mvn spotless:apply verify
 26|2026-02-28 13:35:00|agent:github_copilot|scope:source-truth-doc-sync|Rewrote CLAUDE.md from current code snapshot including app/usecase and ui/async architecture|CLAUDE.md
 27|2026-03-01 01:20:00|agent:github_copilot|scope:source-truth-doc-sync|Updated counts, package tree, and CLI wiring callback from current source|CLAUDE.md
 28|2026-03-01 03:20:00|agent:github_copilot|scope:docs-metrics-refresh|Updated LOC snapshot values to current tokei output|CLAUDE.md
+29|2026-03-07 00:00:00|agent:claude_code|scope:source-truth-sync|Added event handlers subpackage, InterestMatcher, use-case wiring docs, config access gotcha, updated LOC|CLAUDE.md
 ---AGENT-LOG-END---

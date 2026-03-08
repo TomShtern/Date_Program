@@ -60,7 +60,28 @@ public class ChatController extends BaseController implements Initializable {
     private Button sendButton;
 
     @FXML
+    private Button friendZoneButton;
+
+    @FXML
+    private Button gracefulExitButton;
+
+    @FXML
+    private Button unmatchButton;
+
+    @FXML
     private Label chatHeaderLabel;
+
+    @FXML
+    private TextArea profileNoteArea;
+
+    @FXML
+    private Label profileNoteStatusLabel;
+
+    @FXML
+    private Button saveProfileNoteButton;
+
+    @FXML
+    private Button deleteProfileNoteButton;
 
     @FXML
     private VBox emptyStateContainer;
@@ -81,6 +102,37 @@ public class ChatController extends BaseController implements Initializable {
 
         conversationListView.setCellFactory(lv -> createConversationCell());
         messageListView.setCellFactory(lv -> createMessageCell());
+        if (profileNoteArea != null) {
+            profileNoteArea.textProperty().bindBidirectional(viewModel.profileNoteContentProperty());
+        }
+        if (profileNoteStatusLabel != null) {
+            profileNoteStatusLabel.textProperty().bind(viewModel.profileNoteStatusMessageProperty());
+        }
+        if (saveProfileNoteButton != null) {
+            saveProfileNoteButton
+                    .disableProperty()
+                    .bind(viewModel.selectedConversationProperty().isNull().or(viewModel.profileNoteBusyProperty()));
+        }
+        if (deleteProfileNoteButton != null) {
+            deleteProfileNoteButton
+                    .disableProperty()
+                    .bind(viewModel.selectedConversationProperty().isNull().or(viewModel.profileNoteBusyProperty()));
+        }
+        if (friendZoneButton != null) {
+            friendZoneButton
+                    .disableProperty()
+                    .bind(viewModel.selectedConversationProperty().isNull());
+        }
+        if (gracefulExitButton != null) {
+            gracefulExitButton
+                    .disableProperty()
+                    .bind(viewModel.selectedConversationProperty().isNull());
+        }
+        if (unmatchButton != null) {
+            unmatchButton
+                    .disableProperty()
+                    .bind(viewModel.selectedConversationProperty().isNull());
+        }
 
         // Bind selection using Subscription API
         addSubscription(conversationListView
@@ -359,5 +411,68 @@ public class ChatController extends BaseController implements Initializable {
             viewModel.reportUser(otherUser.getId(), reason, null, true);
             UiFeedbackService.showSuccess(otherUser.getName() + " has been reported.");
         });
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleSaveProfileNote() {
+        viewModel.saveSelectedProfileNote();
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleDeleteProfileNote() {
+        viewModel.deleteSelectedProfileNote();
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleRequestFriendZone() {
+        ConversationPreview selected = viewModel.selectedConversationProperty().get();
+        if (selected == null) {
+            return;
+        }
+        User otherUser = selected.otherUser();
+        if (UiFeedbackService.showConfirmation(
+                "Request Friend Zone",
+                "Ask " + otherUser.getName() + " to continue as friends?",
+                "They will receive a friend-zone request.")) {
+            viewModel.requestFriendZoneForSelectedConversation();
+            UiFeedbackService.showSuccess("Friend-zone request sent.");
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleGracefulExit() {
+        ConversationPreview selected = viewModel.selectedConversationProperty().get();
+        if (selected == null) {
+            return;
+        }
+        User otherUser = selected.otherUser();
+        if (UiFeedbackService.showConfirmation(
+                "Graceful Exit",
+                "End things kindly with " + otherUser.getName() + "?",
+                "Your conversation will be archived for both of you.")) {
+            viewModel.gracefulExitSelectedConversation();
+            UiFeedbackService.showSuccess("Graceful exit completed.");
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleUnmatch() {
+        ConversationPreview selected = viewModel.selectedConversationProperty().get();
+        if (selected == null) {
+            return;
+        }
+        User otherUser = selected.otherUser();
+        if (UiFeedbackService.showConfirmation(
+                "Unmatch",
+                "Unmatch with " + otherUser.getName() + "?",
+                "This removes the relationship and archives the conversation.")) {
+            viewModel.unmatchSelectedConversation();
+            UiFeedbackService.showSuccess(otherUser.getName() + " has been unmatched.");
+        }
     }
 }

@@ -12,16 +12,21 @@ import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.Match;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import javafx.application.Platform;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -43,6 +48,7 @@ class ChatViewModelTest {
     private ConnectionService connectionService;
     private User currentUser;
     private User otherUser;
+    private TestStorages.Analytics analytics;
 
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
@@ -61,6 +67,7 @@ class ChatViewModelTest {
         interactions = new TestStorages.Interactions();
         communications = new TestStorages.Communications();
         trustSafety = new TestStorages.TrustSafety();
+        analytics = new TestStorages.Analytics();
 
         TestClock.setFixed(FIXED_INSTANT);
 
@@ -68,8 +75,17 @@ class ChatViewModelTest {
 
         connectionService = new ConnectionService(config, communications, interactions, users);
         TrustSafetyService trustSafetyService = new TrustSafetyService(trustSafety, interactions, users, config);
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(users, profileService, null, null, config);
 
-        viewModel = new ChatViewModel(connectionService, trustSafetyService, AppSession.getInstance());
+        viewModel = new ChatViewModel(
+                connectionService,
+                trustSafetyService,
+                AppSession.getInstance(),
+                new datingapp.ui.async.JavaFxUiThreadDispatcher(),
+                Duration.ofMillis(75),
+                Duration.ofMillis(75),
+                new UseCaseUiProfileNoteDataAccess(noteUseCases));
 
         currentUser = createActiveUser("CurrentUser");
         otherUser = createActiveUser("OtherUser");
@@ -86,8 +102,7 @@ class ChatViewModelTest {
         // setCurrentUser triggers an async refreshConversations (Thread A). Drain it to
         // completion before each test body starts, so it cannot post a stale
         // updateConversations([]) callback after the test's own refresh has run.
-        Thread.sleep(300);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
     }
 
     @AfterEach
@@ -107,6 +122,19 @@ class ChatViewModelTest {
         }
     }
 
+    private boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
+        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+        while (System.nanoTime() < deadlineNanos) {
+            waitForFxEvents();
+            if (condition.getAsBoolean()) {
+                return true;
+            }
+            Thread.sleep(25);
+        }
+        waitForFxEvents();
+        return condition.getAsBoolean();
+    }
+
     @Test
     @DisplayName("refreshConversations updates conversation list on FX thread")
     void shouldRefreshConversations() throws InterruptedException {
@@ -115,8 +143,7 @@ class ChatViewModelTest {
 
         viewModel.refreshConversations();
 
-        Thread.sleep(500); // Allow virtual thread to fetch and dispatch
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 1, 5000));
 
         assertEquals(1, viewModel.getConversations().size());
         assertEquals(
@@ -133,16 +160,14 @@ class ChatViewModelTest {
         connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Message 2");
 
         viewModel.refreshConversations();
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 1, 5000));
 
         // Trigger loading of messages by setting property
         viewModel
                 .selectedConversationProperty()
                 .set(viewModel.getConversations().get(0));
 
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> viewModel.getActiveMessages().size() == 2, 5000));
 
         assertEquals(2, viewModel.getActiveMessages().size());
 
@@ -162,8 +187,7 @@ class ChatViewModelTest {
         connectionService.sendMessage(user3.getId(), currentUser.getId(), "Msg from User3");
 
         viewModel.refreshConversations();
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 2, 5000));
 
         assertEquals(2, viewModel.getConversations().size());
 
@@ -187,8 +211,7 @@ class ChatViewModelTest {
         viewModel.selectedConversationProperty().set(otherUserConv);
         viewModel.selectedConversationProperty().set(user3Conv);
 
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> viewModel.getActiveMessages().size() == 1, 5000));
 
         // The active messages should reflect the 2nd (User3) conversation only
         assertEquals(1, viewModel.getActiveMessages().size());
@@ -201,26 +224,135 @@ class ChatViewModelTest {
     void shouldSendMessageAndUpdate() throws InterruptedException {
         connectionService.getOrCreateConversation(currentUser.getId(), otherUser.getId());
         viewModel.refreshConversations();
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 1, 5000));
 
         viewModel
                 .selectedConversationProperty()
                 .set(viewModel.getConversations().get(0));
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(
+                () -> !viewModel.getActiveMessages().isEmpty()
+                        || !viewModel.loadingProperty().get(),
+                5000));
 
         // Call send message
         boolean accepted = viewModel.sendMessage("Hey there!");
         assertTrue(accepted);
 
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> viewModel.getActiveMessages().size() == 1, 5000));
 
         assertEquals(1, viewModel.getActiveMessages().size());
         Message sentMessage = viewModel.getActiveMessages().get(0);
         assertTrue(viewModel.isMessageFromCurrentUser(sentMessage));
         assertEquals("Hey there!", sentMessage.content());
+    }
+
+    @Test
+    @DisplayName("polling refreshes conversations and active messages without manual refresh")
+    void shouldPollConversationsAndMessages() throws InterruptedException {
+        connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Initial hello");
+
+        assertTrue(waitUntil(() -> !viewModel.getConversations().isEmpty(), 5000));
+        ConversationPreview preview = viewModel.getConversations().get(0);
+        viewModel.selectedConversationProperty().set(preview);
+
+        assertTrue(waitUntil(() -> viewModel.getActiveMessages().size() == 1, 5000));
+
+        connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Polled follow-up");
+
+        assertTrue(waitUntil(() -> viewModel.getActiveMessages().size() == 2, 5000));
+        assertEquals(
+                "Polled follow-up",
+                viewModel
+                        .getActiveMessages()
+                        .get(viewModel.getActiveMessages().size() - 1)
+                        .content());
+        assertEquals(
+                preview.conversation().getId(),
+                viewModel.selectedConversationProperty().get().conversation().getId());
+    }
+
+    @Test
+    @DisplayName("selecting a conversation loads existing private note")
+    void shouldLoadPrivateNoteForSelectedConversation() throws InterruptedException {
+        users.saveProfileNote(ProfileNote.create(currentUser.getId(), otherUser.getId(), "Known context"));
+        connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Hello!");
+
+        viewModel.refreshConversations();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 1, 5000));
+
+        viewModel
+                .selectedConversationProperty()
+                .set(viewModel.getConversations().get(0));
+
+        assertTrue(waitUntil(
+                () -> "Known context"
+                        .equals(viewModel.profileNoteContentProperty().get()),
+                5000));
+        assertEquals("Known context", viewModel.profileNoteContentProperty().get());
+    }
+
+    @Test
+    @DisplayName("saving and deleting a private note updates storage")
+    void shouldSaveAndDeletePrivateNote() throws InterruptedException {
+        connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Hello!");
+
+        viewModel.refreshConversations();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 1, 5000));
+
+        viewModel
+                .selectedConversationProperty()
+                .set(viewModel.getConversations().get(0));
+        assertTrue(waitUntil(() -> !viewModel.profileNoteBusyProperty().get(), 5000));
+
+        viewModel.profileNoteContentProperty().set("Remember this detail");
+        viewModel.saveSelectedProfileNote();
+
+        assertTrue(waitUntil(
+                () -> users.getProfileNote(currentUser.getId(), otherUser.getId())
+                                .map(ProfileNote::content)
+                                .filter("Remember this detail"::equals)
+                                .isPresent()
+                        && "Remember this detail"
+                                .equals(viewModel.profileNoteContentProperty().get()),
+                5000));
+        assertEquals(
+                "Remember this detail",
+                users.getProfileNote(currentUser.getId(), otherUser.getId())
+                        .map(ProfileNote::content)
+                        .orElseThrow());
+
+        viewModel.deleteSelectedProfileNote();
+
+        assertTrue(waitUntil(
+                () -> users.getProfileNote(currentUser.getId(), otherUser.getId())
+                                .isEmpty()
+                        && viewModel.profileNoteContentProperty().get().isEmpty(),
+                5000));
+        assertTrue(users.getProfileNote(currentUser.getId(), otherUser.getId()).isEmpty());
+        assertEquals("", viewModel.profileNoteContentProperty().get());
+    }
+
+    @Test
+    @DisplayName("requesting friend zone from selected conversation creates a pending request")
+    void shouldRequestFriendZoneFromSelectedConversation() throws InterruptedException {
+        connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Hello!");
+
+        viewModel.refreshConversations();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 1, 5000));
+
+        viewModel
+                .selectedConversationProperty()
+                .set(viewModel.getConversations().get(0));
+        assertTrue(waitUntil(() -> !viewModel.profileNoteBusyProperty().get(), 5000));
+
+        viewModel.requestFriendZoneForSelectedConversation();
+
+        assertTrue(waitUntil(
+                () -> communications
+                                .getPendingFriendRequestsForUser(otherUser.getId())
+                                .size()
+                        == 1,
+                5000));
     }
 
     private static User createActiveUser(String name) {

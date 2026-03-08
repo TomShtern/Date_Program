@@ -1,8 +1,12 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UseCaseError;
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.model.Match;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
@@ -95,6 +99,19 @@ public final class UiDataAdapters {
 
         /** Marks the notification with the given ID as read. */
         void markNotificationRead(UUID notificationId);
+    }
+
+    /** UI-layer adapter interface for private profile-note access. */
+    public interface UiProfileNoteDataAccess {
+
+        /** Returns the private note authored by {@code authorId} about {@code subjectId}, if present. */
+        Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId);
+
+        /** Creates or updates the private note authored by {@code authorId} about {@code subjectId}. */
+        ProfileNote upsertProfileNote(UUID authorId, UUID subjectId, String content);
+
+        /** Deletes the private note authored by {@code authorId} about {@code subjectId}. */
+        boolean deleteProfileNote(UUID authorId, UUID subjectId);
     }
 
     // ── Implementations ─────────────────────────────────────────────────────
@@ -194,6 +211,71 @@ public final class UiDataAdapters {
         @Override
         public void deleteLike(UUID likeId) {
             interactionStorage.delete(likeId);
+        }
+    }
+
+    /** Bridges the UI layer to profile-note use-cases. */
+    public static final class UseCaseUiProfileNoteDataAccess implements UiProfileNoteDataAccess {
+
+        private final ProfileUseCases profileUseCases;
+
+        public UseCaseUiProfileNoteDataAccess(ProfileUseCases profileUseCases) {
+            this.profileUseCases = Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
+        }
+
+        @Override
+        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+            var result = profileUseCases.getProfileNote(
+                    new ProfileUseCases.ProfileNoteQuery(UserContext.ui(authorId), subjectId));
+            if (result.success()) {
+                return Optional.of(result.data());
+            }
+            if (result.error().code() == UseCaseError.Code.NOT_FOUND) {
+                return Optional.empty();
+            }
+            throw new IllegalStateException(result.error().message());
+        }
+
+        @Override
+        public ProfileNote upsertProfileNote(UUID authorId, UUID subjectId, String content) {
+            var result = profileUseCases.upsertProfileNote(
+                    new ProfileUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), subjectId, content));
+            if (!result.success()) {
+                throw new IllegalStateException(result.error().message());
+            }
+            return result.data();
+        }
+
+        @Override
+        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            var result = profileUseCases.deleteProfileNote(
+                    new ProfileUseCases.DeleteProfileNoteCommand(UserContext.ui(authorId), subjectId));
+            if (result.success()) {
+                return Boolean.TRUE.equals(result.data());
+            }
+            if (result.error().code() == UseCaseError.Code.NOT_FOUND) {
+                return false;
+            }
+            throw new IllegalStateException(result.error().message());
+        }
+    }
+
+    /** Safe default note adapter used when a caller does not wire note support. */
+    public static final class NoOpUiProfileNoteDataAccess implements UiProfileNoteDataAccess {
+
+        @Override
+        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public ProfileNote upsertProfileNote(UUID authorId, UUID subjectId, String content) {
+            throw new UnsupportedOperationException("Profile-note access is not configured");
+        }
+
+        @Override
+        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            return false;
         }
     }
 }

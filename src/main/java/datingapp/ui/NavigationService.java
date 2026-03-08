@@ -39,6 +39,8 @@ public final class NavigationService {
     private BorderPane rootLayout;
     private StackPane rootStack;
     private ViewModelFactory viewModelFactory;
+    private final UiPreferencesStore uiPreferencesStore = new UiPreferencesStore();
+    private UiPreferencesStore.ThemeMode currentThemeMode = UiPreferencesStore.ThemeMode.DARK;
 
     private final java.util.concurrent.atomic.AtomicReference<NavigationContextEnvelope> navigationContext =
             new java.util.concurrent.atomic.AtomicReference<>();
@@ -71,7 +73,7 @@ public final class NavigationService {
         MATCHES("/fxml/matches.fxml"),
         CHAT("/fxml/chat.fxml"),
         STATS("/fxml/stats.fxml"),
-        PREFERENCES("/fxml/MatchPreferences.fxml"),
+        PREFERENCES("/fxml/preferences.fxml"),
         STANDOUTS("/fxml/standouts.fxml"),
         SOCIAL("/fxml/social.fxml");
 
@@ -119,14 +121,25 @@ public final class NavigationService {
         this.rootStack = new StackPane(rootLayout);
 
         Scene scene = new Scene(rootStack, 900, 760);
-        // Load CSS theme
-        String css =
-                Objects.requireNonNull(getClass().getResource("/css/theme.css")).toExternalForm();
-        scene.getStylesheets().add(css);
+        currentThemeMode = uiPreferencesStore.loadThemeMode();
+        applyTheme(scene, currentThemeMode);
 
         UiFeedbackService.setContainer(rootStack);
 
         primaryStage.setScene(scene);
+    }
+
+    public UiPreferencesStore.ThemeMode getCurrentThemeMode() {
+        return currentThemeMode;
+    }
+
+    public void setThemeMode(UiPreferencesStore.ThemeMode themeMode) {
+        UiPreferencesStore.ThemeMode resolvedThemeMode = Objects.requireNonNull(themeMode, "themeMode cannot be null");
+        currentThemeMode = resolvedThemeMode;
+        Scene scene = primaryStage != null ? primaryStage.getScene() : null;
+        if (scene != null) {
+            applyTheme(scene, resolvedThemeMode);
+        }
     }
 
     /**
@@ -396,6 +409,23 @@ public final class NavigationService {
     private void logError(String message, Object... args) {
         if (logger.isErrorEnabled()) {
             logger.error(message, args);
+        }
+    }
+
+    private void applyTheme(Scene scene, UiPreferencesStore.ThemeMode themeMode) {
+        Objects.requireNonNull(scene, "scene cannot be null");
+        String darkTheme =
+                Objects.requireNonNull(getClass().getResource("/css/theme.css")).toExternalForm();
+        String lightTheme = Objects.requireNonNull(getClass().getResource("/css/light-theme.css"))
+                .toExternalForm();
+
+        scene.getStylesheets().remove(lightTheme);
+        if (!scene.getStylesheets().contains(darkTheme)) {
+            scene.getStylesheets().add(darkTheme);
+        }
+        if (themeMode == UiPreferencesStore.ThemeMode.LIGHT
+                && !scene.getStylesheets().contains(lightTheme)) {
+            scene.getStylesheets().add(lightTheme);
         }
     }
 }

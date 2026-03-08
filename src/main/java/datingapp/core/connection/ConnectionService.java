@@ -291,9 +291,6 @@ public class ConnectionService {
         }
         Match match = matchOpt.get();
 
-        match.transitionToFriends(request.fromUserId());
-        interactionStorage.update(match);
-
         FriendRequest updated = new FriendRequest(
                 request.id(),
                 request.fromUserId(),
@@ -304,6 +301,7 @@ public class ConnectionService {
 
         if (interactionStorage.supportsAtomicRelationshipTransitions()) {
             try {
+                match.transitionToFriends(request.fromUserId());
                 boolean transitioned = interactionStorage.acceptFriendZoneTransition(match, updated, null);
                 if (!transitioned) {
                     return TransitionResult.failure("Failed to persist friend-zone acceptance.");
@@ -313,6 +311,9 @@ public class ConnectionService {
                 return TransitionResult.failure("Failed to persist friend-zone acceptance: " + e.getMessage());
             }
         }
+
+        match.transitionToFriends(request.fromUserId());
+        interactionStorage.update(match);
 
         try {
             communicationStorage.updateFriendRequest(updated);
@@ -388,11 +389,6 @@ public class ConnectionService {
         }
 
         interactionStorage.update(match);
-        // KNOWN LIMITATION: the match state update and conversation archive are not
-        // atomic.
-        // If archiveConversation fails, the match is already GRACEFUL_EXIT but the
-        // conversation
-        // remains unarchived. Proper fix requires cross-storage transaction support.
         convoOpt.ifPresent(convo -> {
             communicationStorage.archiveConversation(convo.getId(), convo.getUserA(), MatchArchiveReason.GRACEFUL_EXIT);
             communicationStorage.archiveConversation(convo.getId(), convo.getUserB(), MatchArchiveReason.GRACEFUL_EXIT);
@@ -424,10 +420,27 @@ public class ConnectionService {
         }
 
         match.unmatch(initiatorId);
-        interactionStorage.update(match);
 
         // Archive the conversation for both participants, if one exists.
         Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetId);
+        convoOpt.ifPresent(convo -> {
+            convo.archive(convo.getUserA(), MatchArchiveReason.UNMATCH);
+            convo.archive(convo.getUserB(), MatchArchiveReason.UNMATCH);
+        });
+
+        if (interactionStorage.supportsAtomicRelationshipTransitions()) {
+            try {
+                boolean transitioned = interactionStorage.unmatchTransition(match, convoOpt);
+                if (!transitioned) {
+                    return TransitionResult.failure("Failed to persist unmatch transition.");
+                }
+                return TransitionResult.ok();
+            } catch (Exception e) {
+                return TransitionResult.failure("Failed to persist unmatch transition: " + e.getMessage());
+            }
+        }
+
+        interactionStorage.update(match);
         convoOpt.ifPresent(convo -> {
             communicationStorage.archiveConversation(convo.getId(), convo.getUserA(), MatchArchiveReason.UNMATCH);
             communicationStorage.archiveConversation(convo.getId(), convo.getUserB(), MatchArchiveReason.UNMATCH);

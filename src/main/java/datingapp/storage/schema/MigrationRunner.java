@@ -1,8 +1,12 @@
 package datingapp.storage.schema;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -34,6 +38,12 @@ public final class MigrationRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(MigrationRunner.class);
     private static final Pattern SQL_IDENTIFIER = Pattern.compile("[A-Za-z]\\w*");
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
+    private static final String USERS_TABLE = "users";
+    private static final String ID_COLUMN = "id";
+    private static final String USER_ID_COLUMN = "user_id";
+    private static final String CONVERSATIONS_TABLE = "conversations";
 
     private MigrationRunner() {
         // Utility class — static methods only
@@ -75,7 +85,19 @@ public final class MigrationRunner {
                     "Backfill FKs, indexes, and constraints for databases migrated under old V1",
                     MigrationRunner::applyV2),
             new VersionedMigration(
-                    3, "Normalize multi-value profile fields into junction tables", MigrationRunner::applyV3));
+                    3, "Normalize multi-value profile fields into junction tables", MigrationRunner::applyV3),
+            new VersionedMigration(
+                    4,
+                    "Backfill normalized profile tables from legacy serialized user columns",
+                    MigrationRunner::applyV4),
+            new VersionedMigration(
+                    5,
+                    "Reapply idempotent user-column backfills for databases migrated under older V2 snapshots",
+                    MigrationRunner::applyV5),
+            new VersionedMigration(
+                    6,
+                    "Reapply user-column backfills for databases that already recorded V5 before later user projections were added",
+                    MigrationRunner::applyV6));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -124,19 +146,7 @@ public final class MigrationRunner {
      * <strong>FROZEN:</strong> do not modify. Future schema changes go into V3+.
      */
     private static void applyV1(Statement stmt) throws SQLException {
-        // 1. Create all tables (idempotent — IF NOT EXISTS throughout)
-        SchemaInitializer.createAllTables(stmt);
-
-        // 2. Ensure columns added after the initial schema exist (covers pre-V1 partial
-        // schemas)
-        migrateSchemaColumns(stmt);
-
-        // 3. Ensure all foreign key constraints exist
-        addMissingForeignKeys(stmt);
-
-        // 4. Ensure all indexes exist (SchemaInitializer uses IF NOT EXISTS — safe
-        // no-op if present)
-        ensureAllIndexes(stmt);
+        applyBaselineSchemaBackfill(stmt);
     }
 
     /**
@@ -155,9 +165,10 @@ public final class MigrationRunner {
      * <strong>FROZEN:</strong> do not modify. Future schema changes go into V3+.
      */
     private static void applyV2(Statement stmt) throws SQLException {
-        // Re-run the same idempotent operations as V1:
-        // - New-system V1 databases: all IF NOT EXISTS → no-op.
-        // - Old-system V1 databases: creates missing tables, adds FKs/indexes.
+        applyBaselineSchemaBackfill(stmt);
+    }
+
+    private static void applyBaselineSchemaBackfill(Statement stmt) throws SQLException {
         SchemaInitializer.createAllTables(stmt);
         migrateSchemaColumns(stmt);
         addMissingForeignKeys(stmt);
@@ -176,6 +187,160 @@ public final class MigrationRunner {
      */
     private static void applyV3(Statement stmt) throws SQLException {
         SchemaInitializer.createNormalizedProfileSchema(stmt);
+    }
+
+    private static void applyV4(Statement stmt) throws SQLException {
+        // Follow-up marker: keep this compatibility backfill until the dedicated legacy-column
+        // removal migration lands after the normalized rollout has proven stable in the field.
+        backfillNormalizedProfileData(stmt);
+    }
+
+    /**
+     * V5 backfill migration for databases that already recorded earlier V2/V3/V4
+     * snapshots before later `users` columns were added to migrateSchemaColumns().
+     *
+     * <p>This deliberately re-runs the column backfill only. All statements use
+     * {@code ADD COLUMN IF NOT EXISTS}, so fresh or already-upgraded databases
+     * see a safe no-op while stale databases gain the missing columns required by
+     * current user-loading queries.
+     */
+    private static void applyV5(Statement stmt) throws SQLException {
+        migrateSchemaColumns(stmt);
+    }
+
+    /**
+     * V6 backfill migration for on-disk databases that already recorded V5 before
+     * additional columns were added to the shared {@code users} projection used by
+     * storage queries such as {@code JdbiUserStorage.ALL_COLUMNS}.
+     *
+     * <p>This intentionally re-runs only the idempotent column backfill so stale
+     * local databases regain any missing {@code users} columns without affecting
+     * fresh databases.
+     */
+    private static void applyV6(Statement stmt) throws SQLException {
+        migrateSchemaColumns(stmt);
+    }
+
+    static void backfillNormalizedProfileData(Statement stmt) throws SQLException {
+        try (ResultSet rs =
+                stmt.executeQuery("SELECT id, photo_urls, interests, interested_in, db_smoking, db_drinking, "
+                        + "db_wants_kids, db_looking_for, db_education FROM users")) {
+            while (rs.next()) {
+                String userId = rs.getString("id");
+                backfillIfMissing(stmt, "user_photos", userId, parsePhotoUrls(rs.getString("photo_urls")), true);
+                backfillIfMissing(stmt, "user_interests", userId, parseCsvOrJson(rs.getString("interests")), false);
+                backfillIfMissing(
+                        stmt, "user_interested_in", userId, parseCsvOrJson(rs.getString("interested_in")), false);
+                backfillIfMissing(stmt, "user_db_smoking", userId, parseCsvOrJson(rs.getString("db_smoking")), false);
+                backfillIfMissing(stmt, "user_db_drinking", userId, parseCsvOrJson(rs.getString("db_drinking")), false);
+                backfillIfMissing(
+                        stmt, "user_db_wants_kids", userId, parseCsvOrJson(rs.getString("db_wants_kids")), false);
+                backfillIfMissing(
+                        stmt, "user_db_looking_for", userId, parseCsvOrJson(rs.getString("db_looking_for")), false);
+                backfillIfMissing(
+                        stmt, "user_db_education", userId, parseCsvOrJson(rs.getString("db_education")), false);
+            }
+        }
+    }
+
+    private static void backfillIfMissing(
+            Statement stmt, String tableName, String userId, List<String> values, boolean ordered) throws SQLException {
+        if (values.isEmpty() || normalizedRowsExist(stmt, tableName, userId)) {
+            return;
+        }
+        if (ordered) {
+            try (PreparedStatement pstmt = stmt.getConnection()
+                    .prepareStatement("INSERT INTO " + tableName + " (user_id, position, url) VALUES (?, ?, ?)")) {
+                for (int i = 0; i < values.size(); i++) {
+                    pstmt.setObject(1, java.util.UUID.fromString(userId));
+                    pstmt.setInt(2, i);
+                    pstmt.setString(3, values.get(i));
+                    pstmt.addBatch();
+                }
+                pstmt.executeBatch();
+            }
+            return;
+        }
+
+        String sql;
+        if ("user_interests".equals(tableName)) {
+            sql = "INSERT INTO user_interests (user_id, interest) VALUES (?, ?)";
+        } else if ("user_interested_in".equals(tableName)) {
+            sql = "INSERT INTO user_interested_in (user_id, gender) VALUES (?, ?)";
+        } else {
+            sql = "INSERT INTO " + tableName + " (user_id, \"value\") VALUES (?, ?)";
+        }
+        try (PreparedStatement pstmt = stmt.getConnection().prepareStatement(sql)) {
+            for (String value : values) {
+                pstmt.setObject(1, java.util.UUID.fromString(userId));
+                pstmt.setString(2, value);
+                pstmt.addBatch();
+            }
+            pstmt.executeBatch();
+        }
+    }
+
+    private static boolean normalizedRowsExist(Statement stmt, String tableName, String userId) throws SQLException {
+        try (PreparedStatement pstmt = stmt.getConnection()
+                .prepareStatement(
+                        "SELECT COUNT(*) FROM " + requireIdentifier(tableName, "table") + " WHERE user_id = ?")) {
+            pstmt.setObject(1, java.util.UUID.fromString(userId));
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
+        }
+    }
+
+    private static List<String> parsePhotoUrls(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        if (raw.trim().startsWith("[") && raw.trim().endsWith("]")) {
+            try {
+                return OBJECT_MAPPER.readValue(raw.trim(), STRING_LIST_TYPE).stream()
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(value -> !value.isBlank())
+                        .toList();
+            } catch (Exception _) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Falling back to legacy-delimited photo URL parsing during normalized backfill");
+                }
+            }
+        }
+        List<String> values = new ArrayList<>();
+        for (String token : raw.split("\\|")) {
+            if (token != null && !token.isBlank()) {
+                values.add(token.trim());
+            }
+        }
+        return values;
+    }
+
+    private static List<String> parseCsvOrJson(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        if (raw.trim().startsWith("[") && raw.trim().endsWith("]")) {
+            try {
+                return OBJECT_MAPPER.readValue(raw.trim(), STRING_LIST_TYPE).stream()
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(value -> !value.isBlank())
+                        .toList();
+            } catch (Exception _) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Falling back to CSV parsing during normalized profile backfill");
+                }
+            }
+        }
+        List<String> values = new ArrayList<>();
+        for (String token : raw.split(",")) {
+            if (token != null && !token.isBlank()) {
+                values.add(token.trim());
+            }
+        }
+        return values;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -306,60 +471,64 @@ public final class MigrationRunner {
     static void addMissingForeignKeys(Statement stmt) throws SQLException {
         // likes (named FKs in SchemaInitializer — IF NOT EXISTS is a true no-op on
         // fresh DBs)
-        addForeignKeyIfPresent(stmt, "likes", "fk_likes_who_likes", "who_likes", "users", "id");
-        addForeignKeyIfPresent(stmt, "likes", "fk_likes_who_got_liked", "who_got_liked", "users", "id");
+        addForeignKeyIfPresent(stmt, "likes", "fk_likes_who_likes", "who_likes", USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(stmt, "likes", "fk_likes_who_got_liked", "who_got_liked", USERS_TABLE, ID_COLUMN);
 
         // matches (named FKs in SchemaInitializer — same logic)
-        addForeignKeyIfPresent(stmt, "matches", "fk_matches_user_a", "user_a", "users", "id");
-        addForeignKeyIfPresent(stmt, "matches", "fk_matches_user_b", "user_b", "users", "id");
+        addForeignKeyIfPresent(stmt, "matches", "fk_matches_user_a", "user_a", USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(stmt, "matches", "fk_matches_user_b", "user_b", USERS_TABLE, ID_COLUMN);
 
         // swipe_sessions (named FK in SchemaInitializer)
-        addForeignKeyIfPresent(stmt, "swipe_sessions", "fk_sessions_user", "user_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "swipe_sessions", "fk_sessions_user", USER_ID_COLUMN, USERS_TABLE, ID_COLUMN);
 
         // user_stats (named FK in SchemaInitializer)
-        addForeignKeyIfPresent(stmt, "user_stats", "fk_user_stats_user", "user_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "user_stats", "fk_user_stats_user", USER_ID_COLUMN, USERS_TABLE, ID_COLUMN);
 
         // standouts (unnamed FKs in SchemaInitializer — produces benign double-FK on
         // fresh DBs)
-        addForeignKeyIfPresent(stmt, "standouts", "fk_standouts_seeker", "seeker_id", "users", "id");
-        addForeignKeyIfPresent(stmt, "standouts", "fk_standouts_user", "standout_user_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "standouts", "fk_standouts_seeker", "seeker_id", USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(stmt, "standouts", "fk_standouts_user", "standout_user_id", USERS_TABLE, ID_COLUMN);
 
         // daily_pick_views
-        addForeignKeyIfPresent(stmt, "daily_pick_views", "fk_daily_pick_views_user", "user_id", "users", "id");
+        addForeignKeyIfPresent(
+                stmt, "daily_pick_views", "fk_daily_pick_views_user", USER_ID_COLUMN, USERS_TABLE, ID_COLUMN);
 
         // user_achievements
-        addForeignKeyIfPresent(stmt, "user_achievements", "fk_user_achievements_user", "user_id", "users", "id");
+        addForeignKeyIfPresent(
+                stmt, "user_achievements", "fk_user_achievements_user", USER_ID_COLUMN, USERS_TABLE, ID_COLUMN);
 
         // friend_requests (unnamed FKs in SchemaInitializer)
-        addForeignKeyIfPresent(stmt, "friend_requests", "fk_friend_requests_from", "from_user_id", "users", "id");
-        addForeignKeyIfPresent(stmt, "friend_requests", "fk_friend_requests_to", "to_user_id", "users", "id");
+        addForeignKeyIfPresent(
+                stmt, "friend_requests", "fk_friend_requests_from", "from_user_id", USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(stmt, "friend_requests", "fk_friend_requests_to", "to_user_id", USERS_TABLE, ID_COLUMN);
 
         // notifications (unnamed FK in SchemaInitializer)
-        addForeignKeyIfPresent(stmt, "notifications", "fk_notifications_user", "user_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "notifications", "fk_notifications_user", USER_ID_COLUMN, USERS_TABLE, ID_COLUMN);
 
         // blocks (unnamed FKs in SchemaInitializer)
-        addForeignKeyIfPresent(stmt, "blocks", "fk_blocks_blocker", "blocker_id", "users", "id");
-        addForeignKeyIfPresent(stmt, "blocks", "fk_blocks_blocked", "blocked_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "blocks", "fk_blocks_blocker", "blocker_id", USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(stmt, "blocks", "fk_blocks_blocked", "blocked_id", USERS_TABLE, ID_COLUMN);
 
         // reports (unnamed FKs in SchemaInitializer)
-        addForeignKeyIfPresent(stmt, "reports", "fk_reports_reporter", "reporter_id", "users", "id");
-        addForeignKeyIfPresent(stmt, "reports", "fk_reports_reported", "reported_user_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "reports", "fk_reports_reporter", "reporter_id", USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(stmt, "reports", "fk_reports_reported", "reported_user_id", USERS_TABLE, ID_COLUMN);
 
         // conversations (unnamed FKs in SchemaInitializer)
-        addForeignKeyIfPresent(stmt, "conversations", "fk_conversations_user_a", "user_a", "users", "id");
-        addForeignKeyIfPresent(stmt, "conversations", "fk_conversations_user_b", "user_b", "users", "id");
+        addForeignKeyIfPresent(stmt, CONVERSATIONS_TABLE, "fk_conversations_user_a", "user_a", USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(stmt, CONVERSATIONS_TABLE, "fk_conversations_user_b", "user_b", USERS_TABLE, ID_COLUMN);
 
         // messages (unnamed FKs in SchemaInitializer)
-        addForeignKeyIfPresent(stmt, "messages", "fk_messages_sender", "sender_id", "users", "id");
-        addForeignKeyIfPresent(stmt, "messages", "fk_messages_conversation", "conversation_id", "conversations", "id");
+        addForeignKeyIfPresent(stmt, "messages", "fk_messages_sender", "sender_id", USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(
+                stmt, "messages", "fk_messages_conversation", "conversation_id", CONVERSATIONS_TABLE, ID_COLUMN);
 
         // profile_notes (unnamed FKs in SchemaInitializer)
-        addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_author", "author_id", "users", "id");
-        addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_subject", "subject_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_author", "author_id", USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(stmt, "profile_notes", "fk_profile_notes_subject", "subject_id", USERS_TABLE, ID_COLUMN);
 
         // profile_views (unnamed FKs in SchemaInitializer)
-        addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewer", "viewer_id", "users", "id");
-        addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewed", "viewed_id", "users", "id");
+        addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewer", "viewer_id", USERS_TABLE, ID_COLUMN);
+        addForeignKeyIfPresent(stmt, "profile_views", "fk_profile_views_viewed", "viewed_id", USERS_TABLE, ID_COLUMN);
     }
 
     // ═══════════════════════════════════════════════════════════════

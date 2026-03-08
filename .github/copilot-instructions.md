@@ -126,61 +126,64 @@ datingapp/
 6. ViewModels should use shared async abstractions in `ui/async` instead of ad-hoc thread/lifecycle patterns.
 7. ViewModels must use `UiDataAdapters` interfaces (avoid direct `core.storage` imports).
 
-## Entrypoint wiring
+## Build and Test
 
-```java
-// Shared bootstrap
-ServiceRegistry services = ApplicationStartup.initialize();
-AppSession session = AppSession.getInstance();
-
-// CLI in Main.java
-InputReader inputReader = new CliTextAndInput.InputReader(scanner);
-ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
-MatchingHandler matching = new MatchingHandler(
-  MatchingHandler.Dependencies.fromServices(services, session, inputReader, profile::completeProfile));
-SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
-StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
-MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);
-
-// JavaFX in DatingApp.java
-ViewModelFactory vmFactory = new ViewModelFactory(services);
-NavigationService nav = NavigationService.getInstance();
-nav.setViewModelFactory(vmFactory);
-nav.initialize(primaryStage);
-```
-
-## Build / test / quality commands
+Use the commands already wired in `pom.xml`:
 
 ```bash
-mvn compile && mvn exec:exec
-mvn javafx:run
 mvn test
 mvn -Ptest-output-verbose test
+mvn compile && mvn exec:exec
+mvn javafx:run
 mvn spotless:apply verify
 ```
 
-## Build constraints from pom.xml
+Notes:
 
-- Java release 25 + preview enabled
-- Spotless (Palantir Java Format) checked on `verify`
-- Checkstyle in `validate`
-- PMD in `verify`
-- JaCoCo line coverage check in `verify` (minimum 0.60)
+- `validate` runs Checkstyle.
+- `verify` runs Spotless, PMD, and JaCoCo.
+- The JaCoCo bundle line-coverage gate is `0.60`.
+- Preview and native-access flags are required; do not remove them casually.
 
-## Never do these
+## Architecture
 
-- Import framework/DB APIs into `core/`
-- Use removed names (`AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`)
-- Import removed standalone enums (`core.model.Gender`, etc.)
-- Return mutable internal collections directly
-- Forget `touch()` behavior on mutable domain setter updates
-- Use `Instant.now()` for domain/service timestamps
+- `src/main/java/datingapp/core/**` is the framework-agnostic domain layer. Do not import UI, database, or web-framework types into `core/`.
+- `src/main/java/datingapp/app/**` contains adapters and orchestration: bootstrap, CLI, REST API, event bus, and app-level use cases.
+- `src/main/java/datingapp/storage/**` contains concrete storage implementations, schema setup, and database management.
+- `src/main/java/datingapp/ui/**` contains the JavaFX application, screens, popups, async utilities, and view models.
+- Shared bootstrapping goes through `datingapp.app.bootstrap.ApplicationStartup` and `datingapp.core.ServiceRegistry`.
+- Entrypoints are `src/main/java/datingapp/Main.java` for the CLI and `src/main/java/datingapp/ui/DatingApp.java` for JavaFX.
 
-## Tooling preference
+## Project Conventions
 
-You are operating in an environment where ast-grep is installed.
-For syntax/structure code search, default to:
+- Import nested enums from their owner types:
+  - `User.Gender`, `User.UserState`, `User.VerificationMethod`
+  - `Match.MatchState`, `Match.MatchArchiveReason`
+- `ProfileNote` is a standalone type: `datingapp.core.model.ProfileNote`.
+- Use `AppClock.now()` in domain and service logic; do not use `Instant.now()` there.
+- Use deterministic pair IDs via `generateId(UUID a, UUID b)` for two-user aggregates.
+- Prefer result records such as `*Result.failure(...)` for business-flow failures when that pattern already exists; avoid introducing flow-control exceptions.
+- Return defensive copies or unmodifiable views instead of exposing mutable internal collections.
+- Use `EnumSetUtil.safeCopy(...)` or equivalent null-safe handling for `EnumSet` values.
+- Use injected runtime config from `ServiceRegistry`; keep `AppConfig.defaults()` at bootstrap, composition, or test boundaries only.
+- Configuration JSON loading is handled in `ApplicationStartup` via Jackson mix-ins. When adding a config field, update `AppConfig.Builder` and `config/app-config.json`; do not add Jackson annotations in `core/`.
+- Do not reintroduce removed names or packages such as `AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`, or legacy `ui/controller` references.
 
-`ast-grep --lang java -p '<pattern>'`
+## UI and Async Rules
 
-Use plain text search only when text-level search is explicitly needed.
+- View models should use the shared async abstractions in `src/main/java/datingapp/ui/async/**`.
+- Prefer `ViewModelAsyncScope`, `UiThreadDispatcher`, and `AsyncErrorRouter` over ad-hoc `Thread.ofVirtual()` or direct `Platform.runLater()` orchestration.
+- View models should depend on `UiDataAdapters` interfaces rather than concrete `core.storage` implementations.
+
+## Key Pattern Files
+
+- `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java` - bootstrap, config loading, and Jackson mix-in pattern.
+- `src/main/java/datingapp/core/ServiceRegistry.java` - central service and use-case wiring.
+- `src/main/java/datingapp/Main.java` - CLI composition root and handler factory usage.
+- `src/main/java/datingapp/ui/DatingApp.java` - JavaFX composition root.
+- `src/main/java/datingapp/ui/viewmodel/ChatViewModel.java` and `MatchesViewModel.java` - current async ViewModel patterns.
+
+## Avoid Stale References
+
+- Treat `PROJECT_STRUCTURE_GUIDE.md` as historical/deprecated for current structure.
+- When docs disagree, prefer `pom.xml` and the current source tree.

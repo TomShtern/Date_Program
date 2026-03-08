@@ -8,9 +8,11 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
+import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
@@ -46,6 +48,7 @@ class MatchesViewModelTest {
 
     private TestStorages.Users users;
     private TestStorages.Interactions interactions;
+    private TestStorages.Communications communications;
     private TestStorages.TrustSafety trustSafetyStorage;
     private UiMatchDataAccess matchData;
     private UiUserStore userStore;
@@ -61,6 +64,7 @@ class MatchesViewModelTest {
     void setUp() {
         users = new TestStorages.Users();
         interactions = new TestStorages.Interactions();
+        communications = new TestStorages.Communications();
         trustSafetyStorage = new TestStorages.TrustSafety();
         TestClock.setFixed(FIXED_INSTANT);
 
@@ -95,15 +99,16 @@ class MatchesViewModelTest {
         var undoService = new datingapp.core.matching.UndoService(interactions, new TestStorages.Undos(), config);
         var matchingUseCases = new datingapp.app.usecase.matching.MatchingUseCases(
                 candidateFinder, matchingService, dailyService, undoService, interactions, users, null);
+        TrustSafetyService trustSafetyService =
+                new TrustSafetyService(trustSafetyStorage, interactions, users, config, communications);
+        var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+                new ConnectionService(config, communications, interactions, users), trustSafetyService, communications);
 
         viewModel = new MatchesViewModel(
-                matchData,
-                userStore,
-                matchingService,
-                dailyService,
-                matchingUseCases,
-                config,
-                AppSession.getInstance());
+                new MatchesViewModel.Dependencies(
+                        matchData, userStore, matchingService, dailyService, matchingUseCases, socialUseCases, config),
+                AppSession.getInstance(),
+                new datingapp.ui.async.JavaFxUiThreadDispatcher());
         currentUser = createActiveUser("Current");
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
@@ -291,6 +296,41 @@ class MatchesViewModelTest {
                 .anyMatch(m -> m.involves(otherUser.getId())));
         assertEquals(1, viewModel.getMatches().size());
         assertEquals(0, viewModel.getLikesReceived().size());
+    }
+
+    @Test
+    @DisplayName("requestFriendZone creates a pending request for the matched user")
+    void requestFriendZoneCreatesPendingRequest() {
+        User otherUser = createActiveUser("FriendZoneUser");
+        users.save(otherUser);
+        interactions.save(Match.create(currentUser.getId(), otherUser.getId()));
+
+        viewModel.initialize();
+        MatchesViewModel.MatchCardData matchCard = viewModel.getMatches().getFirst();
+
+        viewModel.requestFriendZone(matchCard);
+
+        assertEquals(
+                1,
+                communications
+                        .getPendingFriendRequestsForUser(otherUser.getId())
+                        .size());
+    }
+
+    @Test
+    @DisplayName("unmatch removes the match from the list after refresh")
+    void unmatchRemovesMatchFromList() {
+        User otherUser = createActiveUser("UnmatchUser");
+        users.save(otherUser);
+        interactions.save(Match.create(currentUser.getId(), otherUser.getId()));
+
+        viewModel.initialize();
+        assertEquals(1, viewModel.getMatches().size());
+
+        viewModel.unmatch(viewModel.getMatches().getFirst());
+
+        assertEquals(0, interactions.getActiveMatchesFor(currentUser.getId()).size());
+        assertEquals(0, viewModel.getMatches().size());
     }
 
     @Test

@@ -37,6 +37,20 @@ class NavigationServiceContextTest {
     }
 
     @Test
+    @DisplayName("matching candidate context can be handed off by uuid")
+    void matchingCandidateContextCanBeHandedOffByUuid() {
+        NavigationService navigation = NavigationService.getInstance();
+        UUID payload = UUID.randomUUID();
+
+        navigation.setNavigationContext(NavigationService.ViewType.MATCHING, payload);
+
+        Optional<UUID> consumed = navigation.consumeNavigationContext(NavigationService.ViewType.MATCHING, UUID.class);
+
+        assertTrue(consumed.isPresent());
+        assertEquals(payload, consumed.orElseThrow());
+    }
+
+    @Test
     @DisplayName("typed context is rejected for wrong target view")
     void typedContextRejectedForWrongTargetView() {
         NavigationService navigation = NavigationService.getInstance();

@@ -49,6 +49,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     private static final String COLUMN_WHO_LIKES = "who_likes";
     private static final String COLUMN_CREATED_AT = "created_at";
     private static final String ERR_USER_ID_NULL = "userId cannot be null";
+    private static final String ERR_UPDATED_MATCH_NULL = "updatedMatch cannot be null";
 
     private static final String SQL_ACTIVE_LIKE_EXISTS = """
             SELECT EXISTS (
@@ -384,7 +385,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     @Override
     public boolean acceptFriendZoneTransition(
             Match updatedMatch, FriendRequest acceptedRequest, Notification notification) {
-        Objects.requireNonNull(updatedMatch, "updatedMatch cannot be null");
+        Objects.requireNonNull(updatedMatch, ERR_UPDATED_MATCH_NULL);
         Objects.requireNonNull(acceptedRequest, "acceptedRequest cannot be null");
 
         try {
@@ -429,7 +430,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     @Override
     public boolean gracefulExitTransition(
             Match updatedMatch, Optional<Conversation> archivedConversation, Notification notification) {
-        Objects.requireNonNull(updatedMatch, "updatedMatch cannot be null");
+        Objects.requireNonNull(updatedMatch, ERR_UPDATED_MATCH_NULL);
         Objects.requireNonNull(archivedConversation, "archivedConversation cannot be null");
 
         try {
@@ -473,6 +474,52 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
             throw e;
         } catch (Exception e) {
             throw new StorageException("Atomic graceful-exit transition failed", e);
+        }
+    }
+
+    @Override
+    public boolean unmatchTransition(Match updatedMatch, Optional<Conversation> archivedConversation) {
+        Objects.requireNonNull(updatedMatch, ERR_UPDATED_MATCH_NULL);
+        Objects.requireNonNull(archivedConversation, "archivedConversation cannot be null");
+
+        try {
+            return jdbi.inTransaction(handle -> {
+                int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
+                        .bind(PARAM_ID, updatedMatch.getId())
+                        .bind(PARAM_STATE, updatedMatch.getState().name())
+                        .bind(PARAM_ENDED_AT, updatedMatch.getEndedAt())
+                        .bind(PARAM_ENDED_BY, updatedMatch.getEndedBy())
+                        .bind(
+                                PARAM_END_REASON,
+                                updatedMatch.getEndReason() != null
+                                        ? updatedMatch.getEndReason().name()
+                                        : null)
+                        .bind(PARAM_DELETED_AT, updatedMatch.getDeletedAt())
+                        .execute();
+                if (matchRows != 1) {
+                    return false;
+                }
+
+                if (archivedConversation.isPresent()) {
+                    Conversation conversation = archivedConversation.get();
+                    int conversationRows = handle.createUpdate(SQL_ARCHIVE_CONVERSATION)
+                            .bind("conversationId", conversation.getId())
+                            .bind("archivedAtA", conversation.getUserAArchivedAt())
+                            .bind("archiveReasonA", conversation.getUserAArchiveReason())
+                            .bind("archivedAtB", conversation.getUserBArchivedAt())
+                            .bind("archiveReasonB", conversation.getUserBArchiveReason())
+                            .execute();
+                    if (conversationRows != 1) {
+                        throw new StorageException("Failed to archive conversation during atomic unmatch");
+                    }
+                }
+
+                return true;
+            });
+        } catch (StorageException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new StorageException("Atomic unmatch transition failed", e);
         }
     }
 

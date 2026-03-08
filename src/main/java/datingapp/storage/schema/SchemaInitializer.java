@@ -70,6 +70,8 @@ public final class SchemaInitializer {
     // ═══════════════════════════════════════════════════════════════
 
     static void createUsersTable(Statement stmt) throws SQLException {
+        // COMPATIBILITY WINDOW: keep legacy serialized profile columns alongside the normalized tables for
+        // read/write fallback until a later cleanup migration removes them after rollout validation.
         stmt.execute("CREATE TABLE IF NOT EXISTS users ("
                 + "id UUID PRIMARY KEY, "
                 + "name VARCHAR(100) NOT NULL, "
@@ -429,6 +431,8 @@ public final class SchemaInitializer {
      *
      * <p>Created by V3 migration and also during fresh install via
      * {@link #createAllTables(Statement)}.
+     * Legacy serialized columns are intentionally retained during the compatibility
+     * window and should be removed only by a later dedicated cleanup migration.
      */
     static void createNormalizedProfileSchema(Statement stmt) throws SQLException {
         stmt.execute("""

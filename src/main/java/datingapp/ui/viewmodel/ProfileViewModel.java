@@ -15,6 +15,7 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ProfileService.CompletionResult;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.ProfileActivationPolicy.ActivationResult;
+import datingapp.ui.LocalPhotoStore;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
@@ -23,10 +24,6 @@ import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.EnumSet;
@@ -49,9 +46,13 @@ import org.slf4j.LoggerFactory;
  */
 public class ProfileViewModel {
     private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
-    private final AppConfig config;
     private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
     private static final String NONE_SET_LABEL = "None set";
+    private static final String SAVE_PHOTO_ERROR = "Failed to save profile photo";
+    private static final String DELETE_PHOTO_ERROR = "Failed to delete profile photo";
+    private static final String UPDATE_PRIMARY_PHOTO_ERROR = "Failed to update primary photo";
+
+    private final AppConfig config;
 
     private final UiUserStore userStore;
     private final ProfileService profileCompletionService;
@@ -59,6 +60,7 @@ public class ProfileViewModel {
     private final AppSession session;
     private final ProfileActivationPolicy activationPolicy;
     private final ViewModelAsyncScope asyncScope;
+    private final LocalPhotoStore photoStore;
 
     // Observable properties for form binding - Basic Info
     private final StringProperty name = new SimpleStringProperty("");
@@ -165,6 +167,7 @@ public class ProfileViewModel {
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
+        this.photoStore = new LocalPhotoStore();
     }
 
     /**
@@ -830,65 +833,95 @@ public class ProfileViewModel {
         asyncScope.runFireAndForget("photo-save", () -> processPhotoUpload(user, photoFile));
     }
 
+    public void deletePhoto(int index) {
+        if (disposed.get()) {
+            return;
+        }
+        User user = session.getCurrentUser();
+        if (user == null) {
+            logWarn("No current user for photo delete");
+            return;
+        }
+
+        asyncScope.runFireAndForget("photo-delete", () -> processPhotoDeletion(user, index));
+    }
+
+    public void setPrimaryPhoto(int index) {
+        if (disposed.get()) {
+            return;
+        }
+        User user = session.getCurrentUser();
+        if (user == null) {
+            logWarn("No current user for primary photo update");
+            return;
+        }
+
+        asyncScope.runFireAndForget("photo-set-primary", () -> processSetPrimaryPhoto(user, index));
+    }
+
     private void processPhotoUpload(User user, File photoFile) {
         try {
             if (disposed.get()) {
                 return;
             }
-
-            // 1. Create app data directory for photos
-            Path appData = Paths.get(System.getProperty("user.home"), ".datingapp", "photos");
-            Files.createDirectories(appData);
-
-            // 2. Generate unique filename based on user ID and timestamp
-            String filename = user.getId() + "_" + System.currentTimeMillis() + getExtension(photoFile);
-            Path destination = appData.resolve(filename);
-
-            // 3. Copy file to app data directory
-            Files.copy(photoFile.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
-
-            // 4. Update user record with photo URL (use file:// URI)
-            String photoUrl = destination.toUri().toString();
-
-            // Add new photo instead of overwriting all
-            List<String> newUrls =
-                    new java.util.ArrayList<>(user.getPhotoUrls() != null ? user.getPhotoUrls() : List.of());
-            if (newUrls.size() >= 2) {
-                newUrls.set(1, photoUrl); // Limit to 2 per requirement, replace second if maxed
-            } else {
-                newUrls.add(photoUrl);
-            }
-
-            user.setPhotoUrls(newUrls);
-            userStore.save(user);
-
-            // 5. Update UI on FX thread
-            asyncScope.dispatchToUi(() -> {
-                if (disposed.get()) {
-                    return;
-                }
-                photoUrls.setAll(newUrls);
-                currentPhotoIndex.set(photoUrls.size() - 1); // Select the new photo
-                updatePrimaryPhotoFromIndex();
-
-                updateCompletion(user);
-                UiFeedbackService.showSuccess("Photo saved!");
-                logInfo("Profile photo saved: {}", destination);
-            });
+            List<String> updatedPhotoUrls =
+                    photoStore.importPhoto(user.getId(), user.getPhotoUrls(), photoFile.toPath());
+            persistPhotoUrls(user, updatedPhotoUrls, updatedPhotoUrls.size() - 1, "Photo saved!");
 
         } catch (IOException e) {
-            logError("Failed to save profile photo", e);
-            notifyError("Failed to save profile photo", e);
+            logError(SAVE_PHOTO_ERROR, e);
+            notifyError(SAVE_PHOTO_ERROR, e);
+        } catch (IllegalArgumentException e) {
+            logWarn("Invalid photo save request: {}", e.getMessage());
+            notifyError(SAVE_PHOTO_ERROR, e);
         }
     }
 
-    /**
-     * Gets the file extension from a file.
-     */
-    private String getExtension(File file) {
-        String fileName = file.getName();
-        int lastDot = fileName.lastIndexOf('.');
-        return lastDot > 0 ? fileName.substring(lastDot) : ".jpg";
+    private void processPhotoDeletion(User user, int index) {
+        try {
+            if (disposed.get()) {
+                return;
+            }
+            List<String> updatedPhotoUrls = photoStore.deletePhoto(user.getPhotoUrls(), index);
+            int selectedIndex = updatedPhotoUrls.isEmpty() ? 0 : Math.min(index, updatedPhotoUrls.size() - 1);
+            persistPhotoUrls(user, updatedPhotoUrls, selectedIndex, "Photo removed.");
+        } catch (IOException e) {
+            logError(DELETE_PHOTO_ERROR, e);
+            notifyError(DELETE_PHOTO_ERROR, e);
+        } catch (IllegalArgumentException e) {
+            logWarn("Invalid photo delete request: {}", e.getMessage());
+            notifyError(DELETE_PHOTO_ERROR, e);
+        }
+    }
+
+    private void processSetPrimaryPhoto(User user, int index) {
+        try {
+            if (disposed.get()) {
+                return;
+            }
+            List<String> updatedPhotoUrls = photoStore.setPrimaryPhoto(user.getPhotoUrls(), index);
+            persistPhotoUrls(user, updatedPhotoUrls, 0, "Primary photo updated.");
+        } catch (IllegalArgumentException e) {
+            logWarn("Invalid primary photo request: {}", e.getMessage());
+            notifyError(UPDATE_PRIMARY_PHOTO_ERROR, e);
+        }
+    }
+
+    private void persistPhotoUrls(User user, List<String> updatedPhotoUrls, int selectedIndex, String successMessage) {
+        user.setPhotoUrls(updatedPhotoUrls);
+        userStore.save(user);
+
+        asyncScope.dispatchToUi(() -> {
+            if (disposed.get()) {
+                return;
+            }
+            photoUrls.setAll(updatedPhotoUrls);
+            currentPhotoIndex.set(Math.max(0, selectedIndex));
+            updatePrimaryPhotoFromIndex();
+            session.setCurrentUser(user);
+            updateCompletion(user);
+            UiFeedbackService.showSuccess(successMessage);
+        });
     }
 
     private String buildCompletionDetails(CompletionResult result) {

@@ -40,7 +40,7 @@
         <Label fx:id="completionLabel" styleClass="notification-badge profile-completion-percent" text="20%"/>
         <Label styleClass="profile-completion-text" text="complete"/>
         <Label fx:id="completionDetailsLabel" maxWidth="180" styleClass="text-secondary" text="Missing: --"
-                               wrapText="true"/>
+                                       wrapText="true"/>
       </VBox>
     </HBox>
   </top>
@@ -100,6 +100,11 @@
             </VBox>
           </StackPane>
           <Label fx:id="nameLabel" styleClass="profile-name" text="User Name"/>
+          <HBox alignment="CENTER" spacing="12">
+            <Button onAction="#handleUploadPhoto" styleClass="button-secondary-small" text="Add / replace photo"/>
+            <Button fx:id="setPrimaryPhotoButton" onAction="#handleSetPrimaryPhoto" styleClass="button-secondary-small" text="Set as primary"/>
+            <Button fx:id="deletePhotoButton" onAction="#handleDeletePhoto" styleClass="button-transparent" text="Remove photo"/>
+          </HBox>
         </VBox>
         <!-- Decorative separator -->
         <Region styleClass="profile-separator" prefHeight="1"/>
@@ -115,7 +120,7 @@
             <Label fx:id="charCountLabel" styleClass="char-counter" text="0/500"/>
           </HBox>
           <TextArea fx:id="bioArea" prefHeight="100" promptText="Tell others about yourself..."
-                                                                          wrapText="true" styleClass="bio-textarea"/>
+                                                                                    wrapText="true" styleClass="bio-textarea"/>
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Birth date:" prefWidth="120"/>
             <DatePicker fx:id="birthDatePicker" promptText="YYYY-MM-DD" prefWidth="180"/>
@@ -132,7 +137,7 @@
           <HBox spacing="12" alignment="CENTER_LEFT">
             <FontIcon iconLiteral="mdi2m-map-marker-outline" iconSize="20" iconColor="#64748b"/>
             <TextField fx:id="locationField" promptText="e.g. 40.7128, -74.0060"
-                                                                                        HBox.hgrow="ALWAYS"/>
+                                                                                                    HBox.hgrow="ALWAYS"/>
           </HBox>
         </VBox>
         <!-- Gender &amp; Preferences Section - CRITICAL for matching -->

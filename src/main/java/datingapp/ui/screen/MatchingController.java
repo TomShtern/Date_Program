@@ -12,6 +12,7 @@ import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
 import java.util.Objects;
 import java.util.ResourceBundle;
+import java.util.UUID;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.ParallelTransition;
@@ -28,6 +29,7 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
@@ -69,6 +71,18 @@ public class MatchingController extends BaseController implements Initializable 
 
     @FXML
     private Label bioLabel;
+
+    @FXML
+    private TextArea noteTextArea;
+
+    @FXML
+    private Label noteStatusLabel;
+
+    @FXML
+    private Button saveNoteButton;
+
+    @FXML
+    private Button deleteNoteButton;
 
     @FXML
     private Label distanceLabel;
@@ -122,43 +136,10 @@ public class MatchingController extends BaseController implements Initializable 
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        // Bind visibility to hasMoreCandidates
-        candidateCard.visibleProperty().bind(viewModel.hasMoreCandidatesProperty());
-        candidateCard.managedProperty().bind(viewModel.hasMoreCandidatesProperty());
-        noCandidatesContainer
-                .visibleProperty()
-                .bind(viewModel.hasMoreCandidatesProperty().not());
-        noCandidatesContainer
-                .managedProperty()
-                .bind(viewModel.hasMoreCandidatesProperty().not());
-
-        // Hide action buttons when no candidates
-        actionButtonsContainer.visibleProperty().bind(viewModel.hasMoreCandidatesProperty());
-        actionButtonsContainer.managedProperty().bind(viewModel.hasMoreCandidatesProperty());
-
-        // Update UI when current candidate changes - using Subscription API
-        addSubscription(viewModel.currentCandidateProperty().subscribe(this::updateCandidateUI));
-
-        // Listen for matches to show popup - using Subscription API
-        addSubscription(viewModel.matchedUserProperty().subscribe(user -> {
-            if (user != null) {
-                showMatchPopup(user, viewModel.lastMatchProperty().get());
-            }
-        }));
-
-        // Update empty-state text when location is missing vs. genuinely no candidates
-        addSubscription(viewModel.locationMissingProperty().subscribe(locationMissing -> {
-            if (locationMissing) {
-                noCandidatesHeading.setText("Location not set");
-                noCandidatesBody.setText("Add your location in your profile to discover people near you.");
-            } else {
-                noCandidatesHeading.setText("No more people around you!");
-                noCandidatesBody.setText("You've seen everyone nearby. Try expanding your search or check back later!");
-            }
-        }));
-
-        // Initialize the ViewModel with current user from UISession
-        viewModel.initialize();
+        bindVisibility();
+        bindViewModelState();
+        UUID selectedCandidateId = consumeSelectedCandidateId();
+        viewModel.initialize(selectedCandidateId);
 
         updateCandidateUI(viewModel.currentCandidateProperty().get());
 
@@ -174,23 +155,93 @@ public class MatchingController extends BaseController implements Initializable 
         setupKeyboardShortcuts();
 
         wireActionHandlers();
+        bindPhotoState();
+        setupSwipeGestures();
+    }
 
-        // Bind Photo URL
-        addSubscription(viewModel.currentCandidatePhotoUrlProperty().subscribe(url -> {
-            if (url != null && !url.isBlank()) {
-                candidatePhoto.setImage(ImageCache.getImage(url, 400, 350));
-            } else {
-                candidatePhoto.setImage(null);
-            }
-        }));
+    private void bindVisibility() {
+        candidateCard.visibleProperty().bind(viewModel.hasMoreCandidatesProperty());
+        candidateCard.managedProperty().bind(viewModel.hasMoreCandidatesProperty());
+        noCandidatesContainer
+                .visibleProperty()
+                .bind(viewModel.hasMoreCandidatesProperty().not());
+        noCandidatesContainer
+                .managedProperty()
+                .bind(viewModel.hasMoreCandidatesProperty().not());
+        actionButtonsContainer.visibleProperty().bind(viewModel.hasMoreCandidatesProperty());
+        actionButtonsContainer.managedProperty().bind(viewModel.hasMoreCandidatesProperty());
+    }
 
+    private void bindViewModelState() {
+        addSubscription(viewModel.currentCandidateProperty().subscribe(this::updateCandidateUI));
+        bindNoteState();
+        addSubscription(viewModel.infoMessageProperty().subscribe(this::showInfoMessage));
+        addSubscription(viewModel.matchedUserProperty().subscribe(this::showMatchPopupIfPresent));
+        addSubscription(viewModel.locationMissingProperty().subscribe(this::updateEmptyStateCopy));
+    }
+
+    private void bindNoteState() {
+        if (noteTextArea != null) {
+            noteTextArea.textProperty().bindBidirectional(viewModel.noteContentProperty());
+        }
+        if (noteStatusLabel != null) {
+            noteStatusLabel.textProperty().bind(viewModel.noteStatusMessageProperty());
+        }
+        if (saveNoteButton != null) {
+            saveNoteButton
+                    .disableProperty()
+                    .bind(viewModel.currentCandidateProperty().isNull().or(viewModel.noteBusyProperty()));
+        }
+        if (deleteNoteButton != null) {
+            deleteNoteButton
+                    .disableProperty()
+                    .bind(viewModel.currentCandidateProperty().isNull().or(viewModel.noteBusyProperty()));
+        }
+    }
+
+    private void bindPhotoState() {
+        addSubscription(viewModel.currentCandidatePhotoUrlProperty().subscribe(this::updateCandidatePhoto));
         addSubscription(
                 viewModel.currentCandidatePhotoUrlsProperty().subscribe(urls -> updatePhotoControlsVisibility()));
         addSubscription(
                 viewModel.currentCandidatePhotoIndexProperty().subscribe(idx -> updatePhotoControlsVisibility()));
+    }
 
-        // Setup swipe gestures
-        setupSwipeGestures();
+    private UUID consumeSelectedCandidateId() {
+        return NavigationService.getInstance()
+                .consumeNavigationContext(NavigationService.ViewType.MATCHING, UUID.class)
+                .orElse(null);
+    }
+
+    private void showInfoMessage(String message) {
+        if (message != null && !message.isBlank()) {
+            UiFeedbackService.showInfo(message);
+            viewModel.clearInfoMessage();
+        }
+    }
+
+    private void showMatchPopupIfPresent(User user) {
+        if (user != null) {
+            showMatchPopup(user, viewModel.lastMatchProperty().get());
+        }
+    }
+
+    private void updateEmptyStateCopy(boolean locationMissing) {
+        if (locationMissing) {
+            noCandidatesHeading.setText("Location not set");
+            noCandidatesBody.setText("Add your location in your profile to discover people near you.");
+            return;
+        }
+        noCandidatesHeading.setText("No more people around you!");
+        noCandidatesBody.setText("You've seen everyone nearby. Try expanding your search or check back later!");
+    }
+
+    private void updateCandidatePhoto(String url) {
+        if (url != null && !url.isBlank()) {
+            candidatePhoto.setImage(ImageCache.getImage(url, 400, 350));
+            return;
+        }
+        candidatePhoto.setImage(null);
     }
 
     private void updatePhotoControlsVisibility() {
@@ -581,6 +632,18 @@ public class MatchingController extends BaseController implements Initializable 
             viewModel.reportCandidate(candidate.getId(), reason, null, true);
             UiFeedbackService.showSuccess(candidate.getName() + " has been reported.");
         });
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleSaveNote() {
+        viewModel.saveCurrentCandidateNote();
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleDeleteNote() {
+        viewModel.deleteCurrentCandidateNote();
     }
 
     @FXML

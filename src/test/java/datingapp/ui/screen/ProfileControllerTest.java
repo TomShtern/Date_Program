@@ -1,0 +1,142 @@
+package datingapp.ui.screen;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import datingapp.core.AppClock;
+import datingapp.core.AppConfig;
+import datingapp.core.AppSession;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ProfileService;
+import datingapp.core.testutil.TestStorages;
+import datingapp.ui.JavaFxTestSupport;
+import datingapp.ui.NavigationService;
+import datingapp.ui.viewmodel.ProfileViewModel;
+import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import javafx.scene.Parent;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+@Timeout(value = 10, unit = TimeUnit.SECONDS)
+@DisplayName("ProfileController wiring and binding tests")
+class ProfileControllerTest {
+
+    private static final datingapp.ui.async.UiThreadDispatcher TEST_DISPATCHER =
+            new datingapp.ui.async.UiThreadDispatcher() {
+                @Override
+                public boolean isUiThread() {
+                    return true;
+                }
+
+                @Override
+                public void dispatch(Runnable action) {
+                    action.run();
+                }
+            };
+
+    @BeforeAll
+    static void initJfx() throws InterruptedException {
+        JavaFxTestSupport.initJfx();
+    }
+
+    @Test
+    @DisplayName("FXML photo navigation and primary-photo action stay wired")
+    void photoNavigationAndPrimaryPhotoActionStayWired() throws Exception {
+        String originalUserHome = System.getProperty("user.home");
+        Path tempHome = Files.createTempDirectory("datingapp-profile-controller-home");
+        try {
+            System.setProperty("user.home", tempHome.toString());
+
+            TestStorages.Users users = new TestStorages.Users();
+            TestStorages.Interactions interactions = new TestStorages.Interactions();
+            TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+            TestStorages.Analytics analytics = new TestStorages.Analytics();
+            AppConfig config = AppConfig.defaults();
+            ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+
+            User currentUser = createActiveUser("Photo User");
+            Path managedDir = tempHome.resolve(".datingapp").resolve("photos");
+            Files.createDirectories(managedDir);
+            Path photoOne = Files.createTempFile(managedDir, "photo-one", ".png");
+            Path photoTwo = Files.createTempFile(managedDir, "photo-two", ".png");
+            currentUser.setPhotoUrls(
+                    List.of(photoOne.toUri().toString(), photoTwo.toUri().toString()));
+            users.save(currentUser);
+            AppSession.getInstance().setCurrentUser(currentUser);
+
+            ProfileViewModel viewModel = new ProfileViewModel(
+                    new StorageUiUserStore(users),
+                    profileService,
+                    null,
+                    config,
+                    AppSession.getInstance(),
+                    TEST_DISPATCHER,
+                    new datingapp.core.workflow.ProfileActivationPolicy());
+
+            JavaFxTestSupport.LoadedFxml loaded =
+                    JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> new ProfileController(viewModel));
+            Parent root = loaded.root();
+            Button nextPhotoButton = JavaFxTestSupport.lookup(root, "#nextPhotoButton", Button.class);
+            Button setPrimaryPhotoButton = JavaFxTestSupport.lookup(root, "#setPrimaryPhotoButton", Button.class);
+            Label photoIndicatorLabel = JavaFxTestSupport.lookup(root, "#photoIndicatorLabel", Label.class);
+
+            assertTrue(JavaFxTestSupport.waitUntil(
+                    () -> {
+                        try {
+                            return JavaFxTestSupport.callOnFxAndWait(photoIndicatorLabel::isVisible)
+                                    && "1/2".equals(JavaFxTestSupport.callOnFxAndWait(photoIndicatorLabel::getText));
+                        } catch (InterruptedException e) {
+                            throw new IllegalStateException(e);
+                        }
+                    },
+                    5000));
+
+            JavaFxTestSupport.runOnFxAndWait(nextPhotoButton::fire);
+            assertEquals("2/2", JavaFxTestSupport.callOnFxAndWait(photoIndicatorLabel::getText));
+
+            JavaFxTestSupport.runOnFxAndWait(setPrimaryPhotoButton::fire);
+            assertTrue(JavaFxTestSupport.waitUntil(
+                    () -> AppSession.getInstance()
+                            .getCurrentUser()
+                            .getPhotoUrls()
+                            .getFirst()
+                            .equals(photoTwo.toUri().toString()),
+                    5000));
+
+            viewModel.dispose();
+            NavigationService.getInstance().clearHistory();
+            AppSession.getInstance().reset();
+        } finally {
+            System.setProperty("user.home", originalUserHome);
+        }
+    }
+
+    private static User createActiveUser(String name) {
+        User user = new User(UUID.randomUUID(), name);
+        user.setBirthDate(AppClock.today().minusYears(25));
+        user.setGender(Gender.OTHER);
+        user.setInterestedIn(EnumSet.of(Gender.OTHER));
+        user.setAgeRange(18, 60, 18, 120);
+        user.setMaxDistanceKm(50, 500);
+        user.setLocation(40.7128, -74.0060);
+        user.setBio("Bio");
+        user.setPacePreferences(new PacePreferences(
+                PacePreferences.MessagingFrequency.OFTEN,
+                PacePreferences.TimeToFirstDate.FEW_DAYS,
+                PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                PacePreferences.DepthPreference.DEEP_CHAT));
+        return user;
+    }
+}

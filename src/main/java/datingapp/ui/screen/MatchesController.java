@@ -1,9 +1,11 @@
 package datingapp.ui.screen;
 
 import datingapp.core.AppClock;
+import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
 import datingapp.ui.UiFeedbackService;
+import datingapp.ui.UiUtils;
 import datingapp.ui.viewmodel.MatchesViewModel;
 import datingapp.ui.viewmodel.MatchesViewModel.LikeCardData;
 import datingapp.ui.viewmodel.MatchesViewModel.MatchCardData;
@@ -34,6 +36,10 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
@@ -604,8 +610,111 @@ public class MatchesController extends BaseController implements Initializable {
             unbounce.play();
         });
 
-        card.getChildren().addAll(avatarContainer, nameLabel, timeLabel, messageBtn);
+        Button friendZoneBtn = createMatchActionButton("Friend zone", event -> {
+            event.consume();
+            handleRequestFriendZone(match);
+        });
+        Button gracefulExitBtn = createMatchActionButton("Graceful exit", event -> {
+            event.consume();
+            handleGracefulExit(match);
+        });
+        Button unmatchBtn = createMatchActionButton("Unmatch", event -> {
+            event.consume();
+            handleUnmatch(match);
+        });
+        Button blockBtn = createMatchActionButton("Block", event -> {
+            event.consume();
+            handleBlockMatch(match);
+        });
+        Button reportBtn = createMatchActionButton("Report", event -> {
+            event.consume();
+            showReportDialog(match);
+        });
+
+        HBox primaryActions = new HBox(8, messageBtn, friendZoneBtn);
+        primaryActions.setAlignment(Pos.CENTER);
+
+        HBox secondaryActions = new HBox(8, gracefulExitBtn, unmatchBtn, blockBtn, reportBtn);
+        secondaryActions.setAlignment(Pos.CENTER);
+
+        card.getChildren().addAll(avatarContainer, nameLabel, timeLabel, primaryActions, secondaryActions);
         return card;
+    }
+
+    private Button createMatchActionButton(String text, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
+        return configureMatchActionButton(new Button(text), handler);
+    }
+
+    private Button configureMatchActionButton(
+            Button button, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
+        button.getStyleClass().add("button-transparent");
+        button.setOnAction(handler);
+        return button;
+    }
+
+    private void handleRequestFriendZone(MatchCardData match) {
+        if (UiFeedbackService.showConfirmation(
+                "Request Friend Zone",
+                "Move your match with " + match.userName() + " toward friendship?",
+                "They will receive a request to continue as friends.")) {
+            viewModel.requestFriendZone(match);
+            UiFeedbackService.showSuccess("Friend-zone request sent to " + match.userName() + ".");
+        }
+    }
+
+    private void handleGracefulExit(MatchCardData match) {
+        if (UiFeedbackService.showConfirmation(
+                "Graceful Exit",
+                "End things kindly with " + match.userName() + "?",
+                "The conversation will be archived for both of you.")) {
+            viewModel.gracefulExit(match);
+            UiFeedbackService.showSuccess("Graceful exit completed.");
+        }
+    }
+
+    private void handleUnmatch(MatchCardData match) {
+        if (UiFeedbackService.showConfirmation(
+                "Unmatch",
+                "Unmatch with " + match.userName() + "?",
+                "This removes the match and archives the conversation.")) {
+            viewModel.unmatch(match);
+            UiFeedbackService.showSuccess(match.userName() + " has been unmatched.");
+        }
+    }
+
+    private void handleBlockMatch(MatchCardData match) {
+        if (UiFeedbackService.showConfirmation(
+                "Block User",
+                "Block " + match.userName() + "?",
+                "They will be removed from your matches and can no longer contact you.")) {
+            viewModel.blockMatch(match);
+            UiFeedbackService.showSuccess(match.userName() + " has been blocked.");
+        }
+    }
+
+    private void showReportDialog(MatchCardData match) {
+        Dialog<Report.Reason> dialog = new Dialog<>();
+        dialog.setTitle("Report User");
+        dialog.setHeaderText("Report " + match.userName());
+
+        ChoiceBox<Report.Reason> reasonBox = new ChoiceBox<>();
+        reasonBox.getItems().addAll(Report.Reason.values());
+        reasonBox.setConverter(
+                UiUtils.createEnumStringConverter(reason -> reason.name().replace('_', ' ')));
+        reasonBox.setValue(Report.Reason.INAPPROPRIATE_CONTENT);
+
+        VBox content = new VBox(10, new Label("Select a reason:"), reasonBox);
+        content.setPadding(new Insets(20));
+        dialog.getDialogPane().setContent(content);
+
+        ButtonType reportBtn = new ButtonType("Report", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelBtn = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(reportBtn, cancelBtn);
+        dialog.setResultConverter(buttonType -> Objects.equals(buttonType, reportBtn) ? reasonBox.getValue() : null);
+        dialog.showAndWait().ifPresent(reason -> {
+            viewModel.reportMatch(match, reason, null, true);
+            UiFeedbackService.showSuccess(match.userName() + " has been reported.");
+        });
     }
 
     /** Navigate to chat with selected match. */

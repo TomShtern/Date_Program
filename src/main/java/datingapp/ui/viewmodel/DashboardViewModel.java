@@ -17,10 +17,13 @@ import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
@@ -51,6 +54,7 @@ public class DashboardViewModel {
     private final StringProperty userName = new SimpleStringProperty("Not Logged In");
     private final StringProperty dailyLikesStatus = new SimpleStringProperty("Likes: 0/50");
     private final StringProperty dailyPickName = new SimpleStringProperty("No pick today");
+    private final ObjectProperty<UUID> dailyPickUserId = new SimpleObjectProperty<>();
     private final StringProperty totalMatches = new SimpleStringProperty("0");
     private final StringProperty profileCompletion = new SimpleStringProperty("0%");
     private final IntegerProperty notificationCount = new SimpleIntegerProperty(0);
@@ -62,43 +66,38 @@ public class DashboardViewModel {
 
     private ViewModelErrorSink errorHandler;
 
-    public DashboardViewModel(
-            RecommendationService dailyService,
-            UiMatchDataAccess matchData,
-            ProfileService achievementService,
-            ConnectionService messagingService,
-            ProfileService profileCompletionService,
-            AppConfig config,
-            AppSession session) {
-        this(
-                dailyService,
-                matchData,
-                achievementService,
-                messagingService,
-                profileCompletionService,
-                config,
-                session,
-                new JavaFxUiThreadDispatcher());
+    public DashboardViewModel(Dependencies dependencies, AppSession session) {
+        this(dependencies, session, new JavaFxUiThreadDispatcher());
     }
 
-    public DashboardViewModel(
+    public DashboardViewModel(Dependencies dependencies, AppSession session, UiThreadDispatcher uiDispatcher) {
+        Dependencies resolvedDependencies = Objects.requireNonNull(dependencies, "dependencies cannot be null");
+        this.dailyService = resolvedDependencies.dailyService();
+        this.matchData = resolvedDependencies.matchData();
+        this.achievementService = resolvedDependencies.achievementService();
+        this.messagingService = resolvedDependencies.messagingService();
+        this.profileCompletionService = resolvedDependencies.profileCompletionService();
+        this.config = resolvedDependencies.config();
+        this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.asyncScope = createAsyncScope(uiDispatcher);
+    }
+
+    public record Dependencies(
             RecommendationService dailyService,
             UiMatchDataAccess matchData,
             ProfileService achievementService,
             ConnectionService messagingService,
             ProfileService profileCompletionService,
-            AppConfig config,
-            AppSession session,
-            UiThreadDispatcher uiDispatcher) {
-        this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
-        this.matchData = Objects.requireNonNull(matchData, "matchData cannot be null");
-        this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
-        this.messagingService = Objects.requireNonNull(messagingService, "messagingService cannot be null");
-        this.profileCompletionService =
-                Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
-        this.config = Objects.requireNonNull(config, "config cannot be null");
-        this.session = Objects.requireNonNull(session, "session cannot be null");
-        this.asyncScope = createAsyncScope(uiDispatcher);
+            AppConfig config) {
+
+        public Dependencies {
+            Objects.requireNonNull(dailyService, "dailyService cannot be null");
+            Objects.requireNonNull(matchData, "matchData cannot be null");
+            Objects.requireNonNull(achievementService, "achievementService cannot be null");
+            Objects.requireNonNull(messagingService, "messagingService cannot be null");
+            Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
+            Objects.requireNonNull(config, "config cannot be null");
+        }
     }
 
     /**
@@ -160,7 +159,7 @@ public class DashboardViewModel {
         if (Thread.currentThread().isInterrupted()) {
             return DashboardData.empty(name);
         }
-        String pickName = loadPickName(user, errors);
+        DailyPickSnapshot dailyPickSnapshot = loadDailyPick(user, errors);
         if (Thread.currentThread().isInterrupted()) {
             return DashboardData.empty(name);
         }
@@ -175,7 +174,8 @@ public class DashboardViewModel {
                 completionText,
                 likesText,
                 matchCount,
-                pickName,
+                dailyPickSnapshot.pickName(),
+                dailyPickSnapshot.pickUserId(),
                 achievements,
                 notificationSnapshot.unreadCount(),
                 notificationSnapshot.pendingRequests(),
@@ -225,25 +225,25 @@ public class DashboardViewModel {
         }
     }
 
-    private String loadPickName(User user, ErrorCollector errors) {
+    private DailyPickSnapshot loadDailyPick(User user, ErrorCollector errors) {
         if (Thread.currentThread().isInterrupted()) {
-            return DEFAULT_PICK_TEXT;
+            return DailyPickSnapshot.empty();
         }
         try {
             Optional<DailyPick> pick = dailyService.getDailyPick(user);
             if (pick.isEmpty()) {
-                return DEFAULT_PICK_TEXT;
+                return DailyPickSnapshot.empty();
             }
 
             User pickedUser = pick.get().user();
             java.time.ZoneId timezone = config.safety().userTimeZone();
             int ageVal = pickedUser.getAge(timezone);
             String age = ageVal > 0 ? String.valueOf(ageVal) : "?";
-            return pickedUser.getName() + ", " + age;
+            return new DailyPickSnapshot(pickedUser.getName() + ", " + age, pickedUser.getId());
         } catch (Exception e) {
             logError("Daily pick error", e);
             errors.capture(e);
-            return DEFAULT_PICK_TEXT;
+            return DailyPickSnapshot.empty();
         }
     }
 
@@ -282,6 +282,7 @@ public class DashboardViewModel {
         dailyLikesStatus.set(data.likesText());
         totalMatches.set(data.matchCount());
         dailyPickName.set(data.pickName());
+        dailyPickUserId.set(data.pickUserId());
         unreadMessages.set(data.unreadCount());
         friendRequestsCount.set(data.pendingRequests());
         notificationCount.set(data.unreadCount() + data.pendingRequests() + data.unreadNotifications());
@@ -327,6 +328,7 @@ public class DashboardViewModel {
             String likesText,
             String matchCount,
             String pickName,
+            UUID pickUserId,
             List<UserAchievement> achievements,
             int unreadCount,
             int pendingRequests,
@@ -339,6 +341,7 @@ public class DashboardViewModel {
                     DEFAULT_LIKES_TEXT,
                     UNKNOWN_VALUE,
                     DEFAULT_PICK_TEXT,
+                    null,
                     List.of(),
                     0,
                     0,
@@ -348,6 +351,12 @@ public class DashboardViewModel {
     }
 
     private record NotificationSnapshot(int unreadCount, int pendingRequests, int unreadNotifications) {}
+
+    private record DailyPickSnapshot(String pickName, UUID pickUserId) {
+        private static DailyPickSnapshot empty() {
+            return new DailyPickSnapshot(DEFAULT_PICK_TEXT, null);
+        }
+    }
 
     private static final class ErrorCollector {
         private Exception firstError;
@@ -393,6 +402,10 @@ public class DashboardViewModel {
 
     public StringProperty dailyPickNameProperty() {
         return dailyPickName;
+    }
+
+    public ObjectProperty<UUID> dailyPickUserIdProperty() {
+        return dailyPickUserId;
     }
 
     public StringProperty totalMatchesProperty() {

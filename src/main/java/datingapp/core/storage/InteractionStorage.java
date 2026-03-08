@@ -266,6 +266,18 @@ public interface InteractionStorage {
         return false;
     }
 
+    /**
+     * Atomically persists the unmatch transition (match + optional conversation
+     * archive).
+     *
+     * <p>
+     * Default implementation returns {@code false}, signaling unsupported
+     * operation.
+     */
+    default boolean unmatchTransition(Match updatedMatch, Optional<Conversation> archivedConversation) {
+        return false;
+    }
+
     // ═══ Transaction Operations ═══
 
     boolean atomicUndoDelete(UUID likeId, String matchId);

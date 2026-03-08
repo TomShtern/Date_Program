@@ -71,7 +71,7 @@ public class StandoutsController extends BaseController implements Initializable
             return;
         }
         viewModel.markInteracted(entry);
-        // Navigate to matching so the user can swipe on this candidate
+        NavigationService.getInstance().setNavigationContext(NavigationService.ViewType.MATCHING, entry.userId());
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
     }
 

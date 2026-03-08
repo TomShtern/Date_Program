@@ -1,7 +1,7 @@
 package datingapp.ui.screen;
 
-import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiPreferencesStore.ThemeMode;
 import datingapp.ui.viewmodel.PreferencesViewModel;
 import datingapp.ui.viewmodel.PreferencesViewModel.GenderPreference;
 import java.net.URL;
@@ -9,7 +9,6 @@ import java.util.Objects;
 import java.util.ResourceBundle;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
@@ -84,6 +83,7 @@ public class PreferencesController extends BaseController implements Initializab
         setupAgeControls();
         setupDistanceControls();
         setupGenderControls();
+        setupThemeControls();
         wireActionButtons();
 
         UiAnimations.fadeIn(rootPane, 600);
@@ -107,6 +107,11 @@ public class PreferencesController extends BaseController implements Initializab
             viewModel.minAgeProperty().set(val);
             updateAgeLabels();
         }));
+        addSubscription(viewModel.minAgeProperty().subscribe(newVal -> {
+            if (newVal != null && minAgeSlider.getValue() != newVal.doubleValue()) {
+                minAgeSlider.setValue(newVal.doubleValue());
+            }
+        }));
 
         addSubscription(maxAgeSlider.valueProperty().subscribe(newVal -> {
             int val = newVal.intValue();
@@ -116,6 +121,11 @@ public class PreferencesController extends BaseController implements Initializab
             }
             viewModel.maxAgeProperty().set(val);
             updateAgeLabels();
+        }));
+        addSubscription(viewModel.maxAgeProperty().subscribe(newVal -> {
+            if (newVal != null && maxAgeSlider.getValue() != newVal.doubleValue()) {
+                maxAgeSlider.setValue(newVal.doubleValue());
+            }
         }));
     }
 
@@ -132,6 +142,11 @@ public class PreferencesController extends BaseController implements Initializab
             viewModel.maxDistanceProperty().set(newVal.intValue());
             updateDistanceLabel();
         }));
+        addSubscription(viewModel.maxDistanceProperty().subscribe(newVal -> {
+            if (newVal != null && distanceSlider.getValue() != newVal.doubleValue()) {
+                distanceSlider.setValue(newVal.doubleValue());
+            }
+        }));
     }
 
     private void updateDistanceLabel() {
@@ -139,21 +154,8 @@ public class PreferencesController extends BaseController implements Initializab
     }
 
     private void setupGenderControls() {
-        // Set initial toggle
-        GenderPreference pref = viewModel.interestedInProperty().get();
-        if (pref == null) {
-            everyoneToggle.setSelected(true);
-        } else {
-            switch (pref) {
-                case MEN -> menToggle.setSelected(true);
-                case WOMEN -> womenToggle.setSelected(true);
-                case EVERYONE -> everyoneToggle.setSelected(true);
-                default -> {
-                    logWarn("Unknown gender preference: {}", pref);
-                    everyoneToggle.setSelected(true);
-                }
-            }
-        }
+        syncGenderToggle(viewModel.interestedInProperty().get());
+        addSubscription(viewModel.interestedInProperty().subscribe(this::syncGenderToggle));
 
         // Add listener using Subscription API
         addSubscription(genderGroup.selectedToggleProperty().subscribe((oldVal, newVal) -> {
@@ -173,50 +175,42 @@ public class PreferencesController extends BaseController implements Initializab
         }));
     }
 
+    private void setupThemeControls() {
+        ThemeMode mode = viewModel.themeModeProperty().get();
+        themeToggle.setSelected(mode == null || mode.isDark());
+        addSubscription(viewModel.themeModeProperty().subscribe(newMode -> {
+            ThemeMode resolvedMode = newMode == null ? ThemeMode.DARK : newMode;
+            if (themeToggle.isSelected() != resolvedMode.isDark()) {
+                themeToggle.setSelected(resolvedMode.isDark());
+            }
+        }));
+    }
+
+    private void syncGenderToggle(GenderPreference pref) {
+        GenderPreference resolvedPreference = pref == null ? GenderPreference.EVERYONE : pref;
+        switch (resolvedPreference) {
+            case MEN -> menToggle.setSelected(true);
+            case WOMEN -> womenToggle.setSelected(true);
+            case EVERYONE -> everyoneToggle.setSelected(true);
+            default -> {
+                logWarn("Unknown gender preference: {}", resolvedPreference);
+                everyoneToggle.setSelected(true);
+            }
+        }
+    }
+
     @FXML
     private void handleSave() {
         logInfo("Saving MatchPreferences...");
         viewModel.savePreferences();
-        NavigationService.getInstance().goBack();
+        datingapp.ui.NavigationService.getInstance().goBack();
     }
 
     @FXML
     private void handleThemeToggle() {
-        boolean isDarkMode = themeToggle.isSelected();
-        logInfo("Toggling theme to: {}", isDarkMode ? "Dark" : "Light");
-
-        Scene scene = rootPane.getScene();
-        if (scene == null) {
-            logWarn("Scene not available for theme toggle");
-            return;
-        }
-
-        String darkTheme = resolveStylesheet("/css/theme.css");
-        String lightTheme = resolveStylesheet("/css/light-theme.css");
-
-        if (isDarkMode) {
-            // Remove light theme, ensure dark theme is present
-            if (lightTheme != null) {
-                scene.getStylesheets().remove(lightTheme);
-            }
-            if (darkTheme != null && !scene.getStylesheets().contains(darkTheme)) {
-                scene.getStylesheets().add(darkTheme);
-            }
-        } else {
-            // Add light theme on top (it overrides dark theme)
-            if (lightTheme != null && !scene.getStylesheets().contains(lightTheme)) {
-                scene.getStylesheets().add(lightTheme);
-            }
-        }
-    }
-
-    private String resolveStylesheet(String path) {
-        URL resource = getClass().getResource(path);
-        if (resource == null) {
-            logWarn("Stylesheet not found: {}", path);
-            return null;
-        }
-        return resource.toExternalForm();
+        ThemeMode selectedTheme = ThemeMode.fromDarkMode(themeToggle.isSelected());
+        logInfo("Toggling theme to: {}", selectedTheme);
+        viewModel.updateThemeMode(selectedTheme);
     }
 
     private void logInfo(String message, Object... args) {

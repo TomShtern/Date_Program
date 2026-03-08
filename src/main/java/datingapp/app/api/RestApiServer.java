@@ -10,13 +10,26 @@ import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases;
 import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
+import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.ProfileUseCases.DeleteProfileNoteCommand;
+import datingapp.app.usecase.profile.ProfileUseCases.ProfileNoteQuery;
+import datingapp.app.usecase.profile.ProfileUseCases.ProfileNotesQuery;
+import datingapp.app.usecase.profile.ProfileUseCases.UpsertProfileNoteCommand;
+import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.FriendRequestAction;
+import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
+import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
+import datingapp.app.usecase.social.SocialUseCases.RespondFriendRequestCommand;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.Conversation;
+import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Message;
+import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.model.Match;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import io.javalin.Javalin;
@@ -64,6 +77,12 @@ public class RestApiServer {
     private static final String UNKNOWN_USER = "Unknown";
     private static final String BAD_REQUEST = "BAD_REQUEST";
     private static final String CONFLICT = "CONFLICT";
+    private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
+    private static final String PATH_AUTHOR_ID = "authorId";
+    private static final String PATH_SUBJECT_ID = "subjectId";
+    private static final String PATH_TARGET_ID = "targetId";
+    private static final String NOTES_COLLECTION_ROUTE = "/api/users/{authorId}/notes";
+    private static final String NOTE_ITEM_ROUTE = "/api/users/{authorId}/notes/{subjectId}";
     /**
      * Pagination query-parameter names shared by match and future list endpoints.
      */
@@ -78,6 +97,8 @@ public class RestApiServer {
     private final ConnectionService messagingService;
     private final MatchingUseCases matchingUseCases;
     private final MessagingUseCases messagingUseCases;
+    private final ProfileUseCases profileUseCases;
+    private final SocialUseCases socialUseCases;
     private final ZoneId userTimeZone;
     private final int port;
     private Javalin app;
@@ -95,6 +116,8 @@ public class RestApiServer {
         this.messagingService = services.getConnectionService();
         this.matchingUseCases = services.getMatchingUseCases();
         this.messagingUseCases = services.getMessagingUseCases();
+        this.profileUseCases = services.getProfileUseCases();
+        this.socialUseCases = services.getSocialUseCases();
         this.userTimeZone = services.getConfig().safety().userTimeZone();
         this.port = port;
     }
@@ -154,10 +177,25 @@ public class RestApiServer {
         app.post("/api/users/{id}/like/{targetId}", this::likeUser);
         app.post("/api/users/{id}/pass/{targetId}", this::passUser);
 
+        // Relationship / moderation routes
+        app.post("/api/users/{id}/friend-requests/{targetId}", this::requestFriendZone);
+        app.post("/api/users/{id}/friend-requests/{requestId}/accept", this::acceptFriendRequest);
+        app.post("/api/users/{id}/friend-requests/{requestId}/decline", this::declineFriendRequest);
+        app.post("/api/users/{id}/relationships/{targetId}/graceful-exit", this::gracefulExit);
+        app.post("/api/users/{id}/relationships/{targetId}/unmatch", this::unmatch);
+        app.post("/api/users/{id}/block/{targetId}", this::blockUser);
+        app.post("/api/users/{id}/report/{targetId}", this::reportUser);
+
         // Messaging routes
         app.get("/api/users/{id}/conversations", this::getConversations);
         app.get("/api/conversations/{conversationId}/messages", this::getMessages);
         app.post("/api/conversations/{conversationId}/messages", this::sendMessage);
+
+        // Private profile-note routes
+        app.get(NOTES_COLLECTION_ROUTE, this::listProfileNotes);
+        app.get(NOTE_ITEM_ROUTE, this::getProfileNote);
+        app.put(NOTE_ITEM_ROUTE, this::upsertProfileNote);
+        app.delete(NOTE_ITEM_ROUTE, this::deleteProfileNote);
     }
 
     // ── User Handlers ───────────────────────────────────────────────────
@@ -213,7 +251,7 @@ public class RestApiServer {
 
     private void likeUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        UUID targetId = parseUuid(ctx.pathParam("targetId"));
+        UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
         validateUserExists(userId);
         validateUserExists(targetId);
 
@@ -241,7 +279,7 @@ public class RestApiServer {
 
     private void passUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        UUID targetId = parseUuid(ctx.pathParam("targetId"));
+        UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
         validateUserExists(userId);
         validateUserExists(targetId);
 
@@ -257,6 +295,110 @@ public class RestApiServer {
         }
         ctx.status(200);
         ctx.json(new PassResponse("Passed"));
+    }
+
+    private void requestFriendZone(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
+        validateUserExists(userId);
+        validateUserExists(targetId);
+
+        var result = socialUseCases.requestFriendZone(new RelationshipCommand(UserContext.api(userId), targetId));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.status(201);
+        ctx.json(TransitionResponse.from(result.data()));
+    }
+
+    private void acceptFriendRequest(Context ctx) {
+        respondToFriendRequest(ctx, FriendRequestAction.ACCEPT);
+    }
+
+    private void declineFriendRequest(Context ctx) {
+        respondToFriendRequest(ctx, FriendRequestAction.DECLINE);
+    }
+
+    private void respondToFriendRequest(Context ctx, FriendRequestAction action) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        UUID requestId = parseUuid(ctx.pathParam("requestId"));
+        validateUserExists(userId);
+
+        var result = socialUseCases.respondToFriendRequest(
+                new RespondFriendRequestCommand(UserContext.api(userId), requestId, action));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(TransitionResponse.from(result.data()));
+    }
+
+    private void gracefulExit(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
+        validateUserExists(userId);
+        validateUserExists(targetId);
+
+        var result = socialUseCases.gracefulExit(new RelationshipCommand(UserContext.api(userId), targetId));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(TransitionResponse.from(result.data()));
+    }
+
+    private void unmatch(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
+        validateUserExists(userId);
+        validateUserExists(targetId);
+
+        var result = socialUseCases.unmatch(new RelationshipCommand(UserContext.api(userId), targetId));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(TransitionResponse.from(result.data()));
+    }
+
+    private void blockUser(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
+        validateUserExists(userId);
+        validateUserExists(targetId);
+
+        var result = socialUseCases.blockUser(new RelationshipCommand(UserContext.api(userId), targetId));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(new ModerationResponse(
+                result.data().success(), false, result.data().errorMessage()));
+    }
+
+    private void reportUser(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
+        validateUserExists(userId);
+        validateUserExists(targetId);
+
+        ReportUserRequest request = ctx.bodyAsClass(ReportUserRequest.class);
+        if (request.reason() == null) {
+            throw new IllegalArgumentException("reason is required");
+        }
+
+        var result = socialUseCases.reportUser(new ReportCommand(
+                UserContext.api(userId), targetId, request.reason(), request.description(), request.blockUser()));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(new ReportResponse(
+                result.data().success(),
+                result.data().userWasBanned(),
+                result.data().errorMessage(),
+                request.blockUser()));
     }
 
     // ── Messaging Handlers ──────────────────────────────────────────────
@@ -334,6 +476,56 @@ public class RestApiServer {
         }
     }
 
+    private void listProfileNotes(Context ctx) {
+        UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
+        var result = profileUseCases.listProfileNotes(new ProfileNotesQuery(UserContext.api(authorId)));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(result.data().stream().map(ProfileNoteDto::from).toList());
+    }
+
+    private void getProfileNote(Context ctx) {
+        UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
+        UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
+        var result = profileUseCases.getProfileNote(new ProfileNoteQuery(UserContext.api(authorId), subjectId));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(ProfileNoteDto.from(result.data()));
+    }
+
+    private void upsertProfileNote(Context ctx) {
+        UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
+        UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
+        ProfileNoteUpsertRequest request = ctx.bodyAsClass(ProfileNoteUpsertRequest.class);
+        if (request.content() == null) {
+            throw new IllegalArgumentException("content is required");
+        }
+
+        var result = profileUseCases.upsertProfileNote(
+                new UpsertProfileNoteCommand(UserContext.api(authorId), subjectId, request.content()));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(ProfileNoteDto.from(result.data()));
+    }
+
+    private void deleteProfileNote(Context ctx) {
+        UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
+        UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
+        var result =
+                profileUseCases.deleteProfileNote(new DeleteProfileNoteCommand(UserContext.api(authorId), subjectId));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.status(204);
+    }
+
     // ── Shared Helpers ──────────────────────────────────────────────────
 
     private UUID parseUuid(String value) {
@@ -388,6 +580,32 @@ public class RestApiServer {
         }
     }
 
+    private void handleUseCaseFailure(Context ctx, datingapp.app.usecase.common.UseCaseError error) {
+        switch (error.code()) {
+            case VALIDATION -> {
+                ctx.status(400);
+                ctx.json(new ErrorResponse(BAD_REQUEST, error.message()));
+            }
+            case NOT_FOUND -> throw new NotFoundResponse(error.message());
+            case FORBIDDEN -> {
+                ctx.status(403);
+                ctx.json(new ErrorResponse("FORBIDDEN", error.message()));
+            }
+            case DEPENDENCY, INTERNAL -> {
+                ctx.status(500);
+                ctx.json(new ErrorResponse(INTERNAL_ERROR, error.message()));
+            }
+            case CONFLICT -> {
+                ctx.status(409);
+                ctx.json(new ErrorResponse(CONFLICT, error.message()));
+            }
+            default -> {
+                ctx.status(500);
+                ctx.json(new ErrorResponse(INTERNAL_ERROR, error.message()));
+            }
+        }
+    }
+
     // ── Infrastructure ──────────────────────────────────────────────────
 
     private ObjectMapper createObjectMapper() {
@@ -428,7 +646,7 @@ public class RestApiServer {
                 logger.error("Unhandled exception on {} {}", ctx.method(), ctx.path(), e);
             }
             ctx.status(500);
-            ctx.json(new ErrorResponse("INTERNAL_ERROR", "An unexpected error occurred"));
+            ctx.json(new ErrorResponse(INTERNAL_ERROR, "An unexpected error occurred"));
         });
     }
 
@@ -528,6 +746,37 @@ public class RestApiServer {
 
     /** Request body for sending a message. */
     public static record SendMessageRequest(UUID senderId, String content) {}
+
+    /** Response for relationship transitions. */
+    public static record TransitionResponse(boolean success, UUID friendRequestId, String errorMessage) {
+        public static TransitionResponse from(ConnectionService.TransitionResult result) {
+            FriendRequest request = result.friendRequest();
+            return new TransitionResponse(
+                    result.success(), request != null ? request.id() : null, result.errorMessage());
+        }
+    }
+
+    /** Response for moderation operations. */
+    public static record ModerationResponse(boolean success, boolean alreadyHandled, String errorMessage) {}
+
+    /** Response for reporting a user. */
+    public static record ReportResponse(
+            boolean success, boolean autoBanned, String errorMessage, boolean blockedByReporter) {}
+
+    /** Private profile note DTO. */
+    public static record ProfileNoteDto(
+            UUID authorId, UUID subjectId, String content, Instant createdAt, Instant updatedAt) {
+        public static ProfileNoteDto from(ProfileNote note) {
+            return new ProfileNoteDto(
+                    note.authorId(), note.subjectId(), note.content(), note.createdAt(), note.updatedAt());
+        }
+    }
+
+    /** Request body for creating or updating a private profile note. */
+    public static record ProfileNoteUpsertRequest(String content) {}
+
+    /** Request body for reporting a user. */
+    public static record ReportUserRequest(Report.Reason reason, String description, boolean blockUser) {}
 
     /** Main entry point for standalone REST API server. */
     public static void main(String[] args) {

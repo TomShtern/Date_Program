@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jdbi.v3.core.Handle;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
@@ -42,8 +43,16 @@ import org.slf4j.LoggerFactory;
 /** Consolidated JDBI-backed user storage implementation. */
 public final class JdbiUserStorage implements UserStorage {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(JdbiUserStorage.class);
+
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
+    private static final String USER_ID_BIND = "userId";
+    private static final String USER_DB_SMOKING = "user_db_smoking";
+    private static final String USER_DB_DRINKING = "user_db_drinking";
+    private static final String USER_DB_WANTS_KIDS = "user_db_wants_kids";
+    private static final String USER_DB_LOOKING_FOR = "user_db_looking_for";
+    private static final String USER_DB_EDUCATION = "user_db_education";
 
     public static final String ALL_COLUMNS = """
             id, name, bio, birth_date, gender, interested_in, lat, lon,
@@ -66,17 +75,24 @@ public final class JdbiUserStorage implements UserStorage {
 
     @Override
     public void save(User user) {
-        dao.save(new UserSqlBindings(user));
+        Objects.requireNonNull(user, "user cannot be null");
+        jdbi.useTransaction(handle -> {
+            handle.attach(Dao.class).save(new UserSqlBindings(user));
+            // Follow-up marker: remove dual-write compatibility once every supported deployment has
+            // completed V4 backfill validation and legacy serialized user columns are retired in a
+            // dedicated cleanup migration.
+            saveNormalizedProfileData(handle, user);
+        });
     }
 
     @Override
     public Optional<User> get(UUID id) {
-        return dao.get(id);
+        return dao.get(id).map(this::applyNormalizedProfileData);
     }
 
     @Override
     public List<User> findActive() {
-        return dao.findActive();
+        return applyNormalizedProfileData(dao.findActive());
     }
 
     @Override
@@ -114,7 +130,7 @@ public final class JdbiUserStorage implements UserStorage {
                         .append(" AND lat BETWEEN :latMin AND :latMax")
                         .append(" AND lon BETWEEN :lonMin AND :lonMax");
                 return handle.createQuery(sql.toString())
-                        .defineList("genders", genderNames)
+                        .bindList("genders", genderNames)
                         .bind("excludeId", excludeId)
                         .bind("minAge", minAge)
                         .bind("maxAge", maxAge)
@@ -126,7 +142,7 @@ public final class JdbiUserStorage implements UserStorage {
                         .list();
             } else {
                 return handle.createQuery(sql.toString())
-                        .defineList("genders", genderNames)
+                        .bindList("genders", genderNames)
                         .bind("excludeId", excludeId)
                         .bind("minAge", minAge)
                         .bind("maxAge", maxAge)
@@ -138,7 +154,7 @@ public final class JdbiUserStorage implements UserStorage {
 
     @Override
     public List<User> findAll() {
-        return dao.findAll();
+        return applyNormalizedProfileData(dao.findAll());
     }
 
     @Override
@@ -153,6 +169,7 @@ public final class JdbiUserStorage implements UserStorage {
                     .bindList("userIds", new ArrayList<>(ids))
                     .map(new Mapper())
                     .list();
+            applyNormalizedProfileData(users);
 
             Map<UUID, User> result = new HashMap<>();
             for (User user : users) {
@@ -201,22 +218,7 @@ public final class JdbiUserStorage implements UserStorage {
      * table. Uses delete-then-insert within a transaction to ensure atomicity.
      */
     public void saveUserPhotos(UUID userId, List<String> urls) {
-        jdbi.useTransaction(handle -> {
-            handle.execute("DELETE FROM user_photos WHERE user_id = ?", userId);
-            if (urls != null) {
-                var batch = handle.prepareBatch(
-                        "INSERT INTO user_photos (user_id, position, url) VALUES (:userId, :position, :url)");
-                for (int i = 0; i < urls.size(); i++) {
-                    batch.bind("userId", userId)
-                            .bind("position", i)
-                            .bind("url", urls.get(i))
-                            .add();
-                }
-                if (!urls.isEmpty()) {
-                    batch.execute();
-                }
-            }
-        });
+        jdbi.useTransaction(handle -> saveUserPhotos(handle, userId, urls));
     }
 
     /**
@@ -226,7 +228,7 @@ public final class JdbiUserStorage implements UserStorage {
     public List<String> loadUserPhotos(UUID userId) {
         return jdbi.withHandle(
                 handle -> handle.createQuery("SELECT url FROM user_photos WHERE user_id = :userId ORDER BY position")
-                        .bind("userId", userId)
+                        .bind(USER_ID_BIND, userId)
                         .mapTo(String.class)
                         .list());
     }
@@ -236,24 +238,14 @@ public final class JdbiUserStorage implements UserStorage {
      * table.
      */
     public void saveUserInterests(UUID userId, Set<String> interests) {
-        jdbi.useTransaction(handle -> {
-            handle.execute("DELETE FROM user_interests WHERE user_id = ?", userId);
-            if (interests != null && !interests.isEmpty()) {
-                var batch = handle.prepareBatch(
-                        "INSERT INTO user_interests (user_id, interest) VALUES (:userId, :interest)");
-                for (String interest : interests) {
-                    batch.bind("userId", userId).bind("interest", interest).add();
-                }
-                batch.execute();
-            }
-        });
+        jdbi.useTransaction(handle -> saveUserInterests(handle, userId, interests));
     }
 
     /** Loads all interests for a user from the normalized table. */
     public Set<String> loadUserInterests(UUID userId) {
         return jdbi.withHandle(handle ->
                 new HashSet<>(handle.createQuery("SELECT interest FROM user_interests WHERE user_id = :userId")
-                        .bind("userId", userId)
+                        .bind(USER_ID_BIND, userId)
                         .mapTo(String.class)
                         .list()));
     }
@@ -263,24 +255,14 @@ public final class JdbiUserStorage implements UserStorage {
      * {@code user_interested_in} table.
      */
     public void saveUserInterestedIn(UUID userId, Set<String> genders) {
-        jdbi.useTransaction(handle -> {
-            handle.execute("DELETE FROM user_interested_in WHERE user_id = ?", userId);
-            if (genders != null && !genders.isEmpty()) {
-                var batch = handle.prepareBatch(
-                        "INSERT INTO user_interested_in (user_id, gender) VALUES (:userId, :gender)");
-                for (String gender : genders) {
-                    batch.bind("userId", userId).bind("gender", gender).add();
-                }
-                batch.execute();
-            }
-        });
+        jdbi.useTransaction(handle -> saveUserInterestedIn(handle, userId, genders));
     }
 
     /** Loads all gender preferences for a user from the normalized table. */
     public Set<String> loadUserInterestedIn(UUID userId) {
         return jdbi.withHandle(handle ->
                 new HashSet<>(handle.createQuery("SELECT gender FROM user_interested_in WHERE user_id = :userId")
-                        .bind("userId", userId)
+                        .bind(USER_ID_BIND, userId)
                         .mapTo(String.class)
                         .list()));
     }
@@ -293,17 +275,207 @@ public final class JdbiUserStorage implements UserStorage {
      */
     public void saveDealbreaker(UUID userId, String tableName, Set<String> values) {
         validateNormalizedTable(tableName);
-        jdbi.useTransaction(handle -> {
-            handle.execute("DELETE FROM " + tableName + " WHERE user_id = ?", userId);
-            if (values != null && !values.isEmpty()) {
-                var batch = handle.prepareBatch(
-                        "INSERT INTO " + tableName + " (user_id, \"value\") VALUES (:userId, :value)");
-                for (String value : values) {
-                    batch.bind("userId", userId).bind("value", value).add();
-                }
-                batch.execute();
+        jdbi.useTransaction(handle -> saveDealbreaker(handle, userId, tableName, values));
+    }
+
+    private void saveNormalizedProfileData(Handle handle, User user) {
+        UUID userId = user.getId();
+        saveUserPhotos(handle, userId, user.getPhotoUrls());
+        saveUserInterests(handle, userId, enumNames(user.getInterests()));
+        saveUserInterestedIn(handle, userId, enumNames(user.getInterestedIn()));
+
+        Dealbreakers dealbreakers = user.getDealbreakers();
+        saveDealbreaker(
+                handle,
+                userId,
+                USER_DB_SMOKING,
+                dealbreakers != null ? enumNames(dealbreakers.acceptableSmoking()) : Set.of());
+        saveDealbreaker(
+                handle,
+                userId,
+                USER_DB_DRINKING,
+                dealbreakers != null ? enumNames(dealbreakers.acceptableDrinking()) : Set.of());
+        saveDealbreaker(
+                handle,
+                userId,
+                USER_DB_WANTS_KIDS,
+                dealbreakers != null ? enumNames(dealbreakers.acceptableKidsStance()) : Set.of());
+        saveDealbreaker(
+                handle,
+                userId,
+                USER_DB_LOOKING_FOR,
+                dealbreakers != null ? enumNames(dealbreakers.acceptableLookingFor()) : Set.of());
+        saveDealbreaker(
+                handle,
+                userId,
+                USER_DB_EDUCATION,
+                dealbreakers != null ? enumNames(dealbreakers.acceptableEducation()) : Set.of());
+    }
+
+    private void saveUserPhotos(Handle handle, UUID userId, List<String> urls) {
+        handle.execute("DELETE FROM user_photos WHERE user_id = ?", userId);
+        if (urls == null || urls.isEmpty()) {
+            return;
+        }
+        try (var batch = handle.prepareBatch(
+                "INSERT INTO user_photos (user_id, position, url) VALUES (:userId, :position, :url)")) {
+            for (int i = 0; i < urls.size(); i++) {
+                batch.bind(USER_ID_BIND, userId)
+                        .bind("position", i)
+                        .bind("url", urls.get(i))
+                        .add();
             }
-        });
+            batch.execute();
+        }
+    }
+
+    private void saveUserInterests(Handle handle, UUID userId, Set<String> interests) {
+        handle.execute("DELETE FROM user_interests WHERE user_id = ?", userId);
+        if (interests == null || interests.isEmpty()) {
+            return;
+        }
+        try (var batch =
+                handle.prepareBatch("INSERT INTO user_interests (user_id, interest) VALUES (:userId, :interest)")) {
+            for (String interest : interests) {
+                batch.bind(USER_ID_BIND, userId).bind("interest", interest).add();
+            }
+            batch.execute();
+        }
+    }
+
+    private void saveUserInterestedIn(Handle handle, UUID userId, Set<String> genders) {
+        handle.execute("DELETE FROM user_interested_in WHERE user_id = ?", userId);
+        if (genders == null || genders.isEmpty()) {
+            return;
+        }
+        try (var batch =
+                handle.prepareBatch("INSERT INTO user_interested_in (user_id, gender) VALUES (:userId, :gender)")) {
+            for (String gender : genders) {
+                batch.bind(USER_ID_BIND, userId).bind("gender", gender).add();
+            }
+            batch.execute();
+        }
+    }
+
+    private void saveDealbreaker(Handle handle, UUID userId, String tableName, Set<String> values) {
+        validateNormalizedTable(tableName);
+        handle.execute("DELETE FROM " + tableName + " WHERE user_id = ?", userId);
+        if (values == null || values.isEmpty()) {
+            return;
+        }
+        try (var batch =
+                handle.prepareBatch("INSERT INTO " + tableName + " (user_id, \"value\") VALUES (:userId, :value)")) {
+            for (String value : values) {
+                batch.bind(USER_ID_BIND, userId).bind("value", value).add();
+            }
+            batch.execute();
+        }
+    }
+
+    private List<User> applyNormalizedProfileData(List<User> users) {
+        users.forEach(this::applyNormalizedProfileData);
+        return users;
+    }
+
+    private User applyNormalizedProfileData(User user) {
+        UUID userId = user.getId();
+
+        // Follow-up marker: remove these normalized-first / legacy-fallback compatibility reads
+        // after the rollout window closes and the legacy serialized columns are dropped.
+        List<String> normalizedPhotos = loadUserPhotos(userId);
+        if (!normalizedPhotos.isEmpty()) {
+            user.setPhotoUrls(normalizedPhotos);
+        }
+
+        Set<Interest> normalizedInterests = parseEnumNames(loadUserInterests(userId), Interest.class);
+        if (!normalizedInterests.isEmpty()) {
+            user.setInterests(EnumSet.copyOf(normalizedInterests));
+        }
+
+        Set<Gender> normalizedInterestedIn = parseEnumNames(loadUserInterestedIn(userId), Gender.class);
+        if (!normalizedInterestedIn.isEmpty()) {
+            user.setInterestedIn(EnumSet.copyOf(normalizedInterestedIn));
+        }
+
+        Dealbreakers existing = user.getDealbreakers();
+        Dealbreakers.Builder builder = (existing != null ? existing : Dealbreakers.none()).toBuilder();
+        boolean normalizedDealbreakersPresent = false;
+
+        Set<Lifestyle.Smoking> smoking =
+                parseEnumNames(loadDealbreaker(userId, USER_DB_SMOKING), Lifestyle.Smoking.class);
+        if (!smoking.isEmpty()) {
+            builder.clearSmoking();
+            builder.acceptSmoking(smoking.toArray(Lifestyle.Smoking[]::new));
+            normalizedDealbreakersPresent = true;
+        }
+
+        Set<Lifestyle.Drinking> drinking =
+                parseEnumNames(loadDealbreaker(userId, USER_DB_DRINKING), Lifestyle.Drinking.class);
+        if (!drinking.isEmpty()) {
+            builder.clearDrinking();
+            builder.acceptDrinking(drinking.toArray(Lifestyle.Drinking[]::new));
+            normalizedDealbreakersPresent = true;
+        }
+
+        Set<Lifestyle.WantsKids> kids =
+                parseEnumNames(loadDealbreaker(userId, USER_DB_WANTS_KIDS), Lifestyle.WantsKids.class);
+        if (!kids.isEmpty()) {
+            builder.clearKids();
+            builder.acceptKidsStance(kids.toArray(Lifestyle.WantsKids[]::new));
+            normalizedDealbreakersPresent = true;
+        }
+
+        Set<Lifestyle.LookingFor> lookingFor =
+                parseEnumNames(loadDealbreaker(userId, USER_DB_LOOKING_FOR), Lifestyle.LookingFor.class);
+        if (!lookingFor.isEmpty()) {
+            builder.clearLookingFor();
+            builder.acceptLookingFor(lookingFor.toArray(Lifestyle.LookingFor[]::new));
+            normalizedDealbreakersPresent = true;
+        }
+
+        Set<Lifestyle.Education> education =
+                parseEnumNames(loadDealbreaker(userId, USER_DB_EDUCATION), Lifestyle.Education.class);
+        if (!education.isEmpty()) {
+            builder.clearEducation();
+            builder.requireEducation(education.toArray(Lifestyle.Education[]::new));
+            normalizedDealbreakersPresent = true;
+        }
+
+        if (normalizedDealbreakersPresent) {
+            user.setDealbreakers(builder.build());
+        }
+
+        return user;
+    }
+
+    private static Set<String> enumNames(Set<? extends Enum<?>> values) {
+        if (values == null || values.isEmpty()) {
+            return Set.of();
+        }
+        return values.stream().map(Enum::name).collect(Collectors.toSet());
+    }
+
+    private static <E extends Enum<E>> Set<E> parseEnumNames(Set<String> values, Class<E> enumType) {
+        if (values == null || values.isEmpty()) {
+            return EnumSet.noneOf(enumType);
+        }
+        EnumSet<E> parsed = EnumSet.noneOf(enumType);
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            try {
+                parsed.add(Enum.valueOf(enumType, value.trim()));
+            } catch (IllegalArgumentException _) {
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug(
+                            "Ignoring invalid {} value '{}' during compatibility read",
+                            enumType.getSimpleName(),
+                            value);
+                }
+            }
+        }
+        return parsed;
     }
 
     /**
@@ -314,13 +486,13 @@ public final class JdbiUserStorage implements UserStorage {
         validateNormalizedTable(tableName);
         return jdbi.withHandle(handle ->
                 new HashSet<>(handle.createQuery("SELECT \"value\" FROM " + tableName + " WHERE user_id = :userId")
-                        .bind("userId", userId)
+                        .bind(USER_ID_BIND, userId)
                         .mapTo(String.class)
                         .list()));
     }
 
-    private static final Set<String> VALID_DEALBREAKER_TABLES = Set.of(
-            "user_db_smoking", "user_db_drinking", "user_db_wants_kids", "user_db_looking_for", "user_db_education");
+    private static final Set<String> VALID_DEALBREAKER_TABLES =
+            Set.of(USER_DB_SMOKING, USER_DB_DRINKING, USER_DB_WANTS_KIDS, USER_DB_LOOKING_FOR, USER_DB_EDUCATION);
 
     private static void validateNormalizedTable(String tableName) {
         if (!VALID_DEALBREAKER_TABLES.contains(tableName)) {

@@ -234,6 +234,12 @@ public class DashboardController extends BaseController
     @FXML
     private void handleViewDailyPick() {
         logger.info("Viewing daily pick - navigating to Matching");
+        if (viewModel.dailyPickUserIdProperty().get() != null) {
+            NavigationService.getInstance()
+                    .setNavigationContext(
+                            NavigationService.ViewType.MATCHING,
+                            viewModel.dailyPickUserIdProperty().get());
+        }
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
     }
 

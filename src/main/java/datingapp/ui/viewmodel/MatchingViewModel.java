@@ -18,17 +18,22 @@ import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.model.Match;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.async.ViewModelAsyncScope;
+import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
@@ -49,11 +54,10 @@ public class MatchingViewModel {
     private static final Logger logger = LoggerFactory.getLogger(MatchingViewModel.class);
 
     private final CandidateFinder candidateFinder;
-    private final MatchingService matchingService;
     private final UndoService undoService;
-    private final TrustSafetyService trustSafetyService;
     private final MatchingUseCases matchingUseCases;
     private final SocialUseCases socialUseCases;
+    private final UiProfileNoteDataAccess noteDataAccess;
     private final AppSession session;
     private final ViewModelAsyncScope asyncScope;
 
@@ -62,10 +66,14 @@ public class MatchingViewModel {
     private final BooleanProperty hasMoreCandidates = new SimpleBooleanProperty(false);
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty locationMissing = new SimpleBooleanProperty(false);
+    private final StringProperty infoMessage = new SimpleStringProperty();
 
     private final ObjectProperty<List<String>> currentCandidatePhotoUrls = new SimpleObjectProperty<>(List.of());
     private final IntegerProperty currentCandidatePhotoIndex = new SimpleIntegerProperty(0);
     private final StringProperty currentCandidatePhotoUrl = new SimpleStringProperty();
+    private final StringProperty noteContent = new SimpleStringProperty("");
+    private final StringProperty noteStatusMessage = new SimpleStringProperty();
+    private final BooleanProperty noteBusy = new SimpleBooleanProperty(false);
 
     // New: Property to notify when a match occurs
     private final ObjectProperty<Match> lastMatch = new SimpleObjectProperty<>();
@@ -73,6 +81,28 @@ public class MatchingViewModel {
 
     private User lastSwipedCandidate;
     private User currentUser;
+    private UUID prioritizedCandidateId;
+    private final AtomicInteger noteLoadToken = new AtomicInteger();
+
+    public record Dependencies(
+            CandidateFinder candidateFinder,
+            MatchingService matchingService,
+            UndoService undoService,
+            TrustSafetyService trustSafetyService,
+            MatchingUseCases matchingUseCases,
+            SocialUseCases socialUseCases,
+            UiProfileNoteDataAccess noteDataAccess) {
+
+        public Dependencies {
+            Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
+            Objects.requireNonNull(matchingService, "matchingService cannot be null");
+            Objects.requireNonNull(undoService, "undoService cannot be null");
+            Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
+            Objects.requireNonNull(matchingUseCases, "matchingUseCases cannot be null");
+            Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
+            Objects.requireNonNull(noteDataAccess, "noteDataAccess cannot be null");
+        }
+    }
 
     public MatchingViewModel(
             CandidateFinder candidateFinder,
@@ -96,12 +126,26 @@ public class MatchingViewModel {
             TrustSafetyService trustSafetyService,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
-        this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
-        this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
-        this.undoService = Objects.requireNonNull(undoService, "undoService cannot be null");
-        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
-        this.matchingUseCases = new MatchingUseCases(this.candidateFinder, this.matchingService, this.undoService);
-        this.socialUseCases = new SocialUseCases(this.trustSafetyService);
+        this(
+                new Dependencies(
+                        candidateFinder,
+                        matchingService,
+                        undoService,
+                        trustSafetyService,
+                        new MatchingUseCases(candidateFinder, matchingService, undoService),
+                        new SocialUseCases(trustSafetyService),
+                        new NoOpUiProfileNoteDataAccess()),
+                session,
+                uiDispatcher);
+    }
+
+    public MatchingViewModel(Dependencies dependencies, AppSession session, UiThreadDispatcher uiDispatcher) {
+        Dependencies resolvedDependencies = Objects.requireNonNull(dependencies, "dependencies cannot be null");
+        this.candidateFinder = resolvedDependencies.candidateFinder();
+        this.undoService = resolvedDependencies.undoService();
+        this.matchingUseCases = resolvedDependencies.matchingUseCases();
+        this.socialUseCases = resolvedDependencies.socialUseCases();
+        this.noteDataAccess = resolvedDependencies.noteDataAccess();
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.asyncScope = createAsyncScope(uiDispatcher);
     }
@@ -125,6 +169,11 @@ public class MatchingViewModel {
      * Initializes the ViewModel by loading the current user from UISession.
      */
     public void initialize() {
+        initialize(null);
+    }
+
+    public void initialize(UUID selectedCandidateId) {
+        prioritizedCandidateId = selectedCandidateId;
         User user = ensureCurrentUser();
         if (user != null) {
             refreshCandidates();
@@ -154,17 +203,24 @@ public class MatchingViewModel {
             return;
         }
 
-        asyncScope.runLatest("matching-refresh", "refresh candidates", () -> fetchCandidates(user), result -> {
-            locationMissing.set(result.locationMissing());
-            candidateQueue.clear();
-            candidateQueue.addAll(result.candidates());
-            nextCandidate();
-        });
+        UUID requestedCandidateId = prioritizedCandidateId;
+        asyncScope.runLatest(
+                "matching-refresh", "refresh candidates", () -> fetchCandidates(user, requestedCandidateId), result -> {
+                    locationMissing.set(result.locationMissing());
+                    candidateQueue.clear();
+                    candidateQueue.addAll(result.candidates());
+                    prioritizedCandidateId = null;
+                    if (result.requestedCandidateUnavailable()) {
+                        infoMessage.set("That profile is no longer available. Showing other nearby people instead.");
+                    }
+                    nextCandidate();
+                });
     }
 
-    private RefreshResult fetchCandidates(User user) {
+    private RefreshResult fetchCandidates(User user, UUID requestedCandidateId) {
         List<User> candidates = List.of();
         boolean locationMissingLocal = false;
+        boolean requestedCandidateUnavailable = false;
         try {
             logDebug(
                     "Refreshing candidates for user: {} (state={}, isComplete={}, gender={}, interestedIn={})",
@@ -179,6 +235,9 @@ public class MatchingViewModel {
             if (browseResult.success()) {
                 candidates = browseResult.data().candidates();
                 locationMissingLocal = browseResult.data().locationMissing();
+                CandidatePrioritization prioritization = prioritizeCandidate(candidates, requestedCandidateId);
+                candidates = prioritization.candidates();
+                requestedCandidateUnavailable = prioritization.requestedCandidateUnavailable();
             } else if (user.getState() != UserState.ACTIVE) {
                 logWarn(
                         "Current user {} is NOT ACTIVE (state={}). Cannot browse candidates. Profile complete: {}",
@@ -192,7 +251,28 @@ public class MatchingViewModel {
         } catch (Exception e) {
             logWarn("Failed to refresh candidates", e);
         }
-        return new RefreshResult(candidates, locationMissingLocal);
+        return new RefreshResult(candidates, locationMissingLocal, requestedCandidateUnavailable);
+    }
+
+    private CandidatePrioritization prioritizeCandidate(List<User> candidates, UUID requestedCandidateId) {
+        if (requestedCandidateId == null || candidates.isEmpty()) {
+            return new CandidatePrioritization(candidates, false);
+        }
+
+        List<User> reordered = new ArrayList<>(candidates.size());
+        User prioritizedCandidate = null;
+        for (User candidate : candidates) {
+            if (requestedCandidateId.equals(candidate.getId())) {
+                prioritizedCandidate = candidate;
+            } else {
+                reordered.add(candidate);
+            }
+        }
+        if (prioritizedCandidate == null) {
+            return new CandidatePrioritization(candidates, true);
+        }
+        reordered.addFirst(prioritizedCandidate);
+        return new CandidatePrioritization(List.copyOf(reordered), false);
     }
 
     /**
@@ -215,7 +295,125 @@ public class MatchingViewModel {
                 currentCandidatePhotoUrl.set(null);
             }
             hasMoreCandidates.set(next != null);
+            if (next != null) {
+                loadNoteForCandidate(next);
+            } else {
+                clearNoteState();
+            }
         });
+    }
+
+    private void loadNoteForCandidate(User candidate) {
+        User user = ensureCurrentUser();
+        if (candidate == null || user == null) {
+            clearNoteState();
+            return;
+        }
+
+        int token = noteLoadToken.incrementAndGet();
+        noteStatusMessage.set(null);
+        noteBusy.set(true);
+        asyncScope.runFireAndForget("load candidate note", () -> {
+            try {
+                ProfileNote note = noteDataAccess
+                        .getProfileNote(user.getId(), candidate.getId())
+                        .orElse(null);
+                asyncScope.dispatchToUi(() -> applyLoadedNote(candidate.getId(), note, token));
+            } catch (Exception e) {
+                asyncScope.dispatchToUi(() -> applyNoteFailure(candidate.getId(), token, "Failed to load note", e));
+            }
+        });
+    }
+
+    public void saveCurrentCandidateNote() {
+        User user = ensureCurrentUser();
+        User candidate = currentCandidate.get();
+        if (user == null || candidate == null) {
+            return;
+        }
+
+        String content = noteContent.get();
+        noteBusy.set(true);
+        noteStatusMessage.set(null);
+        asyncScope.runFireAndForget("save candidate note", () -> {
+            try {
+                ProfileNote savedNote = noteDataAccess.upsertProfileNote(user.getId(), candidate.getId(), content);
+                int token = noteLoadToken.incrementAndGet();
+                asyncScope.dispatchToUi(() -> {
+                    if (!isCurrentCandidate(candidate.getId(), token)) {
+                        return;
+                    }
+                    noteContent.set(savedNote.content());
+                    noteStatusMessage.set("Private note saved.");
+                    noteBusy.set(false);
+                });
+            } catch (Exception e) {
+                asyncScope.dispatchToUi(
+                        () -> applyNoteFailure(candidate.getId(), noteLoadToken.get(), "Failed to save note", e));
+            }
+        });
+    }
+
+    public void deleteCurrentCandidateNote() {
+        User user = ensureCurrentUser();
+        User candidate = currentCandidate.get();
+        if (user == null || candidate == null) {
+            return;
+        }
+
+        noteBusy.set(true);
+        noteStatusMessage.set(null);
+        asyncScope.runFireAndForget("delete candidate note", () -> {
+            try {
+                noteDataAccess.deleteProfileNote(user.getId(), candidate.getId());
+                int token = noteLoadToken.incrementAndGet();
+                asyncScope.dispatchToUi(() -> {
+                    if (!isCurrentCandidate(candidate.getId(), token)) {
+                        return;
+                    }
+                    noteContent.set("");
+                    noteStatusMessage.set("Private note deleted.");
+                    noteBusy.set(false);
+                });
+            } catch (Exception e) {
+                asyncScope.dispatchToUi(
+                        () -> applyNoteFailure(candidate.getId(), noteLoadToken.get(), "Failed to delete note", e));
+            }
+        });
+    }
+
+    private void applyLoadedNote(UUID candidateId, ProfileNote note, int token) {
+        if (!isCurrentCandidate(candidateId, token)) {
+            return;
+        }
+        noteContent.set(note != null ? note.content() : "");
+        noteBusy.set(false);
+    }
+
+    private void applyNoteFailure(UUID candidateId, int token, String message, Exception error) {
+        if (!isCurrentCandidate(candidateId, token)) {
+            return;
+        }
+        noteStatusMessage.set(
+                error != null
+                                && error.getMessage() != null
+                                && !error.getMessage().isBlank()
+                        ? message + ": " + error.getMessage()
+                        : message);
+        noteBusy.set(false);
+    }
+
+    private boolean isCurrentCandidate(UUID candidateId, int token) {
+        return token == noteLoadToken.get()
+                && currentCandidate.get() != null
+                && currentCandidate.get().getId().equals(candidateId);
+    }
+
+    private void clearNoteState() {
+        noteLoadToken.incrementAndGet();
+        noteContent.set("");
+        noteStatusMessage.set(null);
+        noteBusy.set(false);
     }
 
     public void like() {
@@ -450,6 +648,26 @@ public class MatchingViewModel {
         return currentCandidatePhotoIndex;
     }
 
+    public StringProperty infoMessageProperty() {
+        return infoMessage;
+    }
+
+    public StringProperty noteContentProperty() {
+        return noteContent;
+    }
+
+    public StringProperty noteStatusMessageProperty() {
+        return noteStatusMessage;
+    }
+
+    public BooleanProperty noteBusyProperty() {
+        return noteBusy;
+    }
+
+    public void clearInfoMessage() {
+        infoMessage.set(null);
+    }
+
     private void logDebug(String message, Object... args) {
         if (logger.isDebugEnabled()) {
             logger.debug(message, args);
@@ -482,5 +700,8 @@ public class MatchingViewModel {
         return scope;
     }
 
-    private record RefreshResult(List<User> candidates, boolean locationMissing) {}
+    private record RefreshResult(
+            List<User> candidates, boolean locationMissing, boolean requestedCandidateUnavailable) {}
+
+    private record CandidatePrioritization(List<User> candidates, boolean requestedCandidateUnavailable) {}
 }
