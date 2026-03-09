@@ -23,6 +23,7 @@ import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
+import org.jdbi.v3.sqlobject.customizer.BindMethods;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
@@ -272,7 +273,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                     :blocksGiven, :blocksReceived, :reportsGiven, :reportsReceived,
                     :reciprocityScore, :selectivenessScore, :attractivenessScore)
                 """)
-        void saveUserStats(@BindBean UserStats stats);
+        void saveUserStats(@BindMethods UserStats stats);
 
         @SqlQuery("""
                 SELECT id, user_id, computed_at,
@@ -329,7 +330,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                 VALUES (:id, :computedAt, :totalActiveUsers, :avgLikesReceived,
                     :avgLikesGiven, :avgMatchRate, :avgLikeRatio)
                 """)
-        void savePlatformStats(@BindBean PlatformStats stats);
+        void savePlatformStats(@BindMethods PlatformStats stats);
 
         @SqlQuery("""
                 SELECT id, computed_at, total_active_users,
@@ -399,7 +400,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                 KEY (user_id, achievement)
                 VALUES (:id, :userId, :achievement, :unlockedAt)
                 """)
-        void saveUserAchievement(@BindBean UserAchievement achievement);
+        void saveUserAchievement(@BindMethods UserAchievement achievement);
 
         @SqlQuery("""
                 SELECT id, user_id, achievement, unlocked_at

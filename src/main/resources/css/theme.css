@@ -100,6 +100,12 @@
     /* Note: transitions must be done in Java code - JavaFX CSS has no transition property */
 }
 
+.button:disabled {
+    -fx-background-color: #475569;
+    -fx-text-fill: #94a3b8;
+    -fx-opacity: 0.8;
+}
+
 .button:hover {
     -fx-background-color: linear-gradient(to bottom right, derive(-fx-primary, 15%), derive(-fx-primary-dark, 15%));
     -fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.5), 15, 0, 0, 4);
@@ -439,6 +445,12 @@
     -fx-prompt-text-fill: #64748b;
     -fx-padding: 6 4;
     -fx-border-color: transparent;
+}
+
+.login-search-field:focused {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-effect: none;
 }
 
 .login-search-icon {

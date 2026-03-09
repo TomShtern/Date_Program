@@ -334,6 +334,21 @@ public class User {
         return EnumSetUtil.safeCopy(interestedIn, Gender.class);
     }
 
+    /**
+     * Returns {@code true} when this user is interested in all genders — i.e.,
+     * their {@code interestedIn} set contains every value in {@link Gender}.
+     *
+     * <p>This is the application convention for "open to everyone / any gender".
+     * Rather than adding a separate {@code ANY} enum value (which would require
+     * schema and codec changes), we store all three genders in the normalized
+     * {@code user_interested_in} table and use this helper to detect the "all
+     * selected" state. The matching engine short-circuits for this user — they
+     * are considered compatible with a candidate of any gender.
+     */
+    public boolean isInterestedInEveryone() {
+        return interestedIn != null && interestedIn.containsAll(EnumSet.allOf(Gender.class));
+    }
+
     public double getLat() {
         return lat;
     }

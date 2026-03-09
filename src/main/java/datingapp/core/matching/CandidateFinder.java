@@ -188,9 +188,16 @@ public class CandidateFinder implements LoggingSupport {
             return cached.candidates();
         }
 
+        // When a seeker is open to everyone (all genders selected), pass the full
+        // Gender enum to the DB pre-filter so the SQL `gender IN (...)` clause does
+        // not exclude candidates by gender before the in-memory check runs.
+        Set<Gender> gendersForQuery = currentUser.isInterestedInEveryone()
+                ? java.util.EnumSet.allOf(Gender.class)
+                : currentUser.getInterestedIn();
+
         List<User> preFiltered = userStorage.findCandidates(
                 currentUser.getId(),
-                currentUser.getInterestedIn(),
+                gendersForQuery,
                 currentUser.getMinAge(),
                 currentUser.getMaxAge(),
                 currentUser.getLat(),
@@ -313,9 +320,15 @@ public class CandidateFinder implements LoggingSupport {
     }
 
     /**
-     * Checks if gender preferences match both ways: - Seeker is interested in
-     * candidate's gender -
-     * Candidate is interested in seeker's gender.
+     * Checks if gender preferences match both ways:
+     * <ul>
+     *   <li>Seeker is interested in candidate's gender
+     *   <li>Candidate is interested in seeker's gender
+     * </ul>
+     *
+     * <p>A user with all genders selected ({@link User#isInterestedInEveryone()}) is
+     * treated as compatible with any gender on their side of the check, so "open to
+     * everyone" users are never excluded solely because of gender.
      */
     private boolean hasMatchingGenderPreferences(User seeker, User candidate, Set<Gender> seekerInterestedIn) {
         if (seeker.getGender() == null || candidate.getGender() == null) {
@@ -325,8 +338,13 @@ public class CandidateFinder implements LoggingSupport {
             return false;
         }
 
-        boolean seekerInterestedInCandidate = seekerInterestedIn.contains(candidate.getGender());
-        boolean candidateInterestedInSeeker = candidate.getInterestedIn().contains(seeker.getGender());
+        // "Open to everyone" short-circuit: if a user has all genders selected,
+        // they are interested in any gender — skip the set membership check for
+        // their side and only verify the other side's preference.
+        boolean seekerInterestedInCandidate =
+                seeker.isInterestedInEveryone() || seekerInterestedIn.contains(candidate.getGender());
+        boolean candidateInterestedInSeeker = candidate.isInterestedInEveryone()
+                || candidate.getInterestedIn().contains(seeker.getGender());
 
         return seekerInterestedInCandidate && candidateInterestedInSeeker;
     }

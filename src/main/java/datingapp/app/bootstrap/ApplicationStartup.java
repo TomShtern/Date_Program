@@ -12,6 +12,7 @@ import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
 import datingapp.storage.DatabaseManager;
+import datingapp.storage.DevDataSeeder;
 import datingapp.storage.StorageFactory;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -88,6 +89,12 @@ public final class ApplicationStartup {
         if (!initialized) {
             dbManager = DatabaseManager.getInstance();
             services = StorageFactory.buildH2(dbManager, config);
+
+            // Seed the database with developer test data if the sentinel user is absent.
+            // DevDataSeeder.seed() is idempotent — it checks for the sentinel UUID before
+            // inserting, so this is a fast no-op on any non-empty database.
+            DevDataSeeder.seed(services.getUserStorage());
+
             initialized = true;
         }
         return services;

@@ -176,6 +176,63 @@ class CandidateFinderTest {
         assertEquals(2, userStorage.findCandidatesCallCount());
     }
 
+    // =========================================================================
+    // Tests for "interested in everyone" (all genders selected) matching
+    // =========================================================================
+
+    @Test
+    @DisplayName("Seeker open to everyone matches MALE, FEMALE, and OTHER candidates")
+    void interestedInEveryone_seekerMatchesCandidatesOfAnyGender() {
+        // A seeker who has selected all three genders is "open to everyone".
+        User everyoneSeeker = createUser(
+                "EveryoneSeeker",
+                Gender.FEMALE,
+                EnumSet.allOf(Gender.class), // MALE + FEMALE + OTHER
+                30,
+                32.09,
+                34.79);
+
+        // Three candidates of different genders — each interested in FEMALE,
+        // so the reverse-direction check (candidate → seeker) also passes.
+        User maleCand = createUser("MaleCandidate", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
+        User femaleCand = createUser("FemaleCandidate", Gender.FEMALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
+        User otherCand = createUser("OtherCandidate", Gender.OTHER, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
+
+        List<User> result = finder.findCandidates(everyoneSeeker, List.of(maleCand, femaleCand, otherCand), Set.of());
+
+        // All three should be returned — gender preference is fully open on the seeker side.
+        assertEquals(3, result.size(), "Seeker open to everyone should match all three genders");
+    }
+
+    @Test
+    @DisplayName("Candidate open to everyone matches any seeker gender")
+    void interestedInEveryone_candidateMatchesAnySeeker() {
+        // MAlE seeker who only likes FEMALE.
+        // The candidate (FEMALE, open to everyone) should still appear because
+        // the candidate's side of the bidirectional check passes for MALE seekers.
+        User maleSeeker = createUser("MaleSeeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
+
+        // FEMALE candidate who is open to everyone (all genders).
+        User everyoneCand =
+                createUser("EveryoneCandidate", Gender.FEMALE, EnumSet.allOf(Gender.class), 28, 32.09, 34.79);
+
+        List<User> result = finder.findCandidates(maleSeeker, List.of(everyoneCand), Set.of());
+
+        assertEquals(1, result.size(), "Candidate open to everyone should match a MALE seeker");
+    }
+
+    @Test
+    @DisplayName("Both seeker and candidate open to everyone match each other")
+    void interestedInEveryone_mutualMatchWhenBothAreOpen() {
+        User seekerAll = createUser("SeekerAll", Gender.OTHER, EnumSet.allOf(Gender.class), 30, 32.09, 34.79);
+
+        User candidateAll = createUser("CandidateAll", Gender.MALE, EnumSet.allOf(Gender.class), 28, 32.09, 34.79);
+
+        List<User> result = finder.findCandidates(seekerAll, List.of(candidateAll), Set.of());
+
+        assertEquals(1, result.size(), "When both users are open to everyone, they should mutually match");
+    }
+
     private User createUser(String name, Gender gender, Set<Gender> interestedIn, int age, double lat, double lon) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Bio");
