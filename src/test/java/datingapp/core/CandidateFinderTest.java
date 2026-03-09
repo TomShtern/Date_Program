@@ -200,15 +200,16 @@ class CandidateFinderTest {
 
         List<User> result = finder.findCandidates(everyoneSeeker, List.of(maleCand, femaleCand, otherCand), Set.of());
 
-        // All three should be returned — gender preference is fully open on the seeker side.
+        // All three should be returned — gender preference is fully open on the seeker
+        // side.
         assertEquals(3, result.size(), "Seeker open to everyone should match all three genders");
     }
 
     @Test
     @DisplayName("Candidate open to everyone matches any seeker gender")
     void interestedInEveryone_candidateMatchesAnySeeker() {
-        // MAlE seeker who only likes FEMALE.
-        // The candidate (FEMALE, open to everyone) should still appear because
+        // MALE seeker who only likes FEMALE. // The candidate (FEMALE, open to
+        // everyone) should still appear because
         // the candidate's side of the bidirectional check passes for MALE seekers.
         User maleSeeker = createUser("MaleSeeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
 
