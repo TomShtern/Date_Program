@@ -37,10 +37,10 @@ class RelationshipHandlerTest {
     @BeforeEach
     void setUp() {
         userStorage = new TestStorages.Users();
-        interactionStorage = new TestStorages.Interactions();
         trustSafetyStorage = new TestStorages.TrustSafety();
         analyticsStorage = new TestStorages.Analytics();
         communicationStorage = new TestStorages.Communications();
+        interactionStorage = new TestStorages.Interactions(communicationStorage);
 
         session = AppSession.getInstance();
         session.reset();

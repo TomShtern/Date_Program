@@ -9,6 +9,7 @@ import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.UpdateDiscoveryPreferencesCommand;
+import datingapp.app.usecase.profile.ProfileUseCases.UpsertProfileNoteCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.metrics.ActivityMetricsService;
@@ -79,6 +80,34 @@ class ProfileUseCasesTest {
         assertTrue(result.success());
         assertTrue(result.data().activated());
         assertEquals(User.UserState.ACTIVE, result.data().user().getState());
+    }
+
+    @Test
+    @DisplayName("saveProfile should sanitize name and bio before persisting")
+    void saveProfileSanitizesNameAndBio() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "<b>Alice</b>");
+        user.setBio("<script>alert('xss')</script>Bio");
+
+        var result = useCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
+
+        assertTrue(result.success());
+        assertEquals("Alice", result.data().user().getName());
+        assertEquals("Bio", result.data().user().getBio());
+    }
+
+    @Test
+    @DisplayName("upsertProfileNote should sanitize note content")
+    void upsertProfileNoteSanitizesContent() {
+        User author = TestUserFactory.createActiveUser(UUID.randomUUID(), "Author");
+        User subject = TestUserFactory.createActiveUser(UUID.randomUUID(), "Subject");
+        userStorage.save(author);
+        userStorage.save(subject);
+
+        var result = useCases.upsertProfileNote(new UpsertProfileNoteCommand(
+                UserContext.cli(author.getId()), subject.getId(), "<img src=x onerror=alert('xss')>Keep"));
+
+        assertTrue(result.success());
+        assertEquals("Keep", result.data().content());
     }
 
     @Test

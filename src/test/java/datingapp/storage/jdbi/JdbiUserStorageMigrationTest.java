@@ -1,6 +1,7 @@
 package datingapp.storage.jdbi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import datingapp.core.AppClock;
 import datingapp.core.model.User;
@@ -63,8 +64,8 @@ class JdbiUserStorageMigrationTest {
     }
 
     @Test
-    @DisplayName("save dual-writes normalized tables and reads prefer normalized values")
-    void saveDualWritesAndReadPrefersNormalizedValues() {
+    @DisplayName("save writes normalized tables and users table no longer exposes legacy serialized columns")
+    void saveWritesNormalizedTablesAndDropsLegacyColumns() {
         User user = createUser();
         storage.save(user);
 
@@ -72,49 +73,28 @@ class JdbiUserStorageMigrationTest {
         assertEquals(Set.of("MUSIC", "TRAVEL"), storage.loadUserInterests(userId));
         assertEquals(Set.of("FEMALE"), storage.loadUserInterestedIn(userId));
 
-        jdbi.useHandle(handle -> {
-            handle.execute(
-                    "UPDATE users SET photo_urls = ?, interests = ?, interested_in = ?, db_smoking = ? WHERE id = ?",
-                    "[\"legacy-photo.png\"]",
-                    "[\"COOKING\"]",
-                    "[\"MALE\"]",
-                    "SOMETIMES",
-                    userId);
-        });
-
         User loaded = storage.get(userId).orElseThrow();
         assertEquals(user.getPhotoUrls(), loaded.getPhotoUrls());
         assertEquals(EnumSet.of(Interest.MUSIC, Interest.TRAVEL), loaded.getInterests());
         assertEquals(EnumSet.of(Gender.FEMALE), loaded.getInterestedIn());
         assertEquals(Set.of(Lifestyle.Smoking.NEVER), loaded.getDealbreakers().acceptableSmoking());
-    }
-
-    @Test
-    @DisplayName("read falls back to legacy columns when normalized rows are absent")
-    void readFallsBackToLegacyWhenNormalizedRowsAbsent() {
-        User user = createUser();
-        storage.save(user);
 
         jdbi.useHandle(handle -> {
-            handle.execute("DELETE FROM user_photos WHERE user_id = ?", userId);
-            handle.execute("DELETE FROM user_interests WHERE user_id = ?", userId);
-            handle.execute("DELETE FROM user_interested_in WHERE user_id = ?", userId);
-            handle.execute("DELETE FROM user_db_smoking WHERE user_id = ?", userId);
-            handle.execute(
-                    "UPDATE users SET photo_urls = ?, interests = ?, interested_in = ?, db_smoking = ? WHERE id = ?",
-                    "[\"fallback-photo.png\"]",
-                    "[\"COOKING\"]",
-                    "[\"MALE\"]",
-                    "SOMETIMES",
-                    userId);
-        });
+            var columns = handle.createQuery("""
+                            SELECT column_name
+                            FROM information_schema.columns
+                            WHERE table_name = 'USERS'
+                            """).mapTo(String.class).list();
 
-        User loaded = storage.get(userId).orElseThrow();
-        assertEquals(List.of("fallback-photo.png"), loaded.getPhotoUrls());
-        assertEquals(EnumSet.of(Interest.COOKING), loaded.getInterests());
-        assertEquals(EnumSet.of(Gender.MALE), loaded.getInterestedIn());
-        assertEquals(
-                Set.of(Lifestyle.Smoking.SOMETIMES), loaded.getDealbreakers().acceptableSmoking());
+            assertFalse(columns.contains("PHOTO_URLS"));
+            assertFalse(columns.contains("INTERESTS"));
+            assertFalse(columns.contains("INTERESTED_IN"));
+            assertFalse(columns.contains("DB_SMOKING"));
+            assertFalse(columns.contains("DB_DRINKING"));
+            assertFalse(columns.contains("DB_WANTS_KIDS"));
+            assertFalse(columns.contains("DB_LOOKING_FOR"));
+            assertFalse(columns.contains("DB_EDUCATION"));
+        });
     }
 
     @Test

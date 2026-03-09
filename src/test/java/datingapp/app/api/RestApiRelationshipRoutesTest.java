@@ -75,8 +75,8 @@ class RestApiRelationshipRoutesTest {
     @DisplayName("friend request routes support request accept and decline")
     void friendRequestRoutesSupportRequestAcceptAndDecline() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
-        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
         ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
 
         UUID userA = UUID.randomUUID();
@@ -143,8 +143,8 @@ class RestApiRelationshipRoutesTest {
     @DisplayName("relationship and moderation routes support graceful exit unmatch block and report")
     void relationshipAndModerationRoutesSupportGracefulExitUnmatchBlockAndReport() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
-        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
         TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
         ServiceRegistry services =
                 createServices(userStorage, interactionStorage, communicationStorage, trustSafetyStorage);

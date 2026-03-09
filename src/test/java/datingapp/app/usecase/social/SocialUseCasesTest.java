@@ -38,8 +38,8 @@ class SocialUseCasesTest {
     void setUp() {
         var config = AppConfig.defaults();
         var userStorage = new TestStorages.Users();
-        interactionStorage = new TestStorages.Interactions();
         communicationStorage = new TestStorages.Communications();
+        interactionStorage = new TestStorages.Interactions(communicationStorage);
         var trustSafetyStorage = new TestStorages.TrustSafety();
 
         userA = TestUserFactory.createActiveUser(UUID.randomUUID(), "UserA");

@@ -1,3 +1,7 @@
+
+> 🚀 **VERIFIED & UPDATED: 2026-03-09**
+> This document has been programmatically verified against the codebase as of this date.
+
 <!--AGENT-DOCSYNC:ON-->
 # ChangeStamp format: SEQ|YYYY-MM-DD HH:MM:SS|agent:<id>|scope:<tag>|summary|files
 # SEQ: file-local increasing int. If collision after 3 retries append "<SEQ>:CONFLICT".
@@ -20,10 +24,10 @@ Guidance for AI coding agents working in this repository.
 - Java 25 + JavaFX 25
 - Maven
 
-## Verified Source Snapshot (2026-03-07)
+## Verified Source Snapshot (2026-03-09)
 
-- Java files: **116 main + 88 test = 204 total**
-- Java LOC (`tokei`): **56,484 total / 43,329 code / 8,502 blank / 4,653 comments**
+- Java files: **231 total**
+- Java LOC (`tokei`): **63,974 total / 50,038 code / 9,358 blank / 4,578 comments**
 
 ## Architecture (code-verified)
 

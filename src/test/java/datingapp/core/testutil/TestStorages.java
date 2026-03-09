@@ -169,6 +169,15 @@ public final class TestStorages {
     public static class Interactions implements InteractionStorage {
         private final Map<UUID, Like> likes = new HashMap<>();
         private final Map<String, Match> matches = new HashMap<>();
+        private final CommunicationStorage communicationStorage;
+
+        public Interactions() {
+            this(null);
+        }
+
+        public Interactions(CommunicationStorage communicationStorage) {
+            this.communicationStorage = communicationStorage;
+        }
 
         @Override
         public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
@@ -433,6 +442,40 @@ public final class TestStorages {
             if (matchId != null) {
                 matches.remove(matchId);
             }
+            return true;
+        }
+
+        @Override
+        public boolean supportsAtomicRelationshipTransitions() {
+            return true;
+        }
+
+        @Override
+        public boolean acceptFriendZoneTransition(
+                Match updatedMatch, FriendRequest acceptedRequest, Notification notification) {
+            update(updatedMatch);
+            if (communicationStorage != null) {
+                communicationStorage.updateFriendRequest(acceptedRequest);
+                if (notification != null) {
+                    communicationStorage.saveNotification(notification);
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public boolean gracefulExitTransition(
+                Match updatedMatch, Optional<Conversation> archivedConversation, Notification notification) {
+            update(updatedMatch);
+            if (communicationStorage != null && notification != null) {
+                communicationStorage.saveNotification(notification);
+            }
+            return true;
+        }
+
+        @Override
+        public boolean unmatchTransition(Match updatedMatch, Optional<Conversation> archivedConversation) {
+            update(updatedMatch);
             return true;
         }
 

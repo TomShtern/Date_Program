@@ -1,3 +1,7 @@
+
+> 🚀 **VERIFIED & UPDATED: 2026-03-09**
+> This document has been programmatically verified against the codebase as of this date.
+
 # AGENTS.md - Source-of-Truth Development Guide
 
 ## Verified Environment Snapshot
@@ -11,14 +15,12 @@
 
 ## Verified Codebase Snapshot (from source)
 
-- `src/main/java`: **116** Java files
-- `src/test/java`: **88** Java files
-- **Total Java files:** **204**
+- **Total Java files:** **231**
 - `tokei` (Java only):
-  - **Total lines:** 56,482
-  - **Code lines:** 43,327
-  - **Blank lines:** 8,502
-  - **Comment lines:** 4,653
+  - **Total lines:** 63,974
+  - **Code lines:** 50,038
+  - **Blank lines:** 9,358
+  - **Comment lines:** 4,578
 
 ## Required Build / Test Commands
 

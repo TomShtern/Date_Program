@@ -5,7 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.connection.*;
+import datingapp.core.connection.ConnectionModels;
+import datingapp.core.connection.ConnectionService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
@@ -33,8 +34,8 @@ class RelationshipTransitionServiceTest {
     @SuppressWarnings("unused") // JUnit 5 invokes via reflection
     @BeforeEach
     void setUp() {
-        interactionStorage = new TestStorages.Interactions();
         communicationStorage = new TestStorages.Communications();
+        interactionStorage = new TestStorages.Interactions(communicationStorage);
         service = new ConnectionService(
                 AppConfig.defaults(), communicationStorage, interactionStorage, new TestStorages.Users());
 

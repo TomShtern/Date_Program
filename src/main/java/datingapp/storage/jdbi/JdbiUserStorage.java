@@ -1,8 +1,5 @@
 package datingapp.storage.jdbi;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
@@ -44,9 +41,6 @@ import org.slf4j.LoggerFactory;
 public final class JdbiUserStorage implements UserStorage {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JdbiUserStorage.class);
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
     private static final String USER_ID_BIND = "userId";
     private static final String USER_DB_SMOKING = "user_db_smoking";
     private static final String USER_DB_DRINKING = "user_db_drinking";
@@ -67,9 +61,6 @@ public final class JdbiUserStorage implements UserStorage {
         Objects.requireNonNull(user, "user cannot be null");
         jdbi.useTransaction(handle -> {
             handle.attach(Dao.class).save(new UserSqlBindings(user));
-            // Follow-up marker: remove dual-write compatibility once every supported deployment has
-            // completed V4 backfill validation and legacy serialized user columns are retired in a
-            // dedicated cleanup migration.
             saveNormalizedProfileData(handle, user);
         });
     }
@@ -365,71 +356,38 @@ public final class JdbiUserStorage implements UserStorage {
 
     private User applyNormalizedProfileData(User user) {
         UUID userId = user.getId();
-
-        // Follow-up marker: remove these normalized-first / legacy-fallback compatibility reads
-        // after the rollout window closes and the legacy serialized columns are dropped.
-        List<String> normalizedPhotos = loadUserPhotos(userId);
-        if (!normalizedPhotos.isEmpty()) {
-            user.setPhotoUrls(normalizedPhotos);
-        }
-
-        Set<Interest> normalizedInterests = parseEnumNames(loadUserInterests(userId), Interest.class);
-        if (!normalizedInterests.isEmpty()) {
-            user.setInterests(EnumSet.copyOf(normalizedInterests));
-        }
-
-        Set<Gender> normalizedInterestedIn = parseEnumNames(loadUserInterestedIn(userId), Gender.class);
-        if (!normalizedInterestedIn.isEmpty()) {
-            user.setInterestedIn(EnumSet.copyOf(normalizedInterestedIn));
-        }
+        user.setPhotoUrls(loadUserPhotos(userId));
+        user.setInterests(parseEnumNames(loadUserInterests(userId), Interest.class));
+        user.setInterestedIn(parseEnumNames(loadUserInterestedIn(userId), Gender.class));
 
         Dealbreakers existing = user.getDealbreakers();
         Dealbreakers.Builder builder = (existing != null ? existing : Dealbreakers.none()).toBuilder();
-        boolean normalizedDealbreakersPresent = false;
 
         Set<Lifestyle.Smoking> smoking =
                 parseEnumNames(loadDealbreaker(userId, USER_DB_SMOKING), Lifestyle.Smoking.class);
-        if (!smoking.isEmpty()) {
-            builder.clearSmoking();
-            builder.acceptSmoking(smoking.toArray(Lifestyle.Smoking[]::new));
-            normalizedDealbreakersPresent = true;
-        }
+        builder.clearSmoking();
+        builder.acceptSmoking(smoking.toArray(Lifestyle.Smoking[]::new));
 
         Set<Lifestyle.Drinking> drinking =
                 parseEnumNames(loadDealbreaker(userId, USER_DB_DRINKING), Lifestyle.Drinking.class);
-        if (!drinking.isEmpty()) {
-            builder.clearDrinking();
-            builder.acceptDrinking(drinking.toArray(Lifestyle.Drinking[]::new));
-            normalizedDealbreakersPresent = true;
-        }
+        builder.clearDrinking();
+        builder.acceptDrinking(drinking.toArray(Lifestyle.Drinking[]::new));
 
         Set<Lifestyle.WantsKids> kids =
                 parseEnumNames(loadDealbreaker(userId, USER_DB_WANTS_KIDS), Lifestyle.WantsKids.class);
-        if (!kids.isEmpty()) {
-            builder.clearKids();
-            builder.acceptKidsStance(kids.toArray(Lifestyle.WantsKids[]::new));
-            normalizedDealbreakersPresent = true;
-        }
+        builder.clearKids();
+        builder.acceptKidsStance(kids.toArray(Lifestyle.WantsKids[]::new));
 
         Set<Lifestyle.LookingFor> lookingFor =
                 parseEnumNames(loadDealbreaker(userId, USER_DB_LOOKING_FOR), Lifestyle.LookingFor.class);
-        if (!lookingFor.isEmpty()) {
-            builder.clearLookingFor();
-            builder.acceptLookingFor(lookingFor.toArray(Lifestyle.LookingFor[]::new));
-            normalizedDealbreakersPresent = true;
-        }
+        builder.clearLookingFor();
+        builder.acceptLookingFor(lookingFor.toArray(Lifestyle.LookingFor[]::new));
 
         Set<Lifestyle.Education> education =
                 parseEnumNames(loadDealbreaker(userId, USER_DB_EDUCATION), Lifestyle.Education.class);
-        if (!education.isEmpty()) {
-            builder.clearEducation();
-            builder.requireEducation(education.toArray(Lifestyle.Education[]::new));
-            normalizedDealbreakersPresent = true;
-        }
-
-        if (normalizedDealbreakersPresent) {
-            user.setDealbreakers(builder.build());
-        }
+        builder.clearEducation();
+        builder.requireEducation(education.toArray(Lifestyle.Education[]::new));
+        user.setDealbreakers(builder.build());
 
         return user;
     }
@@ -492,25 +450,22 @@ public final class JdbiUserStorage implements UserStorage {
 
         @SqlUpdate("""
                 MERGE INTO users (
-                    id, name, bio, birth_date, gender, interested_in, lat, lon,
-                    has_location_set, max_distance_km, min_age, max_age, photo_urls, state, created_at,
+                    id, name, bio, birth_date, gender, lat, lon,
+                    has_location_set, max_distance_km, min_age, max_age, state, created_at,
                     updated_at, smoking, drinking, wants_kids, looking_for, education,
-                    height_cm, db_smoking, db_drinking, db_wants_kids, db_looking_for,
-                    db_education, db_min_height_cm, db_max_height_cm, db_max_age_diff,
-                    interests, email, phone, is_verified, verification_method,
+                    height_cm, db_min_height_cm, db_max_height_cm, db_max_age_diff,
+                    email, phone, is_verified, verification_method,
                     verification_code, verification_sent_at, verified_at,
                     pace_messaging_frequency, pace_time_to_first_date,
                     pace_communication_style, pace_depth_preference, deleted_at
                 ) KEY (id) VALUES (
-                    :id, :name, :bio, :birthDate, :gender, :interestedInCsv,
-                    :lat, :lon, :hasLocationSet, :maxDistanceKm, :minAge, :maxAge, :photoUrlsCsv,
+                    :id, :name, :bio, :birthDate, :gender,
+                    :lat, :lon, :hasLocationSet, :maxDistanceKm, :minAge, :maxAge,
                     :state, :createdAt, :updatedAt,
                     :smoking, :drinking, :wantsKids, :lookingFor,
                     :education, :heightCm,
-                    :dealbreakerSmokingCsv, :dealbreakerDrinkingCsv, :dealbreakerWantsKidsCsv,
-                    :dealbreakerLookingForCsv, :dealbreakerEducationCsv,
                     :dealbreakerMinHeightCm, :dealbreakerMaxHeightCm, :dealbreakerMaxAgeDiff,
-                    :interestsCsv, :email, :phone, :verified, :verificationMethod,
+                    :email, :phone, :verified, :verificationMethod,
                     :verificationCode, :verificationSentAt, :verifiedAt,
                     :paceMessagingFrequency, :paceTimeToFirstDate,
                     :paceCommunicationStyle, :paceDepthPreference, :deletedAt
@@ -569,8 +524,6 @@ public final class JdbiUserStorage implements UserStorage {
     /** Row mapper for User entity. */
     public static class Mapper implements RowMapper<User> {
 
-        private static final Logger logger = LoggerFactory.getLogger(Mapper.class);
-
         @Override
         public User map(ResultSet rs, StatementContext ctx) throws SQLException {
             Double lat = JdbiTypeCodecs.SqlRowReaders.readDouble(rs, "lat");
@@ -584,15 +537,12 @@ public final class JdbiUserStorage implements UserStorage {
                     .bio(rs.getString("bio"))
                     .birthDate(JdbiTypeCodecs.SqlRowReaders.readLocalDate(rs, "birth_date"))
                     .gender(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "gender", Gender.class))
-                    .interestedIn(readGenderSet(rs, "interested_in"))
                     .location(lat != null ? lat : 0.0, lon != null ? lon : 0.0)
                     .hasLocationSet(hasLocationSet)
                     .maxDistanceKm(rs.getInt("max_distance_km"))
                     .ageRange(rs.getInt("min_age"), rs.getInt("max_age"))
-                    .photoUrls(readPhotoUrls(rs, "photo_urls"))
                     .state(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "state", UserState.class))
                     .updatedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "updated_at"))
-                    .interests(readInterestSet(rs, "interests"))
                     .smoking(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "smoking", Lifestyle.Smoking.class))
                     .drinking(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "drinking", Lifestyle.Drinking.class))
                     .wantsKids(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "wants_kids", Lifestyle.WantsKids.class))
@@ -617,49 +567,6 @@ public final class JdbiUserStorage implements UserStorage {
             }
 
             return user;
-        }
-
-        private Set<Gender> readGenderSet(ResultSet rs, String column) throws SQLException {
-            return readEnumSet(rs, column, Gender.class);
-        }
-
-        private List<String> readPhotoUrls(ResultSet rs, String column) throws SQLException {
-            String raw = rs.getString(column);
-            if (raw == null) {
-                return new ArrayList<>();
-            }
-
-            String trimmedRaw = raw.trim();
-            if (trimmedRaw.isEmpty()) {
-                return new ArrayList<>();
-            }
-
-            List<String> parsed = parsePhotoUrlsJson(trimmedRaw).orElseGet(() -> List.of(trimmedRaw.split("\\|")));
-
-            return parsed.stream()
-                    .filter(Objects::nonNull)
-                    .map(String::trim)
-                    .filter(url -> !url.isBlank())
-                    .collect(Collectors.toCollection(ArrayList::new));
-        }
-
-        private Optional<List<String>> parsePhotoUrlsJson(String raw) {
-            if (!raw.startsWith("[") || !raw.endsWith("]")) {
-                return Optional.empty();
-            }
-
-            try {
-                return Optional.of(OBJECT_MAPPER.readValue(raw, STRING_LIST_TYPE));
-            } catch (JsonProcessingException _) {
-                if (logger.isWarnEnabled()) {
-                    logger.warn("Invalid JSON in photo_urls column; falling back to legacy parsing");
-                }
-                return Optional.empty();
-            }
-        }
-
-        private Set<Interest> readInterestSet(ResultSet rs, String column) throws SQLException {
-            return readEnumSet(rs, column, Interest.class);
         }
 
         private PacePreferences readPacePreferences(ResultSet rs) throws SQLException {
@@ -687,69 +594,8 @@ public final class JdbiUserStorage implements UserStorage {
             Integer dbMaxHeight = JdbiTypeCodecs.SqlRowReaders.readInteger(rs, "db_max_height_cm");
             Integer dbMaxAgeDiff = JdbiTypeCodecs.SqlRowReaders.readInteger(rs, "db_max_age_diff");
 
-            Set<Lifestyle.Smoking> dbSmoking = readEnumSet(rs, "db_smoking", Lifestyle.Smoking.class);
-            Set<Lifestyle.Drinking> dbDrinking = readEnumSet(rs, "db_drinking", Lifestyle.Drinking.class);
-            Set<Lifestyle.WantsKids> dbKids = readEnumSet(rs, "db_wants_kids", Lifestyle.WantsKids.class);
-            Set<Lifestyle.LookingFor> dbLookingFor = readEnumSet(rs, "db_looking_for", Lifestyle.LookingFor.class);
-            Set<Lifestyle.Education> dbEducation = readEnumSet(rs, "db_education", Lifestyle.Education.class);
-
             return new Dealbreakers(
-                    dbSmoking, dbDrinking, dbKids, dbLookingFor, dbEducation, dbMinHeight, dbMaxHeight, dbMaxAgeDiff);
-        }
-
-        private <E extends Enum<E>> Set<E> readEnumSet(ResultSet rs, String column, Class<E> enumClass)
-                throws SQLException {
-            String serialized = rs.getString(column);
-            if (serialized == null || serialized.isBlank()) {
-                return EnumSet.noneOf(enumClass);
-            }
-            Set<E> result = EnumSet.noneOf(enumClass);
-            for (String token : parseMultiValueTokens(serialized)) {
-                String trimmed = token.trim();
-                if (!trimmed.isEmpty()) {
-                    try {
-                        result.add(Enum.valueOf(enumClass, trimmed));
-                    } catch (IllegalArgumentException e) {
-                        if (logger.isDebugEnabled()) {
-                            logger.debug(
-                                    "Skipping invalid {} value '{}' from database",
-                                    enumClass.getSimpleName(),
-                                    trimmed,
-                                    e);
-                        }
-                    }
-                }
-            }
-            return result;
-        }
-
-        private List<String> parseMultiValueTokens(String serialized) {
-            if (serialized == null || serialized.isBlank()) {
-                return List.of();
-            }
-
-            String trimmed = serialized.trim();
-            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-                try {
-                    return OBJECT_MAPPER.readValue(trimmed, STRING_LIST_TYPE).stream()
-                            .filter(Objects::nonNull)
-                            .map(String::trim)
-                            .filter(token -> !token.isBlank())
-                            .toList();
-                } catch (JsonProcessingException _) {
-                    if (logger.isWarnEnabled()) {
-                        logger.warn("Invalid JSON enum set in column; falling back to CSV parser");
-                    }
-                }
-            }
-
-            List<String> tokens = new ArrayList<>();
-            for (String token : trimmed.split(",")) {
-                if (token != null && !token.isBlank()) {
-                    tokens.add(token.trim());
-                }
-            }
-            return tokens;
+                    Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), dbMinHeight, dbMaxHeight, dbMaxAgeDiff);
         }
     }
 
@@ -800,10 +646,6 @@ public final class JdbiUserStorage implements UserStorage {
             return user.getGender() != null ? user.getGender().name() : null;
         }
 
-        public String getInterestedInCsv() {
-            return serializeEnumSet(user.getInterestedIn());
-        }
-
         public double getLat() {
             return user.getLat();
         }
@@ -826,27 +668,6 @@ public final class JdbiUserStorage implements UserStorage {
 
         public int getMaxAge() {
             return user.getMaxAge();
-        }
-
-        public String getPhotoUrlsCsv() {
-            if (user.getPhotoUrls() == null || user.getPhotoUrls().isEmpty()) {
-                return null;
-            }
-
-            List<String> normalized = user.getPhotoUrls().stream()
-                    .filter(Objects::nonNull)
-                    .map(String::trim)
-                    .filter(url -> !url.isBlank())
-                    .toList();
-            if (normalized.isEmpty()) {
-                return null;
-            }
-
-            try {
-                return OBJECT_MAPPER.writeValueAsString(normalized);
-            } catch (JsonProcessingException e) {
-                throw new IllegalStateException("Failed to serialize photo URLs to JSON", e);
-            }
         }
 
         public String getState() {
@@ -885,10 +706,6 @@ public final class JdbiUserStorage implements UserStorage {
             return user.getHeightCm();
         }
 
-        public String getInterestsCsv() {
-            return serializeEnumSet(user.getInterests());
-        }
-
         public String getEmail() {
             return user.getEmail();
         }
@@ -917,41 +734,6 @@ public final class JdbiUserStorage implements UserStorage {
 
         public Instant getVerifiedAt() {
             return user.getVerifiedAt();
-        }
-
-        public String getDealbreakerSmokingCsv() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return serializeEnumSet(dealbreakers.acceptableSmoking());
-        }
-
-        public String getDealbreakerDrinkingCsv() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return serializeEnumSet(dealbreakers.acceptableDrinking());
-        }
-
-        public String getDealbreakerWantsKidsCsv() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return serializeEnumSet(dealbreakers.acceptableKidsStance());
-        }
-
-        public String getDealbreakerLookingForCsv() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return serializeEnumSet(dealbreakers.acceptableLookingFor());
-        }
-
-        public String getDealbreakerEducationCsv() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return serializeEnumSet(dealbreakers.acceptableEducation());
         }
 
         public Integer getDealbreakerMinHeightCm() {
@@ -1001,19 +783,6 @@ public final class JdbiUserStorage implements UserStorage {
 
         public Instant getDeletedAt() {
             return user.getDeletedAt();
-        }
-
-        private String serializeEnumSet(Set<? extends Enum<?>> values) {
-            if (values == null || values.isEmpty()) {
-                return null;
-            }
-
-            List<String> enumNames = values.stream().map(Enum::name).toList();
-            try {
-                return OBJECT_MAPPER.writeValueAsString(enumNames);
-            } catch (JsonProcessingException e) {
-                throw new IllegalStateException("Failed to serialize enum set", e);
-            }
         }
     }
 }

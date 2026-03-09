@@ -68,7 +68,11 @@ public final class MigrationRunner {
             new VersionedMigration(
                     2,
                     "Add daily_picks cache table (no-op on fresh databases where V1 already includes it)",
-                    MigrationRunner::applyV2));
+                    MigrationRunner::applyV2),
+            new VersionedMigration(
+                    3,
+                    "Drop legacy serialized users-table columns after normalized profile rollout",
+                    MigrationRunner::applyV3));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -133,6 +137,21 @@ public final class MigrationRunner {
                 )
                 """);
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_daily_picks_pick_date ON daily_picks(pick_date)");
+    }
+
+    /**
+     * V3 migration: retires legacy serialized profile columns now that normalized
+     * tables are the single source of truth.
+     */
+    private static void applyV3(Statement stmt) throws SQLException {
+        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS photo_urls");
+        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS interests");
+        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS interested_in");
+        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_smoking");
+        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_drinking");
+        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_wants_kids");
+        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_looking_for");
+        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_education");
     }
 
     // ═══════════════════════════════════════════════════════════════

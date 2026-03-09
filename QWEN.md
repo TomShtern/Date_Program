@@ -1,3 +1,7 @@
+
+> 🚀 **VERIFIED & UPDATED: 2026-03-09**
+> This document has been programmatically verified against the codebase as of this date.
+
 # Dating App - Qwen Code Context
 
 **Java 25** (preview) | **JavaFX 25** | **Maven** | **H2 + JDBI**
@@ -13,8 +17,8 @@
   - `ui/DatingApp.java` (JavaFX)
   - `app/api/RestApiServer.java` (REST)
 - Bootstrap: `ApplicationStartup.initialize()`
-- Java files: `116` main + `88` test = `204`
-- Java LOC (`tokei`): `56,482 total / 43,327 code`
+- Java files: `231` total
+- Java LOC (`tokei`): `63,974 total / 50,038 code`
 
 ---
 

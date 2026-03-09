@@ -15,6 +15,7 @@ import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.SanitizerUtils;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
@@ -46,6 +47,7 @@ public class ProfileUseCases {
     private final AppEventBus eventBus;
 
     /** Backward-compatible constructor — uses default activation policy, no event bus. */
+    @SuppressWarnings("java:S107")
     public ProfileUseCases(
             UserStorage userStorage,
             ProfileService profileService,
@@ -149,6 +151,7 @@ public class ProfileUseCases {
         }
 
         User user = command.user();
+        sanitizeProfileText(user);
         var activation = activationPolicy.tryActivate(user);
         boolean activated = activation.activated();
         try {
@@ -336,11 +339,12 @@ public class ProfileUseCases {
         }
 
         try {
+            String sanitizedContent = SanitizerUtils.sanitize(command.content());
             ProfileNote note = userStorage
                     .getProfileNote(command.context().userId(), command.subjectId())
-                    .map(existing -> existing.withContent(command.content()))
+                    .map(existing -> existing.withContent(sanitizedContent))
                     .orElseGet(() ->
-                            ProfileNote.create(command.context().userId(), command.subjectId(), command.content()));
+                            ProfileNote.create(command.context().userId(), command.subjectId(), sanitizedContent));
             userStorage.saveProfileNote(note);
             return UseCaseResult.success(note);
         } catch (IllegalArgumentException | NullPointerException e) {
@@ -395,6 +399,11 @@ public class ProfileUseCases {
     public static record UpsertProfileNoteCommand(UserContext context, UUID subjectId, String content) {}
 
     public static record DeleteProfileNoteCommand(UserContext context, UUID subjectId) {}
+
+    private static void sanitizeProfileText(User user) {
+        user.setName(SanitizerUtils.sanitize(user.getName()));
+        user.setBio(SanitizerUtils.sanitize(user.getBio()));
+    }
 
     private List<UserAchievement> unlockAchievements(UUID userId) {
         if (achievementService != null) {

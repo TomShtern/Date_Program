@@ -9,6 +9,7 @@ import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
+import datingapp.core.profile.SanitizerUtils;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
@@ -32,6 +33,7 @@ public class ConnectionService {
     private static final String NO_ACTIVE_MATCH = "Cannot message: no active match";
     private static final String EMPTY_MESSAGE = "Message cannot be empty";
     private static final String MESSAGE_TOO_LONG = "Message too long (max %d characters)";
+    private static final String ATOMIC_TRANSITIONS_REQUIRED = "Relationship transition requires atomic storage support";
 
     private final AppConfig config;
     private final CommunicationStorage communicationStorage;
@@ -79,6 +81,10 @@ public class ConnectionService {
             };
         }
 
+        if (content == null || content.isBlank()) {
+            return SendResult.failure(EMPTY_MESSAGE, SendResult.ErrorCode.EMPTY_MESSAGE);
+        }
+        content = SanitizerUtils.sanitize(content);
         if (content == null || content.isBlank()) {
             return SendResult.failure(EMPTY_MESSAGE, SendResult.ErrorCode.EMPTY_MESSAGE);
         }
@@ -299,34 +305,20 @@ public class ConnectionService {
                 FriendRequest.Status.ACCEPTED,
                 AppClock.now());
 
-        if (interactionStorage.supportsAtomicRelationshipTransitions()) {
-            try {
-                match.transitionToFriends(request.fromUserId());
-                boolean transitioned = interactionStorage.acceptFriendZoneTransition(match, updated, null);
-                if (!transitioned) {
-                    return TransitionResult.failure("Failed to persist friend-zone acceptance.");
-                }
-                return TransitionResult.okWithRequest(updated);
-            } catch (Exception e) {
-                return TransitionResult.failure("Failed to persist friend-zone acceptance: " + e.getMessage());
-            }
+        if (!interactionStorage.supportsAtomicRelationshipTransitions()) {
+            return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
         }
-
-        match.transitionToFriends(request.fromUserId());
-        interactionStorage.update(match);
 
         try {
-            communicationStorage.updateFriendRequest(updated);
+            match.transitionToFriends(request.fromUserId());
+            boolean transitioned = interactionStorage.acceptFriendZoneTransition(match, updated, null);
+            if (!transitioned) {
+                return TransitionResult.failure("Failed to persist friend-zone acceptance.");
+            }
+            return TransitionResult.okWithRequest(updated);
         } catch (Exception e) {
-            // Compensating write: revert match state to keep data consistent.
-            // KNOWN LIMITATION: this revert is itself not atomic; a second failure here
-            // would leave the match in FRIENDS state with a still-pending request.
-            // A proper fix requires cross-storage transaction support.
-            match.revertToActive();
-            interactionStorage.update(match);
-            return TransitionResult.failure("Failed to update friend request status: " + e.getMessage());
+            return TransitionResult.failure("Failed to persist friend-zone acceptance: " + e.getMessage());
         }
-        return TransitionResult.okWithRequest(updated);
     }
 
     public TransitionResult declineFriendZone(UUID requestId, UUID responderId) {
@@ -376,24 +368,19 @@ public class ConnectionService {
             convo.archive(convo.getUserB(), MatchArchiveReason.GRACEFUL_EXIT);
         });
 
-        if (interactionStorage.supportsAtomicRelationshipTransitions()) {
-            try {
-                boolean transitioned = interactionStorage.gracefulExitTransition(match, convoOpt, null);
-                if (!transitioned) {
-                    return TransitionResult.failure("Failed to persist graceful exit transition.");
-                }
-                return TransitionResult.ok();
-            } catch (Exception e) {
-                return TransitionResult.failure("Failed to persist graceful exit transition: " + e.getMessage());
-            }
+        if (!interactionStorage.supportsAtomicRelationshipTransitions()) {
+            return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
         }
 
-        interactionStorage.update(match);
-        convoOpt.ifPresent(convo -> {
-            communicationStorage.archiveConversation(convo.getId(), convo.getUserA(), MatchArchiveReason.GRACEFUL_EXIT);
-            communicationStorage.archiveConversation(convo.getId(), convo.getUserB(), MatchArchiveReason.GRACEFUL_EXIT);
-        });
-        return TransitionResult.ok();
+        try {
+            boolean transitioned = interactionStorage.gracefulExitTransition(match, convoOpt, null);
+            if (!transitioned) {
+                return TransitionResult.failure("Failed to persist graceful exit transition.");
+            }
+            return TransitionResult.ok();
+        } catch (Exception e) {
+            return TransitionResult.failure("Failed to persist graceful exit transition: " + e.getMessage());
+        }
     }
 
     /**
@@ -428,25 +415,19 @@ public class ConnectionService {
             convo.archive(convo.getUserB(), MatchArchiveReason.UNMATCH);
         });
 
-        if (interactionStorage.supportsAtomicRelationshipTransitions()) {
-            try {
-                boolean transitioned = interactionStorage.unmatchTransition(match, convoOpt);
-                if (!transitioned) {
-                    return TransitionResult.failure("Failed to persist unmatch transition.");
-                }
-                return TransitionResult.ok();
-            } catch (Exception e) {
-                return TransitionResult.failure("Failed to persist unmatch transition: " + e.getMessage());
-            }
+        if (!interactionStorage.supportsAtomicRelationshipTransitions()) {
+            return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
         }
 
-        interactionStorage.update(match);
-        convoOpt.ifPresent(convo -> {
-            communicationStorage.archiveConversation(convo.getId(), convo.getUserA(), MatchArchiveReason.UNMATCH);
-            communicationStorage.archiveConversation(convo.getId(), convo.getUserB(), MatchArchiveReason.UNMATCH);
-        });
-
-        return TransitionResult.ok();
+        try {
+            boolean transitioned = interactionStorage.unmatchTransition(match, convoOpt);
+            if (!transitioned) {
+                return TransitionResult.failure("Failed to persist unmatch transition.");
+            }
+            return TransitionResult.ok();
+        } catch (Exception e) {
+            return TransitionResult.failure("Failed to persist unmatch transition: " + e.getMessage());
+        }
     }
 
     public List<FriendRequest> getPendingRequestsFor(UUID userId) {

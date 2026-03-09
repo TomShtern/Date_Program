@@ -32,8 +32,8 @@ class MessagingUseCasesTest {
     void setUp() {
         var config = AppConfig.defaults();
         userStorage = new TestStorages.Users();
-        interactionStorage = new TestStorages.Interactions();
         var communicationStorage = new TestStorages.Communications();
+        interactionStorage = new TestStorages.Interactions(communicationStorage);
 
         sender = TestUserFactory.createActiveUser(UUID.randomUUID(), "Sender");
         recipient = TestUserFactory.createActiveUser(UUID.randomUUID(), "Recipient");
@@ -59,6 +59,16 @@ class MessagingUseCasesTest {
         assertNotNull(result.data());
         assertTrue(result.data().success());
         assertNotNull(result.data().message());
+    }
+
+    @Test
+    @DisplayName("sendMessage should sanitize HTML payloads before persisting")
+    void sendMessageSanitizesHtmlPayloads() {
+        var result = useCases.sendMessage(new SendMessageCommand(
+                UserContext.cli(sender.getId()), recipient.getId(), "<script>alert('xss')</script>Hello"));
+
+        assertTrue(result.success());
+        assertEquals("Hello", result.data().message().content());
     }
 
     @Test
