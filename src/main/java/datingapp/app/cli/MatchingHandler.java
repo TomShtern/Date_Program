@@ -72,6 +72,7 @@ public class MatchingHandler implements LoggingSupport {
     private final Runnable profileCompleteCallback; // nullable; invoked when location is missing
     private final MatchingUseCases matchingUseCases;
     private final SocialUseCases socialUseCases;
+    private final MatchingCliPresenter presenter;
 
     public MatchingHandler(Dependencies dependencies) {
         this.dailyService = dependencies.dailyService();
@@ -85,6 +86,7 @@ public class MatchingHandler implements LoggingSupport {
         this.profileCompleteCallback = dependencies.profileCompleteCallback();
         this.matchingUseCases = dependencies.matchingUseCases();
         this.socialUseCases = dependencies.socialUseCases();
+        this.presenter = new MatchingCliPresenter();
     }
 
     @Override
@@ -206,7 +208,8 @@ public class MatchingHandler implements LoggingSupport {
         logInfo("\n" + CliTextAndInput.HEADER_BROWSE_CANDIDATES + "\n");
         List<User> candidates = browseData.candidates();
         if (candidates.isEmpty()) {
-            logInfo("😔 No candidates found. Try again later!\n");
+            logInfo(presenter.noCandidatesFound());
+            logInfo("");
             return;
         }
 
@@ -226,11 +229,7 @@ public class MatchingHandler implements LoggingSupport {
         displayCandidateProfile(candidate, currentUser, distance);
 
         String action = readValidatedChoice(
-                CliTextAndInput.PROMPT_LIKE_PASS_QUIT,
-                "❌ Invalid choice. Please enter L (like), P (pass), or Q (quit).",
-                "l",
-                "p",
-                "q");
+                CliTextAndInput.PROMPT_LIKE_PASS_QUIT, presenter.invalidLikePassQuitChoice(), "l", "p", "q");
         if ("q".equals(action)) {
             logInfo(CliTextAndInput.MSG_STOPPING_BROWSE);
             return false;
@@ -266,15 +265,11 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private void displaySwipeResult(MatchingService.SwipeResult result, User candidate) {
-        if (result.matched()) {
-            logInfo("\n🎉🎉🎉 IT'S A MATCH! 🎉🎉🎉");
-            logInfo("You and {} like each other!\n", candidate.getName());
-            // Achievement unlock is handled by AchievementEventHandler via event bus
-        } else if (result.like().direction() == Like.Direction.LIKE) {
-            logInfo("❤️  Liked!\n");
-        } else {
-            logInfo("👋 Passed.\n");
-        }
+        logLines(presenter.swipeResultLines(result, candidate.getName()));
+    }
+
+    private void logLines(List<String> lines) {
+        lines.forEach(this::logInfo);
     }
 
     private String readValidatedChoice(String prompt, String errorMsg, String... valid) {
@@ -628,20 +623,8 @@ public class MatchingHandler implements LoggingSupport {
         RecommendationService.DailyStatus status = dailyService.getStatus(currentUser.getId());
         String timeUntilReset = RecommendationService.formatDuration(dailyService.getTimeUntilReset());
 
-        logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
-        logInfo("         💔 DAILY LIMIT REACHED");
-        logInfo(CliTextAndInput.SEPARATOR_LINE);
-        logInfo("");
-        logInfo("   You've used all {} likes for today!", status.likesUsed());
-        logInfo("");
-        logInfo("   Resets in: {}", timeUntilReset);
-        logInfo("");
-        logInfo("   Tips for tomorrow:");
-        logInfo("   • Take time to read profiles");
-        logInfo("   • Quality over quantity");
-        logInfo("   • Check your matches!");
-        logInfo("");
-        inputReader.readLine("   [Press Enter to return to menu]");
+        logLines(presenter.dailyLimitReachedLines(status, timeUntilReset));
+        inputReader.readLine(presenter.pressEnterPrompt());
         logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
     }
 
@@ -653,13 +636,10 @@ public class MatchingHandler implements LoggingSupport {
         displayDailyPickProfile(pick, currentUser, distance);
 
         String action = readValidatedChoice(
-                CliTextAndInput.PROMPT_LIKE_PASS_SKIP,
-                "❌ Invalid choice. Please enter L (like), P (pass), or S (skip).",
-                "l",
-                "p",
-                "s");
+                CliTextAndInput.PROMPT_LIKE_PASS_SKIP, presenter.invalidLikePassSkipChoice(), "l", "p", "s");
         if ("s".equals(action)) {
-            logInfo("  👋 You can see this pick again later today.\n");
+            logInfo(presenter.dailyPickDeferred());
+            logInfo("");
             return;
         }
         processDailyPickSwipe(pick, currentUser, action);
@@ -667,7 +647,7 @@ public class MatchingHandler implements LoggingSupport {
 
     private void displayDailyPickProfile(DailyPick pick, User currentUser, double distance) {
         logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
-        logInfo("       🎲 YOUR DAILY PICK 🎲");
+        logInfo(presenter.dailyPickHeader());
         logInfo(CliTextAndInput.SEPARATOR_LINE);
         logInfo("");
         logInfo("  ✨ {}", pick.reason());
@@ -687,7 +667,7 @@ public class MatchingHandler implements LoggingSupport {
         }
         logInfo(CliTextAndInput.BOX_BOTTOM);
         logInfo("");
-        logInfo("  This pick resets tomorrow at midnight!");
+        logInfo(presenter.dailyPickResetNotice());
         logInfo("");
     }
 
@@ -699,13 +679,7 @@ public class MatchingHandler implements LoggingSupport {
             showDailyLimitReached(currentUser);
             return;
         }
-        if (result.data().matched()) {
-            logInfo("\n🎉🎉🎉 IT'S A MATCH WITH YOUR DAILY PICK! 🎉🎉🎉\n");
-        } else if (result.data().like().direction() == Like.Direction.LIKE) {
-            logInfo("❤️  Liked your daily pick!\n");
-        } else {
-            logInfo("👋 Passed on daily pick.\n");
-        }
+        logLines(presenter.dailyPickSwipeResultLines(result.data(), candidate.getName()));
         promptUndo(candidate.getName(), currentUser);
     }
 
@@ -842,13 +816,8 @@ public class MatchingHandler implements LoggingSupport {
         matchingUseCases.markStandoutInteracted(
                 new StandoutInteractionCommand(UserContext.cli(currentUser.getId()), candidate.getId()));
 
-        if (likeResult.data().match().isPresent()) {
-            logInfo("\n🎉 IT'S A MATCH with {}! 🎉\n", candidate.getName());
-        } else if (isLike) {
-            logInfo("✅ Liked {}!\n", candidate.getName());
-        } else {
-            logInfo("👋 Passed on {}.\n", candidate.getName());
-        }
+        logLines(presenter.standoutInteractionResultLines(
+                candidate.getName(), likeResult.data().match().isPresent(), isLike));
     }
 
     private String getStandoutEmoji(int rank) {

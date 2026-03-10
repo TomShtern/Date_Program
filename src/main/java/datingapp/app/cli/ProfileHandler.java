@@ -11,6 +11,7 @@ import datingapp.core.EnumSetUtil;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.TextUtil;
+import datingapp.core.i18n.I18n;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
@@ -51,7 +52,6 @@ public class ProfileHandler implements LoggingSupport {
     private static final String INDENTED_BULLET = "    - {}";
     private static final String ERROR_MESSAGE_FORMAT = "❌ {}\n";
     private static final String ERROR_WITH_GAP_FORMAT = "\n❌ {}\n";
-    private static final String PRESS_ENTER_MENU_PROMPT = "  [Press Enter to return to menu]";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final UserStorage userStorage;
@@ -102,7 +102,7 @@ public class ProfileHandler implements LoggingSupport {
     public void completeProfile() {
         CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
-            logInfo("\n--- Complete Profile for {} ---\n", currentUser.getName());
+            logInfo("\n" + I18n.text("cli.profile.complete.header", currentUser.getName()) + "\n");
 
             promptBio(currentUser);
             promptBirthDate(currentUser);
@@ -123,12 +123,12 @@ public class ProfileHandler implements LoggingSupport {
             }
 
             if (saveResult.data().activated()) {
-                logInfo("\n🎉 Profile complete! Status changed to ACTIVE.");
+                logInfo("\n" + I18n.text("cli.profile.complete.activated"));
             } else if (!currentUser.isComplete()) {
-                logInfo("\n⚠️  Profile still incomplete. Missing required fields.");
+                logInfo("\n" + I18n.text("cli.profile.complete.incomplete"));
             }
 
-            logInfo("✅ Profile saved!\n");
+            logInfo(I18n.text("cli.profile.complete.saved") + "\n");
             displayNewAchievements(saveResult.data().newlyUnlocked());
         });
     }
@@ -144,16 +144,16 @@ public class ProfileHandler implements LoggingSupport {
             var previewResult = profileUseCases.generatePreview(currentUser);
             if (!previewResult.success()) {
                 logInfo(ERROR_WITH_GAP_FORMAT, previewResult.error().message());
-                inputReader.readLine(PRESS_ENTER_MENU_PROMPT);
+                inputReader.readLine(I18n.text("cli.common.press_enter_menu"));
                 return;
             }
             ProfileService.ProfilePreview preview = previewResult.data();
 
             logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
-            logInfo("      👤 YOUR PROFILE PREVIEW");
+            logInfo(I18n.text("cli.profile.preview.title"));
             logInfo(CliTextAndInput.SEPARATOR_LINE);
             logInfo("");
-            logInfo("  This is how others see you:");
+            logInfo(I18n.text("cli.profile.preview.subtitle"));
             logInfo("");
 
             // Card display
@@ -176,7 +176,7 @@ public class ProfileHandler implements LoggingSupport {
             // Completeness
             ProfileService.ProfileCompleteness comp = preview.completeness();
             logInfo("");
-            logInfo("  📊 PROFILE COMPLETENESS: {}%", comp.percentage());
+            logInfo(I18n.text("cli.profile.preview.completeness", comp.percentage()));
 
             // Render progress bar when profile has some completeness
             if (comp.percentage() > 0 && logger.isInfoEnabled()) {
@@ -186,19 +186,19 @@ public class ProfileHandler implements LoggingSupport {
 
             if (!comp.missingFields().isEmpty()) {
                 logInfo("");
-                logInfo("  ⚠️  Missing fields:");
+                logInfo(I18n.text("cli.profile.preview.missing"));
                 comp.missingFields().forEach(f -> logInfo("    • {}", f));
             }
 
             // Tips
             if (!preview.improvementTips().isEmpty()) {
                 logInfo("");
-                logInfo("  💡 IMPROVEMENT TIPS:");
+                logInfo(I18n.text("cli.profile.preview.tips"));
                 preview.improvementTips().forEach(tip -> logInfo(INDENTED_LINE, tip));
             }
 
             logInfo("");
-            inputReader.readLine(PRESS_ENTER_MENU_PROMPT);
+            inputReader.readLine(I18n.text("cli.common.press_enter_menu"));
         });
     }
 
@@ -237,7 +237,7 @@ public class ProfileHandler implements LoggingSupport {
      */
     private void displayNewAchievements(List<UserAchievement> newAchievements) {
         if (!newAchievements.isEmpty()) {
-            logInfo("\n🏆 NEW ACHIEVEMENTS UNLOCKED! 🏆");
+            logInfo("\n" + I18n.text("cli.profile.achievements.title"));
             for (UserAchievement ua : newAchievements) {
                 logInfo(
                         "  ✨ {} - {}",
@@ -970,7 +970,7 @@ public class ProfileHandler implements LoggingSupport {
             var completionResult = profileUseCases.calculateCompletion(currentUser);
             if (!completionResult.success()) {
                 logInfo(ERROR_WITH_GAP_FORMAT, completionResult.error().message());
-                inputReader.readLine(PRESS_ENTER_MENU_PROMPT);
+                inputReader.readLine(I18n.text("cli.common.press_enter_menu"));
                 return;
             }
             ProfileService.CompletionResult result = completionResult.data();
@@ -1005,7 +1005,7 @@ public class ProfileHandler implements LoggingSupport {
             }
 
             logInfo("");
-            inputReader.readLine(PRESS_ENTER_MENU_PROMPT);
+            inputReader.readLine(I18n.text("cli.common.press_enter_menu"));
         });
     }
 }

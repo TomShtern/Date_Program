@@ -1,5 +1,6 @@
 package datingapp.ui;
 
+import datingapp.core.i18n.I18n;
 import java.util.ArrayDeque;
 import java.util.Objects;
 import java.util.Queue;
@@ -89,7 +90,7 @@ public final class JavaFxTestSupport {
         Objects.requireNonNull(resourcePath, "resourcePath cannot be null");
         Objects.requireNonNull(controllerSupplier, "controllerSupplier cannot be null");
         return callOnFxAndWait(() -> {
-            FXMLLoader loader = new FXMLLoader(JavaFxTestSupport.class.getResource(resourcePath));
+            FXMLLoader loader = new FXMLLoader(JavaFxTestSupport.class.getResource(resourcePath), I18n.bundle());
             Object controller = controllerSupplier.get();
             loader.setControllerFactory(_ -> controller);
             Parent root = loader.load();

@@ -31,28 +31,20 @@ public record AppConfig(
             int minSharedInterests,
             int maxDistanceKm) {
         public MatchingConfig {
-            if (dailyLikeLimit < -1) {
-                throw new IllegalArgumentException("dailyLikeLimit must be >= -1");
-            }
-            if (dailyPassLimit < -1) {
-                throw new IllegalArgumentException("dailyPassLimit must be >= -1");
-            }
-            requireNonNegative("dailySuperLikeLimit", dailySuperLikeLimit);
-            requireNonNegative("maxSwipesPerSession", maxSwipesPerSession);
-            requireNonNegative("suspiciousSwipeVelocity", suspiciousSwipeVelocity);
-            requireNonNegative("distanceWeight", distanceWeight);
-            requireNonNegative("ageWeight", ageWeight);
-            requireNonNegative("interestWeight", interestWeight);
-            requireNonNegative("lifestyleWeight", lifestyleWeight);
-            requireNonNegative("paceWeight", paceWeight);
-            requireNonNegative("responseWeight", responseWeight);
-            requireNonNegative("minSharedInterests", minSharedInterests);
-            requireNonNegative("maxDistanceKm", maxDistanceKm);
-            double weightSum =
-                    distanceWeight + ageWeight + interestWeight + lifestyleWeight + paceWeight + responseWeight;
-            if (Math.abs(weightSum - 1.0) > 0.01) {
-                throw new IllegalArgumentException("Match-quality weights must sum to 1.0, got: " + weightSum);
-            }
+            AppConfigValidator.validateMatching(
+                    dailyLikeLimit,
+                    dailySuperLikeLimit,
+                    dailyPassLimit,
+                    maxSwipesPerSession,
+                    suspiciousSwipeVelocity,
+                    distanceWeight,
+                    ageWeight,
+                    interestWeight,
+                    lifestyleWeight,
+                    paceWeight,
+                    responseWeight,
+                    minSharedInterests,
+                    maxDistanceKm);
         }
     }
 
@@ -74,24 +66,19 @@ public record AppConfig(
             int maxPhotos,
             int messageMaxPageSize) {
         public ValidationConfig {
-            requireNonNegative("minAge", minAge);
-            requireNonNegative("maxAge", maxAge);
-            if (minAge > maxAge) {
-                throw new IllegalArgumentException("minAge must be <= maxAge");
-            }
-            requireNonNegative("minHeightCm", minHeightCm);
-            requireNonNegative("maxHeightCm", maxHeightCm);
-            if (minHeightCm > maxHeightCm) {
-                throw new IllegalArgumentException("minHeightCm must be <= maxHeightCm");
-            }
-            requireNonNegative("maxBioLength", maxBioLength);
-            requireNonNegative("maxReportDescLength", maxReportDescLength);
-            requireNonNegative("maxNameLength", maxNameLength);
-            requireNonNegative("minAgeRangeSpan", minAgeRangeSpan);
-            requireNonNegative("minDistanceKm", minDistanceKm);
-            requireNonNegative("maxInterests", maxInterests);
-            requireNonNegative("maxPhotos", maxPhotos);
-            requireNonNegative("messageMaxPageSize", messageMaxPageSize);
+            AppConfigValidator.validateValidation(
+                    minAge,
+                    maxAge,
+                    minHeightCm,
+                    maxHeightCm,
+                    maxBioLength,
+                    maxReportDescLength,
+                    maxNameLength,
+                    minAgeRangeSpan,
+                    minDistanceKm,
+                    maxInterests,
+                    maxPhotos,
+                    messageMaxPageSize);
         }
     }
 
@@ -117,22 +104,23 @@ public record AppConfig(
             double standoutCompletenessWeight,
             double standoutActivityWeight) {
         public AlgorithmConfig {
-            requireNonNegative("nearbyDistanceKm", nearbyDistanceKm);
-            requireNonNegative("closeDistanceKm", closeDistanceKm);
-            requireNonNegative("similarAgeDiff", similarAgeDiff);
-            requireNonNegative("compatibleAgeDiff", compatibleAgeDiff);
-            requireNonNegative("paceCompatibilityThreshold", paceCompatibilityThreshold);
-            requireNonNegative("responseTimeExcellentHours", responseTimeExcellentHours);
-            requireNonNegative("responseTimeGreatHours", responseTimeGreatHours);
-            requireNonNegative("responseTimeGoodHours", responseTimeGoodHours);
-            requireNonNegative("responseTimeWeekHours", responseTimeWeekHours);
-            requireNonNegative("responseTimeMonthHours", responseTimeMonthHours);
-            requireNonNegative("standoutDistanceWeight", standoutDistanceWeight);
-            requireNonNegative("standoutAgeWeight", standoutAgeWeight);
-            requireNonNegative("standoutInterestWeight", standoutInterestWeight);
-            requireNonNegative("standoutLifestyleWeight", standoutLifestyleWeight);
-            requireNonNegative("standoutCompletenessWeight", standoutCompletenessWeight);
-            requireNonNegative("standoutActivityWeight", standoutActivityWeight);
+            AppConfigValidator.validateAlgorithm(
+                    nearbyDistanceKm,
+                    closeDistanceKm,
+                    similarAgeDiff,
+                    compatibleAgeDiff,
+                    paceCompatibilityThreshold,
+                    responseTimeExcellentHours,
+                    responseTimeGreatHours,
+                    responseTimeGoodHours,
+                    responseTimeWeekHours,
+                    responseTimeMonthHours,
+                    standoutDistanceWeight,
+                    standoutAgeWeight,
+                    standoutInterestWeight,
+                    standoutLifestyleWeight,
+                    standoutCompletenessWeight,
+                    standoutActivityWeight);
         }
     }
 
@@ -158,22 +146,23 @@ public record AppConfig(
             int cleanupRetentionDays,
             int softDeleteRetentionDays) {
         public SafetyConfig {
-            Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
-            requireNonNegative("autoBanThreshold", autoBanThreshold);
-            requireNonNegative("sessionTimeoutMinutes", sessionTimeoutMinutes);
-            requireNonNegative("undoWindowSeconds", undoWindowSeconds);
-            requireNonNegative("achievementMatchTier1", achievementMatchTier1);
-            requireNonNegative("achievementMatchTier2", achievementMatchTier2);
-            requireNonNegative("achievementMatchTier3", achievementMatchTier3);
-            requireNonNegative("achievementMatchTier4", achievementMatchTier4);
-            requireNonNegative("achievementMatchTier5", achievementMatchTier5);
-            requireNonNegative("minSwipesForBehaviorAchievement", minSwipesForBehaviorAchievement);
-            requireNonNegative("selectiveThreshold", selectiveThreshold);
-            requireNonNegative("openMindedThreshold", openMindedThreshold);
-            requireNonNegative("bioAchievementLength", bioAchievementLength);
-            requireNonNegative("lifestyleFieldTarget", lifestyleFieldTarget);
-            requireNonNegative("cleanupRetentionDays", cleanupRetentionDays);
-            requireNonNegative("softDeleteRetentionDays", softDeleteRetentionDays);
+            AppConfigValidator.validateSafety(
+                    autoBanThreshold,
+                    userTimeZone,
+                    sessionTimeoutMinutes,
+                    undoWindowSeconds,
+                    achievementMatchTier1,
+                    achievementMatchTier2,
+                    achievementMatchTier3,
+                    achievementMatchTier4,
+                    achievementMatchTier5,
+                    minSwipesForBehaviorAchievement,
+                    selectiveThreshold,
+                    openMindedThreshold,
+                    bioAchievementLength,
+                    lifestyleFieldTarget,
+                    cleanupRetentionDays,
+                    softDeleteRetentionDays);
         }
     }
 
@@ -219,22 +208,6 @@ public record AppConfig(
     /** Builder for creating custom {@link AppConfig} instances. */
     public static Builder builder() {
         return new Builder();
-    }
-
-    // ========================================================================
-    // Shared validation helpers (accessible from sub-record compact constructors)
-    // ========================================================================
-
-    private static void requireNonNegative(String name, int value) {
-        if (value < 0) {
-            throw new IllegalArgumentException(name + " must be non-negative");
-        }
-    }
-
-    private static void requireNonNegative(String name, double value) {
-        if (value < 0) {
-            throw new IllegalArgumentException(name + " must be non-negative");
-        }
     }
 
     // ========================================================================

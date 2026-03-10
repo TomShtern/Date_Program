@@ -1,5 +1,6 @@
 package datingapp.ui;
 
+import datingapp.core.i18n.I18n;
 import datingapp.ui.screen.BaseController;
 import datingapp.ui.viewmodel.ViewModelFactory;
 import java.io.IOException;
@@ -229,7 +230,7 @@ public final class NavigationService {
             return false;
         }
 
-        FXMLLoader loader = new FXMLLoader(fxmlUrl);
+        FXMLLoader loader = new FXMLLoader(fxmlUrl, I18n.bundle());
         loader.setControllerFactory(viewModelFactory::createController);
 
         Parent newView;

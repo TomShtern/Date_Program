@@ -1,5 +1,6 @@
 package datingapp.ui.screen;
 
+import datingapp.core.i18n.I18n;
 import datingapp.core.model.User;
 import datingapp.ui.UiAnimations.ConfettiAnimation;
 import java.net.URL;
@@ -49,6 +50,9 @@ public class MilestonePopupController implements Initializable {
     private Label nameLabel;
 
     @FXML
+    private Label titleLabel;
+
+    @FXML
     private Label descriptionLabel;
 
     @FXML
@@ -73,9 +77,11 @@ public class MilestonePopupController implements Initializable {
     private Runnable onMessageCallback;
     private Runnable onContinueCallback;
     private boolean autoDismiss = true;
+    private ResourceBundle resources;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        this.resources = resources != null ? resources : I18n.bundle();
         if (confettiCanvas != null && rootPane != null) {
             confettiCanvas.widthProperty().bind(rootPane.widthProperty());
             confettiCanvas.heightProperty().bind(rootPane.heightProperty());
@@ -88,9 +94,12 @@ public class MilestonePopupController implements Initializable {
         }
 
         achievementIcon.setIconLiteral(iconLiteral);
+        if (titleLabel != null) {
+            titleLabel.setText(localize("ui.achievement.title"));
+        }
         nameLabel.setText(name);
         descriptionLabel.setText(description);
-        xpLabel.setText("+" + xpAmount + " XP");
+        xpLabel.setText(localize("ui.achievement.xp", xpAmount));
 
         logger.info("Showing achievement: {} (+{} XP)", name, xpAmount);
         playAchievementEntranceAnimation();
@@ -103,15 +112,19 @@ public class MilestonePopupController implements Initializable {
     }
 
     public void showAchievement(AchievementType type) {
-        showAchievement(type.iconLiteral, type.name, type.description, type.xp);
+        showAchievement(type.iconLiteral, type.localizedName(resources), type.localizedDescription(resources), type.xp);
     }
 
     public void setMatchedUser(User currentUser, User matchedUser) {
         if (matchMessage == null) {
             throw new IllegalStateException("Match popup fields are not configured");
         }
-        matchMessage.setText("You and " + matchedUser.getName() + " liked each other!");
+        matchMessage.setText(localize("ui.match.popup.message", matchedUser.getName()));
         playMatchEntranceAnimation();
+    }
+
+    private String localize(String key, Object... args) {
+        return I18n.text(resources != null ? resources : I18n.bundle(), key, args);
     }
 
     private void playAchievementEntranceAnimation() {
@@ -309,27 +322,58 @@ public class MilestonePopupController implements Initializable {
     }
 
     public static enum AchievementType {
-        FIRST_MATCH("mdi2h-heart-multiple", "First Match!", "You've made your first connection!", 50),
-        PROFILE_COMPLETE("mdi2a-account-check", "Profile Complete", "Your profile is 100% complete!", 100),
-        FIRST_MESSAGE("mdi2m-message-text", "First Message", "You sent your first message!", 25),
-        TEN_MATCHES("mdi2s-star", "Popular!", "You've reached 10 matches!", 200),
-        TWENTY_FIVE_MATCHES("mdi2t-trophy", "Rising Star", "25 matches and counting!", 500),
-        FIFTY_MATCHES("mdi2c-crown", "Match Master", "50 matches! You're on fire!", 1000),
-        FIRST_DATE("mdi2c-calendar-heart", "First Date", "You've scheduled your first date!", 150),
-        ACTIVE_WEEK("mdi2f-fire", "Active Week", "You've been active for 7 days straight!", 75),
-        SUPER_LIKER("mdi2l-lightning-bolt", "Super Liker", "You've used your first Super Like!", 30),
-        PHOTO_PERFECT("mdi2c-camera", "Photo Perfect", "Added 5 photos to your profile!", 50);
+        FIRST_MATCH(
+                "mdi2h-heart-multiple",
+                "ui.achievement.first_match.name",
+                "ui.achievement.first_match.description",
+                50),
+        PROFILE_COMPLETE(
+                "mdi2a-account-check",
+                "ui.achievement.profile_complete.name",
+                "ui.achievement.profile_complete.description",
+                100),
+        FIRST_MESSAGE(
+                "mdi2m-message-text",
+                "ui.achievement.first_message.name",
+                "ui.achievement.first_message.description",
+                25),
+        TEN_MATCHES("mdi2s-star", "ui.achievement.ten_matches.name", "ui.achievement.ten_matches.description", 200),
+        TWENTY_FIVE_MATCHES(
+                "mdi2t-trophy",
+                "ui.achievement.twenty_five_matches.name",
+                "ui.achievement.twenty_five_matches.description",
+                500),
+        FIFTY_MATCHES(
+                "mdi2c-crown", "ui.achievement.fifty_matches.name", "ui.achievement.fifty_matches.description", 1000),
+        FIRST_DATE(
+                "mdi2c-calendar-heart", "ui.achievement.first_date.name", "ui.achievement.first_date.description", 150),
+        ACTIVE_WEEK("mdi2f-fire", "ui.achievement.active_week.name", "ui.achievement.active_week.description", 75),
+        SUPER_LIKER(
+                "mdi2l-lightning-bolt",
+                "ui.achievement.super_liker.name",
+                "ui.achievement.super_liker.description",
+                30),
+        PHOTO_PERFECT(
+                "mdi2c-camera", "ui.achievement.photo_perfect.name", "ui.achievement.photo_perfect.description", 50);
 
         final String iconLiteral;
-        final String name;
-        final String description;
+        final String nameKey;
+        final String descriptionKey;
         final int xp;
 
-        AchievementType(String iconLiteral, String name, String description, int xp) {
+        AchievementType(String iconLiteral, String nameKey, String descriptionKey, int xp) {
             this.iconLiteral = iconLiteral;
-            this.name = name;
-            this.description = description;
+            this.nameKey = nameKey;
+            this.descriptionKey = descriptionKey;
             this.xp = xp;
+        }
+
+        String localizedName(ResourceBundle resources) {
+            return I18n.text(resources != null ? resources : I18n.bundle(), nameKey);
+        }
+
+        String localizedDescription(ResourceBundle resources) {
+            return I18n.text(resources != null ? resources : I18n.bundle(), descriptionKey);
         }
     }
 }

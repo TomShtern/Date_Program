@@ -1,5 +1,6 @@
 package datingapp.ui.screen;
 
+import datingapp.core.i18n.I18n;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.ui.ImageCache;
@@ -513,7 +514,7 @@ public class MatchingController extends BaseController implements Initializable 
         }
 
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("It's a Match!");
+        dialog.setTitle(I18n.text("ui.match.dialog.title"));
 
         // Apply theme
         String themeStylesheet = resolveStylesheet("/css/theme.css");
@@ -527,14 +528,14 @@ public class MatchingController extends BaseController implements Initializable 
         content.setAlignment(Pos.CENTER);
         content.setStyle("-fx-padding: 40;");
 
-        Label titleLabel = new Label("It's a Match!");
+        Label titleLabel = new Label(I18n.text("ui.match.dialog.title"));
         titleLabel.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-super;");
 
         org.kordamp.ikonli.javafx.FontIcon heartIcon = new org.kordamp.ikonli.javafx.FontIcon("mdi2h-heart-pulse");
         heartIcon.setIconSize(80);
         heartIcon.setIconColor(javafx.scene.paint.Color.web("#f43f5e")); // Rose 500
 
-        Label messageLabel = new Label("You and " + matchedUser.getName() + " liked each other!");
+        Label messageLabel = new Label(I18n.text("ui.match.dialog.message", matchedUser.getName()));
         messageLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: -fx-text-secondary;");
 
         content.getChildren().addAll(heartIcon, titleLabel, messageLabel);
@@ -544,8 +545,9 @@ public class MatchingController extends BaseController implements Initializable 
         UiAnimations.fadeIn(content, 600);
 
         // Add buttons
-        ButtonType sendMessageBtn = new ButtonType("Send Message", ButtonBar.ButtonData.OK_DONE);
-        ButtonType keepSwipingBtn = new ButtonType("Keep Swiping", ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType sendMessageBtn = new ButtonType(I18n.text("ui.match.dialog.send"), ButtonBar.ButtonData.OK_DONE);
+        ButtonType keepSwipingBtn =
+                new ButtonType(I18n.text("ui.match.dialog.keep_swiping"), ButtonBar.ButtonData.CANCEL_CLOSE);
         dialog.getDialogPane().getButtonTypes().addAll(sendMessageBtn, keepSwipingBtn);
 
         // Style buttons
