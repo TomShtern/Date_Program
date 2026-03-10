@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javafx.scene.image.Image;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
+import javafx.scene.paint.Color;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,24 +122,67 @@ public final class ImageCache {
     /** Loads the default avatar image from resources or creates a placeholder. */
     private static Image loadDefaultAvatarImage(double width, double height) {
         try {
-            try (var stream = ImageCache.class.getResourceAsStream(DEFAULT_AVATAR_PATH)) {
-                if (stream != null) {
-                    return new Image(stream, width, height, true, true);
+            var resource = ImageCache.class.getResource(DEFAULT_AVATAR_PATH);
+            if (resource != null) {
+                Image rawImage = new Image(resource.toExternalForm(), false);
+                if (!rawImage.isError() && rawImage.getWidth() > 1 && rawImage.getHeight() > 1) {
+                    return new Image(resource.toExternalForm(), width, height, true, true, false);
                 }
+                logWarn(
+                        "Default avatar resource is too small to be visible ({}x{}); using generated placeholder",
+                        rawImage.getWidth(),
+                        rawImage.getHeight());
             }
         } catch (Exception e) {
             logWarn("Failed to load default avatar", e);
         }
-        // Fallback: create a simple colored placeholder
+
         return createPlaceholder(width, height);
     }
 
     /** Creates a simple placeholder image when default avatar is unavailable. */
     private static Image createPlaceholder(double width, double height) {
-        // Return a 1x1 transparent image as last resort
-        String base64Png = "data:image/png;base64,"
-                + "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=";
-        return new Image(base64Png, width, height, true, true);
+        int imageWidth = Math.max(64, (int) Math.ceil(width));
+        int imageHeight = Math.max(64, (int) Math.ceil(height));
+        WritableImage image = new WritableImage(imageWidth, imageHeight);
+        PixelWriter pixelWriter = image.getPixelWriter();
+
+        Color topColor = Color.web("#334155");
+        Color bottomColor = Color.web("#1e293b");
+        Color silhouetteColor = Color.web("#cbd5e1");
+
+        for (int y = 0; y < imageHeight; y++) {
+            double blend = imageHeight == 1 ? 0 : (double) y / (imageHeight - 1);
+            Color rowColor = topColor.interpolate(bottomColor, blend);
+            for (int x = 0; x < imageWidth; x++) {
+                pixelWriter.setColor(x, y, rowColor);
+            }
+        }
+
+        double centerX = imageWidth / 2.0;
+        double centerY = imageHeight / 2.0;
+        double headRadius = Math.min(imageWidth, imageHeight) * 0.18;
+        double shoulderRadiusX = Math.min(imageWidth, imageHeight) * 0.30;
+        double shoulderRadiusY = Math.min(imageWidth, imageHeight) * 0.22;
+        double shoulderCenterY = centerY + imageHeight * 0.18;
+
+        for (int y = 0; y < imageHeight; y++) {
+            for (int x = 0; x < imageWidth; x++) {
+                double dxHead = x - centerX;
+                double dyHead = y - (centerY - imageHeight * 0.14);
+                boolean inHead = (dxHead * dxHead) + (dyHead * dyHead) <= headRadius * headRadius;
+
+                double dxShoulders = (x - centerX) / shoulderRadiusX;
+                double dyShoulders = (y - shoulderCenterY) / shoulderRadiusY;
+                boolean inShoulders = (dxShoulders * dxShoulders) + (dyShoulders * dyShoulders) <= 1.0;
+
+                if (inHead || inShoulders) {
+                    pixelWriter.setColor(x, y, silhouetteColor);
+                }
+            }
+        }
+
+        return image;
     }
 
     /**

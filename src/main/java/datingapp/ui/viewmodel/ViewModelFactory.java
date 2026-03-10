@@ -18,10 +18,12 @@ import datingapp.ui.screen.SafetyController;
 import datingapp.ui.screen.SocialController;
 import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
+import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
@@ -225,7 +227,8 @@ public class ViewModelFactory {
                         uiDispatcher,
                         java.time.Duration.ofSeconds(15),
                         java.time.Duration.ofSeconds(5),
-                        createUiProfileNoteDataAccess()));
+                        new ChatViewModel.ChatUiDependencies(
+                                createUiProfileNoteDataAccess(), createUiPresenceDataAccess())));
     }
 
     public StatsViewModel getStatsViewModel() {
@@ -342,6 +345,10 @@ public class ViewModelFactory {
 
     private UiProfileNoteDataAccess createUiProfileNoteDataAccess() {
         return new UseCaseUiProfileNoteDataAccess(services.getProfileUseCases());
+    }
+
+    private UiPresenceDataAccess createUiPresenceDataAccess() {
+        return new NoOpUiPresenceDataAccess();
     }
 
     private void logDebug(String message, Object... args) {

@@ -18,7 +18,7 @@ import java.util.UUID;
  */
 public final class LocalPhotoStore {
 
-    public static final int MAX_PHOTOS = 2;
+    public static final int MAX_PHOTOS = 6;
 
     private final Path photoDirectory;
 
@@ -47,6 +47,27 @@ public final class LocalPhotoStore {
             deleteManagedFileIfPresent(updated.removeLast());
         }
         updated.add(destination.toUri().toString());
+        return List.copyOf(updated);
+    }
+
+    public List<String> replacePhoto(UUID userId, List<String> existingPhotoUrls, int index, Path sourceFile)
+            throws IOException {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(sourceFile, "sourceFile cannot be null");
+        if (!Files.isRegularFile(sourceFile)) {
+            throw new IOException("Selected photo file does not exist");
+        }
+
+        Files.createDirectories(photoDirectory);
+
+        List<String> updated = new ArrayList<>(normalizedPhotoUrls(existingPhotoUrls));
+        validatePhotoIndex(updated, index);
+
+        Path destination = photoDirectory.resolve(userId + "_" + System.currentTimeMillis() + extensionOf(sourceFile));
+        Files.copy(sourceFile, destination, StandardCopyOption.REPLACE_EXISTING);
+
+        String previousPhoto = updated.set(index, destination.toUri().toString());
+        deleteManagedFileIfPresent(previousPhoto);
         return List.copyOf(updated);
     }
 

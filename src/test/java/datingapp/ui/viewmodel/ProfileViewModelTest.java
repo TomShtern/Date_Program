@@ -1,6 +1,7 @@
 package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -15,9 +16,14 @@ import datingapp.ui.async.UiThreadDispatcher;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import javafx.application.Platform;
@@ -109,8 +115,10 @@ class ProfileViewModelTest {
         assertTrue(Files.exists(Path.of(URI.create(secondManagedUri))));
 
         viewModel.setPrimaryPhoto(1);
-        assertTrue(
-                waitUntil(() -> secondManagedUri.equals(viewModel.getPhotoUrls().getFirst()), 5000));
+        assertTrue(waitUntil(
+                () -> !viewModel.getPhotoUrls().isEmpty()
+                        && secondManagedUri.equals(viewModel.getPhotoUrls().getFirst()),
+                5000));
         assertEquals(secondManagedUri, viewModel.getPhotoUrls().getFirst());
 
         viewModel.deletePhoto(0);
@@ -128,7 +136,7 @@ class ProfileViewModelTest {
 
     @Test
     @DisplayName("saving a third photo keeps the primary photo and replaces the secondary slot")
-    void saveThirdPhotoPreservesPrimaryAndReplacesSecondarySlot() throws Exception {
+    void replacePhotoMaintainsGallerySizeAtSix() throws Exception {
         originalUserHome = System.getProperty("user.home");
         Path tempHome = Files.createTempDirectory("datingapp-profile-home");
         System.setProperty("user.home", tempHome.toString());
@@ -154,25 +162,174 @@ class ProfileViewModelTest {
                 new datingapp.core.workflow.ProfileActivationPolicy());
         viewModel.loadCurrentUser();
 
-        Path firstPhoto = createTempImageFile("photo-one");
-        Path secondPhoto = createTempImageFile("photo-two");
-        Path thirdPhoto = createTempImageFile("photo-three");
+        List<Path> sourcePhotos = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            sourcePhotos.add(createTempImageFile("photo-" + i));
+        }
+        for (Path sourcePhoto : sourcePhotos) {
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
+            viewModel.savePhoto(sourcePhoto.toFile());
+        }
 
-        viewModel.savePhoto(firstPhoto.toFile());
-        assertTrue(waitUntil(() -> viewModel.getPhotoUrls().size() == 1, 5000));
-        String firstManagedUri = viewModel.getPhotoUrls().getFirst();
+        assertTrue(waitUntil(() -> viewModel.getPhotoUrls().size() == 6, 5000));
+        assertEquals(6, viewModel.photoCountProperty().get());
 
+        Path replacementPhoto = createTempImageFile("replacement-photo");
         LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
-        viewModel.savePhoto(secondPhoto.toFile());
-        assertTrue(waitUntil(() -> viewModel.getPhotoUrls().size() == 2, 5000));
-        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
-        viewModel.savePhoto(thirdPhoto.toFile());
-        assertTrue(waitUntil(() -> viewModel.getPhotoUrls().size() == 2, 5000));
-        assertTrue(waitUntil(() -> viewModel.getPhotoUrls().contains(firstManagedUri), 5000));
+        viewModel.replacePhoto(2, replacementPhoto.toFile());
 
-        assertTrue(Files.exists(Path.of(URI.create(firstManagedUri))));
-        assertEquals(2, viewModel.getPhotoUrls().size());
-        assertEquals(firstManagedUri, viewModel.getPhotoUrls().getFirst());
+        assertTrue(waitUntil(
+                () -> viewModel.getPhotoUrls().size() == 6
+                        && viewModel.getPhotoUrls().size() > 2
+                        && Files.exists(
+                                Path.of(URI.create(viewModel.getPhotoUrls().get(2)))),
+                5000));
+
+        String replacementUri = viewModel.getPhotoUrls().get(2);
+        assertEquals(6, viewModel.photoCountProperty().get());
+        assertTrue(Files.exists(Path.of(URI.create(replacementUri))));
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("saveAsync persists edits only after a successful background save")
+    void saveAsyncPersistsEditsOnlyAfterSuccess() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+
+        User currentUser = createActiveUser("SaveUser");
+        currentUser.setBio("Original bio");
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                (datingapp.app.usecase.profile.ProfileUseCases) null,
+                config,
+                session,
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy());
+        viewModel.loadCurrentUser();
+        viewModel.bioProperty().set("Updated bio");
+        viewModel.setLocationCoordinates(12.3456, -45.6789);
+
+        AtomicBoolean saveResult = new AtomicBoolean(false);
+        CountDownLatch latch = new CountDownLatch(1);
+        viewModel.saveAsync(success -> {
+            saveResult.set(success);
+            latch.countDown();
+        });
+
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertTrue(saveResult.get());
+        assertFalse(viewModel.savingProperty().get());
+        assertEquals("Updated bio", session.getCurrentUser().getBio());
+        assertEquals("12.3456, -45.6789", viewModel.locationDisplayProperty().get());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("saveAsync failure keeps the original session user unchanged")
+    void saveAsyncFailureKeepsOriginalSessionUserUnchanged() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+
+        User currentUser = createActiveUser("SaveFailureUser");
+        currentUser.setBio("Original bio");
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        UiDataAdapters.UiUserStore failingStore = new UiDataAdapters.UiUserStore() {
+            @Override
+            public java.util.List<User> findAll() {
+                return users.findAll();
+            }
+
+            @Override
+            public void save(User user) {
+                throw new IllegalStateException("Simulated save failure");
+            }
+
+            @Override
+            public java.util.Map<UUID, User> findByIds(java.util.Set<UUID> ids) {
+                return users.findByIds(ids);
+            }
+        };
+
+        ProfileViewModel viewModel = new ProfileViewModel(
+                failingStore,
+                profileService,
+                (datingapp.app.usecase.profile.ProfileUseCases) null,
+                config,
+                session,
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy());
+        AtomicReference<String> errorMessage = new AtomicReference<>();
+        viewModel.setErrorHandler(errorMessage::set);
+        viewModel.loadCurrentUser();
+        viewModel.bioProperty().set("Should not persist");
+
+        AtomicBoolean saveResult = new AtomicBoolean(true);
+        CountDownLatch latch = new CountDownLatch(1);
+        viewModel.saveAsync(success -> {
+            saveResult.set(success);
+            latch.countDown();
+        });
+
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertFalse(saveResult.get());
+        assertFalse(viewModel.savingProperty().get());
+        assertEquals("Original bio", session.getCurrentUser().getBio());
+        assertTrue(errorMessage.get().contains("Failed to save profile"));
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("oversized photos are rejected before any upload work starts")
+    void oversizedPhotosAreRejectedBeforeUpload() throws Exception {
+        originalUserHome = System.getProperty("user.home");
+        Path tempHome = Files.createTempDirectory("datingapp-profile-home");
+        System.setProperty("user.home", tempHome.toString());
+
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+
+        User currentUser = createActiveUser("LargePhotoUser");
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                (datingapp.app.usecase.profile.ProfileUseCases) null,
+                config,
+                session,
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy());
+
+        Path oversizedPhoto = Files.createTempFile("oversized-photo", ".jpg");
+        Files.write(oversizedPhoto, new byte[(5 * 1024 * 1024) + 1]);
+
+        viewModel.savePhoto(oversizedPhoto.toFile());
+
+        assertTrue(viewModel.getPhotoUrls().isEmpty());
+        assertEquals(0, viewModel.photoCountProperty().get());
 
         viewModel.dispose();
     }

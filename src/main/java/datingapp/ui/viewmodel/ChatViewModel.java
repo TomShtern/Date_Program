@@ -22,7 +22,10 @@ import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.TaskHandle;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.async.ViewModelAsyncScope;
+import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.PresenceStatus;
+import datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import java.time.Duration;
 import java.util.List;
@@ -55,9 +58,21 @@ public class ChatViewModel {
     private static final String TASK_LOAD_MESSAGES = "load messages";
     private static final String TASK_REFRESH_CONVERSATIONS = "refresh conversations";
 
+    public record ChatUiDependencies(UiProfileNoteDataAccess noteDataAccess, UiPresenceDataAccess presenceDataAccess) {
+        public ChatUiDependencies {
+            Objects.requireNonNull(noteDataAccess, "noteDataAccess cannot be null");
+            Objects.requireNonNull(presenceDataAccess, "presenceDataAccess cannot be null");
+        }
+
+        public static ChatUiDependencies noOp() {
+            return new ChatUiDependencies(new NoOpUiProfileNoteDataAccess(), new NoOpUiPresenceDataAccess());
+        }
+    }
+
     private final MessagingUseCases messagingUseCases;
     private final SocialUseCases socialUseCases;
     private final UiProfileNoteDataAccess noteDataAccess;
+    private final UiPresenceDataAccess presenceDataAccess;
     private final AppSession session;
     private final ViewModelAsyncScope asyncScope;
     private final Duration conversationPollInterval;
@@ -71,6 +86,8 @@ public class ChatViewModel {
     private final StringProperty profileNoteContent = new SimpleStringProperty("");
     private final StringProperty profileNoteStatusMessage = new SimpleStringProperty();
     private final BooleanProperty profileNoteBusy = new SimpleBooleanProperty(false);
+    private final ObjectProperty<PresenceStatus> presenceStatus = new SimpleObjectProperty<>(PresenceStatus.UNKNOWN);
+    private final BooleanProperty remoteTyping = new SimpleBooleanProperty(false);
 
     private User currentUser;
     private TaskHandle conversationsPollingHandle;
@@ -103,7 +120,7 @@ public class ChatViewModel {
                 uiDispatcher,
                 DEFAULT_CONVERSATION_POLL_INTERVAL,
                 DEFAULT_ACTIVE_CONVERSATION_POLL_INTERVAL,
-                new NoOpUiProfileNoteDataAccess());
+                ChatUiDependencies.noOp());
     }
 
     public ChatViewModel(
@@ -120,7 +137,7 @@ public class ChatViewModel {
                 uiDispatcher,
                 conversationPollInterval,
                 activeConversationPollInterval,
-                new NoOpUiProfileNoteDataAccess());
+                ChatUiDependencies.noOp());
     }
 
     public ChatViewModel(
@@ -130,7 +147,7 @@ public class ChatViewModel {
             UiThreadDispatcher uiDispatcher,
             Duration conversationPollInterval,
             Duration activeConversationPollInterval,
-            UiProfileNoteDataAccess noteDataAccess) {
+            ChatUiDependencies uiDependencies) {
         this.messagingUseCases = Objects.requireNonNull(messagingUseCases, "messagingUseCases cannot be null");
         this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
@@ -139,7 +156,10 @@ public class ChatViewModel {
                 Objects.requireNonNull(conversationPollInterval, "conversationPollInterval cannot be null");
         this.activeConversationPollInterval =
                 Objects.requireNonNull(activeConversationPollInterval, "activeConversationPollInterval cannot be null");
-        this.noteDataAccess = Objects.requireNonNull(noteDataAccess, "noteDataAccess cannot be null");
+        ChatUiDependencies resolvedUiDependencies =
+                Objects.requireNonNull(uiDependencies, "uiDependencies cannot be null");
+        this.noteDataAccess = resolvedUiDependencies.noteDataAccess();
+        this.presenceDataAccess = resolvedUiDependencies.presenceDataAccess();
 
         // Listen for selection changes to load messages
         selectionListener = (obs, oldVal, newVal) -> {
@@ -147,10 +167,12 @@ public class ChatViewModel {
                 loadMessages(newVal);
                 startMessagesPolling();
                 loadProfileNoteFor(newVal.otherUser());
+                refreshPresenceState(newVal.otherUser());
             } else {
                 activeMessages.clear();
                 stopMessagesPolling();
                 clearProfileNoteState();
+                clearPresenceState();
             }
         };
         selectedConversation.addListener(selectionListener);
@@ -167,7 +189,45 @@ public class ChatViewModel {
         selectedConversation.removeListener(selectionListener);
         conversations.clear();
         activeMessages.clear();
+        clearPresenceState();
         setLoadingState(false);
+    }
+
+    private void refreshPresenceState(User otherUser) {
+        User user = ensureCurrentUser();
+        if (user == null || otherUser == null) {
+            clearPresenceState();
+            return;
+        }
+
+        UUID otherUserId = otherUser.getId();
+        asyncScope.runFireAndForget("load presence", () -> {
+            try {
+                PresenceStatus status = presenceDataAccess.getPresence(otherUserId);
+                boolean typing = presenceDataAccess.isTyping(otherUserId);
+                asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, status, typing));
+            } catch (Exception e) {
+                logError("Failed to load presence state", e);
+                asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, PresenceStatus.UNKNOWN, false));
+            }
+        });
+    }
+
+    private void applyPresenceState(UUID otherUserId, PresenceStatus status, boolean typing) {
+        if (asyncScope.isDisposed()) {
+            return;
+        }
+        ConversationPreview selected = selectedConversation.get();
+        if (selected == null || !selected.otherUser().getId().equals(otherUserId)) {
+            return;
+        }
+        presenceStatus.set(status != null ? status : PresenceStatus.UNKNOWN);
+        remoteTyping.set(typing);
+    }
+
+    private void clearPresenceState() {
+        presenceStatus.set(PresenceStatus.UNKNOWN);
+        remoteTyping.set(false);
     }
 
     private void loadProfileNoteFor(User otherUser) {
@@ -653,6 +713,7 @@ public class ChatViewModel {
                     ConversationPreview conversation = selectedConversation.get();
                     if (conversation != null) {
                         loadMessages(conversation, true);
+                        refreshPresenceState(conversation.otherUser());
                     }
                 });
     }
@@ -851,6 +912,14 @@ public class ChatViewModel {
 
     public BooleanProperty profileNoteBusyProperty() {
         return profileNoteBusy;
+    }
+
+    public ObjectProperty<PresenceStatus> presenceStatusProperty() {
+        return presenceStatus;
+    }
+
+    public BooleanProperty remoteTypingProperty() {
+        return remoteTyping;
     }
 
     private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {

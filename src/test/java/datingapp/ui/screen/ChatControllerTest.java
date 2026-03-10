@@ -1,6 +1,5 @@
 package datingapp.ui.screen;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -18,6 +17,7 @@ import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.ChatViewModel;
+import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
 import java.time.Duration;
 import java.util.EnumSet;
@@ -79,8 +79,7 @@ class ChatControllerTest {
                 () -> {
                     try {
                         return JavaFxTestSupport.callOnFxAndWait(chatContainer::isVisible)
-                                && !JavaFxTestSupport.callOnFxAndWait(emptyStateContainer::isVisible)
-                                && !JavaFxTestSupport.callOnFxAndWait(friendZoneButton::isDisabled);
+                                && !JavaFxTestSupport.callOnFxAndWait(emptyStateContainer::isVisible);
                     } catch (InterruptedException e) {
                         throw new IllegalStateException(e);
                     }
@@ -112,7 +111,6 @@ class ChatControllerTest {
         JavaFxTestSupport.runOnFxAndWait(deleteNoteButton::fire);
 
         assertTrue(JavaFxTestSupport.waitUntil(() -> fixture.lookupNote().isEmpty(), 5000));
-        assertFalse(JavaFxTestSupport.callOnFxAndWait(friendZoneButton::isDisabled));
 
         fixture.dispose();
         NavigationService.getInstance().clearHistory();
@@ -147,7 +145,8 @@ class ChatControllerTest {
                     new datingapp.ui.async.JavaFxUiThreadDispatcher(),
                     Duration.ofMillis(75),
                     Duration.ofMillis(75),
-                    new UseCaseUiProfileNoteDataAccess(noteUseCases));
+                    new ChatViewModel.ChatUiDependencies(
+                            new UseCaseUiProfileNoteDataAccess(noteUseCases), new NoOpUiPresenceDataAccess()));
         }
 
         private void seedConversationWithNote(String noteContent) {

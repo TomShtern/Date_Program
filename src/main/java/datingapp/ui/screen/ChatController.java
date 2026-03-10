@@ -5,10 +5,12 @@ import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.model.User;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
+import datingapp.ui.UiComponents;
 import datingapp.ui.UiConstants;
 import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.ChatViewModel;
+import datingapp.ui.viewmodel.UiDataAdapters.PresenceStatus;
 import java.net.URL;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -67,6 +69,9 @@ public class ChatController extends BaseController implements Initializable {
     private Label chatHeaderLabel;
 
     @FXML
+    private Region chatPresenceDot;
+
+    @FXML
     private TextArea profileNoteArea;
 
     @FXML
@@ -84,7 +89,11 @@ public class ChatController extends BaseController implements Initializable {
     @FXML
     private VBox chatContainer;
 
+    @FXML
+    private HBox typingIndicatorHost;
+
     private final ChatViewModel viewModel;
+    private final UiComponents.TypingIndicator typingIndicator = new UiComponents.TypingIndicator();
 
     public ChatController(ChatViewModel viewModel) {
         this.viewModel = viewModel;
@@ -128,16 +137,25 @@ public class ChatController extends BaseController implements Initializable {
                     .disableProperty()
                     .bind(viewModel.selectedConversationProperty().isNull());
         }
+        if (typingIndicatorHost != null) {
+            typingIndicatorHost.getChildren().setAll(typingIndicator);
+            typingIndicatorHost.setVisible(false);
+            typingIndicatorHost.setManaged(false);
+        }
 
         // Bind selection using Subscription API
         addSubscription(conversationListView
                 .getSelectionModel()
                 .selectedItemProperty()
                 .subscribe(this::handleConversationSelection));
+        addSubscription(viewModel.presenceStatusProperty().subscribe(this::updatePresenceIndicator));
+        addSubscription(viewModel.remoteTypingProperty().subscribe(this::updateTypingIndicator));
 
         // Initial state
         chatContainer.setVisible(false);
         emptyStateContainer.setVisible(true);
+        updatePresenceIndicator(viewModel.presenceStatusProperty().get());
+        updateTypingIndicator(viewModel.remoteTypingProperty().get());
 
         // Initialize ViewModel with current user from UISession
         viewModel.initialize();
@@ -166,6 +184,44 @@ public class ChatController extends BaseController implements Initializable {
             chatContainer.setVisible(false);
             emptyStateContainer.setVisible(true);
         }
+        updateTypingIndicator(viewModel.remoteTypingProperty().get());
+    }
+
+    private void updatePresenceIndicator(PresenceStatus status) {
+        if (chatPresenceDot == null) {
+            return;
+        }
+        chatPresenceDot.getStyleClass().removeAll("status-online", "status-away", "status-offline");
+        PresenceStatus resolvedStatus = status != null ? status : PresenceStatus.UNKNOWN;
+        boolean visible = resolvedStatus != PresenceStatus.UNKNOWN;
+        if (visible) {
+            chatPresenceDot
+                    .getStyleClass()
+                    .add(
+                            switch (resolvedStatus) {
+                                case ONLINE -> "status-online";
+                                case AWAY -> "status-away";
+                                case OFFLINE -> "status-offline";
+                                case UNKNOWN -> "status-offline";
+                            });
+        }
+        chatPresenceDot.setVisible(visible);
+        chatPresenceDot.setManaged(visible);
+    }
+
+    private void updateTypingIndicator(Boolean typing) {
+        if (typingIndicatorHost == null) {
+            return;
+        }
+        boolean visible = Boolean.TRUE.equals(typing)
+                && viewModel.selectedConversationProperty().get() != null;
+        typingIndicatorHost.setVisible(visible);
+        typingIndicatorHost.setManaged(visible);
+        if (visible) {
+            typingIndicator.show();
+        } else {
+            typingIndicator.hide();
+        }
     }
 
     private ListCell<ConversationPreview> createConversationCell() {
@@ -191,7 +247,9 @@ public class ChatController extends BaseController implements Initializable {
             avatarIcon.setIconSize(24);
 
             // Configure status dot
-            statusDot.getStyleClass().addAll("status-dot", "status-online");
+            statusDot.getStyleClass().add("status-dot");
+            statusDot.setVisible(false);
+            statusDot.setManaged(false);
             StackPane.setAlignment(statusDot, Pos.BOTTOM_RIGHT);
             statusDot.setTranslateX(2);
             statusDot.setTranslateY(2);

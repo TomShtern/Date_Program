@@ -43,6 +43,7 @@ class DashboardViewModelTest {
     private TestStorages.TrustSafety trustSafetyStorage;
     private TestStorages.Analytics analyticsStorage;
     private TestStorages.Communications communications;
+    private RecommendationService dailyService;
 
     private DashboardViewModel viewModel;
     private User currentUser;
@@ -75,7 +76,7 @@ class DashboardViewModelTest {
         ProfileService profileService =
                 new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
 
-        RecommendationService dailyService = RecommendationService.builder()
+        dailyService = RecommendationService.builder()
                 .interactionStorage(interactions)
                 .userStorage(users)
                 .trustSafetyStorage(trustSafetyStorage)
@@ -141,6 +142,30 @@ class DashboardViewModelTest {
         assertEquals("0", viewModel.totalMatchesProperty().get());
         assertFalse(viewModel.loadingProperty().get());
         assertEquals(0, viewModel.unreadMessagesProperty().get());
+        assertFalse(viewModel.dailyPickAvailableProperty().get());
+    }
+
+    @Test
+    @DisplayName("refresh exposes daily pick reason, availability, and seen state")
+    void shouldExposeDailyPickReasonAvailabilityAndSeenState() throws InterruptedException {
+        User candidate = createActiveUser("DailyPickCandidate");
+        candidate.setGender(Gender.FEMALE);
+        candidate.setInterestedIn(EnumSet.of(Gender.MALE));
+        users.save(candidate);
+
+        viewModel.performRefresh();
+
+        assertTrue(waitUntil(viewModel.dailyPickAvailableProperty()::get, 5000));
+        assertEquals(candidate.getId(), viewModel.dailyPickUserIdProperty().get());
+        assertTrue(viewModel.dailyPickReasonProperty().get() != null
+                && !viewModel.dailyPickReasonProperty().get().isBlank());
+        assertFalse(viewModel.dailyPickSeenProperty().get());
+        assertEquals("", viewModel.dailyPickEmptyMessageProperty().get());
+
+        dailyService.markDailyPickViewed(currentUser.getId());
+        viewModel.performRefresh();
+
+        assertTrue(waitUntil(viewModel.dailyPickSeenProperty()::get, 5000));
     }
 
     @Test

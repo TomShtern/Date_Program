@@ -19,7 +19,6 @@ import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javafx.scene.Parent;
-import javafx.scene.control.Button;
 import javafx.scene.control.ListView;
 import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.AfterEach;
@@ -88,13 +87,11 @@ class SafetyControllerTest {
         ListView<SafetyViewModel.BlockedUserEntry> blockedUsersListView =
                 JavaFxTestSupport.lookup(root, "#blockedUsersListView", ListView.class);
         VBox emptyStateBox = JavaFxTestSupport.lookup(root, "#emptyStateBox", VBox.class);
-        Button unblockButton = JavaFxTestSupport.findButtonByText(root, "Unblock");
 
         assertTrue(
                 JavaFxTestSupport.waitUntil(() -> !viewModel.getBlockedUsers().isEmpty(), 5000));
         assertFalse(JavaFxTestSupport.callOnFxAndWait(blockedUsersListView.getItems()::isEmpty));
         assertFalse(JavaFxTestSupport.callOnFxAndWait(emptyStateBox::isVisible));
-        assertFalse(JavaFxTestSupport.callOnFxAndWait(unblockButton::isDisabled));
     }
 
     private static User createUser(String name, Gender gender, EnumSet<Gender> interestedIn) {

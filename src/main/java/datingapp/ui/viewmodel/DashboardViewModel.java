@@ -39,6 +39,8 @@ public class DashboardViewModel extends BaseViewModel {
     private static final String UNKNOWN_VALUE = "--";
     private static final String DEFAULT_LIKES_TEXT = "Likes: --";
     private static final String DEFAULT_PICK_TEXT = "No pick today";
+    private static final String DEFAULT_PICK_EMPTY_MESSAGE =
+            "No daily pick is available right now. Check back tomorrow.";
 
     private final RecommendationService dailyService;
     private final UiMatchDataAccess matchData;
@@ -52,7 +54,11 @@ public class DashboardViewModel extends BaseViewModel {
     private final StringProperty userName = new SimpleStringProperty("Not Logged In");
     private final StringProperty dailyLikesStatus = new SimpleStringProperty(DEFAULT_LIKES_TEXT);
     private final StringProperty dailyPickName = new SimpleStringProperty(DEFAULT_PICK_TEXT);
+    private final StringProperty dailyPickReason = new SimpleStringProperty("");
+    private final StringProperty dailyPickEmptyMessage = new SimpleStringProperty(DEFAULT_PICK_EMPTY_MESSAGE);
     private final ObjectProperty<UUID> dailyPickUserId = new SimpleObjectProperty<>();
+    private final BooleanProperty dailyPickSeen = new SimpleBooleanProperty(false);
+    private final BooleanProperty dailyPickAvailable = new SimpleBooleanProperty(false);
     private final StringProperty totalMatches = new SimpleStringProperty("0");
     private final StringProperty profileCompletion = new SimpleStringProperty("0% Starter");
     private final IntegerProperty notificationCount = new SimpleIntegerProperty(0);
@@ -156,6 +162,22 @@ public class DashboardViewModel extends BaseViewModel {
         return dailyPickUserId;
     }
 
+    public StringProperty dailyPickReasonProperty() {
+        return dailyPickReason;
+    }
+
+    public StringProperty dailyPickEmptyMessageProperty() {
+        return dailyPickEmptyMessage;
+    }
+
+    public BooleanProperty dailyPickSeenProperty() {
+        return dailyPickSeen;
+    }
+
+    public BooleanProperty dailyPickAvailableProperty() {
+        return dailyPickAvailable;
+    }
+
     public StringProperty totalMatchesProperty() {
         return totalMatches;
     }
@@ -200,12 +222,21 @@ public class DashboardViewModel extends BaseViewModel {
             int activeMatchCount = matchData.countActiveMatchesFor(user.getId());
             Optional<DailyPick> dailyPick = dailyService.getDailyPick(user);
             String pickName = DEFAULT_PICK_TEXT;
+            String pickReason = "";
             UUID pickUserId = null;
+            boolean pickSeen = false;
+            boolean pickAvailable = false;
+            String pickEmptyMessage = DEFAULT_PICK_EMPTY_MESSAGE;
             if (dailyPick.isPresent()) {
-                User pickUser = dailyPick.get().user();
+                DailyPick pick = dailyPick.get();
+                User pickUser = pick.user();
                 int age = pickUser.getAge(config.safety().userTimeZone()).orElse(0);
                 pickName = pickUser.getName() + ", " + age;
                 pickUserId = pickUser.getId();
+                pickReason = pick.reason();
+                pickSeen = pick.alreadySeen();
+                pickAvailable = true;
+                pickEmptyMessage = "";
             }
 
             List<UserAchievement> achievements = achievementService.getUnlocked(user.getId());
@@ -220,7 +251,11 @@ public class DashboardViewModel extends BaseViewModel {
                     likesText,
                     String.valueOf(activeMatchCount),
                     pickName,
+                    pickReason,
                     pickUserId,
+                    pickSeen,
+                    pickAvailable,
+                    pickEmptyMessage,
                     achievements,
                     unreadCount,
                     pendingRequests,
@@ -239,7 +274,11 @@ public class DashboardViewModel extends BaseViewModel {
         userName.set(data.name());
         dailyLikesStatus.set(data.likesText());
         dailyPickName.set(data.pickName());
+        dailyPickReason.set(data.pickReason());
         dailyPickUserId.set(data.pickUserId());
+        dailyPickSeen.set(data.pickSeen());
+        dailyPickAvailable.set(data.pickAvailable());
+        dailyPickEmptyMessage.set(data.pickEmptyMessage());
         totalMatches.set(data.matchCount());
         profileCompletion.set(data.completionText());
         unreadMessages.set(data.unreadCount());
@@ -295,7 +334,11 @@ public class DashboardViewModel extends BaseViewModel {
             String likesText,
             String matchCount,
             String pickName,
+            String pickReason,
             UUID pickUserId,
+            boolean pickSeen,
+            boolean pickAvailable,
+            String pickEmptyMessage,
             List<UserAchievement> achievements,
             int unreadCount,
             int pendingRequests,
@@ -309,7 +352,11 @@ public class DashboardViewModel extends BaseViewModel {
                     DEFAULT_LIKES_TEXT,
                     "0",
                     DEFAULT_PICK_TEXT,
+                    "",
                     null,
+                    false,
+                    false,
+                    DEFAULT_PICK_EMPTY_MESSAGE,
                     List.of(),
                     0,
                     0,

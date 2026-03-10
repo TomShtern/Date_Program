@@ -50,7 +50,7 @@
         <Label fx:id="completionLabel" styleClass="notification-badge profile-completion-percent" text="20%"/>
         <Label styleClass="profile-completion-text" text="complete"/>
         <Label fx:id="completionDetailsLabel" maxWidth="180" styleClass="text-secondary" text="Missing: --"
-                                               wrapText="true"/>
+                                                       wrapText="true"/>
       </VBox>
     </HBox>
   </top>
@@ -110,6 +110,7 @@
             </VBox>
           </StackPane>
           <Label fx:id="nameLabel" styleClass="profile-name" text="User Name"/>
+          <Label fx:id="photoCountLabel" styleClass="profile-photo-count" text="Photos 0/6"/>
           <HBox alignment="CENTER" spacing="12">
             <Button onAction="#handleUploadPhoto" styleClass="button-secondary-small" text="Add / replace photo"/>
             <Button fx:id="setPrimaryPhotoButton" onAction="#handleSetPrimaryPhoto" styleClass="button-secondary-small" text="Set as primary"/>
@@ -130,7 +131,7 @@
             <Label fx:id="charCountLabel" styleClass="char-counter" text="0/500"/>
           </HBox>
           <TextArea fx:id="bioArea" prefHeight="100" promptText="Tell others about yourself..."
-                                                                                              wrapText="true" styleClass="bio-textarea"/>
+                                                                                                        wrapText="true" styleClass="bio-textarea"/>
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Birth date:" prefWidth="120"/>
             <DatePicker fx:id="birthDatePicker" promptText="YYYY-MM-DD" prefWidth="180"/>
@@ -146,9 +147,11 @@
           </HBox>
           <HBox spacing="12" alignment="CENTER_LEFT">
             <FontIcon iconLiteral="mdi2m-map-marker-outline" iconSize="20" iconColor="#64748b"/>
-            <TextField fx:id="locationField" promptText="e.g. 40.7128, -74.0060"
-                                                                                                                HBox.hgrow="ALWAYS"/>
+            <TextField fx:id="locationField" editable="false" focusTraversable="false" promptText="Set your coordinates" styleClass="profile-location-field"
+                                                                                                                            HBox.hgrow="ALWAYS"/>
+            <Button fx:id="setLocationButton" onAction="#handleSetLocation" styleClass="button-secondary-small" text="Set Location"/>
           </HBox>
+          <Label styleClass="text-secondary" text="Use validated latitude and longitude values. No raw parsing surprises." wrapText="true"/>
         </VBox>
         <!-- Gender &amp; Preferences Section - CRITICAL for matching -->
         <VBox styleClass="section-glass-card" spacing="16">
@@ -283,12 +286,13 @@
   <!-- Sticky Action Footer -->
   <bottom>
     <VBox styleClass="sticky-footer" spacing="12">
-      <Button onAction="#handleSave" text="Save Changes" styleClass="cta-primary-full">
+      <Label fx:id="saveStatusLabel" managed="false" visible="false" styleClass="profile-save-status" text="Saving…"/>
+      <Button fx:id="saveButton" onAction="#handleSave" text="Save Changes" styleClass="cta-primary-full">
         <graphic>
           <FontIcon iconLiteral="mdi2c-content-save-outline" iconSize="20" iconColor="white"/>
         </graphic>
       </Button>
-      <Button onAction="#handleCancel" text="Cancel" styleClass="button-ghost-full"/>
+      <Button fx:id="cancelButton" onAction="#handleCancel" text="Cancel" styleClass="button-ghost-full"/>
     </VBox>
   </bottom>
 </BorderPane>

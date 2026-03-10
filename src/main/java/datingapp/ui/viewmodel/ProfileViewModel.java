@@ -28,9 +28,17 @@ import java.time.LocalDate;
 import java.time.Period;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
@@ -51,6 +59,10 @@ public class ProfileViewModel {
     private static final String SAVE_PHOTO_ERROR = "Failed to save profile photo";
     private static final String DELETE_PHOTO_ERROR = "Failed to delete profile photo";
     private static final String UPDATE_PRIMARY_PHOTO_ERROR = "Failed to update primary photo";
+    private static final String REPLACE_PHOTO_ERROR = "Failed to replace profile photo";
+    private static final String SAVE_PROFILE_ERROR = "Failed to save profile";
+    private static final String PROFILE_EDITOR_INACTIVE = "Profile editor is no longer active";
+    private static final long MAX_PHOTO_SIZE_BYTES = 5L * 1024 * 1024;
 
     private final AppConfig config;
 
@@ -65,16 +77,20 @@ public class ProfileViewModel {
     // Observable properties for form binding - Basic Info
     private final StringProperty name = new SimpleStringProperty("");
     private final StringProperty bio = new SimpleStringProperty("");
-    private final StringProperty location = new SimpleStringProperty("");
+    private final StringProperty locationDisplay = new SimpleStringProperty("");
     private final StringProperty interests = new SimpleStringProperty("");
     private final StringProperty completionStatus = new SimpleStringProperty("0%");
     private final StringProperty completionDetails = new SimpleStringProperty("");
     private final StringProperty primaryPhotoUrl = new SimpleStringProperty("");
+    private final DoubleProperty latitude = new SimpleDoubleProperty(Double.NaN);
+    private final DoubleProperty longitude = new SimpleDoubleProperty(Double.NaN);
+    private final BooleanProperty hasLocation = new SimpleBooleanProperty(false);
+    private final IntegerProperty photoCount = new SimpleIntegerProperty(0);
+    private final BooleanProperty saving = new SimpleBooleanProperty(false);
 
     // Multiple photos
     private final javafx.collections.ObservableList<String> photoUrls = FXCollections.observableArrayList();
-    private final javafx.beans.property.IntegerProperty currentPhotoIndex =
-            new javafx.beans.property.SimpleIntegerProperty(0);
+    private final IntegerProperty currentPhotoIndex = new SimpleIntegerProperty(0);
 
     // Gender and preferences
     private final ObjectProperty<Gender> gender = new SimpleObjectProperty<>(null);
@@ -200,7 +216,7 @@ public class ProfileViewModel {
         // Basic info
         name.set(user.getName());
         bio.set(user.getBio() != null ? user.getBio() : "");
-        location.set(formatLocation(user.getLat(), user.getLon()));
+        loadLocation(user);
 
         // Gender and interested in
         gender.set(user.getGender());
@@ -321,11 +337,13 @@ public class ProfileViewModel {
             primaryPhotoUrl.set("");
             photoUrls.clear();
             currentPhotoIndex.set(0);
+            photoCount.set(0);
             return;
         }
         List<String> urls = user.getPhotoUrls();
         photoUrls.setAll(urls != null ? urls : List.of());
         currentPhotoIndex.set(0);
+        photoCount.set(photoUrls.size());
 
         if (urls == null || urls.isEmpty()) {
             primaryPhotoUrl.set("");
@@ -339,100 +357,132 @@ public class ProfileViewModel {
         }
     }
 
-    private String formatLocation(double lat, double lon) {
-        if (lat == 0 && lon == 0) {
-            return "";
+    private void loadLocation(User user) {
+        if (user != null && user.hasLocation()) {
+            setLocationCoordinates(user.getLat(), user.getLon());
+            return;
         }
-        return String.format("%.4f, %.4f", lat, lon);
+        clearLocation();
+    }
+
+    private String formatLocation(double lat, double lon) {
+        return String.format(Locale.ROOT, "%.4f, %.4f", lat, lon);
+    }
+
+    private void updateLocationDisplay() {
+        if (hasLocation.get() && !Double.isNaN(latitude.get()) && !Double.isNaN(longitude.get())) {
+            locationDisplay.set(formatLocation(latitude.get(), longitude.get()));
+            return;
+        }
+        locationDisplay.set("");
     }
 
     /**
      * Saves the profile changes to storage.
      */
     public void save() {
+        saveAsync(null);
+    }
+
+    public void saveAsync(Consumer<Boolean> onComplete) {
         if (disposed.get()) {
             logWarn("ProfileViewModel is disposed; skipping save");
+            completeSave(onComplete, false);
+            return;
+        }
+        if (saving.get()) {
+            logWarn("Profile save already in progress");
             return;
         }
 
-        User user = session.getCurrentUser();
-        if (user == null) {
+        User currentUser = session.getCurrentUser();
+        if (currentUser == null) {
             logWarn("No current user to save");
+            completeSave(onComplete, false);
             return;
         }
 
-        logInfo("Saving profile for user: {}", user.getName());
+        User draftUser;
+        try {
+            draftUser = createDraftUser();
+        } catch (Exception e) {
+            logError("Failed to prepare profile draft", e);
+            notifyError(SAVE_PROFILE_ERROR, e);
+            completeSave(onComplete, false);
+            return;
+        }
 
-        applyBasicFields(user);
-        applyLocation(user);
-        applyInterests(user);
-        applyLifestyleFields(user);
-        applySearchPreferences(user);
-        applyDealbreakers(user);
-
-        saveInBackground(user);
+        logInfo("Saving profile for user: {}", currentUser.getName());
+        saving.set(true);
+        asyncScope.runFireAndForget("profile-save", () -> persistProfileInBackground(draftUser, onComplete));
     }
 
-    private void saveInBackground(User user) {
-        asyncScope.runFireAndForget("profile-save", () -> persistProfile(user));
-    }
-
-    private void persistProfile(User user) {
+    private void persistProfileInBackground(User draftUser, Consumer<Boolean> onComplete) {
+        SaveOperationResult result;
         try {
             if (disposed.get()) {
-                return;
+                result = SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
+            } else if (profileUseCases != null) {
+                result = persistProfileViaUseCase(draftUser);
+            } else {
+                result = persistProfileLegacy(draftUser);
             }
-
-            if (profileUseCases != null) {
-                persistProfileViaUseCase(user);
-                return;
-            }
-
-            persistProfileLegacy(user);
         } catch (Exception e) {
             logError("Failed to save profile: {}", e.getMessage(), e);
-            notifyError("Failed to save profile", e);
+            result = SaveOperationResult.failure(e);
         }
+
+        SaveOperationResult completedResult = result;
+        asyncScope.dispatchToUi(() -> applySaveOperationResult(completedResult, onComplete));
     }
 
-    private void persistProfileViaUseCase(User user) {
+    private SaveOperationResult persistProfileViaUseCase(User user) {
         var saveResult = profileUseCases.saveProfile(new SaveProfileCommand(UserContext.ui(user.getId()), user));
         if (!saveResult.success()) {
-            throw new IllegalStateException(saveResult.error().message());
+            return SaveOperationResult.failure(
+                    new IllegalStateException(saveResult.error().message()));
         }
 
         User savedUser = saveResult.data().user();
-        boolean activated = saveResult.data().activated();
-        asyncScope.dispatchToUi(() -> {
-            if (disposed.get()) {
-                return;
-            }
-            updateSessionAndCompletion(savedUser);
-            if (activated) {
-                UiFeedbackService.showSuccess("Profile complete! You're now active!");
-            }
-            logInfo("Profile saved successfully");
-        });
+        return SaveOperationResult.success(savedUser);
     }
 
-    private void persistProfileLegacy(User user) {
+    private SaveOperationResult persistProfileLegacy(User user) {
         persistUser(user);
         if (disposed.get()) {
-            return;
+            return SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
         }
 
         attemptActivation(user);
         if (disposed.get()) {
+            return SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
+        }
+
+        return SaveOperationResult.success(user);
+    }
+
+    private void applySaveOperationResult(SaveOperationResult result, Consumer<Boolean> onComplete) {
+        saving.set(false);
+        if (disposed.get()) {
+            completeSave(onComplete, false);
             return;
         }
 
-        asyncScope.dispatchToUi(() -> {
-            if (disposed.get()) {
-                return;
-            }
-            updateSessionAndCompletion(user);
-            logInfo("Profile saved successfully");
-        });
+        if (!result.success()) {
+            notifyError(SAVE_PROFILE_ERROR, result.error());
+            completeSave(onComplete, false);
+            return;
+        }
+
+        updateSessionAndCompletion(result.savedUser());
+        logInfo("Profile saved successfully");
+        completeSave(onComplete, true);
+    }
+
+    private void completeSave(Consumer<Boolean> onComplete, boolean success) {
+        if (onComplete != null) {
+            onComplete.accept(success);
+        }
     }
 
     private void applyBasicFields(User user) {
@@ -448,19 +498,10 @@ public class ProfileViewModel {
     }
 
     private void applyLocation(User user) {
-        String loc = location.get();
-        if (loc == null || !loc.contains(",")) {
+        if (!hasLocation.get()) {
             return;
         }
-
-        try {
-            String[] parts = loc.split(",");
-            if (parts.length == 2) {
-                user.setLocation(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()));
-            }
-        } catch (NumberFormatException _) {
-            logWarn("Could not parse location: {}", loc);
-        }
+        user.setLocation(latitude.get(), longitude.get());
     }
 
     private void applyInterests(User user) {
@@ -487,11 +528,12 @@ public class ProfileViewModel {
         }
     }
 
-    private void applySearchPreferences(User user) {
-        applySearchPreferences(user, true);
+    private void applySearchPreferences(User user, boolean notifyUser) {
+        applyAgeRangePreference(user, notifyUser);
+        applyMaxDistancePreference(user, notifyUser);
     }
 
-    private void applySearchPreferences(User user, boolean notifyUser) {
+    private void applyAgeRangePreference(User user, boolean notifyUser) {
         try {
             int min = Integer.parseInt(minAge.get());
             int max = Integer.parseInt(maxAge.get());
@@ -515,7 +557,9 @@ public class ProfileViewModel {
                 UiFeedbackService.showWarning("Please enter valid ages");
             }
         }
+    }
 
+    private void applyMaxDistancePreference(User user, boolean notifyUser) {
         try {
             int dist = Integer.parseInt(maxDistance.get());
             if (dist > 0 && dist <= config.matching().maxDistanceKm()) {
@@ -549,7 +593,6 @@ public class ProfileViewModel {
         if (activation.activated()) {
             userStore.save(user);
             logInfo("User {} activated after profile completion", user.getName());
-            asyncScope.dispatchToUi(() -> UiFeedbackService.showSuccess("Profile complete! You're now active!"));
         }
     }
 
@@ -612,7 +655,11 @@ public class ProfileViewModel {
     }
 
     public StringProperty locationProperty() {
-        return location;
+        return locationDisplay;
+    }
+
+    public StringProperty locationDisplayProperty() {
+        return locationDisplay;
     }
 
     public StringProperty interestsProperty() {
@@ -640,7 +687,19 @@ public class ProfileViewModel {
         return photoUrls;
     }
 
-    public javafx.beans.property.IntegerProperty currentPhotoIndexProperty() {
+    public IntegerProperty photoCountProperty() {
+        return photoCount;
+    }
+
+    public int getMaxPhotos() {
+        return LocalPhotoStore.MAX_PHOTOS;
+    }
+
+    public BooleanProperty savingProperty() {
+        return saving;
+    }
+
+    public IntegerProperty currentPhotoIndexProperty() {
         return currentPhotoIndex;
     }
 
@@ -693,6 +752,42 @@ public class ProfileViewModel {
 
     public ObjectProperty<LocalDate> birthDateProperty() {
         return birthDate;
+    }
+
+    public double getLatitude() {
+        return latitude.get();
+    }
+
+    public double getLongitude() {
+        return longitude.get();
+    }
+
+    public boolean hasLocationSet() {
+        return hasLocation.get();
+    }
+
+    public void setLocationCoordinates(double latitude, double longitude) {
+        validateCoordinates(latitude, longitude);
+        this.latitude.set(latitude);
+        this.longitude.set(longitude);
+        hasLocation.set(true);
+        updateLocationDisplay();
+    }
+
+    public void clearLocation() {
+        latitude.set(Double.NaN);
+        longitude.set(Double.NaN);
+        hasLocation.set(false);
+        updateLocationDisplay();
+    }
+
+    private void validateCoordinates(double latitude, double longitude) {
+        if (latitude < -90.0 || latitude > 90.0) {
+            throw new IllegalArgumentException("Latitude must be between -90 and 90");
+        }
+        if (longitude < -180.0 || longitude > 180.0) {
+            throw new IllegalArgumentException("Longitude must be between -180 and 180");
+        }
     }
 
     /**
@@ -828,6 +923,14 @@ public class ProfileViewModel {
      * @param photoFile the selected photo file
      */
     public void savePhoto(File photoFile) {
+        savePhotoInternal(photoFile, null);
+    }
+
+    public void replacePhoto(int index, File photoFile) {
+        savePhotoInternal(photoFile, index);
+    }
+
+    private void savePhotoInternal(File photoFile, Integer replaceIndex) {
         if (disposed.get()) {
             return;
         }
@@ -839,6 +942,16 @@ public class ProfileViewModel {
         if (photoFile == null || !photoFile.isFile()) {
             logWarn("Invalid photo file selected: {}", photoFile);
             UiFeedbackService.showError("Invalid photo file selected");
+            return;
+        }
+
+        if (photoFile.length() > MAX_PHOTO_SIZE_BYTES) {
+            UiFeedbackService.showError("Photo must be 5 MB or smaller");
+            return;
+        }
+
+        if (replaceIndex != null) {
+            asyncScope.runFireAndForget("photo-replace", () -> processPhotoReplacement(user, replaceIndex, photoFile));
             return;
         }
 
@@ -889,6 +1002,23 @@ public class ProfileViewModel {
         }
     }
 
+    private void processPhotoReplacement(User user, int index, File photoFile) {
+        try {
+            if (disposed.get()) {
+                return;
+            }
+            List<String> updatedPhotoUrls =
+                    photoStore.replacePhoto(user.getId(), user.getPhotoUrls(), index, photoFile.toPath());
+            persistPhotoUrls(user, updatedPhotoUrls, index, "Photo replaced.");
+        } catch (IOException e) {
+            logError(REPLACE_PHOTO_ERROR, e);
+            notifyError(REPLACE_PHOTO_ERROR, e);
+        } catch (IllegalArgumentException e) {
+            logWarn("Invalid photo replacement request: {}", e.getMessage());
+            notifyError(REPLACE_PHOTO_ERROR, e);
+        }
+    }
+
     private void processPhotoDeletion(User user, int index) {
         try {
             if (disposed.get()) {
@@ -928,6 +1058,7 @@ public class ProfileViewModel {
                 return;
             }
             photoUrls.setAll(updatedPhotoUrls);
+            photoCount.set(updatedPhotoUrls.size());
             currentPhotoIndex.set(Math.max(0, selectedIndex));
             updatePrimaryPhotoFromIndex();
             session.setCurrentUser(user);
@@ -1088,5 +1219,15 @@ public class ProfileViewModel {
         UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
         return new ViewModelAsyncScope(
                 "profile", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
+    }
+
+    private record SaveOperationResult(boolean success, User savedUser, Exception error) {
+        private static SaveOperationResult success(User savedUser) {
+            return new SaveOperationResult(true, savedUser, null);
+        }
+
+        private static SaveOperationResult failure(Exception error) {
+            return new SaveOperationResult(false, null, error);
+        }
     }
 }

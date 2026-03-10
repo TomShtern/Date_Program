@@ -24,7 +24,7 @@
         <Insets bottom="20" left="15" right="15" top="20"/>
       </padding>
       <Label styleClass="text-secondary conversation-section-label"
-                                                                text="CONVERSATIONS" />
+                                                                      text="CONVERSATIONS" />
       <ListView fx:id="conversationListView" VBox.vgrow="ALWAYS"/>
     </VBox>
   </left>
@@ -38,6 +38,7 @@
             <Insets left="25" right="25"/>
           </padding>
           <Label fx:id="chatHeaderLabel" styleClass="subheading" text="User Name"/>
+          <Region fx:id="chatPresenceDot" managed="false" visible="false" styleClass="status-dot"/>
           <Region HBox.hgrow="ALWAYS"/>
           <Button fx:id="friendZoneButton" onAction="#handleRequestFriendZone" styleClass="button-transparent" text="Friend zone"/>
           <Button fx:id="gracefulExitButton" onAction="#handleGracefulExit" styleClass="button-transparent" text="Graceful exit"/>
@@ -69,15 +70,20 @@
           </HBox>
         </VBox>
         <ListView fx:id="messageListView" VBox.vgrow="ALWAYS"
-                                                                                    styleClass="message-list-view" />
+                                                                                            styleClass="message-list-view" />
+        <HBox fx:id="typingIndicatorHost" alignment="CENTER_LEFT" managed="false" visible="false">
+          <padding>
+            <Insets left="20" right="20" bottom="10"/>
+          </padding>
+        </HBox>
         <HBox spacing="15.0" alignment="CENTER" styleClass="header-bar">
           <padding>
             <Insets bottom="20" left="20" right="20" top="20"/>
           </padding>
           <TextArea fx:id="messageArea" prefHeight="50.0" promptText="Type a message..."
-                                                                                                        wrapText="true" HBox.hgrow="ALWAYS" />
+                                                                                                                  wrapText="true" HBox.hgrow="ALWAYS" />
           <Button fx:id="sendButton" onAction="#handleSendMessage" prefHeight="50.0"
-                                                                                                        prefWidth="60.0" styleClass="button">
+                                                                                                                  prefWidth="60.0" styleClass="button">
             <graphic>
               <FontIcon iconLiteral="mdi2s-send" iconSize="20" iconColor="white"/>
             </graphic>

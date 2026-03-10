@@ -17,6 +17,7 @@ import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
@@ -63,6 +64,7 @@ public class ProfileController extends BaseController implements Initializable {
 
     private void wireAuxiliaryActions() {
         wirePhotoActions();
+        wireLocationActions();
         wireDealbreakersAction();
         wirePreviewActions();
     }
@@ -90,6 +92,21 @@ public class ProfileController extends BaseController implements Initializable {
             avatarInner.setOnMouseClicked(event -> {
                 event.consume();
                 handleUploadPhoto();
+            });
+        }
+    }
+
+    private void wireLocationActions() {
+        if (setLocationButton != null) {
+            setLocationButton.setOnAction(event -> {
+                event.consume();
+                handleSetLocation();
+            });
+        }
+        if (locationField != null) {
+            locationField.setOnMouseClicked(event -> {
+                event.consume();
+                handleSetLocation();
             });
         }
     }
@@ -134,6 +151,9 @@ public class ProfileController extends BaseController implements Initializable {
     private TextField locationField;
 
     @FXML
+    private Button setLocationButton;
+
+    @FXML
     private TextField interestsField;
 
     @FXML
@@ -168,6 +188,9 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private Label photoIndicatorLabel;
+
+    @FXML
+    private Label photoCountLabel;
 
     @FXML
     private Label interestCountLabel;
@@ -224,6 +247,15 @@ public class ProfileController extends BaseController implements Initializable {
     @FXML
     private Button profileScoreButton;
 
+    @FXML
+    private Label saveStatusLabel;
+
+    @FXML
+    private Button saveButton;
+
+    @FXML
+    private Button cancelButton;
+
     private static final int BIO_MAX_LENGTH = 500;
     private static final int BIO_WARNING_THRESHOLD = 400;
 
@@ -251,7 +283,9 @@ public class ProfileController extends BaseController implements Initializable {
             bioArea.textProperty().bindBidirectional(viewModel.bioProperty());
         }
         if (locationField != null) {
-            locationField.textProperty().bindBidirectional(viewModel.locationProperty());
+            locationField.textProperty().bind(viewModel.locationDisplayProperty());
+            locationField.setEditable(false);
+            locationField.setFocusTraversable(false);
         }
         if (interestsField != null) {
             interestsField.textProperty().bindBidirectional(viewModel.interestsProperty());
@@ -296,6 +330,8 @@ public class ProfileController extends BaseController implements Initializable {
         viewModel.getPhotoUrls().addListener((javafx.collections.ListChangeListener<String>)
                 c -> updatePhotoControlsVisibility());
         updatePhotoControlsVisibility();
+        updatePhotoCountLabel(viewModel.photoCountProperty().get());
+        addSubscription(viewModel.photoCountProperty().subscribe(this::updatePhotoCountLabel));
 
         // Refresh interested in buttons AFTER user data is loaded (they show the actual
         // preferences)
@@ -320,6 +356,15 @@ public class ProfileController extends BaseController implements Initializable {
 
         // Setup character counter for bio using Subscription API (memory-safe)
         setupCharacterCounter();
+
+        if (saveButton != null) {
+            saveButton.disableProperty().bind(viewModel.savingProperty());
+        }
+        if (cancelButton != null) {
+            cancelButton.disableProperty().bind(viewModel.savingProperty());
+        }
+        updateSavingState(viewModel.savingProperty().get());
+        addSubscription(viewModel.savingProperty().subscribe(this::updateSavingState));
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
@@ -591,6 +636,47 @@ public class ProfileController extends BaseController implements Initializable {
         }
     }
 
+    private void updatePhotoCountLabel(Number countValue) {
+        if (photoCountLabel == null) {
+            return;
+        }
+        int count = countValue == null ? 0 : countValue.intValue();
+        photoCountLabel.setText("Photos " + count + "/" + viewModel.getMaxPhotos());
+    }
+
+    private void updateSavingState(Boolean savingNow) {
+        if (saveStatusLabel == null) {
+            return;
+        }
+        if (Boolean.TRUE.equals(savingNow)) {
+            saveStatusLabel.setText("Saving…");
+            saveStatusLabel.setVisible(true);
+            saveStatusLabel.setManaged(true);
+            return;
+        }
+        if ("Saving…".equals(saveStatusLabel.getText())) {
+            clearSaveStatus();
+        }
+    }
+
+    private void showSaveFailureStatus() {
+        if (saveStatusLabel == null) {
+            return;
+        }
+        saveStatusLabel.setText("Save failed. Please fix any issues and try again.");
+        saveStatusLabel.setVisible(true);
+        saveStatusLabel.setManaged(true);
+    }
+
+    private void clearSaveStatus() {
+        if (saveStatusLabel == null) {
+            return;
+        }
+        saveStatusLabel.setText("");
+        saveStatusLabel.setVisible(false);
+        saveStatusLabel.setManaged(false);
+    }
+
     @FXML
     private void handlePrevPhoto() {
         viewModel.showPreviousPhoto();
@@ -689,10 +775,16 @@ public class ProfileController extends BaseController implements Initializable {
     @FXML
     @SuppressWarnings("unused")
     private void handleSave() {
-        // Save FIRST while bindings are still active, then cleanup
-        viewModel.save();
-        cleanup();
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
+        clearSaveStatus();
+        viewModel.saveAsync(success -> {
+            if (Boolean.TRUE.equals(success)) {
+                UiFeedbackService.showSuccess("Profile saved!");
+                cleanup();
+                NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
+                return;
+            }
+            showSaveFailureStatus();
+        });
     }
 
     @FXML
@@ -765,38 +857,91 @@ public class ProfileController extends BaseController implements Initializable {
     private void handleUploadPhoto() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Select Profile Photo");
+        fileChooser
+                .getExtensionFilters()
+                .setAll(new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg"));
 
         // Show file chooser dialog
         File selectedFile = fileChooser.showOpenDialog(rootPane.getScene().getWindow());
 
         if (selectedFile != null) {
-            try {
-                // Load image preview from file
-                Image image = new Image(selectedFile.toURI().toString(), 200, 200, true, true);
-
-                if (!image.isError()) {
-                    // Set image to ImageView (immediate preview)
-                    profileImageView.setImage(image);
-                    profileImageView.setVisible(true);
-
-                    // Hide placeholder icon
-                    if (avatarPlaceholderIcon != null) {
-                        avatarPlaceholderIcon.setVisible(false);
-                    }
-
-                    logInfo("Profile photo loaded: {}", selectedFile.getName());
-
-                    // Save photo via ViewModel (persists to storage)
-                    viewModel.savePhoto(selectedFile);
-                } else {
-                    logWarn("Failed to load image: {}", selectedFile.getAbsolutePath());
-                    UiFeedbackService.showError("Failed to load image");
+            if (viewModel.photoCountProperty().get() >= viewModel.getMaxPhotos()
+                    && !viewModel.getPhotoUrls().isEmpty()) {
+                boolean replaceCurrent = UiFeedbackService.showConfirmation(
+                        "Replace current photo?",
+                        "You already have " + viewModel.getMaxPhotos() + " photos.",
+                        "Replace the currently selected photo with " + selectedFile.getName() + "?");
+                if (!replaceCurrent) {
+                    return;
                 }
-            } catch (Exception e) {
-                logError("Error loading profile photo", e);
-                UiFeedbackService.showError("Error loading photo: " + e.getMessage());
+                viewModel.replacePhoto(viewModel.currentPhotoIndexProperty().get(), selectedFile);
+                return;
             }
+
+            logInfo("Saving profile photo: {}", selectedFile.getName());
+            viewModel.savePhoto(selectedFile);
         }
+    }
+
+    @FXML
+    private void handleSetLocation() {
+        Dialog<ButtonType> dialog = createThemedDialog("Set Location", "Enter your coordinates");
+
+        VBox content = new VBox(UiConstants.SPACING_MEDIUM);
+        content.setPadding(new Insets(UiConstants.PADDING_XLARGE));
+
+        Label helperLabel = new Label("Latitude must be between -90 and 90. Longitude must be between -180 and 180.");
+        helperLabel.getStyleClass().add("text-secondary");
+        helperLabel.setWrapText(true);
+
+        TextField latitudeField = new TextField();
+        latitudeField.setPromptText("Latitude");
+        latitudeField.getStyleClass().add("location-dialog-field");
+
+        TextField longitudeField = new TextField();
+        longitudeField.setPromptText("Longitude");
+        longitudeField.getStyleClass().add("location-dialog-field");
+
+        if (viewModel.hasLocationSet()) {
+            latitudeField.setText(String.format(java.util.Locale.ROOT, "%.6f", viewModel.getLatitude()));
+            longitudeField.setText(String.format(java.util.Locale.ROOT, "%.6f", viewModel.getLongitude()));
+        }
+
+        Label errorLabel = new Label();
+        errorLabel.getStyleClass().add("dialog-error-label");
+        errorLabel.setWrapText(true);
+        errorLabel.setManaged(false);
+        errorLabel.setVisible(false);
+
+        content.getChildren().addAll(helperLabel, latitudeField, longitudeField, errorLabel);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        Button confirmButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+        confirmButton.setText("Save");
+        confirmButton.addEventFilter(ActionEvent.ACTION, event -> {
+            try {
+                double latitude = Double.parseDouble(latitudeField.getText().trim());
+                double longitude = Double.parseDouble(longitudeField.getText().trim());
+                viewModel.setLocationCoordinates(latitude, longitude);
+                errorLabel.setText("");
+                errorLabel.setManaged(false);
+                errorLabel.setVisible(false);
+            } catch (NumberFormatException e) {
+                errorLabel.setText("Please enter numeric latitude and longitude values.");
+                errorLabel.setManaged(true);
+                errorLabel.setVisible(true);
+                event.consume();
+            } catch (IllegalArgumentException e) {
+                errorLabel.setText(e.getMessage());
+                errorLabel.setManaged(true);
+                errorLabel.setVisible(true);
+                event.consume();
+            }
+        });
+
+        dialog.showAndWait();
     }
 
     /**

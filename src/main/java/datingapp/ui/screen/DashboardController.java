@@ -45,6 +45,15 @@ public class DashboardController extends BaseController
     private Label dailyPickLabel;
 
     @FXML
+    private Label dailyPickReasonLabel;
+
+    @FXML
+    private Label dailyPickSeenLabel;
+
+    @FXML
+    private Label dailyPickEmptyLabel;
+
+    @FXML
     private Label totalMatchesLabel;
 
     @FXML
@@ -115,6 +124,10 @@ public class DashboardController extends BaseController
         addSubscription(viewModel.userNameProperty().subscribe(userNameLabel::setText));
         addSubscription(viewModel.dailyLikesStatusProperty().subscribe(statusLabel::setText));
         addSubscription(viewModel.dailyPickNameProperty().subscribe(dailyPickLabel::setText));
+        addSubscription(viewModel.dailyPickReasonProperty().subscribe(this::updateDailyPickReason));
+        addSubscription(viewModel.dailyPickSeenProperty().subscribe(this::updateDailyPickSeen));
+        addSubscription(viewModel.dailyPickAvailableProperty().subscribe(this::updateDailyPickAvailability));
+        addSubscription(viewModel.dailyPickEmptyMessageProperty().subscribe(this::updateDailyPickEmptyMessage));
         addSubscription(viewModel.totalMatchesProperty().subscribe(totalMatchesLabel::setText));
         addSubscription(viewModel.profileCompletionProperty().subscribe(completionLabel::setText));
         addSubscription(viewModel.profileNudgeMessageProperty().subscribe(this::updateProfileNudge));
@@ -134,6 +147,10 @@ public class DashboardController extends BaseController
         userNameLabel.setText(viewModel.userNameProperty().get());
         statusLabel.setText(viewModel.dailyLikesStatusProperty().get());
         dailyPickLabel.setText(viewModel.dailyPickNameProperty().get());
+        updateDailyPickReason(viewModel.dailyPickReasonProperty().get());
+        updateDailyPickSeen(viewModel.dailyPickSeenProperty().get());
+        updateDailyPickAvailability(viewModel.dailyPickAvailableProperty().get());
+        updateDailyPickEmptyMessage(viewModel.dailyPickEmptyMessageProperty().get());
         totalMatchesLabel.setText(viewModel.totalMatchesProperty().get());
         completionLabel.setText(viewModel.profileCompletionProperty().get());
         updateProfileNudge(viewModel.profileNudgeMessageProperty().get());
@@ -287,6 +304,10 @@ public class DashboardController extends BaseController
 
     @FXML
     private void handleViewDailyPick() {
+        if (!viewModel.dailyPickAvailableProperty().get()) {
+            UiFeedbackService.showInfo(viewModel.dailyPickEmptyMessageProperty().get());
+            return;
+        }
         logger.info("Viewing daily pick - navigating to Matching");
         if (viewModel.dailyPickUserIdProperty().get() != null) {
             NavigationService.getInstance()
@@ -390,6 +411,43 @@ public class DashboardController extends BaseController
             editProfileNudgeButton.setVisible(visible);
             editProfileNudgeButton.setManaged(visible);
         }
+    }
+
+    private void updateDailyPickReason(String reason) {
+        if (dailyPickReasonLabel == null) {
+            return;
+        }
+        String resolvedReason = reason == null ? "" : reason.trim();
+        boolean visible = !resolvedReason.isEmpty();
+        dailyPickReasonLabel.setText(resolvedReason);
+        dailyPickReasonLabel.setVisible(visible);
+        dailyPickReasonLabel.setManaged(visible);
+    }
+
+    private void updateDailyPickSeen(Boolean seen) {
+        if (dailyPickSeenLabel == null) {
+            return;
+        }
+        boolean visible = Boolean.TRUE.equals(seen);
+        dailyPickSeenLabel.setVisible(visible);
+        dailyPickSeenLabel.setManaged(visible);
+    }
+
+    private void updateDailyPickAvailability(Boolean available) {
+        if (dailyPickButton == null) {
+            return;
+        }
+        dailyPickButton.setDisable(!Boolean.TRUE.equals(available));
+    }
+
+    private void updateDailyPickEmptyMessage(String message) {
+        if (dailyPickEmptyLabel == null) {
+            return;
+        }
+        boolean visible = !viewModel.dailyPickAvailableProperty().get();
+        dailyPickEmptyLabel.setText(message == null ? "" : message);
+        dailyPickEmptyLabel.setVisible(visible);
+        dailyPickEmptyLabel.setManaged(visible);
     }
 
     private void handleAchievementCelebration(Boolean shouldCelebrate) {

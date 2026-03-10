@@ -1784,6 +1784,26 @@
     -fx-letter-spacing: 1;
 }
 
+.daily-pick-reason {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+}
+
+.daily-pick-seen-chip {
+    -fx-background-color: rgba(59, 130, 246, 0.2);
+    -fx-background-radius: 999;
+    -fx-padding: 4 10;
+    -fx-text-fill: #bfdbfe;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.daily-pick-empty-state {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+}
+
 /* Sidebar Card Container */
 .sidebar-card {
     -fx-background-color: linear-gradient(to bottom right, rgba(30, 30, 46, 0.9), rgba(20, 20, 35, 0.85));
@@ -2359,6 +2379,28 @@
 
 .profile-camera-btn:pressed {
     -fx-background-color: linear-gradient(to bottom right, #5a72d9, #684095);
+}
+
+.profile-photo-count {
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #cbd5e1;
+}
+
+.profile-save-status {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #cbd5e1;
+}
+
+.location-dialog-field {
+    -fx-pref-width: 260;
+}
+
+.dialog-error-label {
+    -fx-text-fill: #fda4af;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
 }
 
 /* ============================================

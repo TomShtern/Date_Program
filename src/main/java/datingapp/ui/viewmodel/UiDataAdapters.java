@@ -114,6 +114,24 @@ public final class UiDataAdapters {
         boolean deleteProfileNote(UUID authorId, UUID subjectId);
     }
 
+    /** Presence states supported by the chat UI. */
+    public enum PresenceStatus {
+        UNKNOWN,
+        ONLINE,
+        AWAY,
+        OFFLINE
+    }
+
+    /** UI-layer adapter interface for presence and typing indicators. */
+    public interface UiPresenceDataAccess {
+
+        /** Returns the current presence status for the specified user. */
+        PresenceStatus getPresence(UUID userId);
+
+        /** Returns whether the specified user is currently typing. */
+        boolean isTyping(UUID userId);
+    }
+
     // ── Implementations ─────────────────────────────────────────────────────
 
     /** Bridges the UI layer to the core {@link UserStorage} interface. */
@@ -275,6 +293,20 @@ public final class UiDataAdapters {
 
         @Override
         public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+            return false;
+        }
+    }
+
+    /** Safe default presence adapter used when live presence is not configured. */
+    public static final class NoOpUiPresenceDataAccess implements UiPresenceDataAccess {
+
+        @Override
+        public PresenceStatus getPresence(UUID userId) {
+            return PresenceStatus.UNKNOWN;
+        }
+
+        @Override
+        public boolean isTyping(UUID userId) {
             return false;
         }
     }

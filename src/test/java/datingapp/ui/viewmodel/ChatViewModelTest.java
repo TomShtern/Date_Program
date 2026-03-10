@@ -19,6 +19,8 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import datingapp.ui.viewmodel.UiDataAdapters.PresenceStatus;
+import datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,6 +28,8 @@ import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import javafx.application.Platform;
 import org.junit.jupiter.api.AfterEach;
@@ -49,6 +53,8 @@ class ChatViewModelTest {
     private User currentUser;
     private User otherUser;
     private TestStorages.Analytics analytics;
+    private final AtomicReference<PresenceStatus> presenceStatus = new AtomicReference<>(PresenceStatus.UNKNOWN);
+    private final AtomicBoolean remoteTyping = new AtomicBoolean(false);
 
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
@@ -79,6 +85,17 @@ class ChatViewModelTest {
         var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(users, profileService, null, null, config);
         var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService);
         var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, trustSafetyService);
+        UiPresenceDataAccess presenceDataAccess = new UiPresenceDataAccess() {
+            @Override
+            public PresenceStatus getPresence(UUID userId) {
+                return presenceStatus.get();
+            }
+
+            @Override
+            public boolean isTyping(UUID userId) {
+                return remoteTyping.get();
+            }
+        };
 
         viewModel = new ChatViewModel(
                 messagingUseCases,
@@ -87,7 +104,8 @@ class ChatViewModelTest {
                 new datingapp.ui.async.JavaFxUiThreadDispatcher(),
                 Duration.ofMillis(75),
                 Duration.ofMillis(75),
-                new UseCaseUiProfileNoteDataAccess(noteUseCases));
+                new ChatViewModel.ChatUiDependencies(
+                        new UseCaseUiProfileNoteDataAccess(noteUseCases), presenceDataAccess));
 
         currentUser = createActiveUser("CurrentUser");
         otherUser = createActiveUser("OtherUser");
@@ -350,10 +368,44 @@ class ChatViewModelTest {
         viewModel.requestFriendZoneForSelectedConversation();
 
         assertTrue(waitUntil(
-                () -> communications
-                                .getPendingFriendRequestsForUser(otherUser.getId())
+                () -> java.util.List.copyOf(communications.getPendingFriendRequestsForUser(otherUser.getId()))
                                 .size()
                         == 1,
+                5000));
+    }
+
+    @Test
+    @DisplayName("selected conversation refreshes presence and typing state")
+    void shouldRefreshPresenceAndTypingStateForSelectedConversation() throws InterruptedException {
+        connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Hello!");
+        presenceStatus.set(PresenceStatus.ONLINE);
+        remoteTyping.set(true);
+
+        viewModel.refreshConversations();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 1, 5000));
+
+        viewModel
+                .selectedConversationProperty()
+                .set(viewModel.getConversations().get(0));
+
+        assertTrue(waitUntil(
+                () -> viewModel.presenceStatusProperty().get() == PresenceStatus.ONLINE
+                        && viewModel.remoteTypingProperty().get(),
+                5000));
+
+        remoteTyping.set(false);
+        presenceStatus.set(PresenceStatus.AWAY);
+
+        assertTrue(waitUntil(
+                () -> viewModel.presenceStatusProperty().get() == PresenceStatus.AWAY
+                        && !viewModel.remoteTypingProperty().get(),
+                5000));
+
+        viewModel.selectedConversationProperty().set(null);
+
+        assertTrue(waitUntil(
+                () -> viewModel.presenceStatusProperty().get() == PresenceStatus.UNKNOWN
+                        && !viewModel.remoteTypingProperty().get(),
                 5000));
     }
 
