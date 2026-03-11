@@ -1,15 +1,19 @@
 package datingapp.ui.screen;
 
+import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
 import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.DashboardViewModel;
+import java.io.IOException;
 import java.net.URL;
+import java.util.List;
 import java.util.ResourceBundle;
 import javafx.animation.PauseTransition;
 import javafx.animation.RotateTransition;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.Node;
 import javafx.scene.canvas.Canvas;
@@ -460,6 +464,9 @@ public class DashboardController extends BaseController
             return;
         }
 
+        List<Achievement> toShow = viewModel.getNewlyUnlockedAchievements();
+        viewModel.markAchievementsSeen();
+
         Canvas canvas = new Canvas();
         canvas.setMouseTransparent(true);
         canvas.widthProperty().bind(rootStack.widthProperty());
@@ -473,8 +480,30 @@ public class DashboardController extends BaseController
         removalDelay.setOnFinished(event -> {
             confettiAnimation.stop();
             rootStack.getChildren().remove(canvas);
-            viewModel.markAchievementsSeen();
+            showAchievementPopups(rootStack, toShow);
         });
         removalDelay.play();
+    }
+
+    private void showAchievementPopups(StackPane rootStack, List<Achievement> achievements) {
+        for (int i = 0; i < achievements.size(); i++) {
+            Achievement achievement = achievements.get(i);
+            PauseTransition stagger = new PauseTransition(Duration.millis(i * 600L));
+            stagger.setOnFinished(e -> showSingleAchievementPopup(rootStack, achievement));
+            stagger.play();
+        }
+    }
+
+    private void showSingleAchievementPopup(StackPane rootStack, Achievement achievement) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/achievement_popup.fxml"));
+            StackPane popupRoot = loader.load();
+            MilestonePopupController popup = loader.getController();
+            rootStack.getChildren().add(popupRoot);
+            popup.showAchievement(achievement);
+        } catch (IOException e) {
+            logger.error( // NOPMD GuardLogStatement
+                    "Failed to load achievement popup for {}", achievement.getDisplayName(), e);
+        }
     }
 }

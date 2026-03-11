@@ -6,6 +6,7 @@ import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.RecommendationService.DailyPick;
 import datingapp.core.matching.RecommendationService.DailyStatus;
+import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
@@ -69,6 +70,7 @@ public class DashboardViewModel extends BaseViewModel {
     private final StringProperty profileNudgeMessage = new SimpleStringProperty("");
 
     private Set<String> latestAchievementIds = Set.of();
+    private List<Achievement> newlyUnlockedAchievements = List.of();
 
     private ViewModelErrorSink errorHandler;
 
@@ -234,6 +236,10 @@ public class DashboardViewModel extends BaseViewModel {
         return recentAchievements;
     }
 
+    public List<Achievement> getNewlyUnlockedAchievements() {
+        return newlyUnlockedAchievements;
+    }
+
     private DashboardData loadDashboardData(User user) {
         try {
             String completionText = profileCompletionService.calculate(user).getDisplayString();
@@ -320,7 +326,11 @@ public class DashboardViewModel extends BaseViewModel {
                 .map(achievement -> achievement.id().toString())
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         Set<String> seenAchievementIds = uiPreferencesStore.loadSeenAchievementIds();
-        newAchievementsAvailable.set(latestAchievementIds.stream().anyMatch(id -> !seenAchievementIds.contains(id)));
+        newlyUnlockedAchievements = data.achievements().stream()
+                .filter(ua -> !seenAchievementIds.contains(ua.id().toString()))
+                .map(UserAchievement::achievement)
+                .toList();
+        newAchievementsAvailable.set(!newlyUnlockedAchievements.isEmpty());
 
         if (data.error() != null && errorHandler != null) {
             String detail = data.error().getMessage();

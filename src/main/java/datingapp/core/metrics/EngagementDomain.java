@@ -19,17 +19,20 @@ public final class EngagementDomain {
 
     /** Achievement catalog. */
     public static enum Achievement {
-        FIRST_SPARK("First Spark", "Get your first match", "💫", Category.MATCHING, 1),
-        SOCIAL_BUTTERFLY("Social Butterfly", "Get 5 matches", "🦋", Category.MATCHING, 5),
-        POPULAR("Popular", "Get 10 matches", "⭐", Category.MATCHING, 10),
-        SUPERSTAR("Superstar", "Get 25 matches", "🌟", Category.MATCHING, 25),
-        LEGEND("Legend", "Get 50 matches", "👑", Category.MATCHING, 50),
-        SELECTIVE("Selective", "Like ratio < 20% (50+ swipes)", "🎯", Category.BEHAVIOR, 50),
-        OPEN_MINDED("Open-Minded", "Like ratio > 60% (50+ swipes)", "💝", Category.BEHAVIOR, 50),
-        COMPLETE_PACKAGE("Complete Package", "100% profile completion", "✅", Category.PROFILE, 100),
-        STORYTELLER("Storyteller", "Bio over 100 characters", "📖", Category.PROFILE, 100),
-        LIFESTYLE_GURU("Lifestyle Guru", "All lifestyle fields filled", "🧘", Category.PROFILE, 5),
-        GUARDIAN("Guardian", "Report a fake profile", "🛡️", Category.SAFETY, 1);
+        FIRST_SPARK("First Spark", "Get your first match", "💫", Category.MATCHING, 1, "mdi2h-heart-multiple", 50),
+        SOCIAL_BUTTERFLY("Social Butterfly", "Get 5 matches", "🦋", Category.MATCHING, 5, "mdi2s-star-outline", 100),
+        POPULAR("Popular", "Get 10 matches", "⭐", Category.MATCHING, 10, "mdi2s-star", 200),
+        SUPERSTAR("Superstar", "Get 25 matches", "🌟", Category.MATCHING, 25, "mdi2t-trophy", 500),
+        LEGEND("Legend", "Get 50 matches", "👑", Category.MATCHING, 50, "mdi2c-crown", 1000),
+        SELECTIVE("Selective", "Like ratio < 20% (50+ swipes)", "🎯", Category.BEHAVIOR, 50, "mdi2t-target", 75),
+        OPEN_MINDED(
+                "Open-Minded", "Like ratio > 60% (50+ swipes)", "💝", Category.BEHAVIOR, 50, "mdi2h-heart-circle", 75),
+        COMPLETE_PACKAGE(
+                "Complete Package", "100% profile completion", "✅", Category.PROFILE, 100, "mdi2a-account-check", 100),
+        STORYTELLER(
+                "Storyteller", "Bio over 100 characters", "📖", Category.PROFILE, 100, "mdi2b-book-open-variant", 50),
+        LIFESTYLE_GURU("Lifestyle Guru", "All lifestyle fields filled", "🧘", Category.PROFILE, 5, "mdi2y-yoga", 75),
+        GUARDIAN("Guardian", "Report a fake profile", "🛡️", Category.SAFETY, 1, "mdi2s-shield-check", 100);
 
         /** Achievement categories for grouping in UI. */
         public static enum Category {
@@ -54,13 +57,24 @@ public final class EngagementDomain {
         private final String icon;
         private final Category category;
         private final int threshold;
+        private final String iconLiteral;
+        private final int xp;
 
-        Achievement(String displayName, String description, String icon, Category category, int threshold) {
+        Achievement(
+                String displayName,
+                String description,
+                String icon,
+                Category category,
+                int threshold,
+                String iconLiteral,
+                int xp) {
             this.displayName = displayName;
             this.description = description;
             this.icon = icon;
             this.category = category;
             this.threshold = threshold;
+            this.iconLiteral = iconLiteral;
+            this.xp = xp;
         }
 
         public String getDisplayName() {
@@ -81,6 +95,14 @@ public final class EngagementDomain {
 
         public int getThreshold() {
             return threshold;
+        }
+
+        public String getIconLiteral() {
+            return iconLiteral;
+        }
+
+        public int getXp() {
+            return xp;
         }
 
         public String getFormattedDisplay() {

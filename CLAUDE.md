@@ -37,7 +37,7 @@ datingapp/
   app/
     api/RestApiServer.java
     bootstrap/ApplicationStartup.java
-    cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
+    cli/{CliTextAndInput,MainMenuRegistry,MatchingCliPresenter,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
     error/{AppError,AppResult}.java
     event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
     event/handlers/{AchievementEventHandler,MetricsEventHandler,NotificationEventHandler}.java
@@ -48,12 +48,12 @@ datingapp/
       profile/ProfileUseCases.java
       social/SocialUseCases.java
   core/
-    AppClock,AppConfig,AppSession,EnumSetUtil,LoggingSupport,PerformanceMonitor,ServiceRegistry,TextUtil
+    AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil
     model/{User,Match,ProfileNote}
     connection/{ConnectionModels,ConnectionService}
-    matching/{CandidateFinder,CompatibilityScoring,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}
-    metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
-    profile/{MatchPreferences,ProfileService,ValidationService}
+    matching/{CandidateFinder,CompatibilityCalculator,DefaultCompatibilityCalculator,DailyLimitService,DefaultDailyLimitService,DailyPickService,DefaultDailyPickService,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,StandoutService,DefaultStandoutService,TrustSafetyService,UndoService}
+    metrics/{AchievementService,ActivityMetricsService,DefaultAchievementService,EngagementDomain,SwipeState}
+    profile/{MatchPreferences,ProfileCompletionSupport,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
     time/{DefaultTimePolicy,TimePolicy}
     workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
@@ -65,8 +65,7 @@ datingapp/
   ui/
     DatingApp,NavigationService,ImageCache,UiAnimations,UiComponents,UiConstants,UiFeedbackService,UiUtils
     async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
-    popup/{MatchPopupController,MilestonePopupController}
-    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,PreferencesController,ProfileController,SocialController,StandoutsController,StatsController}
+    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,SafetyController,SocialController,StandoutsController,StatsController}
     viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,PreferencesViewModel,ProfileViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
 ```
 
@@ -84,6 +83,8 @@ datingapp/
 | Legacy bootstrap names     | `AppBootstrap`, `HandlerFactory`                               | `ApplicationStartup` + `fromServices(...)`      |
 | Use-case construction      | `new MatchingUseCases(...)` in callers                         | `services.getMatchingUseCases()` from registry  |
 | Config access              | `AppConfig.defaults()` in runtime code                         | injected `AppConfig` via `ServiceRegistry`      |
+| Achievement popup loading  | Manual `Dialog` in MatchingController for match popup          | Load `/fxml/achievement_popup.fxml` via `FXMLLoader`, add root to `NavigationService.getRootStack()`, call `popup.showAchievement(Achievement)` |
+| Session timeout scope      | Assuming `sessionTimeoutMinutes` auto-logs-out users           | Only expires **swipe/metrics sessions** in `ActivityMetricsService`; `AppSession` (login) has no auto-logout |
 
 ## Entrypoints and wiring
 
@@ -114,7 +115,7 @@ nav.initialize(primaryStage);
 
 Callers (CLI handlers, REST API, ViewModels) should obtain use cases from the registry — never construct them directly.
 
-`RestApiServer` delegates business operations (like/pass, send message, list conversations) through the use-case layer, not core services directly.
+`RestApiServer` delegates most write operations through the use-case layer. However, 5 endpoints currently call core services directly and bypass the use-case layer: `GET /api/users`, `GET /api/users/{id}`, `GET /api/users/{id}/candidates`, `GET /api/users/{id}/matches`, and `GET /api/conversations/{id}/messages`. Prefer routing new endpoints through the use-case layer.
 
 `AppEventBus` / `InProcessAppEventBus` provides in-process domain event dispatching. Event handlers live in `app/event/handlers/` and handle cross-cutting concerns (achievements, metrics, notifications).
 
@@ -130,6 +131,10 @@ Use `ui/async` package primitives:
 - `AsyncErrorRouter`
 
 This is now the shared pattern for ViewModel background work, loading-state tracking, latest-wins semantics, error routing, and disposal cancellation.
+
+## Known Flaky Tests
+
+- `ChatControllerTest#selectionTogglesChatStateAndNoteButtonsRemainWired` — fails intermittently in full suite (JavaFX thread ordering); passes in isolation. Pre-existing, not caused by typical code changes.
 
 ## Build & Quality Commands
 
@@ -185,4 +190,5 @@ mvn spotless:apply verify
 27|2026-03-01 01:20:00|agent:github_copilot|scope:source-truth-doc-sync|Updated counts, package tree, and CLI wiring callback from current source|CLAUDE.md
 28|2026-03-01 03:20:00|agent:github_copilot|scope:docs-metrics-refresh|Updated LOC snapshot values to current tokei output|CLAUDE.md
 29|2026-03-07 00:00:00|agent:claude_code|scope:source-truth-sync|Added event handlers subpackage, InterestMatcher, use-case wiring docs, config access gotcha, updated LOC|CLAUDE.md
+30|2026-03-11 00:00:00|agent:claude_code|scope:architecture-corrections|Removed non-existent PerformanceMonitor and CompatibilityScoring; fixed popup package (MatchPopupController removed, MilestonePopupController moved to screen); added SafetyController and NotesController to screen list; added MatchingCliPresenter to cli list; added Default* matching impls, AchievementService, ProfileCompletionSupport; corrected false RestApiServer claim; added 2 new gotchas (AchievementType enum split, sessionTimeout scope)|CLAUDE.md
 ---AGENT-LOG-END---

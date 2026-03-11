@@ -1,6 +1,7 @@
 package datingapp.ui.screen;
 
 import datingapp.core.i18n.I18n;
+import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.model.User;
 import datingapp.ui.UiAnimations.ConfettiAnimation;
 import java.net.URL;
@@ -111,8 +112,12 @@ public class MilestonePopupController implements Initializable {
         }
     }
 
-    public void showAchievement(AchievementType type) {
-        showAchievement(type.iconLiteral, type.localizedName(resources), type.localizedDescription(resources), type.xp);
+    public void showAchievement(Achievement achievement) {
+        showAchievement(
+                achievement.getIconLiteral(),
+                achievement.getDisplayName(),
+                achievement.getDescription(),
+                achievement.getXp());
     }
 
     public void setMatchedUser(User currentUser, User matchedUser) {
@@ -319,61 +324,5 @@ public class MilestonePopupController implements Initializable {
 
     public void setAutoDismiss(boolean autoDismiss) {
         this.autoDismiss = autoDismiss;
-    }
-
-    public static enum AchievementType {
-        FIRST_MATCH(
-                "mdi2h-heart-multiple",
-                "ui.achievement.first_match.name",
-                "ui.achievement.first_match.description",
-                50),
-        PROFILE_COMPLETE(
-                "mdi2a-account-check",
-                "ui.achievement.profile_complete.name",
-                "ui.achievement.profile_complete.description",
-                100),
-        FIRST_MESSAGE(
-                "mdi2m-message-text",
-                "ui.achievement.first_message.name",
-                "ui.achievement.first_message.description",
-                25),
-        TEN_MATCHES("mdi2s-star", "ui.achievement.ten_matches.name", "ui.achievement.ten_matches.description", 200),
-        TWENTY_FIVE_MATCHES(
-                "mdi2t-trophy",
-                "ui.achievement.twenty_five_matches.name",
-                "ui.achievement.twenty_five_matches.description",
-                500),
-        FIFTY_MATCHES(
-                "mdi2c-crown", "ui.achievement.fifty_matches.name", "ui.achievement.fifty_matches.description", 1000),
-        FIRST_DATE(
-                "mdi2c-calendar-heart", "ui.achievement.first_date.name", "ui.achievement.first_date.description", 150),
-        ACTIVE_WEEK("mdi2f-fire", "ui.achievement.active_week.name", "ui.achievement.active_week.description", 75),
-        SUPER_LIKER(
-                "mdi2l-lightning-bolt",
-                "ui.achievement.super_liker.name",
-                "ui.achievement.super_liker.description",
-                30),
-        PHOTO_PERFECT(
-                "mdi2c-camera", "ui.achievement.photo_perfect.name", "ui.achievement.photo_perfect.description", 50);
-
-        final String iconLiteral;
-        final String nameKey;
-        final String descriptionKey;
-        final int xp;
-
-        AchievementType(String iconLiteral, String nameKey, String descriptionKey, int xp) {
-            this.iconLiteral = iconLiteral;
-            this.nameKey = nameKey;
-            this.descriptionKey = descriptionKey;
-            this.xp = xp;
-        }
-
-        String localizedName(ResourceBundle resources) {
-            return I18n.text(resources != null ? resources : I18n.bundle(), nameKey);
-        }
-
-        String localizedDescription(ResourceBundle resources) {
-            return I18n.text(resources != null ? resources : I18n.bundle(), descriptionKey);
-        }
     }
 }
