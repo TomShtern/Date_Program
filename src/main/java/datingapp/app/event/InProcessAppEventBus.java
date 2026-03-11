@@ -13,6 +13,7 @@ public final class InProcessAppEventBus implements AppEventBus, LoggingSupport {
 
     private static final Logger LOG = LoggerFactory.getLogger(InProcessAppEventBus.class);
 
+    // ConcurrentHashMap + CopyOnWriteArrayList ensure thread-safe subscribe/publish (C2 fixed).
     private final Map<Class<? extends AppEvent>, List<HandlerEntry<?>>> handlers = new ConcurrentHashMap<>();
 
     private record HandlerEntry<T extends AppEvent>(AppEventHandler<T> handler, HandlerPolicy policy) {}

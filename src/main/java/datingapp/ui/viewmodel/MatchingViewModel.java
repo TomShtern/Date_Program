@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
@@ -73,6 +74,7 @@ public class MatchingViewModel extends BaseViewModel {
     private User lastSwipedCandidate;
     private User currentUser;
     private UUID prioritizedCandidateId;
+    private final AtomicBoolean swipeInProgress = new AtomicBoolean(false);
     private final AtomicInteger noteLoadToken = new AtomicInteger();
 
     public record Dependencies(
@@ -247,6 +249,7 @@ public class MatchingViewModel extends BaseViewModel {
             } else {
                 clearNoteState();
             }
+            swipeInProgress.set(false);
         });
     }
 
@@ -372,8 +375,12 @@ public class MatchingViewModel extends BaseViewModel {
     }
 
     private void processSwipe(boolean liked) {
+        if (!swipeInProgress.compareAndSet(false, true)) {
+            return;
+        }
         User candidate = currentCandidate.get();
         if (candidate == null || ensureCurrentUser() == null) {
+            swipeInProgress.set(false);
             return;
         }
 
@@ -385,6 +392,7 @@ public class MatchingViewModel extends BaseViewModel {
         if (!result.success()) {
             logWarn("Swipe failed: {}", result.error().message());
             // UI handles daily limit messaging elsewhere; no further action here.
+            swipeInProgress.set(false);
             return;
         }
         MatchingService.SwipeResult swipeResult = result.data();
@@ -422,7 +430,9 @@ public class MatchingViewModel extends BaseViewModel {
                     currentCandidatePhotoUrl.set(urls.isEmpty() ? null : urls.get(0));
                     lastSwipedCandidate = null;
                     hasMoreCandidates.set(true);
+                    swipeInProgress.set(false);
                 } else {
+                    swipeInProgress.set(false);
                     refreshCandidates();
                 }
             }

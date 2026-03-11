@@ -233,15 +233,59 @@ public final class TrustSafetyService {
                 return false;
             }
 
-            User latestReported = userStorage.get(reportedUserId).orElse(null);
+            User latestReported = userStorage
+                    .get(reportedUserId)
+                    .map(TrustSafetyService::copyUser)
+                    .orElse(null);
             if (latestReported == null || latestReported.getState() == UserState.BANNED) {
                 return false;
             }
 
             latestReported.ban();
-            userStorage.save(latestReported);
-            return true;
+            try {
+                userStorage.save(latestReported);
+                return true;
+            } catch (RuntimeException e) {
+                logger.error(
+                        "Auto-ban save failed for user {} after {} reports; ban was not persisted",
+                        reportedUserId,
+                        reportCount,
+                        e);
+                return false;
+            }
         }
+    }
+
+    private static User copyUser(User user) {
+        return User.StorageBuilder.create(user.getId(), user.getName(), user.getCreatedAt())
+                .bio(user.getBio())
+                .birthDate(user.getBirthDate())
+                .gender(user.getGender())
+                .interestedIn(user.getInterestedIn())
+                .location(user.getLat(), user.getLon())
+                .hasLocationSet(user.hasLocationSet())
+                .maxDistanceKm(user.getMaxDistanceKm())
+                .ageRange(user.getMinAge(), user.getMaxAge())
+                .photoUrls(user.getPhotoUrls())
+                .state(user.getState())
+                .updatedAt(user.getUpdatedAt())
+                .interests(user.getInterests())
+                .smoking(user.getSmoking())
+                .drinking(user.getDrinking())
+                .wantsKids(user.getWantsKids())
+                .lookingFor(user.getLookingFor())
+                .education(user.getEducation())
+                .heightCm(user.getHeightCm())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .verified(user.isVerified())
+                .verificationMethod(user.getVerificationMethod())
+                .verificationCode(user.getVerificationCode())
+                .verificationSentAt(user.getVerificationSentAt())
+                .verifiedAt(user.getVerifiedAt())
+                .pacePreferences(user.getPacePreferences())
+                .deletedAt(user.getDeletedAt())
+                .build();
     }
 
     /**

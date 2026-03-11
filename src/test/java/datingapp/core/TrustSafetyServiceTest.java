@@ -190,6 +190,31 @@ class TrustSafetyServiceTest {
 
                 assertTrue(result.userWasBanned(), "Should ban at custom threshold of 2");
             }
+
+            @Test
+            @DisplayName("Auto-ban save failure leaves stored user active")
+            void autoBanSaveFailureLeavesStoredUserActive() {
+                User reporter2 = createActiveUser("Reporter2");
+                User reporter3 = createActiveUser("Reporter3");
+                userStorage.save(reporter2);
+                userStorage.save(reporter3);
+
+                trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
+                trustSafetyService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
+
+                userStorage.failNextSave = true;
+
+                var result = trustSafetyService.report(
+                        reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
+
+                assertTrue(result.success(), "The report itself should still succeed");
+                assertFalse(result.userWasBanned(), "A failed save must not be reported as a successful ban");
+                assertEquals(
+                        UserState.ACTIVE,
+                        userStorage.get(reportedUser.getId()).orElseThrow().getState(),
+                        "Stored user must remain ACTIVE when the ban save fails");
+                assertEquals(3, trustSafetyStorage.countReportsAgainst(reportedUser.getId()));
+            }
         }
 
         @Nested
@@ -516,6 +541,7 @@ class TrustSafetyServiceTest {
     private static class InMemoryUserStorage implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
         private final Map<String, ProfileNote> profileNotes = new java.util.concurrent.ConcurrentHashMap<>();
+        private boolean failNextSave;
 
         private static String noteKey(UUID authorId, UUID subjectId) {
             return authorId + "_" + subjectId;
@@ -523,6 +549,10 @@ class TrustSafetyServiceTest {
 
         @Override
         public void save(User user) {
+            if (failNextSave) {
+                failNextSave = false;
+                throw new RuntimeException("simulated save failure");
+            }
             users.put(user.getId(), user);
         }
 

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
@@ -21,7 +22,9 @@ import datingapp.core.testutil.TestStorages;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
 import java.time.ZoneId;
+import java.util.ArrayDeque;
 import java.util.EnumSet;
+import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
@@ -135,6 +138,62 @@ class MatchingViewModelTest {
         viewModel.dispose();
     }
 
+    @Test
+    @DisplayName("rapid double like only advances one candidate")
+    void rapidDoubleLikeOnlyAdvancesOneCandidate() {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+        QueuedUiDispatcher dispatcher = new QueuedUiDispatcher();
+
+        MatchingViewModel viewModel = fixture.createViewModel(dispatcher);
+        viewModel.initialize(fixture.prioritizedCandidate.getId());
+
+        drainUntil(() -> viewModel.currentCandidateProperty().get() != null, dispatcher, 5000);
+
+        assertEquals(
+                fixture.prioritizedCandidate.getId(),
+                viewModel.currentCandidateProperty().get().getId(),
+                "Prioritized candidate should be shown first");
+
+        viewModel.like();
+        viewModel.like();
+
+        assertEquals(
+                fixture.prioritizedCandidate.getId(),
+                viewModel.currentCandidateProperty().get().getId(),
+                "Candidate should not change until queued UI work is processed");
+
+        dispatcher.drain();
+
+        assertEquals(
+                fixture.fallbackCandidate.getId(),
+                viewModel.currentCandidateProperty().get().getId(),
+                "Rapid double-like should only advance to the next candidate once");
+        assertTrue(viewModel.hasMoreCandidatesProperty().get(), "Next candidate should still be available");
+        assertEquals(
+                1,
+                fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.LIKE),
+                "Only one like should be recorded for the original candidate");
+
+        viewModel.dispose();
+    }
+
+    private static void drainUntil(
+            CheckedBooleanSupplier condition, QueuedUiDispatcher dispatcher, long timeoutMillis) {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+        while (System.nanoTime() < deadline) {
+            dispatcher.drain();
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(25));
+        }
+        dispatcher.drain();
+        if (!condition.getAsBoolean()) {
+            throw new IllegalStateException("Timed out waiting for queued UI work");
+        }
+    }
+
     private static void waitUntil(CheckedBooleanSupplier condition, long timeoutMillis) {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
         while (System.nanoTime() < deadline) {
@@ -180,6 +239,10 @@ class MatchingViewModelTest {
         }
 
         private MatchingViewModel createViewModel() {
+            return createViewModel(TEST_DISPATCHER);
+        }
+
+        private MatchingViewModel createViewModel(UiThreadDispatcher dispatcher) {
             CandidateFinder candidateFinder =
                     new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
             ProfileService profileService =
@@ -221,7 +284,7 @@ class MatchingViewModelTest {
                             new datingapp.app.usecase.social.SocialUseCases(trustSafetyService),
                             new UseCaseUiProfileNoteDataAccess(noteUseCases)),
                     session,
-                    TEST_DISPATCHER);
+                    dispatcher);
         }
 
         private void saveNote(String content) {
@@ -248,6 +311,35 @@ class MatchingViewModelTest {
                     PacePreferences.DepthPreference.DEEP_CHAT));
             user.activate();
             return user;
+        }
+    }
+
+    private static final class QueuedUiDispatcher implements UiThreadDispatcher {
+        private final Queue<Runnable> pending = new ArrayDeque<>();
+
+        @Override
+        public boolean isUiThread() {
+            return false;
+        }
+
+        @Override
+        public void dispatch(Runnable action) {
+            synchronized (pending) {
+                pending.add(action);
+            }
+        }
+
+        private void drain() {
+            while (true) {
+                Runnable next;
+                synchronized (pending) {
+                    next = pending.poll();
+                }
+                if (next == null) {
+                    return;
+                }
+                next.run();
+            }
         }
     }
 }

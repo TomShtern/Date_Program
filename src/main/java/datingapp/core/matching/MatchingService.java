@@ -19,14 +19,17 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class MatchingService {
 
     private static final String LIKE_REQUIRED = "like cannot be null";
+    private static final Object IN_FLIGHT_SENTINEL = new Object();
 
     private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
     private final UserStorage userStorage;
+    private final Map<String, Object> swipeInFlight = new ConcurrentHashMap<>();
     private ActivityMetricsService activityMetricsService; // Optional
     private UndoService undoService; // Optional
     private RecommendationService dailyService; // Optional
@@ -195,16 +198,24 @@ public final class MatchingService {
             return SwipeResult.dailyLimitReached();
         }
 
-        Like.Direction direction = liked ? Like.Direction.LIKE : Like.Direction.PASS;
-        Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
-        Optional<Match> match = recordLike(like);
-        undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
-        invalidateCandidateCaches(currentUser.getId(), candidate.getId());
-
-        if (match.isPresent()) {
-            return SwipeResult.matched(match.get(), like);
+        String inFlightKey = currentUser.getId() + ">" + candidate.getId();
+        if (swipeInFlight.putIfAbsent(inFlightKey, IN_FLIGHT_SENTINEL) != null) {
+            return SwipeResult.configError("A swipe for this candidate is already in progress");
         }
-        return liked ? SwipeResult.liked(like) : SwipeResult.passed(like);
+        try {
+            Like.Direction direction = liked ? Like.Direction.LIKE : Like.Direction.PASS;
+            Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
+            Optional<Match> match = recordLike(like);
+            undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
+            invalidateCandidateCaches(currentUser.getId(), candidate.getId());
+
+            if (match.isPresent()) {
+                return SwipeResult.matched(match.get(), like);
+            }
+            return liked ? SwipeResult.liked(like) : SwipeResult.passed(like);
+        } finally {
+            swipeInFlight.remove(inFlightKey);
+        }
     }
 
     private void invalidateCandidateCaches(UUID firstUserId, UUID secondUserId) {
