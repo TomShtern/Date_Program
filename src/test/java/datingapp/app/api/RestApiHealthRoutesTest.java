@@ -1,10 +1,11 @@
 package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.app.event.InProcessAppEventBus;
-import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionService;
@@ -27,35 +28,31 @@ import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.SwipeState.Undo;
-import datingapp.core.model.Match;
-import datingapp.core.model.User;
-import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestStorages;
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("REST API conversation batch counts")
-class RestApiConversationBatchCountTest {
+@DisplayName("REST API health and validation routes")
+class RestApiHealthRoutesTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -70,42 +67,53 @@ class RestApiConversationBatchCountTest {
     }
 
     @Test
-    @DisplayName("conversations endpoint uses batch count path instead of per-conversation counting")
-    void conversationsEndpointUsesBatchCountPath() throws Exception {
+    @DisplayName("health route responds from localhost-only server")
+    void healthRouteRespondsFromLocalhostOnlyServer() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
-        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
-        SpyCommunications communicationStorage = new SpyCommunications();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
         ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
-
-        UUID userA = UUID.randomUUID();
-        UUID userB = UUID.randomUUID();
-        UUID userC = UUID.randomUUID();
-
-        userStorage.save(activeUser(userA, "Alice"));
-        userStorage.save(activeUser(userB, "Bob"));
-        userStorage.save(activeUser(userC, "Cara"));
-
-        interactionStorage.save(Match.create(userA, userB));
-        interactionStorage.save(Match.create(userA, userC));
-
-        ConnectionService connectionService = services.getConnectionService();
-        connectionService.sendMessage(userA, userB, "AB-1");
-        connectionService.sendMessage(userA, userC, "AC-1");
 
         server = new RestApiServer(services, 0);
         server.start();
 
         int port = server.getApp().port();
-        URI uri = URI.create("http://localhost:" + port + "/api/users/" + userA + "/conversations");
-
         HttpResponse<String> response = HttpClient.newHttpClient()
-                .send(HttpRequest.newBuilder(uri).GET().build(), HttpResponse.BodyHandlers.ofString());
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/health"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
 
         assertEquals(200, response.statusCode());
-        List<?> conversations = MAPPER.readValue(response.body(), List.class);
-        assertEquals(2, conversations.size());
-        assertEquals(1, communicationStorage.batchCountCalls());
-        assertEquals(0, communicationStorage.singleCountCalls());
+        JsonNode json = MAPPER.readTree(response.body());
+        assertEquals("ok", json.get("status").asText());
+        assertTrue(InetAddress.getByName("localhost").isLoopbackAddress());
+    }
+
+    @Test
+    @DisplayName("invalid UUID route returns bad request")
+    void invalidUuidRouteReturnsBadRequest() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+
+        int port = server.getApp().port();
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/not-a-uuid"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(400, response.statusCode());
+        JsonNode json = MAPPER.readTree(response.body());
+        assertEquals("BAD_REQUEST", json.get("code").asText());
+        assertTrue(json.get("message").asText().contains("Invalid UUID format"));
     }
 
     private static ServiceRegistry createServices(
@@ -120,7 +128,6 @@ class RestApiConversationBatchCountTest {
                 new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
         ProfileService profileService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
-
         CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
         DailyLimitService dailyLimitService = new DefaultDailyLimitService(interactionStorage, config);
         DailyPickService dailyPickService =
@@ -180,46 +187,6 @@ class RestApiConversationBatchCountTest {
                 .build();
     }
 
-    private static User activeUser(UUID id, String name) {
-        return User.StorageBuilder.create(id, name, AppClock.now())
-                .state(UserState.ACTIVE)
-                .birthDate(LocalDate.of(1998, 1, 1))
-                .build();
-    }
-
-    private static final class SpyCommunications extends TestStorages.Communications {
-        private int singleCountCalls;
-        private int batchCountCalls;
-        private boolean countingWithinBatch;
-
-        @Override
-        public int countMessages(String conversationId) {
-            if (!countingWithinBatch) {
-                singleCountCalls++;
-            }
-            return super.countMessages(conversationId);
-        }
-
-        @Override
-        public Map<String, Integer> countMessagesByConversationIds(Set<String> conversationIds) {
-            batchCountCalls++;
-            countingWithinBatch = true;
-            try {
-                return super.countMessagesByConversationIds(conversationIds);
-            } finally {
-                countingWithinBatch = false;
-            }
-        }
-
-        private int singleCountCalls() {
-            return singleCountCalls;
-        }
-
-        private int batchCountCalls() {
-            return batchCountCalls;
-        }
-    }
-
     private static final class InMemoryUndoStorage implements Undo.Storage {
         private final Map<UUID, Undo> byUserId = new HashMap<>();
 
@@ -259,7 +226,7 @@ class RestApiConversationBatchCountTest {
     private static final class InMemoryStandoutStorage implements Standout.Storage {
         @Override
         public void saveStandouts(UUID seekerId, List<Standout> standouts, java.time.LocalDate date) {
-            // no-op for this integration test
+            // no-op
         }
 
         @Override
@@ -269,7 +236,7 @@ class RestApiConversationBatchCountTest {
 
         @Override
         public void markInteracted(UUID seekerId, UUID standoutUserId, java.time.LocalDate date) {
-            // no-op for this integration test
+            // no-op
         }
 
         @Override

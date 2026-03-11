@@ -1,5 +1,5 @@
 
-> 🚀 **VERIFIED & UPDATED: 2026-03-09**
+> 🚀 **VERIFIED & UPDATED: 2026-03-11**
 > This document has been programmatically verified against the codebase as of this date.
 
 <!--AGENT-DOCSYNC:ON-->
@@ -24,10 +24,10 @@ Guidance for AI coding agents working in this repository.
 - Java 25 + JavaFX 25
 - Maven
 
-## Verified Source Snapshot (2026-03-09)
+## Verified Source Snapshot (2026-03-11)
 
-- Java files: **231 total**
-- Java LOC (`tokei`): **63,974 total / 50,038 code / 9,358 blank / 4,578 comments**
+- Java files: **247 total**
+- Java LOC (`tokei`): **66,698 total / 52,170 code / 9,728 blank / 4,800 comments**
 
 ## Architecture (code-verified)
 

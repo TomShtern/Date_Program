@@ -92,7 +92,8 @@ class TrustSafetyServiceTest {
             interactionStorage = new TestStorages.Interactions();
 
             AppConfig config = AppConfig.builder().autoBanThreshold(3).build();
-            trustSafetyService = new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
+            trustSafetyService = TrustSafetyService.builder(trustSafetyStorage, interactionStorage, userStorage, config)
+                    .build();
 
             // Create test users
             activeReporter = createActiveUser("Reporter");
@@ -176,8 +177,9 @@ class TrustSafetyServiceTest {
             @DisplayName("Custom threshold works")
             void customThresholdWorks() {
                 AppConfig customConfig = AppConfig.builder().autoBanThreshold(2).build();
-                TrustSafetyService customService =
-                        new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, customConfig);
+                TrustSafetyService customService = TrustSafetyService.builder(
+                                trustSafetyStorage, interactionStorage, userStorage, customConfig)
+                        .build();
 
                 User reporter2 = createActiveUser("Reporter2");
                 userStorage.save(reporter2);
@@ -317,8 +319,10 @@ class TrustSafetyServiceTest {
             var tss = new TestStorages.TrustSafety();
             var iss = new TestStorages.Interactions();
             var us = new TestStorages.Users();
-            TrustSafetyService trustSafetyService =
-                    new TrustSafetyService(tss, iss, us, AppConfig.defaults(), Duration.ofMinutes(15), new Random(123));
+            TrustSafetyService trustSafetyService = TrustSafetyService.builder(tss, iss, us, AppConfig.defaults())
+                    .verificationTtl(Duration.ofMinutes(15))
+                    .random(new Random(123))
+                    .build();
 
             User user = createActiveUser("ExpiredVerify");
             user.startVerification(VerificationMethod.EMAIL, "123456");
@@ -337,11 +341,12 @@ class TrustSafetyServiceTest {
         @Test
         @DisplayName("Returns false when code mismatches")
         void returnsFalseWhenCodeMismatches() {
-            TrustSafetyService trustSafetyService = new TrustSafetyService(
-                    new TestStorages.TrustSafety(),
-                    new TestStorages.Interactions(),
-                    new TestStorages.Users(),
-                    AppConfig.defaults());
+            TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                            new TestStorages.TrustSafety(),
+                            new TestStorages.Interactions(),
+                            new TestStorages.Users(),
+                            AppConfig.defaults())
+                    .build();
 
             User user = createActiveUser("MismatchVerify");
             user.startVerification(VerificationMethod.PHONE, "123456");
@@ -373,8 +378,13 @@ class TrustSafetyServiceTest {
             trustSafetyStorage = new TestStorages.TrustSafety();
             interactionStorage = new TestStorages.Interactions();
             communicationStorage = new TestStorages.Communications();
-            service = new TrustSafetyService(
-                    trustSafetyStorage, interactionStorage, userStorage, AppConfig.defaults(), communicationStorage);
+            service = TrustSafetyService.builder(
+                            trustSafetyStorage,
+                            interactionStorage,
+                            userStorage,
+                            AppConfig.defaults(),
+                            communicationStorage)
+                    .build();
             blocker = createActiveUser("Blocker");
             blocked = createActiveUser("Blocked");
             userStorage.save(blocker);

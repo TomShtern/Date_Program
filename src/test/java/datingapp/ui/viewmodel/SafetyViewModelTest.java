@@ -16,6 +16,7 @@ import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import javafx.application.Platform;
 import org.junit.jupiter.api.AfterEach;
@@ -69,8 +70,9 @@ class SafetyViewModelTest {
         users.save(blocked);
         AppSession.getInstance().setCurrentUser(blocker);
 
-        TrustSafetyService trustSafetyService =
-                new TrustSafetyService(trustSafetyStorage, interactions, users, config, communications);
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
         trustSafetyService.block(blocker.getId(), blocked.getId());
 
         SafetyViewModel viewModel = new SafetyViewModel(trustSafetyService, AppSession.getInstance(), TEST_DISPATCHER);
@@ -100,8 +102,9 @@ class SafetyViewModelTest {
         users.save(blocker);
         AppSession.getInstance().setCurrentUser(blocker);
 
-        TrustSafetyService trustSafetyService =
-                new TrustSafetyService(trustSafetyStorage, interactions, users, config, communications);
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
 
         SafetyViewModel viewModel = new SafetyViewModel(trustSafetyService, AppSession.getInstance(), TEST_DISPATCHER);
         viewModel.initialize();
@@ -117,7 +120,7 @@ class SafetyViewModelTest {
             if (condition.getAsBoolean()) {
                 return true;
             }
-            Thread.sleep(25);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(25));
         }
         waitForFxEvents();
         return condition.getAsBoolean();

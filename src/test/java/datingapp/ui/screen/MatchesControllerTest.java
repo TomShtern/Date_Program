@@ -110,8 +110,9 @@ class MatchesControllerTest {
             var undoService = new datingapp.core.matching.UndoService(interactions, new TestStorages.Undos(), config);
             var matchingUseCases = new datingapp.app.usecase.matching.MatchingUseCases(
                     candidateFinder, matchingService, dailyService, undoService, interactions, users, null);
-            TrustSafetyService trustSafetyService =
-                    new TrustSafetyService(trustSafetyStorage, interactions, users, config, communications);
+            TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                            trustSafetyStorage, interactions, users, config, communications)
+                    .build();
             var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
                     new ConnectionService(config, communications, interactions, users),
                     trustSafetyService,

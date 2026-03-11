@@ -21,7 +21,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TrustSafetyService {
+public final class TrustSafetyService {
 
     private static final Logger logger = LoggerFactory.getLogger(TrustSafetyService.class);
     public static final Duration DEFAULT_VERIFICATION_TTL = Duration.ofMinutes(15);
@@ -36,82 +36,106 @@ public class TrustSafetyService {
     private final RelationshipWorkflowPolicy workflowPolicy;
     private CandidateFinder candidateFinder;
 
-    /** Convenience constructor without communication storage (for tests and simple setups). */
-    public TrustSafetyService(
-            TrustSafetyStorage trustSafetyStorage,
-            InteractionStorage interactionStorage,
-            UserStorage userStorage,
-            AppConfig config) {
-        this(trustSafetyStorage, interactionStorage, userStorage, config, null, DEFAULT_VERIFICATION_TTL, new Random());
+    public static Builder builder() {
+        return new Builder();
     }
 
-    /** Constructor with communication storage for full conversation archiving on block. */
-    public TrustSafetyService(
+    public static Builder builder(
             TrustSafetyStorage trustSafetyStorage,
             InteractionStorage interactionStorage,
             UserStorage userStorage,
             AppConfig config,
             CommunicationStorage communicationStorage) {
-        this(
-                trustSafetyStorage,
-                interactionStorage,
-                userStorage,
-                config,
-                communicationStorage,
-                DEFAULT_VERIFICATION_TTL,
-                new Random());
+        return builder()
+                .trustSafetyStorage(trustSafetyStorage)
+                .interactionStorage(interactionStorage)
+                .userStorage(userStorage)
+                .config(config)
+                .communicationStorage(communicationStorage);
     }
 
-    /** Full constructor with all dependencies. */
-    public TrustSafetyService(
+    public static Builder builder(
             TrustSafetyStorage trustSafetyStorage,
             InteractionStorage interactionStorage,
             UserStorage userStorage,
-            AppConfig config,
-            Duration verificationTtl,
-            Random random) {
-        this(trustSafetyStorage, interactionStorage, userStorage, config, null, verificationTtl, random);
+            AppConfig config) {
+        return builder()
+                .trustSafetyStorage(trustSafetyStorage)
+                .interactionStorage(interactionStorage)
+                .userStorage(userStorage)
+                .config(config);
     }
 
-    /** Backward-compatible canonical constructor — delegates to full constructor. */
-    public TrustSafetyService(
-            TrustSafetyStorage trustSafetyStorage,
-            InteractionStorage interactionStorage,
-            UserStorage userStorage,
-            AppConfig config,
-            CommunicationStorage communicationStorage,
-            Duration verificationTtl,
-            Random random) {
-        this(
-                trustSafetyStorage,
-                interactionStorage,
-                userStorage,
-                config,
-                communicationStorage,
-                verificationTtl,
-                random,
-                new RelationshipWorkflowPolicy());
+    private TrustSafetyService(Builder builder) {
+        Builder resolvedBuilder = Objects.requireNonNull(builder, "builder cannot be null");
+        this.trustSafetyStorage =
+                Objects.requireNonNull(resolvedBuilder.trustSafetyStorage, "trustSafetyStorage cannot be null");
+        this.interactionStorage =
+                Objects.requireNonNull(resolvedBuilder.interactionStorage, "interactionStorage cannot be null");
+        this.userStorage = Objects.requireNonNull(resolvedBuilder.userStorage, "userStorage cannot be null");
+        this.config = Objects.requireNonNull(resolvedBuilder.config, "config cannot be null");
+        this.communicationStorage = resolvedBuilder.communicationStorage;
+        this.verificationTtl =
+                Objects.requireNonNull(resolvedBuilder.verificationTtl, "verificationTtl cannot be null");
+        this.random = Objects.requireNonNull(resolvedBuilder.random, "random cannot be null");
+        this.workflowPolicy = Objects.requireNonNull(resolvedBuilder.workflowPolicy, "workflowPolicy cannot be null");
     }
 
-    /** Full canonical constructor with workflow policy. */
-    @SuppressWarnings("java:S107")
-    public TrustSafetyService(
-            TrustSafetyStorage trustSafetyStorage,
-            InteractionStorage interactionStorage,
-            UserStorage userStorage,
-            AppConfig config,
-            CommunicationStorage communicationStorage,
-            Duration verificationTtl,
-            Random random,
-            RelationshipWorkflowPolicy workflowPolicy) {
-        this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
-        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
-        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
-        this.config = Objects.requireNonNull(config, "config cannot be null");
-        this.communicationStorage = communicationStorage;
-        this.verificationTtl = Objects.requireNonNull(verificationTtl, "verificationTtl cannot be null");
-        this.random = Objects.requireNonNull(random, "random cannot be null");
-        this.workflowPolicy = Objects.requireNonNull(workflowPolicy, "workflowPolicy cannot be null");
+    public static final class Builder {
+        private TrustSafetyStorage trustSafetyStorage;
+        private InteractionStorage interactionStorage;
+        private UserStorage userStorage;
+        private AppConfig config;
+        private CommunicationStorage communicationStorage;
+        private Duration verificationTtl = DEFAULT_VERIFICATION_TTL;
+        private Random random = new Random();
+        private RelationshipWorkflowPolicy workflowPolicy = new RelationshipWorkflowPolicy();
+
+        private Builder() {}
+
+        public Builder trustSafetyStorage(TrustSafetyStorage trustSafetyStorage) {
+            this.trustSafetyStorage = trustSafetyStorage;
+            return this;
+        }
+
+        public Builder interactionStorage(InteractionStorage interactionStorage) {
+            this.interactionStorage = interactionStorage;
+            return this;
+        }
+
+        public Builder userStorage(UserStorage userStorage) {
+            this.userStorage = userStorage;
+            return this;
+        }
+
+        public Builder config(AppConfig config) {
+            this.config = config;
+            return this;
+        }
+
+        public Builder communicationStorage(CommunicationStorage communicationStorage) {
+            this.communicationStorage = communicationStorage;
+            return this;
+        }
+
+        public Builder verificationTtl(Duration verificationTtl) {
+            this.verificationTtl = verificationTtl;
+            return this;
+        }
+
+        public Builder random(Random random) {
+            this.random = random;
+            return this;
+        }
+
+        public Builder workflowPolicy(RelationshipWorkflowPolicy workflowPolicy) {
+            this.workflowPolicy = workflowPolicy;
+            return this;
+        }
+
+        public TrustSafetyService build() {
+            return new TrustSafetyService(this);
+        }
     }
 
     /** Generates a six-digit verification code. */

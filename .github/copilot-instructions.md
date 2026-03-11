@@ -50,7 +50,9 @@ You are operating in an environment where ast-grep is installed. For any code se
 # Dating App - AI Agent Instructions
 
 **Platform:** Windows 11 | PowerShell 7.5.x | VS Code Insiders | Java 25 (preview enabled) | JavaFX 25.0.2
-**Verified snapshot (2026-03-01):** 116 main + 88 test Java files (204 total) | 56,468 LOC / 43,313 code | JaCoCo line coverage gate: 60%
+**Verified snapshot (2026-03-11):** 140 main + 107 test Java files (247 total) | 66,698 LOC / 52,170 code | JaCoCo line coverage gate: 60%
+
+**SOURCE-OF-TRUTH RULE:** If any document conflicts with code, trust `src/main/java`, `src/test/java`, and `pom.xml`.
 
 ## ⚠️ Critical Gotchas (Compilation / Runtime / Agent Accuracy)
 

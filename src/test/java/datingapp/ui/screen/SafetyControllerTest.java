@@ -75,8 +75,9 @@ class SafetyControllerTest {
         users.save(blocked);
         session.setCurrentUser(blocker);
 
-        TrustSafetyService trustSafetyService =
-                new TrustSafetyService(trustSafetyStorage, interactions, users, config, communications);
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
         trustSafetyService.block(blocker.getId(), blocked.getId());
         viewModel = new SafetyViewModel(trustSafetyService, session, TEST_DISPATCHER);
 

@@ -159,8 +159,9 @@ class RestApiNotesRoutesTest {
                 .dailyService(recommendationService)
                 .undoService(undoService)
                 .build();
-        TrustSafetyService trustSafetyService = new TrustSafetyService(
-                trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage);
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)
+                .build();
         ConnectionService connectionService =
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
         MatchQualityService matchQualityService =

@@ -561,6 +561,10 @@ public class ChatViewModel {
     }
 
     public boolean sendMessage(String text) {
+        return sendMessage(text, null);
+    }
+
+    public boolean sendMessage(String text, @Nullable Runnable onSuccess) {
         ConversationPreview conversation = selectedConversation.get();
         User sender = currentUser;
         if (sender == null || conversation == null || text == null || text.isBlank()) {
@@ -570,13 +574,17 @@ public class ChatViewModel {
         String trimmedText = text.trim();
         logInfo("Sending message to: {}", conversation.otherUser().getName());
         dispatchSendMessage(
-                conversation, sender.getId(), conversation.otherUser().getId(), trimmedText);
+                conversation, sender.getId(), conversation.otherUser().getId(), trimmedText, onSuccess);
 
         return true;
     }
 
     private void dispatchSendMessage(
-            ConversationPreview conversation, UUID senderId, UUID otherUserId, String trimmedText) {
+            ConversationPreview conversation,
+            UUID senderId,
+            UUID otherUserId,
+            String trimmedText,
+            @Nullable Runnable onSuccess) {
         asyncScope.runFireAndForget("send message", () -> {
             try {
                 var result = messagingUseCases.sendMessage(
@@ -584,7 +592,8 @@ public class ChatViewModel {
                 asyncScope.dispatchToUi(() -> handleSendResult(
                         conversation,
                         result.success() ? result.data() : null,
-                        result.success() ? null : result.error().message()));
+                        result.success() ? null : result.error().message(),
+                        onSuccess));
             } catch (Exception e) {
                 asyncScope.dispatchToUi(() -> reportSendFailure("Failed to send message: " + e.getMessage(), e));
             }
@@ -592,7 +601,10 @@ public class ChatViewModel {
     }
 
     private void handleSendResult(
-            ConversationPreview conversation, @Nullable SendResult result, @Nullable String errorMessage) {
+            ConversationPreview conversation,
+            @Nullable SendResult result,
+            @Nullable String errorMessage,
+            @Nullable Runnable onSuccess) {
         if (asyncScope.isDisposed()) {
             return;
         }
@@ -607,6 +619,9 @@ public class ChatViewModel {
                 && selected.conversation()
                         .getId()
                         .equals(conversation.conversation().getId())) {
+            if (onSuccess != null) {
+                onSuccess.run();
+            }
             loadMessages(selected);
         }
     }

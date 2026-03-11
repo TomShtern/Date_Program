@@ -1,10 +1,13 @@
 package datingapp.ui.screen;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.Match;
@@ -25,8 +28,11 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -57,7 +63,6 @@ class ChatControllerTest {
         TextArea profileNoteArea = JavaFxTestSupport.lookup(root, "#profileNoteArea", TextArea.class);
         Button saveNoteButton = JavaFxTestSupport.lookup(root, "#saveProfileNoteButton", Button.class);
         Button deleteNoteButton = JavaFxTestSupport.lookup(root, "#deleteProfileNoteButton", Button.class);
-        Button friendZoneButton = JavaFxTestSupport.lookup(root, "#friendZoneButton", Button.class);
         VBox chatContainer = JavaFxTestSupport.lookup(root, "#chatContainer", VBox.class);
         VBox emptyStateContainer = JavaFxTestSupport.lookup(root, "#emptyStateContainer", VBox.class);
 
@@ -117,6 +122,137 @@ class ChatControllerTest {
         AppSession.getInstance().reset();
     }
 
+    @Test
+    @DisplayName("send clears input only after confirmed success and preserves failed text")
+    void sendClearsInputOnlyAfterSuccessAndPreservesFailedText() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.seedConversationWithNote("Known chat note");
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/chat.fxml", () -> new ChatController(fixture.viewModel));
+        Parent root = loaded.root();
+        @SuppressWarnings("unchecked")
+        ListView<ConnectionService.ConversationPreview> conversationListView =
+                JavaFxTestSupport.lookup(root, "#conversationListView", ListView.class);
+        TextArea messageArea = JavaFxTestSupport.lookup(root, "#messageArea", TextArea.class);
+        Button sendButton = JavaFxTestSupport.lookup(root, "#sendButton", Button.class);
+        Label messageLengthLabel = JavaFxTestSupport.lookup(root, "#messageLengthLabel", Label.class);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(
+                                () -> conversationListView.getItems().isEmpty());
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+        JavaFxTestSupport.runOnFxAndWait(
+                () -> conversationListView.getSelectionModel().selectFirst());
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            messageArea.setText("Hello success path");
+            sendButton.fire();
+        });
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return JavaFxTestSupport.callOnFxAndWait(messageArea::getText)
+                                .isEmpty();
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+        assertEquals("Hello success path", fixture.latestMessageContent().orElseThrow());
+        assertEquals("0/1000", JavaFxTestSupport.callOnFxAndWait(messageLengthLabel::getText));
+
+        String oversized = "x".repeat(Message.MAX_LENGTH + 1);
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            messageArea.setText(oversized);
+            sendButton.fire();
+        });
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return oversized.equals(JavaFxTestSupport.callOnFxAndWait(messageArea::getText));
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+        assertEquals(
+                Message.MAX_LENGTH + 1 + "/" + Message.MAX_LENGTH,
+                JavaFxTestSupport.callOnFxAndWait(messageLengthLabel::getText));
+
+        fixture.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("enter sends while shift enter keeps draft text intact")
+    void enterSendsWhileShiftEnterKeepsDraftIntact() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.seedConversationWithNote("Known chat note");
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/chat.fxml", () -> new ChatController(fixture.viewModel));
+        Parent root = loaded.root();
+        @SuppressWarnings("unchecked")
+        ListView<ConnectionService.ConversationPreview> conversationListView =
+                JavaFxTestSupport.lookup(root, "#conversationListView", ListView.class);
+        TextArea messageArea = JavaFxTestSupport.lookup(root, "#messageArea", TextArea.class);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(
+                                () -> conversationListView.getItems().isEmpty());
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+        JavaFxTestSupport.runOnFxAndWait(
+                () -> conversationListView.getSelectionModel().selectFirst());
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            messageArea.setText("Send via Enter");
+            messageArea.fireEvent(
+                    new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
+        });
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return JavaFxTestSupport.callOnFxAndWait(messageArea::getText)
+                                .isEmpty();
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+        assertEquals("Send via Enter", fixture.latestMessageContent().orElseThrow());
+
+        int messageCountAfterEnter = fixture.messageCount();
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            messageArea.setText("Keep this draft");
+            messageArea.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, true, false, false, false));
+        });
+
+        assertEquals("Keep this draft", JavaFxTestSupport.callOnFxAndWait(messageArea::getText));
+        assertEquals(messageCountAfterEnter, fixture.messageCount());
+        assertNotEquals("Keep this draft", fixture.latestMessageContent().orElse(""));
+
+        fixture.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
     private static final class Fixture {
         private final TestStorages.Users users = new TestStorages.Users();
         private final TestStorages.Interactions interactions = new TestStorages.Interactions();
@@ -126,8 +262,9 @@ class ChatControllerTest {
         private final AppConfig config = AppConfig.defaults();
         private final ConnectionService connectionService =
                 new ConnectionService(config, communications, interactions, users);
-        private final TrustSafetyService trustSafetyService =
-                new TrustSafetyService(trustSafety, interactions, users, config);
+        private final TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafety, interactions, users, config)
+                .build();
         private final User currentUser = createActiveUser("CurrentUser", Gender.MALE, EnumSet.of(Gender.FEMALE));
         private final User otherUser = createActiveUser("OtherUser", Gender.FEMALE, EnumSet.of(Gender.MALE));
         private final ChatViewModel viewModel;
@@ -161,6 +298,24 @@ class ChatControllerTest {
 
         private java.util.Optional<ProfileNote> lookupNote() {
             return users.getProfileNote(currentUser.getId(), otherUser.getId());
+        }
+
+        private java.util.Optional<String> latestMessageContent() {
+            String conversationId = datingapp.core.connection.ConnectionModels.Conversation.generateId(
+                    currentUser.getId(), otherUser.getId());
+            var result = connectionService.getMessages(conversationId, 50, 0);
+            if (!result.success() || result.messages().isEmpty()) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(
+                    result.messages().get(result.messages().size() - 1).content());
+        }
+
+        private int messageCount() {
+            String conversationId = datingapp.core.connection.ConnectionModels.Conversation.generateId(
+                    currentUser.getId(), otherUser.getId());
+            var result = connectionService.getMessages(conversationId, 50, 0);
+            return result.success() ? result.messages().size() : 0;
         }
 
         private void dispose() {

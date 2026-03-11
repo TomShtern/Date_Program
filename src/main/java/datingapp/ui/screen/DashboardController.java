@@ -309,6 +309,7 @@ public class DashboardController extends BaseController
             return;
         }
         logger.info("Viewing daily pick - navigating to Matching");
+        viewModel.markDailyPickViewed();
         if (viewModel.dailyPickUserIdProperty().get() != null) {
             NavigationService.getInstance()
                     .setNavigationContext(

@@ -1,11 +1,12 @@
 
-> 🚀 **VERIFIED & UPDATED: 2026-03-09**
+> 🚀 **VERIFIED & UPDATED: 2026-03-11**
 > This document has been programmatically verified against the codebase as of this date.
 
 # GEMINI.md — AI Agent Operational Context
 
-> **Verified against source code:** 2026-03-09
-> **Codebase snapshot:** 231 total Java files, 63,974 Java LOC (50,038 code)
+> **Verified against source code:** 2026-03-11
+> **Codebase snapshot:** 247 total Java files, 66,698 Java LOC (52,170 code)
+> **Source-of-truth rule:** if this document disagrees with code, trust `src/main/java`, `src/test/java`, and `pom.xml`.
 
 ---
 

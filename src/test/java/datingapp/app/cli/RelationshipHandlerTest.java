@@ -58,8 +58,9 @@ class RelationshipHandlerTest {
                 .trustSafetyStorage(trustSafetyStorage)
                 .userStorage(userStorage)
                 .build();
-        TrustSafetyService trustSafetyService =
-                new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactionStorage, userStorage, config)
+                .build();
         ConnectionService transitionService =
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
         CandidateFinder candidateFinder = new CandidateFinder(

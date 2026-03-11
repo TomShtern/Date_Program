@@ -80,7 +80,8 @@ class ChatViewModelTest {
         AppConfig config = AppConfig.defaults();
 
         connectionService = new ConnectionService(config, communications, interactions, users);
-        TrustSafetyService trustSafetyService = new TrustSafetyService(trustSafety, interactions, users, config);
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(trustSafety, interactions, users, config)
+                .build();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
         var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(users, profileService, null, null, config);
         var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService);

@@ -36,6 +36,7 @@ import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
 import io.javalin.json.JavalinJackson;
+import java.net.InetAddress;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -72,6 +73,8 @@ public class RestApiServer {
 
     private static final Logger logger = LoggerFactory.getLogger(RestApiServer.class);
     private static final int DEFAULT_PORT = 7070;
+    private static final String LOCALHOST_HOST =
+            InetAddress.getLoopbackAddress().getHostAddress();
     private static final int DEFAULT_MESSAGE_LIMIT = 50;
     private static final int DEFAULT_MATCHES_LIMIT = 20;
     private static final String UNKNOWN_USER = "Unknown";
@@ -134,9 +137,12 @@ public class RestApiServer {
         registerRoutes();
         registerExceptionHandlers();
 
-        app.start(port);
-        if (logger.isInfoEnabled()) {
-            logger.info("REST API server started on port {}", port);
+        app.start(LOCALHOST_HOST, port);
+        if (logger.isWarnEnabled()) {
+            logger.warn(
+                    "REST API server started on localhost-only (http://{}:{}) for local unauthenticated use only",
+                    LOCALHOST_HOST,
+                    app.port());
         }
     }
 

@@ -35,6 +35,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -58,6 +59,11 @@ public class ProfileController extends BaseController implements Initializable {
     private static final String DARK_PANEL_STYLE = "-fx-background-color: #1e293b;";
     private static final String PRIMARY_ACCENT_COLOR = "#667eea";
     private static final String SUCCESS_ACCENT_COLOR = "#10b981";
+    private static final String LOCATION_HELPER_TEXT =
+            "Use decimal coordinates for the place where you want to discover people nearby.";
+    private static final String LOCATION_EXAMPLE_TEXT = "Examples: 32.0853, 34.7818 or 40.7128, -74.0060";
+    private static final String STYLE_CLASS_TEXT_SECONDARY = "text-secondary";
+    private static final String STYLE_CLASS_INTEREST_CHIP = "interest-chip";
 
     @FXML
     private javafx.scene.layout.BorderPane rootPane;
@@ -754,7 +760,7 @@ public class ProfileController extends BaseController implements Initializable {
         String interests = viewModel.interestsProperty().get();
         if (interests == null || interests.isBlank()) {
             Label placeholder = new Label("No interests set");
-            placeholder.getStyleClass().add("interest-chip");
+            placeholder.getStyleClass().add(STYLE_CLASS_INTEREST_CHIP);
             placeholder.setStyle("-fx-opacity: 0.6;");
             interestsFlow.getChildren().add(placeholder);
             return;
@@ -766,7 +772,7 @@ public class ProfileController extends BaseController implements Initializable {
             String trimmed = interest.trim();
             if (!trimmed.isEmpty()) {
                 Label chip = new Label(trimmed);
-                chip.getStyleClass().add("interest-chip");
+                chip.getStyleClass().add(STYLE_CLASS_INTEREST_CHIP);
                 interestsFlow.getChildren().add(chip);
             }
         }
@@ -885,27 +891,40 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private void handleSetLocation() {
-        Dialog<ButtonType> dialog = createThemedDialog("Set Location", "Enter your coordinates");
+        Dialog<ButtonType> dialog = createThemedDialog("Set Location", "Choose where you want to discover people");
 
-        VBox content = new VBox(UiConstants.SPACING_MEDIUM);
+        VBox content = new VBox(UiConstants.SPACING_LARGE);
         content.setPadding(new Insets(UiConstants.PADDING_XLARGE));
 
-        Label helperLabel = new Label("Latitude must be between -90 and 90. Longitude must be between -180 and 180.");
-        helperLabel.getStyleClass().add("text-secondary");
-        helperLabel.setWrapText(true);
+        Label helperLabel = createSecondaryLabel(LOCATION_HELPER_TEXT);
+        Label exampleLabel = createSecondaryLabel(LOCATION_EXAMPLE_TEXT);
+        Label currentLocationLabel = createSecondaryLabel(buildCurrentLocationSummary());
 
+        GridPane fieldGrid = new GridPane();
+        fieldGrid.setHgap(UiConstants.SPACING_MEDIUM);
+        fieldGrid.setVgap(UiConstants.SPACING_MEDIUM);
+
+        Label latitudeLabel = new Label("Latitude");
         TextField latitudeField = new TextField();
-        latitudeField.setPromptText("Latitude");
+        latitudeField.setPromptText("-90.000000 to 90.000000");
         latitudeField.getStyleClass().add("location-dialog-field");
 
+        Label longitudeLabel = new Label("Longitude");
         TextField longitudeField = new TextField();
-        longitudeField.setPromptText("Longitude");
+        longitudeField.setPromptText("-180.000000 to 180.000000");
         longitudeField.getStyleClass().add("location-dialog-field");
+
+        fieldGrid.add(latitudeLabel, 0, 0);
+        fieldGrid.add(latitudeField, 1, 0);
+        fieldGrid.add(longitudeLabel, 0, 1);
+        fieldGrid.add(longitudeField, 1, 1);
 
         if (viewModel.hasLocationSet()) {
             latitudeField.setText(String.format(java.util.Locale.ROOT, "%.6f", viewModel.getLatitude()));
             longitudeField.setText(String.format(java.util.Locale.ROOT, "%.6f", viewModel.getLongitude()));
         }
+
+        Label previewLabel = createSecondaryLabel("");
 
         Label errorLabel = new Label();
         errorLabel.getStyleClass().add("dialog-error-label");
@@ -913,35 +932,113 @@ public class ProfileController extends BaseController implements Initializable {
         errorLabel.setManaged(false);
         errorLabel.setVisible(false);
 
-        content.getChildren().addAll(helperLabel, latitudeField, longitudeField, errorLabel);
+        content.getChildren()
+                .addAll(helperLabel, exampleLabel, currentLocationLabel, fieldGrid, previewLabel, errorLabel);
 
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
         Button confirmButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
-        confirmButton.setText("Save");
+        confirmButton.setText("Save Location");
+
+        Runnable refreshValidationState = () ->
+                updateLocationDialogValidation(latitudeField, longitudeField, confirmButton, previewLabel, errorLabel);
+
+        latitudeField.textProperty().addListener((obs, oldVal, newVal) -> refreshValidationState.run());
+        longitudeField.textProperty().addListener((obs, oldVal, newVal) -> refreshValidationState.run());
+        refreshValidationState.run();
+
         confirmButton.addEventFilter(ActionEvent.ACTION, event -> {
             try {
                 double latitude = Double.parseDouble(latitudeField.getText().trim());
                 double longitude = Double.parseDouble(longitudeField.getText().trim());
+                validateLocationCoordinates(latitude, longitude);
                 viewModel.setLocationCoordinates(latitude, longitude);
-                errorLabel.setText("");
-                errorLabel.setManaged(false);
-                errorLabel.setVisible(false);
-            } catch (NumberFormatException e) {
-                errorLabel.setText("Please enter numeric latitude and longitude values.");
-                errorLabel.setManaged(true);
-                errorLabel.setVisible(true);
+            } catch (NumberFormatException _) {
+                showLocationDialogError(errorLabel, "Please enter numeric latitude and longitude values.");
                 event.consume();
             } catch (IllegalArgumentException e) {
-                errorLabel.setText(e.getMessage());
-                errorLabel.setManaged(true);
-                errorLabel.setVisible(true);
+                showLocationDialogError(errorLabel, e.getMessage());
                 event.consume();
             }
         });
 
         dialog.showAndWait();
+    }
+
+    private Label createSecondaryLabel(String text) {
+        Label label = new Label(text);
+        label.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
+        label.setWrapText(true);
+        return label;
+    }
+
+    private String buildCurrentLocationSummary() {
+        if (!viewModel.hasLocationSet()) {
+            return "Current location: not set yet";
+        }
+        return String.format(
+                java.util.Locale.ROOT,
+                "Current location: %.4f, %.4f",
+                viewModel.getLatitude(),
+                viewModel.getLongitude());
+    }
+
+    private void updateLocationDialogValidation(
+            TextField latitudeField,
+            TextField longitudeField,
+            Button confirmButton,
+            Label previewLabel,
+            Label errorLabel) {
+        String latitudeText =
+                latitudeField.getText() == null ? "" : latitudeField.getText().trim();
+        String longitudeText =
+                longitudeField.getText() == null ? "" : longitudeField.getText().trim();
+        if (latitudeText.isEmpty() || longitudeText.isEmpty()) {
+            confirmButton.setDisable(true);
+            previewLabel.setText("Enter both coordinates to preview the saved location.");
+            hideLocationDialogError(errorLabel);
+            return;
+        }
+
+        try {
+            double parsedLatitude = Double.parseDouble(latitudeText);
+            double parsedLongitude = Double.parseDouble(longitudeText);
+            validateLocationCoordinates(parsedLatitude, parsedLongitude);
+            confirmButton.setDisable(false);
+            previewLabel.setText(String.format(
+                    java.util.Locale.ROOT, "Location preview: %.4f, %.4f", parsedLatitude, parsedLongitude));
+            hideLocationDialogError(errorLabel);
+        } catch (NumberFormatException _) {
+            confirmButton.setDisable(true);
+            previewLabel.setText("Enter numbers in decimal format, for example 32.0853 and 34.7818.");
+            showLocationDialogError(errorLabel, "Please enter numeric latitude and longitude values.");
+        } catch (IllegalArgumentException e) {
+            confirmButton.setDisable(true);
+            previewLabel.setText("Check the allowed coordinate ranges before saving.");
+            showLocationDialogError(errorLabel, e.getMessage());
+        }
+    }
+
+    private void showLocationDialogError(Label errorLabel, String message) {
+        errorLabel.setText(message);
+        errorLabel.setManaged(true);
+        errorLabel.setVisible(true);
+    }
+
+    private void hideLocationDialogError(Label errorLabel) {
+        errorLabel.setText("");
+        errorLabel.setManaged(false);
+        errorLabel.setVisible(false);
+    }
+
+    private void validateLocationCoordinates(double latitude, double longitude) {
+        if (latitude < -90.0 || latitude > 90.0) {
+            throw new IllegalArgumentException("Latitude must be between -90 and 90");
+        }
+        if (longitude < -180.0 || longitude > 180.0) {
+            throw new IllegalArgumentException("Longitude must be between -180 and 180");
+        }
     }
 
     /**
@@ -1133,22 +1230,22 @@ public class ProfileController extends BaseController implements Initializable {
             locationLabel.getStyleClass().add("card-distance");
 
             Label lookingForLabel = new Label("Looking for: " + snapshot.lookingFor());
-            lookingForLabel.getStyleClass().add("text-secondary");
+            lookingForLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
 
             Label bioPreviewLabel = new Label(snapshot.bio());
             bioPreviewLabel.setWrapText(true);
-            bioPreviewLabel.getStyleClass().add("text-secondary");
+            bioPreviewLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
 
             FlowPane interestPane = new FlowPane(UiConstants.SPACING_SMALL, UiConstants.SPACING_SMALL);
             interestPane.getStyleClass().add("interests-container");
             if (snapshot.interests().isEmpty()) {
                 Label placeholderChip = new Label("No interests added yet");
-                placeholderChip.getStyleClass().add("interest-chip");
+                placeholderChip.getStyleClass().add(STYLE_CLASS_INTEREST_CHIP);
                 interestPane.getChildren().add(placeholderChip);
             } else {
                 snapshot.interests().forEach(interest -> {
                     Label chip = new Label(interest);
-                    chip.getStyleClass().add("interest-chip");
+                    chip.getStyleClass().add(STYLE_CLASS_INTEREST_CHIP);
                     interestPane.getChildren().add(chip);
                 });
             }
@@ -1193,12 +1290,12 @@ public class ProfileController extends BaseController implements Initializable {
                 VBox missingItems = new VBox(UiConstants.SPACING_XSMALL);
                 if (category.missingItems().isEmpty()) {
                     Label doneLabel = new Label("Fully completed");
-                    doneLabel.getStyleClass().add("text-secondary");
+                    doneLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
                     missingItems.getChildren().add(doneLabel);
                 } else {
                     category.missingItems().forEach(item -> {
                         Label itemLabel = new Label("• " + item);
-                        itemLabel.getStyleClass().add("text-secondary");
+                        itemLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
                         missingItems.getChildren().add(itemLabel);
                     });
                 }
@@ -1214,7 +1311,7 @@ public class ProfileController extends BaseController implements Initializable {
                 completion.nextSteps().forEach(step -> {
                     Label stepLabel = new Label("• " + step);
                     stepLabel.setWrapText(true);
-                    stepLabel.getStyleClass().add("text-secondary");
+                    stepLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
                     nextStepsBox.getChildren().add(stepLabel);
                 });
             }

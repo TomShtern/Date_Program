@@ -125,8 +125,9 @@ public final class StorageFactory {
         ConnectionService connectionService =
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
 
-        TrustSafetyService trustSafetyService = new TrustSafetyService(
-                trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage);
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)
+                .build();
         trustSafetyService.setCandidateFinder(candidateFinder);
 
         ValidationService validationService = new ValidationService(config);

@@ -202,8 +202,9 @@ class MatchingViewModelTest {
                     .undoService(undoService)
                     .dailyService(recommendationService)
                     .build();
-            TrustSafetyService trustSafetyService =
-                    new TrustSafetyService(trustSafetyStorage, interactions, users, config, communications);
+            TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                            trustSafetyStorage, interactions, users, config, communications)
+                    .build();
             ProfileService noteProfileService =
                     new ProfileService(config, analytics, interactions, trustSafetyStorage, users);
             var noteUseCases =

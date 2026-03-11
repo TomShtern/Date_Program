@@ -52,8 +52,9 @@ class SocialUseCasesTest {
         interactionStorage.save(Match.create(userA.getId(), userB.getId()));
 
         var connectionService = new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
-        var trustSafetyService = new TrustSafetyService(
-                trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage);
+        var trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)
+                .build();
         useCases = new SocialUseCases(connectionService, trustSafetyService, communicationStorage);
     }
 

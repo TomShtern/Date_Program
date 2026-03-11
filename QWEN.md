@@ -1,5 +1,5 @@
 
-> 🚀 **VERIFIED & UPDATED: 2026-03-09**
+> 🚀 **VERIFIED & UPDATED: 2026-03-11**
 > This document has been programmatically verified against the codebase as of this date.
 
 # Dating App - Qwen Code Context
@@ -10,15 +10,15 @@
 
 ---
 
-## Quick Facts (Verified 2026-02-28)
+## Quick Facts (Verified 2026-03-11)
 
 - Entry points:
   - `Main.java` (CLI)
   - `ui/DatingApp.java` (JavaFX)
   - `app/api/RestApiServer.java` (REST)
 - Bootstrap: `ApplicationStartup.initialize()`
-- Java files: `231` total
-- Java LOC (`tokei`): `63,974 total / 50,038 code`
+- Java files: `247` total
+- Java LOC (`tokei`): `66,698 total / 52,170 code`
 
 ---
 

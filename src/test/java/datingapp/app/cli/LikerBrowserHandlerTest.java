@@ -59,8 +59,9 @@ class LikerBrowserHandlerTest {
                 .trustSafetyStorage(trustSafetyStorage)
                 .userStorage(userStorage)
                 .build();
-        TrustSafetyService trustSafetyService =
-                new TrustSafetyService(trustSafetyStorage, interactionStorage, userStorage, config);
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactionStorage, userStorage, config)
+                .build();
         CandidateFinder candidateFinder = new CandidateFinder(
                 userStorage,
                 interactionStorage,

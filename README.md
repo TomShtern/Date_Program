@@ -20,9 +20,11 @@ A Java 25 dating application with shared domain logic and three adapters:
 
 ## Verified snapshot (source-only)
 
-- Java files: **116 main + 88 test = 204 total**
-- Java LOC (`tokei`): **56,482 total / 43,327 code / 8,502 blank / 4,653 comments**
-- Latest full gate run in this repo state: **BUILD SUCCESS**, tests **983 run / 0 failed / 0 errors / 2 skipped**
+- Java files: **140 main + 107 test = 247 total**
+- Java LOC (`tokei`): **66,698 total / 52,170 code / 9,728 blank / 4,800 comments**
+- Latest full gate run in this repo state: **BUILD SUCCESS**, tests **1026 run / 0 failed / 0 errors / 2 skipped**
+
+> If this README ever conflicts with source code, trust `src/main/java`, `src/test/java`, and `pom.xml`.
 
 ## Tech stack
 
@@ -75,8 +77,10 @@ datingapp/
     metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
     profile/{MatchPreferences,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
-    time/{DefaultTimePolicy,TimePolicy}.java
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}.java    DatabaseManager.java
+    time/{DefaultTimePolicy,TimePolicy}
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
+  storage/
+    DatabaseManager.java
     StorageFactory.java
     jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
     schema/{MigrationRunner,SchemaInitializer}.java

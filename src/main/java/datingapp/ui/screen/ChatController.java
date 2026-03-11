@@ -21,10 +21,13 @@ import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -39,6 +42,10 @@ import javafx.scene.layout.VBox;
 public class ChatController extends BaseController implements Initializable {
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final int MESSAGE_WARNING_THRESHOLD = Message.MAX_LENGTH - 100;
+    private static final String MESSAGE_LENGTH_STYLE_NORMAL = "-fx-font-size: 11px; -fx-text-fill: -fx-text-secondary;";
+    private static final String MESSAGE_LENGTH_STYLE_WARNING = "-fx-font-size: 11px; -fx-text-fill: #f59e0b;";
+    private static final String MESSAGE_LENGTH_STYLE_LIMIT = "-fx-font-size: 11px; -fx-text-fill: #ef4444;";
 
     @FXML
     private javafx.scene.layout.BorderPane rootPane;
@@ -61,6 +68,9 @@ public class ChatController extends BaseController implements Initializable {
 
     @FXML
     private Button gracefulExitButton;
+
+    @FXML
+    private Button refreshButton;
 
     @FXML
     private Button unmatchButton;
@@ -91,6 +101,9 @@ public class ChatController extends BaseController implements Initializable {
 
     @FXML
     private HBox typingIndicatorHost;
+
+    @FXML
+    private Label messageLengthLabel;
 
     private final ChatViewModel viewModel;
     private final UiComponents.TypingIndicator typingIndicator = new UiComponents.TypingIndicator();
@@ -141,6 +154,18 @@ public class ChatController extends BaseController implements Initializable {
             typingIndicatorHost.getChildren().setAll(typingIndicator);
             typingIndicatorHost.setVisible(false);
             typingIndicatorHost.setManaged(false);
+        }
+        if (messageArea != null) {
+            messageArea.addEventFilter(KeyEvent.KEY_PRESSED, this::handleMessageComposerKeyPressed);
+            updateMessageLengthIndicator(messageArea.getText());
+            addSubscription(messageArea.textProperty().subscribe(this::updateMessageLengthIndicator));
+        }
+        if (messageLengthLabel != null) {
+            messageLengthLabel.setText(Message.MAX_LENGTH + "/" + Message.MAX_LENGTH);
+            messageLengthLabel.setStyle(MESSAGE_LENGTH_STYLE_NORMAL);
+        }
+        if (refreshButton != null) {
+            refreshButton.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         }
 
         // Bind selection using Subscription API
@@ -405,16 +430,50 @@ public class ChatController extends BaseController implements Initializable {
     private void handleSendMessage() {
         String text = messageArea.getText();
         if (text != null && !text.isBlank()) {
-            boolean sent = viewModel.sendMessage(text);
+            boolean sent = viewModel.sendMessage(text, this::handleSendSuccess);
             if (sent) {
-                messageArea.clear();
-
-                // Scroll to bottom
-                if (!viewModel.getActiveMessages().isEmpty()) {
-                    messageListView.scrollTo(viewModel.getActiveMessages().size() - 1);
-                }
+                updateMessageLengthIndicator(messageArea.getText());
             }
         }
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleRefreshConversations() {
+        viewModel.refreshConversations();
+    }
+
+    private void handleSendSuccess() {
+        if (messageArea != null) {
+            messageArea.clear();
+        }
+        if (messageListView != null && !viewModel.getActiveMessages().isEmpty()) {
+            messageListView.scrollTo(viewModel.getActiveMessages().size() - 1);
+        }
+    }
+
+    private void handleMessageComposerKeyPressed(KeyEvent event) {
+        if (event.getCode() == KeyCode.ENTER && !event.isShiftDown()) {
+            event.consume();
+            handleSendMessage();
+        }
+    }
+
+    private void updateMessageLengthIndicator(String text) {
+        if (messageLengthLabel == null) {
+            return;
+        }
+        int length = text == null ? 0 : text.length();
+        messageLengthLabel.setText(length + "/" + Message.MAX_LENGTH);
+        if (length >= Message.MAX_LENGTH) {
+            messageLengthLabel.setStyle(MESSAGE_LENGTH_STYLE_LIMIT);
+            return;
+        }
+        if (length >= MESSAGE_WARNING_THRESHOLD) {
+            messageLengthLabel.setStyle(MESSAGE_LENGTH_STYLE_WARNING);
+            return;
+        }
+        messageLengthLabel.setStyle(MESSAGE_LENGTH_STYLE_NORMAL);
     }
 
     @SuppressWarnings("unused")

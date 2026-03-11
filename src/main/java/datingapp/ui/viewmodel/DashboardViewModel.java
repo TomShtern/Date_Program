@@ -146,6 +146,29 @@ public class DashboardViewModel extends BaseViewModel {
         session.logout();
     }
 
+    public void markDailyPickViewed() {
+        if (isDisposed() || !dailyPickAvailable.get() || dailyPickSeen.get()) {
+            return;
+        }
+
+        User user = session.getCurrentUser();
+        if (user == null || dailyPickUserId.get() == null) {
+            return;
+        }
+
+        asyncScope.runFireAndForget("mark daily pick viewed", () -> {
+            try {
+                dailyService.markDailyPickViewed(user.getId());
+                asyncScope.dispatchToUi(() -> dailyPickSeen.set(true));
+            } catch (Exception e) {
+                logError("Failed to mark daily pick viewed", e);
+                if (errorHandler != null) {
+                    asyncScope.dispatchToUi(() -> errorHandler.onError("Failed to update daily pick status"));
+                }
+            }
+        });
+    }
+
     public StringProperty userNameProperty() {
         return userName;
     }
