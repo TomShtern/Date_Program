@@ -14,6 +14,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,6 +86,7 @@ public class PreferencesController extends BaseController implements Initializab
         setupGenderControls();
         setupThemeControls();
         wireActionButtons();
+        setupAccessibilityMetadata();
 
         UiAnimations.fadeIn(rootPane, 600);
     }
@@ -242,6 +244,44 @@ public class PreferencesController extends BaseController implements Initializab
             themeToggle.setOnAction(event -> {
                 event.consume();
                 handleThemeToggle();
+            });
+        }
+    }
+
+    private void setupAccessibilityMetadata() {
+        if (minAgeSlider != null) {
+            minAgeSlider.setAccessibleText("Minimum preferred age");
+        }
+        if (maxAgeSlider != null) {
+            maxAgeSlider.setAccessibleText("Maximum preferred age");
+        }
+        if (distanceSlider != null) {
+            distanceSlider.setAccessibleText("Maximum preferred distance");
+        }
+        if (menToggle != null) {
+            menToggle.setAccessibleText("Show men");
+        }
+        if (womenToggle != null) {
+            womenToggle.setAccessibleText("Show women");
+        }
+        if (everyoneToggle != null) {
+            everyoneToggle.setAccessibleText("Show everyone");
+        }
+        if (themeToggle != null) {
+            themeToggle.setAccessibleText("Toggle dark mode");
+        }
+        if (saveButton != null) {
+            saveButton.setAccessibleText("Save discovery settings");
+        }
+        if (backButton != null) {
+            backButton.setAccessibleText("Go back");
+        }
+        if (rootPane != null) {
+            rootPane.setOnKeyPressed(event -> {
+                if (event.isAltDown() && event.getCode() == KeyCode.S) {
+                    handleSave();
+                    event.consume();
+                }
             });
         }
     }

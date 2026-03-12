@@ -4,6 +4,7 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
+import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.ui.ImageCache;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
@@ -34,6 +35,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -240,6 +242,30 @@ public class ProfileController extends BaseController implements Initializable {
     @FXML
     private TextField maxDistanceField;
 
+    @FXML
+    private ComboBox<PacePreferences.MessagingFrequency> messagingFrequencyCombo;
+
+    @FXML
+    private ComboBox<PacePreferences.TimeToFirstDate> timeToFirstDateCombo;
+
+    @FXML
+    private ComboBox<PacePreferences.CommunicationStyle> communicationStyleCombo;
+
+    @FXML
+    private ComboBox<PacePreferences.DepthPreference> depthPreferenceCombo;
+
+    @FXML
+    private Label birthDateErrorLabel;
+
+    @FXML
+    private Label heightErrorLabel;
+
+    @FXML
+    private Label searchPreferencesErrorLabel;
+
+    @FXML
+    private Label pacePreferencesErrorLabel;
+
     // Dealbreakers fields
     @FXML
     private Label dealbreakersStatusLabel;
@@ -266,6 +292,7 @@ public class ProfileController extends BaseController implements Initializable {
     private static final int BIO_WARNING_THRESHOLD = 400;
 
     private final ProfileViewModel viewModel;
+    private final ProfileFormValidator formValidator = new ProfileFormValidator();
 
     public ProfileController(ProfileViewModel viewModel) {
         this.viewModel = viewModel;
@@ -300,8 +327,9 @@ public class ProfileController extends BaseController implements Initializable {
             birthDatePicker.valueProperty().bindBidirectional(viewModel.birthDateProperty());
         }
 
-        // Setup lifestyle combo boxes
+        // Setup lifestyle and pace-preference combo boxes
         setupLifestyleComboBoxes();
+        setupPacePreferenceComboBoxes();
 
         // Setup gender and interested in
         setupGenderPreferences();
@@ -315,6 +343,10 @@ public class ProfileController extends BaseController implements Initializable {
         bindCombo(drinkingCombo, viewModel.drinkingProperty());
         bindCombo(wantsKidsCombo, viewModel.wantsKidsProperty());
         bindCombo(lookingForCombo, viewModel.lookingForProperty());
+        bindCombo(messagingFrequencyCombo, viewModel.messagingFrequencyProperty());
+        bindCombo(timeToFirstDateCombo, viewModel.timeToFirstDateProperty());
+        bindCombo(communicationStyleCombo, viewModel.communicationStyleProperty());
+        bindCombo(depthPreferenceCombo, viewModel.depthPreferenceProperty());
 
         // Bind search preference fields
         bindSearchPreferenceFields();
@@ -371,6 +403,9 @@ public class ProfileController extends BaseController implements Initializable {
         }
         updateSavingState(viewModel.savingProperty().get());
         addSubscription(viewModel.savingProperty().subscribe(this::updateSavingState));
+        setupDirtyTracking();
+        setupAccessibilityMetadata();
+        viewModel.markCurrentStateSaved();
 
         // Apply fade-in animation
         UiAnimations.fadeIn(rootPane, 800);
@@ -413,6 +448,35 @@ public class ProfileController extends BaseController implements Initializable {
             lookingForCombo.setConverter(UiUtils.createEnumStringConverter(Lifestyle.LookingFor::getDisplayName));
             lookingForCombo.setButtonCell(UiUtils.createDisplayCell(Lifestyle.LookingFor::getDisplayName));
         }
+    }
+
+    private void setupPacePreferenceComboBoxes() {
+        configurePaceCombo(
+                messagingFrequencyCombo,
+                PacePreferences.MessagingFrequency.values(),
+                PacePreferences.MessagingFrequency::getDisplayName);
+        configurePaceCombo(
+                timeToFirstDateCombo,
+                PacePreferences.TimeToFirstDate.values(),
+                PacePreferences.TimeToFirstDate::getDisplayName);
+        configurePaceCombo(
+                communicationStyleCombo,
+                PacePreferences.CommunicationStyle.values(),
+                PacePreferences.CommunicationStyle::getDisplayName);
+        configurePaceCombo(
+                depthPreferenceCombo,
+                PacePreferences.DepthPreference.values(),
+                PacePreferences.DepthPreference::getDisplayName);
+    }
+
+    private <T extends Enum<T>> void configurePaceCombo(
+            ComboBox<T> comboBox, T[] values, java.util.function.Function<T, String> displayMapper) {
+        if (comboBox == null) {
+            return;
+        }
+        comboBox.setItems(FXCollections.observableArrayList(values));
+        comboBox.setConverter(UiUtils.createEnumStringConverter(displayMapper));
+        comboBox.setButtonCell(UiUtils.createDisplayCell(displayMapper));
     }
 
     /**
@@ -492,6 +556,7 @@ public class ProfileController extends BaseController implements Initializable {
                 UiUtils.updateToggleStyle(
                         btn, nowSelected, "-fx-background-radius: 20; -fx-padding: 8 16; -fx-font-size: 13px;");
                 updateInterestedInLabel();
+                viewModel.refreshUnsavedChangesFlag();
             });
 
             interestedInFlow.getChildren().add(btn);
@@ -523,14 +588,17 @@ public class ProfileController extends BaseController implements Initializable {
         addSubscription(heightField.textProperty().subscribe(newVal -> {
             if (newVal == null || newVal.isBlank()) {
                 viewModel.heightProperty().set(null);
+                applyValidationMessage(heightErrorLabel, null);
                 return;
             }
             try {
                 int height = Integer.parseInt(newVal.trim());
                 viewModel.heightProperty().set(height);
+                applyValidationMessage(heightErrorLabel, null);
             } catch (NumberFormatException _) {
-                assert true; // Non-numeric input ignored; user is still typing
+                applyValidationMessage(heightErrorLabel, "Height must be a whole number in centimeters.");
             }
+            viewModel.refreshUnsavedChangesFlag();
         }));
 
         addSubscription(heightField.focusedProperty().subscribe(focused -> {
@@ -541,21 +609,10 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     private void validateHeightRange() {
-        String heightText = heightField.getText();
-        try {
-            int height = Integer.parseInt(heightText);
-            // Use centralized config bounds for validation
-            int minHeight = viewModel.getMinHeightCm();
-            int maxHeight = viewModel.getMaxHeightCm();
-            if (height < minHeight || height > maxHeight) {
-                heightField.setText("");
-                viewModel.heightProperty().set(null);
-                UiFeedbackService.showWarning("Please enter a height between " + minHeight + "-" + maxHeight + " cm");
-            }
-        } catch (NumberFormatException _) {
-            heightField.setText("");
-            viewModel.heightProperty().set(null);
-        }
+        applyValidationMessage(
+                heightErrorLabel,
+                formValidator.validateHeight(
+                        heightField.getText(), viewModel.getMinHeightCm(), viewModel.getMaxHeightCm()));
     }
 
     private <T> void bindCombo(ComboBox<T> comboBox, ObjectProperty<T> property) {
@@ -568,13 +625,32 @@ public class ProfileController extends BaseController implements Initializable {
     private void bindSearchPreferenceFields() {
         if (minAgeField != null) {
             minAgeField.textProperty().bindBidirectional(viewModel.minAgeProperty());
+            addSubscription(minAgeField.textProperty().subscribe(_ -> {
+                validateSearchPreferenceRange();
+                viewModel.refreshUnsavedChangesFlag();
+            }));
         }
         if (maxAgeField != null) {
             maxAgeField.textProperty().bindBidirectional(viewModel.maxAgeProperty());
+            addSubscription(maxAgeField.textProperty().subscribe(_ -> {
+                validateSearchPreferenceRange();
+                viewModel.refreshUnsavedChangesFlag();
+            }));
         }
         if (maxDistanceField != null) {
             maxDistanceField.textProperty().bindBidirectional(viewModel.maxDistanceProperty());
+            addSubscription(maxDistanceField.textProperty().subscribe(_ -> {
+                validateSearchPreferenceRange();
+                viewModel.refreshUnsavedChangesFlag();
+            }));
         }
+    }
+
+    private void validateSearchPreferenceRange() {
+        applyValidationMessage(
+                searchPreferencesErrorLabel,
+                formValidator.validateSearchPreferences(
+                        minAgeField.getText(), maxAgeField.getText(), maxDistanceField.getText()));
     }
 
     /**
@@ -781,6 +857,10 @@ public class ProfileController extends BaseController implements Initializable {
     @FXML
     @SuppressWarnings("unused")
     private void handleSave() {
+        if (!validateProfileForm()) {
+            showSaveFailureStatus();
+            return;
+        }
         clearSaveStatus();
         viewModel.saveAsync(success -> {
             if (Boolean.TRUE.equals(success)) {
@@ -795,8 +875,20 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private void handleCancel() {
+        if (!confirmDiscardUnsavedChanges()) {
+            return;
+        }
         cleanup(); // Clean up subscriptions before navigating away
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
+    }
+
+    @Override
+    @FXML
+    protected void handleBack() {
+        if (!confirmDiscardUnsavedChanges()) {
+            return;
+        }
+        super.handleBack();
     }
 
     /**
@@ -833,6 +925,7 @@ public class ProfileController extends BaseController implements Initializable {
                     boolean nowSelected = viewModel.toggleInterest(interest);
                     UiUtils.updateChipStyle(chipBtn, nowSelected, PRIMARY_ACCENT_COLOR);
                     updateInterestCountLabel();
+                    viewModel.refreshUnsavedChangesFlag();
                 });
 
                 interestPane.getChildren().add(chipBtn);
@@ -853,6 +946,7 @@ public class ProfileController extends BaseController implements Initializable {
         // Update display after dialog closes
         populateInterestChips();
         updateInterestCountLabel();
+        viewModel.refreshUnsavedChangesFlag();
     }
 
     /**
@@ -881,11 +975,13 @@ public class ProfileController extends BaseController implements Initializable {
                     return;
                 }
                 viewModel.replacePhoto(viewModel.currentPhotoIndexProperty().get(), selectedFile);
+                viewModel.refreshUnsavedChangesFlag();
                 return;
             }
 
             logInfo("Saving profile photo: {}", selectedFile.getName());
             viewModel.savePhoto(selectedFile);
+            viewModel.refreshUnsavedChangesFlag();
         }
     }
 
@@ -954,11 +1050,12 @@ public class ProfileController extends BaseController implements Initializable {
                 double longitude = Double.parseDouble(longitudeField.getText().trim());
                 validateLocationCoordinates(latitude, longitude);
                 viewModel.setLocationCoordinates(latitude, longitude);
+                viewModel.refreshUnsavedChangesFlag();
             } catch (NumberFormatException _) {
                 showLocationDialogError(errorLabel, "Please enter numeric latitude and longitude values.");
                 event.consume();
-            } catch (IllegalArgumentException e) {
-                showLocationDialogError(errorLabel, e.getMessage());
+            } catch (IllegalArgumentException ex) {
+                showLocationDialogError(errorLabel, ex.getMessage());
                 event.consume();
             }
         });
@@ -1169,6 +1266,128 @@ public class ProfileController extends BaseController implements Initializable {
         dialog.showAndWait().ifPresent(newDealbreakers -> {
             viewModel.setDealbreakers(newDealbreakers);
             logInfo("Dealbreakers updated");
+            viewModel.refreshUnsavedChangesFlag();
+        });
+    }
+
+    private boolean validateProfileForm() {
+        validateBirthDateField();
+        validateHeightRange();
+        validateSearchPreferenceRange();
+        validatePacePreferences();
+        return !hasValidationErrors();
+    }
+
+    private void validateBirthDateField() {
+        applyValidationMessage(
+                birthDateErrorLabel,
+                formValidator.validateBirthDate(birthDatePicker == null ? null : birthDatePicker.getValue()));
+    }
+
+    private void validatePacePreferences() {
+        boolean anySet = viewModel.messagingFrequencyProperty().get() != null
+                || viewModel.timeToFirstDateProperty().get() != null
+                || viewModel.communicationStyleProperty().get() != null
+                || viewModel.depthPreferenceProperty().get() != null;
+        boolean allSet = viewModel.messagingFrequencyProperty().get() != null
+                && viewModel.timeToFirstDateProperty().get() != null
+                && viewModel.communicationStyleProperty().get() != null
+                && viewModel.depthPreferenceProperty().get() != null;
+        applyValidationMessage(pacePreferencesErrorLabel, formValidator.validatePacePreferences(anySet, allSet));
+    }
+
+    private boolean hasValidationErrors() {
+        return hasMessage(birthDateErrorLabel)
+                || hasMessage(heightErrorLabel)
+                || hasMessage(searchPreferencesErrorLabel)
+                || hasMessage(pacePreferencesErrorLabel);
+    }
+
+    private boolean hasMessage(Label label) {
+        return label != null && label.getText() != null && !label.getText().isBlank();
+    }
+
+    private void applyValidationMessage(Label label, String message) {
+        if (label == null) {
+            return;
+        }
+        boolean visible = message != null && !message.isBlank();
+        label.setText(visible ? message : "");
+        label.setManaged(visible);
+        label.setVisible(visible);
+    }
+
+    private boolean confirmDiscardUnsavedChanges() {
+        return !viewModel.hasUnsavedChangesProperty().get()
+                || UiFeedbackService.showConfirmation(
+                        "Discard changes?",
+                        "You have unsaved profile changes.",
+                        "Leave this screen and lose the pending edits?");
+    }
+
+    private void setupDirtyTracking() {
+        addSubscription(viewModel.bioProperty().subscribe(_ -> viewModel.refreshUnsavedChangesFlag()));
+        addSubscription(viewModel.birthDateProperty().subscribe(_ -> {
+            validateBirthDateField();
+            viewModel.refreshUnsavedChangesFlag();
+        }));
+        addSubscription(viewModel.genderProperty().subscribe(_ -> viewModel.refreshUnsavedChangesFlag()));
+        addSubscription(viewModel.heightProperty().subscribe(_ -> viewModel.refreshUnsavedChangesFlag()));
+        addSubscription(viewModel.smokingProperty().subscribe(_ -> viewModel.refreshUnsavedChangesFlag()));
+        addSubscription(viewModel.drinkingProperty().subscribe(_ -> viewModel.refreshUnsavedChangesFlag()));
+        addSubscription(viewModel.wantsKidsProperty().subscribe(_ -> viewModel.refreshUnsavedChangesFlag()));
+        addSubscription(viewModel.lookingForProperty().subscribe(_ -> viewModel.refreshUnsavedChangesFlag()));
+        addSubscription(viewModel.messagingFrequencyProperty().subscribe(_ -> {
+            validatePacePreferences();
+            viewModel.refreshUnsavedChangesFlag();
+        }));
+        addSubscription(viewModel.timeToFirstDateProperty().subscribe(_ -> {
+            validatePacePreferences();
+            viewModel.refreshUnsavedChangesFlag();
+        }));
+        addSubscription(viewModel.communicationStyleProperty().subscribe(_ -> {
+            validatePacePreferences();
+            viewModel.refreshUnsavedChangesFlag();
+        }));
+        addSubscription(viewModel.depthPreferenceProperty().subscribe(_ -> {
+            validatePacePreferences();
+            viewModel.refreshUnsavedChangesFlag();
+        }));
+    }
+
+    private void setupAccessibilityMetadata() {
+        applyAccessibleText(bioArea, "Profile bio");
+        applyAccessibleText(birthDatePicker, "Birth date");
+        applyAccessibleText(locationField, "Profile location");
+        applyAccessibleText(genderCombo, "Your gender");
+        applyAccessibleText(heightField, "Height in centimeters");
+        applyAccessibleText(minAgeField, "Minimum preferred age");
+        applyAccessibleText(maxAgeField, "Maximum preferred age");
+        applyAccessibleText(maxDistanceField, "Maximum preferred distance in kilometers");
+        applyAccessibleText(messagingFrequencyCombo, "Messaging frequency preference");
+        applyAccessibleText(timeToFirstDateCombo, "Time to first date preference");
+        applyAccessibleText(communicationStyleCombo, "Communication style preference");
+        applyAccessibleText(depthPreferenceCombo, "Conversation depth preference");
+        applyAccessibleText(saveButton, "Save profile changes");
+        applyAccessibleText(cancelButton, "Cancel profile changes");
+        registerSaveShortcut();
+    }
+
+    private void applyAccessibleText(javafx.scene.Node node, String accessibleText) {
+        if (node != null) {
+            node.setAccessibleText(accessibleText);
+        }
+    }
+
+    private void registerSaveShortcut() {
+        if (rootPane == null) {
+            return;
+        }
+        rootPane.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            if (event.isAltDown() && event.getCode() == KeyCode.S && saveButton != null && !saveButton.isDisabled()) {
+                saveButton.fire();
+                event.consume();
+            }
         });
     }
 

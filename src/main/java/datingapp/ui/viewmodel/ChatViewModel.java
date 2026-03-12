@@ -90,6 +90,8 @@ public class ChatViewModel {
     private final BooleanProperty profileNoteBusy = new SimpleBooleanProperty(false);
     private final ObjectProperty<PresenceStatus> presenceStatus = new SimpleObjectProperty<>(PresenceStatus.UNKNOWN);
     private final BooleanProperty remoteTyping = new SimpleBooleanProperty(false);
+    private final BooleanProperty presenceSupported = new SimpleBooleanProperty(false);
+    private final StringProperty presenceUnavailableMessage = new SimpleStringProperty("");
 
     private User currentUser;
     private TaskHandle conversationsPollingHandle;
@@ -162,6 +164,8 @@ public class ChatViewModel {
                 Objects.requireNonNull(uiDependencies, "uiDependencies cannot be null");
         this.noteDataAccess = resolvedUiDependencies.noteDataAccess();
         this.presenceDataAccess = resolvedUiDependencies.presenceDataAccess();
+        this.presenceSupported.set(this.presenceDataAccess.isSupported());
+        this.presenceUnavailableMessage.set(this.presenceDataAccess.unsupportedReason());
 
         // Listen for selection changes to load messages
         selectionListener = (obs, oldVal, newVal) -> {
@@ -945,6 +949,14 @@ public class ChatViewModel {
 
     public BooleanProperty remoteTypingProperty() {
         return remoteTyping;
+    }
+
+    public ReadOnlyBooleanProperty presenceSupportedProperty() {
+        return presenceSupported;
+    }
+
+    public StringProperty presenceUnavailableMessageProperty() {
+        return presenceUnavailableMessage;
     }
 
     private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {

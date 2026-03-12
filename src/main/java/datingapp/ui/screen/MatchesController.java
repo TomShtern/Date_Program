@@ -582,6 +582,13 @@ public class MatchesController extends BaseController implements Initializable {
         Label timeLabel = new Label("Matched " + match.matchedTimeAgo());
         timeLabel.getStyleClass().add("match-time-label");
 
+        Label compatibilityLabel = null;
+        if (match.compatibilityScore() != null) {
+            String label = match.compatibilityLabel() == null ? "Compatibility" : match.compatibilityLabel();
+            compatibilityLabel = new Label(label + " • " + match.compatibilityScore() + "%");
+            compatibilityLabel.getStyleClass().add("text-secondary");
+        }
+
         // Premium message button
         Button messageBtn = new Button("Message");
         messageBtn.getStyleClass().add("match-message-btn");
@@ -637,11 +644,26 @@ public class MatchesController extends BaseController implements Initializable {
         HBox primaryActions = new HBox(UiConstants.SPACING_SMALL, messageBtn, friendZoneBtn);
         primaryActions.setAlignment(Pos.CENTER);
 
+        Button viewProfileBtn = createMatchActionButton("View profile", event -> {
+            event.consume();
+            handleViewProfile(match);
+        });
+
         HBox secondaryActions = new HBox(UiConstants.SPACING_SMALL, gracefulExitBtn, unmatchBtn, blockBtn, reportBtn);
         secondaryActions.setAlignment(Pos.CENTER);
 
-        card.getChildren().addAll(avatarContainer, nameLabel, timeLabel, primaryActions, secondaryActions);
+        card.getChildren().addAll(avatarContainer, nameLabel, timeLabel);
+        if (compatibilityLabel != null) {
+            card.getChildren().add(compatibilityLabel);
+        }
+        card.getChildren().addAll(primaryActions, viewProfileBtn, secondaryActions);
         return card;
+    }
+
+    private void handleViewProfile(MatchCardData match) {
+        NavigationService nav = NavigationService.getInstance();
+        nav.setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, match.userId());
+        nav.navigateTo(NavigationService.ViewType.PROFILE_VIEW);
     }
 
     private Button createMatchActionButton(String text, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {

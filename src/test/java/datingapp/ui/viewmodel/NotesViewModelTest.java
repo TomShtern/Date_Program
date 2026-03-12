@@ -18,6 +18,7 @@ import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import javafx.application.Platform;
 import org.junit.jupiter.api.AfterEach;
@@ -121,7 +122,7 @@ class NotesViewModelTest {
             if (condition.getAsBoolean()) {
                 return true;
             }
-            Thread.sleep(25);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(25));
         }
         waitForFxEvents();
         return condition.getAsBoolean();

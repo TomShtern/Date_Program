@@ -11,6 +11,7 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
+import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ProfileService.CompletionResult;
 import datingapp.core.workflow.ProfileActivationPolicy;
@@ -112,6 +113,11 @@ public class ProfileViewModel {
     // Dealbreakers property
     private final ObjectProperty<Dealbreakers> dealbreakers = new SimpleObjectProperty<>(Dealbreakers.none());
     private final StringProperty dealbreakersStatus = new SimpleStringProperty(NONE_SET_LABEL);
+    private final ObjectProperty<PacePreferences.MessagingFrequency> messagingFrequency = new SimpleObjectProperty<>();
+    private final ObjectProperty<PacePreferences.TimeToFirstDate> timeToFirstDate = new SimpleObjectProperty<>();
+    private final ObjectProperty<PacePreferences.CommunicationStyle> communicationStyle = new SimpleObjectProperty<>();
+    private final ObjectProperty<PacePreferences.DepthPreference> depthPreference = new SimpleObjectProperty<>();
+    private final BooleanProperty hasUnsavedChanges = new SimpleBooleanProperty(false);
 
     // Selected interests (observable set for multi-selection)
     private final ObservableSet<Interest> selectedInterests =
@@ -119,6 +125,10 @@ public class ProfileViewModel {
 
     /** Track disposed state to prevent operations after cleanup. */
     private final AtomicBoolean disposed = new AtomicBoolean(false);
+
+    private final Object photoMutationLock = new Object();
+
+    private String lastSavedSnapshot = "";
 
     private ViewModelErrorSink errorHandler;
 
@@ -263,11 +273,28 @@ public class ProfileViewModel {
             dealbreakersStatus.set(NONE_SET_LABEL);
         }
 
+        loadPacePreferences(user.getPacePreferences());
+
         // Primary photo
         updatePrimaryPhoto(user);
 
         // Calculate completion using static method
         updateCompletion(user);
+        markCurrentStateSaved();
+    }
+
+    private void loadPacePreferences(PacePreferences pacePreferences) {
+        if (pacePreferences == null) {
+            messagingFrequency.set(null);
+            timeToFirstDate.set(null);
+            communicationStyle.set(null);
+            depthPreference.set(null);
+            return;
+        }
+        messagingFrequency.set(pacePreferences.messagingFrequency());
+        timeToFirstDate.set(pacePreferences.timeToFirstDate());
+        communicationStyle.set(pacePreferences.communicationStyle());
+        depthPreference.set(pacePreferences.depthPreference());
     }
 
     private void updateDealbreakersStatus(Dealbreakers db) {
@@ -599,6 +626,20 @@ public class ProfileViewModel {
     private void updateSessionAndCompletion(User user) {
         session.setCurrentUser(user);
         updateCompletion(user);
+        markCurrentStateSaved();
+    }
+
+    public BooleanProperty hasUnsavedChangesProperty() {
+        return hasUnsavedChanges;
+    }
+
+    public void refreshUnsavedChangesFlag() {
+        hasUnsavedChanges.set(!createStateSnapshot().equals(lastSavedSnapshot));
+    }
+
+    public void markCurrentStateSaved() {
+        lastSavedSnapshot = createStateSnapshot();
+        hasUnsavedChanges.set(false);
     }
 
     /**
@@ -828,6 +869,22 @@ public class ProfileViewModel {
         return lookingFor;
     }
 
+    public ObjectProperty<PacePreferences.MessagingFrequency> messagingFrequencyProperty() {
+        return messagingFrequency;
+    }
+
+    public ObjectProperty<PacePreferences.TimeToFirstDate> timeToFirstDateProperty() {
+        return timeToFirstDate;
+    }
+
+    public ObjectProperty<PacePreferences.CommunicationStyle> communicationStyleProperty() {
+        return communicationStyle;
+    }
+
+    public ObjectProperty<PacePreferences.DepthPreference> depthPreferenceProperty() {
+        return depthPreference;
+    }
+
     // --- Search preferences properties ---
 
     public StringProperty minAgeProperty() {
@@ -985,67 +1042,75 @@ public class ProfileViewModel {
     }
 
     private void processPhotoUpload(User user, File photoFile) {
-        try {
-            if (disposed.get()) {
-                return;
-            }
-            List<String> updatedPhotoUrls =
-                    photoStore.importPhoto(user.getId(), user.getPhotoUrls(), photoFile.toPath());
-            persistPhotoUrls(user, updatedPhotoUrls, updatedPhotoUrls.size() - 1, "Photo saved!");
+        synchronized (photoMutationLock) {
+            try {
+                if (disposed.get()) {
+                    return;
+                }
+                List<String> updatedPhotoUrls =
+                        photoStore.importPhoto(user.getId(), user.getPhotoUrls(), photoFile.toPath());
+                persistPhotoUrls(user, updatedPhotoUrls, updatedPhotoUrls.size() - 1, "Photo saved!");
 
-        } catch (IOException e) {
-            logError(SAVE_PHOTO_ERROR, e);
-            notifyError(SAVE_PHOTO_ERROR, e);
-        } catch (IllegalArgumentException e) {
-            logWarn("Invalid photo save request: {}", e.getMessage());
-            notifyError(SAVE_PHOTO_ERROR, e);
+            } catch (IOException e) {
+                logError(SAVE_PHOTO_ERROR, e);
+                notifyError(SAVE_PHOTO_ERROR, e);
+            } catch (IllegalArgumentException e) {
+                logWarn("Invalid photo save request: {}", e.getMessage());
+                notifyError(SAVE_PHOTO_ERROR, e);
+            }
         }
     }
 
     private void processPhotoReplacement(User user, int index, File photoFile) {
-        try {
-            if (disposed.get()) {
-                return;
+        synchronized (photoMutationLock) {
+            try {
+                if (disposed.get()) {
+                    return;
+                }
+                List<String> updatedPhotoUrls =
+                        photoStore.replacePhoto(user.getId(), user.getPhotoUrls(), index, photoFile.toPath());
+                persistPhotoUrls(user, updatedPhotoUrls, index, "Photo replaced.");
+            } catch (IOException e) {
+                logError(REPLACE_PHOTO_ERROR, e);
+                notifyError(REPLACE_PHOTO_ERROR, e);
+            } catch (IllegalArgumentException e) {
+                logWarn("Invalid photo replacement request: {}", e.getMessage());
+                notifyError(REPLACE_PHOTO_ERROR, e);
             }
-            List<String> updatedPhotoUrls =
-                    photoStore.replacePhoto(user.getId(), user.getPhotoUrls(), index, photoFile.toPath());
-            persistPhotoUrls(user, updatedPhotoUrls, index, "Photo replaced.");
-        } catch (IOException e) {
-            logError(REPLACE_PHOTO_ERROR, e);
-            notifyError(REPLACE_PHOTO_ERROR, e);
-        } catch (IllegalArgumentException e) {
-            logWarn("Invalid photo replacement request: {}", e.getMessage());
-            notifyError(REPLACE_PHOTO_ERROR, e);
         }
     }
 
     private void processPhotoDeletion(User user, int index) {
-        try {
-            if (disposed.get()) {
-                return;
+        synchronized (photoMutationLock) {
+            try {
+                if (disposed.get()) {
+                    return;
+                }
+                List<String> updatedPhotoUrls = photoStore.deletePhoto(user.getPhotoUrls(), index);
+                int selectedIndex = updatedPhotoUrls.isEmpty() ? 0 : Math.min(index, updatedPhotoUrls.size() - 1);
+                persistPhotoUrls(user, updatedPhotoUrls, selectedIndex, "Photo removed.");
+            } catch (IOException e) {
+                logError(DELETE_PHOTO_ERROR, e);
+                notifyError(DELETE_PHOTO_ERROR, e);
+            } catch (IllegalArgumentException e) {
+                logWarn("Invalid photo delete request: {}", e.getMessage());
+                notifyError(DELETE_PHOTO_ERROR, e);
             }
-            List<String> updatedPhotoUrls = photoStore.deletePhoto(user.getPhotoUrls(), index);
-            int selectedIndex = updatedPhotoUrls.isEmpty() ? 0 : Math.min(index, updatedPhotoUrls.size() - 1);
-            persistPhotoUrls(user, updatedPhotoUrls, selectedIndex, "Photo removed.");
-        } catch (IOException e) {
-            logError(DELETE_PHOTO_ERROR, e);
-            notifyError(DELETE_PHOTO_ERROR, e);
-        } catch (IllegalArgumentException e) {
-            logWarn("Invalid photo delete request: {}", e.getMessage());
-            notifyError(DELETE_PHOTO_ERROR, e);
         }
     }
 
     private void processSetPrimaryPhoto(User user, int index) {
-        try {
-            if (disposed.get()) {
-                return;
+        synchronized (photoMutationLock) {
+            try {
+                if (disposed.get()) {
+                    return;
+                }
+                List<String> updatedPhotoUrls = photoStore.setPrimaryPhoto(user.getPhotoUrls(), index);
+                persistPhotoUrls(user, updatedPhotoUrls, 0, "Primary photo updated.");
+            } catch (IllegalArgumentException e) {
+                logWarn("Invalid primary photo request: {}", e.getMessage());
+                notifyError(UPDATE_PRIMARY_PHOTO_ERROR, e);
             }
-            List<String> updatedPhotoUrls = photoStore.setPrimaryPhoto(user.getPhotoUrls(), index);
-            persistPhotoUrls(user, updatedPhotoUrls, 0, "Primary photo updated.");
-        } catch (IllegalArgumentException e) {
-            logWarn("Invalid primary photo request: {}", e.getMessage());
-            notifyError(UPDATE_PRIMARY_PHOTO_ERROR, e);
         }
     }
 
@@ -1190,7 +1255,64 @@ public class ProfileViewModel {
         applyLifestyleFields(draftUser);
         applySearchPreferences(draftUser, false);
         applyDealbreakers(draftUser);
+        applyPacePreferences(draftUser, false);
         return draftUser;
+    }
+
+    private void applyPacePreferences(User user, boolean notifyUser) {
+        boolean anySet = messagingFrequency.get() != null
+                || timeToFirstDate.get() != null
+                || communicationStyle.get() != null
+                || depthPreference.get() != null;
+        boolean allSet = messagingFrequency.get() != null
+                && timeToFirstDate.get() != null
+                && communicationStyle.get() != null
+                && depthPreference.get() != null;
+
+        if (!anySet) {
+            user.setPacePreferences(null);
+            return;
+        }
+
+        if (!allSet) {
+            if (notifyUser) {
+                UiFeedbackService.showWarning("Complete all pace preferences or clear them all.");
+            }
+            throw new IllegalArgumentException("Complete all pace preferences or clear them all.");
+        }
+
+        user.setPacePreferences(new PacePreferences(
+                messagingFrequency.get(), timeToFirstDate.get(), communicationStyle.get(), depthPreference.get()));
+    }
+
+    private String createStateSnapshot() {
+        return String.join(
+                "|",
+                normalize(name.get()),
+                normalize(bio.get()),
+                normalize(locationDisplay.get()),
+                String.valueOf(gender.get()),
+                String.valueOf(birthDate.get()),
+                String.valueOf(height.get()),
+                String.valueOf(smoking.get()),
+                String.valueOf(drinking.get()),
+                String.valueOf(wantsKids.get()),
+                String.valueOf(lookingFor.get()),
+                normalize(minAge.get()),
+                normalize(maxAge.get()),
+                normalize(maxDistance.get()),
+                String.valueOf(dealbreakers.get()),
+                String.valueOf(messagingFrequency.get()),
+                String.valueOf(timeToFirstDate.get()),
+                String.valueOf(communicationStyle.get()),
+                String.valueOf(depthPreference.get()),
+                photoUrls.toString(),
+                selectedInterests.stream().sorted().map(Enum::name).toList().toString(),
+                interestedInGenders.stream().sorted().map(Enum::name).toList().toString());
+    }
+
+    private static String normalize(String value) {
+        return value == null ? "" : value;
     }
 
     private String formatLocationLabel(User user) {

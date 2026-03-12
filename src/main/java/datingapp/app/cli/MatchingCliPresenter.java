@@ -1,10 +1,18 @@
 package datingapp.app.cli;
 
+import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.i18n.I18n;
+import datingapp.core.matching.InterestMatcher;
+import datingapp.core.matching.MatchQualityService.MatchQuality;
 import datingapp.core.matching.MatchingService;
+import datingapp.core.matching.MatchingService.PendingLiker;
 import datingapp.core.matching.RecommendationService;
+import datingapp.core.model.User;
+import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /** Localized presentation helper for matching-related CLI output. */
 final class MatchingCliPresenter {
@@ -69,7 +77,7 @@ final class MatchingCliPresenter {
                 "");
     }
 
-    List<String> dailyPickSwipeResultLines(MatchingService.SwipeResult result, String candidateName) {
+    List<String> dailyPickSwipeResultLines(MatchingService.SwipeResult result) {
         if (result.matched()) {
             return List.of("", I18n.text("cli.matching.daily_pick.match.banner"), "");
         }
@@ -87,5 +95,114 @@ final class MatchingCliPresenter {
             return List.of(I18n.text("cli.matching.standout.like", candidateName), "");
         }
         return List.of(I18n.text("cli.matching.standout.pass", candidateName), "");
+    }
+
+    List<String> candidateProfileLines(User candidate, User currentUser, double distance, ZoneId userTimeZone) {
+        List<String> lines = new ArrayList<>();
+        lines.add(CliTextAndInput.BOX_TOP);
+        boolean verified = candidate.isVerified();
+        int age = candidate.getAge(userTimeZone).orElse(0);
+        lines.add("│ 💝 " + candidate.getName() + (verified ? " ✅ Verified" : "") + ", " + age + " years old");
+        lines.add("│ 📍 " + String.format(Locale.ROOT, "%.1f", distance) + " km away");
+        lines.add(CliTextAndInput.PROFILE_BIO_FORMAT.formatted(
+                candidate.getBio() != null ? candidate.getBio() : "(no bio)"));
+
+        InterestMatcher.MatchResult matchResult =
+                InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
+        if (matchResult.hasSharedInterests()) {
+            String sharedInterests = InterestMatcher.formatSharedInterests(matchResult.shared());
+            lines.add("│ " + getMutualInterestsBadge(matchResult.sharedCount()) + " " + matchResult.sharedCount()
+                    + " shared interest" + (matchResult.sharedCount() > 1 ? "s" : "") + ": " + sharedInterests);
+        }
+
+        lines.add(CliTextAndInput.BOX_BOTTOM);
+        return List.copyOf(lines);
+    }
+
+    List<String> matchQualityLines(User otherUser, MatchQuality quality, ZoneId userTimeZone) {
+        List<String> lines = new ArrayList<>();
+        String nameUpper = otherUser.getName().toUpperCase(Locale.ROOT);
+        lines.add("");
+        lines.add(CliTextAndInput.SEPARATOR_LINE);
+        lines.add("         MATCH WITH " + nameUpper);
+        lines.add(CliTextAndInput.SEPARATOR_LINE + "\n");
+
+        int age = otherUser.getAge(userTimeZone).orElse(0);
+        lines.add("  👤 " + otherUser.getName() + ", " + age);
+        if (otherUser.getBio() != null) {
+            lines.add("  📝 " + otherUser.getBio());
+        }
+        double distanceKm = quality.distanceKm();
+        lines.add(
+                distanceKm < 0
+                        ? "  📍 Distance unknown"
+                        : "  📍 " + String.format(Locale.ROOT, "%.1f", distanceKm) + " km away");
+
+        lines.add("\n" + CliTextAndInput.SECTION_LINE);
+        lines.add("  COMPATIBILITY: " + quality.compatibilityScore() + "%  " + quality.getStarDisplay());
+        lines.add("  " + quality.getCompatibilityLabel());
+        lines.add(CliTextAndInput.SECTION_LINE);
+
+        if (!quality.highlights().isEmpty()) {
+            lines.add("\n  ✨ WHY YOU MATCHED");
+            quality.highlights().forEach(highlight -> lines.add("  • " + highlight));
+        }
+
+        lines.addAll(scoreBreakdownLines(quality));
+
+        if (!quality.lifestyleMatches().isEmpty()) {
+            lines.add("\n  💫 LIFESTYLE ALIGNMENT");
+            quality.lifestyleMatches().forEach(match -> lines.add("  • " + match));
+        }
+
+        lines.add("\n  ⏱️  PACE SYNC: " + quality.paceSyncLevel());
+        return List.copyOf(lines);
+    }
+
+    List<String> likerCardLines(PendingLiker pending, ZoneId userTimeZone) {
+        User user = pending.user();
+        String verifiedBadge = user.isVerified() ? " ✅ Verified" : "";
+        String likedAgo = TextUtil.formatTimeAgo(pending.likedAt());
+        String bio = user.getBio() == null ? "" : user.getBio();
+        if (bio.length() > 50) {
+            bio = bio.substring(0, 47) + "...";
+        }
+
+        return List.of(
+                CliTextAndInput.BOX_TOP,
+                "│ 💝 " + user.getName() + ", " + user.getAge(userTimeZone).orElse(0) + " years old" + verifiedBadge,
+                "│ 🕒 Liked you " + likedAgo,
+                "│ 📍 Location: " + user.getLat() + ", " + user.getLon(),
+                CliTextAndInput.PROFILE_BIO_FORMAT.formatted(bio),
+                CliTextAndInput.BOX_BOTTOM,
+                "");
+    }
+
+    private List<String> scoreBreakdownLines(MatchQuality quality) {
+        String distanceBar = TextUtil.renderProgressBar(quality.distanceScore(), 12);
+        String ageBar = TextUtil.renderProgressBar(quality.ageScore(), 12);
+        String interestBar = TextUtil.renderProgressBar(quality.interestScore(), 12);
+        String lifestyleBar = TextUtil.renderProgressBar(quality.lifestyleScore(), 12);
+        String paceBar = TextUtil.renderProgressBar(quality.paceScore(), 12);
+        String responseBar = TextUtil.renderProgressBar(quality.responseScore(), 12);
+
+        return List.of(
+                "\n  📊 SCORE BREAKDOWN",
+                CliTextAndInput.SECTION_LINE,
+                "  Distance:      " + distanceBar + " " + (int) (quality.distanceScore() * 100) + "%",
+                "  Age match:     " + ageBar + " " + (int) (quality.ageScore() * 100) + "%",
+                "  Interests:     " + interestBar + " " + (int) (quality.interestScore() * 100) + "%",
+                "  Lifestyle:     " + lifestyleBar + " " + (int) (quality.lifestyleScore() * 100) + "%",
+                "  Pace/Sync:      " + paceBar + " " + (int) (quality.paceScore() * 100) + "%",
+                "  Response:      " + responseBar + " " + (int) (quality.responseScore() * 100) + "%");
+    }
+
+    private String getMutualInterestsBadge(int sharedCount) {
+        return switch (sharedCount) {
+            case 5, 6, 7, 8, 9, 10 -> "🎯🔥";
+            case 3, 4 -> "🎯✨";
+            case 2 -> "🎯";
+            default -> "✨";
+        };
     }
 }

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="700.0"
+    xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="datingapp.ui.screen.ProfileViewController">
+  <top>
+    <HBox alignment="CENTER_LEFT" spacing="16" styleClass="header-bar">
+      <Button onAction="#handleBack" styleClass="button-transparent">
+        <graphic>
+          <FontIcon iconLiteral="mdi2c-chevron-left" iconSize="28" iconColor="white"/>
+        </graphic>
+      </Button>
+      <Label styleClass="subheading" text="Profile"/>
+      <Region HBox.hgrow="ALWAYS"/>
+      <Label fx:id="photoIndicatorLabel" styleClass="text-secondary" text="0/0"/>
+    </HBox>
+  </top>
+
+  <center>
+    <ScrollPane fitToWidth="true" styleClass="transparent-scroll">
+      <VBox spacing="20">
+        <padding>
+          <Insets top="24" right="40" bottom="24" left="40"/>
+        </padding>
+        <HBox alignment="CENTER" spacing="12">
+          <Button onAction="#handlePreviousPhoto" styleClass="button-transparent" text="◀"/>
+          <ImageView fx:id="profileImageView" fitWidth="360" fitHeight="240" preserveRatio="true"/>
+          <Button onAction="#handleNextPhoto" styleClass="button-transparent" text="▶"/>
+        </HBox>
+        <VBox styleClass="section-glass-card" spacing="12">
+          <Label fx:id="nameLabel" styleClass="section-title" text="Name"/>
+          <Label fx:id="locationLabel" styleClass="text-secondary" text="Location" wrapText="true"/>
+          <Label fx:id="lookingForLabel" styleClass="text-secondary" text="Looking for" wrapText="true"/>
+          <Label fx:id="bioLabel" text="Bio" wrapText="true"/>
+          <Label fx:id="interestsLabel" styleClass="text-secondary" text="Interests" wrapText="true"/>
+        </VBox>
+      </VBox>
+    </ScrollPane>
+  </center>
+</BorderPane>

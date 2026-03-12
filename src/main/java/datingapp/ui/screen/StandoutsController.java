@@ -63,6 +63,8 @@ public class StandoutsController extends BaseController implements Initializable
         addSubscription(
                 standoutsListView.getSelectionModel().selectedItemProperty().subscribe(this::handleStandoutSelected));
 
+        setupAccessibilityMetadata();
+
         viewModel.initialize();
         UiAnimations.fadeIn(rootPane, 800);
     }
@@ -72,14 +74,23 @@ public class StandoutsController extends BaseController implements Initializable
             return;
         }
         viewModel.markInteracted(entry);
-        NavigationService.getInstance().setNavigationContext(NavigationService.ViewType.MATCHING, entry.userId());
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
+        NavigationService.getInstance().setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, entry.userId());
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE_VIEW);
     }
 
     @SuppressWarnings("unused")
     @FXML
     private void handleRefresh() {
         viewModel.loadStandouts();
+    }
+
+    private void setupAccessibilityMetadata() {
+        if (standoutsListView != null) {
+            standoutsListView.setAccessibleText("Today's standout profiles");
+        }
+        if (statusLabel != null) {
+            statusLabel.setAccessibleText("Standouts status message");
+        }
     }
 
     /** Cell that displays a standout entry with rank, name, score, and reason. */
@@ -108,6 +119,7 @@ public class StandoutsController extends BaseController implements Initializable
 
             viewButton.getStyleClass().add("button-primary");
             viewButton.setStyle("-fx-font-size: 12px; -fx-padding: 6 14;");
+            viewButton.setAccessibleText("View profile for standout candidate");
 
             HBox.setHgrow(spacer, Priority.ALWAYS);
             container.setAlignment(Pos.CENTER_LEFT);

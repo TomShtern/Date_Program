@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.profile.*;
+import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.ValidationService.ValidationResult;
+import java.util.EnumSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -65,6 +67,48 @@ class ValidationServiceTest {
             String name = "a".repeat(100);
             ValidationResult result = validator.validateName(name);
             assertTrue(result.valid());
+        }
+
+        @Test
+        @DisplayName("Name with control characters fails validation")
+        void controlCharactersFailValidation() {
+            ValidationResult result = validator.validateName("John\u0000Doe");
+            assertFalse(result.valid());
+            assertEquals(
+                    "Name contains invalid control characters", result.errors().getFirst());
+        }
+    }
+
+    @Nested
+    @DisplayName("Contact Validation")
+    class ContactValidation {
+
+        @Test
+        @DisplayName("Valid email passes validation")
+        void validEmail() {
+            assertTrue(validator.validateEmail("person@example.com").valid());
+        }
+
+        @Test
+        @DisplayName("Invalid email fails validation")
+        void invalidEmail() {
+            ValidationResult result = validator.validateEmail("not-an-email");
+            assertFalse(result.valid());
+            assertEquals("Invalid email format", result.errors().getFirst());
+        }
+
+        @Test
+        @DisplayName("Valid phone passes validation")
+        void validPhone() {
+            assertTrue(validator.validatePhone("+1 (555) 123-4567").valid());
+        }
+
+        @Test
+        @DisplayName("Invalid phone fails validation")
+        void invalidPhone() {
+            ValidationResult result = validator.validatePhone("bad-phone");
+            assertFalse(result.valid());
+            assertEquals("Invalid phone format", result.errors().getFirst());
         }
     }
 
@@ -249,6 +293,33 @@ class ValidationServiceTest {
             assertFalse(result.valid());
             assertEquals(
                     "Bio too long (max " + maxBio + " chars)", result.errors().get(0));
+        }
+    }
+
+    @Nested
+    @DisplayName("Interest Validation")
+    class InterestValidation {
+
+        @Test
+        @DisplayName("Interest count at configured limit passes validation")
+        void interestsAtLimitPass() {
+            EnumSet<Interest> interests = EnumSet.noneOf(Interest.class);
+            while (interests.size() < AppConfig.defaults().validation().maxInterests()) {
+                interests.add(Interest.values()[interests.size()]);
+            }
+            assertTrue(validator.validateInterests(interests).valid());
+        }
+
+        @Test
+        @DisplayName("Interest count above configured limit fails validation")
+        void interestsAboveLimitFail() {
+            EnumSet<Interest> interests = EnumSet.noneOf(Interest.class);
+            while (interests.size() <= AppConfig.defaults().validation().maxInterests()) {
+                interests.add(Interest.values()[interests.size()]);
+            }
+            ValidationResult result = validator.validateInterests(interests);
+            assertFalse(result.valid());
+            assertTrue(result.errors().getFirst().contains("Cannot select more than"));
         }
     }
 

@@ -77,6 +77,7 @@ public final class NavigationService {
         LOGIN("/fxml/login.fxml"),
         DASHBOARD("/fxml/dashboard.fxml"),
         PROFILE("/fxml/profile.fxml"),
+        PROFILE_VIEW("/fxml/profile-view.fxml"),
         MATCHING("/fxml/matching.fxml"),
         MATCHES("/fxml/matches.fxml"),
         CHAT("/fxml/chat.fxml"),

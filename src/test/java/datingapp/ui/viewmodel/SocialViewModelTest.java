@@ -21,6 +21,8 @@ import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
+import java.util.function.BooleanSupplier;
 import javafx.application.Platform;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -101,9 +103,7 @@ class SocialViewModelTest {
         communications.saveNotification(notif);
 
         viewModel.initialize();
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertEquals(1, viewModel.getNotifications().size());
         assertEquals("New Match!", viewModel.getNotifications().get(0).title());
@@ -121,9 +121,7 @@ class SocialViewModelTest {
         communications.saveFriendRequest(request);
 
         viewModel.initialize();
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertEquals(1, viewModel.getPendingRequests().size());
 
@@ -141,9 +139,7 @@ class SocialViewModelTest {
         communications.saveFriendRequest(request);
 
         viewModel.initialize();
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertEquals(1, viewModel.getPendingRequests().size());
         // Graceful degradation: falls back to the UUID string representation
@@ -159,16 +155,16 @@ class SocialViewModelTest {
         communications.saveNotification(notif);
 
         viewModel.initialize();
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertFalse(viewModel.getNotifications().get(0).isRead(), "Notification should start as unread");
 
         viewModel.markNotificationRead(notif);
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(
+                () -> !viewModel.loadingProperty().get()
+                        && !viewModel.getNotifications().isEmpty()
+                        && viewModel.getNotifications().get(0).isRead(),
+                5000));
 
         assertTrue(viewModel.getNotifications().get(0).isRead(), "Notification should be marked as read");
     }
@@ -189,17 +185,13 @@ class SocialViewModelTest {
         communications.saveNotification(alreadyRead);
 
         viewModel.initialize();
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         // Calling markNotificationRead on an already-read notification should be a
         // no-op
         int notifCount = viewModel.getNotifications().size();
         viewModel.markNotificationRead(alreadyRead);
-
-        Thread.sleep(300);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         // List count should be unchanged and ViewModel should remain stable
         assertEquals(notifCount, viewModel.getNotifications().size());
@@ -210,9 +202,7 @@ class SocialViewModelTest {
     @DisplayName("refresh() with no social data results in empty lists")
     void shouldReturnEmptyListsWhenNoData() throws InterruptedException {
         viewModel.initialize();
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertTrue(viewModel.getNotifications().isEmpty());
         assertTrue(viewModel.getPendingRequests().isEmpty());
@@ -228,9 +218,7 @@ class SocialViewModelTest {
 
         viewModel.initialize();
         viewModel.dispose(); // Dispose before the virtual thread completes
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertTrue(viewModel.getNotifications().isEmpty());
         assertTrue(viewModel.getPendingRequests().isEmpty());
@@ -244,9 +232,7 @@ class SocialViewModelTest {
         for (int i = 0; i < 15; i++) {
             Thread.ofVirtual().start(() -> viewModel.refresh());
         }
-
-        Thread.sleep(1000);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         // Lists should be consistent (not stuck loading or partially updated)
         assertFalse(viewModel.loadingProperty().get());
@@ -260,5 +246,18 @@ class SocialViewModelTest {
         if (!latch.await(5, TimeUnit.SECONDS)) {
             throw new RuntimeException("Timeout waiting for FX thread");
         }
+    }
+
+    private boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+        while (System.nanoTime() < deadline) {
+            waitForFxEvents();
+            if (condition.getAsBoolean()) {
+                return true;
+            }
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(25));
+        }
+        waitForFxEvents();
+        return condition.getAsBoolean();
     }
 }

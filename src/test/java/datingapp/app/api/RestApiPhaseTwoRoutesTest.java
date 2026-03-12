@@ -1,6 +1,7 @@
 package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -378,6 +379,156 @@ class RestApiPhaseTwoRoutesTest {
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(204, archiveMatchResponse.statusCode());
         assertTrue(interactionStorage.get(Match.generateId(aliceId, bobId)).isEmpty());
+    }
+
+    @Test
+    @DisplayName("profile save, match, message, and graceful-exit flow work end to end")
+    void profileSaveMatchMessageAndGracefulExitFlowWorksEndToEnd() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        SeededStandoutStorage standoutStorage = new SeededStandoutStorage();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, standoutStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        User alice = activeUser(aliceId, "Alice HappyPath");
+        alice.setBio("Before update");
+        User bob = activeUser(bobId, "Bob HappyPath");
+        userStorage.save(alice);
+        userStorage.save(bob);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> updateProfileResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/profile"))
+                        .header("Content-Type", "application/json")
+                        .PUT(HttpRequest.BodyPublishers.ofString("""
+                                {
+                                  "bio":"Updated happy-path bio",
+                                  "maxDistanceKm":70,
+                                  "minAge":22,
+                                  "maxAge":34,
+                                  "heightCm":168,
+                                  "smoking":"NEVER",
+                                  "drinking":"SOCIALLY",
+                                  "wantsKids":"OPEN",
+                                  "lookingFor":"LONG_TERM",
+                                  "education":"BACHELORS",
+                                  "interests":["MUSIC","TRAVEL"]
+                                }
+                                """))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, updateProfileResponse.statusCode());
+        assertEquals(
+                "Updated happy-path bio", userStorage.get(aliceId).orElseThrow().getBio());
+
+        HttpResponse<String> firstLikeResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/like/" + bobId))
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, firstLikeResponse.statusCode());
+
+        HttpResponse<String> secondLikeResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + bobId + "/like/" + aliceId))
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, secondLikeResponse.statusCode());
+        JsonNode likeJson = MAPPER.readTree(secondLikeResponse.body());
+        assertTrue(likeJson.get("isMatch").asBoolean());
+
+        String conversationId = datingapp.core.connection.ConnectionModels.Conversation.generateId(aliceId, bobId);
+        HttpResponse<String> sendMessageResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/" + conversationId
+                                + "/messages?userId=" + aliceId))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "{\"senderId\":\"" + aliceId + "\",\"content\":\"Hello from the happy path\"}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, sendMessageResponse.statusCode());
+
+        HttpResponse<String> gracefulExitResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
+                                + "/relationships/" + bobId + "/graceful-exit"))
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, gracefulExitResponse.statusCode());
+
+        Match updatedMatch =
+                interactionStorage.get(Match.generateId(aliceId, bobId)).orElseThrow();
+        assertEquals(Match.MatchState.GRACEFUL_EXIT, updatedMatch.getState());
+        var storedConversation =
+                communicationStorage.getConversation(conversationId).orElseThrow();
+        assertNotNull(storedConversation.getLastMessageAt());
+    }
+
+    @Test
+    @DisplayName("report-plus-block flow prevents follow-up messaging and preserves moderation state")
+    void reportAndBlockFlowPreventsFollowUpMessaging() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        SeededStandoutStorage standoutStorage = new SeededStandoutStorage();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, standoutStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        User alice = activeUser(aliceId, "Alice FailurePath");
+        User bob = activeUser(bobId, "Bob FailurePath");
+        userStorage.save(alice);
+        userStorage.save(bob);
+        interactionStorage.save(Match.create(aliceId, bobId));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        String conversationId = datingapp.core.connection.ConnectionModels.Conversation.generateId(aliceId, bobId);
+        HttpResponse<String> sendMessageResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/" + conversationId
+                                + "/messages?userId=" + aliceId))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "{\"senderId\":\"" + aliceId + "\",\"content\":\"Before block\"}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, sendMessageResponse.statusCode());
+
+        HttpResponse<String> reportResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/report/" + bobId))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "{\"reason\":\"HARASSMENT\",\"description\":\"Unsafe behavior\",\"blockUser\":true}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, reportResponse.statusCode());
+        JsonNode reportJson = MAPPER.readTree(reportResponse.body());
+        assertTrue(reportJson.get("success").asBoolean());
+        assertTrue(reportJson.get("blockedByReporter").asBoolean());
+
+        HttpResponse<String> blockedMessageResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/" + conversationId
+                                + "/messages?userId=" + aliceId))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "{\"senderId\":\"" + aliceId + "\",\"content\":\"This should fail\"}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(409, blockedMessageResponse.statusCode());
     }
 
     private static ServiceRegistry createServices(

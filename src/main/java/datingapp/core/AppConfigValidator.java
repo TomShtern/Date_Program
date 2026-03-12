@@ -58,7 +58,10 @@ final class AppConfigValidator {
             int minDistanceKm,
             int maxInterests,
             int maxPhotos,
-            int messageMaxPageSize) {
+            int messageMaxPageSize,
+            int chatBackgroundPollSeconds,
+            int chatActivePollSeconds,
+            int maxStandouts) {
         requireNonNegative("minAge", minAge);
         requireNonNegative("maxAge", maxAge);
         if (minAge > maxAge) {
@@ -77,6 +80,9 @@ final class AppConfigValidator {
         requireNonNegative("maxInterests", maxInterests);
         requireNonNegative("maxPhotos", maxPhotos);
         requireNonNegative("messageMaxPageSize", messageMaxPageSize);
+        requireInRange(chatBackgroundPollSeconds, 1, 300, "chatBackgroundPollSeconds");
+        requireInRange(chatActivePollSeconds, 1, 300, "chatActivePollSeconds");
+        requireInRange(maxStandouts, 1, 100, "maxStandouts");
     }
 
     static void validateAlgorithm(
@@ -158,6 +164,12 @@ final class AppConfigValidator {
     private static void requireNonNegative(String name, double value) {
         if (value < 0) {
             throw new IllegalArgumentException(name + " must be non-negative");
+        }
+    }
+
+    private static void requireInRange(int value, int min, int max, String field) {
+        if (value < min || value > max) {
+            throw new IllegalArgumentException(field + " must be between " + min + " and " + max);
         }
     }
 }

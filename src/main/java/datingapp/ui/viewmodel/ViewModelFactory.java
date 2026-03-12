@@ -14,10 +14,12 @@ import datingapp.ui.screen.MatchingController;
 import datingapp.ui.screen.NotesController;
 import datingapp.ui.screen.PreferencesController;
 import datingapp.ui.screen.ProfileController;
+import datingapp.ui.screen.ProfileViewController;
 import datingapp.ui.screen.SafetyController;
 import datingapp.ui.screen.SocialController;
 import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
+import datingapp.ui.viewmodel.UiDataAdapters.FeatureFlaggedNoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
@@ -47,6 +49,7 @@ import org.slf4j.LoggerFactory;
 public class ViewModelFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(ViewModelFactory.class);
+    private static final String PRESENCE_FLAG_KEY = "datingapp.ui.presence.enabled";
 
     private final ServiceRegistry services;
     private final AppSession session;
@@ -109,6 +112,7 @@ public class ViewModelFactory {
         map.put(LoginController.class, () -> new LoginController(getLoginViewModel(), services.getProfileService()));
         map.put(DashboardController.class, () -> new DashboardController(getDashboardViewModel()));
         map.put(ProfileController.class, () -> new ProfileController(getProfileViewModel()));
+        map.put(ProfileViewController.class, () -> new ProfileViewController(getProfileReadOnlyViewModel()));
         map.put(MatchingController.class, () -> new MatchingController(getMatchingViewModel()));
         map.put(MatchesController.class, () -> new MatchesController(getMatchesViewModel()));
         map.put(ChatController.class, () -> new ChatController(getChatViewModel()));
@@ -185,6 +189,12 @@ public class ViewModelFactory {
                         services.getActivationPolicy()));
     }
 
+    public ProfileReadOnlyViewModel getProfileReadOnlyViewModel() {
+        return getViewModel(
+                ProfileReadOnlyViewModel.class,
+                () -> new ProfileReadOnlyViewModel(createUiUserStore(), services.getConfig(), uiDispatcher));
+    }
+
     public MatchingViewModel getMatchingViewModel() {
         return getViewModel(
                 MatchingViewModel.class,
@@ -225,8 +235,10 @@ public class ViewModelFactory {
                         services.getSocialUseCases(),
                         session,
                         uiDispatcher,
-                        java.time.Duration.ofSeconds(15),
-                        java.time.Duration.ofSeconds(5),
+                        java.time.Duration.ofSeconds(
+                                services.getConfig().validation().chatBackgroundPollSeconds()),
+                        java.time.Duration.ofSeconds(
+                                services.getConfig().validation().chatActivePollSeconds()),
                         new ChatViewModel.ChatUiDependencies(
                                 createUiProfileNoteDataAccess(), createUiPresenceDataAccess())));
     }
@@ -277,7 +289,8 @@ public class ViewModelFactory {
     public SafetyViewModel getSafetyViewModel() {
         return getViewModel(
                 SafetyViewModel.class,
-                () -> new SafetyViewModel(services.getTrustSafetyService(), session, uiDispatcher));
+                () -> new SafetyViewModel(
+                        services.getTrustSafetyService(), services.getProfileUseCases(), session, uiDispatcher));
     }
 
     public NotesViewModel getNotesViewModel() {
@@ -348,6 +361,11 @@ public class ViewModelFactory {
     }
 
     private UiPresenceDataAccess createUiPresenceDataAccess() {
+        boolean presenceEnabled = Boolean.parseBoolean(System.getProperty(PRESENCE_FLAG_KEY, "false"));
+        if (!presenceEnabled) {
+            logInfo("Presence indicators disabled via system property: {}", PRESENCE_FLAG_KEY);
+            return new FeatureFlaggedNoOpUiPresenceDataAccess("Presence indicators are disabled in this build.");
+        }
         return new NoOpUiPresenceDataAccess();
     }
 
@@ -366,6 +384,12 @@ public class ViewModelFactory {
     private void logWarn(String message, Object... args) {
         if (logger.isWarnEnabled()) {
             logger.warn(message, args);
+        }
+    }
+
+    private void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
         }
     }
 }

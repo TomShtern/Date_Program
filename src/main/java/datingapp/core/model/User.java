@@ -6,6 +6,7 @@ import datingapp.core.profile.MatchPreferences;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ValidationService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
@@ -516,12 +517,12 @@ public class User {
     }
 
     public void setEmail(String email) {
-        this.email = email;
+        this.email = ValidationService.normalizeEmail(email);
         touch();
     }
 
     public void setPhone(String phone) {
-        this.phone = phone;
+        this.phone = ValidationService.normalizePhone(phone);
         touch();
     }
 

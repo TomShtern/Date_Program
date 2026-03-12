@@ -46,6 +46,10 @@ public class MatchingUseCases {
     private final MatchQualityService matchQualityService;
     private final AppEventBus eventBus;
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
     public MatchingUseCases(CandidateFinder candidateFinder, MatchingService matchingService, UndoService undoService) {
         this(candidateFinder, matchingService, null, null, null, undoService, null, null, null, null);
     }
@@ -137,6 +141,92 @@ public class MatchingUseCases {
         this.userStorage = userStorage;
         this.matchQualityService = matchQualityService;
         this.eventBus = eventBus;
+    }
+
+    public static final class Builder {
+        private CandidateFinder candidateFinder;
+        private MatchingService matchingService;
+        private DailyLimitService dailyLimitService;
+        private DailyPickService dailyPickService;
+        private StandoutService standoutService;
+        private UndoService undoService;
+        private InteractionStorage interactionStorage;
+        private UserStorage userStorage;
+        private MatchQualityService matchQualityService;
+        private AppEventBus eventBus;
+
+        private Builder() {}
+
+        public Builder candidateFinder(CandidateFinder candidateFinder) {
+            this.candidateFinder = candidateFinder;
+            return this;
+        }
+
+        public Builder matchingService(MatchingService matchingService) {
+            this.matchingService = matchingService;
+            return this;
+        }
+
+        public Builder recommendationService(RecommendationService recommendationService) {
+            this.dailyLimitService = wrapDailyLimitService(recommendationService);
+            this.dailyPickService = wrapDailyPickService(recommendationService);
+            this.standoutService = wrapStandoutService(recommendationService);
+            return this;
+        }
+
+        public Builder dailyLimitService(DailyLimitService dailyLimitService) {
+            this.dailyLimitService = dailyLimitService;
+            return this;
+        }
+
+        public Builder dailyPickService(DailyPickService dailyPickService) {
+            this.dailyPickService = dailyPickService;
+            return this;
+        }
+
+        public Builder standoutService(StandoutService standoutService) {
+            this.standoutService = standoutService;
+            return this;
+        }
+
+        public Builder undoService(UndoService undoService) {
+            this.undoService = undoService;
+            return this;
+        }
+
+        public Builder interactionStorage(InteractionStorage interactionStorage) {
+            this.interactionStorage = interactionStorage;
+            return this;
+        }
+
+        public Builder userStorage(UserStorage userStorage) {
+            this.userStorage = userStorage;
+            return this;
+        }
+
+        public Builder matchQualityService(MatchQualityService matchQualityService) {
+            this.matchQualityService = matchQualityService;
+            return this;
+        }
+
+        public Builder eventBus(AppEventBus eventBus) {
+            this.eventBus = eventBus;
+            return this;
+        }
+
+        public MatchingUseCases build() {
+            return new MatchingUseCases(
+                    candidateFinder,
+                    matchingService,
+                    dailyLimitService,
+                    dailyPickService,
+                    standoutService,
+                    undoService,
+                    interactionStorage,
+                    userStorage,
+                    matchQualityService,
+                    eventBus);
+        }
     }
 
     public UseCaseResult<BrowseCandidatesResult> browseCandidates(BrowseCandidatesCommand command) {

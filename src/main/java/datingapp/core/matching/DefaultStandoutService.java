@@ -22,7 +22,6 @@ import java.util.UUID;
  */
 public final class DefaultStandoutService implements StandoutService {
 
-    private static final int MAX_STANDOUTS = 10;
     private static final int DIVERSITY_DAYS = 3;
 
     private final CompatibilityCalculator calculator;
@@ -97,7 +96,7 @@ public final class DefaultStandoutService implements StandoutService {
                 .filter(candidate -> !recentStandoutIds.contains(candidate.getId()))
                 .map(candidate -> scoreCandidate(seeker, candidate))
                 .sorted(Comparator.comparingInt(ScoredCandidate::score).reversed())
-                .limit(MAX_STANDOUTS)
+                .limit(config.validation().maxStandouts())
                 .toList();
 
         if (scored.isEmpty()) {

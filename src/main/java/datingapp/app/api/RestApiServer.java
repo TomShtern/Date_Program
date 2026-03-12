@@ -210,54 +210,12 @@ public class RestApiServer {
         // All routes below operate without any identity verification.
         // ────────────────────────────────────────────────────────────────────
 
-        // Health check
-        app.get("/api/health", ctx -> ctx.json(new HealthResponse("ok", System.currentTimeMillis())));
-
-        // User routes
-        app.get("/api/users", this::listUsers);
-        app.get("/api/users/{id}", this::getUser);
-        app.put("/api/users/{id}/profile", this::updateProfile);
-        app.get("/api/users/{id}/candidates", this::getCandidates);
-
-        // Match routes
-        app.get("/api/users/{id}/matches", this::getMatches);
-        app.get("/api/users/{id}/pending-likers", this::getPendingLikers);
-        app.get("/api/users/{id}/standouts", this::getStandouts);
-        app.get("/api/users/{id}/match-quality/{matchId}", this::getMatchQuality);
-        app.post("/api/users/{id}/like/{targetId}", this::likeUser);
-        app.post("/api/users/{id}/pass/{targetId}", this::passUser);
-        app.post("/api/users/{id}/matches/{matchId}/archive", this::archiveMatch);
-        app.post("/api/users/{id}/undo", this::undoSwipe);
-
-        // Stats / achievements / notifications routes
-        app.get("/api/users/{id}/stats", this::getStats);
-        app.get("/api/users/{id}/achievements", this::getAchievements);
-        app.get("/api/users/{id}/notifications", this::getNotifications);
-        app.post("/api/users/{id}/notifications/read-all", this::markAllNotificationsRead);
-        app.post("/api/users/{id}/notifications/{notificationId}/read", this::markNotificationRead);
-
-        // Relationship / moderation routes
-        app.post("/api/users/{id}/friend-requests/{targetId}", this::requestFriendZone);
-        app.post("/api/users/{id}/friend-requests/{requestId}/accept", this::acceptFriendRequest);
-        app.post("/api/users/{id}/friend-requests/{requestId}/decline", this::declineFriendRequest);
-        app.post("/api/users/{id}/relationships/{targetId}/graceful-exit", this::gracefulExit);
-        app.post("/api/users/{id}/relationships/{targetId}/unmatch", this::unmatch);
-        app.post("/api/users/{id}/block/{targetId}", this::blockUser);
-        app.post("/api/users/{id}/report/{targetId}", this::reportUser);
-
-        // Messaging routes
-        app.get("/api/users/{id}/conversations", this::getConversations);
-        app.delete("/api/users/{id}/conversations/{conversationId}", this::deleteConversation);
-        app.post("/api/users/{id}/conversations/{conversationId}/archive", this::archiveConversation);
-        app.get("/api/conversations/{conversationId}/messages", this::getMessages);
-        app.delete("/api/conversations/{conversationId}/messages/{messageId}", this::deleteMessage);
-        app.post("/api/conversations/{conversationId}/messages", this::sendMessage);
-
-        // Private profile-note routes
-        app.get(NOTES_COLLECTION_ROUTE, this::listProfileNotes);
-        app.get(NOTE_ITEM_ROUTE, this::getProfileNote);
-        app.put(NOTE_ITEM_ROUTE, this::upsertProfileNote);
-        app.delete(NOTE_ITEM_ROUTE, this::deleteProfileNote);
+        new HealthRoutes(app).register();
+        new UserRoutes(app, this).register();
+        new MatchingRoutes(app, this).register();
+        new SocialRoutes(app, this).register();
+        new MessagingRoutes(app, this).register();
+        new ProfileNoteRoutes(app, this).register();
     }
 
     private void registerRequestGuards() {
@@ -1467,6 +1425,127 @@ public class RestApiServer {
     private static final class ApiTooManyRequestsException extends RuntimeException {
         private ApiTooManyRequestsException(String message) {
             super(message);
+        }
+    }
+
+    private interface RouteModule {
+        void register();
+    }
+
+    private static final class HealthRoutes implements RouteModule {
+        private final Javalin app;
+
+        private HealthRoutes(Javalin app) {
+            this.app = app;
+        }
+
+        @Override
+        public void register() {
+            app.get("/api/health", ctx -> ctx.json(new HealthResponse("ok", System.currentTimeMillis())));
+        }
+    }
+
+    private static final class UserRoutes implements RouteModule {
+        private final Javalin app;
+        private final RestApiServer server;
+
+        private UserRoutes(Javalin app, RestApiServer server) {
+            this.app = app;
+            this.server = server;
+        }
+
+        @Override
+        public void register() {
+            app.get("/api/users", server::listUsers);
+            app.get("/api/users/{id}", server::getUser);
+            app.put("/api/users/{id}/profile", server::updateProfile);
+            app.get("/api/users/{id}/candidates", server::getCandidates);
+        }
+    }
+
+    private static final class MatchingRoutes implements RouteModule {
+        private final Javalin app;
+        private final RestApiServer server;
+
+        private MatchingRoutes(Javalin app, RestApiServer server) {
+            this.app = app;
+            this.server = server;
+        }
+
+        @Override
+        public void register() {
+            app.get("/api/users/{id}/matches", server::getMatches);
+            app.get("/api/users/{id}/pending-likers", server::getPendingLikers);
+            app.get("/api/users/{id}/standouts", server::getStandouts);
+            app.get("/api/users/{id}/match-quality/{matchId}", server::getMatchQuality);
+            app.post("/api/users/{id}/like/{targetId}", server::likeUser);
+            app.post("/api/users/{id}/pass/{targetId}", server::passUser);
+            app.post("/api/users/{id}/matches/{matchId}/archive", server::archiveMatch);
+            app.post("/api/users/{id}/undo", server::undoSwipe);
+            app.get("/api/users/{id}/stats", server::getStats);
+            app.get("/api/users/{id}/achievements", server::getAchievements);
+        }
+    }
+
+    private static final class SocialRoutes implements RouteModule {
+        private final Javalin app;
+        private final RestApiServer server;
+
+        private SocialRoutes(Javalin app, RestApiServer server) {
+            this.app = app;
+            this.server = server;
+        }
+
+        @Override
+        public void register() {
+            app.get("/api/users/{id}/notifications", server::getNotifications);
+            app.post("/api/users/{id}/notifications/read-all", server::markAllNotificationsRead);
+            app.post("/api/users/{id}/notifications/{notificationId}/read", server::markNotificationRead);
+            app.post("/api/users/{id}/friend-requests/{targetId}", server::requestFriendZone);
+            app.post("/api/users/{id}/friend-requests/{requestId}/accept", server::acceptFriendRequest);
+            app.post("/api/users/{id}/friend-requests/{requestId}/decline", server::declineFriendRequest);
+            app.post("/api/users/{id}/relationships/{targetId}/graceful-exit", server::gracefulExit);
+            app.post("/api/users/{id}/relationships/{targetId}/unmatch", server::unmatch);
+            app.post("/api/users/{id}/block/{targetId}", server::blockUser);
+            app.post("/api/users/{id}/report/{targetId}", server::reportUser);
+        }
+    }
+
+    private static final class MessagingRoutes implements RouteModule {
+        private final Javalin app;
+        private final RestApiServer server;
+
+        private MessagingRoutes(Javalin app, RestApiServer server) {
+            this.app = app;
+            this.server = server;
+        }
+
+        @Override
+        public void register() {
+            app.get("/api/users/{id}/conversations", server::getConversations);
+            app.delete("/api/users/{id}/conversations/{conversationId}", server::deleteConversation);
+            app.post("/api/users/{id}/conversations/{conversationId}/archive", server::archiveConversation);
+            app.get("/api/conversations/{conversationId}/messages", server::getMessages);
+            app.delete("/api/conversations/{conversationId}/messages/{messageId}", server::deleteMessage);
+            app.post("/api/conversations/{conversationId}/messages", server::sendMessage);
+        }
+    }
+
+    private static final class ProfileNoteRoutes implements RouteModule {
+        private final Javalin app;
+        private final RestApiServer server;
+
+        private ProfileNoteRoutes(Javalin app, RestApiServer server) {
+            this.app = app;
+            this.server = server;
+        }
+
+        @Override
+        public void register() {
+            app.get(NOTES_COLLECTION_ROUTE, server::listProfileNotes);
+            app.get(NOTE_ITEM_ROUTE, server::getProfileNote);
+            app.put(NOTE_ITEM_ROUTE, server::upsertProfileNote);
+            app.delete(NOTE_ITEM_ROUTE, server::deleteProfileNote);
         }
     }
 

@@ -31,12 +31,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Profile and user-progress application use-cases shared across adapters. */
+@SuppressWarnings("java:S107")
 public class ProfileUseCases {
 
     private static final Logger logger = LoggerFactory.getLogger(ProfileUseCases.class);
     private static final String CONTEXT_REQUIRED = "Context is required";
     private static final String PROFILE_SERVICE_REQUIRED = "ProfileService is required";
     private static final String USER_STORAGE_REQUIRED = "UserStorage is required";
+    private static final String USER_NOT_FOUND = "User not found";
     private static final String AUTHOR_NOT_FOUND = "Author not found";
     private static final String CONTEXT_AND_SUBJECT_REQUIRED = "Context and subjectId are required";
 
@@ -48,6 +50,10 @@ public class ProfileUseCases {
     private final AppConfig config;
     private final ProfileActivationPolicy activationPolicy;
     private final AppEventBus eventBus;
+
+    public static Builder builder() {
+        return new Builder();
+    }
 
     /** Backward-compatible constructor — uses default activation policy, no event bus. */
     @SuppressWarnings("java:S107")
@@ -68,6 +74,7 @@ public class ProfileUseCases {
                 null);
     }
 
+    @SuppressWarnings("java:S107")
     public ProfileUseCases(
             UserStorage userStorage,
             ProfileService profileService,
@@ -123,6 +130,7 @@ public class ProfileUseCases {
                 null);
     }
 
+    @SuppressWarnings("java:S107")
     public ProfileUseCases(
             UserStorage userStorage,
             ProfileService profileService,
@@ -140,6 +148,71 @@ public class ProfileUseCases {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
         this.eventBus = eventBus;
+    }
+
+    public static final class Builder {
+        private UserStorage userStorage;
+        private ProfileService profileService;
+        private ValidationService validationService;
+        private ActivityMetricsService activityMetricsService;
+        private AchievementService achievementService;
+        private AppConfig config;
+        private ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
+        private AppEventBus eventBus;
+
+        private Builder() {}
+
+        public Builder userStorage(UserStorage userStorage) {
+            this.userStorage = userStorage;
+            return this;
+        }
+
+        public Builder profileService(ProfileService profileService) {
+            this.profileService = profileService;
+            return this;
+        }
+
+        public Builder validationService(ValidationService validationService) {
+            this.validationService = validationService;
+            return this;
+        }
+
+        public Builder activityMetricsService(ActivityMetricsService activityMetricsService) {
+            this.activityMetricsService = activityMetricsService;
+            return this;
+        }
+
+        public Builder achievementService(AchievementService achievementService) {
+            this.achievementService = achievementService;
+            return this;
+        }
+
+        public Builder config(AppConfig config) {
+            this.config = config;
+            return this;
+        }
+
+        public Builder activationPolicy(ProfileActivationPolicy activationPolicy) {
+            this.activationPolicy = activationPolicy;
+            return this;
+        }
+
+        public Builder eventBus(AppEventBus eventBus) {
+            this.eventBus = eventBus;
+            return this;
+        }
+
+        public ProfileUseCases build() {
+            return new ProfileUseCases(
+                    userStorage,
+                    profileService,
+                    validationService,
+                    activityMetricsService,
+                    achievementService,
+                    config,
+                    activationPolicy,
+                    eventBus);
+        }
     }
 
     public UseCaseResult<ProfileSaveResult> saveProfile(SaveProfileCommand command) {
@@ -187,7 +260,7 @@ public class ProfileUseCases {
 
         User user = userStorage.get(command.context().userId()).orElse(null);
         if (user == null) {
-            return UseCaseResult.failure(UseCaseError.notFound("User not found"));
+            return UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND));
         }
 
         try {
@@ -235,7 +308,7 @@ public class ProfileUseCases {
 
         User user = userStorage.get(command.context().userId()).orElse(null);
         if (user == null) {
-            return UseCaseResult.failure(UseCaseError.notFound("User not found"));
+            return UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND));
         }
 
         try {
@@ -311,6 +384,34 @@ public class ProfileUseCases {
         } catch (Exception e) {
             return UseCaseResult.failure(
                     UseCaseError.internal("Failed to generate profile preview: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<Boolean> deleteAccount(DeleteAccountCommand command) {
+        if (command == null || command.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+
+        User user = userStorage.get(command.context().userId()).orElse(null);
+        if (user == null) {
+            return UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND));
+        }
+
+        try {
+            user.markDeleted(AppClock.now());
+            if (user.getState() == User.UserState.ACTIVE) {
+                user.pause();
+            }
+            userStorage.save(user);
+            if (logger.isInfoEnabled()) {
+                logger.info("Account soft-deleted for user {} (reason={})", user.getId(), command.reason());
+            }
+            return UseCaseResult.success(true);
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to delete account: " + e.getMessage()));
         }
     }
 
@@ -439,6 +540,8 @@ public class ProfileUseCases {
     public static record AchievementSnapshot(List<UserAchievement> unlocked, List<UserAchievement> newlyUnlocked) {}
 
     public static record StatsQuery(UserContext context) {}
+
+    public static record DeleteAccountCommand(UserContext context, String reason) {}
 
     public static record ProfileNotesQuery(UserContext context) {}
 

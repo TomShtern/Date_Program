@@ -64,7 +64,10 @@ public record AppConfig(
             int minDistanceKm,
             int maxInterests,
             int maxPhotos,
-            int messageMaxPageSize) {
+            int messageMaxPageSize,
+            int chatBackgroundPollSeconds,
+            int chatActivePollSeconds,
+            int maxStandouts) {
         public ValidationConfig {
             AppConfigValidator.validateValidation(
                     minAge,
@@ -78,7 +81,10 @@ public record AppConfig(
                     minDistanceKm,
                     maxInterests,
                     maxPhotos,
-                    messageMaxPageSize);
+                    messageMaxPageSize,
+                    chatBackgroundPollSeconds,
+                    chatActivePollSeconds,
+                    maxStandouts);
         }
     }
 
@@ -243,6 +249,9 @@ public record AppConfig(
         private int maxInterests = 10;
         private int maxPhotos = 2;
         private int messageMaxPageSize = 100;
+        private int chatBackgroundPollSeconds = 15;
+        private int chatActivePollSeconds = 5;
+        private int maxStandouts = 10;
         // AlgorithmConfig fields
         private int nearbyDistanceKm = 5;
         private int closeDistanceKm = 10;
@@ -558,6 +567,21 @@ public record AppConfig(
             return this;
         }
 
+        public Builder chatBackgroundPollSeconds(int v) {
+            this.chatBackgroundPollSeconds = v;
+            return this;
+        }
+
+        public Builder chatActivePollSeconds(int v) {
+            this.chatActivePollSeconds = v;
+            return this;
+        }
+
+        public Builder maxStandouts(int v) {
+            this.maxStandouts = v;
+            return this;
+        }
+
         public Builder softDeleteRetentionDays(int v) {
             this.softDeleteRetentionDays = v;
             return this;
@@ -598,7 +622,10 @@ public record AppConfig(
                     minDistanceKm,
                     maxInterests,
                     maxPhotos,
-                    messageMaxPageSize);
+                    messageMaxPageSize,
+                    chatBackgroundPollSeconds,
+                    chatActivePollSeconds,
+                    maxStandouts);
         }
 
         private AlgorithmConfig buildAlgorithmConfig() {

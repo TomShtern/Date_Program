@@ -304,15 +304,31 @@ public class MatchesViewModel {
             UUID otherUserId = match.getOtherUser(userId);
             User otherUser = otherUsers.get(otherUserId);
             if (otherUser != null) {
+                MatchQualitySummary qualitySummary = resolveMatchQualitySummary(userId, match);
                 cardData.add(new MatchCardData(
                         match.getId(),
                         otherUser.getId(),
                         otherUser.getName(),
                         TextUtil.formatTimeAgo(match.getCreatedAt()),
-                        match.getCreatedAt()));
+                        match.getCreatedAt(),
+                        qualitySummary.score(),
+                        qualitySummary.label()));
             }
         }
         return new MatchFetchResult(List.copyOf(cardData), page.totalCount(), page.hasMore());
+    }
+
+    private MatchQualitySummary resolveMatchQualitySummary(UUID userId, Match match) {
+        if (matchingUseCases == null) {
+            return MatchQualitySummary.empty();
+        }
+        var quality =
+                matchingUseCases.matchQuality(new MatchingUseCases.MatchQualityQuery(UserContext.ui(userId), match));
+        if (!quality.success()) {
+            return MatchQualitySummary.empty();
+        }
+        return new MatchQualitySummary(
+                quality.data().compatibilityScore(), quality.data().getCompatibilityLabel());
     }
 
     private List<LikeCardData> fetchReceivedLikesFromStorage(UUID userId) {
@@ -736,6 +752,12 @@ public class MatchesViewModel {
 
     private record LoadMorePayload(long epoch, MatchFetchResult result) {}
 
+    private record MatchQualitySummary(Integer score, String label) {
+        private static MatchQualitySummary empty() {
+            return new MatchQualitySummary(null, null);
+        }
+    }
+
     private void logWarn(String message, Object... args) {
         if (logger.isWarnEnabled()) {
             logger.warn(message, args);
@@ -835,7 +857,13 @@ public class MatchesViewModel {
 
     /** Data class for a match card display. */
     public static record MatchCardData(
-            String matchId, UUID userId, String userName, String matchedTimeAgo, Instant matchedAt) {}
+            String matchId,
+            UUID userId,
+            String userName,
+            String matchedTimeAgo,
+            Instant matchedAt,
+            Integer compatibilityScore,
+            String compatibilityLabel) {}
 
     /** Data class for a like card display. */
     public static record LikeCardData(

@@ -93,7 +93,7 @@ datingapp/
       profile/ProfileUseCases.java
       social/SocialUseCases.java
   core/
-    AppClock,AppConfig,AppSession,EnumSetUtil,LoggingSupport,PerformanceMonitor,ServiceRegistry,TextUtil
+    AppClock,AppConfig,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil
     model/{User,Match,ProfileNote}
     connection/{ConnectionModels,ConnectionService}
     matching/{CandidateFinder,CompatibilityScoring,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}

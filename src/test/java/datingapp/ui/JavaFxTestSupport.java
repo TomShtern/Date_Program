@@ -9,6 +9,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javafx.application.Platform;
@@ -145,7 +146,7 @@ public final class JavaFxTestSupport {
             if (condition.getAsBoolean()) {
                 return true;
             }
-            Thread.sleep(25);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(25));
         }
         waitForFxEvents();
         return condition.getAsBoolean();

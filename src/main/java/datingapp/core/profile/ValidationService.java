@@ -2,11 +2,14 @@ package datingapp.core.profile;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.profile.MatchPreferences.Interest;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 public class ValidationService {
 
@@ -20,6 +23,13 @@ public class ValidationService {
     private static final String DISTANCE_TOO_SHORT = "Distance must be at least %dkm";
     private static final String DISTANCE_TOO_FAR = "Distance too far (max %dkm)";
     private static final String BIO_TOO_LONG = "Bio too long (max %d chars)";
+    private static final String INVALID_EMAIL = "Invalid email format";
+    private static final String INVALID_PHONE = "Invalid phone format";
+    private static final int MAX_EMAIL_LENGTH = 254;
+    private static final int MIN_PHONE_DIGITS = 7;
+    private static final int MAX_PHONE_DIGITS = 15;
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    private static final Pattern PHONE_ALLOWED_PATTERN = Pattern.compile("^[+0-9()\\-\\s]+$");
 
     /** Shared configuration for validation thresholds. */
     private final AppConfig config;
@@ -66,11 +76,33 @@ public class ValidationService {
         if (name == null || name.isBlank()) {
             return ValidationResult.failure(NAME_EMPTY);
         }
-        if (name.length() > config.validation().maxNameLength()) {
+        String normalized = java.text.Normalizer.normalize(name.trim(), java.text.Normalizer.Form.NFKC);
+        if (normalized.chars().anyMatch(Character::isISOControl)) {
+            return ValidationResult.failure("Name contains invalid control characters");
+        }
+        if (normalized.length() > config.validation().maxNameLength()) {
             return ValidationResult.failure(
                     NAME_TOO_LONG.formatted(config.validation().maxNameLength()));
         }
         return ValidationResult.success();
+    }
+
+    public ValidationResult validateEmail(String email) {
+        try {
+            normalizeEmail(email);
+            return ValidationResult.success();
+        } catch (IllegalArgumentException e) {
+            return ValidationResult.failure(e.getMessage());
+        }
+    }
+
+    public ValidationResult validatePhone(String phone) {
+        try {
+            normalizePhone(phone);
+            return ValidationResult.success();
+        } catch (IllegalArgumentException e) {
+            return ValidationResult.failure(e.getMessage());
+        }
     }
 
     /**
@@ -170,6 +202,17 @@ public class ValidationService {
         return ValidationResult.success();
     }
 
+    public ValidationResult validateInterests(Set<Interest> interests) {
+        if (interests == null) {
+            return ValidationResult.success();
+        }
+        if (interests.size() > config.validation().maxInterests()) {
+            return ValidationResult.failure(
+                    "Cannot select more than " + config.validation().maxInterests() + " interests");
+        }
+        return ValidationResult.success();
+    }
+
     /**
      * Validates an age range preference.
      *
@@ -214,5 +257,32 @@ public class ValidationService {
         }
 
         return errors.isEmpty() ? ValidationResult.success() : ValidationResult.failure(errors);
+    }
+
+    public static String normalizeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        String normalized = email.trim();
+        if (normalized.length() > MAX_EMAIL_LENGTH
+                || !EMAIL_PATTERN.matcher(normalized).matches()) {
+            throw new IllegalArgumentException(INVALID_EMAIL);
+        }
+        return normalized;
+    }
+
+    public static String normalizePhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return null;
+        }
+        String normalized = phone.trim();
+        if (!PHONE_ALLOWED_PATTERN.matcher(normalized).matches()) {
+            throw new IllegalArgumentException(INVALID_PHONE);
+        }
+        String digitsOnly = normalized.replaceAll("\\D", "");
+        if (digitsOnly.length() < MIN_PHONE_DIGITS || digitsOnly.length() > MAX_PHONE_DIGITS) {
+            throw new IllegalArgumentException(INVALID_PHONE);
+        }
+        return normalized;
     }
 }

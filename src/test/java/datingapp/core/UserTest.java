@@ -236,6 +236,44 @@ class UserTest {
         assertTrue(user.getInterests().contains(Interest.TRAVEL));
     }
 
+    @Test
+    @DisplayName("setEmail accepts valid format and trims input")
+    void setEmail_acceptsValidFormat() {
+        User user = new User(UUID.randomUUID(), "EmailUser");
+
+        user.setEmail("  valid.user+test@example.com ");
+
+        assertEquals("valid.user+test@example.com", user.getEmail());
+    }
+
+    @Test
+    @DisplayName("setEmail rejects invalid format")
+    void setEmail_rejectsInvalidFormat() {
+        User user = new User(UUID.randomUUID(), "BadEmailUser");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> user.setEmail("not-an-email"));
+        assertTrue(ex.getMessage().contains("Invalid email format"));
+    }
+
+    @Test
+    @DisplayName("setPhone accepts valid format")
+    void setPhone_acceptsValidFormat() {
+        User user = new User(UUID.randomUUID(), "PhoneUser");
+
+        user.setPhone("+1 (555) 123-4567");
+
+        assertEquals("+1 (555) 123-4567", user.getPhone());
+    }
+
+    @Test
+    @DisplayName("setPhone rejects invalid format")
+    void setPhone_rejectsInvalidFormat() {
+        User user = new User(UUID.randomUUID(), "BadPhoneUser");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> user.setPhone("abc123"));
+        assertTrue(ex.getMessage().contains("Invalid phone format"));
+    }
+
     private User createCompleteUser(String name) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("A great person");

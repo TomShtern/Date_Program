@@ -1,15 +1,21 @@
 package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.matching.TrustSafetyService;
+import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.async.UiThreadDispatcher;
 import java.util.EnumSet;
@@ -40,6 +46,8 @@ class SafetyViewModelTest {
             action.run();
         }
     };
+
+    private SafetyViewModel viewModel;
 
     @BeforeAll
     static void initJfx() {
@@ -75,7 +83,7 @@ class SafetyViewModelTest {
                 .build();
         trustSafetyService.block(blocker.getId(), blocked.getId());
 
-        SafetyViewModel viewModel = new SafetyViewModel(trustSafetyService, AppSession.getInstance(), TEST_DISPATCHER);
+        viewModel = new SafetyViewModel(trustSafetyService, AppSession.getInstance(), TEST_DISPATCHER);
         viewModel.initialize();
 
         assertTrue(waitUntil(() -> viewModel.getBlockedUsers().size() == 1, 5000));
@@ -106,11 +114,85 @@ class SafetyViewModelTest {
                         trustSafetyStorage, interactions, users, config, communications)
                 .build();
 
-        SafetyViewModel viewModel = new SafetyViewModel(trustSafetyService, AppSession.getInstance(), TEST_DISPATCHER);
+        viewModel = new SafetyViewModel(trustSafetyService, AppSession.getInstance(), TEST_DISPATCHER);
         viewModel.initialize();
 
         assertTrue(waitUntil(viewModel.getBlockedUsers()::isEmpty, 5000));
         viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("verification flow persists generated code and marks the user verified")
+    void verificationFlowPersistsAndVerifiesUser() {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createUser("Veronica", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                users,
+                new ProfileService(config, analytics, interactions, trustSafetyStorage, users),
+                new ValidationService(config),
+                new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config),
+                config);
+
+        viewModel = new SafetyViewModel(trustSafetyService, profileUseCases, AppSession.getInstance(), TEST_DISPATCHER);
+        viewModel.initialize();
+        viewModel.verificationMethodProperty().set(VerificationMethod.EMAIL);
+        viewModel.verificationContactProperty().set("verified@example.com");
+
+        viewModel.startVerification();
+
+        User afterStart = AppSession.getInstance().getCurrentUser();
+        String generatedCode = afterStart.getVerificationCode();
+        assertTrue(generatedCode != null && generatedCode.length() == 6);
+        assertTrue(viewModel.statusMessageProperty().get().contains(generatedCode));
+
+        viewModel.verificationCodeProperty().set(generatedCode);
+        viewModel.confirmVerification();
+
+        assertTrue(AppSession.getInstance().getCurrentUser().isVerified());
+        assertTrue(viewModel.statusMessageProperty().get().contains("verified"));
+    }
+
+    @Test
+    @DisplayName("delete account soft-deletes the current user and resets the session")
+    void deleteAccountSoftDeletesAndSignsOut() {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createUser("DeleteMe", Gender.OTHER, EnumSet.of(Gender.OTHER));
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                users,
+                new ProfileService(config, analytics, interactions, trustSafetyStorage, users),
+                new ValidationService(config),
+                new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config),
+                config);
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, new TestStorages.Communications())
+                .build();
+
+        viewModel = new SafetyViewModel(trustSafetyService, profileUseCases, AppSession.getInstance(), TEST_DISPATCHER);
+        viewModel.deleteCurrentAccount();
+
+        assertTrue(viewModel.accountDeletedProperty().get());
+        assertTrue(users.get(currentUser.getId()).orElseThrow().isDeleted());
+        assertNull(AppSession.getInstance().getCurrentUser());
     }
 
     private static boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {

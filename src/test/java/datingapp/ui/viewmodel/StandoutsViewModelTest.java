@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
+import java.util.function.BooleanSupplier;
 import javafx.application.Platform;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -109,9 +111,7 @@ class StandoutsViewModelTest {
     void shouldSetStatusMessageWhenNoStandouts() throws InterruptedException {
         // No candidates in storage — RecommendationService returns an empty result
         viewModel.initialize();
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertTrue(viewModel.getStandouts().isEmpty());
         assertFalse(viewModel.loadingProperty().get());
@@ -136,9 +136,7 @@ class StandoutsViewModelTest {
         standoutStorage.saveStandouts(currentUser.getId(), seeded, FIXED_DATE);
 
         viewModel.initialize();
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertFalse(viewModel.loadingProperty().get());
         assertEquals(2, viewModel.getStandouts().size());
@@ -156,9 +154,7 @@ class StandoutsViewModelTest {
         standoutStorage.saveStandouts(currentUser.getId(), List.of(seeded), FIXED_DATE);
 
         viewModel.initialize();
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertEquals(1, viewModel.getStandouts().size());
 
@@ -182,9 +178,7 @@ class StandoutsViewModelTest {
 
         viewModel.initialize();
         viewModel.dispose(); // Dispose immediately, before the virtual thread may finish
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertTrue(viewModel.getStandouts().isEmpty());
         assertFalse(viewModel.loadingProperty().get());
@@ -201,9 +195,7 @@ class StandoutsViewModelTest {
                 FIXED_DATE);
 
         viewModel.initialize();
-
-        Thread.sleep(500);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertEquals(1, viewModel.getStandouts().size());
 
@@ -211,9 +203,7 @@ class StandoutsViewModelTest {
         StandoutsViewModel.StandoutEntry entry = viewModel.getStandouts().get(0);
         viewModel.markInteracted(entry);
         viewModel.markInteracted(null); // null guard must be handled silently
-
-        Thread.sleep(300);
-        waitForFxEvents();
+        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
 
         assertFalse(viewModel.loadingProperty().get());
         assertEquals(1, viewModel.getStandouts().size());
@@ -227,6 +217,19 @@ class StandoutsViewModelTest {
         if (!latch.await(5, TimeUnit.SECONDS)) {
             throw new RuntimeException("Timeout waiting for FX thread");
         }
+    }
+
+    private boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+        while (System.nanoTime() < deadline) {
+            waitForFxEvents();
+            if (condition.getAsBoolean()) {
+                return true;
+            }
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(25));
+        }
+        waitForFxEvents();
+        return condition.getAsBoolean();
     }
 
     private static User buildActiveUser(String name) {

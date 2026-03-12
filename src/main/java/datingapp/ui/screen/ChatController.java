@@ -83,6 +83,9 @@ public class ChatController extends BaseController implements Initializable {
     private Region chatPresenceDot;
 
     @FXML
+    private Label chatPresenceStatusLabel;
+
+    @FXML
     private TextArea profileNoteArea;
 
     @FXML
@@ -169,6 +172,7 @@ public class ChatController extends BaseController implements Initializable {
         if (refreshButton != null) {
             refreshButton.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         }
+        setupAccessibilityMetadata();
 
         // Bind selection using Subscription API
         addSubscription(conversationListView
@@ -177,6 +181,7 @@ public class ChatController extends BaseController implements Initializable {
                 .subscribe(this::handleConversationSelection));
         addSubscription(viewModel.presenceStatusProperty().subscribe(this::updatePresenceIndicator));
         addSubscription(viewModel.remoteTypingProperty().subscribe(this::updateTypingIndicator));
+        bindPresenceAvailability();
 
         // Initial state
         chatContainer.setVisible(false);
@@ -250,6 +255,47 @@ public class ChatController extends BaseController implements Initializable {
                         viewModel.selectedConversationProperty(),
                         viewModel.sendingProperty(),
                         messageArea.textProperty()));
+    }
+
+    private void bindPresenceAvailability() {
+        if (chatPresenceStatusLabel == null) {
+            return;
+        }
+        chatPresenceStatusLabel
+                .textProperty()
+                .bind(Bindings.createStringBinding(
+                        () -> viewModel.presenceSupportedProperty().get()
+                                ? ""
+                                : viewModel.presenceUnavailableMessageProperty().get(),
+                        viewModel.presenceSupportedProperty(),
+                        viewModel.presenceUnavailableMessageProperty()));
+        chatPresenceStatusLabel
+                .managedProperty()
+                .bind(viewModel.presenceSupportedProperty().not());
+        chatPresenceStatusLabel
+                .visibleProperty()
+                .bind(viewModel.presenceSupportedProperty().not());
+    }
+
+    private void setupAccessibilityMetadata() {
+        if (conversationListView != null) {
+            conversationListView.setAccessibleText("Conversation list");
+        }
+        if (messageListView != null) {
+            messageListView.setAccessibleText("Message thread");
+        }
+        if (messageArea != null) {
+            messageArea.setAccessibleText("Message composer");
+        }
+        if (sendButton != null) {
+            sendButton.setAccessibleText("Send message");
+        }
+        if (refreshButton != null) {
+            refreshButton.setAccessibleText("Refresh conversations");
+        }
+        if (profileNoteArea != null) {
+            profileNoteArea.setAccessibleText("Private profile note");
+        }
     }
 
     private void updateTypingIndicator(Boolean typing) {

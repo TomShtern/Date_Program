@@ -17,6 +17,7 @@ import datingapp.storage.StorageFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -72,6 +73,7 @@ public final class ApplicationStartup {
 
     private static volatile ServiceRegistry services;
     private static volatile DatabaseManager dbManager;
+    private static volatile CleanupScheduler cleanupScheduler;
     private static volatile boolean initialized = false;
 
     private ApplicationStartup() {}
@@ -95,6 +97,8 @@ public final class ApplicationStartup {
             // inserting, so this is a fast no-op on any non-empty database.
             DevDataSeeder.seed(services.getUserStorage());
 
+            startCleanupScheduler(services);
+
             initialized = true;
         }
         return services;
@@ -109,6 +113,10 @@ public final class ApplicationStartup {
     }
 
     public static synchronized void shutdown() {
+        if (cleanupScheduler != null) {
+            cleanupScheduler.stop();
+            cleanupScheduler = null;
+        }
         if (dbManager != null) {
             dbManager.shutdown();
         }
@@ -352,5 +360,11 @@ public final class ApplicationStartup {
         if (logger.isWarnEnabled()) {
             logger.warn(message, args);
         }
+    }
+
+    private static void startCleanupScheduler(ServiceRegistry serviceRegistry) {
+        cleanupScheduler =
+                new CleanupScheduler(Duration.ofHours(24), serviceRegistry.getActivityMetricsService()::runCleanup);
+        cleanupScheduler.start();
     }
 }

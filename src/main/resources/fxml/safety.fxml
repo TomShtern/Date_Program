@@ -2,8 +2,12 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
@@ -27,16 +31,47 @@
   </top>
 
   <center>
-    <StackPane>
-      <padding>
-        <Insets top="28" right="40" bottom="28" left="40"/>
-      </padding>
-      <ListView fx:id="blockedUsersListView" styleClass="transparent-scroll"/>
-      <VBox fx:id="emptyStateBox" alignment="CENTER" managed="false" spacing="12" visible="false">
-        <FontIcon iconLiteral="mdi2s-shield-account-outline" iconSize="54" iconColor="#64748b"/>
-        <Label styleClass="empty-state-title" text="No blocked users"/>
-        <Label styleClass="empty-state-subtitle" text="You haven't blocked anyone yet. Blocked profiles will appear here, and you can unblock them anytime."/>
+    <ScrollPane fitToWidth="true" styleClass="transparent-scroll">
+      <VBox spacing="20">
+        <padding>
+          <Insets top="28" right="40" bottom="28" left="40"/>
+        </padding>
+        <VBox spacing="12" styleClass="section-glass-card">
+          <Label styleClass="section-title" text="Profile Verification"/>
+          <Label styleClass="text-secondary" text="Start a local verification flow using email or phone. In this dev build, the generated code is shown as a toast so you can complete the flow without external providers." wrapText="true"/>
+          <HBox alignment="CENTER_LEFT" spacing="12">
+            <Label styleClass="field-label" text="Method:" prefWidth="120"/>
+            <ComboBox fx:id="verificationMethodCombo" prefWidth="180" promptText="Select method"/>
+          </HBox>
+          <HBox alignment="CENTER_LEFT" spacing="12">
+            <Label styleClass="field-label" text="Contact:" prefWidth="120"/>
+            <TextField fx:id="verificationContactField" prefWidth="260" promptText="name@example.com or +1 555 555 5555"/>
+            <Button fx:id="startVerificationButton" onAction="#handleStartVerification" styleClass="button-secondary-small" text="Send Code"/>
+          </HBox>
+          <HBox alignment="CENTER_LEFT" spacing="12">
+            <Label styleClass="field-label" text="Code:" prefWidth="120"/>
+            <TextField fx:id="verificationCodeField" prefWidth="180" promptText="6-digit code"/>
+            <Button fx:id="confirmVerificationButton" onAction="#handleConfirmVerification" styleClass="button-secondary-small" text="Verify"/>
+          </HBox>
+        </VBox>
+        <VBox spacing="12" styleClass="section-glass-card">
+          <Label styleClass="section-title" text="Blocked Users"/>
+          <StackPane>
+            <ListView fx:id="blockedUsersListView" styleClass="transparent-scroll" prefHeight="280"/>
+            <VBox fx:id="emptyStateBox" alignment="CENTER" managed="false" spacing="12" visible="false">
+              <FontIcon iconLiteral="mdi2s-shield-account-outline" iconSize="54" iconColor="#64748b"/>
+              <Label styleClass="empty-state-title" text="No blocked users"/>
+              <Label styleClass="empty-state-subtitle" text="You haven't blocked anyone yet. Blocked profiles will appear here, and you can unblock them anytime."/>
+            </VBox>
+          </StackPane>
+        </VBox>
+        <VBox spacing="12" styleClass="section-glass-card">
+          <Label styleClass="section-title" text="Danger Zone"/>
+          <Label styleClass="text-secondary" text="Delete your account from this device. The current implementation performs a soft delete and signs you out immediately." wrapText="true"/>
+          <Separator/>
+          <Button fx:id="deleteAccountButton" onAction="#handleDeleteAccount" styleClass="button-danger" text="Delete Account"/>
+        </VBox>
       </VBox>
-    </StackPane>
+    </ScrollPane>
   </center>
 </BorderPane>

@@ -24,7 +24,7 @@
         <Insets bottom="20" left="15" right="15" top="20"/>
       </padding>
       <Label styleClass="text-secondary conversation-section-label"
-                                                                            text="CONVERSATIONS" />
+                                                                                  text="CONVERSATIONS" />
       <ListView fx:id="conversationListView" VBox.vgrow="ALWAYS"/>
     </VBox>
   </left>
@@ -39,6 +39,7 @@
           </padding>
           <Label fx:id="chatHeaderLabel" styleClass="subheading" text="User Name"/>
           <Region fx:id="chatPresenceDot" managed="false" visible="false" styleClass="status-dot"/>
+          <Label fx:id="chatPresenceStatusLabel" styleClass="text-secondary" managed="false" visible="false"/>
           <Region HBox.hgrow="ALWAYS"/>
           <Button fx:id="refreshButton" onAction="#handleRefreshConversations" styleClass="button-transparent">
             <graphic>
@@ -78,7 +79,7 @@
           </HBox>
         </VBox>
         <ListView fx:id="messageListView" VBox.vgrow="ALWAYS"
-                                                                                                    styleClass="message-list-view" />
+                                                                                                            styleClass="message-list-view" />
         <HBox fx:id="typingIndicatorHost" alignment="CENTER_LEFT" managed="false" visible="false">
           <padding>
             <Insets left="20" right="20" bottom="10"/>
@@ -90,11 +91,11 @@
           </padding>
           <VBox spacing="6.0" HBox.hgrow="ALWAYS">
             <TextArea fx:id="messageArea" prefHeight="50.0" promptText="Type a message..."
-                                                                                                                              wrapText="true" HBox.hgrow="ALWAYS" />
+                                                                                                                                          wrapText="true" HBox.hgrow="ALWAYS" />
             <Label fx:id="messageLengthLabel" styleClass="text-secondary" text="0/1000"/>
           </VBox>
           <Button fx:id="sendButton" onAction="#handleSendMessage" prefHeight="50.0"
-                                                                                                                            prefWidth="60.0" styleClass="button">
+                                                                                                                                      prefWidth="60.0" styleClass="button">
             <graphic>
               <FontIcon iconLiteral="mdi2s-send" iconSize="20" iconColor="white"/>
             </graphic>

@@ -21,7 +21,6 @@ import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
@@ -247,21 +246,8 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private void displayCandidateProfile(User candidate, User currentUser, double distance) {
-        logInfo(CliTextAndInput.BOX_TOP);
-        boolean verified = candidate.isVerified();
-        int age = candidate.getAge(config.safety().userTimeZone()).orElse(0);
-        logInfo(
-                "│ 💝 {}{}{}, {} years old",
-                candidate.getName(),
-                verified ? " " : "",
-                verified ? "✅ Verified" : "",
-                age);
-        if (logger.isInfoEnabled()) {
-            logInfo("│ 📍 {} km away", String.format("%.1f", distance));
-        }
-        logInfo(CliTextAndInput.PROFILE_BIO_FORMAT, candidate.getBio() != null ? candidate.getBio() : "(no bio)");
-        logSharedInterests(currentUser, candidate);
-        logInfo(CliTextAndInput.BOX_BOTTOM);
+        logLines(presenter.candidateProfileLines(
+                candidate, currentUser, distance, config.safety().userTimeZone()));
     }
 
     private void displaySwipeResult(MatchingService.SwipeResult result, User candidate) {
@@ -412,82 +398,7 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private void displayMatchQuality(User otherUser, MatchQuality quality) {
-        String nameUpper = otherUser.getName().toUpperCase(Locale.ROOT);
-        logInfo("\n" + CliTextAndInput.SEPARATOR_LINE);
-        logInfo("         MATCH WITH {}", nameUpper);
-        logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
-
-        int age = otherUser.getAge(config.safety().userTimeZone()).orElse(0);
-        logInfo("  👤 {}, {}", otherUser.getName(), age);
-        if (otherUser.getBio() != null) {
-            logInfo("  📝 {}", otherUser.getBio());
-        }
-        double distanceKm = quality.distanceKm();
-        if (distanceKm < 0) {
-            logInfo("  📍 Distance unknown");
-        } else {
-            String distanceStr = String.format("%.1f", distanceKm);
-            logInfo("  📍 {} km away", distanceStr);
-        }
-
-        logInfo("\n" + CliTextAndInput.SECTION_LINE);
-        logInfo("  COMPATIBILITY: {}%  {}", quality.compatibilityScore(), quality.getStarDisplay());
-        logInfo("  {}", quality.getCompatibilityLabel());
-        logInfo(CliTextAndInput.SECTION_LINE);
-
-        if (!quality.highlights().isEmpty()) {
-            logInfo("\n  ✨ WHY YOU MATCHED");
-            quality.highlights().forEach(h -> logInfo("  • {}", h));
-        }
-
-        displayScoreBreakdown(quality);
-
-        if (!quality.lifestyleMatches().isEmpty()) {
-            logInfo("\n  💫 LIFESTYLE ALIGNMENT");
-            quality.lifestyleMatches().forEach(m -> logInfo("  • {}", m));
-        }
-
-        logInfo("\n  ⏱️  PACE SYNC: {}", quality.paceSyncLevel());
-    }
-
-    private void displayScoreBreakdown(MatchQuality quality) {
-        if (!logger.isInfoEnabled()) {
-            return;
-        }
-
-        // Use TextUtil for consistent progress bar rendering
-        String distanceBar = TextUtil.renderProgressBar(quality.distanceScore(), 12);
-        String ageBar = TextUtil.renderProgressBar(quality.ageScore(), 12);
-        String interestBar = TextUtil.renderProgressBar(quality.interestScore(), 12);
-        String lifestyleBar = TextUtil.renderProgressBar(quality.lifestyleScore(), 12);
-        String paceBar = TextUtil.renderProgressBar(quality.paceScore(), 12);
-        String responseBar = TextUtil.renderProgressBar(quality.responseScore(), 12);
-
-        logInfo("\n  📊 SCORE BREAKDOWN");
-        logInfo(CliTextAndInput.SECTION_LINE);
-        logInfo("  Distance:      {} {}%", distanceBar, (int) (quality.distanceScore() * 100));
-        logInfo("  Age match:     {} {}%", ageBar, (int) (quality.ageScore() * 100));
-        logInfo("  Interests:     {} {}%", interestBar, (int) (quality.interestScore() * 100));
-        logInfo("  Lifestyle:     {} {}%", lifestyleBar, (int) (quality.lifestyleScore() * 100));
-        logInfo("  Pace/Sync:      {} {}%", paceBar, (int) (quality.paceScore() * 100));
-        logInfo("  Response:      {} {}%", responseBar, (int) (quality.responseScore() * 100));
-    }
-
-    private void logSharedInterests(User currentUser, User candidate) {
-        InterestMatcher.MatchResult matchResult =
-                InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
-        if (!matchResult.hasSharedInterests() || !logger.isInfoEnabled()) {
-            return;
-        }
-
-        String badge = getMutualInterestsBadge(matchResult.sharedCount());
-        String sharedInterests = InterestMatcher.formatSharedInterests(matchResult.shared());
-        logInfo(
-                "│ {} {} shared interest{}: {}",
-                badge,
-                matchResult.sharedCount(),
-                matchResult.sharedCount() > 1 ? "s" : "",
-                sharedInterests);
+        logLines(presenter.matchQualityLines(otherUser, quality, config.safety().userTimeZone()));
     }
 
     private void handleMatchDetailAction(String action, User otherUser, UUID otherUserId, User currentUser) {
@@ -679,7 +590,7 @@ public class MatchingHandler implements LoggingSupport {
             showDailyLimitReached(currentUser);
             return;
         }
-        logLines(presenter.dailyPickSwipeResultLines(result.data(), candidate.getName()));
+        logLines(presenter.dailyPickSwipeResultLines(result.data()));
         promptUndo(candidate.getName(), currentUser);
     }
 
@@ -707,23 +618,6 @@ public class MatchingHandler implements LoggingSupport {
             } else {
                 logInfo("\n❌ {}\n", result.message());
             }
-        }
-    }
-
-    /**
-     * Returns an emoji badge based on the number of shared interests. More matches
-     * = more exciting
-     * badge!
-     */
-    private String getMutualInterestsBadge(int sharedCount) {
-        if (sharedCount >= 5) {
-            return "🎯🔥"; // Perfect match
-        } else if (sharedCount >= 3) {
-            return "🎯✨"; // Great match
-        } else if (sharedCount >= 2) {
-            return "🎯"; // Good match
-        } else {
-            return "✨"; // Some shared interests
         }
     }
 
@@ -980,23 +874,7 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private void showLikerCard(PendingLiker pending) {
-        User user = pending.user();
-        String verifiedBadge = user.isVerified() ? " ✅ Verified" : "";
-        String likedAgo = TextUtil.formatTimeAgo(pending.likedAt());
-
-        logInfo(CliTextAndInput.BOX_TOP);
-        int age = user.getAge(config.safety().userTimeZone()).orElse(0);
-        logInfo("│ 💝 {}, {} years old{}", user.getName(), age, verifiedBadge);
-        logInfo("│ 🕒 Liked you {}", likedAgo);
-        logInfo("│ 📍 Location: {}, {}", user.getLat(), user.getLon());
-
-        String bio = user.getBio() == null ? "" : user.getBio();
-        if (bio.length() > 50) {
-            bio = bio.substring(0, 47) + "...";
-        }
-        logInfo(CliTextAndInput.PROFILE_BIO_FORMAT, bio);
-        logInfo(CliTextAndInput.BOX_BOTTOM);
-        logInfo("");
+        logLines(presenter.likerCardLines(pending, config.safety().userTimeZone()));
     }
 
     private void recordLikerSwipe(User currentUser, User other, Like.Direction direction) {

@@ -106,24 +106,26 @@ public final class ServiceRegistry {
         this.workflowPolicy = Objects.requireNonNull(builder.workflowPolicy, "workflowPolicy cannot be null");
 
         this.messagingUseCases = new MessagingUseCases(this.connectionService, this.eventBus);
-        this.matchingUseCases = new MatchingUseCases(
-                this.candidateFinder,
-                this.matchingService,
-                this.recommendationService,
-                this.undoService,
-                this.interactionStorage,
-                this.userStorage,
-                this.matchQualityService,
-                this.eventBus);
-        this.profileUseCases = new ProfileUseCases(
-                this.userStorage,
-                this.profileService,
-                this.validationService,
-                this.activityMetricsService,
-                this.achievementService,
-                this.config,
-                this.activationPolicy,
-                this.eventBus);
+        this.matchingUseCases = MatchingUseCases.builder()
+                .candidateFinder(this.candidateFinder)
+                .matchingService(this.matchingService)
+                .recommendationService(this.recommendationService)
+                .undoService(this.undoService)
+                .interactionStorage(this.interactionStorage)
+                .userStorage(this.userStorage)
+                .matchQualityService(this.matchQualityService)
+                .eventBus(this.eventBus)
+                .build();
+        this.profileUseCases = ProfileUseCases.builder()
+                .userStorage(this.userStorage)
+                .profileService(this.profileService)
+                .validationService(this.validationService)
+                .activityMetricsService(this.activityMetricsService)
+                .achievementService(this.achievementService)
+                .config(this.config)
+                .activationPolicy(this.activationPolicy)
+                .eventBus(this.eventBus)
+                .build();
         this.socialUseCases = new SocialUseCases(
                 this.connectionService, this.trustSafetyService, this.communicationStorage, this.eventBus);
     }
