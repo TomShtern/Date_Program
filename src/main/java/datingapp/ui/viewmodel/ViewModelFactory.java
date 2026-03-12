@@ -179,14 +179,15 @@ public class ViewModelFactory {
     public ProfileViewModel getProfileViewModel() {
         return getViewModel(
                 ProfileViewModel.class,
-                () -> new ProfileViewModel(
+                () -> new ProfileViewModel(new ProfileViewModel.Dependencies(
                         createUiUserStore(),
                         services.getProfileService(),
                         services.getProfileUseCases(),
                         services.getConfig(),
                         session,
+                        services.getLocationService(),
                         uiDispatcher,
-                        services.getActivationPolicy()));
+                        services.getActivationPolicy())));
     }
 
     public ProfileReadOnlyViewModel getProfileReadOnlyViewModel() {

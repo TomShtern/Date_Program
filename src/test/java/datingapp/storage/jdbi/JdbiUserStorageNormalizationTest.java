@@ -3,6 +3,7 @@ package datingapp.storage.jdbi;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.storage.DatabaseManager;
 import java.sql.Timestamp;
@@ -144,5 +145,28 @@ class JdbiUserStorageNormalizationTest {
 
         storage.saveUserInterests(userId, null);
         assertTrue(storage.loadUserInterests(userId).isEmpty());
+    }
+
+    @Test
+    @DisplayName("should save and update profile notes with record binding")
+    void saveAndUpdateProfileNoteRoundTrip() {
+        UUID subjectId = UUID.randomUUID();
+        storage.save(new User(subjectId, "SubjectUser"));
+
+        storage.saveProfileNote(ProfileNote.create(userId, subjectId, "First note"));
+
+        assertEquals(
+                "First note",
+                storage.getProfileNote(userId, subjectId)
+                        .map(ProfileNote::content)
+                        .orElseThrow());
+
+        storage.saveProfileNote(ProfileNote.create(userId, subjectId, "Updated note"));
+
+        assertEquals(
+                "Updated note",
+                storage.getProfileNote(userId, subjectId)
+                        .map(ProfileNote::content)
+                        .orElseThrow());
     }
 }

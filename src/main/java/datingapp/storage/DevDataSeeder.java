@@ -1,5 +1,8 @@
 package datingapp.storage;
 
+import datingapp.core.connection.ConnectionModels.Conversation;
+import datingapp.core.connection.ConnectionModels.Message;
+import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Interest;
@@ -9,6 +12,8 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyl
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;
 import datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency;
 import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
+import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -77,6 +82,56 @@ public final class DevDataSeeder {
         LOG.info("DevDataSeeder: inserting 30 seed users for development/testing...");
         buildAllSeedUsers().forEach(userStorage::save);
         LOG.info("DevDataSeeder: seed data inserted successfully.");
+    }
+
+    /**
+     * Seeds users, and also seeds pre-made matches and a sample conversation so
+     * the chat feature works immediately after login without requiring any swipes.
+     *
+     * <p>Adam Cohen (M1) is matched with both Avital Katz (F1) and Batel Oron (F2).
+     * A short sample conversation is seeded between Adam and Avital.
+     */
+    public static void seed(
+            UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
+        seed(userStorage);
+        seedMatchesIfAbsent(interactionStorage, communicationStorage);
+    }
+
+    private static void seedMatchesIfAbsent(
+            InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
+        UUID adamId = SEED_SENTINEL_ID; // M1 — Adam Cohen
+        UUID avitalId = uuid(11); // F1 — Avital Katz
+        UUID batelId = uuid(12); // F2 — Batel Oron
+
+        String matchSentinelId = Match.generateId(adamId, avitalId);
+        if (interactionStorage.get(matchSentinelId).isPresent()) {
+            LOG.debug("DevDataSeeder: seed matches already present, skipping.");
+            return;
+        }
+
+        LOG.info("DevDataSeeder: inserting seed matches and sample conversation...");
+
+        // Active match: Adam ↔ Avital
+        interactionStorage.save(Match.create(adamId, avitalId));
+
+        // Active match: Adam ↔ Batel (no messages — tests the "match exists, no chat yet" path)
+        interactionStorage.save(Match.create(adamId, batelId));
+
+        // Seed a short sample conversation between Adam and Avital
+        Conversation convo = Conversation.create(adamId, avitalId);
+        communicationStorage.saveConversation(convo);
+
+        Message msg1 = Message.create(convo.getId(), avitalId, "Hey Adam! I saw you like hiking too");
+        communicationStorage.saveMessage(msg1);
+
+        Message msg2 = Message.create(convo.getId(), adamId, "Haha yeah! We should grab coffee sometime.");
+        communicationStorage.saveMessage(msg2);
+
+        Message msg3 = Message.create(convo.getId(), avitalId, "Sounds perfect! When are you free?");
+        communicationStorage.saveMessage(msg3);
+        communicationStorage.updateConversationLastMessageAt(convo.getId(), msg3.createdAt());
+
+        LOG.info("DevDataSeeder: seed matches and sample conversation inserted.");
     }
 
     // ════════════════════════════════════════════════════════════════════════

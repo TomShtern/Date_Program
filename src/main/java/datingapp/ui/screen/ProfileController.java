@@ -1,6 +1,10 @@
 package datingapp.ui.screen;
 
+import datingapp.core.model.LocationModels.City;
+import datingapp.core.model.LocationModels.Country;
+import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.User.Gender;
+import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -15,6 +19,7 @@ import datingapp.ui.UiUtils;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
 import java.net.URL;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
@@ -29,6 +34,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
@@ -37,7 +43,6 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -61,9 +66,6 @@ public class ProfileController extends BaseController implements Initializable {
     private static final String DARK_PANEL_STYLE = "-fx-background-color: #1e293b;";
     private static final String PRIMARY_ACCENT_COLOR = "#667eea";
     private static final String SUCCESS_ACCENT_COLOR = "#10b981";
-    private static final String LOCATION_HELPER_TEXT =
-            "Use decimal coordinates for the place where you want to discover people nearby.";
-    private static final String LOCATION_EXAMPLE_TEXT = "Examples: 32.0853, 34.7818 or 40.7128, -74.0060";
     private static final String STYLE_CLASS_TEXT_SECONDARY = "text-secondary";
     private static final String STYLE_CLASS_INTEREST_CHIP = "interest-chip";
 
@@ -992,33 +994,21 @@ public class ProfileController extends BaseController implements Initializable {
         VBox content = new VBox(UiConstants.SPACING_LARGE);
         content.setPadding(new Insets(UiConstants.PADDING_XLARGE));
 
-        Label helperLabel = createSecondaryLabel(LOCATION_HELPER_TEXT);
-        Label exampleLabel = createSecondaryLabel(LOCATION_EXAMPLE_TEXT);
+        LocationService locationService = viewModel.getLocationService();
+        Country defaultCountry = locationService.getDefaultCountry();
+
+        Label helperLabel = createSecondaryLabel("Choose a country, then select a city or enter a ZIP code.");
+        Label exampleLabel = createSecondaryLabel("Coordinates stay internal; you only choose human-friendly places.");
         Label currentLocationLabel = createSecondaryLabel(buildCurrentLocationSummary());
 
-        GridPane fieldGrid = new GridPane();
-        fieldGrid.setHgap(UiConstants.SPACING_MEDIUM);
-        fieldGrid.setVgap(UiConstants.SPACING_MEDIUM);
+        ComboBox<Country> countryCombo = createCountryCombo(locationService, defaultCountry);
 
-        Label latitudeLabel = new Label("Latitude");
-        TextField latitudeField = new TextField();
-        latitudeField.setPromptText("-90.000000 to 90.000000");
-        latitudeField.getStyleClass().add("location-dialog-field");
+        TextField citySearchField = new TextField();
+        citySearchField.setPromptText("Search city (for example, Tel Aviv)");
+        ListView<City> cityListView = createCityListView();
 
-        Label longitudeLabel = new Label("Longitude");
-        TextField longitudeField = new TextField();
-        longitudeField.setPromptText("-180.000000 to 180.000000");
-        longitudeField.getStyleClass().add("location-dialog-field");
-
-        fieldGrid.add(latitudeLabel, 0, 0);
-        fieldGrid.add(latitudeField, 1, 0);
-        fieldGrid.add(longitudeLabel, 0, 1);
-        fieldGrid.add(longitudeField, 1, 1);
-
-        if (viewModel.hasLocationSet()) {
-            latitudeField.setText(String.format(java.util.Locale.ROOT, "%.6f", viewModel.getLatitude()));
-            longitudeField.setText(String.format(java.util.Locale.ROOT, "%.6f", viewModel.getLongitude()));
-        }
+        TextField zipField = new TextField();
+        zipField.setPromptText("Israeli ZIP code (7 digits)");
 
         Label previewLabel = createSecondaryLabel("");
 
@@ -1029,7 +1019,19 @@ public class ProfileController extends BaseController implements Initializable {
         errorLabel.setVisible(false);
 
         content.getChildren()
-                .addAll(helperLabel, exampleLabel, currentLocationLabel, fieldGrid, previewLabel, errorLabel);
+                .addAll(
+                        helperLabel,
+                        exampleLabel,
+                        currentLocationLabel,
+                        new Label("Country"),
+                        countryCombo,
+                        new Label("City"),
+                        citySearchField,
+                        cityListView,
+                        new Label("ZIP code (optional fallback)"),
+                        zipField,
+                        previewLabel,
+                        errorLabel);
 
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -1037,27 +1039,26 @@ public class ProfileController extends BaseController implements Initializable {
         Button confirmButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
         confirmButton.setText("Save Location");
 
-        Runnable refreshValidationState = () ->
-                updateLocationDialogValidation(latitudeField, longitudeField, confirmButton, previewLabel, errorLabel);
+        final ResolvedLocation[] pendingLocation = new ResolvedLocation[1];
+        LocationDialogRefs dialogRefs = new LocationDialogRefs(
+                countryCombo, citySearchField, cityListView, zipField, confirmButton, previewLabel, errorLabel);
+        Runnable refreshCitySuggestions = () -> refreshCitySuggestions(locationService, dialogRefs);
+        Runnable refreshValidationState = () -> refreshLocationValidation(locationService, dialogRefs, pendingLocation);
 
-        latitudeField.textProperty().addListener((obs, oldVal, newVal) -> refreshValidationState.run());
-        longitudeField.textProperty().addListener((obs, oldVal, newVal) -> refreshValidationState.run());
+        wireLocationDialogInteractions(defaultCountry, dialogRefs, refreshCitySuggestions, refreshValidationState);
+
+        refreshCitySuggestions.run();
         refreshValidationState.run();
 
         confirmButton.addEventFilter(ActionEvent.ACTION, event -> {
-            try {
-                double latitude = Double.parseDouble(latitudeField.getText().trim());
-                double longitude = Double.parseDouble(longitudeField.getText().trim());
-                validateLocationCoordinates(latitude, longitude);
-                viewModel.setLocationCoordinates(latitude, longitude);
-                viewModel.refreshUnsavedChangesFlag();
-            } catch (NumberFormatException _) {
-                showLocationDialogError(errorLabel, "Please enter numeric latitude and longitude values.");
+            if (pendingLocation[0] == null) {
+                showLocationDialogError(
+                        dialogRefs.errorLabel(), "Please choose a supported city or ZIP code before saving.");
                 event.consume();
-            } catch (IllegalArgumentException ex) {
-                showLocationDialogError(errorLabel, ex.getMessage());
-                event.consume();
+                return;
             }
+            viewModel.setResolvedLocation(pendingLocation[0]);
+            viewModel.refreshUnsavedChangesFlag();
         });
 
         dialog.showAndWait();
@@ -1074,48 +1075,191 @@ public class ProfileController extends BaseController implements Initializable {
         if (!viewModel.hasLocationSet()) {
             return "Current location: not set yet";
         }
-        return String.format(
-                java.util.Locale.ROOT,
-                "Current location: %.4f, %.4f",
-                viewModel.getLatitude(),
-                viewModel.getLongitude());
+        return "Current location: " + viewModel.locationDisplayProperty().get();
     }
 
-    private void updateLocationDialogValidation(
-            TextField latitudeField,
-            TextField longitudeField,
-            Button confirmButton,
-            Label previewLabel,
-            Label errorLabel) {
-        String latitudeText =
-                latitudeField.getText() == null ? "" : latitudeField.getText().trim();
-        String longitudeText =
-                longitudeField.getText() == null ? "" : longitudeField.getText().trim();
-        if (latitudeText.isEmpty() || longitudeText.isEmpty()) {
-            confirmButton.setDisable(true);
-            previewLabel.setText("Enter both coordinates to preview the saved location.");
-            hideLocationDialogError(errorLabel);
+    private ComboBox<Country> createCountryCombo(LocationService locationService, Country defaultCountry) {
+        ComboBox<Country> countryCombo =
+                new ComboBox<>(FXCollections.observableArrayList(locationService.getAvailableCountries()));
+        countryCombo.setMaxWidth(Double.MAX_VALUE);
+        countryCombo.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(Country country) {
+                return country == null ? "" : country.displayName();
+            }
+
+            @Override
+            public Country fromString(String string) {
+                return null;
+            }
+        });
+        countryCombo.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(Country item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setDisable(false);
+                    return;
+                }
+                setText(item.displayName());
+                setDisable(!item.available());
+            }
+        });
+        countryCombo.getSelectionModel().select(defaultCountry);
+        return countryCombo;
+    }
+
+    private ListView<City> createCityListView() {
+        ListView<City> cityListView = new ListView<>();
+        cityListView.setPrefHeight(180);
+        cityListView.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(City item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.displayName());
+            }
+        });
+        return cityListView;
+    }
+
+    private void refreshCitySuggestions(LocationService locationService, LocationDialogRefs dialogRefs) {
+        Country selectedCountry = dialogRefs.countryCombo().getValue();
+        if (selectedCountry == null) {
+            dialogRefs.cityListView().getItems().clear();
+            return;
+        }
+        dialogRefs
+                .cityListView()
+                .getItems()
+                .setAll(locationService.searchCities(
+                        selectedCountry.code(), dialogRefs.citySearchField().getText(), 10));
+    }
+
+    private void wireLocationDialogInteractions(
+            Country defaultCountry,
+            LocationDialogRefs dialogRefs,
+            Runnable refreshCitySuggestions,
+            Runnable refreshValidationState) {
+        dialogRefs.countryCombo().valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !newVal.available()) {
+                dialogRefs.countryCombo().getSelectionModel().select(oldVal != null ? oldVal : defaultCountry);
+                showLocationDialogError(
+                        dialogRefs.errorLabel(), newVal.name() + " is coming soon. Please choose Israel for now.");
+                return;
+            }
+            dialogRefs.citySearchField().clear();
+            dialogRefs.zipField().clear();
+            dialogRefs.cityListView().getSelectionModel().clearSelection();
+            refreshCitySuggestions.run();
+            refreshValidationState.run();
+        });
+        dialogRefs.citySearchField().textProperty().addListener((obs, oldVal, newVal) -> {
+            dialogRefs.cityListView().getSelectionModel().clearSelection();
+            refreshCitySuggestions.run();
+            refreshValidationState.run();
+        });
+        dialogRefs.cityListView().getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                dialogRefs.zipField().clear();
+            }
+            refreshValidationState.run();
+        });
+        dialogRefs.zipField().textProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !newVal.isBlank()) {
+                dialogRefs.cityListView().getSelectionModel().clearSelection();
+            }
+            refreshValidationState.run();
+        });
+    }
+
+    private void refreshLocationValidation(
+            LocationService locationService, LocationDialogRefs dialogRefs, ResolvedLocation[] pendingLocation) {
+        pendingLocation[0] = null;
+        hideLocationDialogError(dialogRefs.errorLabel());
+
+        Country selectedCountry = dialogRefs.countryCombo().getValue();
+        if (selectedCountry == null) {
+            setLocationDialogState(
+                    dialogRefs.confirmButton(), dialogRefs.previewLabel(), true, "Choose a supported country first.");
+            return;
+        }
+        if (!selectedCountry.available()) {
+            setLocationDialogState(
+                    dialogRefs.confirmButton(),
+                    dialogRefs.previewLabel(),
+                    true,
+                    "This country will be available in a future update.");
+            showLocationDialogError(
+                    dialogRefs.errorLabel(), "This country is coming soon. Please choose Israel for now.");
             return;
         }
 
-        try {
-            double parsedLatitude = Double.parseDouble(latitudeText);
-            double parsedLongitude = Double.parseDouble(longitudeText);
-            validateLocationCoordinates(parsedLatitude, parsedLongitude);
-            confirmButton.setDisable(false);
-            previewLabel.setText(String.format(
-                    java.util.Locale.ROOT, "Location preview: %.4f, %.4f", parsedLatitude, parsedLongitude));
-            hideLocationDialogError(errorLabel);
-        } catch (NumberFormatException _) {
-            confirmButton.setDisable(true);
-            previewLabel.setText("Enter numbers in decimal format, for example 32.0853 and 34.7818.");
-            showLocationDialogError(errorLabel, "Please enter numeric latitude and longitude values.");
-        } catch (IllegalArgumentException e) {
-            confirmButton.setDisable(true);
-            previewLabel.setText("Check the allowed coordinate ranges before saving.");
-            showLocationDialogError(errorLabel, e.getMessage());
+        City selectedCity = dialogRefs.cityListView().getSelectionModel().getSelectedItem();
+        if (selectedCity != null) {
+            pendingLocation[0] = locationService.resolveCity(selectedCity);
+            setLocationDialogState(
+                    dialogRefs.confirmButton(),
+                    dialogRefs.previewLabel(),
+                    false,
+                    "Selected city: " + pendingLocation[0].label());
+            return;
         }
+
+        String zipText = dialogRefs.zipField().getText() == null
+                ? ""
+                : dialogRefs.zipField().getText().trim();
+        if (zipText.isBlank()) {
+            setLocationDialogState(
+                    dialogRefs.confirmButton(),
+                    dialogRefs.previewLabel(),
+                    true,
+                    "Search for a city or enter a supported ZIP code.");
+            return;
+        }
+
+        LocationService.ZipLookupResult lookupResult = locationService.lookupZip(selectedCountry.code(), zipText);
+        if (!lookupResult.valid()) {
+            setLocationDialogState(
+                    dialogRefs.confirmButton(),
+                    dialogRefs.previewLabel(),
+                    true,
+                    "Enter a valid supported ZIP code to continue.");
+            showLocationDialogError(dialogRefs.errorLabel(), lookupResult.message());
+            return;
+        }
+        Optional<ResolvedLocation> resolvedLocation = lookupResult.resolvedLocation();
+        if (resolvedLocation.isPresent()) {
+            pendingLocation[0] = resolvedLocation.orElseThrow();
+            setLocationDialogState(
+                    dialogRefs.confirmButton(),
+                    dialogRefs.previewLabel(),
+                    false,
+                    "ZIP preview: " + pendingLocation[0].label());
+            return;
+        }
+        setLocationDialogState(
+                dialogRefs.confirmButton(),
+                dialogRefs.previewLabel(),
+                true,
+                "ZIP format is valid, but we do not support that area yet.");
+        showLocationDialogError(dialogRefs.errorLabel(), lookupResult.message());
     }
+
+    private void setLocationDialogState(
+            Button confirmButton, Label previewLabel, boolean disabled, String previewText) {
+        confirmButton.setDisable(disabled);
+        previewLabel.setText(previewText);
+    }
+
+    private record LocationDialogRefs(
+            ComboBox<Country> countryCombo,
+            TextField citySearchField,
+            ListView<City> cityListView,
+            TextField zipField,
+            Button confirmButton,
+            Label previewLabel,
+            Label errorLabel) {}
 
     private void showLocationDialogError(Label errorLabel, String message) {
         errorLabel.setText(message);
@@ -1127,15 +1271,6 @@ public class ProfileController extends BaseController implements Initializable {
         errorLabel.setText("");
         errorLabel.setManaged(false);
         errorLabel.setVisible(false);
-    }
-
-    private void validateLocationCoordinates(double latitude, double longitude) {
-        if (latitude < -90.0 || latitude > 90.0) {
-            throw new IllegalArgumentException("Latitude must be between -90 and 90");
-        }
-        if (longitude < -180.0 || longitude > 180.0) {
-            throw new IllegalArgumentException("Longitude must be between -180 and 180");
-        }
     }
 
     /**

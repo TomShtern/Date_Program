@@ -45,7 +45,18 @@ You are operating in an environment where ast-grep is installed. For any code se
 
 </system_tools>
 
-
+Optimize for: predictable, minimal, contract-driven code
+Determinism: same inputs → same outputs. Seed randomness and isolate side effects.
+Explicit contracts: types + schemas + pre/post conditions. Use OpenAPI/JSON Schema/Protobuf where relevant.
+Small modules & functions: tiny units of behavior that are easy to test and swap.
+Idempotent interfaces: safe to retry; clear state transitions.
+Observability: structured logs, metrics, clear errors — machines need signals.
+Stable public surface: semantic versioning, changelogs, and strict backward-compat rules.
+Concrete rules / thresholds (safe defaults)
+Max function length: ≤ 85 lines.
+Max nesting depth: ≤ 4.
+Cyclomatic complexity per function: ≤ 9.
+One responsibility per function/module (SRP).
 
 # Dating App - AI Agent Instructions
 

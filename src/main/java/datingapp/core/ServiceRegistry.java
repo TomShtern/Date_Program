@@ -18,6 +18,7 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AnalyticsStorage;
@@ -54,6 +55,7 @@ public final class ServiceRegistry {
     private final TrustSafetyService trustSafetyService;
     private final ProfileService profileService;
     private final ValidationService validationService;
+    private final LocationService locationService;
     private final AchievementService achievementService;
 
     private final ConnectionService connectionService;
@@ -99,6 +101,7 @@ public final class ServiceRegistry {
                 Objects.requireNonNull(builder.compatibilityCalculator, "compatibilityCalculator cannot be null");
         this.connectionService = Objects.requireNonNull(builder.connectionService, "connectionService cannot be null");
         this.validationService = Objects.requireNonNull(builder.validationService, "validationService cannot be null");
+        this.locationService = new LocationService(this.validationService);
         this.achievementService =
                 Objects.requireNonNull(builder.achievementService, "achievementService cannot be null");
         this.eventBus = Objects.requireNonNull(builder.eventBus, "eventBus cannot be null");
@@ -361,6 +364,10 @@ public final class ServiceRegistry {
 
     public ValidationService getValidationService() {
         return validationService;
+    }
+
+    public LocationService getLocationService() {
+        return locationService;
     }
 
     public AchievementService getAchievementService() {

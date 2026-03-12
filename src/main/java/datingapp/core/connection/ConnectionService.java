@@ -194,6 +194,10 @@ public class ConnectionService {
             return;
         }
 
+        if (calculateUnreadCount(userId, convoOpt.get()) == 0) {
+            return;
+        }
+
         communicationStorage.updateConversationReadTimestamp(conversationId, userId, AppClock.now());
     }
 

@@ -591,6 +591,13 @@
     -fx-border-width: 0 0 1 0;
 }
 
+.chat-composer-bar {
+    -fx-background-color: rgba(15, 23, 42, 0.88);
+    -fx-padding: 16 24;
+    -fx-border-color: #334155;
+    -fx-border-width: 1 0 0 0;
+}
+
 .sidebar {
     -fx-background-color: #0f172a;
     -fx-padding: 24;

@@ -95,7 +95,8 @@ public final class ApplicationStartup {
             // Seed the database with developer test data if the sentinel user is absent.
             // DevDataSeeder.seed() is idempotent — it checks for the sentinel UUID before
             // inserting, so this is a fast no-op on any non-empty database.
-            DevDataSeeder.seed(services.getUserStorage());
+            DevDataSeeder.seed(
+                    services.getUserStorage(), services.getInteractionStorage(), services.getCommunicationStorage());
 
             startCleanupScheduler(services);
 

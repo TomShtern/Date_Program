@@ -2,6 +2,7 @@ package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.usecase.common.UseCaseResult;
@@ -481,6 +482,72 @@ class ChatViewModelTest {
                 () -> viewModel.presenceStatusProperty().get() == PresenceStatus.UNKNOWN
                         && !viewModel.remoteTypingProperty().get(),
                 5000));
+    }
+
+    @Test
+    @DisplayName("refresh failure does not clear selected conversation")
+    void refreshFailureDoesNotClearSelectedConversation() throws InterruptedException {
+        AtomicBoolean failListConversations = new AtomicBoolean(false);
+        var flakyMessagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService) {
+            @Override
+            public UseCaseResult<ConversationListResult> listConversations(ListConversationsQuery query) {
+                if (failListConversations.get()) {
+                    throw new RuntimeException("simulated lock timeout");
+                }
+                return super.listConversations(query);
+            }
+        };
+        var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+                connectionService,
+                TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
+                        .build());
+        ProfileService profileService =
+                new ProfileService(AppConfig.defaults(), analytics, interactions, trustSafety, users);
+        var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
+                users, profileService, null, null, AppConfig.defaults());
+        ChatViewModel flakyViewModel = new ChatViewModel(
+                flakyMessagingUseCases,
+                socialUseCases,
+                AppSession.getInstance(),
+                new datingapp.ui.async.JavaFxUiThreadDispatcher(),
+                Duration.ofMillis(75),
+                Duration.ofMillis(75),
+                new ChatViewModel.ChatUiDependencies(
+                        new UseCaseUiProfileNoteDataAccess(noteUseCases), new UiPresenceDataAccess() {
+                            @Override
+                            public PresenceStatus getPresence(UUID userId) {
+                                return presenceStatus.get();
+                            }
+
+                            @Override
+                            public boolean isTyping(UUID userId) {
+                                return remoteTyping.get();
+                            }
+                        }));
+
+        try {
+            flakyViewModel.setCurrentUser(currentUser);
+            assertTrue(waitUntil(() -> !flakyViewModel.loadingProperty().get(), 5000));
+
+            connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Hello!");
+
+            flakyViewModel.refreshConversations();
+            assertTrue(waitUntil(() -> flakyViewModel.getConversations().size() == 1, 5000));
+
+            ConversationPreview selected = flakyViewModel.getConversations().get(0);
+            flakyViewModel.selectedConversationProperty().set(selected);
+            assertTrue(waitUntil(
+                    () -> flakyViewModel.selectedConversationProperty().get() != null, 5000));
+
+            failListConversations.set(true);
+            flakyViewModel.refreshConversations();
+
+            assertTrue(waitUntil(() -> !flakyViewModel.loadingProperty().get(), 5000));
+            assertNotNull(flakyViewModel.selectedConversationProperty().get());
+            assertEquals(1, flakyViewModel.getConversations().size());
+        } finally {
+            flakyViewModel.dispose();
+        }
     }
 
     private static User createActiveUser(String name) {

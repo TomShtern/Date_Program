@@ -90,7 +90,17 @@ public class MessagingUseCases {
 
             String conversationId = Conversation.generateId(query.context().userId(), query.otherUserId());
             if (query.markAsRead()) {
-                connectionService.markAsRead(query.context().userId(), conversationId);
+                try {
+                    connectionService.markAsRead(query.context().userId(), conversationId);
+                } catch (Exception markReadError) {
+                    if (logger.isWarnEnabled()) {
+                        logger.warn(
+                                "markAsRead failed for conversation {} and user {}: {}",
+                                conversationId,
+                                query.context().userId(),
+                                markReadError.getMessage());
+                    }
+                }
             }
             boolean canMessage = connectionService.canMessage(query.context().userId(), query.otherUserId());
 

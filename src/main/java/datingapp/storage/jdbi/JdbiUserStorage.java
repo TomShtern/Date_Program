@@ -32,6 +32,7 @@ import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
+import org.jdbi.v3.sqlobject.customizer.BindMethods;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 import org.slf4j.Logger;
@@ -493,7 +494,7 @@ public final class JdbiUserStorage implements UserStorage {
                 KEY (author_id, subject_id)
                 VALUES (:authorId, :subjectId, :content, :createdAt, :updatedAt)
                 """)
-        void saveProfileNote(@BindBean ProfileNote note);
+        void saveProfileNote(@BindMethods ProfileNote note);
 
         @SqlQuery("""
                 SELECT author_id, subject_id, content, created_at, updated_at

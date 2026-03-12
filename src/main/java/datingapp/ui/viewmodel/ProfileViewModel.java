@@ -6,8 +6,10 @@ import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -72,6 +74,7 @@ public class ProfileViewModel {
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
     private final ProfileActivationPolicy activationPolicy;
+    private final LocationService locationService;
     private final ViewModelAsyncScope asyncScope;
     private final LocalPhotoStore photoStore;
 
@@ -134,14 +137,15 @@ public class ProfileViewModel {
 
     public ProfileViewModel(
             UiUserStore userStore, ProfileService profileCompletionService, AppConfig config, AppSession session) {
-        this(
+        this(new Dependencies(
                 userStore,
                 profileCompletionService,
                 null,
                 config,
                 session,
+                new LocationService(new datingapp.core.profile.ValidationService(config)),
                 new JavaFxUiThreadDispatcher(),
-                new ProfileActivationPolicy());
+                new ProfileActivationPolicy()));
     }
 
     public ProfileViewModel(
@@ -150,14 +154,15 @@ public class ProfileViewModel {
             ProfileUseCases profileUseCases,
             AppConfig config,
             AppSession session) {
-        this(
+        this(new Dependencies(
                 userStore,
                 profileCompletionService,
                 profileUseCases,
                 config,
                 session,
+                new LocationService(new datingapp.core.profile.ValidationService(config)),
                 new JavaFxUiThreadDispatcher(),
-                new ProfileActivationPolicy());
+                new ProfileActivationPolicy()));
     }
 
     public ProfileViewModel(
@@ -167,14 +172,15 @@ public class ProfileViewModel {
             AppConfig config,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
-        this(
+        this(new Dependencies(
                 userStore,
                 profileCompletionService,
                 profileUseCases,
                 config,
                 session,
+                new LocationService(new datingapp.core.profile.ValidationService(config)),
                 uiDispatcher,
-                new ProfileActivationPolicy());
+                new ProfileActivationPolicy()));
     }
 
     public ProfileViewModel(
@@ -185,14 +191,28 @@ public class ProfileViewModel {
             AppSession session,
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {
-        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
-        this.profileCompletionService =
-                Objects.requireNonNull(profileCompletionService, "profileCompletionService cannot be null");
-        this.profileUseCases = profileUseCases;
-        this.config = Objects.requireNonNull(config, "config cannot be null");
-        this.session = Objects.requireNonNull(session, "session cannot be null");
-        this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
-        this.asyncScope = createAsyncScope(uiDispatcher);
+        this(new Dependencies(
+                userStore,
+                profileCompletionService,
+                profileUseCases,
+                config,
+                session,
+                new LocationService(new datingapp.core.profile.ValidationService(config)),
+                uiDispatcher,
+                activationPolicy));
+    }
+
+    public ProfileViewModel(Dependencies dependencies) {
+        this.userStore = Objects.requireNonNull(dependencies.userStore(), "userStore cannot be null");
+        this.profileCompletionService = Objects.requireNonNull(
+                dependencies.profileCompletionService(), "profileCompletionService cannot be null");
+        this.profileUseCases = dependencies.profileUseCases();
+        this.config = Objects.requireNonNull(dependencies.config(), "config cannot be null");
+        this.session = Objects.requireNonNull(dependencies.session(), "session cannot be null");
+        this.locationService = Objects.requireNonNull(dependencies.locationService(), "locationService cannot be null");
+        this.activationPolicy =
+                Objects.requireNonNull(dependencies.activationPolicy(), "activationPolicy cannot be null");
+        this.asyncScope = createAsyncScope(dependencies.uiDispatcher());
         this.photoStore = new LocalPhotoStore();
     }
 
@@ -386,7 +406,8 @@ public class ProfileViewModel {
 
     private void loadLocation(User user) {
         if (user != null && user.hasLocation()) {
-            setLocationCoordinates(user.getLat(), user.getLon());
+            applyLocationDisplay(
+                    user.getLat(), user.getLon(), locationService.formatForDisplay(user.getLat(), user.getLon()));
             return;
         }
         clearLocation();
@@ -809,10 +830,13 @@ public class ProfileViewModel {
 
     public void setLocationCoordinates(double latitude, double longitude) {
         validateCoordinates(latitude, longitude);
-        this.latitude.set(latitude);
-        this.longitude.set(longitude);
-        hasLocation.set(true);
-        updateLocationDisplay();
+        applyLocationDisplay(latitude, longitude, locationService.formatForDisplay(latitude, longitude));
+    }
+
+    public void setResolvedLocation(ResolvedLocation resolvedLocation) {
+        Objects.requireNonNull(resolvedLocation, "resolvedLocation cannot be null");
+        validateCoordinates(resolvedLocation.latitude(), resolvedLocation.longitude());
+        applyLocationDisplay(resolvedLocation.latitude(), resolvedLocation.longitude(), resolvedLocation.label());
     }
 
     public void clearLocation() {
@@ -829,6 +853,18 @@ public class ProfileViewModel {
         if (longitude < -180.0 || longitude > 180.0) {
             throw new IllegalArgumentException("Longitude must be between -180 and 180");
         }
+    }
+
+    private void applyLocationDisplay(double latitude, double longitude, String displayLabel) {
+        this.latitude.set(latitude);
+        this.longitude.set(longitude);
+        hasLocation.set(true);
+        locationDisplay.set(
+                displayLabel == null || displayLabel.isBlank() ? formatLocation(latitude, longitude) : displayLabel);
+    }
+
+    public LocationService getLocationService() {
+        return locationService;
     }
 
     /**
@@ -1336,6 +1372,16 @@ public class ProfileViewModel {
             photoUrls = photoUrls != null ? List.copyOf(photoUrls) : List.of();
         }
     }
+
+    public record Dependencies(
+            UiUserStore userStore,
+            ProfileService profileCompletionService,
+            ProfileUseCases profileUseCases,
+            AppConfig config,
+            AppSession session,
+            LocationService locationService,
+            UiThreadDispatcher uiDispatcher,
+            ProfileActivationPolicy activationPolicy) {}
 
     private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
         UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");

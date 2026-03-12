@@ -467,4 +467,40 @@ class ValidationServiceTest {
             assertTrue(result.errors().contains("Invalid longitude (must be -180 to 180)"));
         }
     }
+
+    @Nested
+    @DisplayName("ZIP Validation")
+    class ZipValidation {
+
+        @Test
+        @DisplayName("Valid Israeli ZIP passes validation")
+        void validIsraeliZip() {
+            ValidationResult result = validator.validateZipCode("6701-101", "IL");
+
+            assertTrue(result.valid());
+            assertTrue(result.errors().isEmpty());
+        }
+
+        @Test
+        @DisplayName("Invalid Israeli ZIP fails validation")
+        void invalidIsraeliZip() {
+            ValidationResult result = validator.validateZipCode("12345", "IL");
+
+            assertFalse(result.valid());
+            assertEquals(
+                    "Israeli ZIP code must be 7 digits (e.g., 6701101)",
+                    result.errors().getFirst());
+        }
+
+        @Test
+        @DisplayName("Unsupported country ZIP validation fails clearly")
+        void unsupportedCountryZipValidationFailsClearly() {
+            ValidationResult result = validator.validateZipCode("90210", "US");
+
+            assertFalse(result.valid());
+            assertEquals(
+                    "ZIP validation is not available for this country yet",
+                    result.errors().getFirst());
+        }
+    }
 }

@@ -33,6 +33,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import javafx.animation.PauseTransition;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
@@ -97,6 +98,7 @@ public class ChatViewModel {
     private TaskHandle conversationsPollingHandle;
     private TaskHandle messagesPollingHandle;
     private final AtomicInteger noteLoadToken = new AtomicInteger();
+    private PauseTransition profileNoteStatusDismissTransition;
 
     private ViewModelErrorSink errorHandler;
 
@@ -169,9 +171,17 @@ public class ChatViewModel {
 
         // Listen for selection changes to load messages
         selectionListener = (obs, oldVal, newVal) -> {
+            if (oldVal != null
+                    && newVal != null
+                    && oldVal.conversation()
+                            .getId()
+                            .equals(newVal.conversation().getId())) {
+                return;
+            }
             if (newVal != null) {
                 loadMessages(newVal);
                 startMessagesPolling();
+                clearProfileNoteState();
                 loadProfileNoteFor(newVal.otherUser());
                 refreshPresenceState(newVal.otherUser());
             } else {
@@ -245,7 +255,7 @@ public class ChatViewModel {
         }
 
         int token = noteLoadToken.incrementAndGet();
-        profileNoteStatusMessage.set(null);
+        setProfileNoteStatus(null, token, false);
         profileNoteBusy.set(true);
         asyncScope.runFireAndForget("load profile note", () -> {
             try {
@@ -280,7 +290,7 @@ public class ChatViewModel {
                         return;
                     }
                     profileNoteContent.set(savedNote.content());
-                    profileNoteStatusMessage.set("Private note saved.");
+                    setProfileNoteStatus("Private note saved.", token, true);
                     profileNoteBusy.set(false);
                 });
             } catch (Exception e) {
@@ -309,7 +319,7 @@ public class ChatViewModel {
                         return;
                     }
                     profileNoteContent.set("");
-                    profileNoteStatusMessage.set("Private note deleted.");
+                    setProfileNoteStatus("Private note deleted.", token, true);
                     profileNoteBusy.set(false);
                 });
             } catch (Exception e) {
@@ -324,6 +334,7 @@ public class ChatViewModel {
             return;
         }
         profileNoteContent.set(note != null ? note.content() : "");
+        setProfileNoteStatus(null, token, false);
         profileNoteBusy.set(false);
     }
 
@@ -331,13 +342,38 @@ public class ChatViewModel {
         if (!isSelectedConversation(otherUserId, token)) {
             return;
         }
-        profileNoteStatusMessage.set(
-                error != null
-                                && error.getMessage() != null
-                                && !error.getMessage().isBlank()
-                        ? message + ": " + error.getMessage()
-                        : message);
+        if (error != null) {
+            logError(message, error);
+        }
+        setProfileNoteStatus(message, token, true);
         profileNoteBusy.set(false);
+    }
+
+    private void setProfileNoteStatus(@Nullable String message, int token, boolean autoDismiss) {
+        cancelProfileNoteStatusDismiss();
+        profileNoteStatusMessage.set(message);
+        if (!autoDismiss || message == null || message.isBlank()) {
+            return;
+        }
+        PauseTransition pause = new PauseTransition(javafx.util.Duration.seconds(3));
+        profileNoteStatusDismissTransition = pause;
+        pause.setOnFinished(_ -> {
+            if (!Objects.equals(pause, profileNoteStatusDismissTransition)) {
+                return;
+            }
+            profileNoteStatusDismissTransition = null;
+            if (token == noteLoadToken.get()) {
+                profileNoteStatusMessage.set(null);
+            }
+        });
+        pause.play();
+    }
+
+    private void cancelProfileNoteStatusDismiss() {
+        if (profileNoteStatusDismissTransition != null) {
+            profileNoteStatusDismissTransition.stop();
+            profileNoteStatusDismissTransition = null;
+        }
     }
 
     private boolean isSelectedConversation(UUID otherUserId, int token) {
@@ -349,6 +385,7 @@ public class ChatViewModel {
 
     private void clearProfileNoteState() {
         noteLoadToken.incrementAndGet();
+        cancelProfileNoteStatusDismiss();
         profileNoteContent.set("");
         profileNoteStatusMessage.set(null);
         profileNoteBusy.set(false);
@@ -399,22 +436,27 @@ public class ChatViewModel {
 
         if (silent) {
             asyncScope.runLatestSilently(
-                    "chat-refresh",
-                    TASK_REFRESH_CONVERSATIONS,
-                    () -> refreshConversationData(user),
-                    data -> updateConversations(data.previews(), data.unreadCount()));
+                    "chat-refresh", TASK_REFRESH_CONVERSATIONS, () -> refreshConversationData(user), data -> {
+                        if (data.previews() != null) {
+                            updateConversations(data.previews(), data.unreadCount());
+                        } else {
+                            totalUnreadCount.set(data.unreadCount());
+                        }
+                    });
             return;
         }
 
-        asyncScope.runLatest(
-                "chat-refresh",
-                TASK_REFRESH_CONVERSATIONS,
-                () -> refreshConversationData(user),
-                data -> updateConversations(data.previews(), data.unreadCount()));
+        asyncScope.runLatest("chat-refresh", TASK_REFRESH_CONVERSATIONS, () -> refreshConversationData(user), data -> {
+            if (data.previews() != null) {
+                updateConversations(data.previews(), data.unreadCount());
+            } else {
+                totalUnreadCount.set(data.unreadCount());
+            }
+        });
     }
 
     private ConversationRefreshData refreshConversationData(User user) {
-        List<ConversationPreview> previews = List.of();
+        List<ConversationPreview> previews = null;
         int unread = totalUnreadCount.get();
         try {
             logInfo("Refreshing conversations for user: {}", user.getName());
@@ -522,6 +564,7 @@ public class ChatViewModel {
     private MessageLoadData loadMessagesInBackground(String conversationId, UUID otherUserId, User user) {
         List<Message> messages = null;
         Integer unread = null;
+        List<ConversationPreview> previews = null;
         try {
             logInfo("Loading messages for conversation: {}", otherUserId);
             var result = messagingUseCases.loadConversation(
@@ -532,6 +575,7 @@ public class ChatViewModel {
                         new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0));
                 if (conversationsResult.success()) {
                     unread = conversationsResult.data().totalUnreadCount();
+                    previews = conversationsResult.data().conversations();
                 }
             } else {
                 logError("Failed to load messages: " + result.error().message(), null);
@@ -541,7 +585,7 @@ public class ChatViewModel {
             asyncScope.onError(TASK_LOAD_MESSAGES, e);
         }
 
-        return new MessageLoadData(conversationId, messages, unread);
+        return new MessageLoadData(conversationId, messages, unread, previews);
     }
 
     /**
@@ -560,6 +604,11 @@ public class ChatViewModel {
                 && selected.conversation().getId().equals(messageData.conversationId())) {
             if (messageData.messages() != null && !sameMessages(activeMessages, messageData.messages())) {
                 activeMessages.setAll(messageData.messages());
+            }
+            if (messageData.previews() != null) {
+                int unread = messageData.unreadCount() != null ? messageData.unreadCount() : totalUnreadCount.get();
+                updateConversations(messageData.previews(), unread);
+                return;
             }
             if (messageData.unreadCount() != null) {
                 totalUnreadCount.set(messageData.unreadCount());
@@ -709,7 +758,8 @@ public class ChatViewModel {
         }
         UUID currentMessageId = current.lastMessage().map(Message::id).orElse(null);
         UUID candidateMessageId = candidate.lastMessage().map(Message::id).orElse(null);
-        return Objects.equals(currentMessageId, candidateMessageId);
+        return Objects.equals(current.otherUser().getId(), candidate.otherUser().getId())
+                && Objects.equals(currentMessageId, candidateMessageId);
     }
 
     private void startConversationsPolling() {
@@ -967,10 +1017,11 @@ public class ChatViewModel {
         return scope;
     }
 
-    private record ConversationRefreshData(List<ConversationPreview> previews, int unreadCount) {}
+    private record ConversationRefreshData(@Nullable List<ConversationPreview> previews, int unreadCount) {}
 
     private record OpenConversationData(
             boolean loaded, ConversationPreview preview, List<ConversationPreview> previews) {}
 
-    private record MessageLoadData(String conversationId, List<Message> messages, Integer unreadCount) {}
+    private record MessageLoadData(
+            String conversationId, List<Message> messages, Integer unreadCount, List<ConversationPreview> previews) {}
 }

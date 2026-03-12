@@ -10,6 +10,7 @@ import datingapp.app.usecase.messaging.MessagingUseCases.ArchiveConversationComm
 import datingapp.app.usecase.messaging.MessagingUseCases.DeleteConversationCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.DeleteMessageCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
+import datingapp.app.usecase.messaging.MessagingUseCases.LoadConversationQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionService;
@@ -148,5 +149,28 @@ class MessagingUseCasesTest {
         assertTrue(deleteResult.success());
         assertTrue(communicationStorage.getConversation(conversationId).isEmpty());
         assertTrue(communicationStorage.getMessages(conversationId, 50, 0).isEmpty());
+    }
+
+    @Test
+    @DisplayName("loadConversation should succeed even when markAsRead side effect fails")
+    void loadConversationSucceedsWhenMarkAsReadFails() {
+        var sendResult = useCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(sender.getId()), recipient.getId(), "Hello"));
+        assertTrue(sendResult.success());
+
+        ConnectionService flakyService =
+                new ConnectionService(AppConfig.defaults(), communicationStorage, interactionStorage, userStorage) {
+                    @Override
+                    public void markAsRead(UUID userId, String conversationId) {
+                        throw new IllegalStateException("simulated lock timeout");
+                    }
+                };
+        MessagingUseCases flakyUseCases = new MessagingUseCases(flakyService);
+
+        var loadResult = flakyUseCases.loadConversation(
+                new LoadConversationQuery(UserContext.cli(recipient.getId()), sender.getId(), 50, 0, true));
+
+        assertTrue(loadResult.success());
+        assertEquals(1, loadResult.data().messages().size());
     }
 }

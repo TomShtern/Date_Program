@@ -13,9 +13,13 @@ import datingapp.core.ServiceRegistry;
 import datingapp.core.TextUtil;
 import datingapp.core.i18n.I18n;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.model.LocationModels.City;
+import datingapp.core.model.LocationModels.Country;
+import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -52,10 +56,13 @@ public class ProfileHandler implements LoggingSupport {
     private static final String INDENTED_BULLET = "    - {}";
     private static final String ERROR_MESSAGE_FORMAT = "❌ {}\n";
     private static final String ERROR_WITH_GAP_FORMAT = "\n❌ {}\n";
+    private static final String WARNING_MESSAGE_FORMAT = "⚠️  {}";
+    private static final String PRESS_ENTER_MENU_KEY = "cli.common.press_enter_menu";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final UserStorage userStorage;
     private final ValidationService validationService;
+    private final LocationService locationService;
     private final AppConfig config;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
@@ -66,16 +73,35 @@ public class ProfileHandler implements LoggingSupport {
     public ProfileHandler(
             UserStorage userStorage,
             ValidationService validationService,
+            LocationService locationService,
             ProfileUseCases profileUseCases,
             AppConfig config,
             AppSession session,
             InputReader inputReader) {
         this.userStorage = Objects.requireNonNull(userStorage);
         this.validationService = Objects.requireNonNull(validationService, "validationService cannot be null");
+        this.locationService = Objects.requireNonNull(locationService, "locationService cannot be null");
         this.profileUseCases = Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = session;
         this.inputReader = inputReader;
+    }
+
+    public ProfileHandler(
+            UserStorage userStorage,
+            ValidationService validationService,
+            ProfileUseCases profileUseCases,
+            AppConfig config,
+            AppSession session,
+            InputReader inputReader) {
+        this(
+                userStorage,
+                validationService,
+                new LocationService(validationService),
+                profileUseCases,
+                config,
+                session,
+                inputReader);
     }
 
     public static ProfileHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
@@ -83,6 +109,7 @@ public class ProfileHandler implements LoggingSupport {
         return new ProfileHandler(
                 services.getUserStorage(),
                 services.getValidationService(),
+                services.getLocationService(),
                 services.getProfileUseCases(),
                 services.getConfig(),
                 session,
@@ -144,7 +171,7 @@ public class ProfileHandler implements LoggingSupport {
             var previewResult = profileUseCases.generatePreview(currentUser);
             if (!previewResult.success()) {
                 logInfo(ERROR_WITH_GAP_FORMAT, previewResult.error().message());
-                inputReader.readLine(I18n.text("cli.common.press_enter_menu"));
+                inputReader.readLine(I18n.text(PRESS_ENTER_MENU_KEY));
                 return;
             }
             ProfileService.ProfilePreview preview = previewResult.data();
@@ -162,7 +189,7 @@ public class ProfileHandler implements LoggingSupport {
             @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
             int age = currentUser.getAge().orElse(0);
             logInfo("│ 💝 {}, {} years old{}", currentUser.getName(), age, verifiedBadge);
-            logInfo("│ 📍 Location: {}, {}", currentUser.getLat(), currentUser.getLon());
+            logInfo("│ 📍 Location: {}", locationService.formatForDisplay(currentUser.getLat(), currentUser.getLon()));
             String bio = preview.displayBio();
             if (bio.length() > 50) {
                 bio = bio.substring(0, 47) + "...";
@@ -198,7 +225,7 @@ public class ProfileHandler implements LoggingSupport {
             }
 
             logInfo("");
-            inputReader.readLine(I18n.text("cli.common.press_enter_menu"));
+            inputReader.readLine(I18n.text(PRESS_ENTER_MENU_KEY));
         });
     }
 
@@ -273,7 +300,7 @@ public class ProfileHandler implements LoggingSupport {
                 String message = result.errors().isEmpty()
                         ? "Invalid date"
                         : result.errors().getFirst();
-                logInfo("⚠️  {}", message);
+                logInfo(WARNING_MESSAGE_FORMAT, message);
                 return;
             }
             currentUser.setBirthDate(birthDate);
@@ -445,22 +472,110 @@ public class ProfileHandler implements LoggingSupport {
      * @param currentUser The user whose location is being set
      */
     private void promptLocation(User currentUser) {
-        String latStr = inputReader.readLine("\nLatitude (e.g., 32.0853): ");
-        String lonStr = inputReader.readLine("Longitude (e.g., 34.7818): ");
-        try {
-            double lat = Double.parseDouble(latStr);
-            double lon = Double.parseDouble(lonStr);
-            ValidationService.ValidationResult result = validationService.validateLocation(lat, lon);
-            if (!result.valid()) {
-                logInfo("⚠️  Invalid coordinates:");
-                result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
-            } else {
-                currentUser.setLocation(lat, lon);
-            }
-        } catch (NumberFormatException e) {
-            logDebug("Invalid coordinates: {}", e.getMessage());
-            logInfo("⚠️  Invalid coordinates, skipping.");
+        Country selectedCountry = promptCountry();
+        Optional<ResolvedLocation> resolved = promptCitySelection(selectedCountry.code());
+        if (resolved.isEmpty()) {
+            resolved = promptZipSelection(selectedCountry.code());
         }
+        if (resolved.isPresent()) {
+            ResolvedLocation location = resolved.get();
+            currentUser.setLocation(location.latitude(), location.longitude());
+            logInfo("✅ Location set to {}.", location.label());
+            return;
+        }
+        logInfo("⚠️  Location skipped.");
+    }
+
+    private Country promptCountry() {
+        Country defaultCountry = locationService.getDefaultCountry();
+        List<Country> countries = locationService.getAvailableCountries();
+        logInfo("\n--- LOCATION ---");
+        for (int i = 0; i < countries.size(); i++) {
+            Country country = countries.get(i);
+            String defaultMarker = country.defaultSelection() ? " [default]" : "";
+            logInfo("  {}. {}{}", i + 1, country.displayName(), defaultMarker);
+        }
+        String input = inputReader
+                .readLine("Select country (press Enter for default): ")
+                .trim();
+        if (input.isBlank()) {
+            return defaultCountry;
+        }
+        try {
+            int selectedIndex = Integer.parseInt(input) - 1;
+            if (selectedIndex < 0 || selectedIndex >= countries.size()) {
+                logInfo("⚠️  Invalid selection. Using {}.", defaultCountry.displayName());
+                return defaultCountry;
+            }
+            Country selectedCountry = countries.get(selectedIndex);
+            if (!selectedCountry.available()) {
+                logInfo("⚠️  {} is coming soon. Using {}.", selectedCountry.name(), defaultCountry.displayName());
+                return defaultCountry;
+            }
+            return selectedCountry;
+        } catch (NumberFormatException _) {
+            logInfo("⚠️  Invalid selection. Using {}.", defaultCountry.displayName());
+            return defaultCountry;
+        }
+    }
+
+    private Optional<ResolvedLocation> promptCitySelection(String countryCode) {
+        List<City> popularCities = locationService.getPopularCities(countryCode, 5);
+        if (!popularCities.isEmpty()) {
+            logInfo("Popular cities:");
+            for (int i = 0; i < popularCities.size(); i++) {
+                logInfo("  {}. {}", i + 1, popularCities.get(i).displayName());
+            }
+        }
+        String query = inputReader
+                .readLine("City name (press Enter to use ZIP instead): ")
+                .trim();
+        if (query.isBlank()) {
+            return Optional.empty();
+        }
+        List<City> results = locationService.searchCities(countryCode, query, 10);
+        if (results.isEmpty()) {
+            logInfo("⚠️  No matching cities found. Try ZIP instead.");
+            return Optional.empty();
+        }
+        logInfo("Matching cities:");
+        for (int i = 0; i < results.size(); i++) {
+            logInfo("  {}. {}", i + 1, results.get(i).displayName());
+        }
+        String selection =
+                inputReader.readLine("Choose city number (or 0 to use ZIP): ").trim();
+        try {
+            int selectedIndex = Integer.parseInt(selection) - 1;
+            if (selectedIndex == -1) {
+                return Optional.empty();
+            }
+            if (selectedIndex < 0 || selectedIndex >= results.size()) {
+                logInfo("⚠️  Invalid city selection. Try ZIP instead.");
+                return Optional.empty();
+            }
+            return Optional.of(locationService.resolveCity(results.get(selectedIndex)));
+        } catch (NumberFormatException _) {
+            logInfo("⚠️  Invalid city selection. Try ZIP instead.");
+            return Optional.empty();
+        }
+    }
+
+    private Optional<ResolvedLocation> promptZipSelection(String countryCode) {
+        String zipCode =
+                inputReader.readLine("ZIP code (press Enter to skip): ").trim();
+        if (zipCode.isBlank()) {
+            return Optional.empty();
+        }
+        LocationService.ZipLookupResult lookupResult = locationService.lookupZip(countryCode, zipCode);
+        if (!lookupResult.valid()) {
+            logInfo(WARNING_MESSAGE_FORMAT, lookupResult.message());
+            return Optional.empty();
+        }
+        if (lookupResult.resolvedLocation().isEmpty()) {
+            logInfo(WARNING_MESSAGE_FORMAT, lookupResult.message());
+            return Optional.empty();
+        }
+        return lookupResult.resolvedLocation();
     }
 
     /**
@@ -970,7 +1085,7 @@ public class ProfileHandler implements LoggingSupport {
             var completionResult = profileUseCases.calculateCompletion(currentUser);
             if (!completionResult.success()) {
                 logInfo(ERROR_WITH_GAP_FORMAT, completionResult.error().message());
-                inputReader.readLine(I18n.text("cli.common.press_enter_menu"));
+                inputReader.readLine(I18n.text(PRESS_ENTER_MENU_KEY));
                 return;
             }
             ProfileService.CompletionResult result = completionResult.data();
@@ -1005,7 +1120,7 @@ public class ProfileHandler implements LoggingSupport {
             }
 
             logInfo("");
-            inputReader.readLine(I18n.text("cli.common.press_enter_menu"));
+            inputReader.readLine(I18n.text(PRESS_ENTER_MENU_KEY));
         });
     }
 }

@@ -25,6 +25,7 @@ public class ValidationService {
     private static final String BIO_TOO_LONG = "Bio too long (max %d chars)";
     private static final String INVALID_EMAIL = "Invalid email format";
     private static final String INVALID_PHONE = "Invalid phone format";
+    private static final String INVALID_ZIP = "Israeli ZIP code must be 7 digits (e.g., 6701101)";
     private static final int MAX_EMAIL_LENGTH = 254;
     private static final int MIN_PHONE_DIGITS = 7;
     private static final int MAX_PHONE_DIGITS = 15;
@@ -257,6 +258,22 @@ public class ValidationService {
         }
 
         return errors.isEmpty() ? ValidationResult.success() : ValidationResult.failure(errors);
+    }
+
+    public ValidationResult validateZipCode(String zipCode, String countryCode) {
+        if (zipCode == null || zipCode.isBlank()) {
+            return ValidationResult.failure("ZIP code is required");
+        }
+        if (countryCode == null || countryCode.isBlank()) {
+            return ValidationResult.failure("Country is required");
+        }
+
+        String normalized = zipCode.replaceAll("[\\s-]", "");
+        return switch (countryCode.trim().toUpperCase(java.util.Locale.ROOT)) {
+            case "IL" ->
+                normalized.matches("\\d{7}") ? ValidationResult.success() : ValidationResult.failure(INVALID_ZIP);
+            default -> ValidationResult.failure("ZIP validation is not available for this country yet");
+        };
     }
 
     public static String normalizeEmail(String email) {

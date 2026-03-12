@@ -24,8 +24,21 @@
         <Insets bottom="20" left="15" right="15" top="20"/>
       </padding>
       <Label styleClass="text-secondary conversation-section-label"
-                                                                                  text="CONVERSATIONS" />
-      <ListView fx:id="conversationListView" VBox.vgrow="ALWAYS"/>
+                                                                                              text="CONVERSATIONS" />
+      <ListView fx:id="conversationListView" VBox.vgrow="ALWAYS" minHeight="120.0"/>
+      <VBox fx:id="notePanelContainer" spacing="10.0" styleClass="card-info-container" managed="false" visible="false" maxHeight="220.0">
+        <VBox.margin>
+          <Insets top="10"/>
+        </VBox.margin>
+        <Separator opacity="0.3"/>
+        <Label styleClass="text-secondary conversation-section-label" text="PRIVATE NOTE"/>
+        <TextArea fx:id="profileNoteArea" prefRowCount="3" promptText="Add a private note about this conversation..." wrapText="true"/>
+        <HBox alignment="CENTER_LEFT" spacing="10.0">
+          <Button fx:id="saveProfileNoteButton" onAction="#handleSaveProfileNote" styleClass="button" text="Save note"/>
+          <Button fx:id="deleteProfileNoteButton" onAction="#handleDeleteProfileNote" styleClass="button-transparent" text="Delete"/>
+          <Label fx:id="profileNoteStatusLabel" styleClass="text-secondary" maxWidth="200.0" ellipsisString="..." HBox.hgrow="ALWAYS"/>
+        </HBox>
+      </VBox>
     </VBox>
   </left>
 
@@ -39,7 +52,6 @@
           </padding>
           <Label fx:id="chatHeaderLabel" styleClass="subheading" text="User Name"/>
           <Region fx:id="chatPresenceDot" managed="false" visible="false" styleClass="status-dot"/>
-          <Label fx:id="chatPresenceStatusLabel" styleClass="text-secondary" managed="false" visible="false"/>
           <Region HBox.hgrow="ALWAYS"/>
           <Button fx:id="refreshButton" onAction="#handleRefreshConversations" styleClass="button-transparent">
             <graphic>
@@ -49,9 +61,31 @@
               <Tooltip text="Refresh conversations"/>
             </tooltip>
           </Button>
-          <Button fx:id="friendZoneButton" onAction="#handleRequestFriendZone" styleClass="button-transparent" text="Friend zone"/>
-          <Button fx:id="gracefulExitButton" onAction="#handleGracefulExit" styleClass="button-transparent" text="Graceful exit"/>
-          <Button fx:id="unmatchButton" onAction="#handleUnmatch" styleClass="button-transparent" text="Unmatch"/>
+          <Button fx:id="friendZoneButton" onAction="#handleRequestFriendZone" styleClass="button-transparent">
+            <graphic>
+              <FontIcon iconLiteral="mdi2h-heart-circle" iconSize="20" iconColor="white"/>
+            </graphic>
+            <tooltip>
+              <Tooltip text="Request Friend Zone"/>
+            </tooltip>
+          </Button>
+          <Button fx:id="gracefulExitButton" onAction="#handleGracefulExit" styleClass="button-transparent">
+            <graphic>
+              <FontIcon iconLiteral="mdi2d-door-open" iconSize="20" iconColor="white"/>
+            </graphic>
+            <tooltip>
+              <Tooltip text="Graceful Exit"/>
+            </tooltip>
+          </Button>
+          <Button fx:id="unmatchButton" onAction="#handleUnmatch" styleClass="button-transparent">
+            <graphic>
+              <FontIcon iconLiteral="mdi2h-heart-broken" iconSize="20" iconColor="#f59e0b"/>
+            </graphic>
+            <tooltip>
+              <Tooltip text="Unmatch"/>
+            </tooltip>
+          </Button>
+          <Separator orientation="VERTICAL" prefHeight="20.0" opacity="0.3"/>
           <Button onAction="#handleBlock" styleClass="button-transparent">
             <graphic>
               <FontIcon iconLiteral="mdi2b-block-helper" iconSize="20" iconColor="#ef4444"/>
@@ -69,33 +103,27 @@
             </tooltip>
           </Button>
         </HBox>
-        <VBox spacing="10.0" styleClass="card-info-container">
-          <Label styleClass="text-secondary conversation-section-label" text="PRIVATE NOTE"/>
-          <TextArea fx:id="profileNoteArea" prefRowCount="3" promptText="Add a private note about this conversation..." wrapText="true"/>
-          <HBox alignment="CENTER_LEFT" spacing="10.0">
-            <Button fx:id="saveProfileNoteButton" onAction="#handleSaveProfileNote" styleClass="button" text="Save note"/>
-            <Button fx:id="deleteProfileNoteButton" onAction="#handleDeleteProfileNote" styleClass="button-transparent" text="Delete"/>
-            <Label fx:id="profileNoteStatusLabel" styleClass="text-secondary" wrapText="true" HBox.hgrow="ALWAYS"/>
-          </HBox>
-        </VBox>
-        <ListView fx:id="messageListView" VBox.vgrow="ALWAYS"
-                                                                                                            styleClass="message-list-view" />
+        <StackPane VBox.vgrow="ALWAYS">
+          <ListView fx:id="messageListView" styleClass="message-list-view"/>
+          <ProgressIndicator fx:id="chatLoadingIndicator" managed="false" visible="false" maxWidth="34" maxHeight="34"/>
+        </StackPane>
         <HBox fx:id="typingIndicatorHost" alignment="CENTER_LEFT" managed="false" visible="false">
           <padding>
             <Insets left="20" right="20" bottom="10"/>
           </padding>
         </HBox>
-        <HBox spacing="15.0" alignment="CENTER" styleClass="header-bar">
+        <HBox spacing="15.0" alignment="CENTER" styleClass="chat-composer-bar">
           <padding>
             <Insets bottom="20" left="20" right="20" top="20"/>
           </padding>
           <VBox spacing="6.0" HBox.hgrow="ALWAYS">
             <TextArea fx:id="messageArea" prefHeight="50.0" promptText="Type a message..."
-                                                                                                                                          wrapText="true" HBox.hgrow="ALWAYS" />
+                                                                                                                                                                  wrapText="true" HBox.hgrow="ALWAYS" />
             <Label fx:id="messageLengthLabel" styleClass="text-secondary" text="0/1000"/>
+            <Label text="Enter to send · Shift+Enter for new line" styleClass="text-secondary" style="-fx-font-size: 10px;"/>
           </VBox>
           <Button fx:id="sendButton" onAction="#handleSendMessage" prefHeight="50.0"
-                                                                                                                                      prefWidth="60.0" styleClass="button">
+                                                                                                                                                          prefWidth="60.0" styleClass="button">
             <graphic>
               <FontIcon iconLiteral="mdi2s-send" iconSize="20" iconColor="white"/>
             </graphic>

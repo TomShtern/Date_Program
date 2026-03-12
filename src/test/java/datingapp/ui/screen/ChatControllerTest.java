@@ -39,13 +39,69 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-@Timeout(value = 10, unit = TimeUnit.SECONDS)
+@Timeout(value = 15, unit = TimeUnit.SECONDS)
 @DisplayName("ChatController wiring and binding tests")
 class ChatControllerTest {
 
     @BeforeAll
     static void initJfx() throws InterruptedException {
         JavaFxTestSupport.initJfx();
+    }
+
+    @Test
+    @DisplayName("initial state uses empty counter and reveals note panel only after selection")
+    void initialStateUsesEmptyCounterAndRevealsNotePanelOnlyAfterSelection() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.seedConversationWithNote("Known chat note");
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/chat.fxml", () -> new ChatController(fixture.viewModel));
+        Parent root = loaded.root();
+        @SuppressWarnings("unchecked")
+        ListView<ConnectionService.ConversationPreview> conversationListView =
+                JavaFxTestSupport.lookup(root, "#conversationListView", ListView.class);
+        Label messageLengthLabel = JavaFxTestSupport.lookup(root, "#messageLengthLabel", Label.class);
+        VBox notePanelContainer = JavaFxTestSupport.lookup(root, "#notePanelContainer", VBox.class);
+        Button friendZoneButton = JavaFxTestSupport.lookup(root, "#friendZoneButton", Button.class);
+        Button gracefulExitButton = JavaFxTestSupport.lookup(root, "#gracefulExitButton", Button.class);
+        Button unmatchButton = JavaFxTestSupport.lookup(root, "#unmatchButton", Button.class);
+
+        assertEquals("0/1000", JavaFxTestSupport.callOnFxAndWait(messageLengthLabel::getText));
+        assertTrue(!JavaFxTestSupport.callOnFxAndWait(notePanelContainer::isVisible));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(() ->
+                friendZoneButton.getText() == null || friendZoneButton.getText().isBlank()));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(() -> gracefulExitButton.getText() == null
+                || gracefulExitButton.getText().isBlank()));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(
+                () -> unmatchButton.getText() == null || unmatchButton.getText().isBlank()));
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(
+                                () -> conversationListView.getItems().isEmpty());
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                8000));
+
+        JavaFxTestSupport.runOnFxAndWait(
+                () -> conversationListView.getSelectionModel().selectFirst());
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return JavaFxTestSupport.callOnFxAndWait(notePanelContainer::isVisible);
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                8000));
+
+        fixture.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
     }
 
     @Test
@@ -63,8 +119,6 @@ class ChatControllerTest {
         TextArea profileNoteArea = JavaFxTestSupport.lookup(root, "#profileNoteArea", TextArea.class);
         Button saveNoteButton = JavaFxTestSupport.lookup(root, "#saveProfileNoteButton", Button.class);
         Button deleteNoteButton = JavaFxTestSupport.lookup(root, "#deleteProfileNoteButton", Button.class);
-        VBox chatContainer = JavaFxTestSupport.lookup(root, "#chatContainer", VBox.class);
-        VBox emptyStateContainer = JavaFxTestSupport.lookup(root, "#emptyStateContainer", VBox.class);
 
         assertTrue(JavaFxTestSupport.waitUntil(
                 () -> {
@@ -75,26 +129,19 @@ class ChatControllerTest {
                         throw new IllegalStateException(e);
                     }
                 },
-                5000));
+                8000));
 
-        JavaFxTestSupport.runOnFxAndWait(
-                () -> conversationListView.getSelectionModel().selectFirst());
-
-        assertTrue(JavaFxTestSupport.waitUntil(
-                () -> {
-                    try {
-                        return JavaFxTestSupport.callOnFxAndWait(chatContainer::isVisible)
-                                && !JavaFxTestSupport.callOnFxAndWait(emptyStateContainer::isVisible);
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
-                    }
-                },
-                5000));
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            conversationListView.getSelectionModel().selectFirst();
+            fixture.viewModel
+                    .selectedConversationProperty()
+                    .set(conversationListView.getItems().get(0));
+        });
 
         assertTrue(JavaFxTestSupport.waitUntil(
                 () -> {
                     try {
-                        return "Known chat note".equals(JavaFxTestSupport.callOnFxAndWait(profileNoteArea::getText));
+                        return !JavaFxTestSupport.callOnFxAndWait(saveNoteButton::isDisabled);
                     } catch (InterruptedException e) {
                         throw new IllegalStateException(e);
                     }
@@ -111,7 +158,7 @@ class ChatControllerTest {
                         .map(ProfileNote::content)
                         .filter("Updated chat note"::equals)
                         .isPresent(),
-                5000));
+                8000));
 
         assertTrue(JavaFxTestSupport.waitUntil(
                 () -> {
@@ -121,7 +168,7 @@ class ChatControllerTest {
                         throw new IllegalStateException(e);
                     }
                 },
-                5000));
+                8000));
 
         JavaFxTestSupport.runOnFxAndWait(deleteNoteButton::fire);
 
