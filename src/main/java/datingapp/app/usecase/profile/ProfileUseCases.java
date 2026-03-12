@@ -14,6 +14,9 @@ import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.profile.MatchPreferences.Dealbreakers;
+import datingapp.core.profile.MatchPreferences.Interest;
+import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.SanitizerUtils;
 import datingapp.core.profile.ValidationService;
@@ -222,6 +225,31 @@ public class ProfileUseCases {
         }
     }
 
+    public UseCaseResult<ProfileSaveResult> updateProfile(UpdateProfileCommand command) {
+        if (command == null || command.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        if (userStorage == null || validationService == null) {
+            return UseCaseResult.failure(UseCaseError.dependency("UserStorage and ValidationService are required"));
+        }
+
+        User user = userStorage.get(command.context().userId()).orElse(null);
+        if (user == null) {
+            return UseCaseResult.failure(UseCaseError.notFound("User not found"));
+        }
+
+        try {
+            applyProfileTextAndIdentityFields(user, command);
+            applyProfileLocationFields(user, command);
+            applyProfilePreferenceFields(user, command);
+            applyProfileLifestyleFields(user, command);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
+        }
+
+        return saveProfile(new SaveProfileCommand(command.context(), user));
+    }
+
     public UseCaseResult<AchievementSnapshot> getAchievements(AchievementsQuery query) {
         if (query == null || query.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
@@ -386,6 +414,26 @@ public class ProfileUseCases {
     public static record UpdateDiscoveryPreferencesCommand(
             UserContext context, int minAge, int maxAge, int maxDistanceKm, Set<Gender> interestedIn) {}
 
+    public static record UpdateProfileCommand(
+            UserContext context,
+            String bio,
+            java.time.LocalDate birthDate,
+            Gender gender,
+            Set<Gender> interestedIn,
+            Double latitude,
+            Double longitude,
+            Integer maxDistanceKm,
+            Integer minAge,
+            Integer maxAge,
+            Integer heightCm,
+            Lifestyle.Smoking smoking,
+            Lifestyle.Drinking drinking,
+            Lifestyle.WantsKids wantsKids,
+            Lifestyle.LookingFor lookingFor,
+            Lifestyle.Education education,
+            Set<Interest> interests,
+            Dealbreakers dealbreakers) {}
+
     public static record AchievementsQuery(UserContext context, boolean checkForNew) {}
 
     public static record AchievementSnapshot(List<UserAchievement> unlocked, List<UserAchievement> newlyUnlocked) {}
@@ -423,5 +471,97 @@ public class ProfileUseCases {
             return profileService.getUnlocked(userId);
         }
         return List.of();
+    }
+
+    private void applyProfileTextAndIdentityFields(User user, UpdateProfileCommand command) {
+        if (command.bio() != null) {
+            assertValid(validationService.validateBio(command.bio()));
+            user.setBio(SanitizerUtils.sanitize(command.bio()));
+        }
+        if (command.birthDate() != null) {
+            assertValid(validationService.validateBirthDate(command.birthDate()));
+            user.setBirthDate(command.birthDate());
+        }
+        if (command.gender() != null) {
+            user.setGender(command.gender());
+        }
+        if (command.interestedIn() != null && !command.interestedIn().isEmpty()) {
+            user.setInterestedIn(command.interestedIn());
+        }
+    }
+
+    private void applyProfileLocationFields(User user, UpdateProfileCommand command) {
+        if (command.latitude() == null && command.longitude() == null) {
+            return;
+        }
+        if (command.latitude() == null || command.longitude() == null) {
+            throw new IllegalArgumentException("Both latitude and longitude are required");
+        }
+        assertValid(validationService.validateLocation(command.latitude(), command.longitude()));
+        user.setLocation(command.latitude(), command.longitude());
+
+        if (command.maxDistanceKm() != null) {
+            assertValid(validationService.validateDistance(command.maxDistanceKm()));
+            user.setMaxDistanceKm(command.maxDistanceKm(), config.matching().maxDistanceKm());
+        }
+    }
+
+    private void applyProfilePreferenceFields(User user, UpdateProfileCommand command) {
+        if (command.maxDistanceKm() != null && command.latitude() == null && command.longitude() == null) {
+            assertValid(validationService.validateDistance(command.maxDistanceKm()));
+            user.setMaxDistanceKm(command.maxDistanceKm(), config.matching().maxDistanceKm());
+        }
+
+        if (command.minAge() == null && command.maxAge() == null) {
+            return;
+        }
+
+        int minAge = command.minAge() != null ? command.minAge() : user.getMinAge();
+        int maxAge = command.maxAge() != null ? command.maxAge() : user.getMaxAge();
+        if (minAge > maxAge) {
+            int swap = minAge;
+            minAge = maxAge;
+            maxAge = swap;
+        }
+        assertValid(validationService.validateAgeRange(minAge, maxAge));
+        user.setAgeRange(
+                minAge,
+                maxAge,
+                config.validation().minAge(),
+                config.validation().maxAge());
+    }
+
+    private void applyProfileLifestyleFields(User user, UpdateProfileCommand command) {
+        if (command.heightCm() != null) {
+            assertValid(validationService.validateHeight(command.heightCm()));
+            user.setHeightCm(command.heightCm());
+        }
+        if (command.smoking() != null) {
+            user.setSmoking(command.smoking());
+        }
+        if (command.drinking() != null) {
+            user.setDrinking(command.drinking());
+        }
+        if (command.wantsKids() != null) {
+            user.setWantsKids(command.wantsKids());
+        }
+        if (command.lookingFor() != null) {
+            user.setLookingFor(command.lookingFor());
+        }
+        if (command.education() != null) {
+            user.setEducation(command.education());
+        }
+        if (command.interests() != null && !command.interests().isEmpty()) {
+            user.setInterests(command.interests());
+        }
+        if (command.dealbreakers() != null) {
+            user.setDealbreakers(command.dealbreakers());
+        }
+    }
+
+    private static void assertValid(ValidationService.ValidationResult validationResult) {
+        if (!validationResult.valid()) {
+            throw new IllegalArgumentException(validationResult.errors().getFirst());
+        }
     }
 }

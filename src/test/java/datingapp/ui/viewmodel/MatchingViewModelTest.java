@@ -2,6 +2,7 @@ package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -91,6 +92,22 @@ class MatchingViewModelTest {
     }
 
     @Test
+    @DisplayName("initialize marks location missing when current user has no location")
+    void initializeMarksLocationMissingWhenCurrentUserHasNoLocation() {
+        Fixture fixture = new Fixture(false);
+        fixture.saveUsers();
+
+        MatchingViewModel viewModel = fixture.createViewModel();
+        viewModel.initialize(null);
+
+        waitUntil(() -> viewModel.locationMissingProperty().get(), 5000);
+
+        assertTrue(viewModel.locationMissingProperty().get());
+        assertNull(viewModel.currentCandidateProperty().get());
+        viewModel.dispose();
+    }
+
+    @Test
     @DisplayName("initialize loads existing private note for prioritized candidate")
     void initializeLoadsExistingPrivateNoteForCandidate() {
         Fixture fixture = new Fixture();
@@ -135,6 +152,25 @@ class MatchingViewModelTest {
                 5000);
         assertTrue(fixture.lookupNote().isEmpty());
         assertEquals("", viewModel.noteContentProperty().get());
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("successful swipe starts undo countdown state")
+    void successfulSwipeStartsUndoCountdownState() {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+
+        MatchingViewModel viewModel = fixture.createViewModel();
+        viewModel.initialize(fixture.prioritizedCandidate.getId());
+
+        waitUntil(() -> viewModel.currentCandidateProperty().get() != null, 5000);
+        viewModel.like();
+
+        waitUntil(() -> viewModel.undoAvailableProperty().get(), 5000);
+
+        assertTrue(viewModel.undoCountdownSecondsProperty().get() > 0);
+        assertTrue(viewModel.undoAvailableProperty().get());
         viewModel.dispose();
     }
 
@@ -226,7 +262,13 @@ class MatchingViewModelTest {
         private final User fallbackCandidate = createUser("Casey", Gender.FEMALE, EnumSet.of(Gender.MALE));
 
         private Fixture() {
-            currentUser.setLocation(40.7128, -74.0060);
+            this(true);
+        }
+
+        private Fixture(boolean withCurrentUserLocation) {
+            if (withCurrentUserLocation) {
+                currentUser.setLocation(40.7128, -74.0060);
+            }
             prioritizedCandidate.setLocation(40.7130, -74.0050);
             fallbackCandidate.setLocation(40.7140, -74.0040);
             session.setCurrentUser(currentUser);

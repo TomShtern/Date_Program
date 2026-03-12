@@ -36,6 +36,7 @@ import java.util.function.Consumer;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -82,6 +83,7 @@ public class ChatViewModel {
 
     private final ObjectProperty<ConversationPreview> selectedConversation = new SimpleObjectProperty<>();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
+    private final BooleanProperty sending = new SimpleBooleanProperty(false);
     private final IntegerProperty totalUnreadCount = new SimpleIntegerProperty(0);
     private final StringProperty profileNoteContent = new SimpleStringProperty("");
     private final StringProperty profileNoteStatusMessage = new SimpleStringProperty();
@@ -191,6 +193,7 @@ public class ChatViewModel {
         activeMessages.clear();
         clearPresenceState();
         setLoadingState(false);
+        sending.set(false);
     }
 
     private void refreshPresenceState(User otherUser) {
@@ -573,6 +576,7 @@ public class ChatViewModel {
 
         String trimmedText = text.trim();
         logInfo("Sending message to: {}", conversation.otherUser().getName());
+        sending.set(true);
         dispatchSendMessage(
                 conversation, sender.getId(), conversation.otherUser().getId(), trimmedText, onSuccess);
 
@@ -608,6 +612,7 @@ public class ChatViewModel {
         if (asyncScope.isDisposed()) {
             return;
         }
+        sending.set(false);
         if (result == null || !result.success()) {
             reportSendFailure(
                     "Failed to send message: " + (errorMessage == null ? "Unknown error" : errorMessage), null);
@@ -627,6 +632,7 @@ public class ChatViewModel {
     }
 
     private void reportSendFailure(String message, Exception error) {
+        sending.set(false);
         if (errorHandler != null) {
             errorHandler.onError(message);
             return;
@@ -911,6 +917,10 @@ public class ChatViewModel {
 
     public BooleanProperty loadingProperty() {
         return loading;
+    }
+
+    public ReadOnlyBooleanProperty sendingProperty() {
+        return sending;
     }
 
     public IntegerProperty totalUnreadCountProperty() {

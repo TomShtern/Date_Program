@@ -3,86 +3,106 @@ package datingapp.app.event.handlers;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import datingapp.app.event.AppEvent;
+import datingapp.app.event.AppEventBus;
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.core.metrics.AchievementService;
+import datingapp.core.metrics.EngagementDomain.Achievement;
+import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class AchievementEventHandlerTest {
 
     private InProcessAppEventBus bus;
-    private final List<UUID> checkedUserIds = new ArrayList<>();
+    private CapturingAchievementService achievementService;
 
     @BeforeEach
     void setUp() {
         bus = new InProcessAppEventBus();
-        checkedUserIds.clear();
+        achievementService = new CapturingAchievementService();
+        new AchievementEventHandler(achievementService).register(bus);
     }
 
     @Test
     void callsCheckAndUnlockWhenMatchCreated() {
-        AtomicInteger callCount = new AtomicInteger();
-
-        // Subscribe a capturing handler that mirrors the real handler logic
-        bus.subscribe(AppEvent.SwipeRecorded.class, event -> {
-            if (event.resultedInMatch()) {
-                callCount.incrementAndGet();
-                checkedUserIds.add(event.swiperId());
-            }
-        });
-
         UUID swiperId = UUID.randomUUID();
         bus.publish(new AppEvent.SwipeRecorded(swiperId, UUID.randomUUID(), "LIKE", true, Instant.now()));
 
-        assertEquals(1, callCount.get());
-        assertEquals(swiperId, checkedUserIds.getFirst());
+        assertEquals(List.of(swiperId), achievementService.checkedUserIds);
     }
 
     @Test
     void doesNotCallCheckAndUnlockWhenNoMatch() {
-        AtomicInteger callCount = new AtomicInteger();
-
-        bus.subscribe(AppEvent.SwipeRecorded.class, event -> {
-            if (event.resultedInMatch()) {
-                callCount.incrementAndGet();
-            }
-        });
-
         bus.publish(new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", false, Instant.now()));
 
-        assertEquals(0, callCount.get());
+        assertEquals(List.of(), achievementService.checkedUserIds);
     }
 
     @Test
     void doesNotCallCheckAndUnlockOnPass() {
-        AtomicInteger callCount = new AtomicInteger();
-
-        bus.subscribe(AppEvent.SwipeRecorded.class, event -> {
-            if (event.resultedInMatch()) {
-                callCount.incrementAndGet();
-            }
-        });
-
         bus.publish(new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "PASS", false, Instant.now()));
 
-        assertEquals(0, callCount.get());
+        assertEquals(List.of(), achievementService.checkedUserIds);
+    }
+
+    @Test
+    void profileSavedTriggersAchievementCheck() {
+        UUID userId = UUID.randomUUID();
+
+        bus.publish(new AppEvent.ProfileSaved(userId, true, Instant.now()));
+
+        assertEquals(List.of(userId), achievementService.checkedUserIds);
     }
 
     @Test
     void handlerRegistersWithBestEffortPolicy() {
         // Verify handler doesn't propagate exceptions through the bus
         bus.subscribe(
-                AppEvent.SwipeRecorded.class,
+                AppEvent.ProfileSaved.class,
                 event -> {
                     throw new RuntimeException("simulated achievement failure");
                 },
-                datingapp.app.event.AppEventBus.HandlerPolicy.BEST_EFFORT);
+                AppEventBus.HandlerPolicy.BEST_EFFORT);
 
         // Should not throw
-        bus.publish(new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", true, Instant.now()));
+        UUID userId = UUID.randomUUID();
+        bus.publish(new AppEvent.ProfileSaved(userId, true, Instant.now()));
+
+        assertEquals(List.of(userId), achievementService.checkedUserIds);
+    }
+
+    private static final class CapturingAchievementService implements AchievementService {
+        private final List<UUID> checkedUserIds = new ArrayList<>();
+
+        @Override
+        public List<UserAchievement> checkAndUnlock(UUID userId) {
+            checkedUserIds.add(userId);
+            return List.of();
+        }
+
+        @Override
+        public List<UserAchievement> getUnlocked(UUID userId) {
+            return List.of();
+        }
+
+        @Override
+        public List<AchievementProgress> getProgress(UUID userId) {
+            return List.of();
+        }
+
+        @Override
+        public Map<Achievement.Category, List<AchievementProgress>> getProgressByCategory(UUID userId) {
+            return Map.of();
+        }
+
+        @Override
+        public int countUnlocked(UUID userId) {
+            return 0;
+        }
     }
 }

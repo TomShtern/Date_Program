@@ -49,6 +49,8 @@ public interface CommunicationStorage {
 
     List<Message> getMessages(String conversationId, int limit, int offset);
 
+    Optional<Message> getMessage(UUID messageId);
+
     Optional<Message> getLatestMessage(String conversationId);
 
     int countMessages(String conversationId);
@@ -82,6 +84,8 @@ public interface CommunicationStorage {
     int countMessagesNotFromSender(String conversationId, UUID senderId);
 
     int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId);
+
+    void deleteMessage(UUID messageId);
 
     void deleteMessagesByConversation(String conversationId);
 

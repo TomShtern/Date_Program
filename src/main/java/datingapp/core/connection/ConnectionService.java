@@ -31,6 +31,9 @@ public class ConnectionService {
     private static final String SENDER_NOT_FOUND = "Sender not found or inactive";
     private static final String RECIPIENT_NOT_FOUND = "Recipient not found or inactive";
     private static final String NO_ACTIVE_MATCH = "Cannot message: no active match";
+    private static final String USER_ID_REQUIRED = "userId cannot be null";
+    private static final String CONVERSATION_ID_REQUIRED = "conversationId cannot be null";
+    private static final String CONVERSATION_NOT_FOUND = "Conversation not found";
     private static final String EMPTY_MESSAGE = "Message cannot be empty";
     private static final String MESSAGE_TOO_LONG = "Message too long (max %d characters)";
     private static final String ATOMIC_TRANSITIONS_REQUIRED = "Relationship transition requires atomic storage support";
@@ -135,7 +138,7 @@ public class ConnectionService {
             return MessageLoadResult.failure("Invalid offset");
         }
         if (communicationStorage.getConversation(conversationId).isEmpty()) {
-            return MessageLoadResult.failure("Conversation not found");
+            return MessageLoadResult.failure(CONVERSATION_NOT_FOUND);
         }
         return MessageLoadResult.success(communicationStorage.getMessages(conversationId, limit, offset));
     }
@@ -241,6 +244,58 @@ public class ConnectionService {
             communicationStorage.saveConversation(newConvo);
             return newConvo;
         });
+    }
+
+    public void archiveConversation(String conversationId, UUID userId, MatchArchiveReason reason) {
+        Objects.requireNonNull(conversationId, CONVERSATION_ID_REQUIRED);
+        Objects.requireNonNull(userId, USER_ID_REQUIRED);
+        Objects.requireNonNull(reason, "reason cannot be null");
+
+        Conversation conversation = communicationStorage
+                .getConversation(conversationId)
+                .orElseThrow(() -> new IllegalArgumentException(CONVERSATION_NOT_FOUND));
+        if (!conversation.involves(userId)) {
+            throw new IllegalArgumentException("Conversation not found or unauthorized");
+        }
+        communicationStorage.archiveConversation(conversationId, userId, reason);
+    }
+
+    public void deleteConversation(UUID userId, String conversationId) {
+        Objects.requireNonNull(userId, USER_ID_REQUIRED);
+        Objects.requireNonNull(conversationId, CONVERSATION_ID_REQUIRED);
+
+        Conversation conversation = communicationStorage
+                .getConversation(conversationId)
+                .orElseThrow(() -> new IllegalArgumentException(CONVERSATION_NOT_FOUND));
+        if (!conversation.involves(userId)) {
+            throw new IllegalArgumentException("Conversation not found or unauthorized");
+        }
+        communicationStorage.deleteMessagesByConversation(conversationId);
+        communicationStorage.deleteConversation(conversationId);
+    }
+
+    public void deleteMessage(UUID userId, String conversationId, UUID messageId) {
+        Objects.requireNonNull(userId, USER_ID_REQUIRED);
+        Objects.requireNonNull(conversationId, CONVERSATION_ID_REQUIRED);
+        Objects.requireNonNull(messageId, "messageId cannot be null");
+
+        Conversation conversation = communicationStorage
+                .getConversation(conversationId)
+                .orElseThrow(() -> new IllegalArgumentException(CONVERSATION_NOT_FOUND));
+        if (!conversation.involves(userId)) {
+            throw new IllegalArgumentException("Conversation not found or unauthorized");
+        }
+
+        Message message = communicationStorage
+                .getMessage(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Message not found"));
+        if (!conversationId.equals(message.conversationId())) {
+            throw new IllegalArgumentException("Message not found in conversation");
+        }
+        if (!message.senderId().equals(userId)) {
+            throw new IllegalArgumentException("Only the sender can delete a message");
+        }
+        communicationStorage.deleteMessage(messageId);
     }
 
     public TransitionResult requestFriendZone(UUID fromUserId, UUID targetUserId) {

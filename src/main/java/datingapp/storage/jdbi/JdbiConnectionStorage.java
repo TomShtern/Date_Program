@@ -108,6 +108,11 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     }
 
     @Override
+    public Optional<Message> getMessage(UUID messageId) {
+        return messagingDao.getMessage(messageId);
+    }
+
+    @Override
     public Optional<Message> getLatestMessage(String conversationId) {
         return messagingDao.getLatestMessage(conversationId);
     }
@@ -151,6 +156,11 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     @Override
     public int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId) {
         return messagingDao.countMessagesAfterNotFrom(conversationId, after, excludeSenderId);
+    }
+
+    @Override
+    public void deleteMessage(UUID messageId) {
+        messagingDao.deleteMessage(messageId);
     }
 
     @Override
@@ -357,6 +367,13 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 @Bind("conversationId") String conversationId, @Bind("limit") int limit, @Bind("offset") int offset);
 
         @SqlQuery("""
+            SELECT id, conversation_id, sender_id, content, created_at
+            FROM messages
+            WHERE id = :messageId
+            """)
+        Optional<Message> getMessage(@Bind("messageId") UUID messageId);
+
+        @SqlQuery("""
                 SELECT id, conversation_id, sender_id, content, created_at
                 FROM messages
                 WHERE conversation_id = :conversationId
@@ -392,6 +409,9 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 @Bind("conversationId") String conversationId,
                 @Bind("after") Instant after,
                 @Bind("excludeSenderId") UUID excludeSenderId);
+
+        @SqlUpdate("DELETE FROM messages WHERE id = :messageId")
+        void deleteMessage(@Bind("messageId") UUID messageId);
 
         @SqlUpdate("DELETE FROM messages WHERE conversation_id = :conversationId")
         void deleteMessagesByConversation(@Bind("conversationId") String conversationId);

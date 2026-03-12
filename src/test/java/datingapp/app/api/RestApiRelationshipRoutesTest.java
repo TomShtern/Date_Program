@@ -218,6 +218,56 @@ class RestApiRelationshipRoutesTest {
         assertTrue(trustSafetyStorage.hasReported(userA, userB));
     }
 
+    @Test
+    @DisplayName("conversation messages require a matching acting user and reject non-participants")
+    void conversationMessagesRequireMatchingActingUser() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        UUID outsiderId = UUID.randomUUID();
+        userStorage.save(activeUser(userA, "Alice"));
+        userStorage.save(activeUser(userB, "Bob"));
+        userStorage.save(activeUser(outsiderId, "Mallory"));
+        interactionStorage.save(Match.create(userA, userB));
+
+        ConnectionModels.Conversation conversation = ConnectionModels.Conversation.create(userA, userB);
+        communicationStorage.saveConversation(conversation);
+        communicationStorage.saveMessage(ConnectionModels.Message.create(conversation.getId(), userA, "hello"));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> successResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
+                                + conversation.getId() + "/messages?userId=" + userA))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, successResponse.statusCode(), successResponse.body());
+
+        HttpResponse<String> forbiddenResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
+                                + conversation.getId() + "/messages?userId=" + outsiderId))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(403, forbiddenResponse.statusCode());
+
+        HttpResponse<String> missingIdentityResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
+                                + conversation.getId() + "/messages"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, missingIdentityResponse.statusCode());
+    }
+
     private static ServiceRegistry createServices(
             UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
         return createServices(userStorage, interactionStorage, communicationStorage, new TestStorages.TrustSafety());

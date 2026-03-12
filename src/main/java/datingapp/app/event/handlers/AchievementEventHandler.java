@@ -20,11 +20,16 @@ public final class AchievementEventHandler {
     /** Subscribes this handler to the given event bus with BEST_EFFORT policy. */
     public void register(AppEventBus eventBus) {
         eventBus.subscribe(AppEvent.SwipeRecorded.class, this::onSwipeRecorded, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(AppEvent.ProfileSaved.class, this::onProfileSaved, AppEventBus.HandlerPolicy.BEST_EFFORT);
     }
 
     void onSwipeRecorded(AppEvent.SwipeRecorded event) {
         if (event.resultedInMatch()) {
             achievementService.checkAndUnlock(event.swiperId());
         }
+    }
+
+    void onProfileSaved(AppEvent.ProfileSaved event) {
+        achievementService.checkAndUnlock(event.userId());
     }
 }

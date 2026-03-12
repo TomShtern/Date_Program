@@ -25,6 +25,8 @@ public final class NotificationEventHandler {
                 AppEvent.RelationshipTransitioned.class,
                 this::onRelationshipTransitioned,
                 AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(AppEvent.MatchCreated.class, this::onMatchCreated, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(AppEvent.MessageSent.class, this::onMessageSent, AppEventBus.HandlerPolicy.BEST_EFFORT);
     }
 
     void onRelationshipTransitioned(AppEvent.RelationshipTransitioned event) {
@@ -51,5 +53,35 @@ public final class NotificationEventHandler {
                 // No notification needed for other transitions
             }
         }
+    }
+
+    void onMatchCreated(AppEvent.MatchCreated event) {
+        saveNotification(Notification.create(
+                event.userA(),
+                Notification.Type.MATCH_FOUND,
+                "New Match!",
+                "You have a new match!",
+                Map.of("matchId", event.matchId(), "otherUserId", event.userB().toString())));
+        saveNotification(Notification.create(
+                event.userB(),
+                Notification.Type.MATCH_FOUND,
+                "New Match!",
+                "You have a new match!",
+                Map.of("matchId", event.matchId(), "otherUserId", event.userA().toString())));
+    }
+
+    void onMessageSent(AppEvent.MessageSent event) {
+        saveNotification(Notification.create(
+                event.recipientId(),
+                Notification.Type.NEW_MESSAGE,
+                "New Message",
+                "Someone sent you a new message.",
+                Map.of(
+                        "senderId", event.senderId().toString(),
+                        "messageId", event.messageId().toString())));
+    }
+
+    private void saveNotification(Notification notification) {
+        communicationStorage.saveNotification(notification);
     }
 }

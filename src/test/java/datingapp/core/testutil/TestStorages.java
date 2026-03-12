@@ -605,6 +605,14 @@ public final class TestStorages {
         }
 
         @Override
+        public Optional<Message> getMessage(UUID messageId) {
+            return messagesByConversation.values().stream()
+                    .flatMap(List::stream)
+                    .filter(message -> message.id().equals(messageId))
+                    .findFirst();
+        }
+
+        @Override
         public Optional<Message> getLatestMessage(String conversationId) {
             return messagesByConversation.getOrDefault(conversationId, List.of()).stream()
                     .max(Comparator.comparing(Message::createdAt));
@@ -648,6 +656,14 @@ public final class TestStorages {
                     .filter(message -> message.createdAt().isAfter(after))
                     .filter(message -> !message.senderId().equals(excludeSenderId))
                     .count();
+        }
+
+        @Override
+        public void deleteMessage(UUID messageId) {
+            messagesByConversation
+                    .values()
+                    .forEach(messages ->
+                            messages.removeIf(message -> message.id().equals(messageId)));
         }
 
         @Override

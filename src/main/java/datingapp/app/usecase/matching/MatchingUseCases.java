@@ -365,6 +365,28 @@ public class MatchingUseCases {
         }
     }
 
+    public UseCaseResult<Void> archiveMatch(ArchiveMatchCommand command) {
+        if (command == null || command.context() == null || command.matchId() == null) {
+            return UseCaseResult.failure(UseCaseError.validation("Context and matchId are required"));
+        }
+        if (interactionStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency("InteractionStorage is not configured"));
+        }
+        Match match = interactionStorage.get(command.matchId()).orElse(null);
+        if (match == null) {
+            return UseCaseResult.failure(UseCaseError.notFound("Match not found"));
+        }
+        if (!match.involves(command.context().userId())) {
+            return UseCaseResult.failure(UseCaseError.forbidden("Match does not belong to current user"));
+        }
+        try {
+            interactionStorage.delete(command.matchId());
+            return UseCaseResult.success(null);
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to archive match: " + e.getMessage()));
+        }
+    }
+
     public static record BrowseCandidatesCommand(UserContext context, User currentUser) {}
 
     public static record BrowseCandidatesResult(
@@ -395,6 +417,8 @@ public class MatchingUseCases {
     public static record RemoveLikeCommand(UserContext context, UUID likeId) {}
 
     public static record MatchQualityQuery(UserContext context, Match match) {}
+
+    public static record ArchiveMatchCommand(UserContext context, String matchId) {}
 
     private static DailyLimitService wrapDailyLimitService(RecommendationService recommendationService) {
         if (recommendationService == null) {

@@ -10,6 +10,7 @@ import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
+import datingapp.core.model.Match.MatchArchiveReason;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -112,27 +113,32 @@ public class MessagingUseCases {
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
-            if (eventBus != null) {
-                try {
-                    eventBus.publish(new AppEvent.MessageSent(
-                            command.context().userId(),
-                            command.recipientId(),
-                            result.message().id(),
-                            AppClock.now()));
-                } catch (Exception publishEx) {
-                    if (logger.isWarnEnabled()) {
-                        logger.warn(
-                                "Event publish failed for message {} from {} to {}: {}",
-                                result.message().id(),
-                                command.context().userId(),
-                                command.recipientId(),
-                                publishEx.getMessage());
-                    }
-                }
-            }
+            publishMessageSentEvent(command, result);
             return UseCaseResult.success(result);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to send message: " + e.getMessage()));
+        }
+    }
+
+    private void publishMessageSentEvent(SendMessageCommand command, ConnectionService.SendResult result) {
+        if (eventBus == null) {
+            return;
+        }
+        try {
+            eventBus.publish(new AppEvent.MessageSent(
+                    command.context().userId(),
+                    command.recipientId(),
+                    result.message().id(),
+                    AppClock.now()));
+        } catch (Exception publishEx) {
+            if (logger.isWarnEnabled()) {
+                logger.warn(
+                        "Event publish failed for message {} from {} to {}: {}",
+                        result.message().id(),
+                        command.context().userId(),
+                        command.recipientId(),
+                        publishEx.getMessage());
+            }
         }
     }
 
@@ -160,6 +166,55 @@ public class MessagingUseCases {
         }
     }
 
+    public UseCaseResult<Void> deleteConversation(DeleteConversationCommand command) {
+        if (command == null || command.context() == null || command.conversationId() == null) {
+            return UseCaseResult.failure(UseCaseError.validation("Context and conversationId are required"));
+        }
+        try {
+            connectionService.deleteConversation(command.context().userId(), command.conversationId());
+            return UseCaseResult.success(null);
+        } catch (IllegalArgumentException e) {
+            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to delete conversation: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<Void> archiveConversation(ArchiveConversationCommand command) {
+        if (command == null
+                || command.context() == null
+                || command.conversationId() == null
+                || command.reason() == null) {
+            return UseCaseResult.failure(UseCaseError.validation("Context, conversationId and reason are required"));
+        }
+        try {
+            connectionService.archiveConversation(
+                    command.conversationId(), command.context().userId(), command.reason());
+            return UseCaseResult.success(null);
+        } catch (IllegalArgumentException e) {
+            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to archive conversation: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<Void> deleteMessage(DeleteMessageCommand command) {
+        if (command == null
+                || command.context() == null
+                || command.conversationId() == null
+                || command.messageId() == null) {
+            return UseCaseResult.failure(UseCaseError.validation("Context, conversationId and messageId are required"));
+        }
+        try {
+            connectionService.deleteMessage(command.context().userId(), command.conversationId(), command.messageId());
+            return UseCaseResult.success(null);
+        } catch (IllegalArgumentException e) {
+            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to delete message: " + e.getMessage()));
+        }
+    }
+
     public static record ListConversationsQuery(UserContext context, int limit, int offset) {}
 
     public static record ConversationListResult(List<ConversationPreview> conversations, int totalUnreadCount) {}
@@ -177,4 +232,11 @@ public class MessagingUseCases {
     public static record SendMessageCommand(UserContext context, UUID recipientId, String content) {}
 
     public static record MarkConversationReadCommand(UserContext context, String conversationId) {}
+
+    public static record DeleteConversationCommand(UserContext context, String conversationId) {}
+
+    public static record ArchiveConversationCommand(
+            UserContext context, String conversationId, MatchArchiveReason reason) {}
+
+    public static record DeleteMessageCommand(UserContext context, String conversationId, UUID messageId) {}
 }

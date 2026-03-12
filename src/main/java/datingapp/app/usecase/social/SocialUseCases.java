@@ -15,10 +15,15 @@ import datingapp.core.model.Match;
 import datingapp.core.storage.CommunicationStorage;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Social-graph and trust/safety use-cases shared by application adapters. */
 public class SocialUseCases {
 
+    private static final Logger logger = LoggerFactory.getLogger(SocialUseCases.class);
+    private static final String COMMUNICATION_STORAGE_NOT_CONFIGURED = "CommunicationStorage is not configured";
+    private static final String CONTEXT_REQUIRED = "Context is required";
     private static final String CONTEXT_AND_TARGET_REQUIRED = "Context and target user are required";
     private static final String CONNECTION_SERVICE_NOT_CONFIGURED = "ConnectionService is not configured";
 
@@ -66,6 +71,11 @@ public class SocialUseCases {
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
+            logModerationAction("block", command.context().userId(), command.targetUserId(), null);
+            if (eventBus != null) {
+                eventBus.publish(
+                        new AppEvent.UserBlocked(command.context().userId(), command.targetUserId(), AppClock.now()));
+            }
             return UseCaseResult.success(result);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to block user: " + e.getMessage()));
@@ -91,6 +101,19 @@ public class SocialUseCases {
                     command.blockUser());
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+            }
+            logModerationAction(
+                    "report",
+                    command.context().userId(),
+                    command.targetUserId(),
+                    command.reason().name());
+            if (eventBus != null) {
+                eventBus.publish(new AppEvent.UserReported(
+                        command.context().userId(),
+                        command.targetUserId(),
+                        command.reason().name(),
+                        command.blockUser(),
+                        AppClock.now()));
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {
@@ -189,7 +212,7 @@ public class SocialUseCases {
 
     public UseCaseResult<List<FriendRequest>> pendingFriendRequests(FriendRequestsQuery query) {
         if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context is required"));
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
         if (connectionService == null) {
             return UseCaseResult.failure(UseCaseError.dependency(CONNECTION_SERVICE_NOT_CONFIGURED));
@@ -239,10 +262,10 @@ public class SocialUseCases {
 
     public UseCaseResult<List<Notification>> notifications(NotificationsQuery query) {
         if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context is required"));
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
         if (communicationStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("CommunicationStorage is not configured"));
+            return UseCaseResult.failure(UseCaseError.dependency(COMMUNICATION_STORAGE_NOT_CONFIGURED));
         }
         try {
             return UseCaseResult.success(
@@ -257,15 +280,53 @@ public class SocialUseCases {
             return UseCaseResult.failure(UseCaseError.validation("Context and notificationId are required"));
         }
         if (communicationStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("CommunicationStorage is not configured"));
+            return UseCaseResult.failure(UseCaseError.dependency(COMMUNICATION_STORAGE_NOT_CONFIGURED));
         }
         try {
+            Notification notification = communicationStorage
+                    .getNotification(command.notificationId())
+                    .orElse(null);
+            if (notification == null) {
+                return UseCaseResult.failure(UseCaseError.notFound("Notification not found"));
+            }
+            if (!notification.userId().equals(command.context().userId())) {
+                return UseCaseResult.failure(UseCaseError.forbidden("Notification does not belong to current user"));
+            }
             communicationStorage.markNotificationAsRead(command.notificationId());
             return UseCaseResult.success(null);
         } catch (Exception e) {
             return UseCaseResult.failure(
                     UseCaseError.internal("Failed to mark notification as read: " + e.getMessage()));
         }
+    }
+
+    public UseCaseResult<Integer> markAllNotificationsRead(MarkAllNotificationsReadCommand command) {
+        if (command == null || command.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        if (communicationStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(COMMUNICATION_STORAGE_NOT_CONFIGURED));
+        }
+        try {
+            List<Notification> unreadNotifications = communicationStorage.getNotificationsForUser(
+                    command.context().userId(), true);
+            unreadNotifications.stream().map(Notification::id).forEach(communicationStorage::markNotificationAsRead);
+            return UseCaseResult.success(unreadNotifications.size());
+        } catch (Exception e) {
+            return UseCaseResult.failure(
+                    UseCaseError.internal("Failed to mark notifications as read: " + e.getMessage()));
+        }
+    }
+
+    private void logModerationAction(String action, UUID actorId, UUID targetUserId, String reason) {
+        if (!logger.isInfoEnabled()) {
+            return;
+        }
+        if (reason == null || reason.isBlank()) {
+            logger.info("Moderation action={} actorId={} targetUserId={}", action, actorId, targetUserId);
+            return;
+        }
+        logger.info("Moderation action={} actorId={} targetUserId={} reason={}", action, actorId, targetUserId, reason);
     }
 
     public static record RelationshipCommand(UserContext context, UUID targetUserId) {}
@@ -285,4 +346,6 @@ public class SocialUseCases {
     public static record NotificationsQuery(UserContext context, boolean unreadOnly) {}
 
     public static record MarkNotificationReadCommand(UserContext context, UUID notificationId) {}
+
+    public static record MarkAllNotificationsReadCommand(UserContext context) {}
 }

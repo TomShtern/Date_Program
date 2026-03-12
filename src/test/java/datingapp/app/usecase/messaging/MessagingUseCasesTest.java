@@ -6,11 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.messaging.MessagingUseCases.ArchiveConversationCommand;
+import datingapp.app.usecase.messaging.MessagingUseCases.DeleteConversationCommand;
+import datingapp.app.usecase.messaging.MessagingUseCases.DeleteMessageCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.model.Match;
+import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
@@ -24,6 +28,7 @@ class MessagingUseCasesTest {
 
     private TestStorages.Users userStorage;
     private TestStorages.Interactions interactionStorage;
+    private TestStorages.Communications communicationStorage;
     private MessagingUseCases useCases;
     private User sender;
     private User recipient;
@@ -32,7 +37,7 @@ class MessagingUseCasesTest {
     void setUp() {
         var config = AppConfig.defaults();
         userStorage = new TestStorages.Users();
-        var communicationStorage = new TestStorages.Communications();
+        communicationStorage = new TestStorages.Communications();
         interactionStorage = new TestStorages.Interactions(communicationStorage);
 
         sender = TestUserFactory.createActiveUser(UUID.randomUUID(), "Sender");
@@ -93,5 +98,55 @@ class MessagingUseCasesTest {
         assertTrue(result.success());
         assertFalse(result.data().conversations().isEmpty());
         assertEquals(1, result.data().totalUnreadCount());
+    }
+
+    @Test
+    @DisplayName("deleteMessage removes sender-owned message")
+    void deleteMessageRemovesSenderOwnedMessage() {
+        var sendResult = useCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(sender.getId()), recipient.getId(), "Delete me"));
+        assertTrue(sendResult.success());
+
+        var message = sendResult.data().message();
+        var deleteResult = useCases.deleteMessage(
+                new DeleteMessageCommand(UserContext.cli(sender.getId()), message.conversationId(), message.id()));
+
+        assertTrue(deleteResult.success());
+        assertTrue(communicationStorage.getMessage(message.id()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("archiveConversation archives the conversation for the acting user")
+    void archiveConversationArchivesConversationForActingUser() {
+        var sendResult = useCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(sender.getId()), recipient.getId(), "Archive me"));
+        assertTrue(sendResult.success());
+
+        String conversationId = sendResult.data().message().conversationId();
+        var archiveResult = useCases.archiveConversation(new ArchiveConversationCommand(
+                UserContext.cli(sender.getId()), conversationId, MatchArchiveReason.UNMATCH));
+
+        assertTrue(archiveResult.success());
+        var conversation = communicationStorage.getConversation(conversationId).orElseThrow();
+        MatchArchiveReason archiveReason = conversation.getUserA().equals(sender.getId())
+                ? conversation.getUserAArchiveReason()
+                : conversation.getUserBArchiveReason();
+        assertEquals(MatchArchiveReason.UNMATCH, archiveReason);
+    }
+
+    @Test
+    @DisplayName("deleteConversation removes conversation and messages")
+    void deleteConversationRemovesConversationAndMessages() {
+        var sendResult = useCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(sender.getId()), recipient.getId(), "Delete conversation"));
+        assertTrue(sendResult.success());
+
+        String conversationId = sendResult.data().message().conversationId();
+        var deleteResult = useCases.deleteConversation(
+                new DeleteConversationCommand(UserContext.cli(sender.getId()), conversationId));
+
+        assertTrue(deleteResult.success());
+        assertTrue(communicationStorage.getConversation(conversationId).isEmpty());
+        assertTrue(communicationStorage.getMessages(conversationId, 50, 0).isEmpty());
     }
 }

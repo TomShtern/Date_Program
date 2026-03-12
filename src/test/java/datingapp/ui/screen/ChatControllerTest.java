@@ -113,9 +113,29 @@ class ChatControllerTest {
                         .isPresent(),
                 5000));
 
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(deleteNoteButton::isDisabled);
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+
         JavaFxTestSupport.runOnFxAndWait(deleteNoteButton::fire);
 
-        assertTrue(JavaFxTestSupport.waitUntil(() -> fixture.lookupNote().isEmpty(), 5000));
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return fixture.lookupNote().isEmpty()
+                                && JavaFxTestSupport.callOnFxAndWait(profileNoteArea::getText)
+                                        .isEmpty();
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
 
         fixture.dispose();
         NavigationService.getInstance().clearHistory();

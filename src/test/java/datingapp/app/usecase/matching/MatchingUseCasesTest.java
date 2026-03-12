@@ -10,6 +10,7 @@ import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.ListActiveMatchesQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoSwipeCommand;
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchingService;
@@ -74,6 +75,29 @@ class MatchingUseCasesTest {
 
         assertTrue(result.success());
         assertFalse(result.data().candidates().isEmpty());
+    }
+
+    @Test
+    @DisplayName("browseCandidates reports location missing when seeker has no location")
+    void browseCandidatesReportsLocationMissingWhenSeekerHasNoLocation() {
+        User noLocationUser = new User(UUID.randomUUID(), "NoLocation");
+        noLocationUser.setBirthDate(AppClock.today().minusYears(27));
+        noLocationUser.setGender(User.Gender.MALE);
+        noLocationUser.setInterestedIn(Set.of(User.Gender.FEMALE));
+        noLocationUser.setAgeRange(20, 45, 18, 120);
+        noLocationUser.setMaxDistanceKm(100, AppConfig.defaults().matching().maxDistanceKm());
+        noLocationUser.addPhotoUrl("http://example.com/no-location.jpg");
+        noLocationUser.setBio("No location test user");
+        noLocationUser.setPacePreferences(currentUser.getPacePreferences());
+        noLocationUser.activate();
+        userStorage.save(noLocationUser);
+
+        var result = useCases.browseCandidates(
+                new BrowseCandidatesCommand(UserContext.cli(noLocationUser.getId()), noLocationUser));
+
+        assertTrue(result.success());
+        assertTrue(result.data().candidates().isEmpty());
+        assertTrue(result.data().locationMissing());
     }
 
     @Test

@@ -29,6 +29,7 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
@@ -443,7 +444,22 @@ public class MatchingController extends BaseController implements Initializable 
                 event.consume();
                 handleUndo();
             });
-            undoButton.disableProperty().bind(viewModel.loadingProperty());
+            undoButton
+                    .disableProperty()
+                    .bind(viewModel
+                            .loadingProperty()
+                            .or(viewModel.undoAvailableProperty().not()));
+            addSubscription(viewModel.undoCountdownSecondsProperty().subscribe(seconds -> {
+                if (undoButton.getTooltip() == null) {
+                    undoButton.setTooltip(new Tooltip());
+                }
+                int remainingSeconds = seconds.intValue();
+                if (remainingSeconds > 0) {
+                    undoButton.getTooltip().setText("Undo last action (Ctrl+Z) - " + remainingSeconds + "s remaining");
+                } else {
+                    undoButton.getTooltip().setText("Undo last action (Ctrl+Z)");
+                }
+            }));
         }
         if (cardStackContainer != null) {
             cardStackContainer.setOnMouseClicked(event -> {

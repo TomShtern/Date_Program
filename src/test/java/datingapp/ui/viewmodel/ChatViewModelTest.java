@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -265,6 +266,77 @@ class ChatViewModelTest {
         Message sentMessage = viewModel.getActiveMessages().get(0);
         assertTrue(viewModel.isMessageFromCurrentUser(sentMessage));
         assertEquals("Hey there!", sentMessage.content());
+    }
+
+    @Test
+    @DisplayName("sending property tracks in-flight message sends")
+    void sendingPropertyTracksInFlightMessageSends() throws InterruptedException {
+        CountDownLatch sendStarted = new CountDownLatch(1);
+        CountDownLatch releaseSend = new CountDownLatch(1);
+        ProfileService profileService =
+                new ProfileService(AppConfig.defaults(), analytics, interactions, trustSafety, users);
+        var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
+                users, profileService, null, null, AppConfig.defaults());
+        var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+                connectionService,
+                TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
+                        .build());
+        UiPresenceDataAccess delayedPresenceDataAccess = new UiPresenceDataAccess() {
+            @Override
+            public PresenceStatus getPresence(UUID userId) {
+                return presenceStatus.get();
+            }
+
+            @Override
+            public boolean isTyping(UUID userId) {
+                return remoteTyping.get();
+            }
+        };
+        var delayedMessagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService) {
+            @Override
+            public UseCaseResult<ConnectionService.SendResult> sendMessage(SendMessageCommand command) {
+                sendStarted.countDown();
+                try {
+                    assertTrue(releaseSend.await(5, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return UseCaseResult.failure(datingapp.app.usecase.common.UseCaseError.internal(e.getMessage()));
+                }
+                return super.sendMessage(command);
+            }
+        };
+
+        ChatViewModel delayedViewModel = new ChatViewModel(
+                delayedMessagingUseCases,
+                socialUseCases,
+                AppSession.getInstance(),
+                new datingapp.ui.async.JavaFxUiThreadDispatcher(),
+                Duration.ofMillis(75),
+                Duration.ofMillis(75),
+                new ChatViewModel.ChatUiDependencies(
+                        new UseCaseUiProfileNoteDataAccess(noteUseCases), delayedPresenceDataAccess));
+
+        try {
+            delayedViewModel.setCurrentUser(currentUser);
+            assertTrue(waitUntil(() -> !delayedViewModel.loadingProperty().get(), 5000));
+            connectionService.getOrCreateConversation(currentUser.getId(), otherUser.getId());
+            delayedViewModel.refreshConversations();
+            assertTrue(waitUntil(() -> delayedViewModel.getConversations().size() == 1, 5000));
+            delayedViewModel
+                    .selectedConversationProperty()
+                    .set(delayedViewModel.getConversations().get(0));
+
+            assertTrue(delayedViewModel.sendMessage("Delayed hello"));
+            assertTrue(sendStarted.await(5, TimeUnit.SECONDS));
+            assertTrue(waitUntil(delayedViewModel.sendingProperty()::get, 5000));
+
+            releaseSend.countDown();
+
+            assertTrue(waitUntil(() -> !delayedViewModel.sendingProperty().get(), 5000));
+            assertTrue(waitUntil(() -> delayedViewModel.getActiveMessages().size() == 1, 5000));
+        } finally {
+            delayedViewModel.dispose();
+        }
     }
 
     @Test

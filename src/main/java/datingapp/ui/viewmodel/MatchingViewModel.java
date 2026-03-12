@@ -21,8 +21,10 @@ import datingapp.core.model.Match;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
+import datingapp.ui.async.TaskHandle;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -66,6 +68,8 @@ public class MatchingViewModel extends BaseViewModel {
     private final StringProperty noteContent = new SimpleStringProperty("");
     private final StringProperty noteStatusMessage = new SimpleStringProperty();
     private final BooleanProperty noteBusy = new SimpleBooleanProperty(false);
+    private final IntegerProperty undoCountdownSeconds = new SimpleIntegerProperty(0);
+    private final BooleanProperty undoAvailable = new SimpleBooleanProperty(false);
 
     // New: Property to notify when a match occurs
     private final ObjectProperty<Match> lastMatch = new SimpleObjectProperty<>();
@@ -76,6 +80,7 @@ public class MatchingViewModel extends BaseViewModel {
     private UUID prioritizedCandidateId;
     private final AtomicBoolean swipeInProgress = new AtomicBoolean(false);
     private final AtomicInteger noteLoadToken = new AtomicInteger();
+    private TaskHandle undoCountdownHandle;
 
     public record Dependencies(
             CandidateFinder candidateFinder,
@@ -398,6 +403,7 @@ public class MatchingViewModel extends BaseViewModel {
         MatchingService.SwipeResult swipeResult = result.data();
 
         lastSwipedCandidate = candidate;
+        startUndoCountdown();
 
         // Check for a match and notify UI
         if (swipeResult.matched()) {
@@ -421,6 +427,7 @@ public class MatchingViewModel extends BaseViewModel {
             var result = matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.ui(currentUser.getId())));
 
             if (result.success()) {
+                stopUndoCountdown();
                 // Return last candidate to view
                 if (lastSwipedCandidate != null) {
                     currentCandidate.set(lastSwipedCandidate);
@@ -437,6 +444,49 @@ public class MatchingViewModel extends BaseViewModel {
                 }
             }
         }
+    }
+
+    private void startUndoCountdown() {
+        stopUndoCountdown();
+        User user = ensureCurrentUser();
+        if (user == null) {
+            return;
+        }
+
+        applyUndoCountdownState(undoService.getSecondsRemaining(user.getId()));
+        if (!undoAvailable.get()) {
+            return;
+        }
+
+        undoCountdownHandle =
+                asyncScope.runPolling("matching-undo-countdown", "poll undo countdown", Duration.ofSeconds(1), () -> {
+                    User current = ensureCurrentUser();
+                    if (current == null) {
+                        asyncScope.dispatchToUi(this::stopUndoCountdown);
+                        return;
+                    }
+                    int remaining = undoService.getSecondsRemaining(current.getId());
+                    asyncScope.dispatchToUi(() -> applyUndoCountdownState(remaining));
+                });
+    }
+
+    private void applyUndoCountdownState(int remainingSeconds) {
+        int normalizedSeconds = Math.max(0, remainingSeconds);
+        undoCountdownSeconds.set(normalizedSeconds);
+        undoAvailable.set(normalizedSeconds > 0);
+        if (normalizedSeconds == 0 && undoCountdownHandle != null) {
+            undoCountdownHandle.cancel();
+            undoCountdownHandle = null;
+        }
+    }
+
+    private void stopUndoCountdown() {
+        if (undoCountdownHandle != null) {
+            undoCountdownHandle.cancel();
+            undoCountdownHandle = null;
+        }
+        undoCountdownSeconds.set(0);
+        undoAvailable.set(false);
     }
 
     /**
@@ -621,12 +671,21 @@ public class MatchingViewModel extends BaseViewModel {
         return noteBusy;
     }
 
+    public IntegerProperty undoCountdownSecondsProperty() {
+        return undoCountdownSeconds;
+    }
+
+    public BooleanProperty undoAvailableProperty() {
+        return undoAvailable;
+    }
+
     public void clearInfoMessage() {
         infoMessage.set(null);
     }
 
     @Override
     protected void onDispose() {
+        stopUndoCountdown();
         candidateQueue.clear();
         matchedUser.set(null);
         lastMatch.set(null);

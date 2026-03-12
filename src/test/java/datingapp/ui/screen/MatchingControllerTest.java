@@ -1,5 +1,6 @@
 package datingapp.ui.screen;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -27,7 +28,9 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -149,6 +152,74 @@ class MatchingControllerTest {
         AppSession.getInstance().reset();
     }
 
+    @Test
+    @DisplayName("undo button becomes enabled and shows countdown after swipe")
+    void undoButtonBecomesEnabledAndShowsCountdownAfterSwipe() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+
+        MatchingViewModel viewModel = fixture.createViewModel();
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/matching.fxml", () -> new MatchingController(viewModel));
+        Parent root = loaded.root();
+        Button likeButton = JavaFxTestSupport.lookup(root, "#likeButton", Button.class);
+        Button undoButton = JavaFxTestSupport.lookup(root, "#undoButton", Button.class);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> viewModel.currentCandidateProperty().get() != null, 5000));
+
+        JavaFxTestSupport.runOnFxAndWait(likeButton::fire);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        Tooltip tooltip = JavaFxTestSupport.callOnFxAndWait(undoButton::getTooltip);
+                        return !JavaFxTestSupport.callOnFxAndWait(undoButton::isDisabled)
+                                && tooltip != null
+                                && tooltip.getText().contains("remaining");
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+
+        viewModel.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("empty state shows actionable location guidance when seeker has no location")
+    void emptyStateShowsLocationGuidanceWhenSeekerHasNoLocation() throws Exception {
+        Fixture fixture = new Fixture(false);
+        fixture.saveUsers();
+
+        MatchingViewModel viewModel = fixture.createViewModel();
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/matching.fxml", () -> new MatchingController(viewModel));
+        Parent root = loaded.root();
+        Label noCandidatesHeading = JavaFxTestSupport.lookup(root, "#noCandidatesHeading", Label.class);
+        Label noCandidatesBody = JavaFxTestSupport.lookup(root, "#noCandidatesBody", Label.class);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return "Location not set"
+                                        .equals(JavaFxTestSupport.callOnFxAndWait(noCandidatesHeading::getText))
+                                && JavaFxTestSupport.callOnFxAndWait(noCandidatesBody::getText)
+                                        .contains("Add your location in your profile");
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+
+        assertEquals("Location not set", JavaFxTestSupport.callOnFxAndWait(noCandidatesHeading::getText));
+        viewModel.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
     private static final class Fixture {
         private final TestStorages.Users users = new TestStorages.Users();
         private final TestStorages.Interactions interactions = new TestStorages.Interactions();
@@ -163,7 +234,13 @@ class MatchingControllerTest {
         private final User fallbackCandidate = createUser("Casey", Gender.FEMALE, EnumSet.of(Gender.MALE));
 
         private Fixture() {
-            currentUser.setLocation(40.7128, -74.0060);
+            this(true);
+        }
+
+        private Fixture(boolean withCurrentUserLocation) {
+            if (withCurrentUserLocation) {
+                currentUser.setLocation(40.7128, -74.0060);
+            }
             prioritizedCandidate.setLocation(40.7130, -74.0050);
             fallbackCandidate.setLocation(40.7140, -74.0040);
             AppSession.getInstance().setCurrentUser(currentUser);

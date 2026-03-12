@@ -79,6 +79,39 @@ class NotificationEventHandlerTest {
     }
 
     @Test
+    void matchCreatedCreatesNotificationsForBothUsers() {
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        String matchId = "match-" + UUID.randomUUID();
+
+        bus.publish(new AppEvent.MatchCreated(matchId, userA, userB, Instant.now()));
+
+        assertEquals(2, savedNotifications.size());
+        Notification first = savedNotifications.get(0);
+        Notification second = savedNotifications.get(1);
+        assertEquals(Notification.Type.MATCH_FOUND, first.type());
+        assertEquals(Notification.Type.MATCH_FOUND, second.type());
+        assertEquals(matchId, first.data().get("matchId"));
+        assertEquals(matchId, second.data().get("matchId"));
+    }
+
+    @Test
+    void messageSentCreatesNotificationForRecipient() {
+        UUID senderId = UUID.randomUUID();
+        UUID recipientId = UUID.randomUUID();
+        UUID messageId = UUID.randomUUID();
+
+        bus.publish(new AppEvent.MessageSent(senderId, recipientId, messageId, Instant.now()));
+
+        assertEquals(1, savedNotifications.size());
+        Notification notification = savedNotifications.getFirst();
+        assertEquals(recipientId, notification.userId());
+        assertEquals(Notification.Type.NEW_MESSAGE, notification.type());
+        assertEquals(senderId.toString(), notification.data().get("senderId"));
+        assertEquals(messageId.toString(), notification.data().get("messageId"));
+    }
+
+    @Test
     void handlerExceptionsDoNotPropagate() {
         bus.subscribe(
                 AppEvent.RelationshipTransitioned.class,
@@ -170,6 +203,11 @@ class NotificationEventHandlerTest {
         }
 
         @Override
+        public Optional<Message> getMessage(UUID id) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
         public Optional<Message> getLatestMessage(String id) {
             throw new UnsupportedOperationException("stub");
         }
@@ -191,6 +229,11 @@ class NotificationEventHandlerTest {
 
         @Override
         public int countMessagesAfterNotFrom(String id, Instant a, UUID s) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public void deleteMessage(UUID id) {
             throw new UnsupportedOperationException("stub");
         }
 

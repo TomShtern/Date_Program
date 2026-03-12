@@ -16,6 +16,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ResourceBundle;
 import java.util.UUID;
+import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
@@ -160,6 +161,7 @@ public class ChatController extends BaseController implements Initializable {
             updateMessageLengthIndicator(messageArea.getText());
             addSubscription(messageArea.textProperty().subscribe(this::updateMessageLengthIndicator));
         }
+        configureSendButtonState();
         if (messageLengthLabel != null) {
             messageLengthLabel.setText(Message.MAX_LENGTH + "/" + Message.MAX_LENGTH);
             messageLengthLabel.setStyle(MESSAGE_LENGTH_STYLE_NORMAL);
@@ -232,6 +234,22 @@ public class ChatController extends BaseController implements Initializable {
         }
         chatPresenceDot.setVisible(visible);
         chatPresenceDot.setManaged(visible);
+    }
+
+    private void configureSendButtonState() {
+        if (sendButton == null || messageArea == null) {
+            return;
+        }
+        sendButton
+                .disableProperty()
+                .bind(Bindings.createBooleanBinding(
+                        () -> viewModel.selectedConversationProperty().get() == null
+                                || viewModel.sendingProperty().get()
+                                || messageArea.getText() == null
+                                || messageArea.getText().isBlank(),
+                        viewModel.selectedConversationProperty(),
+                        viewModel.sendingProperty(),
+                        messageArea.textProperty()));
     }
 
     private void updateTypingIndicator(Boolean typing) {

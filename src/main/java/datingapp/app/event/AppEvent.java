@@ -13,7 +13,9 @@ public sealed interface AppEvent
                 AppEvent.ProfileSaved,
                 AppEvent.FriendRequestAccepted,
                 AppEvent.RelationshipTransitioned,
-                AppEvent.MessageSent {
+                AppEvent.MessageSent,
+                AppEvent.UserBlocked,
+                AppEvent.UserReported {
 
     Instant occurredAt();
 
@@ -32,4 +34,9 @@ public sealed interface AppEvent
             implements AppEvent {}
 
     record MessageSent(UUID senderId, UUID recipientId, UUID messageId, Instant occurredAt) implements AppEvent {}
+
+    record UserBlocked(UUID blockerId, UUID blockedUserId, Instant occurredAt) implements AppEvent {}
+
+    record UserReported(UUID reporterId, UUID reportedUserId, String reason, boolean blockedUser, Instant occurredAt)
+            implements AppEvent {}
 }
