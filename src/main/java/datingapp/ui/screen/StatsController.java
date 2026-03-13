@@ -6,6 +6,7 @@ import datingapp.ui.UiConstants;
 import datingapp.ui.viewmodel.StatsViewModel;
 import java.net.URL;
 import java.util.ResourceBundle;
+import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
@@ -49,6 +50,9 @@ public class StatsController extends BaseController implements Initializable {
 
     @FXML
     private Label loginStreakLabel;
+
+    @FXML
+    private Label achievementCountLabel;
 
     @FXML
     private GridPane statsGrid;
@@ -95,6 +99,13 @@ public class StatsController extends BaseController implements Initializable {
         }
         if (loginStreakLabel != null) {
             loginStreakLabel.textProperty().bind(viewModel.loginStreakProperty().asString());
+        }
+        if (achievementCountLabel != null) {
+            achievementCountLabel
+                    .textProperty()
+                    .bind(Bindings.createStringBinding(
+                            () -> viewModel.getAchievements().size() + " / " + viewModel.getTotalAchievementCount(),
+                            viewModel.getAchievements()));
         }
 
         // Apply fade-in animation

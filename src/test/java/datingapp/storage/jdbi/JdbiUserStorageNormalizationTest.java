@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.storage.DatabaseManager;
+import datingapp.storage.DevDataSeeder;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -168,5 +169,17 @@ class JdbiUserStorageNormalizationTest {
                 storage.getProfileNote(userId, subjectId)
                         .map(ProfileNote::content)
                         .orElseThrow());
+    }
+
+    @Test
+    @DisplayName("seeded sentinel user should have multiple randomuser portraits")
+    void seededSentinelUserHasMultipleRandomuserPortraits() {
+        DevDataSeeder.seed(storage);
+
+        UUID sentinelId = UUID.fromString("11111111-1111-1111-1111-000000000001");
+        List<String> photos = storage.loadUserPhotos(sentinelId);
+
+        assertTrue(photos.size() >= 2);
+        assertTrue(photos.stream().allMatch(url -> url.startsWith("https://randomuser.me/api/portraits/")));
     }
 }

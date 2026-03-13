@@ -1027,8 +1027,20 @@ public final class DevDataSeeder {
         user.setInterests(interests);
         user.setPacePreferences(pace);
 
-        // Deterministic avatar so the profile passes isComplete() without a real photo.
-        user.addPhotoUrl("https://api.dicebear.com/9.x/avataaars/png?seed=" + id);
+        // Assign 3 deterministic, gender-appropriate portrait photos per user.
+        // randomuser.me serves stable portraits indexed 0-99 by gender path.
+        // The index math below keeps values in the safe 5-94 range.
+        int photoBase = Math.floorMod(id.getLeastSignificantBits(), 85) + 5;
+        String portraitGender =
+                switch (gender) {
+                    case MALE -> "men";
+                    case FEMALE -> "women";
+                    case OTHER -> (Math.floorMod(id.getLeastSignificantBits(), 2) == 0) ? "men" : "women";
+                };
+        String portraitBaseUrl = "https://randomuser.me/api/portraits/" + portraitGender + "/";
+        user.addPhotoUrl(portraitBaseUrl + photoBase + ".jpg");
+        user.addPhotoUrl(portraitBaseUrl + ((photoBase + 12) % 90 + 5) + ".jpg");
+        user.addPhotoUrl(portraitBaseUrl + ((photoBase + 27) % 90 + 5) + ".jpg");
 
         // Activate immediately — will throw if any required field is still absent,
         // making bad seed entries fail loudly at startup rather than silently.

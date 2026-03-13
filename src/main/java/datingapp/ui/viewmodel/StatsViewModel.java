@@ -251,6 +251,11 @@ public class StatsViewModel {
         return achievements;
     }
 
+    /** Returns the total number of achievements defined in the system. */
+    public int getTotalAchievementCount() {
+        return Achievement.values().length;
+    }
+
     public BooleanProperty loadingProperty() {
         return loading;
     }

@@ -101,7 +101,7 @@
             <FontIcon iconLiteral="mdi2t-trophy-award" iconSize="24" iconColor="#fbbf24"/>
             <Label text="Achievements" styleClass="stats-section-header"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label styleClass="text-secondary, stat-label-secondary" text="Coming Soon"/>
+            <Label fx:id="achievementCountLabel" styleClass="text-secondary, stat-label-secondary" text="0 / 0"/>
           </HBox>
           <!-- Achievement List -->
           <ListView fx:id="achievementListView" styleClass="achievement-list-view" maxHeight="Infinity" minHeight="400"/>

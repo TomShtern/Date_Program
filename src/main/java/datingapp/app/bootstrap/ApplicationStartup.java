@@ -48,6 +48,7 @@ public final class ApplicationStartup {
 
     private static final String CONFIG_FILE = "./config/app-config.json";
     private static final String ENV_PREFIX = "DATING_APP_";
+    private static final String SEED_DATA_ENV_VAR = ENV_PREFIX + "SEED_DATA";
 
     /**
      * Pre-configured {@link ObjectMapper} for config deserialization.
@@ -92,11 +93,17 @@ public final class ApplicationStartup {
             dbManager = DatabaseManager.getInstance();
             services = StorageFactory.buildH2(dbManager, config);
 
-            // Seed the database with developer test data if the sentinel user is absent.
-            // DevDataSeeder.seed() is idempotent — it checks for the sentinel UUID before
-            // inserting, so this is a fast no-op on any non-empty database.
-            DevDataSeeder.seed(
-                    services.getUserStorage(), services.getInteractionStorage(), services.getCommunicationStorage());
+            // Seed the database with developer test data only when explicitly enabled.
+            // DevDataSeeder.seed(...) remains idempotent via sentinel checks.
+            if (isDevDataSeedingEnabled()) {
+                DevDataSeeder.seed(
+                        services.getUserStorage(),
+                        services.getInteractionStorage(),
+                        services.getCommunicationStorage());
+                logInfo("Dev data seeding enabled ({}=true)", SEED_DATA_ENV_VAR);
+            } else if (logger.isDebugEnabled()) {
+                logger.debug("Dev data seeding skipped ({} is not true)", SEED_DATA_ENV_VAR);
+            }
 
             startCleanupScheduler(services);
 
@@ -230,6 +237,10 @@ public final class ApplicationStartup {
                 logWarn("Invalid timezone in env var {}{}: {}", ENV_PREFIX, "USER_TIME_ZONE", tz);
             }
         }
+    }
+
+    private static boolean isDevDataSeedingEnabled() {
+        return "true".equalsIgnoreCase(System.getenv(SEED_DATA_ENV_VAR));
     }
 
     private static void applyEnvInt(String suffix, java.util.function.IntConsumer setter) {

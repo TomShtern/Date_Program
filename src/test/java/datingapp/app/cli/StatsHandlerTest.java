@@ -2,6 +2,10 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
@@ -140,6 +144,33 @@ class StatsHandlerTest {
             StatsHandler handler = createHandler("\n");
 
             assertDoesNotThrow(handler::viewAchievements);
+        }
+
+        @Test
+        @DisplayName("Displays unlocked count with total achievement definitions")
+        void displaysUnlockedCountWithTotalDefinitions() {
+            UserAchievement achievement = UserAchievement.create(testUser.getId(), Achievement.FIRST_SPARK);
+            analyticsStorage.saveUserAchievement(achievement);
+
+            StatsHandler handler = createHandler("\n");
+            Logger statsLogger = (Logger) org.slf4j.LoggerFactory.getLogger(StatsHandler.class);
+            Level previousLevel = statsLogger.getLevel();
+            statsLogger.setLevel(Level.INFO);
+            ListAppender<ILoggingEvent> appender = new ListAppender<>();
+            appender.start();
+            statsLogger.addAppender(appender);
+
+            try {
+                handler.viewAchievements();
+                String expected = "Unlocked: 1 / " + Achievement.values().length;
+                assertTrue(appender.list.stream()
+                        .map(ILoggingEvent::getFormattedMessage)
+                        .anyMatch(message -> message.contains(expected)));
+            } finally {
+                statsLogger.detachAppender(appender);
+                statsLogger.setLevel(previousLevel);
+                appender.stop();
+            }
         }
 
         @Test

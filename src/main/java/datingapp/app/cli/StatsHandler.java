@@ -8,6 +8,7 @@ import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
+import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.User;
@@ -100,8 +101,7 @@ public class StatsHandler implements LoggingSupport {
             if (unlocked.isEmpty()) {
                 logInfo("  No achievements yet. Keep swiping!\n");
             } else {
-                logInfo("  Unlocked: {} / ???\n", unlocked.size());
-                // I don't know total count easily without asking service for all definitions.
+                logInfo("  Unlocked: {} / {}\n", unlocked.size(), Achievement.values().length);
 
                 for (UserAchievement ua : unlocked) {
                     logInfo(

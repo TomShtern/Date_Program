@@ -79,6 +79,32 @@ class StatsViewModelTest {
         viewModel.dispose();
     }
 
+    @Test
+    @DisplayName("total achievement count matches enum length")
+    void totalAchievementCountMatchesEnumLength() {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createActiveUser("Stats User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        StatsViewModel viewModel = new StatsViewModel(
+                new SingleAchievementService(currentUser.getId()),
+                new ActivityMetricsService(interactions, trustSafety, analytics, config),
+                new ConnectionService(config, communications, interactions, users),
+                AppSession.getInstance());
+        try {
+            assertEquals(Achievement.values().length, viewModel.getTotalAchievementCount());
+        } finally {
+            viewModel.dispose();
+        }
+    }
+
     private static User createActiveUser(String name) {
         User user = new User(UUID.randomUUID(), name);
         user.setBirthDate(AppClock.today().minusYears(25));
