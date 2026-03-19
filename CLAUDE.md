@@ -1,5 +1,5 @@
 
-> 🚀 **VERIFIED & UPDATED: 2026-03-11**
+> 🚀 **VERIFIED & UPDATED: 2026-03-13**
 > This document has been programmatically verified against the codebase as of this date.
 
 <!--AGENT-DOCSYNC:ON-->
@@ -24,10 +24,10 @@ Guidance for AI coding agents working in this repository.
 - Java 25 + JavaFX 25
 - Maven
 
-## Verified Source Snapshot (2026-03-11)
+## Verified Source Snapshot (2026-03-13)
 
-- Java files: **247 total**
-- Java LOC (`tokei`): **66,698 total / 52,170 code / 9,728 blank / 4,800 comments**
+- Java files: **267 total** (`fd -e java . src/` — includes `src/main` + `src/test`)
+- Java LOC (`tokei src/`): **73,830 total / 58,653 code / 10,562 blank / 4,615 comments**
 
 ## Architecture (code-verified)
 
@@ -49,17 +49,18 @@ datingapp/
       social/SocialUseCases.java
   core/
     AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil
-    model/{User,Match,ProfileNote}
+    model/{User,Match,ProfileNote,LocationModels}
     connection/{ConnectionModels,ConnectionService}
     matching/{CandidateFinder,CompatibilityCalculator,DefaultCompatibilityCalculator,DailyLimitService,DefaultDailyLimitService,DailyPickService,DefaultDailyPickService,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,StandoutService,DefaultStandoutService,TrustSafetyService,UndoService}
     metrics/{AchievementService,ActivityMetricsService,DefaultAchievementService,EngagementDomain,SwipeState}
-    profile/{MatchPreferences,ProfileCompletionSupport,ProfileService,ValidationService}
+    profile/{MatchPreferences,ProfileCompletionSupport,ProfileService,ValidationService,LocationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
     time/{DefaultTimePolicy,TimePolicy}
     workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
   storage/
     DatabaseManager.java
     StorageFactory.java
+    DevDataSeeder.java
     jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
     schema/{MigrationRunner,SchemaInitializer}.java
   ui/
@@ -85,6 +86,10 @@ datingapp/
 | Config access              | `AppConfig.defaults()` in runtime code                         | injected `AppConfig` via `ServiceRegistry`      |
 | Achievement popup loading  | Manual `Dialog` in MatchingController for match popup          | Load `/fxml/achievement_popup.fxml` via `FXMLLoader`, add root to `NavigationService.getRootStack()`, call `popup.showAchievement(Achievement)` |
 | Session timeout scope      | Assuming `sessionTimeoutMinutes` auto-logs-out users           | Only expires **swipe/metrics sessions** in `ActivityMetricsService`; `AppSession` (login) has no auto-logout |
+| JDBI record binding        | `@BindBean ProfileNote note` in JDBI SQL objects               | `@BindMethods ProfileNote note` — `@BindBean` uses Java Beans `getX()` introspection which fails on records; `@BindMethods` works with record accessor names |
+| Date formatter locale      | `DateTimeFormatter.ofPattern("dd MMM")`                        | `DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH)` — JVM default locale renders Hebrew/other month names on non-English systems |
+| LocationService scope      | Treating all 5 listed countries as available                   | Only Israel (`IL`) is production-ready; US/GB/CA/AU listed as coming soon — `country.available()` returns false for them; reverse-lookup only works for Israeli coordinates |
+| RestApiServer binding      | Assuming server binds to all interfaces (0.0.0.0)             | Server binds **loopback only** (`127.0.0.1`) — not accessible from external hosts by design |
 
 ## Entrypoints and wiring
 
@@ -116,6 +121,8 @@ nav.initialize(primaryStage);
 Callers (CLI handlers, REST API, ViewModels) should obtain use cases from the registry — never construct them directly.
 
 `RestApiServer` delegates most write operations through the use-case layer. However, 5 endpoints currently call core services directly and bypass the use-case layer: `GET /api/users`, `GET /api/users/{id}`, `GET /api/users/{id}/candidates`, `GET /api/users/{id}/matches`, and `GET /api/conversations/{id}/messages`. Prefer routing new endpoints through the use-case layer.
+
+`ProfileUseCases` now exposes: `updateProfile(UpdateProfileCommand)`, `getAchievements(AchievementsQuery)` → `AchievementSnapshot`, `getOrComputeStats(StatsQuery)` → `UserStats`. Use these instead of calling `AchievementService` or `ActivityMetricsService` directly from UI code.
 
 `AppEventBus` / `InProcessAppEventBus` provides in-process domain event dispatching. Event handlers live in `app/event/handlers/` and handle cross-cutting concerns (achievements, metrics, notifications).
 
@@ -166,6 +173,38 @@ mvn spotless:apply verify
 - Construct use-case classes directly — obtain them from `ServiceRegistry`
 - Use `AppConfig.defaults()` in runtime service code — inject via `ServiceRegistry`
 
+## Recent Updates (2026-03-13)
+
+### Location Feature (`core/model/LocationModels`, `core/profile/LocationService`)
+- **New domain model**: `LocationModels` record types — `Country`, `City`, `ZipRange`, `ResolvedLocation` (with `Precision` enum: CITY/ZIP). Static `formatCoordinates()` utility.
+- **New service**: `LocationService` wired via `ServiceRegistry.getLocationService()`. Provides city/ZIP lookup, reverse-lookup, and country listing.
+- **Israel-first**: 5 countries listed (IL, US, GB, CA, AU) but only IL is `available=true`. Reverse-lookup only supported for Israeli coordinates. Check `country.available()` before offering to users.
+- **No DB persistence**: Location data is in-memory (hardcoded lists). Not stored in schema.
+
+### REST API Expansion (`app/api/RestApiServer`)
+- Now **33 endpoints** (was ~15). Route groups: health, users, matching, social, messaging, profile-notes.
+- **Localhost-only**: Binds to `InetAddress.getLoopbackAddress()` (127.0.0.1). Not reachable from external hosts.
+- **Rate limiting**: `LocalRateLimiter` — 240 requests/minute per IP, applied via `beforeMatched()` guard.
+- **New endpoints**: `PUT /api/users/{id}/profile`, `GET /api/users/{id}/stats`, `GET /api/users/{id}/achievements`, notifications CRUD, friend-request flows, conversation archive/delete, message delete.
+- 5 read endpoints still bypass the use-case layer (unchanged, see Use-Case Layer section).
+
+### Dev Data Seeder (`storage/DevDataSeeder`)
+- Seeds 30 stable-UUID users (10 M/F/Other) + sample matches + conversation.
+- **Environment-gated**: only runs when `DATING_APP_SEED_DATA=true` env var is set (checked via `ApplicationStartup.isDevDataSeedingEnabled()`).
+- **Idempotent**: sentinel UUID check (`11111111-1111-1111-1111-000000000001`) prevents duplicate inserts. Safe to call on every startup.
+
+### ProfileUseCases Additions
+- `updateProfile(UpdateProfileCommand)` — updates profile fields via use-case layer.
+- `getAchievements(AchievementsQuery)` → `AchievementSnapshot` — preferred over calling `AchievementService` directly.
+- `getOrComputeStats(StatsQuery)` → `UserStats` — preferred over calling `ActivityMetricsService` directly.
+
+### Chat UI Phase 2 Fixes (commits `a99771b`, `31396c9`)
+- **CRITICAL**: `@BindBean` on Java records fails in JDBI — replaced with `@BindMethods` for `ProfileNote` binding. Every record-typed JDBI parameter needs `@BindMethods`.
+- **Locale fix**: `DateTimeFormatter` now uses `Locale.ENGLISH` explicitly — system Hebrew locale was rendering Hebrew month names.
+- **Note status**: Raw exception text no longer propagated to UI; sanitized to short user-facing strings.
+- **Chat stability**: `listConversations` failures no longer clear `selectedConversation` (was causing "send message exits chat" regression).
+- **`markAsRead` is best-effort**: failures are logged, do not fail message loading.
+
 ## Agent Changelog (append-only)
 ---AGENT-LOG-START---
 # Format: SEQ|TS|agent|scope|summary|files
@@ -191,4 +230,5 @@ mvn spotless:apply verify
 28|2026-03-01 03:20:00|agent:github_copilot|scope:docs-metrics-refresh|Updated LOC snapshot values to current tokei output|CLAUDE.md
 29|2026-03-07 00:00:00|agent:claude_code|scope:source-truth-sync|Added event handlers subpackage, InterestMatcher, use-case wiring docs, config access gotcha, updated LOC|CLAUDE.md
 30|2026-03-11 00:00:00|agent:claude_code|scope:architecture-corrections|Removed non-existent PerformanceMonitor and CompatibilityScoring; fixed popup package (MatchPopupController removed, MilestonePopupController moved to screen); added SafetyController and NotesController to screen list; added MatchingCliPresenter to cli list; added Default* matching impls, AchievementService, ProfileCompletionSupport; corrected false RestApiServer claim; added 2 new gotchas (AchievementType enum split, sessionTimeout scope)|CLAUDE.md
+31|2026-03-13 00:00:00|agent:claude_code|scope:code-verified-sync|Updated snapshot (267 files, 73830 LOC via tokei/fd); added LocationModels+LocationService to arch; added DevDataSeeder to storage; added 4 new gotchas (@BindMethods, Locale.ENGLISH, LocationService scope, RestApiServer localhost-only); documented 33 REST endpoints, rate limiter, localhost bind; added ProfileUseCases new commands; added Recent Updates section|CLAUDE.md
 ---AGENT-LOG-END---

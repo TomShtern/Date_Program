@@ -1,6 +1,9 @@
 # Dating App - Complete Project Structure Guide
 
 > **Purpose**: This document provides a comprehensive overview of every source file in the Dating App codebase. For each file, you'll find what it is, what it does, how it works, why it exists, and why it's in its own file.
+>
+> ⚠️ **Deprecated as current-state guide (2026-03-01):** this document contains legacy package/file references (for example `ui/controller`, old storage/interface names, and outdated class maps).
+> Use `architecture.md`, `AGENTS.md`, and direct source tree inspection for current structure.
 
 ---
 

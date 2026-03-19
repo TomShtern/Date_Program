@@ -1,5 +1,8 @@
 # MED-03 Implementation Verification
 
+> ⚠️ **Superseded verification note (2026-03-01):** this file references legacy paths/classes from an older structure and is retained as historical implementation notes only.
+> Do not use this document as a current source map.
+
 ## Changes Made
 
 ### 1. BlockStorage Interface (UserInteractions.java)
