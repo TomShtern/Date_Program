@@ -721,6 +721,7 @@ public class ChatController extends BaseController implements Initializable {
     private void handleSendSuccess() {
         if (messageArea != null) {
             messageArea.clear();
+            updateMessageLengthIndicator(messageArea.getText());
         }
         shouldAutoScrollToBottom = true;
         scrollToLatestMessage();

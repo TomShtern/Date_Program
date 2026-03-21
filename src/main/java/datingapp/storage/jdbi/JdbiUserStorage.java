@@ -1,5 +1,6 @@
 package datingapp.storage.jdbi;
 
+import datingapp.core.AppClock;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
@@ -184,7 +185,7 @@ public final class JdbiUserStorage implements UserStorage {
 
     @Override
     public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
-        return dao.deleteProfileNote(authorId, subjectId);
+        return dao.deleteProfileNoteInternal(authorId, subjectId, AppClock.now()) > 0;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -490,36 +491,34 @@ public final class JdbiUserStorage implements UserStorage {
         int purgeDeletedBefore(@Bind("threshold") Instant threshold);
 
         @SqlUpdate("""
-                MERGE INTO profile_notes (author_id, subject_id, content, created_at, updated_at)
+                MERGE INTO profile_notes (author_id, subject_id, content, created_at, updated_at, deleted_at)
                 KEY (author_id, subject_id)
-                VALUES (:authorId, :subjectId, :content, :createdAt, :updatedAt)
+                VALUES (:authorId, :subjectId, :content, :createdAt, :updatedAt, NULL)
                 """)
         void saveProfileNote(@BindMethods ProfileNote note);
 
         @SqlQuery("""
                 SELECT author_id, subject_id, content, created_at, updated_at
                 FROM profile_notes
-                WHERE author_id = :authorId AND subject_id = :subjectId
+                WHERE author_id = :authorId AND subject_id = :subjectId AND deleted_at IS NULL
                 """)
         Optional<ProfileNote> getProfileNote(@Bind("authorId") UUID authorId, @Bind("subjectId") UUID subjectId);
 
         @SqlQuery("""
                 SELECT author_id, subject_id, content, created_at, updated_at
                 FROM profile_notes
-                WHERE author_id = :authorId
+                WHERE author_id = :authorId AND deleted_at IS NULL
                 ORDER BY updated_at DESC
                 """)
         List<ProfileNote> getProfileNotesByAuthor(@Bind("authorId") UUID authorId);
 
         @SqlUpdate("""
-                DELETE FROM profile_notes
-                WHERE author_id = :authorId AND subject_id = :subjectId
+                UPDATE profile_notes
+                SET deleted_at = :now
+                WHERE author_id = :authorId AND subject_id = :subjectId AND deleted_at IS NULL
                 """)
-        int deleteProfileNoteInternal(@Bind("authorId") UUID authorId, @Bind("subjectId") UUID subjectId);
-
-        default boolean deleteProfileNote(UUID authorId, UUID subjectId) {
-            return deleteProfileNoteInternal(authorId, subjectId) > 0;
-        }
+        int deleteProfileNoteInternal(
+                @Bind("authorId") UUID authorId, @Bind("subjectId") UUID subjectId, @Bind("now") Instant now);
     }
 
     /** Row mapper for User entity. */

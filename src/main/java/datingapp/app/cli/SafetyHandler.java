@@ -163,6 +163,7 @@ public class SafetyHandler implements LoggingSupport {
             }
             return reasons[reasonIdx];
         } catch (NumberFormatException _) {
+            logger.warn("Invalid report reason input: {}", reasonInput);
             logInfo("❌ Invalid input.\n");
             return null;
         }
@@ -269,6 +270,7 @@ public class SafetyHandler implements LoggingSupport {
             }
             return users.get(idx);
         } catch (NumberFormatException _) {
+            logger.warn("Invalid safety handler selection input: {}", input);
             logInfo(CliTextAndInput.INVALID_INPUT);
             return null;
         }

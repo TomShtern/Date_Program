@@ -17,6 +17,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.async.UiThreadDispatcher;
 import java.util.EnumSet;
 import java.util.UUID;
@@ -143,7 +144,10 @@ class SafetyViewModelTest {
                 new ProfileService(config, analytics, interactions, trustSafetyStorage, users),
                 new ValidationService(config),
                 new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config),
-                config);
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                null);
 
         viewModel = new SafetyViewModel(trustSafetyService, profileUseCases, AppSession.getInstance(), TEST_DISPATCHER);
         viewModel.initialize();
@@ -182,7 +186,10 @@ class SafetyViewModelTest {
                 new ProfileService(config, analytics, interactions, trustSafetyStorage, users),
                 new ValidationService(config),
                 new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config),
-                config);
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                null);
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactions, users, config, new TestStorages.Communications())
                 .build();

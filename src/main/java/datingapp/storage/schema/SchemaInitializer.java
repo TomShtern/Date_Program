@@ -142,6 +142,7 @@ public final class SchemaInitializer {
                     user_a UUID NOT NULL,
                     user_b UUID NOT NULL,
                     created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL,
                     state VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
                     ended_at TIMESTAMP,
                     ended_by UUID,
@@ -378,6 +379,7 @@ public final class SchemaInitializer {
                     content VARCHAR(500) NOT NULL,
                     created_at TIMESTAMP NOT NULL,
                     updated_at TIMESTAMP NOT NULL,
+                    deleted_at TIMESTAMP,
                     PRIMARY KEY (author_id, subject_id),
                     FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (subject_id) REFERENCES users(id) ON DELETE CASCADE

@@ -15,7 +15,7 @@ class AppConfigValidatorTest {
     void validateMatchingRejectsInvalidWeightSum() {
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateMatching(10, 2, 10, 100, 3.0, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 1, 50));
+                () -> AppConfigValidator.validateMatching(10, 2, 10, 100, 3.0, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 1));
         org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("sum to 1.0"));
     }
 
@@ -25,7 +25,39 @@ class AppConfigValidatorTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> AppConfigValidator.validateValidation(
-                        40, 20, 100, 220, 500, 500, 50, 2, 1, 10, 6, 50, 15, 5, 10));
+                        40, 20, 100, 220, 500, 500, 50, 2, 1, 50, 10, 6, 50, 15, 5, 10));
+    }
+
+    @Test
+    @DisplayName("validateValidation rejects minDistanceKm greater than maxDistanceKm")
+    void validateValidationRejectsInvalidDistanceOrdering() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateValidation(
+                        18, 50, 100, 220, 500, 500, 50, 2, 100, 50, 10, 6, 50, 15, 5, 10));
+    }
+
+    @Test
+    @DisplayName("validateValidation accepts valid distance ordering")
+    void validateValidationAcceptsValidDistanceOrdering() {
+        assertDoesNotThrow(() ->
+                AppConfigValidator.validateValidation(18, 50, 100, 220, 500, 500, 50, 2, 1, 500, 10, 6, 50, 15, 5, 10));
+    }
+
+    @Test
+    @DisplayName("validateAlgorithm rejects nearbyDistanceKm greater than closeDistanceKm")
+    void validateAlgorithmRejectsInvalidDistanceOrdering() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateAlgorithm(
+                        100, 50, 2, 5, 50, 1, 24, 72, 168, 720, 0.20, 0.15, 0.25, 0.20, 0.10, 0.10));
+    }
+
+    @Test
+    @DisplayName("validateAlgorithm accepts valid distance ordering")
+    void validateAlgorithmAcceptsValidDistanceOrdering() {
+        assertDoesNotThrow(() -> AppConfigValidator.validateAlgorithm(
+                5, 10, 2, 5, 50, 1, 24, 72, 168, 720, 0.20, 0.15, 0.25, 0.20, 0.10, 0.10));
     }
 
     @Test

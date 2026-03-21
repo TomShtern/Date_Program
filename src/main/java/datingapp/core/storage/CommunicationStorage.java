@@ -41,6 +41,23 @@ public interface CommunicationStorage {
 
     void setConversationVisibility(String conversationId, UUID userId, boolean visible);
 
+    /**
+     * Soft-deletes a conversation by setting its {@code deleted_at} timestamp.
+     *
+     * <p>
+     * The conversation record remains in the database but is logically hidden from
+     * queries. After soft deletion, the conversation will not appear in
+     * {@link #getConversation}, {@link #getConversationsFor}, or
+     * {@link #getAllConversationsFor} results. Update and visibility operations on
+     * soft-deleted conversations are prevented (WHERE clauses include
+     * {@code deleted_at IS NULL}).
+     *
+     * <p>
+     * Calling this method on an already soft-deleted conversation is a no-op
+     * (protected by {@code AND deleted_at IS NULL} in the WHERE clause).
+     *
+     * @param conversationId the conversation to soft-delete
+     */
     void deleteConversation(String conversationId);
 
     // ═══ Message Operations ═══

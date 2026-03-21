@@ -261,8 +261,8 @@ class MatchStateTest {
             Instant createdAt = AppClock.now().minusSeconds(3600);
             Instant endedAt = AppClock.now();
 
-            Match match =
-                    new Match(id, a, b, createdAt, MatchState.UNMATCHED, endedAt, a, MatchArchiveReason.UNMATCH, null);
+            Match match = new Match(
+                    id, a, b, createdAt, endedAt, MatchState.UNMATCHED, endedAt, a, MatchArchiveReason.UNMATCH, null);
 
             assertEquals(id, match.getId());
             assertEquals(a, match.getUserA());
@@ -284,7 +284,7 @@ class MatchStateTest {
             Instant now = AppClock.now();
             IllegalArgumentException ex = assertThrows(
                     IllegalArgumentException.class,
-                    () -> new Match(id, a, b, now, MatchState.ACTIVE, null, null, null, null),
+                    () -> new Match(id, a, b, now, now, MatchState.ACTIVE, null, null, null, null),
                     "Should throw when userA is not lexicographically smaller");
             assertNotNull(ex);
         }

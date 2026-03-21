@@ -488,7 +488,7 @@ public class DashboardController extends BaseController
     private void showAchievementPopups(StackPane rootStack, List<Achievement> achievements) {
         for (int i = 0; i < achievements.size(); i++) {
             Achievement achievement = achievements.get(i);
-            PauseTransition stagger = new PauseTransition(Duration.millis(i * 600L));
+            PauseTransition stagger = new PauseTransition(Duration.millis(i * 600.0));
             stagger.setOnFinished(e -> showSingleAchievementPopup(rootStack, achievement));
             stagger.play();
         }
@@ -504,6 +504,7 @@ public class DashboardController extends BaseController
         } catch (IOException e) {
             logger.error( // NOPMD GuardLogStatement
                     "Failed to load achievement popup for {}", achievement.getDisplayName(), e);
+            UiFeedbackService.showWarning("We couldn\'t show an achievement popup, but your progress was saved.");
         }
     }
 }

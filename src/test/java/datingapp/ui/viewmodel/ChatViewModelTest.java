@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -81,13 +82,22 @@ class ChatViewModelTest {
         TestClock.setFixed(FIXED_INSTANT);
 
         AppConfig config = AppConfig.defaults();
+        var eventBus = new InProcessAppEventBus();
 
         connectionService = new ConnectionService(config, communications, interactions, users);
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(trustSafety, interactions, users, config)
                 .build();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
-        var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(users, profileService, null, null, config);
-        var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService);
+        var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
+                users,
+                profileService,
+                null,
+                null,
+                null,
+                config,
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                eventBus);
+        var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService, eventBus);
         var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, trustSafetyService);
         UiPresenceDataAccess presenceDataAccess = new UiPresenceDataAccess() {
             @Override
@@ -275,10 +285,18 @@ class ChatViewModelTest {
     void sendingPropertyTracksInFlightMessageSends() throws InterruptedException {
         CountDownLatch sendStarted = new CountDownLatch(1);
         CountDownLatch releaseSend = new CountDownLatch(1);
+        var eventBus = new InProcessAppEventBus();
         ProfileService profileService =
                 new ProfileService(AppConfig.defaults(), analytics, interactions, trustSafety, users);
         var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
-                users, profileService, null, null, AppConfig.defaults());
+                users,
+                profileService,
+                null,
+                null,
+                null,
+                AppConfig.defaults(),
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                eventBus);
         var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
@@ -294,19 +312,21 @@ class ChatViewModelTest {
                 return remoteTyping.get();
             }
         };
-        var delayedMessagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService) {
-            @Override
-            public UseCaseResult<ConnectionService.SendResult> sendMessage(SendMessageCommand command) {
-                sendStarted.countDown();
-                try {
-                    assertTrue(releaseSend.await(5, TimeUnit.SECONDS));
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return UseCaseResult.failure(datingapp.app.usecase.common.UseCaseError.internal(e.getMessage()));
-                }
-                return super.sendMessage(command);
-            }
-        };
+        var delayedMessagingUseCases =
+                new datingapp.app.usecase.messaging.MessagingUseCases(connectionService, eventBus) {
+                    @Override
+                    public UseCaseResult<ConnectionService.SendResult> sendMessage(SendMessageCommand command) {
+                        sendStarted.countDown();
+                        try {
+                            assertTrue(releaseSend.await(5, TimeUnit.SECONDS));
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return UseCaseResult.failure(
+                                    datingapp.app.usecase.common.UseCaseError.internal(e.getMessage()));
+                        }
+                        return super.sendMessage(command);
+                    }
+                };
 
         ChatViewModel delayedViewModel = new ChatViewModel(
                 delayedMessagingUseCases,
@@ -488,15 +508,17 @@ class ChatViewModelTest {
     @DisplayName("refresh failure does not clear selected conversation")
     void refreshFailureDoesNotClearSelectedConversation() throws InterruptedException {
         AtomicBoolean failListConversations = new AtomicBoolean(false);
-        var flakyMessagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService) {
-            @Override
-            public UseCaseResult<ConversationListResult> listConversations(ListConversationsQuery query) {
-                if (failListConversations.get()) {
-                    throw new RuntimeException("simulated lock timeout");
-                }
-                return super.listConversations(query);
-            }
-        };
+        var eventBus = new InProcessAppEventBus();
+        var flakyMessagingUseCases =
+                new datingapp.app.usecase.messaging.MessagingUseCases(connectionService, eventBus) {
+                    @Override
+                    public UseCaseResult<ConversationListResult> listConversations(ListConversationsQuery query) {
+                        if (failListConversations.get()) {
+                            throw new RuntimeException("simulated lock timeout");
+                        }
+                        return super.listConversations(query);
+                    }
+                };
         var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
@@ -504,7 +526,14 @@ class ChatViewModelTest {
         ProfileService profileService =
                 new ProfileService(AppConfig.defaults(), analytics, interactions, trustSafety, users);
         var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
-                users, profileService, null, null, AppConfig.defaults());
+                users,
+                profileService,
+                null,
+                null,
+                null,
+                AppConfig.defaults(),
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                eventBus);
         ChatViewModel flakyViewModel = new ChatViewModel(
                 flakyMessagingUseCases,
                 socialUseCases,

@@ -25,6 +25,8 @@ import java.util.UUID;
  */
 public class User {
 
+    public static final int MAX_PHOTOS = 6;
+
     // ── Nested domain types ────────────────────────────────────────────
 
     /** Gender options available for users. */
@@ -46,6 +48,7 @@ public class User {
     }
 
     /**
+     * touch();
      * Verification method used to verify a profile.
      * NOTE: Currently simulated - email/phone not sent externally.
      */
@@ -440,22 +443,6 @@ public class User {
     }
 
     /**
-     * Calculates the user's age based on their birth date using the system default
-     * timezone.
-     * Uses system default timezone to match local date perception and avoid
-     * off-by-one issues
-     * when the birthday occurs at midnight across timezones.
-     *
-     * @deprecated Use {@link #getAge(java.time.ZoneId)} to explicitly specify timezone.
-     *             For business logic (matching, validation), always pass the configured timezone.
-     */
-    @Deprecated(since = "2026-03", forRemoval = false)
-    @SuppressWarnings("java:S1133")
-    public Optional<Integer> getAge() {
-        return getAge(java.time.ZoneId.systemDefault());
-    }
-
-    /**
      * Calculates the user's age based on their birth date using the specified
      * timezone.
      *
@@ -563,6 +550,24 @@ public class User {
     }
 
     public void setLocation(double lat, double lon) {
+        // Validate finite values
+        if (!Double.isFinite(lat)) {
+            throw new IllegalArgumentException("Latitude cannot be NaN or Infinity");
+        }
+        if (!Double.isFinite(lon)) {
+            throw new IllegalArgumentException("Longitude cannot be NaN or Infinity");
+        }
+
+        // Validate latitude bounds [-90, 90]
+        if (lat < -90.0 || lat > 90.0) {
+            throw new IllegalArgumentException("Latitude must be between -90 and 90, got " + lat);
+        }
+
+        // Validate longitude bounds [-180, 180]
+        if (lon < -180.0 || lon > 180.0) {
+            throw new IllegalArgumentException("Longitude must be between -180 and 180, got " + lon);
+        }
+
         this.lat = lat;
         this.lon = lon;
         this.hasLocationSet = true;
@@ -621,12 +626,15 @@ public class User {
 
     /** Sets photo URLs with null-safe copy. */
     public void setPhotoUrls(List<String> photoUrls) {
-        this.photoUrls = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
+        List<String> normalized = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
+        validatePhotoLimit(normalized.size());
+        this.photoUrls = normalized;
         touch();
     }
 
     /** Adds a photo URL. */
     public void addPhotoUrl(String url) {
+        validatePhotoLimit(photoUrls.size() + 1);
         photoUrls.add(url);
         touch();
     }
@@ -784,6 +792,12 @@ public class User {
         this.updatedAt = AppClock.now();
     }
 
+    private static void validatePhotoLimit(int photoCount) {
+        if (photoCount > MAX_PHOTOS) {
+            throw new IllegalArgumentException("Cannot set more than " + MAX_PHOTOS + " photos");
+        }
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -818,6 +832,7 @@ public class User {
     /** Marks this entity as soft-deleted at the given instant. */
     public void markDeleted(Instant deletedAt) {
         this.deletedAt = Objects.requireNonNull(deletedAt, "deletedAt cannot be null");
+        touch();
     }
 
     /** Returns {@code true} if this user has been soft-deleted. */

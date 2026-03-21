@@ -49,7 +49,7 @@ public class StandoutsController extends BaseController implements Initializable
         viewModel.setErrorHandler(UiFeedbackService::showError);
 
         standoutsListView.setItems(viewModel.getStandouts());
-        standoutsListView.setCellFactory(lv -> new StandoutListCell());
+        standoutsListView.setCellFactory(lv -> new StandoutListCell(this::handleViewProfileClicked));
 
         // Show status message (e.g. "No standouts today") when list is empty
         addSubscription(viewModel.statusMessageProperty().subscribe(msg -> {
@@ -59,17 +59,13 @@ public class StandoutsController extends BaseController implements Initializable
             statusLabel.setManaged(hasMessage);
         }));
 
-        // On item selection: mark interacted and navigate to matching
-        addSubscription(
-                standoutsListView.getSelectionModel().selectedItemProperty().subscribe(this::handleStandoutSelected));
-
         setupAccessibilityMetadata();
 
         viewModel.initialize();
         UiAnimations.fadeIn(rootPane, 800);
     }
 
-    private void handleStandoutSelected(StandoutEntry entry) {
+    private void handleViewProfileClicked(StandoutEntry entry) {
         if (entry == null) {
             return;
         }
@@ -86,7 +82,8 @@ public class StandoutsController extends BaseController implements Initializable
 
     private void setupAccessibilityMetadata() {
         if (standoutsListView != null) {
-            standoutsListView.setAccessibleText("Today's standout profiles");
+            standoutsListView.setAccessibleText(
+                    "Today's standout profiles. Use the View Profile button on each row to open a profile.");
         }
         if (statusLabel != null) {
             statusLabel.setAccessibleText("Standouts status message");
@@ -96,6 +93,11 @@ public class StandoutsController extends BaseController implements Initializable
     /** Cell that displays a standout entry with rank, name, score, and reason. */
     private static class StandoutListCell extends ListCell<StandoutEntry> {
 
+        @FunctionalInterface
+        private interface OnViewProfileClicked {
+            void handle(StandoutEntry entry);
+        }
+
         private final HBox container = new HBox(16);
         private final Label rankLabel = new Label();
         private final VBox infoBox = new VBox(4);
@@ -104,8 +106,10 @@ public class StandoutsController extends BaseController implements Initializable
         private final Label reasonLabel = new Label();
         private final Region spacer = new Region();
         private final Button viewButton = new Button("View Profile");
+        private final OnViewProfileClicked onViewProfileClicked;
 
-        public StandoutListCell() {
+        public StandoutListCell(OnViewProfileClicked callback) {
+            this.onViewProfileClicked = callback;
             rankLabel.setStyle(
                     "-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #fbbf24; -fx-min-width: 40;");
 
@@ -151,10 +155,12 @@ public class StandoutsController extends BaseController implements Initializable
                     reasonLabel.setManaged(false);
                 }
 
-                // Button click triggers selection, which the controller handles
+                // Button click triggers explicit navigation via callback
                 viewButton.setOnAction(event -> {
                     event.consume();
-                    getListView().getSelectionModel().select(entry);
+                    if (onViewProfileClicked != null) {
+                        onViewProfileClicked.handle(entry);
+                    }
                 });
 
                 setGraphic(container);

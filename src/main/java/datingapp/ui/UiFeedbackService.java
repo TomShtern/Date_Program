@@ -1,9 +1,9 @@
 package datingapp.ui;
 
+import datingapp.core.profile.ValidationService;
 import java.net.URL;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
 import javafx.animation.PauseTransition;
@@ -200,7 +200,6 @@ public final class UiFeedbackService {
 
         private static final String ERROR_CLASS = "error";
         private static final String SUCCESS_CLASS = "success";
-        private static final Pattern EMAIL_PATTERN = Pattern.compile("^[\\w.-]++@(?:[\\w-]++\\.)++[\\w-]{2,63}$");
 
         private ValidationHelper() {
             // Utility class
@@ -231,12 +230,18 @@ public final class UiFeedbackService {
          */
         public static boolean validateEmail(TextField field, Label errorLabel) {
             String email = field.getText();
-            if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
+            if (email == null || email.isBlank()) {
                 markError(field, errorLabel, "Please enter a valid email");
                 return false;
             }
-            markSuccess(field, errorLabel);
-            return true;
+            try {
+                ValidationService.normalizeEmail(email);
+                markSuccess(field, errorLabel);
+                return true;
+            } catch (IllegalArgumentException _) {
+                markError(field, errorLabel, "Please enter a valid email");
+                return false;
+            }
         }
 
         /**

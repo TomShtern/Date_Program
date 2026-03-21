@@ -654,7 +654,7 @@ public class MatchingHandler implements LoggingSupport {
             }
             displayStandoutCandidates(standouts, users, result.totalCandidates());
             logInfo("\n[L] Like a standout  [P] Pass  [B] Back to menu");
-            String input = inputReader.readLine("\nYour choice: ").toUpperCase(Locale.ROOT);
+            String input = inputReader.readLine("\nYour choice: ").toLowerCase(Locale.ROOT);
             handleStandoutSelection(input, standouts, users, currentUser);
         });
     }
@@ -677,7 +677,7 @@ public class MatchingHandler implements LoggingSupport {
 
     private void handleStandoutSelection(
             String input, List<Standout> standouts, Map<UUID, User> users, User currentUser) {
-        if (!"L".equals(input) && !"P".equals(input)) {
+        if (!"l".equals(input) && !"p".equals(input)) {
             return;
         }
         logInfo("Enter standout number (1-{}):", standouts.size());
@@ -688,7 +688,7 @@ public class MatchingHandler implements LoggingSupport {
                 Standout selected = standouts.get(num - 1);
                 User candidate = users.get(selected.standoutUserId());
                 if (candidate != null) {
-                    processStandoutInteraction(currentUser, candidate, "L".equals(input));
+                    processStandoutInteraction(currentUser, candidate, "l".equals(input));
                 }
             } else {
                 logInfo("Invalid number.\n");

@@ -8,6 +8,7 @@ import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.TrustSafetyService;
@@ -108,8 +109,18 @@ class MatchesControllerTest {
                     .build();
 
             var undoService = new datingapp.core.matching.UndoService(interactions, new TestStorages.Undos(), config);
+            var matchQualityService = new MatchQualityService(users, interactions, config);
             var matchingUseCases = new datingapp.app.usecase.matching.MatchingUseCases(
-                    candidateFinder, matchingService, dailyService, undoService, interactions, users, null);
+                    candidateFinder,
+                    matchingService,
+                    datingapp.app.usecase.matching.MatchingUseCases.wrapDailyLimitService(dailyService),
+                    datingapp.app.usecase.matching.MatchingUseCases.wrapDailyPickService(dailyService),
+                    datingapp.app.usecase.matching.MatchingUseCases.wrapStandoutService(dailyService),
+                    undoService,
+                    interactions,
+                    users,
+                    matchQualityService,
+                    new datingapp.app.event.InProcessAppEventBus());
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                             trustSafetyStorage, interactions, users, config, communications)
                     .build();

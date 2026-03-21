@@ -10,6 +10,7 @@ import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.TrustSafetyService;
@@ -97,8 +98,18 @@ class MatchesViewModelTest {
                 .build();
 
         var undoService = new datingapp.core.matching.UndoService(interactions, new TestStorages.Undos(), config);
+        var matchQualityService = new MatchQualityService(users, interactions, config);
         var matchingUseCases = new datingapp.app.usecase.matching.MatchingUseCases(
-                candidateFinder, matchingService, dailyService, undoService, interactions, users, null);
+                candidateFinder,
+                matchingService,
+                datingapp.app.usecase.matching.MatchingUseCases.wrapDailyLimitService(dailyService),
+                datingapp.app.usecase.matching.MatchingUseCases.wrapDailyPickService(dailyService),
+                datingapp.app.usecase.matching.MatchingUseCases.wrapStandoutService(dailyService),
+                undoService,
+                interactions,
+                users,
+                matchQualityService,
+                new datingapp.app.event.InProcessAppEventBus());
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactions, users, config, communications)
                 .build();
@@ -153,8 +164,18 @@ class MatchesViewModelTest {
                 new datingapp.app.usecase.matching.MatchingUseCases(
                         candidateFinder,
                         matchingService,
+                        datingapp.app.usecase.matching.MatchingUseCases.wrapDailyLimitService(
+                                zeroLimitRecommendationService),
+                        datingapp.app.usecase.matching.MatchingUseCases.wrapDailyPickService(
+                                zeroLimitRecommendationService),
+                        datingapp.app.usecase.matching.MatchingUseCases.wrapStandoutService(
+                                zeroLimitRecommendationService),
                         new datingapp.core.matching.UndoService(
-                                interactions, new TestStorages.Undos(), zeroLimitConfig)),
+                                interactions, new TestStorages.Undos(), zeroLimitConfig),
+                        interactions,
+                        users,
+                        new MatchQualityService(users, interactions, zeroLimitConfig),
+                        new datingapp.app.event.InProcessAppEventBus()),
                 zeroLimitConfig,
                 AppSession.getInstance());
 

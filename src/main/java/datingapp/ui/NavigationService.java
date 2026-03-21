@@ -397,14 +397,18 @@ public final class NavigationService {
         Objects.requireNonNull(consumerView, "consumerView cannot be null");
         Objects.requireNonNull(expectedType, "expectedType cannot be null");
 
-        NavigationContextEnvelope envelope = navigationContext.getAndSet(null);
+        NavigationContextEnvelope envelope = navigationContext.get();
         if (envelope == null) {
             return Optional.empty();
         }
         if (envelope.targetView != null && envelope.targetView != consumerView) {
-            if (logger.isDebugEnabled()) {
-                logger.debug("Discarding navigation context for {} consumed by {}", envelope.targetView, consumerView);
+            if (logger.isWarnEnabled()) {
+                logger.warn(
+                        "Keeping navigation context for {} because {} tried to consume it",
+                        envelope.targetView,
+                        consumerView);
             }
+            UiFeedbackService.showWarning("Navigation data is still being prepared for a different screen.");
             return Optional.empty();
         }
         if (!expectedType.isInstance(envelope.payload)) {
@@ -417,6 +421,10 @@ public final class NavigationService {
                                 ? "null"
                                 : envelope.payload.getClass().getName());
             }
+            UiFeedbackService.showWarning("Navigation data could not be opened on this screen.");
+            return Optional.empty();
+        }
+        if (!navigationContext.compareAndSet(envelope, null)) {
             return Optional.empty();
         }
         return Optional.of(expectedType.cast(envelope.payload));

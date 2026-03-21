@@ -10,6 +10,7 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
 import javafx.scene.layout.VBox;
 
 /**
@@ -42,7 +43,17 @@ public final class UiDialogs {
 
         VBox content = new VBox(10);
         content.setStyle("-fx-padding: 20;");
-        content.getChildren().addAll(new Label("Select a reason:"), reasonBox);
+        TextArea descriptionArea = new TextArea();
+        descriptionArea.setPromptText("Description (optional)");
+        descriptionArea.setWrapText(true);
+        descriptionArea.setPrefRowCount(4);
+
+        content.getChildren()
+                .addAll(
+                        new Label("Select a reason:"),
+                        reasonBox,
+                        new Label("Description (optional):"),
+                        descriptionArea);
         dialog.getDialogPane().setContent(content);
 
         ButtonType reportBtn = new ButtonType("Report", ButtonBar.ButtonData.OK_DONE);
@@ -50,12 +61,22 @@ public final class UiDialogs {
         dialog.getDialogPane().getButtonTypes().addAll(reportBtn, cancelBtn);
 
         dialog.setResultConverter(bt -> reportBtn.equals(bt) ? reasonBox.getValue() : null);
-        dialog.showAndWait().ifPresent(reason -> onReport.accept(reason, null));
+        dialog.showAndWait().ifPresent(reason -> deliverReportSelection(onReport, reason, descriptionArea.getText()));
     }
 
     public static void showReportDialog(User targetUser, BiConsumer<Report.Reason, String> onReport) {
         Objects.requireNonNull(targetUser, "targetUser cannot be null");
         showReportDialog(targetUser.getName(), onReport);
+    }
+
+    static void deliverReportSelection(
+            BiConsumer<Report.Reason, String> onReport, Report.Reason reason, String description) {
+        Objects.requireNonNull(onReport, "onReport cannot be null");
+        Objects.requireNonNull(reason, "reason cannot be null");
+        String normalizedDescription = description == null ? null : description.trim();
+        onReport.accept(
+                reason,
+                normalizedDescription == null || normalizedDescription.isEmpty() ? null : normalizedDescription);
     }
 
     /**

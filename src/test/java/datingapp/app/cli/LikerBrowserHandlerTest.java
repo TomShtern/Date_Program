@@ -98,11 +98,14 @@ class LikerBrowserHandlerTest {
         MatchingUseCases matchingUseCases = new MatchingUseCases(
                 candidateFinder,
                 matchingService,
-                dailyService,
+                MatchingUseCases.wrapDailyLimitService(dailyService),
+                MatchingUseCases.wrapDailyPickService(dailyService),
+                MatchingUseCases.wrapStandoutService(dailyService),
                 undoService,
                 interactionStorage,
                 userStorage,
-                matchQualityService);
+                matchQualityService,
+                null);
         SocialUseCases socialUseCases = new SocialUseCases(connectionService, trustSafetyService, communicationStorage);
 
         MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(

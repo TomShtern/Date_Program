@@ -19,6 +19,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import java.io.StringReader;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -59,8 +60,15 @@ class StatsHandlerTest {
                 interactionStorage, trustSafetyStorage, analyticsStorage, AppConfig.defaults());
         ProfileService achievementService = new ProfileService(
                 AppConfig.defaults(), analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
-        ProfileUseCases profileUseCases =
-                new ProfileUseCases(userStorage, achievementService, null, statsService, AppConfig.defaults());
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                userStorage,
+                achievementService,
+                null,
+                statsService,
+                null,
+                AppConfig.defaults(),
+                new ProfileActivationPolicy(),
+                null);
         return new StatsHandler(profileUseCases, session, inputReader);
     }
 

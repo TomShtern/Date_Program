@@ -59,6 +59,8 @@ public final class DatabaseManager {
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(2);
         config.setConnectionTimeout(5000);
+        config.setConnectionTestQuery("SELECT 1");
+        config.setValidationTimeout(3000);
         dataSource.set(new HikariDataSource(config));
     }
 

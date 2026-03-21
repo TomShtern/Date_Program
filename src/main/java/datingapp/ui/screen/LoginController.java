@@ -557,8 +557,7 @@ public class LoginController extends BaseController implements Initializable {
                     container.setScaleY(1.0);
                 } else {
                     setText(null);
-                    @SuppressWarnings("deprecation") // UI display - system timezone appropriate
-                    int age = user.getAge().orElse(0);
+                    int age = user.getAge(java.time.ZoneId.systemDefault()).orElse(0);
                     nameLabel.setText(user.getName() + ", " + age);
 
                     StringBuilder sb = new StringBuilder(formatState(user.getState()));

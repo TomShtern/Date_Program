@@ -141,3 +141,4 @@ telemetry-id
 # Kilo Code configuration folder
 .kilocode/
 .kilocodemodes
+.github/agents/Delta-Ops-Agent.agent.md

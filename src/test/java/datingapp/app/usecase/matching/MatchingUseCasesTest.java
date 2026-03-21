@@ -64,7 +64,16 @@ class MatchingUseCasesTest {
                 .build();
 
         useCases = new MatchingUseCases(
-                candidateFinder, matchingService, null, undoService, interactionStorage, userStorage, null);
+                candidateFinder,
+                matchingService,
+                null,
+                null,
+                null,
+                undoService,
+                interactionStorage,
+                userStorage,
+                null,
+                null);
     }
 
     @Test

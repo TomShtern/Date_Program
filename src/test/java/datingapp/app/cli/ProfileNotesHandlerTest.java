@@ -11,6 +11,7 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.profile.*;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import java.io.StringReader;
 import java.time.LocalDate;
 import java.util.*;
@@ -41,7 +42,8 @@ class ProfileNotesHandlerTest {
 
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        ProfileUseCases profileUseCases = new ProfileUseCases(userStorage, null, null, null, AppConfig.defaults());
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                userStorage, null, null, null, null, AppConfig.defaults(), new ProfileActivationPolicy(), null);
         return new ProfileHandler(
                 userStorage,
                 new ValidationService(AppConfig.defaults()),

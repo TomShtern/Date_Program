@@ -13,7 +13,6 @@
 
 <BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21"
     xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.screen.StandoutsController">
-
   <top>
     <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="header-surface">
       <Button onAction="#handleBack" styleClass="button-transparent" text="← Back"/>
@@ -39,17 +38,14 @@
         </StackPane>
         <VBox spacing="2">
           <Label styleClass="subheading" text="Today&apos;s Standouts"/>
-          <Label styleClass="text-secondary" text="Top profiles curated just for you — tap to view"/>
+          <Label styleClass="text-secondary" text="Top profiles curated just for you — use the View Profile button to open a profile"/>
         </VBox>
       </HBox>
-
       <!-- Status label shown when list is empty -->
       <Label fx:id="statusLabel" styleClass="text-secondary" visible="false" managed="false"
-             style="-fx-font-size: 14px; -fx-padding: 24 0;"/>
-
+                   style="-fx-font-size: 14px; -fx-padding: 24 0;"/>
       <!-- Standouts list -->
       <ListView fx:id="standoutsListView" VBox.vgrow="ALWAYS" styleClass="transparent-scroll"/>
     </VBox>
   </center>
-
 </BorderPane>

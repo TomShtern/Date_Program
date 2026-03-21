@@ -49,6 +49,7 @@ public class Match {
     private final UUID userA;
     private final UUID userB;
     private final Instant createdAt;
+    private Instant updatedAt;
     private MatchState state;
     private Instant endedAt; // When match was ended (nullable)
     private UUID endedBy; // Who ended it (nullable)
@@ -62,6 +63,7 @@ public class Match {
             UUID userA,
             UUID userB,
             Instant createdAt,
+            Instant updatedAt,
             MatchState state,
             Instant endedAt,
             UUID endedBy,
@@ -71,6 +73,7 @@ public class Match {
         Objects.requireNonNull(userA, "userA cannot be null");
         Objects.requireNonNull(userB, "userB cannot be null");
         Objects.requireNonNull(createdAt, "createdAt cannot be null");
+        Objects.requireNonNull(updatedAt, "updatedAt cannot be null");
         Objects.requireNonNull(state, "state cannot be null");
 
         if (userA.equals(userB)) {
@@ -86,6 +89,7 @@ public class Match {
         this.userA = userA;
         this.userB = userB;
         this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
         this.state = state;
         this.endedAt = endedAt;
         this.endedBy = endedBy;
@@ -123,7 +127,8 @@ public class Match {
         }
 
         String id = userA + "_" + userB;
-        return new Match(id, userA, userB, AppClock.now(), MatchState.ACTIVE, null, null, null, null);
+        Instant now = AppClock.now();
+        return new Match(id, userA, userB, now, now, MatchState.ACTIVE, null, null, null, null);
     }
 
     /** Generates the deterministic match ID for two user UUIDs. */
@@ -157,6 +162,7 @@ public class Match {
         this.endedAt = AppClock.now();
         this.endedBy = userId;
         this.endReason = MatchArchiveReason.UNMATCH;
+        touch();
     }
 
     /** Block - ends the match due to blocking. */
@@ -169,6 +175,7 @@ public class Match {
         this.endedAt = AppClock.now();
         this.endedBy = userId;
         this.endReason = MatchArchiveReason.BLOCK;
+        touch();
     }
 
     /** transitionToFriends - transitions the match to FRIENDS state. */
@@ -183,6 +190,7 @@ public class Match {
         this.endedAt = AppClock.now();
         this.endedBy = initiatorId;
         this.endReason = MatchArchiveReason.FRIEND_ZONE;
+        touch();
     }
 
     /** Reverts match from FRIENDS back to ACTIVE. Used for compensating transactions only. */
@@ -194,6 +202,7 @@ public class Match {
         this.endedAt = null;
         this.endedBy = null;
         this.endReason = null;
+        touch();
     }
 
     /** gracefulExit - ends the match kindly. */
@@ -208,6 +217,7 @@ public class Match {
         this.endedAt = AppClock.now();
         this.endedBy = initiatorId;
         this.endReason = MatchArchiveReason.GRACEFUL_EXIT;
+        touch();
     }
 
     private boolean isInvalidTransition(MatchState from, MatchState to) {
@@ -264,6 +274,10 @@ public class Match {
         return createdAt;
     }
 
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
     public MatchState getState() {
         return state;
     }
@@ -290,6 +304,7 @@ public class Match {
     /** Marks this entity as soft-deleted at the given instant. */
     public void markDeleted(Instant deletedAt) {
         this.deletedAt = Objects.requireNonNull(deletedAt, "deletedAt cannot be null");
+        touch();
     }
 
     /** Returns {@code true} if this match has been soft-deleted. */
@@ -317,5 +332,9 @@ public class Match {
     @Override
     public String toString() {
         return "Match{id='" + id + "', state=" + state + "}";
+    }
+
+    private void touch() {
+        this.updatedAt = AppClock.now();
     }
 }

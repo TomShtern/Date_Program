@@ -52,7 +52,7 @@ class MessagingUseCasesTest {
 
         ConnectionService connectionService =
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
-        useCases = new MessagingUseCases(connectionService);
+        useCases = new MessagingUseCases(connectionService, null);
     }
 
     @Test
@@ -165,7 +165,7 @@ class MessagingUseCasesTest {
                         throw new IllegalStateException("simulated lock timeout");
                     }
                 };
-        MessagingUseCases flakyUseCases = new MessagingUseCases(flakyService);
+        MessagingUseCases flakyUseCases = new MessagingUseCases(flakyService, null);
 
         var loadResult = flakyUseCases.loadConversation(
                 new LoadConversationQuery(UserContext.cli(recipient.getId()), sender.getId(), 50, 0, true));

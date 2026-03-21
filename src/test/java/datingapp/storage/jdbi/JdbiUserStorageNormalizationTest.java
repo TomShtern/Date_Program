@@ -1,6 +1,7 @@
 package datingapp.storage.jdbi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.ProfileNote;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.Timeout;
 class JdbiUserStorageNormalizationTest {
 
     private JdbiUserStorage storage;
+    private Jdbi jdbi;
     private UUID userId;
 
     @BeforeEach
@@ -36,7 +38,7 @@ class JdbiUserStorageNormalizationTest {
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1");
         DatabaseManager dbManager = DatabaseManager.getInstance();
 
-        Jdbi jdbi = Jdbi.create(() -> {
+        jdbi = Jdbi.create(() -> {
                     try {
                         return dbManager.getConnection();
                     } catch (java.sql.SQLException e) {
@@ -181,5 +183,61 @@ class JdbiUserStorageNormalizationTest {
 
         assertTrue(photos.size() >= 2);
         assertTrue(photos.stream().allMatch(url -> url.startsWith("https://randomuser.me/api/portraits/")));
+    }
+
+    @Test
+    @DisplayName("should soft-delete profile note and hide from queries")
+    void shouldSoftDeleteProfileNote() {
+        UUID subjectId = UUID.randomUUID();
+        storage.save(new User(subjectId, "SubjectUser"));
+
+        // Save a profile note
+        ProfileNote note = ProfileNote.create(userId, subjectId, "Test note");
+        storage.saveProfileNote(note);
+
+        // Verify note is visible before delete
+        assertTrue(storage.getProfileNote(userId, subjectId).isPresent());
+        assertEquals(1, storage.getProfileNotesByAuthor(userId).size());
+
+        // Soft-delete the profile note
+        boolean deleted = storage.deleteProfileNote(userId, subjectId);
+        assertTrue(deleted, "deleteProfileNote should return true when a row was deleted");
+
+        // Verify note is no longer visible in queries (soft-deleted)
+        assertTrue(storage.getProfileNote(userId, subjectId).isEmpty());
+        assertTrue(storage.getProfileNotesByAuthor(userId).isEmpty());
+
+        Instant deletedAt = jdbi.withHandle(handle -> handle.createQuery("""
+                SELECT deleted_at
+                FROM profile_notes
+                WHERE author_id = :authorId
+                  AND subject_id = :subjectId
+                """)
+                .bind("authorId", userId)
+                .bind("subjectId", subjectId)
+                .mapTo(Instant.class)
+                .one());
+        assertNotNull(deletedAt, "profile_notes.deleted_at should be set on soft delete");
+    }
+
+    @Test
+    @DisplayName("should revive soft-deleted profile note when re-saved")
+    void shouldReviveSoftDeletedProfileNoteOnResave() {
+        UUID subjectId = UUID.randomUUID();
+        storage.save(new User(subjectId, "SubjectUser"));
+
+        // Save, delete, then re-save a profile note
+        storage.saveProfileNote(ProfileNote.create(userId, subjectId, "Original note"));
+        storage.deleteProfileNote(userId, subjectId);
+        storage.saveProfileNote(ProfileNote.create(userId, subjectId, "Revived note"));
+
+        // Verify the revived note is visible and has the new content
+        assertTrue(storage.getProfileNote(userId, subjectId).isPresent());
+        assertEquals(
+                "Revived note",
+                storage.getProfileNote(userId, subjectId)
+                        .map(ProfileNote::content)
+                        .orElseThrow());
+        assertEquals(1, storage.getProfileNotesByAuthor(userId).size());
     }
 }

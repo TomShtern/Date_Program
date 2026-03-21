@@ -17,6 +17,7 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.ChatViewModel;
@@ -204,6 +205,7 @@ class ChatControllerTest {
         TextArea messageArea = JavaFxTestSupport.lookup(root, "#messageArea", TextArea.class);
         Button sendButton = JavaFxTestSupport.lookup(root, "#sendButton", Button.class);
         Label messageLengthLabel = JavaFxTestSupport.lookup(root, "#messageLengthLabel", Label.class);
+        String initialMessageLengthStyle = JavaFxTestSupport.callOnFxAndWait(messageLengthLabel::getStyle);
 
         assertTrue(JavaFxTestSupport.waitUntil(
                 () -> {
@@ -235,6 +237,7 @@ class ChatControllerTest {
                 5000));
         assertEquals("Hello success path", fixture.latestMessageContent().orElseThrow());
         assertEquals("0/1000", JavaFxTestSupport.callOnFxAndWait(messageLengthLabel::getText));
+        assertEquals(initialMessageLengthStyle, JavaFxTestSupport.callOnFxAndWait(messageLengthLabel::getStyle));
 
         String oversized = "x".repeat(Message.MAX_LENGTH + 1);
         JavaFxTestSupport.runOnFxAndWait(() -> {
@@ -338,9 +341,9 @@ class ChatControllerTest {
 
         private Fixture() {
             ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
-            var noteUseCases =
-                    new datingapp.app.usecase.profile.ProfileUseCases(users, profileService, null, null, config);
-            var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService);
+            var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
+                    users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
+            var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService, null);
             var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, trustSafetyService);
             this.viewModel = new ChatViewModel(
                     messagingUseCases,

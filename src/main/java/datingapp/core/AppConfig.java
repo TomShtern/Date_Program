@@ -43,8 +43,7 @@ public record AppConfig(
                     lifestyleWeight,
                     paceWeight,
                     responseWeight,
-                    minSharedInterests,
-                    maxDistanceKm);
+                    minSharedInterests);
         }
     }
 
@@ -62,6 +61,7 @@ public record AppConfig(
             int maxNameLength,
             int minAgeRangeSpan,
             int minDistanceKm,
+            int maxDistanceKm,
             int maxInterests,
             int maxPhotos,
             int messageMaxPageSize,
@@ -79,6 +79,7 @@ public record AppConfig(
                     maxNameLength,
                     minAgeRangeSpan,
                     minDistanceKm,
+                    maxDistanceKm,
                     maxInterests,
                     maxPhotos,
                     messageMaxPageSize,
@@ -620,6 +621,7 @@ public record AppConfig(
                     maxNameLength,
                     minAgeRangeSpan,
                     minDistanceKm,
+                    maxDistanceKm,
                     maxInterests,
                     maxPhotos,
                     messageMaxPageSize,

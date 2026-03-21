@@ -268,7 +268,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                     archived_at_b AS user_b_archived_at, archive_reason_b AS user_b_archive_reason,
                     visible_to_user_a, visible_to_user_b
                 FROM conversations
-                WHERE id = :conversationId
+                WHERE id = :conversationId AND deleted_at IS NULL
                 """)
         Optional<Conversation> getConversation(@Bind("conversationId") String conversationId);
 
@@ -284,7 +284,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                     archived_at_b AS user_b_archived_at, archive_reason_b AS user_b_archive_reason,
                     visible_to_user_a, visible_to_user_b
                 FROM conversations
-                WHERE user_a = :userId OR user_b = :userId
+                WHERE (user_a = :userId OR user_b = :userId) AND deleted_at IS NULL
                 ORDER BY COALESCE(last_message_at, created_at) DESC
                 LIMIT :limit OFFSET :offset
                 """)
@@ -298,12 +298,13 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                     archived_at_b AS user_b_archived_at, archive_reason_b AS user_b_archive_reason,
                     visible_to_user_a, visible_to_user_b
                 FROM conversations
-                WHERE user_a = :userId OR user_b = :userId
+                WHERE (user_a = :userId OR user_b = :userId) AND deleted_at IS NULL
                 ORDER BY COALESCE(last_message_at, created_at) DESC
                 """)
         List<Conversation> getAllConversationsFor(@Bind("userId") UUID userId);
 
-        @SqlUpdate("UPDATE conversations SET last_message_at = :timestamp WHERE id = :conversationId")
+        @SqlUpdate(
+                "UPDATE conversations SET last_message_at = :timestamp WHERE id = :conversationId AND deleted_at IS NULL")
         void updateConversationLastMessageAt(
                 @Bind("conversationId") String conversationId, @Bind("timestamp") Instant timestamp);
 
@@ -311,7 +312,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 UPDATE conversations
                 SET user_a_last_read_at = CASE WHEN user_a = :userId THEN :timestamp ELSE user_a_last_read_at END,
                     user_b_last_read_at = CASE WHEN user_b = :userId THEN :timestamp ELSE user_b_last_read_at END
-                WHERE id = :conversationId AND (user_a = :userId OR user_b = :userId)
+                WHERE id = :conversationId AND (user_a = :userId OR user_b = :userId) AND deleted_at IS NULL
                 """)
         void updateConversationReadTimestamp(
                 @Bind("conversationId") String conversationId,
@@ -328,7 +329,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                     archive_reason_a = CASE WHEN user_a = :userId THEN :reason ELSE archive_reason_a END,
                     archived_at_b = CASE WHEN user_b = :userId THEN :archivedAt ELSE archived_at_b END,
                     archive_reason_b = CASE WHEN user_b = :userId THEN :reason ELSE archive_reason_b END
-                WHERE id = :conversationId AND (user_a = :userId OR user_b = :userId)
+                WHERE id = :conversationId AND (user_a = :userId OR user_b = :userId) AND deleted_at IS NULL
                 """)
         void archiveConversationInternal(
                 @Bind("conversationId") String conversationId,
@@ -340,15 +341,19 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 UPDATE conversations
                 SET visible_to_user_a = CASE WHEN user_a = :userId THEN :visible ELSE visible_to_user_a END,
                     visible_to_user_b = CASE WHEN user_b = :userId THEN :visible ELSE visible_to_user_b END
-                WHERE id = :conversationId
+                WHERE id = :conversationId AND deleted_at IS NULL
                 """)
         void setConversationVisibility(
                 @Bind("conversationId") String conversationId,
                 @Bind("userId") UUID userId,
                 @Bind("visible") boolean visible);
 
-        @SqlUpdate("DELETE FROM conversations WHERE id = :conversationId")
-        void deleteConversation(@Bind("conversationId") String conversationId);
+        default void deleteConversation(String conversationId) {
+            deleteConversationInternal(conversationId, AppClock.now());
+        }
+
+        @SqlUpdate("UPDATE conversations SET deleted_at = :now WHERE id = :conversationId AND deleted_at IS NULL")
+        void deleteConversationInternal(@Bind("conversationId") String conversationId, @Bind("now") Instant now);
 
         @SqlUpdate("""
                 INSERT INTO messages (id, conversation_id, sender_id, content, created_at)

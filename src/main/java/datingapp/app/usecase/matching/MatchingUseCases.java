@@ -50,76 +50,6 @@ public class MatchingUseCases {
         return new Builder();
     }
 
-    public MatchingUseCases(CandidateFinder candidateFinder, MatchingService matchingService, UndoService undoService) {
-        this(candidateFinder, matchingService, null, null, null, undoService, null, null, null, null);
-    }
-
-    public MatchingUseCases(
-            CandidateFinder candidateFinder,
-            MatchingService matchingService,
-            RecommendationService recommendationService,
-            UndoService undoService,
-            InteractionStorage interactionStorage,
-            UserStorage userStorage,
-            MatchQualityService matchQualityService) {
-        this(
-                candidateFinder,
-                matchingService,
-                wrapDailyLimitService(recommendationService),
-                wrapDailyPickService(recommendationService),
-                wrapStandoutService(recommendationService),
-                undoService,
-                interactionStorage,
-                userStorage,
-                matchQualityService,
-                null);
-    }
-
-    public MatchingUseCases(
-            CandidateFinder candidateFinder,
-            MatchingService matchingService,
-            RecommendationService recommendationService,
-            UndoService undoService,
-            InteractionStorage interactionStorage,
-            UserStorage userStorage,
-            MatchQualityService matchQualityService,
-            AppEventBus eventBus) {
-        this(
-                candidateFinder,
-                matchingService,
-                wrapDailyLimitService(recommendationService),
-                wrapDailyPickService(recommendationService),
-                wrapStandoutService(recommendationService),
-                undoService,
-                interactionStorage,
-                userStorage,
-                matchQualityService,
-                eventBus);
-    }
-
-    public MatchingUseCases(
-            CandidateFinder candidateFinder,
-            MatchingService matchingService,
-            DailyLimitService dailyLimitService,
-            DailyPickService dailyPickService,
-            StandoutService standoutService,
-            UndoService undoService,
-            InteractionStorage interactionStorage,
-            UserStorage userStorage,
-            MatchQualityService matchQualityService) {
-        this(
-                candidateFinder,
-                matchingService,
-                dailyLimitService,
-                dailyPickService,
-                standoutService,
-                undoService,
-                interactionStorage,
-                userStorage,
-                matchQualityService,
-                null);
-    }
-
     public MatchingUseCases(
             CandidateFinder candidateFinder,
             MatchingService matchingService,
@@ -510,7 +440,7 @@ public class MatchingUseCases {
 
     public static record ArchiveMatchCommand(UserContext context, String matchId) {}
 
-    private static DailyLimitService wrapDailyLimitService(RecommendationService recommendationService) {
+    public static DailyLimitService wrapDailyLimitService(RecommendationService recommendationService) {
         if (recommendationService == null) {
             return null;
         }
@@ -549,7 +479,7 @@ public class MatchingUseCases {
         };
     }
 
-    private static DailyPickService wrapDailyPickService(RecommendationService recommendationService) {
+    public static DailyPickService wrapDailyPickService(RecommendationService recommendationService) {
         if (recommendationService == null) {
             return null;
         }
@@ -578,7 +508,7 @@ public class MatchingUseCases {
         };
     }
 
-    private static StandoutService wrapStandoutService(RecommendationService recommendationService) {
+    public static StandoutService wrapStandoutService(RecommendationService recommendationService) {
         if (recommendationService == null) {
             return null;
         }

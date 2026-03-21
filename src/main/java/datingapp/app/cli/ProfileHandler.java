@@ -186,8 +186,7 @@ public class ProfileHandler implements LoggingSupport {
             // Card display
             logInfo(CliTextAndInput.BOX_TOP);
             String verifiedBadge = currentUser.isVerified() ? " ✅ Verified" : "";
-            @SuppressWarnings("deprecation") // CLI display - system timezone appropriate
-            int age = currentUser.getAge().orElse(0);
+            int age = currentUser.getAge(java.time.ZoneId.systemDefault()).orElse(0);
             logInfo("│ 💝 {}, {} years old{}", currentUser.getName(), age, verifiedBadge);
             logInfo("│ 📍 Location: {}", locationService.formatForDisplay(currentUser.getLat(), currentUser.getLon()));
             String bio = preview.displayBio();
@@ -282,9 +281,18 @@ public class ProfileHandler implements LoggingSupport {
      */
     private void promptBio(User currentUser) {
         String bio = inputReader.readLine("Bio (short description): ");
-        if (!bio.isBlank()) {
-            currentUser.setBio(bio);
+        if (bio.isBlank()) {
+            return;
         }
+
+        ValidationService.ValidationResult bioResult = validationService.validateBio(bio);
+        if (!bioResult.valid()) {
+            logInfo("⚠️  Invalid bio:");
+            bioResult.errors().forEach(error -> logInfo(INDENTED_BULLET, error));
+            return;
+        }
+
+        currentUser.setBio(bio.trim());
     }
 
     private void promptBirthDate(User currentUser) {
@@ -626,8 +634,21 @@ public class ProfileHandler implements LoggingSupport {
 
     private void promptPhoto(User currentUser) {
         String photoUrl = inputReader.readLine("Photo URL (or press Enter to skip): ");
-        if (!photoUrl.isBlank()) {
-            currentUser.addPhotoUrl(photoUrl);
+        if (photoUrl.isBlank()) {
+            return;
+        }
+
+        ValidationService.ValidationResult photoResult = validationService.validatePhotoUrl(photoUrl);
+        if (!photoResult.valid()) {
+            logInfo("⚠️  Invalid photo URL:");
+            photoResult.errors().forEach(error -> logInfo(INDENTED_BULLET, error));
+            return;
+        }
+
+        try {
+            currentUser.addPhotoUrl(ValidationService.normalizePhotoUrl(photoUrl));
+        } catch (IllegalArgumentException e) {
+            logInfo(WARNING_MESSAGE_FORMAT, e.getMessage());
         }
     }
 
@@ -1032,12 +1053,15 @@ public class ProfileHandler implements LoggingSupport {
         logInfo("\n--- Create New User ---\n");
 
         String name = inputReader.readLine("Enter your name: ");
-        if (name.isBlank()) {
-            logInfo("❌ Name cannot be empty.\n");
+        ValidationService.ValidationResult nameResult = validationService.validateName(name);
+        if (!nameResult.valid()) {
+            logInfo("❌ Invalid name:");
+            nameResult.errors().forEach(error -> logInfo("   • {}", error));
+            logInfo("");
             return;
         }
 
-        User user = new User(UUID.randomUUID(), name);
+        User user = new User(UUID.randomUUID(), name.trim());
         userStorage.save(user);
         session.setCurrentUser(user);
 

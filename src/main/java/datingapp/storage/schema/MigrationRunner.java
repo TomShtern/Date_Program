@@ -72,7 +72,11 @@ public final class MigrationRunner {
             new VersionedMigration(
                     3,
                     "Drop legacy serialized users-table columns after normalized profile rollout",
-                    MigrationRunner::applyV3));
+                    MigrationRunner::applyV3),
+            new VersionedMigration(
+                    4,
+                    "Add soft-delete columns: deleted_at to conversations and profile_notes tables",
+                    MigrationRunner::applyV4));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -152,6 +156,15 @@ public final class MigrationRunner {
         stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_wants_kids");
         stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_looking_for");
         stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_education");
+    }
+
+    /**
+     * V4 migration: adds soft-delete support via deleted_at column to conversations
+     * and profile_notes. Existing rows remain visible (deleted_at IS NULL).
+     */
+    private static void applyV4(Statement stmt) throws SQLException {
+        stmt.execute("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
+        stmt.execute("ALTER TABLE profile_notes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
     }
 
     // ═══════════════════════════════════════════════════════════════

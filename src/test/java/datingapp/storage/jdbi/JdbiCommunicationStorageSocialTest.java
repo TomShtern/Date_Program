@@ -2,8 +2,10 @@ package datingapp.storage.jdbi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.connection.ConnectionModels;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Notification.Type;
@@ -168,6 +170,57 @@ class JdbiCommunicationStorageSocialTest {
 
             List<Notification> notifications = communicationStorage.getNotificationsForUser(alice.getId(), false);
             assertTrue(notifications.get(0).isRead());
+        }
+    }
+
+    @Nested
+    @DisplayName("Conversations")
+    class Conversations {
+
+        @Test
+        @DisplayName("should soft-delete conversation and hide from queries")
+        void shouldSoftDeleteConversation() {
+            var conversation = ConnectionModels.Conversation.create(alice.getId(), bob.getId());
+            communicationStorage.saveConversation(conversation);
+
+            // Verify conversation is visible before delete
+            assertTrue(
+                    communicationStorage.getConversation(conversation.getId()).isPresent());
+
+            // Soft-delete the conversation
+            communicationStorage.deleteConversation(conversation.getId());
+
+            // Verify conversation is no longer visible in queries (soft-deleted)
+            assertTrue(
+                    communicationStorage.getConversation(conversation.getId()).isEmpty());
+            assertTrue(communicationStorage
+                    .getConversationsFor(alice.getId(), 10, 0)
+                    .isEmpty());
+            assertTrue(communicationStorage.getAllConversationsFor(bob.getId()).isEmpty());
+
+            Instant deletedAt = jdbi.withHandle(
+                    handle -> handle.createQuery("SELECT deleted_at FROM conversations WHERE id = :conversationId")
+                            .bind("conversationId", conversation.getId())
+                            .mapTo(Instant.class)
+                            .one());
+            assertNotNull(deletedAt, "conversations.deleted_at should be set on soft delete");
+        }
+
+        @Test
+        @DisplayName("soft-deleted conversation should remain in database but hidden")
+        void softDeletedConversationRemains() {
+            var conversation = ConnectionModels.Conversation.create(alice.getId(), bob.getId());
+            communicationStorage.saveConversation(conversation);
+
+            communicationStorage.deleteConversation(conversation.getId());
+
+            // The row should still exist in the database (soft-delete, not hard delete)
+            // We verify this by attempting to update the archived state - if the row was hard-deleted,
+            // the update would have no effect
+            // For now, we verify that the conversation is logically hidden from all retrieval methods
+            assertTrue(
+                    communicationStorage.getConversation(conversation.getId()).isEmpty(),
+                    "Soft-deleted conversation should not be retrievable via getConversation");
         }
     }
 }

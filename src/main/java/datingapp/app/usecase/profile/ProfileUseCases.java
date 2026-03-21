@@ -55,81 +55,6 @@ public class ProfileUseCases {
         return new Builder();
     }
 
-    /** Backward-compatible constructor — uses default activation policy, no event bus. */
-    @SuppressWarnings("java:S107")
-    public ProfileUseCases(
-            UserStorage userStorage,
-            ProfileService profileService,
-            ValidationService validationService,
-            ActivityMetricsService activityMetricsService,
-            AppConfig config) {
-        this(
-                userStorage,
-                profileService,
-                validationService,
-                activityMetricsService,
-                null,
-                config,
-                new ProfileActivationPolicy(),
-                null);
-    }
-
-    @SuppressWarnings("java:S107")
-    public ProfileUseCases(
-            UserStorage userStorage,
-            ProfileService profileService,
-            ValidationService validationService,
-            ActivityMetricsService activityMetricsService,
-            AchievementService achievementService,
-            AppConfig config) {
-        this(
-                userStorage,
-                profileService,
-                validationService,
-                activityMetricsService,
-                achievementService,
-                config,
-                new ProfileActivationPolicy(),
-                null);
-    }
-
-    public ProfileUseCases(
-            UserStorage userStorage,
-            ProfileService profileService,
-            ValidationService validationService,
-            ActivityMetricsService activityMetricsService,
-            AppConfig config,
-            ProfileActivationPolicy activationPolicy) {
-        this(
-                userStorage,
-                profileService,
-                validationService,
-                activityMetricsService,
-                null,
-                config,
-                activationPolicy,
-                null);
-    }
-
-    public ProfileUseCases(
-            UserStorage userStorage,
-            ProfileService profileService,
-            ValidationService validationService,
-            ActivityMetricsService activityMetricsService,
-            AchievementService achievementService,
-            AppConfig config,
-            ProfileActivationPolicy activationPolicy) {
-        this(
-                userStorage,
-                profileService,
-                validationService,
-                activityMetricsService,
-                achievementService,
-                config,
-                activationPolicy,
-                null);
-    }
-
     @SuppressWarnings("java:S107")
     public ProfileUseCases(
             UserStorage userStorage,
@@ -236,18 +161,19 @@ public class ProfileUseCases {
             return UseCaseResult.failure(UseCaseError.internal("Failed to save profile: " + e.getMessage()));
         }
 
-        List<UserAchievement> newAchievements = List.of();
         try {
-            newAchievements = unlockAchievements(user.getId());
+            List<UserAchievement> newAchievements = unlockAchievements(user.getId());
             if (eventBus != null) {
                 eventBus.publish(new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()));
             }
+            return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
         } catch (Exception e) {
             if (logger.isWarnEnabled()) {
                 logger.warn("Post-save action failed for user {}: {}", user.getId(), e.getMessage(), e);
             }
+            return UseCaseResult.failure(
+                    UseCaseError.internal("Failed to complete post-save actions: " + e.getMessage()));
         }
-        return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
     }
 
     public UseCaseResult<User> updateDiscoveryPreferences(UpdateDiscoveryPreferencesCommand command) {

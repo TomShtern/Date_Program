@@ -8,6 +8,7 @@ import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppConfig;
 import datingapp.core.model.User;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +26,8 @@ class ProfileUseCasesNotesTest {
         users.save(new User(authorId, "Author"));
         users.save(new User(subjectId, "Subject"));
 
-        ProfileUseCases useCases = new ProfileUseCases(users, null, null, null, AppConfig.defaults());
+        ProfileUseCases useCases = new ProfileUseCases(
+                users, null, null, null, null, AppConfig.defaults(), new ProfileActivationPolicy(), null);
 
         var createResult = useCases.upsertProfileNote(new ProfileUseCases.UpsertProfileNoteCommand(
                 UserContext.ui(authorId), subjectId, "Met at coffee shop"));
@@ -63,7 +65,8 @@ class ProfileUseCasesNotesTest {
         UUID authorId = UUID.randomUUID();
         users.save(new User(authorId, "Author"));
 
-        ProfileUseCases useCases = new ProfileUseCases(users, null, null, null, AppConfig.defaults());
+        ProfileUseCases useCases = new ProfileUseCases(
+                users, null, null, null, null, AppConfig.defaults(), new ProfileActivationPolicy(), null);
         var result = useCases.upsertProfileNote(
                 new ProfileUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), UUID.randomUUID(), "Hello"));
 

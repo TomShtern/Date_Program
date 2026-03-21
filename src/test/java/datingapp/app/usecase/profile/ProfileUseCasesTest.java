@@ -1,9 +1,12 @@
 package datingapp.app.usecase.profile;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.AppEvent;
+import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
@@ -12,6 +15,7 @@ import datingapp.app.usecase.profile.ProfileUseCases.UpdateDiscoveryPreferencesC
 import datingapp.app.usecase.profile.ProfileUseCases.UpsertProfileNoteCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
@@ -23,9 +27,12 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,6 +42,9 @@ class ProfileUseCasesTest {
 
     private AppConfig config;
     private TestStorages.Users userStorage;
+    private ProfileService profileService;
+    private ValidationService validationService;
+    private ActivityMetricsService metricsService;
     private ProfileUseCases useCases;
 
     @BeforeEach
@@ -45,13 +55,20 @@ class ProfileUseCasesTest {
         var analyticsStorage = new TestStorages.Analytics();
         var trustSafetyStorage = new TestStorages.TrustSafety();
 
-        var profileService =
+        profileService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
-        var validationService = new ValidationService(config);
-        var metricsService =
-                new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
+        validationService = new ValidationService(config);
+        metricsService = new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
 
-        useCases = new ProfileUseCases(userStorage, profileService, validationService, metricsService, config);
+        useCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                null);
     }
 
     @Test
@@ -93,6 +110,60 @@ class ProfileUseCasesTest {
         assertTrue(result.success());
         assertEquals("Alice", result.data().user().getName());
         assertEquals("Bio", result.data().user().getBio());
+    }
+
+    @Test
+    @DisplayName("saveProfile returns failure when achievement unlock fails")
+    void saveProfileReturnsFailureWhenAchievementUnlockFails() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Failure User");
+
+        AtomicBoolean eventPublished = new AtomicBoolean(false);
+        ProfileUseCases failingUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                throwingAchievementService("achievements down"),
+                config,
+                new ProfileActivationPolicy(),
+                recordingEventBus(eventPublished));
+
+        var result = failingUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
+
+        assertFalse(result.success());
+        assertEquals(
+                datingapp.app.usecase.common.UseCaseError.Code.INTERNAL,
+                result.error().code());
+        assertTrue(result.error().message().contains("post-save"));
+        assertTrue(userStorage.get(user.getId()).isPresent());
+        assertFalse(eventPublished.get());
+    }
+
+    @Test
+    @DisplayName("saveProfile returns failure when event publication fails")
+    void saveProfileReturnsFailureWhenEventPublicationFails() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Event Failure User");
+
+        AtomicBoolean eventPublished = new AtomicBoolean(false);
+        ProfileUseCases failingUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                noOpAchievementService(),
+                config,
+                new ProfileActivationPolicy(),
+                throwingEventBus(eventPublished));
+
+        var result = failingUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
+
+        assertFalse(result.success());
+        assertEquals(
+                datingapp.app.usecase.common.UseCaseError.Code.INTERNAL,
+                result.error().code());
+        assertTrue(result.error().message().contains("post-save"));
+        assertTrue(eventPublished.get());
+        assertTrue(userStorage.get(user.getId()).isPresent());
     }
 
     @Test
@@ -139,5 +210,112 @@ class ProfileUseCasesTest {
         assertTrue(stats.success());
         assertNotNull(achievements.data());
         assertNotNull(stats.data());
+    }
+
+    private static AchievementService noOpAchievementService() {
+        return new AchievementService() {
+            @Override
+            public List<datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement> checkAndUnlock(
+                    UUID userId) {
+                return List.of();
+            }
+
+            @Override
+            public List<datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement> getUnlocked(UUID userId) {
+                return List.of();
+            }
+
+            @Override
+            public List<AchievementService.AchievementProgress> getProgress(UUID userId) {
+                return List.of();
+            }
+
+            @Override
+            public Map<
+                            datingapp.core.metrics.EngagementDomain.Achievement.Category,
+                            List<AchievementService.AchievementProgress>>
+                    getProgressByCategory(UUID userId) {
+                return Map.of();
+            }
+
+            @Override
+            public int countUnlocked(UUID userId) {
+                return 0;
+            }
+        };
+    }
+
+    private static AchievementService throwingAchievementService(String message) {
+        return new AchievementService() {
+            @Override
+            public List<datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement> checkAndUnlock(
+                    UUID userId) {
+                throw new IllegalStateException(message);
+            }
+
+            @Override
+            public List<datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement> getUnlocked(UUID userId) {
+                return List.of();
+            }
+
+            @Override
+            public List<AchievementService.AchievementProgress> getProgress(UUID userId) {
+                return List.of();
+            }
+
+            @Override
+            public Map<
+                            datingapp.core.metrics.EngagementDomain.Achievement.Category,
+                            List<AchievementService.AchievementProgress>>
+                    getProgressByCategory(UUID userId) {
+                return Map.of();
+            }
+
+            @Override
+            public int countUnlocked(UUID userId) {
+                return 0;
+            }
+        };
+    }
+
+    private static AppEventBus recordingEventBus(AtomicBoolean published) {
+        return new AppEventBus() {
+            @Override
+            public void publish(AppEvent event) {
+                published.set(true);
+            }
+
+            @Override
+            public <T extends AppEvent> void subscribe(Class<T> eventType, AppEventHandler<T> handler) {
+                // Not needed for these tests.
+            }
+
+            @Override
+            public <T extends AppEvent> void subscribe(
+                    Class<T> eventType, AppEventHandler<T> handler, HandlerPolicy policy) {
+                // Not needed for these tests.
+            }
+        };
+    }
+
+    private static AppEventBus throwingEventBus(AtomicBoolean published) {
+        return new AppEventBus() {
+            @Override
+            public void publish(AppEvent event) {
+                published.set(true);
+                throw new IllegalStateException("event publication failed");
+            }
+
+            @Override
+            public <T extends AppEvent> void subscribe(Class<T> eventType, AppEventHandler<T> handler) {
+                // Not needed for these tests.
+            }
+
+            @Override
+            public <T extends AppEvent> void subscribe(
+                    Class<T> eventType, AppEventHandler<T> handler, HandlerPolicy policy) {
+                // Not needed for these tests.
+            }
+        };
     }
 }

@@ -124,11 +124,36 @@ class UserTest {
     @DisplayName("Multiple photo URLs can be added")
     void multiplePhotoUrlsCanBeAdded() {
         User user = new User(UUID.randomUUID(), "Frank");
-        user.addPhotoUrl("photo1.jpg");
-        user.addPhotoUrl("photo2.jpg");
-        user.addPhotoUrl("photo3.jpg");
+        for (int i = 1; i <= User.MAX_PHOTOS; i++) {
+            user.addPhotoUrl("photo" + i + ".jpg");
+        }
 
-        assertEquals(3, user.getPhotoUrls().size());
+        assertEquals(User.MAX_PHOTOS, user.getPhotoUrls().size());
+    }
+
+    @Test
+    @DisplayName("Adding a photo beyond the limit throws")
+    void addPhotoAboveLimitThrows() {
+        User user = new User(UUID.randomUUID(), "Grace");
+        for (int i = 1; i <= User.MAX_PHOTOS; i++) {
+            user.addPhotoUrl("photo" + i + ".jpg");
+        }
+
+        IllegalArgumentException ex =
+                assertThrows(IllegalArgumentException.class, () -> user.addPhotoUrl("photo-overflow.jpg"));
+        assertTrue(ex.getMessage().contains("Cannot set more than " + User.MAX_PHOTOS + " photos"));
+    }
+
+    @Test
+    @DisplayName("Setting too many photo URLs throws")
+    void setPhotoUrlsAboveLimitThrows() {
+        User user = new User(UUID.randomUUID(), "Hannah");
+        List<String> tooManyPhotos = List.of(
+                "photo1.jpg", "photo2.jpg", "photo3.jpg", "photo4.jpg", "photo5.jpg", "photo6.jpg", "photo7.jpg");
+
+        IllegalArgumentException ex =
+                assertThrows(IllegalArgumentException.class, () -> user.setPhotoUrls(tooManyPhotos));
+        assertTrue(ex.getMessage().contains("Cannot set more than " + User.MAX_PHOTOS + " photos"));
     }
 
     @Test
@@ -262,7 +287,7 @@ class UserTest {
 
         user.setPhone("+1 (555) 123-4567");
 
-        assertEquals("+1 (555) 123-4567", user.getPhone());
+        assertEquals("+15551234567", user.getPhone());
     }
 
     @Test
@@ -272,6 +297,21 @@ class UserTest {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> user.setPhone("abc123"));
         assertTrue(ex.getMessage().contains("Invalid phone format"));
+    }
+
+    @Test
+    @DisplayName("markDeleted refreshes updatedAt")
+    void markDeletedRefreshesUpdatedAt() {
+        User user = new User(UUID.randomUUID(), "Soft Delete User");
+        Instant createdAt = user.getUpdatedAt();
+        Instant deletedAt = FIXED_INSTANT.plusSeconds(45);
+        TestClock.setFixed(deletedAt);
+
+        user.markDeleted(AppClock.now());
+
+        assertEquals(deletedAt, user.getDeletedAt());
+        assertEquals(deletedAt, user.getUpdatedAt());
+        assertTrue(user.getUpdatedAt().isAfter(createdAt) || user.getUpdatedAt().equals(deletedAt));
     }
 
     private User createCompleteUser(String name) {
@@ -416,6 +456,203 @@ class UserTest {
             String exact50 = "x".repeat(50);
             ProfileNote note = ProfileNote.create(authorId, subjectId, exact50);
             assertEquals(exact50, note.getPreview());
+        }
+    }
+
+    /** Tests for location validation in setLocation(). */
+    @Nested
+    @DisplayName("Location Validation")
+    @SuppressWarnings("unused")
+    class LocationValidationTests {
+
+        @Test
+        @DisplayName("Valid location with positive coordinates")
+        void validLocationWithPositiveCoordinates() {
+            User user = new User(UUID.randomUUID(), "Alice");
+            user.setLocation(51.5, 0.1);
+
+            assertEquals(51.5, user.getLat());
+            assertEquals(0.1, user.getLon());
+            assertTrue(user.hasLocationSet());
+        }
+
+        @Test
+        @DisplayName("Valid location with negative coordinates")
+        void validLocationWithNegativeCoordinates() {
+            User user = new User(UUID.randomUUID(), "Bob");
+            user.setLocation(-33.9, -151.2);
+
+            assertEquals(-33.9, user.getLat());
+            assertEquals(-151.2, user.getLon());
+            assertTrue(user.hasLocationSet());
+        }
+
+        @Test
+        @DisplayName("Valid location at origin (0, 0)")
+        void validLocationAtOrigin() {
+            User user = new User(UUID.randomUUID(), "Charlie");
+            user.setLocation(0.0, 0.0);
+
+            assertEquals(0.0, user.getLat());
+            assertEquals(0.0, user.getLon());
+            assertTrue(user.hasLocationSet());
+        }
+
+        @Test
+        @DisplayName("Valid latitude at minimum boundary (-90)")
+        void validLatitudeAtMinimumBoundary() {
+            User user = new User(UUID.randomUUID(), "Dave");
+            user.setLocation(-90.0, 0.0);
+
+            assertEquals(-90.0, user.getLat());
+            assertTrue(user.hasLocationSet());
+        }
+
+        @Test
+        @DisplayName("Valid latitude at maximum boundary (90)")
+        void validLatitudeAtMaximumBoundary() {
+            User user = new User(UUID.randomUUID(), "Eve");
+            user.setLocation(90.0, 0.0);
+
+            assertEquals(90.0, user.getLat());
+            assertTrue(user.hasLocationSet());
+        }
+
+        @Test
+        @DisplayName("Valid longitude at minimum boundary (-180)")
+        void validLongitudeAtMinimumBoundary() {
+            User user = new User(UUID.randomUUID(), "Frank");
+            user.setLocation(0.0, -180.0);
+
+            assertEquals(-180.0, user.getLon());
+            assertTrue(user.hasLocationSet());
+        }
+
+        @Test
+        @DisplayName("Valid longitude at maximum boundary (180)")
+        void validLongitudeAtMaximumBoundary() {
+            User user = new User(UUID.randomUUID(), "Grace");
+            user.setLocation(0.0, 180.0);
+
+            assertEquals(180.0, user.getLon());
+            assertTrue(user.hasLocationSet());
+        }
+
+        @Test
+        @DisplayName("Latitude NaN throws IllegalArgumentException")
+        void latitudeNaNThrows() {
+            User user = new User(UUID.randomUUID(), "Hannah");
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> user.setLocation(Double.NaN, 0.0));
+            assertTrue(ex.getMessage().contains("Latitude cannot be NaN or Infinity"));
+        }
+
+        @Test
+        @DisplayName("Longitude NaN throws IllegalArgumentException")
+        void longitudeNaNThrows() {
+            User user = new User(UUID.randomUUID(), "Ivan");
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> user.setLocation(0.0, Double.NaN));
+            assertTrue(ex.getMessage().contains("Longitude cannot be NaN or Infinity"));
+        }
+
+        @Test
+        @DisplayName("Latitude positive Infinity throws IllegalArgumentException")
+        void latitudePositiveInfinityThrows() {
+            User user = new User(UUID.randomUUID(), "Jack");
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> user.setLocation(Double.POSITIVE_INFINITY, 0.0));
+            assertTrue(ex.getMessage().contains("Latitude cannot be NaN or Infinity"));
+        }
+
+        @Test
+        @DisplayName("Latitude negative Infinity throws IllegalArgumentException")
+        void latitudeNegativeInfinityThrows() {
+            User user = new User(UUID.randomUUID(), "Kelly");
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> user.setLocation(Double.NEGATIVE_INFINITY, 0.0));
+            assertTrue(ex.getMessage().contains("Latitude cannot be NaN or Infinity"));
+        }
+
+        @Test
+        @DisplayName("Longitude positive Infinity throws IllegalArgumentException")
+        void longitudePositiveInfinityThrows() {
+            User user = new User(UUID.randomUUID(), "Larry");
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> user.setLocation(0.0, Double.POSITIVE_INFINITY));
+            assertTrue(ex.getMessage().contains("Longitude cannot be NaN or Infinity"));
+        }
+
+        @Test
+        @DisplayName("Longitude negative Infinity throws IllegalArgumentException")
+        void longitudeNegativeInfinityThrows() {
+            User user = new User(UUID.randomUUID(), "Mia");
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> user.setLocation(0.0, Double.NEGATIVE_INFINITY));
+            assertTrue(ex.getMessage().contains("Longitude cannot be NaN or Infinity"));
+        }
+
+        @Test
+        @DisplayName("Latitude below minimum (-91) throws IllegalArgumentException")
+        void latitudeBelowMinimumThrows() {
+            User user = new User(UUID.randomUUID(), "Nathan");
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> user.setLocation(-90.1, 0.0));
+            assertTrue(ex.getMessage().contains("Latitude must be between -90 and 90"));
+        }
+
+        @Test
+        @DisplayName("Latitude above maximum (91) throws IllegalArgumentException")
+        void latitudeAboveMaximumThrows() {
+            User user = new User(UUID.randomUUID(), "Olivia");
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> user.setLocation(90.1, 0.0));
+            assertTrue(ex.getMessage().contains("Latitude must be between -90 and 90"));
+        }
+
+        @Test
+        @DisplayName("Longitude below minimum (-181) throws IllegalArgumentException")
+        void longitudeBelowMinimumThrows() {
+            User user = new User(UUID.randomUUID(), "Peter");
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> user.setLocation(0.0, -180.1));
+            assertTrue(ex.getMessage().contains("Longitude must be between -180 and 180"));
+        }
+
+        @Test
+        @DisplayName("Longitude above maximum (181) throws IllegalArgumentException")
+        void longitudeAboveMaximumThrows() {
+            User user = new User(UUID.randomUUID(), "Quinn");
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> user.setLocation(0.0, 180.1));
+            assertTrue(ex.getMessage().contains("Longitude must be between -180 and 180"));
+        }
+
+        @Test
+        @DisplayName("Valid setLocation calls touch() to update timestamp")
+        void setLocationCallsTouchUpdatesTimestamp() {
+            User user = new User(UUID.randomUUID(), "Rachel");
+            Instant initialUpdate = user.getUpdatedAt();
+
+            // Advance to a different time
+            TestClock.setFixed(FIXED_INSTANT.plusSeconds(1));
+
+            user.setLocation(10.0, 20.0);
+
+            assertTrue(user.getUpdatedAt().isAfter(initialUpdate));
+
+            // Reset TestClock state
+            TestClock.setFixed(FIXED_INSTANT);
         }
     }
 

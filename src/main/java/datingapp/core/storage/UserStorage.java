@@ -56,7 +56,6 @@ public interface UserStorage {
      *                      to skip distance filter
      * @return active users matching base criteria, unsorted
      */
-    @SuppressWarnings("deprecation") // Pre-filtering only; precise age checks done in CandidateFinder with timezone
     default List<User> findCandidates(
             UUID excludeId,
             Set<Gender> genders,
@@ -74,8 +73,9 @@ public interface UserStorage {
         return findActive().stream()
                 .filter(u -> !u.getId().equals(excludeId))
                 .filter(u -> genders.contains(u.getGender()))
-                .filter(u ->
-                        u.getAge().map(age -> age >= minAge && age <= maxAge).orElse(false))
+                .filter(u -> u.getAge(java.time.ZoneId.systemDefault())
+                        .map(age -> age >= minAge && age <= maxAge)
+                        .orElse(false))
                 .filter(u -> !applyDistanceFilter || isWithinDistance(seekerLat, seekerLon, u, maxDistanceKm))
                 .toList();
     }
@@ -130,7 +130,7 @@ public interface UserStorage {
      * @return number of rows purged
      */
     default int purgeDeletedBefore(java.time.Instant threshold) {
-        return 0;
+        throw new UnsupportedOperationException("UserStorage purgeDeletedBefore is not implemented");
     }
 
     // ═══════════════════════════════════════════════════════════════

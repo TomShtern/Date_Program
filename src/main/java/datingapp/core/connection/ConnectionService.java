@@ -87,7 +87,7 @@ public class ConnectionService {
         if (content == null || content.isBlank()) {
             return SendResult.failure(EMPTY_MESSAGE, SendResult.ErrorCode.EMPTY_MESSAGE);
         }
-        content = SanitizerUtils.sanitize(content);
+        content = SanitizerUtils.sanitizeMessage(content);
         if (content == null || content.isBlank()) {
             return SendResult.failure(EMPTY_MESSAGE, SendResult.ErrorCode.EMPTY_MESSAGE);
         }

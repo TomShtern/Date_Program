@@ -13,6 +13,7 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.async.UiThreadDispatcher;
@@ -73,7 +74,8 @@ class NotesControllerTest {
         TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
-        ProfileUseCases profileUseCases = new ProfileUseCases(users, profileService, null, null, config);
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
 
         User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         User subject = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));

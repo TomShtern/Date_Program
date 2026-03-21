@@ -1,8 +1,8 @@
 # Dating App Architecture
 
-> **Last verified against source code:** 2026-03-01
-> **Java files:** 116 main + 88 test = 204
-> **Java LOC (`tokei`):** 56,482 total / 43,327 code / 8,502 blank / 4,653 comments
+> **Last verified against source code:** 2026-03-21
+> **Java files:** 140 main + 107 test = 247
+> **Java LOC (`tokei`):** 66,698 total / 52,170 code / 8,217 blank / 6,311 comments
 
 This document describes current architecture from source (`src/main/java`, `src/test/java`, `pom.xml`).
 
@@ -43,8 +43,8 @@ datingapp/
     api/RestApiServer.java
     bootstrap/ApplicationStartup.java
     cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
-    error/{AppError,AppResult}.java
     event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
+    event/handlers/{AchievementEventHandler,MetricsEventHandler,NotificationEventHandler}.java
     usecase/
       common/{UseCaseError,UseCaseResult,UserContext}.java
       matching/MatchingUseCases.java
@@ -52,26 +52,25 @@ datingapp/
       profile/ProfileUseCases.java
       social/SocialUseCases.java
   core/
-    AppClock,AppConfig,AppSession,EnumSetUtil,LoggingSupport,PerformanceMonitor,ServiceRegistry,TextUtil
+    AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil
+    i18n/I18n.java
     model/{User,Match,ProfileNote}
     connection/{ConnectionModels,ConnectionService}
-    matching/{CandidateFinder,CompatibilityScoring,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}
-    metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
+    matching/{CandidateFinder,CompatibilityCalculator,DailyLimitService,DailyPickService,DefaultCompatibilityCalculator,DefaultDailyLimitService,DefaultDailyPickService,DefaultStandoutService,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,StandoutService,TrustSafetyService,UndoService}
+    metrics/{AchievementService,ActivityMetricsService,DefaultAchievementService,EngagementDomain,SwipeState}
     profile/{MatchPreferences,ProfileService,ValidationService}
     storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
-    time/{DefaultTimePolicy,TimePolicy}
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy}
   storage/
     DatabaseManager.java
     StorageFactory.java
     jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
     schema/{MigrationRunner,SchemaInitializer}.java
   ui/
-    DatingApp,NavigationService,ImageCache,UiAnimations,UiComponents,UiConstants,UiFeedbackService,UiUtils
+    DatingApp,ImageCache,LocalPhotoStore,NavigationService,UiAnimations,UiComponents,UiConstants,UiDialogs,UiFeedbackService,UiPreferencesStore,UiUtils
     async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
-    popup/{MatchPopupController,MilestonePopupController}
-    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,PreferencesController,ProfileController,SocialController,StandoutsController,StatsController}
-    viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,PreferencesViewModel,ProfileViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
+    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,ProfileFormValidator,ProfileViewController,SafetyController,SocialController,StandoutsController,StatsController}
+    viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,NotesViewModel,PreferencesViewModel,ProfileViewModel,SafetyViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
 ```
 
 ---

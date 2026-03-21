@@ -20,8 +20,7 @@ final class AppConfigValidator {
             double lifestyleWeight,
             double paceWeight,
             double responseWeight,
-            int minSharedInterests,
-            int maxDistanceKm) {
+            int minSharedInterests) {
         if (dailyLikeLimit < -1) {
             throw new IllegalArgumentException("dailyLikeLimit must be >= -1");
         }
@@ -38,7 +37,6 @@ final class AppConfigValidator {
         requireNonNegative("paceWeight", paceWeight);
         requireNonNegative("responseWeight", responseWeight);
         requireNonNegative("minSharedInterests", minSharedInterests);
-        requireNonNegative("maxDistanceKm", maxDistanceKm);
 
         double weightSum = distanceWeight + ageWeight + interestWeight + lifestyleWeight + paceWeight + responseWeight;
         if (Math.abs(weightSum - 1.0) > 0.01) {
@@ -56,6 +54,7 @@ final class AppConfigValidator {
             int maxNameLength,
             int minAgeRangeSpan,
             int minDistanceKm,
+            int maxDistanceKm,
             int maxInterests,
             int maxPhotos,
             int messageMaxPageSize,
@@ -77,6 +76,11 @@ final class AppConfigValidator {
         requireNonNegative("maxNameLength", maxNameLength);
         requireNonNegative("minAgeRangeSpan", minAgeRangeSpan);
         requireNonNegative("minDistanceKm", minDistanceKm);
+        requireNonNegative("maxDistanceKm", maxDistanceKm);
+        if (minDistanceKm > maxDistanceKm) {
+            throw new IllegalArgumentException(
+                    "minDistanceKm (" + minDistanceKm + ") must not exceed maxDistanceKm (" + maxDistanceKm + ")");
+        }
         requireNonNegative("maxInterests", maxInterests);
         requireNonNegative("maxPhotos", maxPhotos);
         requireNonNegative("messageMaxPageSize", messageMaxPageSize);
@@ -104,6 +108,10 @@ final class AppConfigValidator {
             double standoutActivityWeight) {
         requireNonNegative("nearbyDistanceKm", nearbyDistanceKm);
         requireNonNegative("closeDistanceKm", closeDistanceKm);
+        if (nearbyDistanceKm > closeDistanceKm) {
+            throw new IllegalArgumentException("nearbyDistanceKm (" + nearbyDistanceKm
+                    + ") must not exceed closeDistanceKm (" + closeDistanceKm + ")");
+        }
         requireNonNegative("similarAgeDiff", similarAgeDiff);
         requireNonNegative("compatibleAgeDiff", compatibleAgeDiff);
         requireNonNegative("paceCompatibilityThreshold", paceCompatibilityThreshold);

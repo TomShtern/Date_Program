@@ -117,7 +117,8 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 archive_reason_a = :archiveReasonA,
                 archived_at_b = :archivedAtB,
                 archive_reason_b = :archiveReasonB
-            WHERE id = :conversationId
+                        WHERE id = :conversationId
+                            AND deleted_at IS NULL
             """;
 
     private static final String SQL_INSERT_NOTIFICATION = """
@@ -780,14 +781,15 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
     @RegisterRowMapper(MatchMapper.class)
     private interface MatchDao {
-        String MATCH_COLUMNS = "id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at";
+        String MATCH_COLUMNS =
+                "id, user_a, user_b, created_at, updated_at, state, ended_at, ended_by, end_reason, deleted_at";
 
         @SqlUpdate("""
                 MERGE INTO matches (
-                    id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
+                    id, user_a, user_b, created_at, updated_at, state, ended_at, ended_by, end_reason, deleted_at
                 ) KEY (id)
                 VALUES (
-                    :id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
+                    :id, :userA, :userB, :createdAt, :updatedAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
                 )
                 """)
         void save(@BindBean Match match);
@@ -795,6 +797,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         @SqlUpdate("""
                 UPDATE matches
                 SET state = :state,
+                    updated_at = :updatedAt,
                     ended_at = :endedAt,
                     ended_by = :endedBy,
                     end_reason = :endReason,
@@ -925,6 +928,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_a"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_b"),
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, COLUMN_CREATED_AT),
+                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "updated_at"),
                     JdbiTypeCodecs.SqlRowReaders.readEnum(rs, PARAM_STATE, MatchState.class),
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "ended_by"),

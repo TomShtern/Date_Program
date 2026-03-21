@@ -3,10 +3,15 @@ package datingapp.core.profile;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.profile.MatchPreferences.Interest;
+import java.net.IDN;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -26,11 +31,15 @@ public class ValidationService {
     private static final String INVALID_EMAIL = "Invalid email format";
     private static final String INVALID_PHONE = "Invalid phone format";
     private static final String INVALID_ZIP = "Israeli ZIP code must be 7 digits (e.g., 6701101)";
+    private static final String INVALID_PHOTO_URL = "Invalid photo URL";
     private static final int MAX_EMAIL_LENGTH = 254;
     private static final int MIN_PHONE_DIGITS = 7;
     private static final int MAX_PHONE_DIGITS = 15;
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    private static final Pattern EMAIL_LOCAL_PATTERN = Pattern.compile("^[^\\s@]+$");
+    private static final Pattern DOMAIN_LABEL_PATTERN =
+            Pattern.compile("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$");
     private static final Pattern PHONE_ALLOWED_PATTERN = Pattern.compile("^[+0-9()\\-\\s]+$");
+    private static final Set<String> PHOTO_URL_SCHEMES = Set.of("http", "https");
 
     /** Shared configuration for validation thresholds. */
     private final AppConfig config;
@@ -77,7 +86,7 @@ public class ValidationService {
         if (name == null || name.isBlank()) {
             return ValidationResult.failure(NAME_EMPTY);
         }
-        String normalized = java.text.Normalizer.normalize(name.trim(), java.text.Normalizer.Form.NFKC);
+        String normalized = Normalizer.normalize(name.trim(), Normalizer.Form.NFKC);
         if (normalized.chars().anyMatch(Character::isISOControl)) {
             return ValidationResult.failure("Name contains invalid control characters");
         }
@@ -100,6 +109,15 @@ public class ValidationService {
     public ValidationResult validatePhone(String phone) {
         try {
             normalizePhone(phone);
+            return ValidationResult.success();
+        } catch (IllegalArgumentException e) {
+            return ValidationResult.failure(e.getMessage());
+        }
+    }
+
+    public ValidationResult validatePhotoUrl(String photoUrl) {
+        try {
+            normalizePhotoUrl(photoUrl);
             return ValidationResult.success();
         } catch (IllegalArgumentException e) {
             return ValidationResult.failure(e.getMessage());
@@ -269,7 +287,7 @@ public class ValidationService {
         }
 
         String normalized = zipCode.replaceAll("[\\s-]", "");
-        return switch (countryCode.trim().toUpperCase(java.util.Locale.ROOT)) {
+        return switch (countryCode.trim().toUpperCase(Locale.ROOT)) {
             case "IL" ->
                 normalized.matches("\\d{7}") ? ValidationResult.success() : ValidationResult.failure(INVALID_ZIP);
             default -> ValidationResult.failure("ZIP validation is not available for this country yet");
@@ -280,12 +298,34 @@ public class ValidationService {
         if (email == null || email.isBlank()) {
             return null;
         }
-        String normalized = email.trim();
-        if (normalized.length() > MAX_EMAIL_LENGTH
-                || !EMAIL_PATTERN.matcher(normalized).matches()) {
+        String normalized = Normalizer.normalize(email.trim(), Normalizer.Form.NFKC);
+        if (normalized.length() > MAX_EMAIL_LENGTH) {
             throw new IllegalArgumentException(INVALID_EMAIL);
         }
-        return normalized;
+        int atIndex = normalized.lastIndexOf('@');
+        if (atIndex <= 0 || atIndex == normalized.length() - 1 || normalized.indexOf('@') != atIndex) {
+            throw new IllegalArgumentException(INVALID_EMAIL);
+        }
+
+        String localPart = normalized.substring(0, atIndex);
+        String domainPart = normalized.substring(atIndex + 1);
+        if (!EMAIL_LOCAL_PATTERN.matcher(localPart).matches()
+                || containsControlCharacters(localPart)
+                || domainPart.isBlank()) {
+            throw new IllegalArgumentException(INVALID_EMAIL);
+        }
+
+        String asciiDomain;
+        try {
+            asciiDomain = IDN.toASCII(domainPart);
+        } catch (IllegalArgumentException _) {
+            throw new IllegalArgumentException(INVALID_EMAIL);
+        }
+        if (!isValidAsciiDomain(asciiDomain)) {
+            throw new IllegalArgumentException(INVALID_EMAIL);
+        }
+
+        return localPart + "@" + asciiDomain.toLowerCase(Locale.ROOT);
     }
 
     public static String normalizePhone(String phone) {
@@ -300,6 +340,51 @@ public class ValidationService {
         if (digitsOnly.length() < MIN_PHONE_DIGITS || digitsOnly.length() > MAX_PHONE_DIGITS) {
             throw new IllegalArgumentException(INVALID_PHONE);
         }
-        return normalized;
+        return normalized.startsWith("+") ? "+" + digitsOnly : digitsOnly;
+    }
+
+    public static String normalizePhotoUrl(String photoUrl) {
+        if (photoUrl == null || photoUrl.isBlank()) {
+            return null;
+        }
+
+        URI uri;
+        try {
+            uri = new URI(photoUrl.trim()).normalize();
+        } catch (URISyntaxException _) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+
+        String scheme = uri.getScheme();
+        if (scheme == null || !PHOTO_URL_SCHEMES.contains(scheme.toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+        if (uri.getHost() == null || uri.getHost().isBlank()) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+
+        return uri.toASCIIString();
+    }
+
+    private static boolean containsControlCharacters(String value) {
+        return value.chars().anyMatch(ch -> Character.isISOControl(ch) || Character.isWhitespace(ch));
+    }
+
+    private static boolean isValidAsciiDomain(String domain) {
+        if (domain == null || domain.isBlank() || domain.length() > 253) {
+            return false;
+        }
+        String[] labels = domain.split("\\.");
+        if (labels.length < 2) {
+            return false;
+        }
+        for (String label : labels) {
+            if (label.isBlank()
+                    || label.length() > 63
+                    || !DOMAIN_LABEL_PATTERN.matcher(label).matches()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

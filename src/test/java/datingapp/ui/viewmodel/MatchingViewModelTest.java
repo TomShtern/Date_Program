@@ -5,11 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.TrustSafetyService;
@@ -312,8 +314,15 @@ class MatchingViewModelTest {
                     .build();
             ProfileService noteProfileService =
                     new ProfileService(config, analytics, interactions, trustSafetyStorage, users);
-            var noteUseCases =
-                    new datingapp.app.usecase.profile.ProfileUseCases(users, noteProfileService, null, null, config);
+            var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
+                    users,
+                    noteProfileService,
+                    null,
+                    null,
+                    null,
+                    config,
+                    new datingapp.core.workflow.ProfileActivationPolicy(),
+                    new InProcessAppEventBus());
 
             return new MatchingViewModel(
                     new MatchingViewModel.Dependencies(
@@ -322,7 +331,19 @@ class MatchingViewModelTest {
                             undoService,
                             trustSafetyService,
                             new datingapp.app.usecase.matching.MatchingUseCases(
-                                    candidateFinder, matchingService, undoService),
+                                    candidateFinder,
+                                    matchingService,
+                                    datingapp.app.usecase.matching.MatchingUseCases.wrapDailyLimitService(
+                                            recommendationService),
+                                    datingapp.app.usecase.matching.MatchingUseCases.wrapDailyPickService(
+                                            recommendationService),
+                                    datingapp.app.usecase.matching.MatchingUseCases.wrapStandoutService(
+                                            recommendationService),
+                                    undoService,
+                                    interactions,
+                                    users,
+                                    new MatchQualityService(users, interactions, config),
+                                    new datingapp.app.event.InProcessAppEventBus()),
                             new datingapp.app.usecase.social.SocialUseCases(trustSafetyService),
                             new UseCaseUiProfileNoteDataAccess(noteUseCases)),
                     session,

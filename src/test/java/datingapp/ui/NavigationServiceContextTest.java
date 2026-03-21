@@ -61,9 +61,11 @@ class NavigationServiceContextTest {
         Optional<UUID> consumed = navigation.consumeNavigationContext(NavigationService.ViewType.CHAT, UUID.class);
 
         assertFalse(consumed.isPresent());
-        assertFalse(navigation
-                .consumeNavigationContext(NavigationService.ViewType.CHAT, Object.class)
-                .isPresent());
+        assertEquals(
+                payload,
+                navigation
+                        .consumeNavigationContext(NavigationService.ViewType.MATCHES, UUID.class)
+                        .orElseThrow());
     }
 
     @Test
@@ -76,9 +78,11 @@ class NavigationServiceContextTest {
         Optional<UUID> consumed = navigation.consumeNavigationContext(NavigationService.ViewType.CHAT, UUID.class);
 
         assertFalse(consumed.isPresent());
-        assertFalse(navigation
-                .consumeNavigationContext(NavigationService.ViewType.CHAT, Object.class)
-                .isPresent());
+        assertEquals(
+                "not-a-uuid",
+                navigation
+                        .consumeNavigationContext(NavigationService.ViewType.CHAT, String.class)
+                        .orElseThrow());
     }
 
     @Test

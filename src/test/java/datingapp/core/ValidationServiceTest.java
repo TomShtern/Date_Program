@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.profile.*;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.ValidationService.ValidationResult;
+import java.net.IDN;
 import java.util.EnumSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -98,9 +99,25 @@ class ValidationServiceTest {
         }
 
         @Test
+        @DisplayName("IDN email is normalized and accepted")
+        void idnEmail() {
+            String input = "person@exämple.de";
+            String expected = "person@" + IDN.toASCII("exämple.de");
+
+            assertTrue(validator.validateEmail(input).valid());
+            assertEquals(expected, ValidationService.normalizeEmail(input));
+        }
+
+        @Test
         @DisplayName("Valid phone passes validation")
         void validPhone() {
             assertTrue(validator.validatePhone("+1 (555) 123-4567").valid());
+        }
+
+        @Test
+        @DisplayName("Phone normalization returns canonical digits")
+        void phoneNormalizationCanonicalizes() {
+            assertEquals("+15551234567", ValidationService.normalizePhone("+1 (555) 123-4567"));
         }
 
         @Test
@@ -109,6 +126,21 @@ class ValidationServiceTest {
             ValidationResult result = validator.validatePhone("bad-phone");
             assertFalse(result.valid());
             assertEquals("Invalid phone format", result.errors().getFirst());
+        }
+
+        @Test
+        @DisplayName("Valid photo URL passes validation")
+        void validPhotoUrl() {
+            assertTrue(
+                    validator.validatePhotoUrl("https://example.com/photo.jpg").valid());
+        }
+
+        @Test
+        @DisplayName("Unsafe photo URL fails validation")
+        void invalidPhotoUrl() {
+            ValidationResult result = validator.validatePhotoUrl("javascript:alert(1)");
+            assertFalse(result.valid());
+            assertEquals("Invalid photo URL", result.errors().getFirst());
         }
     }
 

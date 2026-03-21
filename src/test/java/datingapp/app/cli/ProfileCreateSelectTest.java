@@ -13,6 +13,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -58,7 +59,8 @@ class ProfileCreateSelectTest {
         // ProfileService and ProfileService can be null for create/select
         // tests
         // since they aren't used by these methods
-        ProfileUseCases profileUseCases = new ProfileUseCases(userStorage, null, null, null, AppConfig.defaults());
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                userStorage, null, null, null, null, AppConfig.defaults(), new ProfileActivationPolicy(), null);
         return new ProfileHandler(
                 userStorage,
                 new ValidationService(AppConfig.defaults()),

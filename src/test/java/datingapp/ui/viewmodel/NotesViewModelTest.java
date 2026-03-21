@@ -12,6 +12,7 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.util.EnumSet;
@@ -66,7 +67,8 @@ class NotesViewModelTest {
         TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
-        ProfileUseCases profileUseCases = new ProfileUseCases(users, profileService, null, null, config);
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
 
         User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         User subjectOne = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));
@@ -101,7 +103,8 @@ class NotesViewModelTest {
         TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
-        ProfileUseCases profileUseCases = new ProfileUseCases(users, profileService, null, null, config);
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
 
         User author = createUser("Jordan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         users.save(author);

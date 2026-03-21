@@ -26,10 +26,6 @@ public class MessagingUseCases {
     private final ConnectionService connectionService;
     private final AppEventBus eventBus;
 
-    public MessagingUseCases(ConnectionService connectionService) {
-        this(connectionService, null);
-    }
-
     public MessagingUseCases(ConnectionService connectionService, AppEventBus eventBus) {
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
         this.eventBus = eventBus;
