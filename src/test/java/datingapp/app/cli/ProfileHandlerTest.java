@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.common.UseCaseError;
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -79,6 +81,40 @@ class ProfileHandlerTest {
         invokePrompt(handler, "promptPhoto", user);
 
         assertTrue(user.getPhotoUrls().isEmpty());
+    }
+
+    @Test
+    @DisplayName("completeProfile keeps session user unchanged when save fails")
+    void completeProfileKeepsSessionUserUnchangedWhenSaveFails() {
+        User original = createEditableUser();
+        original.setBio("original-bio");
+        session.setCurrentUser(original);
+
+        ProfileUseCases failingUseCases =
+                new ProfileUseCases(
+                        userStorage,
+                        null,
+                        validationService,
+                        null,
+                        null,
+                        AppConfig.defaults(),
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        null) {
+                    @Override
+                    public UseCaseResult<ProfileUseCases.ProfileSaveResult> saveProfile(
+                            ProfileUseCases.SaveProfileCommand command) {
+                        return UseCaseResult.failure(UseCaseError.internal("forced-save-failure"));
+                    }
+                };
+
+        InputReader inputReader = new InputReader(new Scanner(new StringReader("new-bio\n")));
+        ProfileHandler handler = new ProfileHandler(
+                userStorage, validationService, failingUseCases, AppConfig.defaults(), session, inputReader);
+
+        handler.completeProfile();
+
+        assertEquals("original-bio", session.getCurrentUser().getBio());
+        assertEquals(original.getId(), session.getCurrentUser().getId());
     }
 
     private ProfileHandler createHandler(String input) {

@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchQualityService.MatchQuality;
 import datingapp.core.testutil.TestClock;
+import datingapp.core.testutil.TestStorages;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -34,6 +36,7 @@ class MatchQualityTest {
     @BeforeEach
     void setUpClock() {
         TestClock.setFixed(FIXED_INSTANT);
+        new MatchQualityService(new TestStorages.Users(), new TestStorages.Interactions(), AppConfig.defaults());
     }
 
     @AfterEach

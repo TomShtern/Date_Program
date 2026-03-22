@@ -53,22 +53,11 @@ class RelationshipHandlerTest {
     private MatchingHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         AppConfig config = AppConfig.defaults();
-        MatchingService matchingService = MatchingService.builder()
-                .interactionStorage(interactionStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .userStorage(userStorage)
-                .build();
-        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
-                        trustSafetyStorage, interactionStorage, userStorage, config)
-                .build();
-        ConnectionService transitionService =
-                new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
         CandidateFinder candidateFinder = new CandidateFinder(
                 userStorage,
                 interactionStorage,
                 trustSafetyStorage,
                 config.safety().userTimeZone());
-        MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
         ProfileService profileCompletionService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
         RecommendationService dailyService = RecommendationService.builder()
@@ -82,18 +71,21 @@ class RelationshipHandlerTest {
                 .config(config)
                 .build();
 
-        RecommendationService recService = RecommendationService.builder()
-                .interactionStorage(interactionStorage)
-                .userStorage(userStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .analyticsStorage(analyticsStorage)
-                .candidateFinder(candidateFinder)
-                .standoutStorage(new TestStorages.Standouts())
-                .profileService(profileCompletionService)
-                .config(config)
-                .build();
-
         UndoService undoService = new UndoService(interactionStorage, new TestStorages.Undos(), config);
+        MatchingService matchingService = MatchingService.builder()
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
+                .undoService(undoService)
+                .dailyService(dailyService)
+                .candidateFinder(candidateFinder)
+                .build();
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactionStorage, userStorage, config)
+                .build();
+        ConnectionService transitionService =
+                new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
+        MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
         MatchingUseCases matchingUseCases = new MatchingUseCases(
                 candidateFinder,
                 matchingService,
@@ -115,7 +107,7 @@ class RelationshipHandlerTest {
                 userStorage,
                 profileCompletionService,
                 analyticsStorage,
-                recService,
+                dailyService,
                 config,
                 session,
                 inputReader,

@@ -22,8 +22,6 @@ import java.util.UUID;
  */
 public final class DefaultStandoutService implements StandoutService {
 
-    private static final int DIVERSITY_DAYS = 3;
-
     private final CompatibilityCalculator calculator;
     private final UserStorage userStorage;
     private final CandidateFinder candidateFinder;
@@ -95,6 +93,8 @@ public final class DefaultStandoutService implements StandoutService {
         List<ScoredCandidate> scored = candidates.stream()
                 .filter(candidate -> !recentStandoutIds.contains(candidate.getId()))
                 .map(candidate -> scoreCandidate(seeker, candidate))
+                .filter(scoredCandidate ->
+                        scoredCandidate.score() >= config.algorithm().standoutMinScore())
                 .sorted(Comparator.comparingInt(ScoredCandidate::score).reversed())
                 .limit(config.validation().maxStandouts())
                 .toList();
@@ -179,7 +179,7 @@ public final class DefaultStandoutService implements StandoutService {
 
     private Set<UUID> getRecentStandoutIds(UUID seekerId, LocalDate today) {
         Set<UUID> recent = new HashSet<>();
-        for (int i = 1; i <= DIVERSITY_DAYS; i++) {
+        for (int i = 1; i <= config.algorithm().standoutDiversityDays(); i++) {
             standoutStorage.getStandouts(seekerId, today.minusDays(i)).stream()
                     .map(Standout::standoutUserId)
                     .forEach(recent::add);

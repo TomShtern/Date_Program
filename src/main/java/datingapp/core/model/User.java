@@ -26,6 +26,8 @@ import java.util.UUID;
 public class User {
 
     public static final int MAX_PHOTOS = 6;
+    private static final Set<Gender> MATCHABLE_GENDERS =
+            Collections.unmodifiableSet(EnumSet.of(Gender.MALE, Gender.FEMALE, Gender.OTHER));
 
     // ── Nested domain types ────────────────────────────────────────────
 
@@ -339,6 +341,13 @@ public class User {
     }
 
     /**
+     * Returns the currently matchable genders used by mutual-preference checks.
+     */
+    public static Set<Gender> matchableGenders() {
+        return MATCHABLE_GENDERS;
+    }
+
+    /**
      * Returns {@code true} when this user is interested in all genders — i.e.,
      * their {@code interestedIn} set contains every value in {@link Gender}.
      *
@@ -350,7 +359,7 @@ public class User {
      * are considered compatible with a candidate of any gender.
      */
     public boolean isInterestedInEveryone() {
-        return interestedIn != null && interestedIn.containsAll(EnumSet.allOf(Gender.class));
+        return interestedIn != null && interestedIn.containsAll(MATCHABLE_GENDERS);
     }
 
     public double getLat() {

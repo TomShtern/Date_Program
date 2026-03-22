@@ -76,7 +76,11 @@ public final class MigrationRunner {
             new VersionedMigration(
                     4,
                     "Add soft-delete columns: deleted_at to conversations and profile_notes tables",
-                    MigrationRunner::applyV4));
+                    MigrationRunner::applyV4),
+            new VersionedMigration(
+                    5,
+                    "Remove profile_views surrogate id and normalize the conversation unique constraint name",
+                    MigrationRunner::applyV5));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -165,6 +169,27 @@ public final class MigrationRunner {
     private static void applyV4(Statement stmt) throws SQLException {
         stmt.execute("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
         stmt.execute("ALTER TABLE profile_notes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP");
+    }
+
+    /**
+     * V5 migration: removes the dead surrogate key from {@code profile_views} and renames the legacy
+     * conversation uniqueness constraint to the {@code uk_*} naming convention.
+     */
+    private static void applyV5(Statement stmt) throws SQLException {
+        stmt.execute("ALTER TABLE profile_views DROP COLUMN IF EXISTS id");
+        if (!hasPrimaryKey(stmt, "PROFILE_VIEWS")) {
+            stmt.execute(
+                    "ALTER TABLE profile_views ADD CONSTRAINT pk_profile_views PRIMARY KEY (viewer_id, viewed_id, viewed_at)");
+        }
+        stmt.execute("ALTER TABLE conversations DROP CONSTRAINT IF EXISTS unq_conversation_users");
+        stmt.execute("ALTER TABLE conversations DROP CONSTRAINT IF EXISTS uk_conversation_users");
+        stmt.execute("ALTER TABLE conversations ADD CONSTRAINT uk_conversation_users UNIQUE (user_a, user_b)");
+    }
+
+    private static boolean hasPrimaryKey(Statement stmt, String tableName) throws SQLException {
+        try (ResultSet rs = stmt.getConnection().getMetaData().getPrimaryKeys(null, null, tableName)) {
+            return rs.next();
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════

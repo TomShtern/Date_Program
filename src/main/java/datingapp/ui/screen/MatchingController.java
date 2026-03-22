@@ -493,8 +493,7 @@ public class MatchingController extends BaseController implements Initializable 
         logInfo("Super Like triggered");
         // Pulse the card for micro-interaction feedback
         UiAnimations.pulseScale(candidateCard);
-        // For now, acts like a regular like (super like logic to be added later)
-        viewModel.like();
+        viewModel.superLike();
     }
 
     private void updateCandidateUI(User user) {

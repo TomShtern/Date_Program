@@ -75,8 +75,8 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                      AND l1.who_got_liked = l2.who_likes
             WHERE l1.who_likes = :whoLikes
               AND l1.who_got_liked = :whoGotLiked
-              AND l1.direction = 'LIKE'
-              AND l2.direction = 'LIKE'
+                            AND l1.direction IN ('LIKE', 'SUPER_LIKE')
+                            AND l2.direction IN ('LIKE', 'SUPER_LIKE')
               AND l1.deleted_at IS NULL
               AND l2.deleted_at IS NULL
             )
@@ -177,7 +177,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                         .bind(PARAM_CREATED_AT, like.createdAt())
                         .execute();
 
-                if (like.direction() != Like.Direction.LIKE) {
+                if (!isPositiveLikeDirection(like.direction())) {
                     return LikeMatchWriteResult.likeOnly();
                 }
 
@@ -266,6 +266,11 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     @Override
     public int countLikesToday(UUID userId, Instant startOfDay) {
         return likeDao.countLikesToday(userId, startOfDay);
+    }
+
+    @Override
+    public int countSuperLikesToday(UUID userId, Instant startOfDay) {
+        return likeDao.countSuperLikesToday(userId, startOfDay);
     }
 
     @Override
@@ -559,6 +564,10 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         }
     }
 
+    private static boolean isPositiveLikeDirection(Like.Direction direction) {
+        return direction == Like.Direction.LIKE || direction == Like.Direction.SUPER_LIKE;
+    }
+
     @Override
     public boolean atomicUndoDelete(UUID likeId, String matchId) {
         try {
@@ -708,8 +717,9 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     JOIN likes l2 ON l1.who_likes = l2.who_got_liked
                                  AND l1.who_got_liked = l2.who_likes
                     WHERE l1.who_likes = :a AND l1.who_got_liked = :b
-                                            AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
-                                            AND l1.deleted_at IS NULL AND l2.deleted_at IS NULL
+                            AND l1.direction IN ('LIKE', 'SUPER_LIKE')
+                            AND l2.direction IN ('LIKE', 'SUPER_LIKE')
+                            AND l1.deleted_at IS NULL AND l2.deleted_at IS NULL
                 )
                 """)
         boolean mutualLikeExists(@Bind("a") UUID a, @Bind("b") UUID b);
@@ -719,13 +729,17 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         @SqlQuery("""
                 SELECT who_likes FROM likes
-                WHERE who_got_liked = :userId AND direction = 'LIKE' AND deleted_at IS NULL
+            WHERE who_got_liked = :userId
+              AND direction IN ('LIKE', 'SUPER_LIKE')
+              AND deleted_at IS NULL
                 """)
         Set<UUID> getUserIdsWhoLiked(@Bind("userId") UUID userId);
 
         @SqlQuery("""
                 SELECT who_likes, created_at FROM likes
-                WHERE who_got_liked = :userId AND direction = 'LIKE' AND deleted_at IS NULL
+            WHERE who_got_liked = :userId
+              AND direction IN ('LIKE', 'SUPER_LIKE')
+              AND deleted_at IS NULL
                 """)
         List<LikeTimeEntry> getLikeTimesInternal(@Bind("userId") UUID userId);
 
@@ -748,30 +762,41 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         int countReceivedByDirection(@Bind("userId") UUID userId, @Bind("direction") Like.Direction direction);
 
         @SqlQuery("""
-                SELECT COUNT(*) FROM likes l1
-                JOIN likes l2 ON l1.who_likes = l2.who_got_liked
-                             AND l1.who_got_liked = l2.who_likes
-                WHERE l1.who_likes = :userId
-                  AND l1.direction = 'LIKE' AND l2.direction = 'LIKE'
-                                    AND l1.deleted_at IS NULL AND l2.deleted_at IS NULL
-                """)
+            SELECT COUNT(*) FROM likes l1
+            JOIN likes l2 ON l1.who_likes = l2.who_got_liked
+                     AND l1.who_got_liked = l2.who_likes
+            WHERE l1.who_likes = :userId
+              AND l1.direction IN ('LIKE', 'SUPER_LIKE')
+              AND l2.direction IN ('LIKE', 'SUPER_LIKE')
+              AND l1.deleted_at IS NULL
+              AND l2.deleted_at IS NULL
+            """)
         int countMutualLikes(@Bind("userId") UUID userId);
 
         @SqlQuery("""
-                SELECT COUNT(*) FROM likes
-                WHERE who_likes = :userId
-                  AND direction = 'LIKE'
-                  AND created_at >= :startOfDay
-                                    AND deleted_at IS NULL
-                """)
+            SELECT COUNT(*) FROM likes
+            WHERE who_likes = :userId
+              AND direction = 'LIKE'
+              AND created_at >= :startOfDay
+              AND deleted_at IS NULL
+            """)
         int countLikesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
+
+        @SqlQuery("""
+            SELECT COUNT(*) FROM likes
+            WHERE who_likes = :userId
+              AND direction = 'SUPER_LIKE'
+              AND created_at >= :startOfDay
+              AND deleted_at IS NULL
+            """)
+        int countSuperLikesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
         @SqlQuery("""
                 SELECT COUNT(*) FROM likes
                 WHERE who_likes = :userId
                   AND direction = 'PASS'
                   AND created_at >= :startOfDay
-                                    AND deleted_at IS NULL
+              AND deleted_at IS NULL
                 """)
         int countPassesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 

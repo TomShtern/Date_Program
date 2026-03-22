@@ -49,6 +49,12 @@ import org.slf4j.LoggerFactory;
 public class ViewModelFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(ViewModelFactory.class);
+    /**
+     * System-property feature flag for presence indicators.
+     *
+     * <p>Key: {@code datingapp.ui.presence.enabled}
+     * <p>Default: {@code false} (presence UI is disabled unless explicitly enabled)
+     */
     private static final String PRESENCE_FLAG_KEY = "datingapp.ui.presence.enabled";
 
     private final ServiceRegistry services;

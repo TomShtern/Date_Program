@@ -46,6 +46,8 @@ public interface InteractionStorage {
 
     int countLikesToday(UUID userId, Instant startOfDay);
 
+    int countSuperLikesToday(UUID userId, Instant startOfDay);
+
     int countPassesToday(UUID userId, Instant startOfDay);
 
     void delete(UUID likeId);
@@ -86,7 +88,7 @@ public interface InteractionStorage {
             }
 
             save(like);
-            if (like.direction() != Like.Direction.LIKE) {
+            if (!isPositiveLikeDirection(like.direction())) {
                 return LikeMatchWriteResult.likeOnly();
             }
 
@@ -281,4 +283,8 @@ public interface InteractionStorage {
     // ═══ Transaction Operations ═══
 
     boolean atomicUndoDelete(UUID likeId, String matchId);
+
+    private static boolean isPositiveLikeDirection(Like.Direction direction) {
+        return direction == Like.Direction.LIKE || direction == Like.Direction.SUPER_LIKE;
+    }
 }

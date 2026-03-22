@@ -131,33 +131,72 @@ public class ProfileHandler implements LoggingSupport {
             User currentUser = session.getCurrentUser();
             logInfo("\n" + I18n.text("cli.profile.complete.header", currentUser.getName()) + "\n");
 
-            promptBio(currentUser);
-            promptBirthDate(currentUser);
-            promptGender(currentUser);
-            promptInterestedIn(currentUser);
-            promptInterests(currentUser);
-            promptLocation(currentUser);
-            promptPreferences(currentUser);
-            promptPhoto(currentUser);
-            promptLifestyle(currentUser);
-            promptPacePreferences(currentUser);
+            User draft = copyForProfileEditing(currentUser);
 
-            var saveResult = profileUseCases.saveProfile(
-                    new SaveProfileCommand(UserContext.cli(currentUser.getId()), currentUser));
+            promptBio(draft);
+            promptBirthDate(draft);
+            promptGender(draft);
+            promptInterestedIn(draft);
+            promptInterests(draft);
+            promptLocation(draft);
+            promptPreferences(draft);
+            promptPhoto(draft);
+            promptLifestyle(draft);
+            promptPacePreferences(draft);
+
+            var saveResult =
+                    profileUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(currentUser.getId()), draft));
             if (!saveResult.success()) {
                 logInfo(ERROR_WITH_GAP_FORMAT, saveResult.error().message());
                 return;
             }
 
+            session.setCurrentUser(saveResult.data().user());
+
             if (saveResult.data().activated()) {
                 logInfo("\n" + I18n.text("cli.profile.complete.activated"));
-            } else if (!currentUser.isComplete()) {
+            } else if (!saveResult.data().user().isComplete()) {
                 logInfo("\n" + I18n.text("cli.profile.complete.incomplete"));
             }
 
             logInfo(I18n.text("cli.profile.complete.saved") + "\n");
             displayNewAchievements(saveResult.data().newlyUnlocked());
         });
+    }
+
+    private static User copyForProfileEditing(User source) {
+        User.StorageBuilder builder = User.StorageBuilder.create(
+                        source.getId(), source.getName(), source.getCreatedAt())
+                .bio(source.getBio())
+                .birthDate(source.getBirthDate())
+                .gender(source.getGender())
+                .interestedIn(source.getInterestedIn())
+                .location(source.getLat(), source.getLon())
+                .hasLocationSet(source.hasLocationSet())
+                .maxDistanceKm(source.getMaxDistanceKm())
+                .ageRange(source.getMinAge(), source.getMaxAge())
+                .state(source.getState())
+                .verified(source.isVerified())
+                .verificationMethod(source.getVerificationMethod())
+                .verificationCode(source.getVerificationCode())
+                .verificationSentAt(source.getVerificationSentAt())
+                .verifiedAt(source.getVerifiedAt())
+                .updatedAt(source.getUpdatedAt())
+                .deletedAt(source.getDeletedAt())
+                .photoUrls(source.getPhotoUrls())
+                .interests(source.getInterests())
+                .smoking(source.getSmoking())
+                .drinking(source.getDrinking())
+                .wantsKids(source.getWantsKids())
+                .lookingFor(source.getLookingFor())
+                .education(source.getEducation())
+                .heightCm(source.getHeightCm())
+                .email(source.getEmail())
+                .phone(source.getPhone())
+                .pacePreferences(source.getPacePreferences());
+        User copy = builder.build();
+        copy.setDealbreakers(source.getDealbreakers());
+        return copy;
     }
 
     /**
@@ -242,14 +281,16 @@ public class ProfileHandler implements LoggingSupport {
                 displayDealbreakerMenu();
 
                 String choice = inputReader.readLine(PROMPT_CHOICE).trim();
+                if (choice.isEmpty() && inputReader.wasInputExhausted()) {
+                    choice = "0";
+                }
                 if ("0".equals(choice)) {
                     logInfo(CliTextAndInput.CANCELLED);
                     editing = false;
-                    continue;
+                } else {
+                    handleDealbreakerChoice(choice, currentUser);
+                    userStorage.save(currentUser);
                 }
-
-                handleDealbreakerChoice(choice, currentUser);
-                userStorage.save(currentUser);
             }
         });
     }
@@ -372,6 +413,10 @@ public class ProfileHandler implements LoggingSupport {
         while (editing) {
             displayInterestMenu(interestSet);
             String choice = inputReader.readLine("Select: ").trim();
+            if (choice.isEmpty() && inputReader.wasInputExhausted()) {
+                logDebug("Input exhausted while editing interests; returning to previous menu.");
+                break;
+            }
             switch (choice) {
                 case "1" -> addInterestByCategory(currentUser, Interest.Category.OUTDOORS, interestSet);
                 case "2" -> addInterestByCategory(currentUser, Interest.Category.ARTS, interestSet);

@@ -119,6 +119,7 @@ public final class CliTextAndInput {
     public static class InputReader {
         private static final Logger log = LoggerFactory.getLogger(InputReader.class);
         private final Scanner scanner;
+        private boolean inputExhausted;
 
         public InputReader(Scanner scanner) {
             this.scanner = scanner;
@@ -127,9 +128,18 @@ public final class CliTextAndInput {
         public String readLine(String prompt) {
             log.info(prompt);
             if (scanner.hasNextLine()) {
+                inputExhausted = false;
                 return scanner.nextLine().trim();
             }
+            inputExhausted = true;
             return "";
+        }
+
+        /**
+         * Returns true when the most recent {@link #readLine(String)} call hit end-of-input.
+         */
+        public boolean wasInputExhausted() {
+            return inputExhausted;
         }
     }
 

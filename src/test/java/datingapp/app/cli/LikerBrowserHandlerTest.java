@@ -54,11 +54,6 @@ class LikerBrowserHandlerTest {
     private MatchingHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         AppConfig config = AppConfig.defaults();
-        MatchingService matchingService = MatchingService.builder()
-                .interactionStorage(interactionStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .userStorage(userStorage)
-                .build();
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactionStorage, userStorage, config)
                 .build();
@@ -80,19 +75,15 @@ class LikerBrowserHandlerTest {
                 .profileService(profileCompletionService)
                 .config(config)
                 .build();
-
-        RecommendationService recService = RecommendationService.builder()
-                .interactionStorage(interactionStorage)
-                .userStorage(userStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .analyticsStorage(analyticsStorage)
-                .candidateFinder(candidateFinder)
-                .standoutStorage(new TestStorages.Standouts())
-                .profileService(profileCompletionService)
-                .config(config)
-                .build();
-
         UndoService undoService = new UndoService(interactionStorage, new TestStorages.Undos(), config);
+        MatchingService matchingService = MatchingService.builder()
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
+                .undoService(undoService)
+                .dailyService(dailyService)
+                .candidateFinder(candidateFinder)
+                .build();
         ConnectionService connectionService =
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
         MatchingUseCases matchingUseCases = new MatchingUseCases(
@@ -116,7 +107,7 @@ class LikerBrowserHandlerTest {
                 userStorage,
                 profileCompletionService,
                 analyticsStorage,
-                recService,
+                dailyService,
                 config,
                 session,
                 inputReader,

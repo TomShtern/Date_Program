@@ -1,5 +1,6 @@
 package datingapp.core;
 
+import datingapp.core.model.User;
 import java.time.ZoneId;
 import java.util.Objects;
 
@@ -83,6 +84,9 @@ final class AppConfigValidator {
         }
         requireNonNegative("maxInterests", maxInterests);
         requireNonNegative("maxPhotos", maxPhotos);
+        if (maxPhotos != User.MAX_PHOTOS) {
+            throw new IllegalArgumentException("maxPhotos must equal User.MAX_PHOTOS (" + User.MAX_PHOTOS + ")");
+        }
         requireNonNegative("messageMaxPageSize", messageMaxPageSize);
         requireInRange(chatBackgroundPollSeconds, 1, 300, "chatBackgroundPollSeconds");
         requireInRange(chatActivePollSeconds, 1, 300, "chatActivePollSeconds");
@@ -100,6 +104,12 @@ final class AppConfigValidator {
             int responseTimeGoodHours,
             int responseTimeWeekHours,
             int responseTimeMonthHours,
+            int standoutDiversityDays,
+            int standoutMinScore,
+            int starExcellentThreshold,
+            int starGreatThreshold,
+            int starGoodThreshold,
+            int starFairThreshold,
             double standoutDistanceWeight,
             double standoutAgeWeight,
             double standoutInterestWeight,
@@ -120,12 +130,28 @@ final class AppConfigValidator {
         requireNonNegative("responseTimeGoodHours", responseTimeGoodHours);
         requireNonNegative("responseTimeWeekHours", responseTimeWeekHours);
         requireNonNegative("responseTimeMonthHours", responseTimeMonthHours);
+        requireInRange(standoutDiversityDays, 1, 30, "standoutDiversityDays");
+        requireInRange(standoutMinScore, 0, 100, "standoutMinScore");
+        requireInRange(starExcellentThreshold, 0, 100, "starExcellentThreshold");
+        requireInRange(starGreatThreshold, 0, 100, "starGreatThreshold");
+        requireInRange(starGoodThreshold, 0, 100, "starGoodThreshold");
+        requireInRange(starFairThreshold, 0, 100, "starFairThreshold");
+        if (starExcellentThreshold < starGreatThreshold
+                || starGreatThreshold < starGoodThreshold
+                || starGoodThreshold < starFairThreshold) {
+            throw new IllegalArgumentException(
+                    "Star thresholds must be descending: excellent >= great >= good >= fair");
+        }
         requireNonNegative("standoutDistanceWeight", standoutDistanceWeight);
         requireNonNegative("standoutAgeWeight", standoutAgeWeight);
         requireNonNegative("standoutInterestWeight", standoutInterestWeight);
         requireNonNegative("standoutLifestyleWeight", standoutLifestyleWeight);
         requireNonNegative("standoutCompletenessWeight", standoutCompletenessWeight);
         requireNonNegative("standoutActivityWeight", standoutActivityWeight);
+    }
+
+    static void validateStorage(int queryTimeoutSeconds) {
+        requireInRange(queryTimeoutSeconds, 1, 600, "queryTimeoutSeconds");
     }
 
     static void validateSafety(

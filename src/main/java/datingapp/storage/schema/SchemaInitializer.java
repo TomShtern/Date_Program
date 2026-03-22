@@ -273,7 +273,7 @@ public final class SchemaInitializer {
                     visible_to_user_a BOOLEAN DEFAULT TRUE,
                     visible_to_user_b BOOLEAN DEFAULT TRUE,
                     deleted_at TIMESTAMP,
-                    CONSTRAINT unq_conversation_users UNIQUE (user_a, user_b),
+                    CONSTRAINT uk_conversation_users UNIQUE (user_a, user_b),
                     FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE
                 )
@@ -390,10 +390,10 @@ public final class SchemaInitializer {
 
         stmt.execute("""
                 CREATE TABLE IF NOT EXISTS profile_views (
-                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     viewer_id UUID NOT NULL,
                     viewed_id UUID NOT NULL,
                     viewed_at TIMESTAMP NOT NULL,
+                    PRIMARY KEY (viewer_id, viewed_id, viewed_at),
                     FOREIGN KEY (viewer_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (viewed_id) REFERENCES users(id) ON DELETE CASCADE
                 )

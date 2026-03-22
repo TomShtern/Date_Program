@@ -30,6 +30,7 @@ import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
+import datingapp.core.storage.AccountCleanupStorage;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
@@ -37,6 +38,7 @@ import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
+import datingapp.storage.jdbi.JdbiAccountCleanupStorage;
 import datingapp.storage.jdbi.JdbiConnectionStorage;
 import datingapp.storage.jdbi.JdbiMatchmakingStorage;
 import datingapp.storage.jdbi.JdbiMetricsStorage;
@@ -57,6 +59,7 @@ public final class StorageFactory {
     public static ServiceRegistry buildH2(DatabaseManager dbManager, AppConfig config) {
         Objects.requireNonNull(dbManager, "dbManager cannot be null");
         Objects.requireNonNull(config, "config cannot be null");
+        dbManager.configureQueryTimeoutSeconds(config.storage().queryTimeoutSeconds());
 
         Jdbi jdbi = Jdbi.create(() -> {
                     try {
@@ -81,6 +84,7 @@ public final class StorageFactory {
         JdbiMetricsStorage metricsStorage = new JdbiMetricsStorage(jdbi);
         AnalyticsStorage analyticsStorage = metricsStorage;
         TrustSafetyStorage trustSafetyStorage = jdbi.onDemand(JdbiTrustSafetyStorage.class);
+        AccountCleanupStorage accountCleanupStorage = new JdbiAccountCleanupStorage(jdbi);
 
         Undo.Storage undoStorage = matchmakingStorage.undoStorage();
         Standout.Storage standoutStorage = metricsStorage;
@@ -155,6 +159,7 @@ public final class StorageFactory {
                 .communicationStorage(communicationStorage)
                 .analyticsStorage(analyticsStorage)
                 .trustSafetyStorage(trustSafetyStorage)
+                .accountCleanupStorage(accountCleanupStorage)
                 .candidateFinder(candidateFinder)
                 .matchingService(matchingService)
                 .trustSafetyService(trustSafetyService)

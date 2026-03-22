@@ -191,9 +191,8 @@ public class CandidateFinder implements LoggingSupport {
         // When a seeker is open to everyone (all genders selected), pass the full
         // Gender enum to the DB pre-filter so the SQL `gender IN (...)` clause does
         // not exclude candidates by gender before the in-memory check runs.
-        Set<Gender> gendersForQuery = currentUser.isInterestedInEveryone()
-                ? java.util.EnumSet.allOf(Gender.class)
-                : currentUser.getInterestedIn();
+        Set<Gender> gendersForQuery =
+                currentUser.isInterestedInEveryone() ? User.matchableGenders() : currentUser.getInterestedIn();
 
         List<User> preFiltered = userStorage.findCandidates(
                 currentUser.getId(),
@@ -229,6 +228,15 @@ public class CandidateFinder implements LoggingSupport {
                 currentUser.getState(),
                 currentUser.getGender(),
                 currentUser.getInterestedIn(),
+                currentUser.getInterests(),
+                currentUser.getSmoking(),
+                currentUser.getDrinking(),
+                currentUser.getWantsKids(),
+                currentUser.getLookingFor(),
+                currentUser.getEducation(),
+                currentUser.getHeightCm(),
+                currentUser.getPacePreferences(),
+                currentUser.getDealbreakers(),
                 currentUser.getMinAge(),
                 currentUser.getMaxAge(),
                 currentUser.hasLocationSet(),

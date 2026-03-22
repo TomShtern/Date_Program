@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.DailyPickService;
 import datingapp.core.matching.MatchingService;
@@ -43,6 +44,7 @@ class MatchingServiceTest {
     private TestStorages.Interactions interactionStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
     private TestStorages.Users userStorage;
+    private CandidateFinder candidateFinder;
     private MatchingService matchingService;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
@@ -52,10 +54,21 @@ class MatchingServiceTest {
         interactionStorage = new TestStorages.Interactions();
         trustSafetyStorage = new TestStorages.TrustSafety();
         userStorage = new TestStorages.Users();
+        TestStorages.Undos undoStorage = new TestStorages.Undos();
+        candidateFinder = new CandidateFinder(
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                AppConfig.defaults().safety().userTimeZone());
+        RecommendationService dailyService =
+                new RecommendationService(alwaysAllowDailyLimitService(), noDailyPickService(), noStandoutService());
         matchingService = MatchingService.builder()
                 .interactionStorage(interactionStorage)
                 .trustSafetyStorage(trustSafetyStorage)
                 .userStorage(userStorage)
+                .undoService(new UndoService(interactionStorage, undoStorage, AppConfig.defaults()))
+                .dailyService(dailyService)
+                .candidateFinder(candidateFinder)
                 .build();
     }
 
@@ -218,21 +231,41 @@ class MatchingServiceTest {
         }
 
         @Test
-        @DisplayName("processSwipe returns config error when services are missing")
-        void processSwipeReturnsConfigErrorWithoutServices() {
-            // Builder without dailyService/undoService
-            User user = User.StorageBuilder.create(UUID.randomUUID(), "Alice", AppClock.now())
-                    .state(UserState.ACTIVE)
-                    .build();
-            User candidate = User.StorageBuilder.create(UUID.randomUUID(), "Bob", AppClock.now())
-                    .state(UserState.ACTIVE)
-                    .build();
+        @DisplayName("MatchingService builder fails fast when required services are missing")
+        void buildFailsFastWithoutRequiredServices() {
+            RecommendationService dailyService = new RecommendationService(
+                    alwaysAllowDailyLimitService(), noDailyPickService(), noStandoutService());
+            UndoService undoService =
+                    new UndoService(interactionStorage, new TestStorages.Undos(), AppConfig.defaults());
 
-            MatchingService.SwipeResult result = matchingService.processSwipe(user, candidate, true);
+            MatchingService.Builder missingUndoServiceBuilder = MatchingService.builder()
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(userStorage)
+                    .dailyService(dailyService)
+                    .candidateFinder(candidateFinder);
+            NullPointerException undoError = assertThrows(NullPointerException.class, missingUndoServiceBuilder::build);
+            assertEquals("undoService cannot be null", undoError.getMessage());
 
-            assertFalse(result.success(), "processSwipe should fail when dailyService/undoService are null");
-            assertEquals(
-                    "dailyService and undoService required for processSwipe", result.message(), "Unexpected message");
+            MatchingService.Builder missingDailyServiceBuilder = MatchingService.builder()
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(userStorage)
+                    .undoService(undoService)
+                    .candidateFinder(candidateFinder);
+            NullPointerException dailyError =
+                    assertThrows(NullPointerException.class, missingDailyServiceBuilder::build);
+            assertEquals("dailyService cannot be null", dailyError.getMessage());
+
+            MatchingService.Builder missingCandidateFinderBuilder = MatchingService.builder()
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(userStorage)
+                    .undoService(undoService)
+                    .dailyService(dailyService);
+            NullPointerException finderError =
+                    assertThrows(NullPointerException.class, missingCandidateFinderBuilder::build);
+            assertEquals("candidateFinder cannot be null", finderError.getMessage());
         }
     }
 
@@ -253,6 +286,7 @@ class MatchingServiceTest {
                     .userStorage(userStorage)
                     .undoService(new UndoService(slowInteractions, undos, AppConfig.defaults()))
                     .dailyService(recommendationService)
+                    .candidateFinder(candidateFinder)
                     .build();
 
             User alice = activeUser(UUID.randomUUID(), "Alice");
@@ -347,13 +381,18 @@ class MatchingServiceTest {
             }
 
             @Override
+            public boolean canSuperLike(UUID userId) {
+                return true;
+            }
+
+            @Override
             public boolean canPass(UUID userId) {
                 return true;
             }
 
             @Override
             public DailyStatus getStatus(UUID userId) {
-                return new DailyStatus(0, 999, 0, 999, AppClock.today(), AppClock.now());
+                return new DailyStatus(0, 999, 0, 999, 0, 999, AppClock.today(), AppClock.now());
             }
 
             @Override

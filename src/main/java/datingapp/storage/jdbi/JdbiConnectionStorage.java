@@ -131,8 +131,9 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
 
         return jdbi.withHandle(handle -> {
             Map<String, Integer> counts = new java.util.HashMap<>();
-            handle.createQuery("SELECT conversation_id, COUNT(*) AS message_count FROM messages "
-                            + "WHERE conversation_id IN (<conversationIds>) GROUP BY conversation_id")
+            handle.createQuery(
+                            "SELECT conversation_id, COUNT(*) AS message_count FROM messages "
+                                    + "WHERE deleted_at IS NULL AND conversation_id IN (<conversationIds>) GROUP BY conversation_id")
                     .bindList("conversationIds", conversationIds)
                     .map((rs, ctx) -> Map.entry(rs.getString("conversation_id"), rs.getInt("message_count")))
                     .list()
@@ -160,12 +161,12 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
 
     @Override
     public void deleteMessage(UUID messageId) {
-        messagingDao.deleteMessage(messageId);
+        messagingDao.deleteMessage(messageId, AppClock.now());
     }
 
     @Override
     public void deleteMessagesByConversation(String conversationId) {
-        messagingDao.deleteMessagesByConversation(conversationId);
+        messagingDao.deleteMessagesByConversation(conversationId, AppClock.now());
     }
 
     @Override
@@ -364,7 +365,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         @SqlQuery("""
                 SELECT id, conversation_id, sender_id, content, created_at
                 FROM messages
-                WHERE conversation_id = :conversationId
+            WHERE conversation_id = :conversationId AND deleted_at IS NULL
                 ORDER BY created_at ASC
                 LIMIT :limit OFFSET :offset
                 """)
@@ -374,25 +375,26 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         @SqlQuery("""
             SELECT id, conversation_id, sender_id, content, created_at
             FROM messages
-            WHERE id = :messageId
+            WHERE id = :messageId AND deleted_at IS NULL
             """)
         Optional<Message> getMessage(@Bind("messageId") UUID messageId);
 
         @SqlQuery("""
                 SELECT id, conversation_id, sender_id, content, created_at
                 FROM messages
-                WHERE conversation_id = :conversationId
+            WHERE conversation_id = :conversationId AND deleted_at IS NULL
                 ORDER BY created_at DESC
                 LIMIT 1
                 """)
         Optional<Message> getLatestMessage(@Bind("conversationId") String conversationId);
 
-        @SqlQuery("SELECT COUNT(*) FROM messages WHERE conversation_id = :conversationId")
+        @SqlQuery("SELECT COUNT(*) FROM messages WHERE conversation_id = :conversationId AND deleted_at IS NULL")
         int countMessages(@Bind("conversationId") String conversationId);
 
         @SqlQuery("""
                 SELECT COUNT(*) FROM messages
                 WHERE conversation_id = :conversationId
+            AND deleted_at IS NULL
                 AND created_at > :after
                 """)
         int countMessagesAfter(@Bind("conversationId") String conversationId, @Bind("after") Instant after);
@@ -400,6 +402,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         @SqlQuery("""
                 SELECT COUNT(*) FROM messages
                 WHERE conversation_id = :conversationId
+            AND deleted_at IS NULL
                 AND sender_id != :senderId
                 """)
         int countMessagesNotFromSender(@Bind("conversationId") String conversationId, @Bind("senderId") UUID senderId);
@@ -407,6 +410,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         @SqlQuery("""
                 SELECT COUNT(*) FROM messages
                 WHERE conversation_id = :conversationId
+            AND deleted_at IS NULL
                 AND created_at > :after
                 AND sender_id != :excludeSenderId
                 """)
@@ -415,11 +419,12 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 @Bind("after") Instant after,
                 @Bind("excludeSenderId") UUID excludeSenderId);
 
-        @SqlUpdate("DELETE FROM messages WHERE id = :messageId")
-        void deleteMessage(@Bind("messageId") UUID messageId);
+        @SqlUpdate("UPDATE messages SET deleted_at = :now WHERE id = :messageId AND deleted_at IS NULL")
+        void deleteMessage(@Bind("messageId") UUID messageId, @Bind("now") Instant now);
 
-        @SqlUpdate("DELETE FROM messages WHERE conversation_id = :conversationId")
-        void deleteMessagesByConversation(@Bind("conversationId") String conversationId);
+        @SqlUpdate(
+                "UPDATE messages SET deleted_at = :now WHERE conversation_id = :conversationId AND deleted_at IS NULL")
+        void deleteMessagesByConversation(@Bind("conversationId") String conversationId, @Bind("now") Instant now);
     }
 
     @RegisterRowMapper(FriendRequestMapper.class)

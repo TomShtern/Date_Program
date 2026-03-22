@@ -9,6 +9,7 @@ import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
+import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.UpdateDiscoveryPreferencesCommand;
@@ -25,14 +26,17 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequenc
 import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
+import datingapp.core.storage.AccountCleanupStorage;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.core.workflow.ProfileActivationPolicy;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -212,6 +216,34 @@ class ProfileUseCasesTest {
         assertNotNull(stats.data());
     }
 
+    @Test
+    @DisplayName("deleteAccount delegates cleanup to the account cleanup storage")
+    void deleteAccountDelegatesCleanupToStorage() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Cleanup User");
+        userStorage.save(user);
+
+        RecordingAccountCleanupStorage cleanupStorage = new RecordingAccountCleanupStorage();
+        ProfileUseCases cleanupUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                null,
+                cleanupStorage);
+
+        var result = cleanupUseCases.deleteAccount(new DeleteAccountCommand(UserContext.cli(user.getId()), "privacy"));
+
+        assertTrue(result.success());
+        assertEquals(user.getId(), cleanupStorage.userId.get());
+        assertNotNull(cleanupStorage.deletedAt.get());
+        assertTrue(cleanupStorage.userSnapshot.get().isDeleted());
+        assertEquals(User.UserState.PAUSED, cleanupStorage.userSnapshot.get().getState());
+        assertTrue(userStorage.get(user.getId()).orElseThrow().isDeleted());
+    }
+
     private static AchievementService noOpAchievementService() {
         return new AchievementService() {
             @Override
@@ -317,5 +349,18 @@ class ProfileUseCasesTest {
                 // Not needed for these tests.
             }
         };
+    }
+
+    private static final class RecordingAccountCleanupStorage implements AccountCleanupStorage {
+        private final AtomicReference<UUID> userId = new AtomicReference<>();
+        private final AtomicReference<Instant> deletedAt = new AtomicReference<>();
+        private final AtomicReference<User> userSnapshot = new AtomicReference<>();
+
+        @Override
+        public void softDeleteAccount(User user, Instant deletedAt) {
+            userId.set(user.getId());
+            this.deletedAt.set(deletedAt);
+            userSnapshot.set(user);
+        }
     }
 }

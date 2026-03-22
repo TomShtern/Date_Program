@@ -45,7 +45,30 @@ class MatchQualityServiceTest {
 
     @AfterEach
     void tearDown() {
+        new MatchQualityService(userStorage, likeStorage, AppConfig.defaults());
         TestClock.reset();
+    }
+
+    private MatchQuality createWithScore(int score) {
+        return new MatchQuality(
+                "test-match-id",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                AppClock.now(),
+                0.8,
+                0.9,
+                0.5,
+                0.7,
+                0.6,
+                0.5,
+                10.5,
+                5,
+                List.of(),
+                List.of(),
+                Duration.ZERO,
+                "Good Sync",
+                score,
+                List.of());
     }
 
     @Nested
@@ -419,6 +442,24 @@ class MatchQualityServiceTest {
 
             // Score should be very high since distance is the only factor
             assertTrue(quality.compatibilityScore() > 90);
+        }
+
+        @Test
+        @DisplayName("Service updates star thresholds from config")
+        void serviceUpdatesStarThresholdsFromConfig() {
+            AppConfig config = AppConfig.builder()
+                    .starExcellentThreshold(95)
+                    .starGreatThreshold(85)
+                    .starGoodThreshold(70)
+                    .starFairThreshold(50)
+                    .build();
+
+            new MatchQualityService(userStorage, likeStorage, config);
+
+            MatchQuality quality = createWithScore(90);
+
+            assertEquals(4, quality.getStarRating());
+            assertEquals("Great Match", quality.getCompatibilityLabel());
         }
     }
 

@@ -268,6 +268,46 @@ class RestApiRelationshipRoutesTest {
         assertEquals(400, missingIdentityResponse.statusCode());
     }
 
+    @Test
+    @DisplayName("report route rejects invalid enum values and malformed bodies")
+    void reportRouteRejectsInvalidPayloads() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, trustSafetyStorage);
+
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        userStorage.save(activeUser(userA, "EnumAlice"));
+        userStorage.save(activeUser(userB, "EnumBob"));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> invalidEnumResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + userA + "/report/" + userB))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "{\"reason\":\"NOT_A_REASON\",\"description\":\"bad\",\"blockUser\":false}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, invalidEnumResponse.statusCode());
+
+        HttpResponse<String> malformedBodyResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + userA + "/report/" + userB))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString("{"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, malformedBodyResponse.statusCode());
+    }
+
     private static ServiceRegistry createServices(
             UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
         return createServices(userStorage, interactionStorage, communicationStorage, new TestStorages.TrustSafety());
@@ -309,6 +349,7 @@ class RestApiRelationshipRoutesTest {
                 .activityMetricsService(activityMetricsService)
                 .dailyService(recommendationService)
                 .undoService(undoService)
+                .candidateFinder(candidateFinder)
                 .build();
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)

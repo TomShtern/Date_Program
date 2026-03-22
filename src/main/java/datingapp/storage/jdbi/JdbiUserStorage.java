@@ -92,43 +92,31 @@ public final class JdbiUserStorage implements UserStorage {
         List<String> genderNames = genders.stream().map(Enum::name).toList();
 
         return jdbi.withHandle(handle -> {
+            double effectiveDistanceKm = Math.min(Math.max(maxDistanceKm, 0), 20_000);
+            double latDelta = effectiveDistanceKm / 111.0;
+            double cosLat = Math.max(Math.cos(Math.toRadians(Math.abs(seekerLat))), 0.0001);
+            double lonDelta = Math.min(effectiveDistanceKm / (111.0 * cosLat), 180.0);
+
             StringBuilder sql = new StringBuilder("SELECT * FROM users WHERE id <> :excludeId")
                     .append(" AND state = 'ACTIVE'")
                     .append(" AND deleted_at IS NULL")
                     .append(" AND gender IN (<genders>)")
-                    .append(" AND DATEDIFF('YEAR', birth_date, CURRENT_DATE) BETWEEN :minAge AND :maxAge");
+                    .append(" AND DATEDIFF('YEAR', birth_date, CURRENT_DATE) BETWEEN :minAge AND :maxAge")
+                    .append(" AND has_location_set = TRUE")
+                    .append(" AND lat BETWEEN :latMin AND :latMax")
+                    .append(" AND lon BETWEEN :lonMin AND :lonMax");
 
-            // Approximate bounding-box pre-filter when seeker has a location.
-            // Exact great-circle distance is enforced in-memory by CandidateFinder.
-            boolean applyBbox = maxDistanceKm < 50_000;
-            if (applyBbox) {
-                double latDelta = maxDistanceKm / 111.0;
-                double cosLat = Math.max(Math.cos(Math.toRadians(Math.abs(seekerLat))), 0.0001);
-                double lonDelta = maxDistanceKm / (111.0 * cosLat);
-                lonDelta = Math.min(lonDelta, 180.0); // Clamp to valid longitude range
-                sql.append(" AND has_location_set = TRUE")
-                        .append(" AND lat BETWEEN :latMin AND :latMax")
-                        .append(" AND lon BETWEEN :lonMin AND :lonMax");
-                return handle.createQuery(sql.toString())
-                        .bindList("genders", genderNames)
-                        .bind("excludeId", excludeId)
-                        .bind("minAge", minAge)
-                        .bind("maxAge", maxAge)
-                        .bind("latMin", seekerLat - latDelta)
-                        .bind("latMax", seekerLat + latDelta)
-                        .bind("lonMin", seekerLon - lonDelta)
-                        .bind("lonMax", seekerLon + lonDelta)
-                        .map(new Mapper())
-                        .list();
-            } else {
-                return handle.createQuery(sql.toString())
-                        .bindList("genders", genderNames)
-                        .bind("excludeId", excludeId)
-                        .bind("minAge", minAge)
-                        .bind("maxAge", maxAge)
-                        .map(new Mapper())
-                        .list();
-            }
+            return handle.createQuery(sql.toString())
+                    .bindList("genders", genderNames)
+                    .bind("excludeId", excludeId)
+                    .bind("minAge", minAge)
+                    .bind("maxAge", maxAge)
+                    .bind("latMin", seekerLat - latDelta)
+                    .bind("latMax", seekerLat + latDelta)
+                    .bind("lonMin", seekerLon - lonDelta)
+                    .bind("lonMax", seekerLon + lonDelta)
+                    .map(new Mapper())
+                    .list();
         });
     }
 

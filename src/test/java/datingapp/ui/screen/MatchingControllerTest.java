@@ -94,10 +94,31 @@ class MatchingControllerTest {
                 },
                 5000));
 
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(saveNoteButton::isDisabled);
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+
         JavaFxTestSupport.runOnFxAndWait(() -> {
             noteTextArea.setText("Updated note from controller");
             saveNoteButton.fire();
         });
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return "Private note saved."
+                                .equals(JavaFxTestSupport.callOnFxAndWait(viewModel.noteStatusMessageProperty()::get));
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
 
         assertTrue(JavaFxTestSupport.waitUntil(
                 () -> fixture.lookupNote()
@@ -276,6 +297,7 @@ class MatchingControllerTest {
                     .userStorage(users)
                     .undoService(undoService)
                     .dailyService(recommendationService)
+                    .candidateFinder(candidateFinder)
                     .build();
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                             trustSafetyStorage, interactions, users, config, communications)

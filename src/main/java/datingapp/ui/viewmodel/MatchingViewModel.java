@@ -372,14 +372,18 @@ public class MatchingViewModel extends BaseViewModel {
     }
 
     public void like() {
-        processSwipe(true);
+        processSwipe(true, false);
+    }
+
+    public void superLike() {
+        processSwipe(true, true);
     }
 
     public void pass() {
-        processSwipe(false);
+        processSwipe(false, false);
     }
 
-    private void processSwipe(boolean liked) {
+    private void processSwipe(boolean liked, boolean superLike) {
         if (!swipeInProgress.compareAndSet(false, true)) {
             return;
         }
@@ -389,10 +393,14 @@ public class MatchingViewModel extends BaseViewModel {
             return;
         }
 
-        logInfo("User {} {} candidate {}", currentUser.getName(), liked ? "liked" : "passed", candidate.getName());
+        String action = "passed";
+        if (liked) {
+            action = superLike ? "super-liked" : "liked";
+        }
+        logInfo("User {} {} candidate {}", currentUser.getName(), action, candidate.getName());
 
-        var result = matchingUseCases.processSwipe(
-                new ProcessSwipeCommand(UserContext.ui(currentUser.getId()), currentUser, candidate, liked, false));
+        var result = matchingUseCases.processSwipe(new ProcessSwipeCommand(
+                UserContext.ui(currentUser.getId()), currentUser, candidate, liked, superLike, false));
 
         if (!result.success()) {
             logWarn("Swipe failed: {}", result.error().message());

@@ -308,6 +308,7 @@ class MatchingViewModelTest {
                     .userStorage(users)
                     .undoService(undoService)
                     .dailyService(recommendationService)
+                    .candidateFinder(candidateFinder)
                     .build();
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                             trustSafetyStorage, interactions, users, config, communications)

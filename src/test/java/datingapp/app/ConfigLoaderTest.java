@@ -84,7 +84,7 @@ class ConfigLoaderTest {
                       "dailySuperLikeLimit": 3,
                       "dailyPassLimit": 200,
                       "maxInterests": 15,
-                      "maxPhotos": 8,
+                      "maxPhotos": 6,
                       "maxBioLength": 1000
                     }
                     """;
@@ -96,7 +96,7 @@ class ConfigLoaderTest {
             assertEquals(3, config.matching().dailySuperLikeLimit());
             assertEquals(200, config.matching().dailyPassLimit());
             assertEquals(15, config.validation().maxInterests());
-            assertEquals(8, config.validation().maxPhotos());
+            assertEquals(6, config.validation().maxPhotos());
             assertEquals(1000, config.validation().maxBioLength());
         }
 
@@ -106,6 +106,7 @@ class ConfigLoaderTest {
             String json = """
                     {
                       "sessionTimeoutMinutes": 60,
+                "queryTimeoutSeconds": 45,
                       "maxSwipesPerSession": 200,
                       "suspiciousSwipeVelocity": 2.5
                     }
@@ -114,8 +115,24 @@ class ConfigLoaderTest {
             AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals(60, config.safety().sessionTimeoutMinutes());
+            assertEquals(45, config.storage().queryTimeoutSeconds());
             assertEquals(200, config.matching().maxSwipesPerSession());
             assertEquals(2.5, config.matching().suspiciousSwipeVelocity(), 0.01);
+        }
+
+        @Test
+        @DisplayName("Should reject unknown config keys")
+        void rejectsUnknownConfigKeys() {
+            String json = """
+              {
+                "dailyLikeLimit": 50,
+                "unknownLegacyKey": 123
+              }
+              """;
+
+            IllegalStateException error =
+                    assertThrows(IllegalStateException.class, () -> ApplicationStartup.fromJson(json));
+            assertTrue(error.getMessage().contains("unknownLegacyKey"));
         }
 
         @Test
@@ -190,6 +207,22 @@ class ConfigLoaderTest {
             AppConfig config = ApplicationStartup.fromJson(json);
 
             assertEquals("America/New_York", config.safety().userTimeZone().getId());
+        }
+
+        @Test
+        @DisplayName("Should fall back to defaults for invalid timezone values")
+        void fallsBackToDefaultsForInvalidTimezone() {
+            String json = """
+          {
+            "userTimeZone": "Not/A_Real_Zone"
+          }
+          """;
+
+            AppConfig config = ApplicationStartup.fromJson(json);
+
+            assertEquals(
+                    AppConfig.defaults().safety().userTimeZone(),
+                    config.safety().userTimeZone());
         }
 
         @Test

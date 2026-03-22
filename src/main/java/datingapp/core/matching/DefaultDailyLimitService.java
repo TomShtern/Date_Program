@@ -38,6 +38,13 @@ public final class DefaultDailyLimitService implements DailyLimitService {
     }
 
     @Override
+    public boolean canSuperLike(UUID userId) {
+        Instant startOfDay = getStartOfToday();
+        int superLikesUsed = interactionStorage.countSuperLikesToday(userId, startOfDay);
+        return canPerform(false, config.matching().dailySuperLikeLimit(), superLikesUsed);
+    }
+
+    @Override
     public boolean canPass(UUID userId) {
         Instant startOfDay = getStartOfToday();
         int passesUsed = interactionStorage.countPassesToday(userId, startOfDay);
@@ -51,14 +58,24 @@ public final class DefaultDailyLimitService implements DailyLimitService {
         LocalDate today = getToday();
 
         int likesUsed = interactionStorage.countLikesToday(userId, startOfDay);
+        int superLikesUsed = interactionStorage.countSuperLikesToday(userId, startOfDay);
         int passesUsed = interactionStorage.countPassesToday(userId, startOfDay);
 
         int likesRemaining =
                 remainingFor(config.hasUnlimitedLikes(), config.matching().dailyLikeLimit(), likesUsed);
+        int superLikesRemaining = remainingFor(false, config.matching().dailySuperLikeLimit(), superLikesUsed);
         int passesRemaining =
                 remainingFor(config.hasUnlimitedPasses(), config.matching().dailyPassLimit(), passesUsed);
 
-        return new DailyStatus(likesUsed, likesRemaining, passesUsed, passesRemaining, today, resetTime);
+        return new DailyStatus(
+                likesUsed,
+                likesRemaining,
+                superLikesUsed,
+                superLikesRemaining,
+                passesUsed,
+                passesRemaining,
+                today,
+                resetTime);
     }
 
     @Override

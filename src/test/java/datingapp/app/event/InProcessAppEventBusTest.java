@@ -55,6 +55,8 @@ class InProcessAppEventBusTest {
 
     @Test
     void requiredHandlerExceptionPropagates() {
+        AppEvent.SwipeRecorded event =
+                new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", false, Instant.now());
         bus.subscribe(
                 AppEvent.SwipeRecorded.class,
                 e -> {
@@ -62,10 +64,7 @@ class InProcessAppEventBusTest {
                 },
                 AppEventBus.HandlerPolicy.REQUIRED);
 
-        assertThrows(
-                RuntimeException.class,
-                () -> bus.publish(new AppEvent.SwipeRecorded(
-                        UUID.randomUUID(), UUID.randomUUID(), "LIKE", false, Instant.now())));
+        assertThrows(RuntimeException.class, () -> bus.publish(event));
     }
 
     @Test
@@ -95,5 +94,24 @@ class InProcessAppEventBusTest {
 
         bus.publish(new AppEvent.ProfileSaved(UUID.randomUUID(), false, Instant.now()));
         assertEquals(threadCount, callCount.get());
+    }
+
+    @Test
+    void subscribeDuringPublishDefersNewHandlerToLaterEvents() {
+        AtomicInteger primaryHandlerCount = new AtomicInteger();
+        AtomicInteger lateHandlerCount = new AtomicInteger();
+
+        bus.subscribe(AppEvent.ProfileSaved.class, event -> {
+            primaryHandlerCount.incrementAndGet();
+            bus.subscribe(AppEvent.ProfileSaved.class, ignored -> lateHandlerCount.incrementAndGet());
+        });
+
+        bus.publish(new AppEvent.ProfileSaved(UUID.randomUUID(), true, Instant.now()));
+        assertEquals(1, primaryHandlerCount.get());
+        assertEquals(0, lateHandlerCount.get());
+
+        bus.publish(new AppEvent.ProfileSaved(UUID.randomUUID(), false, Instant.now()));
+        assertEquals(2, primaryHandlerCount.get());
+        assertEquals(1, lateHandlerCount.get());
     }
 }

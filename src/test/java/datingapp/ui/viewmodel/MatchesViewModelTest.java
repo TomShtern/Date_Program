@@ -91,13 +91,17 @@ class MatchesViewModelTest {
         matchData = new StorageUiMatchDataAccess(interactions, trustSafetyStorage);
         userStore = new StorageUiUserStore(users);
 
+        var undoService = new datingapp.core.matching.UndoService(interactions, new TestStorages.Undos(), config);
+
         matchingService = MatchingService.builder()
                 .interactionStorage(interactions)
                 .trustSafetyStorage(trustSafetyStorage)
                 .userStorage(users)
+                .undoService(undoService)
+                .dailyService(dailyService)
+                .candidateFinder(candidateFinder)
                 .build();
 
-        var undoService = new datingapp.core.matching.UndoService(interactions, new TestStorages.Undos(), config);
         var matchQualityService = new MatchQualityService(users, interactions, config);
         var matchingUseCases = new datingapp.app.usecase.matching.MatchingUseCases(
                 candidateFinder,

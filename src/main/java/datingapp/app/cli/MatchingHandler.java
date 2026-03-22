@@ -235,7 +235,7 @@ public class MatchingHandler implements LoggingSupport {
         }
 
         var result = matchingUseCases.processSwipe(new ProcessSwipeCommand(
-                UserContext.cli(currentUser.getId()), currentUser, candidate, "l".equals(action), false));
+                UserContext.cli(currentUser.getId()), currentUser, candidate, "l".equals(action), false, false));
         if (!result.success()) {
             showDailyLimitReached(currentUser);
             return false;
@@ -585,7 +585,7 @@ public class MatchingHandler implements LoggingSupport {
     private void processDailyPickSwipe(DailyPick pick, User currentUser, String action) {
         User candidate = pick.user();
         var result = matchingUseCases.processSwipe(new ProcessSwipeCommand(
-                UserContext.cli(currentUser.getId()), currentUser, candidate, "l".equals(action), true));
+                UserContext.cli(currentUser.getId()), currentUser, candidate, "l".equals(action), false, true));
         if (!result.success()) {
             showDailyLimitReached(currentUser);
             return;
@@ -727,11 +727,10 @@ public class MatchingHandler implements LoggingSupport {
 
     /** Displays and manages pending friend requests. */
     public void viewPendingRequests() {
-        User currentUser = session.getCurrentUser();
-        if (currentUser == null) {
-            logInfo("\n⚠️ Please log in first.\n");
-            return;
-        }
+        CliTextAndInput.requireLogin(session, () -> viewPendingRequestsForCurrentUser(session.getCurrentUser()));
+    }
+
+    private void viewPendingRequestsForCurrentUser(User currentUser) {
 
         var requestsResult =
                 socialUseCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.cli(currentUser.getId())));
@@ -798,11 +797,10 @@ public class MatchingHandler implements LoggingSupport {
 
     /** Displays notifications for the current user. */
     public void viewNotifications() {
-        User currentUser = session.getCurrentUser();
-        if (currentUser == null) {
-            logInfo("\n⚠️ Please log in first.\n");
-            return;
-        }
+        CliTextAndInput.requireLogin(session, () -> viewNotificationsForCurrentUser(session.getCurrentUser()));
+    }
+
+    private void viewNotificationsForCurrentUser(User currentUser) {
 
         var notificationsResult =
                 socialUseCases.notifications(new NotificationsQuery(UserContext.cli(currentUser.getId()), false));

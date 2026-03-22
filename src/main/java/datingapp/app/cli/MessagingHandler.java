@@ -59,11 +59,10 @@ public class MessagingHandler implements LoggingSupport {
 
     /** Shows the conversation list and handles navigation. */
     public void showConversations() {
-        User currentUser = session.getCurrentUser();
-        if (currentUser == null) {
-            logInfo(CliTextAndInput.PLEASE_SELECT_USER);
-            return;
-        }
+        CliTextAndInput.requireLogin(session, () -> showConversationsForCurrentUser(session.getCurrentUser()));
+    }
+
+    private void showConversationsForCurrentUser(User currentUser) {
 
         List<ConversationPreview> previews = loadConversationPreviews(currentUser);
 

@@ -1,11 +1,13 @@
 package datingapp.storage.jdbi;
 
+import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionModels.Report.Reason;
 import datingapp.core.storage.TrustSafetyStorage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -37,17 +39,19 @@ public interface JdbiTrustSafetyStorage extends TrustSafetyStorage {
     @SqlQuery("""
             SELECT EXISTS (
                 SELECT 1 FROM blocks
-                WHERE (blocker_id = :userA AND blocked_id = :userB)
+                WHERE deleted_at IS NULL
+                  AND ((blocker_id = :userA AND blocked_id = :userB)
                    OR (blocker_id = :userB AND blocked_id = :userA)
+                  )
             )
             """)
     @Override
     boolean isBlocked(@Bind("userA") UUID userA, @Bind("userB") UUID userB);
 
     @SqlQuery("""
-            SELECT blocked_id FROM blocks WHERE blocker_id = :userId
+            SELECT blocked_id FROM blocks WHERE blocker_id = :userId AND deleted_at IS NULL
             UNION
-            SELECT blocker_id FROM blocks WHERE blocked_id = :userId
+            SELECT blocker_id FROM blocks WHERE blocked_id = :userId AND deleted_at IS NULL
             """)
     @Override
     Set<UUID> getBlockedUserIds(@Bind("userId") UUID userId);
@@ -55,27 +59,28 @@ public interface JdbiTrustSafetyStorage extends TrustSafetyStorage {
     @RegisterRowMapper(BlockMapper.class)
     @SqlQuery("""
             SELECT id, blocker_id, blocked_id, created_at
-            FROM blocks WHERE blocker_id = :blockerId
+            FROM blocks WHERE blocker_id = :blockerId AND deleted_at IS NULL
             """)
     @Override
     List<Block> findByBlocker(@Bind("blockerId") UUID blockerId);
 
     @SqlUpdate("""
-            DELETE FROM blocks
-            WHERE blocker_id = :blockerId AND blocked_id = :blockedId
+            UPDATE blocks
+            SET deleted_at = :now
+            WHERE blocker_id = :blockerId AND blocked_id = :blockedId AND deleted_at IS NULL
             """)
-    int deleteBlockRow(@Bind("blockerId") UUID blockerId, @Bind("blockedId") UUID blockedId);
+    int deleteBlockRow(@Bind("blockerId") UUID blockerId, @Bind("blockedId") UUID blockedId, @Bind("now") Instant now);
 
     @Override
     default boolean deleteBlock(UUID blockerId, UUID blockedId) {
-        return deleteBlockRow(blockerId, blockedId) > 0;
+        return deleteBlockRow(blockerId, blockedId, AppClock.now()) > 0;
     }
 
-    @SqlQuery("SELECT COUNT(*) FROM blocks WHERE blocker_id = :userId")
+    @SqlQuery("SELECT COUNT(*) FROM blocks WHERE blocker_id = :userId AND deleted_at IS NULL")
     @Override
     int countBlocksGiven(@Bind("userId") UUID userId);
 
-    @SqlQuery("SELECT COUNT(*) FROM blocks WHERE blocked_id = :userId")
+    @SqlQuery("SELECT COUNT(*) FROM blocks WHERE blocked_id = :userId AND deleted_at IS NULL")
     @Override
     int countBlocksReceived(@Bind("userId") UUID userId);
 
@@ -90,14 +95,14 @@ public interface JdbiTrustSafetyStorage extends TrustSafetyStorage {
     @Override
     void save(@BindBean Report report);
 
-    @SqlQuery("SELECT COUNT(*) FROM reports WHERE reported_user_id = :userId")
+    @SqlQuery("SELECT COUNT(*) FROM reports WHERE reported_user_id = :userId AND deleted_at IS NULL")
     @Override
     int countReportsAgainst(@Bind("userId") UUID userId);
 
     @SqlQuery("""
             SELECT EXISTS (
                 SELECT 1 FROM reports
-                WHERE reporter_id = :reporterId AND reported_user_id = :reportedUserId
+                                WHERE reporter_id = :reporterId AND reported_user_id = :reportedUserId AND deleted_at IS NULL
             )
             """)
     @Override
@@ -106,12 +111,12 @@ public interface JdbiTrustSafetyStorage extends TrustSafetyStorage {
     @RegisterRowMapper(ReportMapper.class)
     @SqlQuery("""
             SELECT id, reporter_id, reported_user_id, reason, description, created_at
-            FROM reports WHERE reported_user_id = :userId ORDER BY created_at DESC
+            FROM reports WHERE reported_user_id = :userId AND deleted_at IS NULL ORDER BY created_at DESC
             """)
     @Override
     List<Report> getReportsAgainst(@Bind("userId") UUID userId);
 
-    @SqlQuery("SELECT COUNT(*) FROM reports WHERE reporter_id = :userId")
+    @SqlQuery("SELECT COUNT(*) FROM reports WHERE reporter_id = :userId AND deleted_at IS NULL")
     @Override
     int countReportsBy(@Bind("userId") UUID userId);
 

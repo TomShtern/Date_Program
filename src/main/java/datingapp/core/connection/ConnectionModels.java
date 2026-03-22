@@ -340,6 +340,7 @@ public final class ConnectionModels {
 
         public static enum Direction {
             LIKE,
+            SUPER_LIKE,
             PASS
         }
 

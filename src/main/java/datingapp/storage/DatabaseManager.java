@@ -24,6 +24,7 @@ public final class DatabaseManager {
     private static DatabaseManager instance;
     private final AtomicReference<HikariDataSource> dataSource = new AtomicReference<>();
     private volatile boolean initialized = false;
+    private volatile int queryTimeoutSeconds = 30;
 
     public static void setJdbcUrl(String url) {
         jdbcUrl = Objects.requireNonNull(url, "JDBC URL cannot be null");
@@ -35,6 +36,13 @@ public final class DatabaseManager {
 
     private DatabaseManager() {
         // Driver loaded automatically by SPI
+    }
+
+    public void configureQueryTimeoutSeconds(int timeoutSeconds) {
+        if (timeoutSeconds <= 0) {
+            throw new IllegalArgumentException("query timeout must be positive");
+        }
+        this.queryTimeoutSeconds = timeoutSeconds;
     }
 
     public static synchronized DatabaseManager getInstance() {
@@ -80,7 +88,10 @@ public final class DatabaseManager {
         if (localDataSource == null) {
             throw new StorageException("Connection pool is not initialized");
         }
-        return localDataSource.getConnection();
+
+        Connection connection = localDataSource.getConnection();
+        applySessionQueryTimeout(connection);
+        return connection;
     }
 
     /** Shuts down the database gracefully. */
@@ -158,6 +169,21 @@ public final class DatabaseManager {
 
     private static boolean isLocalFileUrl(String url) {
         return url.startsWith("jdbc:h2:./") || url.startsWith("jdbc:h2:\\") || url.startsWith("jdbc:h2:.");
+    }
+
+    private void applySessionQueryTimeout(Connection connection) {
+        int timeoutMillis = queryTimeoutSeconds * 1000;
+        String sql = "SET QUERY_TIMEOUT " + timeoutMillis;
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(sql);
+        } catch (SQLException e) {
+            try {
+                connection.close();
+            } catch (SQLException suppressed) {
+                e.addSuppressed(suppressed);
+            }
+            throw new StorageException("Failed to apply query timeout", e);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════

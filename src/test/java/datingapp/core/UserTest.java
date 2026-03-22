@@ -227,6 +227,18 @@ class UserTest {
     }
 
     @Test
+    @DisplayName("isInterestedInEveryone uses matchable gender policy helper")
+    void isInterestedInEveryone_usesMatchableGenderPolicy() {
+        User openUser = new User(UUID.randomUUID(), "OpenUser");
+        openUser.setInterestedIn(User.matchableGenders());
+        assertTrue(openUser.isInterestedInEveryone());
+
+        User partialUser = new User(UUID.randomUUID(), "PartialUser");
+        partialUser.setInterestedIn(EnumSet.of(Gender.MALE, Gender.FEMALE));
+        assertFalse(partialUser.isInterestedInEveryone());
+    }
+
+    @Test
     @DisplayName("getInterests returns defensive copy")
     void getInterests_returnsDefensiveCopy() {
         User user = new User(UUID.randomUUID(), "Eve");

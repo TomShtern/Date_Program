@@ -50,6 +50,7 @@ public class MatchingUseCases {
         return new Builder();
     }
 
+    @SuppressWarnings("java:S107")
     public MatchingUseCases(
             CandidateFinder candidateFinder,
             MatchingService matchingService,
@@ -201,8 +202,8 @@ public class MatchingUseCases {
             if (command.markDailyPickViewed() && dailyPickService != null) {
                 dailyPickService.markDailyPickViewed(command.context().userId());
             }
-            MatchingService.SwipeResult result =
-                    matchingService.processSwipe(command.currentUser(), command.candidate(), command.liked());
+            MatchingService.SwipeResult result = matchingService.processSwipe(
+                    command.currentUser(), command.candidate(), command.liked(), command.superLike());
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.message()));
             }
@@ -328,6 +329,12 @@ public class MatchingUseCases {
                 && !dailyLimitService.canLike(command.context().userId())) {
             return UseCaseResult.failure(UseCaseError.conflict("Daily like limit reached"));
         }
+        if (command.enforceDailyLimit()
+                && command.direction() == Like.Direction.SUPER_LIKE
+                && dailyLimitService != null
+                && !dailyLimitService.canSuperLike(command.context().userId())) {
+            return UseCaseResult.failure(UseCaseError.conflict("Daily super-like limit reached"));
+        }
 
         try {
             Like like = Like.create(command.context().userId(), command.targetUserId(), command.direction());
@@ -413,7 +420,12 @@ public class MatchingUseCases {
             List<User> candidates, Optional<DailyPick> dailyPick, boolean dailyPickViewed, boolean locationMissing) {}
 
     public static record ProcessSwipeCommand(
-            UserContext context, User currentUser, User candidate, boolean liked, boolean markDailyPickViewed) {}
+            UserContext context,
+            User currentUser,
+            User candidate,
+            boolean liked,
+            boolean superLike,
+            boolean markDailyPickViewed) {}
 
     public static record UndoSwipeCommand(UserContext context) {}
 
@@ -456,11 +468,18 @@ public class MatchingUseCases {
             }
 
             @Override
+            public boolean canSuperLike(UUID userId) {
+                return recommendationService.canSuperLike(userId);
+            }
+
+            @Override
             public DailyStatus getStatus(UUID userId) {
                 RecommendationService.DailyStatus status = recommendationService.getStatus(userId);
                 return new DailyStatus(
                         status.likesUsed(),
                         status.likesRemaining(),
+                        status.superLikesUsed(),
+                        status.superLikesRemaining(),
                         status.passesUsed(),
                         status.passesRemaining(),
                         status.date(),

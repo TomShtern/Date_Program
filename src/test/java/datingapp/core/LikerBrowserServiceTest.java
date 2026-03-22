@@ -5,18 +5,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Report;
+import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.MatchingService.PendingLiker;
+import datingapp.core.matching.RecommendationService;
+import datingapp.core.matching.UndoService;
+import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.Match;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -72,11 +79,7 @@ class LikerBrowserServiceTest {
         userStorage.put(activeUser(matchedId, "Matched"));
         userStorage.put(incompleteUser(inactiveId, "Inactive"));
 
-        MatchingService service = MatchingService.builder()
-                .interactionStorage(interactionStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .userStorage(userStorage)
-                .build();
+        MatchingService service = buildMatchingService(interactionStorage, trustSafetyStorage, userStorage);
 
         List<User> pending = service.findPendingLikers(currentUserId);
 
@@ -100,11 +103,8 @@ class LikerBrowserServiceTest {
         userStorage.put(activeUser(olderLikerId, "Older"));
         userStorage.put(activeUser(newerLikerId, "Newer"));
 
-        MatchingService service = MatchingService.builder()
-                .interactionStorage(interactionStorage)
-                .trustSafetyStorage(new InMemoryTrustSafetyStorage())
-                .userStorage(userStorage)
-                .build();
+        MatchingService service =
+                buildMatchingService(interactionStorage, new InMemoryTrustSafetyStorage(), userStorage);
 
         List<PendingLiker> pending = service.findPendingLikersWithTimes(currentUserId);
 
@@ -130,6 +130,70 @@ class LikerBrowserServiceTest {
                 .updatedAt(Instant.EPOCH)
                 .verified(false)
                 .build();
+    }
+
+    private static MatchingService buildMatchingService(
+            InteractionStorage interactionStorage, TrustSafetyStorage trustSafetyStorage, UserStorage userStorage) {
+        AppConfig config = AppConfig.defaults();
+        TestStorages.Analytics analyticsStorage = new TestStorages.Analytics();
+        CandidateFinder candidateFinder =
+                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
+        ProfileService profileService =
+                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        RecommendationService recommendationService = RecommendationService.builder()
+                .interactionStorage(interactionStorage)
+                .userStorage(userStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(new TestStorages.Standouts())
+                .profileService(profileService)
+                .config(config)
+                .build();
+        UndoService undoService = new UndoService(interactionStorage, new InMemoryUndoStorage(), config);
+
+        return MatchingService.builder()
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
+                .undoService(undoService)
+                .dailyService(recommendationService)
+                .candidateFinder(candidateFinder)
+                .build();
+    }
+
+    private static class InMemoryUndoStorage implements Undo.Storage {
+        private final Map<UUID, Undo> byUserId = new HashMap<>();
+
+        @Override
+        public void save(Undo state) {
+            byUserId.put(state.userId(), state);
+        }
+
+        @Override
+        public Optional<Undo> findByUserId(UUID userId) {
+            return Optional.ofNullable(byUserId.get(userId));
+        }
+
+        @Override
+        public boolean delete(UUID userId) {
+            return byUserId.remove(userId) != null;
+        }
+
+        @Override
+        public int deleteExpired(Instant now) {
+            List<UUID> expired = byUserId.values().stream()
+                    .filter(undo -> undo.isExpired(now))
+                    .map(Undo::userId)
+                    .toList();
+            expired.forEach(byUserId::remove);
+            return expired.size();
+        }
+
+        @Override
+        public List<Undo> findAll() {
+            return List.copyOf(byUserId.values());
+        }
     }
 
     private static class InMemoryInteractionStorage implements InteractionStorage {
@@ -205,6 +269,11 @@ class LikerBrowserServiceTest {
 
         @Override
         public int countLikesToday(UUID userId, Instant startOfDay) {
+            return 0;
+        }
+
+        @Override
+        public int countSuperLikesToday(UUID userId, Instant startOfDay) {
             return 0;
         }
 

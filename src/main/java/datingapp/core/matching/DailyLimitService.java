@@ -14,6 +14,9 @@ public interface DailyLimitService {
     /** Whether the user can perform a like action today. */
     boolean canLike(UUID userId);
 
+    /** Whether the user can perform a super-like action today. */
+    boolean canSuperLike(UUID userId);
+
     /** Whether the user can perform a pass action today. */
     boolean canPass(UUID userId);
 
@@ -30,10 +33,17 @@ public interface DailyLimitService {
 
     /** Status snapshot for daily limits. */
     record DailyStatus(
-            int likesUsed, int likesRemaining, int passesUsed, int passesRemaining, LocalDate date, Instant resetsAt) {
+            int likesUsed,
+            int likesRemaining,
+            int superLikesUsed,
+            int superLikesRemaining,
+            int passesUsed,
+            int passesRemaining,
+            LocalDate date,
+            Instant resetsAt) {
 
         public DailyStatus {
-            if (likesUsed < 0 || passesUsed < 0) {
+            if (likesUsed < 0 || superLikesUsed < 0 || passesUsed < 0) {
                 throw new IllegalArgumentException("Usage counts cannot be negative");
             }
             Objects.requireNonNull(date, "date cannot be null");
@@ -46,6 +56,10 @@ public interface DailyLimitService {
 
         public boolean hasUnlimitedPasses() {
             return passesRemaining < 0;
+        }
+
+        public boolean hasUnlimitedSuperLikes() {
+            return superLikesRemaining < 0;
         }
     }
 }

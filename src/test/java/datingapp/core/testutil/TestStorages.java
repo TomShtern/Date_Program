@@ -202,11 +202,11 @@ public final class TestStorages {
             boolean forward = likes.values().stream()
                     .anyMatch(like -> like.whoLikes().equals(a)
                             && like.whoGotLiked().equals(b)
-                            && like.direction() == Like.Direction.LIKE);
+                            && isPositiveLike(like.direction()));
             boolean backward = likes.values().stream()
                     .anyMatch(like -> like.whoLikes().equals(b)
                             && like.whoGotLiked().equals(a)
-                            && like.direction() == Like.Direction.LIKE);
+                            && isPositiveLike(like.direction()));
             return forward && backward;
         }
 
@@ -222,7 +222,7 @@ public final class TestStorages {
         public Set<UUID> getUserIdsWhoLiked(UUID userId) {
             return likes.values().stream()
                     .filter(like -> like.whoGotLiked().equals(userId))
-                    .filter(like -> like.direction() == Like.Direction.LIKE)
+                    .filter(like -> isPositiveLike(like.direction()))
                     .map(Like::whoLikes)
                     .collect(Collectors.toSet());
         }
@@ -231,7 +231,7 @@ public final class TestStorages {
         public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
             return likes.values().stream()
                     .filter(like -> like.whoGotLiked().equals(userId))
-                    .filter(like -> like.direction() == Like.Direction.LIKE)
+                    .filter(like -> isPositiveLike(like.direction()))
                     .sorted(Comparator.comparing(Like::createdAt))
                     .map(like -> Map.entry(like.whoLikes(), like.createdAt()))
                     .toList();
@@ -257,12 +257,12 @@ public final class TestStorages {
         public int countMutualLikes(UUID userId) {
             Set<UUID> likedByUser = likes.values().stream()
                     .filter(like -> like.whoLikes().equals(userId))
-                    .filter(like -> like.direction() == Like.Direction.LIKE)
+                    .filter(like -> isPositiveLike(like.direction()))
                     .map(Like::whoGotLiked)
                     .collect(Collectors.toSet());
             return (int) likes.values().stream()
                     .filter(like -> like.whoGotLiked().equals(userId))
-                    .filter(like -> like.direction() == Like.Direction.LIKE)
+                    .filter(like -> isPositiveLike(like.direction()))
                     .map(Like::whoLikes)
                     .filter(likedByUser::contains)
                     .distinct()
@@ -279,12 +279,25 @@ public final class TestStorages {
         }
 
         @Override
+        public int countSuperLikesToday(UUID userId, Instant startOfDay) {
+            return (int) likes.values().stream()
+                    .filter(like -> like.whoLikes().equals(userId))
+                    .filter(like -> like.direction() == Like.Direction.SUPER_LIKE)
+                    .filter(like -> !like.createdAt().isBefore(startOfDay))
+                    .count();
+        }
+
+        @Override
         public int countPassesToday(UUID userId, Instant startOfDay) {
             return (int) likes.values().stream()
                     .filter(like -> like.whoLikes().equals(userId))
                     .filter(like -> like.direction() == Like.Direction.PASS)
                     .filter(like -> !like.createdAt().isBefore(startOfDay))
                     .count();
+        }
+
+        private static boolean isPositiveLike(Like.Direction direction) {
+            return direction == Like.Direction.LIKE || direction == Like.Direction.SUPER_LIKE;
         }
 
         @Override

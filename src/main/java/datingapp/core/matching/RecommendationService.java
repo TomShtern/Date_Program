@@ -118,6 +118,11 @@ public final class RecommendationService {
         return dailyLimitService.canLike(userId);
     }
 
+    /** Whether the user can perform a super-like action today. */
+    public boolean canSuperLike(UUID userId) {
+        return dailyLimitService.canSuperLike(userId);
+    }
+
     /** Whether the user can perform a pass action today. */
     public boolean canPass(UUID userId) {
         return dailyLimitService.canPass(userId);
@@ -129,6 +134,8 @@ public final class RecommendationService {
         return new DailyStatus(
                 status.likesUsed(),
                 status.likesRemaining(),
+                status.superLikesUsed(),
+                status.superLikesRemaining(),
                 status.passesUsed(),
                 status.passesRemaining(),
                 status.date(),
@@ -207,6 +214,8 @@ public final class RecommendationService {
     public static record DailyStatus(
             int likesUsed,
             int likesRemaining,
+            int superLikesUsed,
+            int superLikesRemaining,
             int passesUsed,
             int passesRemaining,
             LocalDate date,
@@ -214,6 +223,9 @@ public final class RecommendationService {
         public DailyStatus {
             if (likesUsed < 0) {
                 throw new IllegalArgumentException("likesUsed cannot be negative");
+            }
+            if (superLikesUsed < 0) {
+                throw new IllegalArgumentException("superLikesUsed cannot be negative");
             }
             if (passesUsed < 0) {
                 throw new IllegalArgumentException("passesUsed cannot be negative");
@@ -228,6 +240,10 @@ public final class RecommendationService {
 
         public boolean hasUnlimitedPasses() {
             return passesRemaining < 0;
+        }
+
+        public boolean hasUnlimitedSuperLikes() {
+            return superLikesRemaining < 0;
         }
     }
 

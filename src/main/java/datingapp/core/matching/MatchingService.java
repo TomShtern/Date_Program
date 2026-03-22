@@ -30,10 +30,10 @@ public final class MatchingService {
     private final TrustSafetyStorage trustSafetyStorage;
     private final UserStorage userStorage;
     private final Map<String, Object> swipeInFlight = new ConcurrentHashMap<>();
-    private ActivityMetricsService activityMetricsService; // Optional
-    private UndoService undoService; // Optional
-    private RecommendationService dailyService; // Optional
-    private CandidateFinder candidateFinder; // Optional
+    private final ActivityMetricsService activityMetricsService; // Optional
+    private final UndoService undoService;
+    private final RecommendationService dailyService;
+    private final CandidateFinder candidateFinder;
 
     /** Constructor with all dependencies (optional dependencies may be null). */
     public MatchingService(
@@ -64,10 +64,10 @@ public final class MatchingService {
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+        this.undoService = Objects.requireNonNull(undoService, "undoService cannot be null");
+        this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
+        this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
         this.activityMetricsService = activityMetricsService;
-        this.undoService = undoService;
-        this.dailyService = dailyService;
-        this.candidateFinder = candidateFinder;
     }
 
     public static Builder builder() {
@@ -189,13 +189,27 @@ public final class MatchingService {
      * @return SwipeResult containing success status and match information
      */
     public SwipeResult processSwipe(User currentUser, User candidate, boolean liked) {
+        return processSwipe(currentUser, candidate, liked, false);
+    }
+
+    public SwipeResult processSwipe(User currentUser, User candidate, boolean liked, boolean superLike) {
         Objects.requireNonNull(currentUser, "currentUser cannot be null");
         Objects.requireNonNull(candidate, "candidate cannot be null");
-        if (dailyService == null || undoService == null) {
-            return SwipeResult.configError("dailyService and undoService required for processSwipe");
+
+        if (superLike && !liked) {
+            return SwipeResult.configError("Super like requires liked=true");
         }
-        if (liked && !dailyService.canLike(currentUser.getId())) {
+
+        if (superLike && !dailyService.canSuperLike(currentUser.getId())) {
+            return SwipeResult.dailySuperLikeLimitReached();
+        }
+
+        if (!superLike && liked && !dailyService.canLike(currentUser.getId())) {
             return SwipeResult.dailyLimitReached();
+        }
+
+        if (!liked && !dailyService.canPass(currentUser.getId())) {
+            return SwipeResult.passLimitReached();
         }
 
         String inFlightKey = currentUser.getId() + ">" + candidate.getId();
@@ -203,7 +217,7 @@ public final class MatchingService {
             return SwipeResult.configError("A swipe for this candidate is already in progress");
         }
         try {
-            Like.Direction direction = liked ? Like.Direction.LIKE : Like.Direction.PASS;
+            Like.Direction direction = resolveDirection(liked, superLike);
             Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
             Optional<Match> match = recordLike(like);
             undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
@@ -218,10 +232,14 @@ public final class MatchingService {
         }
     }
 
-    private void invalidateCandidateCaches(UUID firstUserId, UUID secondUserId) {
-        if (candidateFinder == null) {
-            return;
+    private static Like.Direction resolveDirection(boolean liked, boolean superLike) {
+        if (!liked) {
+            return Like.Direction.PASS;
         }
+        return superLike ? Like.Direction.SUPER_LIKE : Like.Direction.LIKE;
+    }
+
+    private void invalidateCandidateCaches(UUID firstUserId, UUID secondUserId) {
         candidateFinder.invalidateCacheFor(firstUserId);
         candidateFinder.invalidateCacheFor(secondUserId);
     }
@@ -321,6 +339,14 @@ public final class MatchingService {
 
         public static SwipeResult dailyLimitReached() {
             return new SwipeResult(false, false, null, null, "Daily like limit reached.");
+        }
+
+        public static SwipeResult dailySuperLikeLimitReached() {
+            return new SwipeResult(false, false, null, null, "Daily super-like limit reached.");
+        }
+
+        public static SwipeResult passLimitReached() {
+            return new SwipeResult(false, false, null, null, "Daily pass limit reached.");
         }
 
         public static SwipeResult configError(String reason) {

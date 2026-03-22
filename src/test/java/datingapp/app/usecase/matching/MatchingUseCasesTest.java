@@ -2,7 +2,6 @@ package datingapp.app.usecase.matching;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.usecase.common.UserContext;
@@ -13,12 +12,20 @@ import datingapp.app.usecase.matching.MatchingUseCases.UndoSwipeCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.DailyLimitService;
+import datingapp.core.matching.DailyPickService;
 import datingapp.core.matching.MatchingService;
+import datingapp.core.matching.RecommendationService;
+import datingapp.core.matching.Standout;
+import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
+import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +48,10 @@ class MatchingUseCasesTest {
         interactionStorage = new TestStorages.Interactions();
         var trustSafetyStorage = new TestStorages.TrustSafety();
         var undoStorage = new TestStorages.Undos();
+        DailyLimitService dailyLimitService = alwaysAllowDailyLimitService();
+        DailyPickService dailyPickService = noDailyPickService();
+        StandoutService standoutService = noStandoutService();
+        var recommendationService = new RecommendationService(dailyLimitService, dailyPickService, standoutService);
 
         currentUser = TestUserFactory.createActiveUser(UUID.randomUUID(), "Current");
         candidate = TestUserFactory.createActiveUser(UUID.randomUUID(), "Candidate");
@@ -61,14 +72,16 @@ class MatchingUseCasesTest {
                 .trustSafetyStorage(trustSafetyStorage)
                 .userStorage(userStorage)
                 .undoService(undoService)
+                .dailyService(recommendationService)
+                .candidateFinder(candidateFinder)
                 .build();
 
         useCases = new MatchingUseCases(
                 candidateFinder,
                 matchingService,
-                null,
-                null,
-                null,
+                dailyLimitService,
+                dailyPickService,
+                standoutService,
                 undoService,
                 interactionStorage,
                 userStorage,
@@ -110,17 +123,17 @@ class MatchingUseCasesTest {
     }
 
     @Test
-    @DisplayName("processSwipe and undoSwipe report configuration/no-history conflicts")
-    void processAndUndoReturnConflictsForCurrentSetup() {
-        var swipeResult = useCases.processSwipe(
-                new ProcessSwipeCommand(UserContext.cli(currentUser.getId()), currentUser, candidate, true, false));
+    @DisplayName("processSwipe and undoSwipe succeed with configured services")
+    void processAndUndoSucceedForCurrentSetup() {
+        var swipeResult = useCases.processSwipe(new ProcessSwipeCommand(
+                UserContext.cli(currentUser.getId()), currentUser, candidate, true, false, false));
 
-        assertFalse(swipeResult.success());
-        assertNotNull(swipeResult.error());
+        assertTrue(swipeResult.success());
+        assertTrue(swipeResult.data().success());
 
         var undoResult = useCases.undoSwipe(new UndoSwipeCommand(UserContext.cli(currentUser.getId())));
-        assertFalse(undoResult.success());
-        assertEquals("No recent swipe to undo", undoResult.error().message());
+        assertTrue(undoResult.success());
+        assertTrue(undoResult.data().success());
     }
 
     @Test
@@ -133,5 +146,82 @@ class MatchingUseCasesTest {
         assertTrue(result.success());
         assertEquals(1, result.data().matches().size());
         assertTrue(result.data().usersById().containsKey(candidate.getId()));
+    }
+
+    private static DailyLimitService alwaysAllowDailyLimitService() {
+        return new DailyLimitService() {
+            @Override
+            public boolean canLike(UUID userId) {
+                return true;
+            }
+
+            @Override
+            public boolean canSuperLike(UUID userId) {
+                return true;
+            }
+
+            @Override
+            public boolean canPass(UUID userId) {
+                return true;
+            }
+
+            @Override
+            public DailyStatus getStatus(UUID userId) {
+                return new DailyStatus(0, 999, 0, 999, 0, 999, AppClock.today(), AppClock.now());
+            }
+
+            @Override
+            public Duration getTimeUntilReset() {
+                return Duration.ZERO;
+            }
+
+            @Override
+            public String formatDuration(Duration duration) {
+                return "00:00:00";
+            }
+        };
+    }
+
+    private static DailyPickService noDailyPickService() {
+        return new DailyPickService() {
+            @Override
+            public Optional<DailyPick> getDailyPick(User seeker) {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean hasViewedDailyPick(UUID userId) {
+                return false;
+            }
+
+            @Override
+            public void markDailyPickViewed(UUID userId) {
+                // No-op: the test only needs a deterministic, side-effect-free daily-pick service.
+            }
+
+            @Override
+            public int cleanupOldDailyPickViews(java.time.LocalDate before) {
+                return 0;
+            }
+        };
+    }
+
+    private static StandoutService noStandoutService() {
+        return new StandoutService() {
+            @Override
+            public Result getStandouts(User seeker) {
+                return Result.empty("none");
+            }
+
+            @Override
+            public void markInteracted(UUID seekerId, UUID standoutUserId) {
+                // No-op: standouts are irrelevant for this use-case test setup.
+            }
+
+            @Override
+            public java.util.Map<UUID, User> resolveUsers(List<Standout> standouts) {
+                return java.util.Map.of();
+            }
+        };
     }
 }

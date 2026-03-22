@@ -142,6 +142,7 @@ class RestApiConversationBatchCountTest {
                 .activityMetricsService(activityMetricsService)
                 .dailyService(recommendationService)
                 .undoService(undoService)
+                .candidateFinder(candidateFinder)
                 .build();
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)

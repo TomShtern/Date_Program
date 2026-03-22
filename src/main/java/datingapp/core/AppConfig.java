@@ -1,16 +1,21 @@
 package datingapp.core;
 
+import datingapp.core.model.User;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Objects;
 
 /**
- * Application configuration grouped by concern into four sub-records.
+ * Application configuration grouped by concern into five sub-records.
  *
  * <p>Use {@link #defaults()} for the default configuration, or {@link #builder()} for a custom one.
  */
 public record AppConfig(
-        MatchingConfig matching, ValidationConfig validation, AlgorithmConfig algorithm, SafetyConfig safety) {
+        MatchingConfig matching,
+        ValidationConfig validation,
+        AlgorithmConfig algorithm,
+        StorageConfig storage,
+        SafetyConfig safety) {
 
     // ========================================================================
     // Sub-record: MatchingConfig
@@ -104,6 +109,12 @@ public record AppConfig(
             int responseTimeGoodHours,
             int responseTimeWeekHours,
             int responseTimeMonthHours,
+            int standoutDiversityDays,
+            int standoutMinScore,
+            int starExcellentThreshold,
+            int starGreatThreshold,
+            int starGoodThreshold,
+            int starFairThreshold,
             double standoutDistanceWeight,
             double standoutAgeWeight,
             double standoutInterestWeight,
@@ -122,12 +133,28 @@ public record AppConfig(
                     responseTimeGoodHours,
                     responseTimeWeekHours,
                     responseTimeMonthHours,
+                    standoutDiversityDays,
+                    standoutMinScore,
+                    starExcellentThreshold,
+                    starGreatThreshold,
+                    starGoodThreshold,
+                    starFairThreshold,
                     standoutDistanceWeight,
                     standoutAgeWeight,
                     standoutInterestWeight,
                     standoutLifestyleWeight,
                     standoutCompletenessWeight,
                     standoutActivityWeight);
+        }
+    }
+
+    // ========================================================================
+    // Sub-record: StorageConfig
+    // ========================================================================
+
+    public static record StorageConfig(int queryTimeoutSeconds) {
+        public StorageConfig {
+            AppConfigValidator.validateStorage(queryTimeoutSeconds);
         }
     }
 
@@ -181,6 +208,7 @@ public record AppConfig(
         Objects.requireNonNull(matching, "matching cannot be null");
         Objects.requireNonNull(validation, "validation cannot be null");
         Objects.requireNonNull(algorithm, "algorithm cannot be null");
+        Objects.requireNonNull(storage, "storage cannot be null");
         Objects.requireNonNull(safety, "safety cannot be null");
     }
 
@@ -248,7 +276,7 @@ public record AppConfig(
         private int minAgeRangeSpan = 5;
         private int minDistanceKm = 1;
         private int maxInterests = 10;
-        private int maxPhotos = 2;
+        private int maxPhotos = User.MAX_PHOTOS;
         private int messageMaxPageSize = 100;
         private int chatBackgroundPollSeconds = 15;
         private int chatActivePollSeconds = 5;
@@ -264,12 +292,20 @@ public record AppConfig(
         private int responseTimeGoodHours = 72;
         private int responseTimeWeekHours = 168;
         private int responseTimeMonthHours = 720;
+        private int standoutDiversityDays = 3;
+        private int standoutMinScore = 40;
+        private int starExcellentThreshold = 90;
+        private int starGreatThreshold = 75;
+        private int starGoodThreshold = 60;
+        private int starFairThreshold = 40;
         private double standoutDistanceWeight = 0.20;
         private double standoutAgeWeight = 0.15;
         private double standoutInterestWeight = 0.25;
         private double standoutLifestyleWeight = 0.20;
         private double standoutCompletenessWeight = 0.10;
         private double standoutActivityWeight = 0.10;
+        // StorageConfig fields
+        private int queryTimeoutSeconds = 30;
         // SafetyConfig fields
         private int autoBanThreshold = 3;
         private ZoneId userTimeZone = ZoneId.systemDefault();
@@ -335,6 +371,11 @@ public record AppConfig(
 
         public Builder sessionTimeoutMinutes(int v) {
             this.sessionTimeoutMinutes = v;
+            return this;
+        }
+
+        public Builder queryTimeoutSeconds(int v) {
+            this.queryTimeoutSeconds = v;
             return this;
         }
 
@@ -405,6 +446,36 @@ public record AppConfig(
 
         public Builder responseTimeMonthHours(int v) {
             this.responseTimeMonthHours = v;
+            return this;
+        }
+
+        public Builder standoutDiversityDays(int v) {
+            this.standoutDiversityDays = v;
+            return this;
+        }
+
+        public Builder standoutMinScore(int v) {
+            this.standoutMinScore = v;
+            return this;
+        }
+
+        public Builder starExcellentThreshold(int v) {
+            this.starExcellentThreshold = v;
+            return this;
+        }
+
+        public Builder starGreatThreshold(int v) {
+            this.starGreatThreshold = v;
+            return this;
+        }
+
+        public Builder starGoodThreshold(int v) {
+            this.starGoodThreshold = v;
+            return this;
+        }
+
+        public Builder starFairThreshold(int v) {
+            this.starFairThreshold = v;
             return this;
         }
 
@@ -590,7 +661,11 @@ public record AppConfig(
 
         public AppConfig build() {
             return new AppConfig(
-                    buildMatchingConfig(), buildValidationConfig(), buildAlgorithmConfig(), buildSafetyConfig());
+                    buildMatchingConfig(),
+                    buildValidationConfig(),
+                    buildAlgorithmConfig(),
+                    buildStorageConfig(),
+                    buildSafetyConfig());
         }
 
         private MatchingConfig buildMatchingConfig() {
@@ -642,12 +717,22 @@ public record AppConfig(
                     responseTimeGoodHours,
                     responseTimeWeekHours,
                     responseTimeMonthHours,
+                    standoutDiversityDays,
+                    standoutMinScore,
+                    starExcellentThreshold,
+                    starGreatThreshold,
+                    starGoodThreshold,
+                    starFairThreshold,
                     standoutDistanceWeight,
                     standoutAgeWeight,
                     standoutInterestWeight,
                     standoutLifestyleWeight,
                     standoutCompletenessWeight,
                     standoutActivityWeight);
+        }
+
+        private StorageConfig buildStorageConfig() {
+            return new StorageConfig(queryTimeoutSeconds);
         }
 
         private SafetyConfig buildSafetyConfig() {

@@ -7,6 +7,8 @@ import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.profile.MatchPreferences.Dealbreakers;
+import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;
@@ -174,6 +176,35 @@ class CandidateFinderTest {
         finder.invalidateCacheFor(cachedSeeker.getId());
         finder.findCandidatesForUser(cachedSeeker);
         assertEquals(2, userStorage.findCandidatesCallCount());
+    }
+
+    @Test
+    @DisplayName("findCandidatesForUser cache fingerprint includes pace/lifestyle/dealbreakers/interests")
+    void findCandidatesForUserCacheFingerprintIncludesPreferenceState() {
+        User cachedSeeker = createUser("CachedSeeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.0853, 34.7818);
+        User candidate = createUser("Candidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.1, 34.8);
+        userStorage.save(cachedSeeker);
+        userStorage.save(candidate);
+
+        finder.findCandidatesForUser(cachedSeeker);
+        finder.findCandidatesForUser(cachedSeeker);
+        assertEquals(
+                1, userStorage.findCandidatesCallCount(), "second call should use cache before preference changes");
+
+        cachedSeeker.setDealbreakers(
+                Dealbreakers.builder().acceptSmoking(Lifestyle.Smoking.NEVER).build());
+        cachedSeeker.setPacePreferences(new PacePreferences(
+                MessagingFrequency.RARELY,
+                TimeToFirstDate.WEEKS,
+                CommunicationStyle.MIX_OF_EVERYTHING,
+                DepthPreference.SMALL_TALK));
+        cachedSeeker.setInterests(EnumSet.of(datingapp.core.profile.MatchPreferences.Interest.TRAVEL));
+
+        finder.findCandidatesForUser(cachedSeeker);
+        assertEquals(
+                2,
+                userStorage.findCandidatesCallCount(),
+                "preference changes must invalidate fingerprint-equivalent cache entries");
     }
 
     // =========================================================================

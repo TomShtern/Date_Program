@@ -99,8 +99,8 @@ public final class Main {
                 var option = menuRegistry.findOption(choice);
                 if (option.isEmpty()) {
                     logInfo(CliTextAndInput.INVALID_SELECTION);
-                } else if (option.orElseThrow().requiresLogin() && session.getCurrentUser() == null) {
-                    logInfo("Please select a user first (option 1 or 2).");
+                } else if (option.orElseThrow().requiresLogin() && !session.isLoggedIn()) {
+                    logInfo(CliTextAndInput.PLEASE_SELECT_USER);
                 } else {
                     MainMenuRegistry.DispatchResult dispatchResult =
                             option.orElseThrow().action().execute();

@@ -143,13 +143,14 @@ class UserInteractionsTest {
         }
 
         @Test
-        @DisplayName("Direction enum contains exactly LIKE and PASS")
+        @DisplayName("Direction enum contains LIKE, PASS, and SUPER_LIKE")
         void directionEnumValues() {
             Like.Direction[] values = Like.Direction.values();
 
-            assertEquals(2, values.length, "Should have exactly 2 directions");
+            assertEquals(3, values.length, "Should have exactly 3 directions");
             assertEquals(Like.Direction.LIKE, Like.Direction.valueOf("LIKE"));
             assertEquals(Like.Direction.PASS, Like.Direction.valueOf("PASS"));
+            assertEquals(Like.Direction.SUPER_LIKE, Like.Direction.valueOf("SUPER_LIKE"));
         }
 
         @Test

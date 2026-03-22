@@ -430,7 +430,7 @@ This document is split for fast triage and deep implementation work:
 - **Severity / Category:** critical / bug
 - **Mentions (total):** 5
 - **Cross-report conflict:** yes
-- **Status note:** RESOLVED/HISTORICAL
+- **Status note:** RESOLVED/VERIFIED (2026-03-22)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                                              |
@@ -443,16 +443,16 @@ This document is split for fast triage and deep implementation work:
 | section_reference     | `#4`                                                        | Part 3: MEDIUM Priority Issues > 3.12 CandidateFinder Cache Fingerprint Incomplete |
 
 #### Details and Context
-- Reads legacy columns but misses merge with normalized table values.
-- Recommendation identifies cache fingerprint incompleteness risk.
-- When distance threshold is very large, bounding box is skipped and all active users are loaded.
-- Fingerprint reportedly excludes dealbreakers/interests/lifestyle, risking stale or incorrect cache hits.
+- Mapper now composes scalar dealbreaker fields with normalized dealbreaker dimensions on read.
+- Candidate cache fingerprint now includes dealbreakers/interests/lifestyle/pace state.
+- Candidate query keeps DB-side location narrowing for very large radius values via capped bounding-box filtering.
+- Added regression coverage for merged dealbreakers, fingerprint sensitivity, and large-radius query narrowing.
 
 #### Recommended Actions
-- Merge legacy and normalized sources deterministically.
-- Include dealbreakers in candidate fingerprint/cache key.
-- Keep bounded query constraints even for large radius values; avoid full-table candidate scans.
-- Include all preference-affecting dimensions in cache fingerprint.
+- ✅ Merge legacy and normalized sources deterministically.
+- ✅ Include dealbreakers in candidate fingerprint/cache key.
+- ✅ Keep bounded query constraints even for large radius values; avoid full-table candidate scans.
+- ✅ Include all preference-affecting dimensions in cache fingerprint.
 
 <details><summary>Evidence snippets</summary>
 
@@ -505,7 +505,7 @@ This document is split for fast triage and deep implementation work:
 - **Severity / Category:** critical / build
 - **Mentions (total):** 1
 - **Cross-report conflict:** status-only
-- **Status note:** RESOLVED/HISTORICAL
+- **Status note:** RESOLVED/HISTORICAL (re-open only if flake is reproducible now)
 
 #### Report Context
 | Type                  | Key                                                          | Value         |
@@ -919,6 +919,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - Runtime toggling support is described as limited.
 - Feature toggling breadth is reported as constrained.
 
+#### Completion status: ✅ Implemented (2026-03-22 batch)
+
 #### Recommended Actions
 - Document `datingapp.ui.presence.enabled` and expected defaults/impacts.
 - Expand feature flag framework and operational docs.
@@ -989,6 +991,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** high / ui-ux
 - **Mentions (total):** 2
 - **Cross-report conflict:** no
+- **Status note:** RESOLVED/HISTORICAL (verified in current code)
 
 #### Report Context
 | Type                  | Key                                                          | Value                                             |
@@ -997,8 +1000,11 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 | section_reference     | `#1`                                                         | 2.3 Unimplemented Or Partial Features; 8 Addendum |
 
 #### Details and Context
-- Cross-layer gap says social features existed in CLI only.
-- Later addendum describes SocialViewModel/Controller/FXML implementation.
+- Historical report gap said social features existed in CLI only.
+- Current code already includes SocialViewModel/SocialController/social.fxml behavior.
+- Treat this as closed unless a concrete missing interaction is reproducible.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - No immediate code change required (historical/resolved context).
@@ -1053,6 +1059,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 #### Details and Context
 - Historical constructor patterns left optional dependencies null, toggling behavior at runtime.
 - Refactoring improved this with Builder/requireNonNull, but report states mode-switching still persists in MatchingService.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - No immediate code change required (historical/resolved context).
@@ -1290,6 +1298,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - Rate limiter: concurrent access and window expiration timing.
 - Configuration: weight-sum edge and timezone parse failures.
 
+#### Completion status: ✅ Implemented (2026-03-22 batch)
+
 #### Recommended Actions
 - Add targeted tests for all listed missing categories.
 
@@ -1403,10 +1413,11 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 | section_reference     | `#2`                                                         | Feature / UI Status > Genuinely Open Items |
 
 #### Details and Context
-- UI was described as only supporting one photo despite domain allowing more.
-- Feature is later marked resolved.
-- Card/profile preview path hardcodes first photo selection.
-- No multi-photo browsing UI in these views; placeholder shown when empty.
+- Original report described one-photo-only behavior despite domain support for multiple photos.
+- Current codebase already includes shipped multi-photo behavior and tests; do not re-open as blank parity reimplementation.
+- Any follow-on work should be tracked as UX enhancement requests, not parity-gap closure.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - Implement photo gallery/carousel for profile/match views.
@@ -1571,6 +1582,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - Some business constraints are embedded in code, reducing runtime flexibility.
 - Report calls out embedded rules that reduce runtime tunability.
 
+#### Completion status: ✅ Implemented (2026-03-22 batch)
+
 #### Recommended Actions
 - Move business thresholds/limits to validated configuration.
 - Move hardcoded business limits into configuration where appropriate.
@@ -1620,6 +1633,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 
 #### Details and Context
 - Some handlers manually inspect current user null-state instead of shared require-login utility.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - Standardize on centralized `CliTextAndInput.requireLogin()` pattern.
@@ -1701,6 +1716,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - Historical concern about fragmented business thresholds in config.
 - Status notes guidance changed: prefer injected runtime config; defaults only at bootstrap/composition/tests.
 
+#### Completion status: ✅ Implemented (2026-03-22 batch)
+
 #### Recommended Actions
 - No immediate code change required (historical/resolved context).
 
@@ -1752,12 +1769,15 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 | section_reference     | `#2`                                                     | 11. Identified Gaps and Incomplete Features > Placeholder Implementations |
 
 #### Details and Context
-- Current app event bus is called out as potentially needing broader capability.
-- Event layer is flagged as potentially under-expanded for future needs.
+- The event system itself exists and is actively used.
+- Remaining work is contract-level: extend event payloads/types only when a concrete feature requires them.
+- This is not a baseline architecture gap.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
-- Expand event contracts/coverage where cross-component decoupling is needed.
-- Expand `AppEventBus` / `InProcessAppEventBus` capabilities as needed.
+- Keep current event infrastructure as-is.
+- Add or extend event contracts only for concrete feature stories that need additional semantics.
 
 <details><summary>Evidence snippets</summary>
 
@@ -1833,6 +1853,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 #### Details and Context
 - Super Like button currently calls regular like flow only.
 - Feature appears surfaced but non-differentiated.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - Implement distinct super-like logic or remove/hide the button.
@@ -2077,6 +2099,9 @@ Achievement thresholds are **centralized in `AppConfig.SafetyConfig`** (lines 14
 #### Details and Context
 - Pre-existing async refresh in setup could post stale list update.
 - Equal timestamps produced nondeterministic ordering assumptions in tests.
+- No current re-open should be made from historical evidence alone without fresh local reproduction.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - No immediate code change required (historical/resolved context).
@@ -2170,6 +2195,8 @@ The claim that `isRunning()` "reads without synchronization" is technically true
 
 #### Details and Context
 - Some flows rely on later `saveProfile()` calls; interruption can drop modifications.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - Persist immediately after mutation or harden transactional flow to prevent interruption loss.
@@ -2548,6 +2575,8 @@ The claim calls these "magic numbers" but they are properly declared named const
 
 This is an intentional design gap — the app uses soft-delete for users but hard-delete cascades for the DB. Whether this needs fixing depends on whether soft-deleted users' data should remain queryable (audit/compliance) or be hidden (privacy).
 
+#### Completion status: ✅ Implemented (2026-03-22 batch)
+
 <details><summary>Evidence snippets</summary>
 
 - `"no `deleted_at` propagation"`
@@ -2644,6 +2673,8 @@ This is an intentional design gap — the app uses soft-delete for users but har
 #### Details and Context
 - Dead/archived code in repository can confuse discoverability and ownership.
 
+#### Completion status: ✅ Implemented (2026-03-22 batch)
+
 #### Recommended Actions
 - Remove or clearly quarantine archived utility code.
 
@@ -2692,6 +2723,8 @@ This is an intentional design gap — the app uses soft-delete for users but har
 
 #### Details and Context
 - Schema mixes naming styles (`uk_` vs `unq_`).
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - Standardize unique-constraint naming.
@@ -2742,6 +2775,8 @@ This is an intentional design gap — the app uses soft-delete for users but har
 
 #### Details and Context
 - Reported as dead schema weight with no query usage.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - Remove unnecessary `AUTO_INCREMENT` id from `profile_views`.
@@ -2853,6 +2888,8 @@ The `errorSink` nullability is a **deliberate null-object pattern with fallback 
 
 #### Details and Context
 - Same thresholds appear in multiple classes.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - Centralize threshold constants.
@@ -3022,6 +3059,8 @@ The report confuses "viewing a standout" (→ see their profile) with "matching 
 #### Details and Context
 - Listed as a recommendation item without a corresponding earlier section; indicates config/ops gap.
 
+#### Completion status: ✅ Implemented (2026-03-22 batch)
+
 #### Recommended Actions
 - Add transaction timeout configuration.
 
@@ -3045,6 +3084,8 @@ The report confuses "viewing a standout" (→ see their profile) with "matching 
 
 #### Details and Context
 - Behavior depends on complete gender enum membership and could break with future changes.
+
+#### Completion status: ✅ Implemented (2026-03-22 batch)
 
 #### Recommended Actions
 - Harden invariant and add regression tests around enum evolution.

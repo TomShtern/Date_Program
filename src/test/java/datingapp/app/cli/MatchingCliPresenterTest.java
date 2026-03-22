@@ -39,7 +39,7 @@ class MatchingCliPresenterTest {
     @DisplayName("renders daily limit panel using localized lines")
     void rendersDailyLimitPanelUsingLocalizedLines() {
         RecommendationService.DailyStatus status = new RecommendationService.DailyStatus(
-                7, 0, 0, -1, LocalDate.now(), Instant.now().plusSeconds(3600));
+                7, 0, 0, 999, 0, 999, LocalDate.now(), Instant.now().plusSeconds(3600));
 
         List<String> lines = presenter.dailyLimitReachedLines(status, "1h 0m");
 

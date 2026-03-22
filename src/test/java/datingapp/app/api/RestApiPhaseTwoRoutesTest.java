@@ -219,7 +219,7 @@ class RestApiPhaseTwoRoutesTest {
                 LocalDate.now());
 
         services.getMatchingUseCases()
-                .processSwipe(new ProcessSwipeCommand(UserContext.api(aliceId), alice, eve, true, false));
+                .processSwipe(new ProcessSwipeCommand(UserContext.api(aliceId), alice, eve, true, false, false));
 
         server = new RestApiServer(services, 0);
         server.start();
@@ -563,6 +563,7 @@ class RestApiPhaseTwoRoutesTest {
                 .activityMetricsService(activityMetricsService)
                 .dailyService(recommendationService)
                 .undoService(undoService)
+                .candidateFinder(candidateFinder)
                 .build();
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)

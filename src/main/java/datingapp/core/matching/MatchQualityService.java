@@ -30,11 +30,8 @@ public class MatchQualityService {
     private final AppConfig config;
     private final CompatibilityCalculator calculator;
 
-    // ── Match quality thresholds (inlined from deleted ScoringConstants) ──
-    private static final int STAR_EXCELLENT_THRESHOLD = 90;
-    private static final int STAR_GREAT_THRESHOLD = 75;
-    private static final int STAR_GOOD_THRESHOLD = 60;
-    private static final int STAR_FAIR_THRESHOLD = 40;
+    private static volatile StarThresholdPolicy starThresholdPolicy =
+            StarThresholdPolicy.from(AppConfig.defaults().algorithm());
     private static final String LABEL_EXCELLENT = "Excellent Match";
     private static final String LABEL_GREAT = "Great Match";
     private static final String LABEL_GOOD = "Good Match";
@@ -47,6 +44,17 @@ public class MatchQualityService {
     private static final int MID_DISTANCE_KM = 15;
     private static final int AGE_SIMILAR_YEARS = 2;
     private static final int QUICK_MUTUAL_INTEREST_HOURS = 24;
+
+    private record StarThresholdPolicy(
+            int excellentThreshold, int greatThreshold, int goodThreshold, int fairThreshold) {
+        private static StarThresholdPolicy from(AppConfig.AlgorithmConfig algorithm) {
+            return new StarThresholdPolicy(
+                    algorithm.starExcellentThreshold(),
+                    algorithm.starGreatThreshold(),
+                    algorithm.starGoodThreshold(),
+                    algorithm.starFairThreshold());
+        }
+    }
 
     /**
      * Immutable record representing the quality/compatibility of a match. Computed
@@ -121,16 +129,16 @@ public class MatchQualityService {
 
         /** Get star rating (1-5 stars based on compatibility). */
         public int getStarRating() {
-            if (compatibilityScore >= STAR_EXCELLENT_THRESHOLD) {
+            if (compatibilityScore >= starThresholdPolicy.excellentThreshold()) {
                 return 5;
             }
-            if (compatibilityScore >= STAR_GREAT_THRESHOLD) {
+            if (compatibilityScore >= starThresholdPolicy.greatThreshold()) {
                 return 4;
             }
-            if (compatibilityScore >= STAR_GOOD_THRESHOLD) {
+            if (compatibilityScore >= starThresholdPolicy.goodThreshold()) {
                 return 3;
             }
-            if (compatibilityScore >= STAR_FAIR_THRESHOLD) {
+            if (compatibilityScore >= starThresholdPolicy.fairThreshold()) {
                 return 2;
             }
             return 1;
@@ -138,16 +146,16 @@ public class MatchQualityService {
 
         /** Get compatibility label. */
         public String getCompatibilityLabel() {
-            if (compatibilityScore >= STAR_EXCELLENT_THRESHOLD) {
+            if (compatibilityScore >= starThresholdPolicy.excellentThreshold()) {
                 return LABEL_EXCELLENT;
             }
-            if (compatibilityScore >= STAR_GREAT_THRESHOLD) {
+            if (compatibilityScore >= starThresholdPolicy.greatThreshold()) {
                 return LABEL_GREAT;
             }
-            if (compatibilityScore >= STAR_GOOD_THRESHOLD) {
+            if (compatibilityScore >= starThresholdPolicy.goodThreshold()) {
                 return LABEL_GOOD;
             }
-            if (compatibilityScore >= STAR_FAIR_THRESHOLD) {
+            if (compatibilityScore >= starThresholdPolicy.fairThreshold()) {
                 return LABEL_FAIR;
             }
             return LABEL_LOW;
@@ -190,6 +198,11 @@ public class MatchQualityService {
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.calculator = Objects.requireNonNull(calculator, "calculator cannot be null");
+        refreshStarThresholdPolicy(this.config);
+    }
+
+    private static synchronized void refreshStarThresholdPolicy(AppConfig config) {
+        starThresholdPolicy = StarThresholdPolicy.from(config.algorithm());
     }
 
     // === Public API ===

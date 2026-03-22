@@ -6,10 +6,13 @@ import datingapp.core.matching.*;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.*;
+import datingapp.core.profile.MatchPreferences.Interest;
+import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -92,6 +95,40 @@ class StandoutsServiceTest {
                 PacePreferences.DepthPreference.DEPENDS_ON_VIBE));
         user.activate();
         return user;
+    }
+
+    private User createLowScoringActiveUser(
+            String name,
+            Gender gender,
+            Gender interestedIn,
+            Instant updatedAt,
+            Set<Interest> interests,
+            Lifestyle.Smoking smoking,
+            Lifestyle.Drinking drinking,
+            Lifestyle.WantsKids wantsKids,
+            Lifestyle.LookingFor lookingFor) {
+        return User.StorageBuilder.create(UUID.randomUUID(), name, updatedAt)
+                .bio("Test bio for " + name)
+                .birthDate(AppClock.today().minusYears(25))
+                .gender(gender)
+                .interestedIn(EnumSet.of(interestedIn))
+                .location(32.0853, 34.7818)
+                .hasLocationSet(true)
+                .maxDistanceKm(50)
+                .ageRange(18, 99)
+                .photoUrls(List.of("https://example.com/photo.jpg"))
+                .state(User.UserState.ACTIVE)
+                .interests(interests)
+                .smoking(smoking)
+                .drinking(drinking)
+                .wantsKids(wantsKids)
+                .lookingFor(lookingFor)
+                .pacePreferences(new PacePreferences(
+                        PacePreferences.MessagingFrequency.WILDCARD,
+                        PacePreferences.TimeToFirstDate.WILDCARD,
+                        PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                        PacePreferences.DepthPreference.DEPENDS_ON_VIBE))
+                .build();
     }
 
     /** Creates a user with specific gender preferences for matching tests. */
@@ -225,6 +262,51 @@ class StandoutsServiceTest {
 
             assertFalse(result.isEmpty());
             assertFalse(result.fromCache());
+        }
+
+        @Test
+        @DisplayName("Should filter out standouts below the configured minimum score")
+        void filtersOutLowScoringStandouts() {
+            AppConfig customConfig = AppConfig.builder().standoutMinScore(50).build();
+            RecommendationService customService = RecommendationService.builder()
+                    .userStorage(userStorage)
+                    .interactionStorage(new TestStorages.Interactions())
+                    .trustSafetyStorage(new TestStorages.TrustSafety())
+                    .analyticsStorage(new TestStorages.Analytics())
+                    .candidateFinder(candidateFinder)
+                    .standoutStorage(new TestStandoutStorage())
+                    .profileService(profileCompletionService)
+                    .config(customConfig)
+                    .build();
+
+            User seeker = createLowScoringActiveUser(
+                    "Seeker",
+                    Gender.FEMALE,
+                    Gender.MALE,
+                    FIXED_INSTANT.minus(Duration.ofDays(1)),
+                    EnumSet.of(Interest.COFFEE),
+                    Lifestyle.Smoking.REGULARLY,
+                    Lifestyle.Drinking.REGULARLY,
+                    Lifestyle.WantsKids.HAS_KIDS,
+                    Lifestyle.LookingFor.MARRIAGE);
+            User candidate = createLowScoringActiveUser(
+                    "Candidate",
+                    Gender.MALE,
+                    Gender.FEMALE,
+                    FIXED_INSTANT.minus(Duration.ofDays(40)),
+                    EnumSet.of(Interest.HIKING),
+                    Lifestyle.Smoking.NEVER,
+                    Lifestyle.Drinking.NEVER,
+                    Lifestyle.WantsKids.NO,
+                    Lifestyle.LookingFor.CASUAL);
+
+            userStorage.save(seeker);
+            userStorage.save(candidate);
+
+            RecommendationService.Result result = customService.getStandouts(seeker);
+
+            assertTrue(result.isEmpty());
+            assertEquals(0, result.count());
         }
 
         @Test

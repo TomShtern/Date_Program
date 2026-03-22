@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -19,7 +20,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +55,7 @@ public final class ApplicationStartup {
     private static final String CONFIG_FILE = "./config/app-config.json";
     private static final String ENV_PREFIX = "DATING_APP_";
     private static final String SEED_DATA_ENV_VAR = ENV_PREFIX + "SEED_DATA";
+    private static final Set<String> KNOWN_CONFIG_KEYS = knownConfigKeys();
 
     /**
      * Pre-configured {@link ObjectMapper} for config deserialization.
@@ -61,10 +68,8 @@ public final class ApplicationStartup {
      * private fields of the builder without needing {@code setXxx}-prefixed methods
      * or
      * Jackson annotations inside {@code core/}.
-     * <li>Silence unknown-property errors
-     * ({@code @JsonIgnoreProperties(ignoreUnknown = true)})
-     * so legacy or future JSON keys that have no corresponding builder field are
-     * skipped.
+     * <li>Allow stable field binding semantics in the mapper while unknown-key
+     * handling is enforced explicitly before binding.
      * </ul>
      * A {@link ZoneIdDeserializer} is also registered to map a plain timezone
      * string like
@@ -74,7 +79,7 @@ public final class ApplicationStartup {
 
     private static volatile ServiceRegistry services;
     private static volatile DatabaseManager dbManager;
-    private static volatile CleanupScheduler cleanupScheduler;
+    private static final AtomicReference<CleanupScheduler> CLEANUP_SCHEDULER_REF = new AtomicReference<>();
     private static volatile boolean initialized = false;
 
     private ApplicationStartup() {}
@@ -121,9 +126,9 @@ public final class ApplicationStartup {
     }
 
     public static synchronized void shutdown() {
-        if (cleanupScheduler != null) {
-            cleanupScheduler.stop();
-            cleanupScheduler = null;
+        CleanupScheduler scheduler = CLEANUP_SCHEDULER_REF.getAndSet(null);
+        if (scheduler != null) {
+            scheduler.stop();
         }
         if (dbManager != null) {
             dbManager.shutdown();
@@ -194,10 +199,38 @@ public final class ApplicationStartup {
      */
     private static void applyJsonConfig(AppConfig.Builder builder, String json) {
         try {
+            failOnUnknownConfigKeys(json);
             MAPPER.readerForUpdating(builder).readValue(json);
+        } catch (IllegalStateException ex) {
+            throw ex;
         } catch (IOException ex) {
             logWarn("Failed to parse JSON config — using defaults for all unread fields", ex);
         }
+    }
+
+    private static void failOnUnknownConfigKeys(String json) throws IOException {
+        JsonNode root = MAPPER.readTree(json);
+        if (root == null || !root.isObject()) {
+            return;
+        }
+
+        Set<String> unknownKeys = new TreeSet<>();
+        root.fieldNames().forEachRemaining(field -> {
+            if (!KNOWN_CONFIG_KEYS.contains(field)) {
+                unknownKeys.add(field);
+            }
+        });
+
+        if (!unknownKeys.isEmpty()) {
+            throw new IllegalStateException("Unknown config keys: " + String.join(", ", unknownKeys));
+        }
+    }
+
+    private static Set<String> knownConfigKeys() {
+        return Arrays.stream(AppConfig.Builder.class.getDeclaredFields())
+                .filter(field -> !java.lang.reflect.Modifier.isStatic(field.getModifiers()))
+                .map(java.lang.reflect.Field::getName)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     // ========================================================================
@@ -225,6 +258,7 @@ public final class ApplicationStartup {
         applyEnvInt("MAX_SWIPES_PER_SESSION", builder::maxSwipesPerSession);
         applyEnvInt("UNDO_WINDOW_SECONDS", builder::undoWindowSeconds);
         applyEnvInt("SESSION_TIMEOUT_MINUTES", builder::sessionTimeoutMinutes);
+        applyEnvInt("QUERY_TIMEOUT_SECONDS", builder::queryTimeoutSeconds);
         applyEnvInt("CLEANUP_RETENTION_DAYS", builder::cleanupRetentionDays);
         applyEnvInt("MIN_AGE", builder::minAge);
         applyEnvInt("MAX_AGE", builder::maxAge);
@@ -315,10 +349,8 @@ public final class ApplicationStartup {
      * interfering
      * with the standard POJO deserialization path; only {@code ANY} field
      * visibility is used.
-     * <li>{@link JsonIgnoreProperties} — silently skips unknown JSON keys (e.g.,
-     * legacy config
-     * entries in {@code app-config.json} that no longer correspond to builder
-     * fields).
+     * <li>{@link JsonIgnoreProperties} — mapper-level fallback behavior; unknown
+     * JSON keys are still rejected earlier by {@code failOnUnknownConfigKeys}.
      * </ul>
      */
     @JsonAutoDetect(
@@ -375,8 +407,9 @@ public final class ApplicationStartup {
     }
 
     private static void startCleanupScheduler(ServiceRegistry serviceRegistry) {
-        cleanupScheduler =
+        CleanupScheduler scheduler =
                 new CleanupScheduler(Duration.ofHours(24), serviceRegistry.getActivityMetricsService()::runCleanup);
-        cleanupScheduler.start();
+        CLEANUP_SCHEDULER_REF.set(scheduler);
+        scheduler.start();
     }
 }

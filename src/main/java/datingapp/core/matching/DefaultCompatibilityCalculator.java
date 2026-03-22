@@ -14,7 +14,7 @@ public final class DefaultCompatibilityCalculator implements CompatibilityCalcul
     private final AppConfig config;
     private final Clock clock;
 
-    // From MatchQualityService STAR thresholds
+    // Local baseline score policy constants.
     private static final double NEUTRAL_SCORE = 0.5;
     private static final double INTEREST_MISSING_SCORE = 0.3;
     private static final int AGE_SIMILAR_YEARS = 2;
@@ -33,14 +33,14 @@ public final class DefaultCompatibilityCalculator implements CompatibilityCalcul
     private static final int PACE_SCORE_CLOSE = 15;
     private static final int PACE_SCORE_FAR = 5;
 
-    // Activity Score Thresholds (from RecommendationService)
+    // Activity score thresholds owned by this calculator.
     private static final long ACTIVITY_VERY_RECENT_HOURS = 1;
     private static final long ACTIVITY_RECENT_HOURS = 24;
     private static final long ACTIVITY_MODERATE_HOURS = 72;
     private static final long ACTIVITY_WEEKLY_HOURS = 168;
     private static final long ACTIVITY_MONTHLY_HOURS = 720;
 
-    // Activity Score Values (from RecommendationService)
+    // Activity score values owned by this calculator.
     private static final double ACTIVITY_SCORE_VERY_RECENT = 1.0;
     private static final double ACTIVITY_SCORE_RECENT = 0.9;
     private static final double ACTIVITY_SCORE_MODERATE = 0.7;

@@ -20,6 +20,7 @@ import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.SanitizerUtils;
 import datingapp.core.profile.ValidationService;
+import datingapp.core.storage.AccountCleanupStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import java.util.EnumSet;
@@ -47,6 +48,7 @@ public class ProfileUseCases {
     private final ValidationService validationService;
     private final ActivityMetricsService activityMetricsService;
     private final AchievementService achievementService;
+    private final AccountCleanupStorage accountCleanupStorage;
     private final AppConfig config;
     private final ProfileActivationPolicy activationPolicy;
     private final AppEventBus eventBus;
@@ -65,11 +67,35 @@ public class ProfileUseCases {
             AppConfig config,
             ProfileActivationPolicy activationPolicy,
             AppEventBus eventBus) {
+        this(
+                userStorage,
+                profileService,
+                validationService,
+                activityMetricsService,
+                achievementService,
+                config,
+                activationPolicy,
+                eventBus,
+                null);
+    }
+
+    @SuppressWarnings("java:S107")
+    public ProfileUseCases(
+            UserStorage userStorage,
+            ProfileService profileService,
+            ValidationService validationService,
+            ActivityMetricsService activityMetricsService,
+            AchievementService achievementService,
+            AppConfig config,
+            ProfileActivationPolicy activationPolicy,
+            AppEventBus eventBus,
+            AccountCleanupStorage accountCleanupStorage) {
         this.userStorage = userStorage;
         this.profileService = profileService;
         this.validationService = validationService;
         this.activityMetricsService = activityMetricsService;
         this.achievementService = achievementService;
+        this.accountCleanupStorage = accountCleanupStorage;
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
         this.eventBus = eventBus;
@@ -81,6 +107,7 @@ public class ProfileUseCases {
         private ValidationService validationService;
         private ActivityMetricsService activityMetricsService;
         private AchievementService achievementService;
+        private AccountCleanupStorage accountCleanupStorage;
         private AppConfig config;
         private ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
         private AppEventBus eventBus;
@@ -112,6 +139,11 @@ public class ProfileUseCases {
             return this;
         }
 
+        public Builder accountCleanupStorage(AccountCleanupStorage accountCleanupStorage) {
+            this.accountCleanupStorage = accountCleanupStorage;
+            return this;
+        }
+
         public Builder config(AppConfig config) {
             this.config = config;
             return this;
@@ -136,7 +168,8 @@ public class ProfileUseCases {
                     achievementService,
                     config,
                     activationPolicy,
-                    eventBus);
+                    eventBus,
+                    accountCleanupStorage);
         }
     }
 
@@ -327,11 +360,16 @@ public class ProfileUseCases {
         }
 
         try {
-            user.markDeleted(AppClock.now());
+            var deletedAt = AppClock.now();
+            user.markDeleted(deletedAt);
             if (user.getState() == User.UserState.ACTIVE) {
                 user.pause();
             }
-            userStorage.save(user);
+            if (accountCleanupStorage != null) {
+                accountCleanupStorage.softDeleteAccount(user, deletedAt);
+            } else {
+                userStorage.save(user);
+            }
             if (logger.isInfoEnabled()) {
                 logger.info("Account soft-deleted for user {} (reason={})", user.getId(), command.reason());
             }

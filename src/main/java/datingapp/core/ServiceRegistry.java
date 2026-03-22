@@ -21,6 +21,7 @@ import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
+import datingapp.core.storage.AccountCleanupStorage;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
@@ -40,6 +41,7 @@ public final class ServiceRegistry {
     private final CommunicationStorage communicationStorage;
     private final AnalyticsStorage analyticsStorage;
     private final TrustSafetyStorage trustSafetyStorage;
+    private final AccountCleanupStorage accountCleanupStorage;
 
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
@@ -82,6 +84,7 @@ public final class ServiceRegistry {
         this.analyticsStorage = Objects.requireNonNull(builder.analyticsStorage, "analyticsStorage cannot be null");
         this.trustSafetyStorage =
                 Objects.requireNonNull(builder.trustSafetyStorage, "trustSafetyStorage cannot be null");
+        this.accountCleanupStorage = builder.accountCleanupStorage;
         this.candidateFinder = Objects.requireNonNull(builder.candidateFinder, "candidateFinder cannot be null");
         this.matchingService = Objects.requireNonNull(builder.matchingService, "matchingService cannot be null");
         this.trustSafetyService =
@@ -125,6 +128,7 @@ public final class ServiceRegistry {
                 .validationService(this.validationService)
                 .activityMetricsService(this.activityMetricsService)
                 .achievementService(this.achievementService)
+                .accountCleanupStorage(this.accountCleanupStorage)
                 .config(this.config)
                 .activationPolicy(this.activationPolicy)
                 .eventBus(this.eventBus)
@@ -140,6 +144,7 @@ public final class ServiceRegistry {
         private CommunicationStorage communicationStorage;
         private AnalyticsStorage analyticsStorage;
         private TrustSafetyStorage trustSafetyStorage;
+        private AccountCleanupStorage accountCleanupStorage;
         private CandidateFinder candidateFinder;
         private MatchingService matchingService;
         private ActivityMetricsService activityMetricsService;
@@ -188,6 +193,11 @@ public final class ServiceRegistry {
 
         public Builder trustSafetyStorage(TrustSafetyStorage trustSafetyStorage) {
             this.trustSafetyStorage = trustSafetyStorage;
+            return this;
+        }
+
+        public Builder accountCleanupStorage(AccountCleanupStorage accountCleanupStorage) {
+            this.accountCleanupStorage = accountCleanupStorage;
             return this;
         }
 

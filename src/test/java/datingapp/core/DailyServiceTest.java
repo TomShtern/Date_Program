@@ -224,14 +224,15 @@ class DailyServiceTest {
         @DisplayName("DailyStatus edge cases")
         void dailyStatus_edgeCases() {
             RecommendationService.DailyStatus status = new RecommendationService.DailyStatus(
-                    0, 5, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now());
+                    0, 5, 0, 10, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now());
             assertFalse(status.hasUnlimitedLikes());
+            assertFalse(status.hasUnlimitedSuperLikes());
             assertFalse(status.hasUnlimitedPasses());
 
             assertThrows(
                     IllegalArgumentException.class,
                     () -> new RecommendationService.DailyStatus(
-                            -1, 5, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now()));
+                            -1, 5, 0, 10, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now()));
         }
     }
 

@@ -21,6 +21,10 @@ import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -201,7 +205,7 @@ class UserSessionTest {
                 listenerEntered.countDown();
                 try {
                     releaseListener.await(5, TimeUnit.SECONDS);
-                } catch (InterruptedException e) {
+                } catch (InterruptedException _) {
                     Thread.currentThread().interrupt();
                 }
             });
@@ -219,6 +223,45 @@ class UserSessionTest {
 
             releaseListener.countDown();
             writer.join(1000);
+        }
+
+        @Test
+        @DisplayName("Listener failures do not block later listeners")
+        void listenerFailuresDoNotBlockLaterListeners() {
+            AtomicInteger successfulNotifications = new AtomicInteger();
+            userSession.addListener(_ -> {
+                throw new IllegalStateException("boom");
+            });
+            userSession.addListener(_ -> successfulNotifications.incrementAndGet());
+
+            userSession.setCurrentUser(new User(UUID.randomUUID(), "ListenerFailureUser"));
+
+            assertEquals(1, successfulNotifications.get());
+        }
+
+        @Test
+        @DisplayName("Listeners can add and remove listeners during notification")
+        void listenersCanAddAndRemoveDuringNotification() {
+            AtomicInteger originalNotifications = new AtomicInteger();
+            AtomicInteger addedNotifications = new AtomicInteger();
+            AtomicBoolean added = new AtomicBoolean(false);
+            AtomicReference<Consumer<User>> originalListener = new AtomicReference<>();
+
+            Consumer<User> listener = user -> {
+                originalNotifications.incrementAndGet();
+                userSession.removeListener(originalListener.get());
+                if (added.compareAndSet(false, true)) {
+                    userSession.addListener(_ -> addedNotifications.incrementAndGet());
+                }
+            };
+            originalListener.set(listener);
+            userSession.addListener(listener);
+
+            userSession.setCurrentUser(new User(UUID.randomUUID(), "FirstPassUser"));
+            userSession.setCurrentUser(new User(UUID.randomUUID(), "SecondPassUser"));
+
+            assertEquals(1, originalNotifications.get());
+            assertEquals(1, addedNotifications.get());
         }
     }
 

@@ -6,10 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
+import datingapp.core.profile.MatchPreferences.Dealbreakers;
+import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.DevDataSeeder;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -118,6 +123,45 @@ class JdbiUserStorageNormalizationTest {
         assertEquals(wantsKids, storage.loadDealbreaker(userId, "user_db_wants_kids"));
         assertEquals(lookingFor, storage.loadDealbreaker(userId, "user_db_looking_for"));
         assertEquals(education, storage.loadDealbreaker(userId, "user_db_education"));
+    }
+
+    @Test
+    @DisplayName("should merge scalar and normalized dealbreaker sources on read")
+    void mergesScalarAndNormalizedDealbreakerSources() {
+        User user = storage.get(userId).orElseThrow();
+        user.setDealbreakers(Dealbreakers.builder()
+                .minHeight(165)
+                .maxHeight(185)
+                .maxAgeDifference(7)
+                .acceptSmoking(Lifestyle.Smoking.NEVER)
+                .acceptDrinking(Lifestyle.Drinking.SOCIALLY)
+                .build());
+        storage.save(user);
+
+        User loaded = storage.get(userId).orElseThrow();
+        Dealbreakers db = loaded.getDealbreakers();
+        assertEquals(165, db.minHeightCm());
+        assertEquals(185, db.maxHeightCm());
+        assertEquals(7, db.maxAgeDifference());
+        assertTrue(db.acceptableSmoking().contains(Lifestyle.Smoking.NEVER));
+        assertTrue(db.acceptableDrinking().contains(Lifestyle.Drinking.SOCIALLY));
+    }
+
+    @Test
+    @DisplayName("findCandidates keeps DB-side location narrowing even at very large radius")
+    void findCandidatesKeepsLocationNarrowingAtVeryLargeRadius() {
+        UUID seekerId = UUID.randomUUID();
+        UUID withLocationId = UUID.randomUUID();
+        UUID withoutLocationId = UUID.randomUUID();
+
+        storage.save(createActiveUser(seekerId, "Seeker", Gender.MALE, Set.of(Gender.FEMALE), true));
+        storage.save(createActiveUser(withLocationId, "Located", Gender.FEMALE, Set.of(Gender.MALE), true));
+        storage.save(createActiveUser(withoutLocationId, "NoLocation", Gender.FEMALE, Set.of(Gender.MALE), false));
+
+        var candidates = storage.findCandidates(seekerId, Set.of(Gender.FEMALE), 18, 99, 32.0853, 34.7818, 100_000);
+
+        assertTrue(candidates.stream().anyMatch(user -> user.getId().equals(withLocationId)));
+        assertTrue(candidates.stream().noneMatch(user -> user.getId().equals(withoutLocationId)));
     }
 
     @Test
@@ -239,5 +283,25 @@ class JdbiUserStorageNormalizationTest {
                         .map(ProfileNote::content)
                         .orElseThrow());
         assertEquals(1, storage.getProfileNotesByAuthor(userId).size());
+    }
+
+    private static User createActiveUser(
+            UUID id, String name, Gender gender, Set<Gender> interestedIn, boolean withLocation) {
+        User.StorageBuilder builder = User.StorageBuilder.create(id, name, Instant.now())
+                .birthDate(LocalDate.now().minusYears(28))
+                .gender(gender)
+                .interestedIn(interestedIn)
+                .maxDistanceKm(500)
+                .ageRange(18, 99)
+                .state(UserState.ACTIVE)
+                .updatedAt(Instant.now());
+
+        if (withLocation) {
+            builder.location(32.0853, 34.7818).hasLocationSet(true);
+        } else {
+            builder.location(0.0, 0.0).hasLocationSet(false);
+        }
+
+        return builder.build();
     }
 }
