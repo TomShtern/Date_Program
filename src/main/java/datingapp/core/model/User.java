@@ -50,7 +50,6 @@ public class User {
     }
 
     /**
-     * touch();
      * Verification method used to verify a profile.
      * NOTE: Currently simulated - email/phone not sent externally.
      */

@@ -46,21 +46,13 @@ public final class AsyncExecutor {
 
         Thread.ofVirtual().name("async-task").start(() -> {
             try {
-                T result = backgroundTask.get();
+                T result = runInterruptibleSupplier(backgroundTask);
                 Platform.runLater(() -> onSuccess.accept(result));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                notifyError(onError, e);
             } catch (Exception e) {
-                // Check if it's an interrupt and restore flag
-                if (Thread.interrupted()) {
-                    Thread.currentThread().interrupt();
-                }
-                Platform.runLater(() -> {
-                    if (onError != null) {
-                        onError.accept(e);
-                    } else {
-                        logger.error("Async task failed", e);
-                        ToastService.getInstance().showError(ERROR_PREFIX + e.getMessage());
-                    }
-                });
+                notifyError(onError, e);
             }
         });
     }
@@ -89,22 +81,15 @@ public final class AsyncExecutor {
 
         Thread.ofVirtual().name("async-run").start(() -> {
             try {
-                backgroundTask.run();
+                runInterruptibleRunnable(backgroundTask);
                 if (onComplete != null) {
                     Platform.runLater(onComplete);
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                notifyError(onError, e);
             } catch (Exception e) {
-                if (Thread.interrupted()) {
-                    Thread.currentThread().interrupt();
-                }
-                Platform.runLater(() -> {
-                    if (onError != null) {
-                        onError.accept(e);
-                    } else {
-                        logger.error("Async run failed", e);
-                        ToastService.getInstance().showError(ERROR_PREFIX + e.getMessage());
-                    }
-                });
+                notifyError(onError, e);
             }
         });
     }
@@ -174,9 +159,14 @@ public final class AsyncExecutor {
     }
 
     private static void notifyError(Consumer<Exception> onError, Exception e) {
-        if (onError != null) {
-            Platform.runLater(() -> onError.accept(e));
-        }
+        Platform.runLater(() -> {
+            if (onError != null) {
+                onError.accept(e);
+            } else {
+                logger.error("Async task failed", e);
+                ToastService.getInstance().showError(ERROR_PREFIX + e.getMessage());
+            }
+        });
     }
 
     private static void notifyErrorOrDefault(Consumer<Exception> onError, Exception e, String defaultMessage) {
@@ -184,8 +174,31 @@ public final class AsyncExecutor {
             if (onError != null) {
                 onError.accept(e);
             } else {
+                logger.error(defaultMessage, e);
                 ToastService.getInstance().showError(defaultMessage);
             }
         });
+    }
+
+    private static <T> T runInterruptibleSupplier(Supplier<T> backgroundTask) throws InterruptedException {
+        try {
+            return backgroundTask.get();
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof InterruptedException interrupted) {
+                throw interrupted;
+            }
+            throw e;
+        }
+    }
+
+    private static void runInterruptibleRunnable(Runnable backgroundTask) throws InterruptedException {
+        try {
+            backgroundTask.run();
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof InterruptedException interrupted) {
+                throw interrupted;
+            }
+            throw e;
+        }
     }
 }

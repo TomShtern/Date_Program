@@ -172,8 +172,9 @@ public final class DatabaseManager {
     }
 
     private void applySessionQueryTimeout(Connection connection) {
-        int timeoutMillis = queryTimeoutSeconds * 1000;
-        String sql = "SET QUERY_TIMEOUT " + timeoutMillis;
+        long timeoutMillisLong = queryTimeoutSeconds * 1000L;
+        long safeTimeoutMillis = Math.min(timeoutMillisLong, Integer.MAX_VALUE);
+        String sql = "SET QUERY_TIMEOUT " + safeTimeoutMillis;
         try (Statement statement = connection.createStatement()) {
             statement.execute(sql);
         } catch (SQLException e) {

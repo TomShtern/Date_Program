@@ -31,6 +31,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.UserStorage;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -288,8 +289,9 @@ public class ProfileHandler implements LoggingSupport {
                     logInfo(CliTextAndInput.CANCELLED);
                     editing = false;
                 } else {
-                    handleDealbreakerChoice(choice, currentUser);
-                    userStorage.save(currentUser);
+                    if (handleDealbreakerChoice(choice, currentUser)) {
+                        userStorage.save(currentUser);
+                    }
                 }
             }
         });
@@ -816,11 +818,11 @@ public class ProfileHandler implements LoggingSupport {
     // for this task I will implement them as private helpers here to avoid changing
     // core classes too much.
 
-    private void handleDealbreakerChoice(String choice, User currentUser) {
+    private boolean handleDealbreakerChoice(String choice, User currentUser) {
         Dealbreakers current = currentUser.getDealbreakers();
         switch (choice) {
-            case "1" ->
-                editEnumDealbreaker(
+            case "1" -> {
+                return editEnumDealbreaker(
                         currentUser,
                         current,
                         Lifestyle.Smoking.class,
@@ -828,8 +830,9 @@ public class ProfileHandler implements LoggingSupport {
                         Dealbreakers.Builder::clearSmoking,
                         Dealbreakers.Builder::acceptSmoking,
                         "Smoking");
-            case "2" ->
-                editEnumDealbreaker(
+            }
+            case "2" -> {
+                return editEnumDealbreaker(
                         currentUser,
                         current,
                         Lifestyle.Drinking.class,
@@ -837,8 +840,9 @@ public class ProfileHandler implements LoggingSupport {
                         Dealbreakers.Builder::clearDrinking,
                         Dealbreakers.Builder::acceptDrinking,
                         "Drinking");
-            case "3" ->
-                editEnumDealbreaker(
+            }
+            case "3" -> {
+                return editEnumDealbreaker(
                         currentUser,
                         current,
                         Lifestyle.WantsKids.class,
@@ -846,8 +850,9 @@ public class ProfileHandler implements LoggingSupport {
                         Dealbreakers.Builder::clearKids,
                         Dealbreakers.Builder::acceptKidsStance,
                         "Kids stance");
-            case "4" ->
-                editEnumDealbreaker(
+            }
+            case "4" -> {
+                return editEnumDealbreaker(
                         currentUser,
                         current,
                         Lifestyle.LookingFor.class,
@@ -855,18 +860,30 @@ public class ProfileHandler implements LoggingSupport {
                         Dealbreakers.Builder::clearLookingFor,
                         Dealbreakers.Builder::acceptLookingFor,
                         "Looking for");
-            case "5" -> editHeightDealbreaker(currentUser, current);
-            case "6" -> editAgeDealbreaker(currentUser, current);
+            }
+            case "5" -> {
+                return editHeightDealbreaker(currentUser, current);
+            }
+            case "6" -> {
+                return editAgeDealbreaker(currentUser, current);
+            }
             case "7" -> {
                 currentUser.setDealbreakers(Dealbreakers.none());
                 logInfo("✅ All dealbreakers cleared.\n");
+                return true;
             }
-            case "0" -> logInfo(CliTextAndInput.CANCELLED);
-            default -> logInfo(CliTextAndInput.INVALID_SELECTION);
+            case "0" -> {
+                logInfo(CliTextAndInput.CANCELLED);
+                return false;
+            }
+            default -> {
+                logInfo(CliTextAndInput.INVALID_SELECTION);
+                return false;
+            }
         }
     }
 
-    private <E extends Enum<E>> void editEnumDealbreaker(
+    private <E extends Enum<E>> boolean editEnumDealbreaker(
             User currentUser,
             Dealbreakers current,
             Class<E> enumClass,
@@ -881,9 +898,10 @@ public class ProfileHandler implements LoggingSupport {
         }
         currentUser.setDealbreakers(builder.build());
         logInfo("✅ {} dealbreaker updated.\n", label);
+        return true;
     }
 
-    private void editHeightDealbreaker(User currentUser, Dealbreakers current) {
+    private boolean editHeightDealbreaker(User currentUser, Dealbreakers current) {
         logInfo("\nHeight range (in cm), or Enter to clear:");
         String minStr = inputReader.readLine("Minimum height (e.g., 160): ");
         String maxStr = inputReader.readLine("Maximum height (e.g., 190): ");
@@ -896,14 +914,17 @@ public class ProfileHandler implements LoggingSupport {
             }
             currentUser.setDealbreakers(builder.build());
             logInfo("✅ Height dealbreaker updated.\n");
+            return true;
         } catch (NumberFormatException _) {
             logInfo(CliTextAndInput.INVALID_INPUT);
+            return false;
         } catch (IllegalArgumentException e) {
             logInfo(ERROR_MESSAGE_FORMAT, e.getMessage());
+            return false;
         }
     }
 
-    private void editAgeDealbreaker(User currentUser, Dealbreakers current) {
+    private boolean editAgeDealbreaker(User currentUser, Dealbreakers current) {
         logInfo("\nMax age difference (years), or Enter to clear:");
         String input = inputReader.readLine("Max years: ");
         Dealbreakers.Builder builder = current.toBuilder().clearAge();
@@ -912,12 +933,15 @@ public class ProfileHandler implements LoggingSupport {
                 builder.maxAgeDifference(Integer.parseInt(input));
                 currentUser.setDealbreakers(builder.build());
                 logInfo("✅ Age dealbreaker updated.\n");
+                return true;
             } catch (NumberFormatException _) {
                 logInfo(CliTextAndInput.INVALID_INPUT);
+                return false;
             }
         } else {
             currentUser.setDealbreakers(builder.build());
             logInfo("✅ Age dealbreaker cleared.\n");
+            return true;
         }
     }
 
@@ -1098,7 +1122,8 @@ public class ProfileHandler implements LoggingSupport {
         logInfo("\n--- Create New User ---\n");
 
         String name = inputReader.readLine("Enter your name: ");
-        ValidationService.ValidationResult nameResult = validationService.validateName(name);
+        String normalizedName = normalizeName(name);
+        ValidationService.ValidationResult nameResult = validationService.validateName(normalizedName);
         if (!nameResult.valid()) {
             logInfo("❌ Invalid name:");
             nameResult.errors().forEach(error -> logInfo("   • {}", error));
@@ -1106,7 +1131,7 @@ public class ProfileHandler implements LoggingSupport {
             return;
         }
 
-        User user = new User(UUID.randomUUID(), name.trim());
+        User user = new User(UUID.randomUUID(), normalizedName);
         userStorage.save(user);
         session.setCurrentUser(user);
 
@@ -1143,6 +1168,13 @@ public class ProfileHandler implements LoggingSupport {
         } catch (NumberFormatException _) {
             logInfo("❌ Invalid input.\n");
         }
+    }
+
+    private static String normalizeName(String name) {
+        if (name == null) {
+            return null;
+        }
+        return Normalizer.normalize(name.trim(), Normalizer.Form.NFKC);
     }
 
     /**

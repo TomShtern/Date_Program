@@ -1,7 +1,6 @@
 package datingapp.app.usecase.profile;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -117,8 +116,8 @@ class ProfileUseCasesTest {
     }
 
     @Test
-    @DisplayName("saveProfile returns failure when achievement unlock fails")
-    void saveProfileReturnsFailureWhenAchievementUnlockFails() {
+    @DisplayName("saveProfile returns success when achievement unlock fails after persistence")
+    void saveProfileReturnsSuccessWhenAchievementUnlockFails() {
         User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Failure User");
 
         AtomicBoolean eventPublished = new AtomicBoolean(false);
@@ -134,18 +133,17 @@ class ProfileUseCasesTest {
 
         var result = failingUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
 
-        assertFalse(result.success());
-        assertEquals(
-                datingapp.app.usecase.common.UseCaseError.Code.INTERNAL,
-                result.error().code());
-        assertTrue(result.error().message().contains("post-save"));
+        assertTrue(result.success());
         assertTrue(userStorage.get(user.getId()).isPresent());
-        assertFalse(eventPublished.get());
+        assertTrue(eventPublished.get());
+        assertNotNull(result.data());
+        assertNotNull(result.data().user());
+        assertTrue(result.data().newlyUnlocked().isEmpty());
     }
 
     @Test
-    @DisplayName("saveProfile returns failure when event publication fails")
-    void saveProfileReturnsFailureWhenEventPublicationFails() {
+    @DisplayName("saveProfile returns success when event publication fails after persistence")
+    void saveProfileReturnsSuccessWhenEventPublicationFails() {
         User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Event Failure User");
 
         AtomicBoolean eventPublished = new AtomicBoolean(false);
@@ -161,13 +159,11 @@ class ProfileUseCasesTest {
 
         var result = failingUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
 
-        assertFalse(result.success());
-        assertEquals(
-                datingapp.app.usecase.common.UseCaseError.Code.INTERNAL,
-                result.error().code());
-        assertTrue(result.error().message().contains("post-save"));
+        assertTrue(result.success());
         assertTrue(eventPublished.get());
         assertTrue(userStorage.get(user.getId()).isPresent());
+        assertNotNull(result.data());
+        assertNotNull(result.data().user());
     }
 
     @Test

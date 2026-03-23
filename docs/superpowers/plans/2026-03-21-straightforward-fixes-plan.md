@@ -44,18 +44,18 @@ mvn javafx:run
 
 ### Critical Gotchas (from CLAUDE.md — will cause build failures if ignored)
 
-| Rule | Wrong | Correct |
-|------|-------|---------|
-| User enum imports | `import datingapp.core.model.Gender` | `import datingapp.core.model.User.Gender` (nested type) |
-| Match enum imports | `import datingapp.core.model.MatchState` | `import datingapp.core.model.Match.MatchState` (nested type) |
-| ProfileNote import | `import datingapp.core.model.User.ProfileNote` | `import datingapp.core.model.ProfileNote` (standalone) |
-| Domain timestamps | `Instant.now()` | `AppClock.now()` (always, for testability) |
-| JDBI record binding | `@BindBean RecordType r` | `@BindMethods RecordType r` (records lack getX() introspection) |
-| Date formatting | `DateTimeFormatter.ofPattern("dd MMM")` | `DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH)` |
-| Use-case construction | `new MatchingUseCases(...)` | `services.getMatchingUseCases()` from `ServiceRegistry` |
-| Config access | `AppConfig.defaults()` in runtime code | Injected `AppConfig` via `ServiceRegistry` |
-| PMD empty catch | Empty catch block `{}` | Use `assert true;` as no-op body |
-| PMD suppression | `@SuppressWarnings` | `// NOPMD RuleName` inline comment |
+| Rule                  | Wrong                                          | Correct                                                         |
+|-----------------------|------------------------------------------------|-----------------------------------------------------------------|
+| User enum imports     | `import datingapp.core.model.Gender`           | `import datingapp.core.model.User.Gender` (nested type)         |
+| Match enum imports    | `import datingapp.core.model.MatchState`       | `import datingapp.core.model.Match.MatchState` (nested type)    |
+| ProfileNote import    | `import datingapp.core.model.User.ProfileNote` | `import datingapp.core.model.ProfileNote` (standalone)          |
+| Domain timestamps     | `Instant.now()`                                | `AppClock.now()` (always, for testability)                      |
+| JDBI record binding   | `@BindBean RecordType r`                       | `@BindMethods RecordType r` (records lack getX() introspection) |
+| Date formatting       | `DateTimeFormatter.ofPattern("dd MMM")`        | `DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH)`         |
+| Use-case construction | `new MatchingUseCases(...)`                    | `services.getMatchingUseCases()` from `ServiceRegistry`         |
+| Config access         | `AppConfig.defaults()` in runtime code         | Injected `AppConfig` via `ServiceRegistry`                      |
+| PMD empty catch       | Empty catch block `{}`                         | Use `assert true;` as no-op body                                |
+| PMD suppression       | `@SuppressWarnings`                            | `// NOPMD RuleName` inline comment                              |
 
 ### Code Style
 
@@ -108,19 +108,19 @@ This plan covers **only issues that are**:
 
 These claims were reported as issues but are **not real problems** in the current codebase:
 
-| Claim | Why it's a false positive |
-|-------|--------------------------|
-| V007 (FK constraints) | All 22+ foreign keys properly defined with `ON DELETE CASCADE` in `SchemaInitializer` |
-| V012 (AppConfig.Builder incomplete) | Builder inner class exists and is fully functional |
-| V030 (stale archive columns) | Columns exist correctly in schema; mapper is properly wired in `JdbiConnectionStorage` |
-| V053 (UndoService robustness) | Proper error handling with try-catch; time-window validation correctly removes expired state |
+| Claim                                    | Why it's a false positive                                                                                 |
+|------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| V007 (FK constraints)                    | All 22+ foreign keys properly defined with `ON DELETE CASCADE` in `SchemaInitializer`                     |
+| V012 (AppConfig.Builder incomplete)      | Builder inner class exists and is fully functional                                                        |
+| V030 (stale archive columns)             | Columns exist correctly in schema; mapper is properly wired in `JdbiConnectionStorage`                    |
+| V053 (UndoService robustness)            | Proper error handling with try-catch; time-window validation correctly removes expired state              |
 | V055 (achievement thresholds duplicated) | All thresholds centralized in `AppConfig` via `config.safety().achievementMatchTier1()` through `Tier5()` |
-| V058 (listener lifecycle) | `ChatController.cleanup()` properly removes listener and nulls reference |
-| V060 (CleanupScheduler race) | Uses `AtomicBoolean` + `synchronized` methods — properly thread-safe |
-| V070 (magic numbers) | All 15+ thresholds are named constants in `ProfileCompletionSupport` (lines 12-42) |
-| V076 (soft-delete cascade) | DB-level `ON DELETE CASCADE` handles cleanup — application-level cascade not needed |
-| V086 (BaseViewModel nullability) | `AsyncErrorRouter` gracefully handles null sink with fallback to logger |
-| V093 (standouts navigation target) | Correctly navigates to `PROFILE_VIEW` (read-only profile), which is appropriate |
+| V058 (listener lifecycle)                | `ChatController.cleanup()` properly removes listener and nulls reference                                  |
+| V060 (CleanupScheduler race)             | Uses `AtomicBoolean` + `synchronized` methods — properly thread-safe                                      |
+| V070 (magic numbers)                     | All 15+ thresholds are named constants in `ProfileCompletionSupport` (lines 12-42)                        |
+| V076 (soft-delete cascade)               | DB-level `ON DELETE CASCADE` handles cleanup — application-level cascade not needed                       |
+| V086 (BaseViewModel nullability)         | `AsyncErrorRouter` gracefully handles null sink with fallback to logger                                   |
+| V093 (standouts navigation target)       | Correctly navigates to `PROFILE_VIEW` (read-only profile), which is appropriate                           |
 
 ### Excluded — already covered by existing plans
 
@@ -131,24 +131,24 @@ These claims were reported as issues but are **not real problems** in the curren
 
 ## File map
 
-| File | Role | Why it changes |
-|------|------|----------------|
-| `src/main/java/datingapp/core/model/User.java` | domain model | Add NaN/Infinity guard in `setLocation` (line 568) |
-| `src/test/java/datingapp/core/UserTest.java` | test | Regression tests for coordinate validation |
-| `src/main/java/datingapp/core/AppConfigValidator.java` | config validation | Add monotonic threshold ordering checks |
-| `src/test/java/datingapp/core/AppConfigValidatorTest.java` | test | Threshold ordering tests |
-| `src/main/java/datingapp/storage/jdbi/JdbiConnectionStorage.java` | storage | Convert conversation delete from hard to soft |
-| `src/main/java/datingapp/storage/schema/SchemaInitializer.java` | schema | Add `deleted_at` column to conversations if missing |
-| `src/main/java/datingapp/storage/schema/MigrationRunner.java` | migration | Migration to add soft-delete column |
-| `src/main/java/datingapp/core/storage/CommunicationStorage.java` | storage interface | Update delete contract |
-| `src/main/java/datingapp/storage/jdbi/JdbiUserStorage.java` | storage | Convert profile note delete from hard to soft |
-| `src/main/java/datingapp/storage/DatabaseManager.java` | infra | Add pool validation query |
-| `src/main/java/datingapp/app/cli/MatchingHandler.java` | CLI | Fix case normalization inconsistency (line 657) |
-| `src/main/java/datingapp/app/usecase/profile/ProfileUseCases.java` | use-case | Reduce constructor overloads |
-| `src/main/java/datingapp/app/usecase/matching/MatchingUseCases.java` | use-case | Reduce constructor overloads |
-| `src/main/java/datingapp/app/usecase/messaging/MessagingUseCases.java` | use-case | Reduce constructor overloads |
-| `src/main/java/datingapp/ui/screen/StandoutsController.java` | UI | Add confirmation before navigation |
-| `src/test/java/datingapp/core/matching/RecommendationServiceTest.java` | test (new) | Test coverage for untested service |
+| File                                                                   | Role              | Why it changes                                      |
+|------------------------------------------------------------------------|-------------------|-----------------------------------------------------|
+| `src/main/java/datingapp/core/model/User.java`                         | domain model      | Add NaN/Infinity guard in `setLocation` (line 568)  |
+| `src/test/java/datingapp/core/UserTest.java`                           | test              | Regression tests for coordinate validation          |
+| `src/main/java/datingapp/core/AppConfigValidator.java`                 | config validation | Add monotonic threshold ordering checks             |
+| `src/test/java/datingapp/core/AppConfigValidatorTest.java`             | test              | Threshold ordering tests                            |
+| `src/main/java/datingapp/storage/jdbi/JdbiConnectionStorage.java`      | storage           | Convert conversation delete from hard to soft       |
+| `src/main/java/datingapp/storage/schema/SchemaInitializer.java`        | schema            | Add `deleted_at` column to conversations if missing |
+| `src/main/java/datingapp/storage/schema/MigrationRunner.java`          | migration         | Migration to add soft-delete column                 |
+| `src/main/java/datingapp/core/storage/CommunicationStorage.java`       | storage interface | Update delete contract                              |
+| `src/main/java/datingapp/storage/jdbi/JdbiUserStorage.java`            | storage           | Convert profile note delete from hard to soft       |
+| `src/main/java/datingapp/storage/DatabaseManager.java`                 | infra             | Add pool validation query                           |
+| `src/main/java/datingapp/app/cli/MatchingHandler.java`                 | CLI               | Fix case normalization inconsistency (line 657)     |
+| `src/main/java/datingapp/app/usecase/profile/ProfileUseCases.java`     | use-case          | Reduce constructor overloads                        |
+| `src/main/java/datingapp/app/usecase/matching/MatchingUseCases.java`   | use-case          | Reduce constructor overloads                        |
+| `src/main/java/datingapp/app/usecase/messaging/MessagingUseCases.java` | use-case          | Reduce constructor overloads                        |
+| `src/main/java/datingapp/ui/screen/StandoutsController.java`           | UI                | Add confirmation before navigation                  |
+| `src/test/java/datingapp/core/matching/RecommendationServiceTest.java` | test (new)        | Test coverage for untested service                  |
 
 ---
 
@@ -391,6 +391,11 @@ Pass `AppClock.now()` as the `:now` parameter.
 - [ ] **Step 5: Update all conversation queries to exclude soft-deleted rows**
 
 Add `WHERE deleted_at IS NULL` (or `AND deleted_at IS NULL`) to every `SELECT` on the conversations table in `JdbiConnectionStorage`.
+
+Concrete verification checklist:
+- Search `JdbiConnectionStorage` for SQL strings that touch `conversations` (`SELECT ... FROM conversations`) and methods such as `getConversationById`, `listConversations`, and `findConversations`.
+- For each query, append `WHERE deleted_at IS NULL` (or `AND deleted_at IS NULL` when a `WHERE` clause already exists).
+- Repeat for `profile_notes` in Task 3.2 by searching `JdbiUserStorage` for all `profile_notes` SQL strings and ensuring each reader query filters soft-deleted rows.
 
 - [ ] **Step 6: Run tests — verify pass**
 
@@ -638,6 +643,16 @@ private static final PolicyFactory CHAT_TEXT = new HtmlPolicyBuilder()
         .toFactory();
 ```
 
+Security review requirements before merge:
+- Confirm behavior against OWASP XSS and Java HTML Sanitizer guidance (strip event handlers, dangerous attributes, and script content by default; keep protocol allowlists explicit if links are ever enabled).
+- Add negative tests for payloads like:
+    - `<b onclick="alert('xss')">safe?</b>`
+    - `<b><script>alert(1)</script>text</b>`
+    - malformed tag sequences (`<b><i>text</b></i>`) and broken close tags
+    - CSS/style payloads (`<span style="background:url(javascript:alert(1))">x</span>`)
+- If links are later required, only allow `a[href]` with strict protocol allowlist (`http`, `https`, optionally `mailto`) and verify `javascript:` is rejected.
+- Ensure tests assert that no event attributes, no `style`, no `javascript:` URLs, and no unexpected tags survive sanitization.
+
 Add a `sanitizeMessage()` method that uses this less restrictive policy, keeping the strict `sanitize()` method for profile fields.
 
 - [ ] **Step 4: Run tests — verify pass**
@@ -696,6 +711,11 @@ Add the button to the FXML:
 ```xml
 <Button fx:id="viewProfileButton" text="View Profile" onAction="#handleViewProfile" disable="true"/>
 ```
+
+- Add an explicit controller field in the fields section:
+    - `private StandoutEntry selectedEntry;`
+- Keep `selectedEntry` as controller state, not a local variable, so the list selection survives the click-to-button flow and the button can reuse the current item.
+- Before changing any conversation or profile-note lookup in this area, search `JdbiConnectionStorage` and `JdbiUserStorage` for `deleted_at IS NULL`, then keep the matching soft-delete mutation in `JdbiAccountCleanupStorage` aligned with the read path.
 
 - [ ] **Step 2: Test manually in JavaFX**
 

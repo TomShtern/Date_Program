@@ -251,6 +251,7 @@ class MatchingControllerTest {
         private final TestStorages.Analytics analytics = new TestStorages.Analytics();
         private final TestStorages.Standouts standouts = new TestStorages.Standouts();
         private final TestStorages.Undos undos = new TestStorages.Undos();
+        private final InProcessAppEventBus eventBus = new InProcessAppEventBus();
         private final AppConfig config = AppConfig.defaults();
         private final User currentUser = createUser("Alex", Gender.MALE, EnumSet.of(Gender.FEMALE));
         private final User prioritizedCandidate = createUser("Blair", Gender.FEMALE, EnumSet.of(Gender.MALE));
@@ -312,7 +313,7 @@ class MatchingControllerTest {
                     null,
                     config,
                     new datingapp.core.workflow.ProfileActivationPolicy(),
-                    new InProcessAppEventBus());
+                    eventBus);
 
             return new MatchingViewModel(
                     new MatchingViewModel.Dependencies(
@@ -333,7 +334,7 @@ class MatchingControllerTest {
                                     interactions,
                                     users,
                                     new MatchQualityService(users, interactions, config),
-                                    new datingapp.app.event.InProcessAppEventBus()),
+                                    eventBus),
                             new datingapp.app.usecase.social.SocialUseCases(trustSafetyService),
                             new UseCaseUiProfileNoteDataAccess(noteUseCases)),
                     AppSession.getInstance(),

@@ -194,19 +194,26 @@ public class ProfileUseCases {
             return UseCaseResult.failure(UseCaseError.internal("Failed to save profile: " + e.getMessage()));
         }
 
+        List<UserAchievement> newAchievements = List.of();
         try {
-            List<UserAchievement> newAchievements = unlockAchievements(user.getId());
+            newAchievements = unlockAchievements(user.getId());
+        } catch (Exception e) {
+            if (logger.isWarnEnabled()) {
+                logger.warn("Post-save achievement update failed for user {}: {}", user.getId(), e.getMessage(), e);
+            }
+        }
+
+        try {
             if (eventBus != null) {
                 eventBus.publish(new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()));
             }
-            return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
         } catch (Exception e) {
             if (logger.isWarnEnabled()) {
-                logger.warn("Post-save action failed for user {}: {}", user.getId(), e.getMessage(), e);
+                logger.warn("Post-save event publication failed for user {}: {}", user.getId(), e.getMessage(), e);
             }
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to complete post-save actions: " + e.getMessage()));
         }
+
+        return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
     }
 
     public UseCaseResult<User> updateDiscoveryPreferences(UpdateDiscoveryPreferencesCommand command) {

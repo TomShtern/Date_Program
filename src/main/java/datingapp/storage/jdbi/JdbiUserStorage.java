@@ -92,7 +92,7 @@ public final class JdbiUserStorage implements UserStorage {
         List<String> genderNames = genders.stream().map(Enum::name).toList();
 
         return jdbi.withHandle(handle -> {
-            double effectiveDistanceKm = Math.min(Math.max(maxDistanceKm, 0), 20_000);
+            int effectiveDistanceKm = Math.clamp(maxDistanceKm, 0, 20_000);
             double latDelta = effectiveDistanceKm / 111.0;
             double cosLat = Math.max(Math.cos(Math.toRadians(Math.abs(seekerLat))), 0.0001);
             double lonDelta = Math.min(effectiveDistanceKm / (111.0 * cosLat), 180.0);
@@ -106,7 +106,7 @@ public final class JdbiUserStorage implements UserStorage {
                     .append(" AND lat BETWEEN :latMin AND :latMax")
                     .append(" AND lon BETWEEN :lonMin AND :lonMax");
 
-            return handle.createQuery(sql.toString())
+            return applyNormalizedProfileData(handle.createQuery(sql.toString())
                     .bindList("genders", genderNames)
                     .bind("excludeId", excludeId)
                     .bind("minAge", minAge)
@@ -116,7 +116,7 @@ public final class JdbiUserStorage implements UserStorage {
                     .bind("lonMin", seekerLon - lonDelta)
                     .bind("lonMax", seekerLon + lonDelta)
                     .map(new Mapper())
-                    .list();
+                    .list());
         });
     }
 

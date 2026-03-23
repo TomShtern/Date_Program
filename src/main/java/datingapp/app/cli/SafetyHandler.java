@@ -163,7 +163,8 @@ public class SafetyHandler implements LoggingSupport {
             }
             return reasons[reasonIdx];
         } catch (NumberFormatException _) {
-            logger.warn("Invalid report reason input: {}", reasonInput);
+            String lengthMeta = reasonInput == null ? "empty" : String.valueOf(reasonInput.length());
+            logger.debug("Invalid report reason input; length={}", lengthMeta);
             logInfo("❌ Invalid input.\n");
             return null;
         }
@@ -178,7 +179,7 @@ public class SafetyHandler implements LoggingSupport {
             List<User> blockedUsers = trustSafetyService.getBlockedUsers(currentUser.getId());
 
             if (blockedUsers.isEmpty()) {
-                logInfo("\nYou haven't blocked anyone.\n");
+                logInfo("No blocked users.\n");
                 return;
             }
 
@@ -270,7 +271,9 @@ public class SafetyHandler implements LoggingSupport {
             }
             return users.get(idx);
         } catch (NumberFormatException _) {
-            logger.warn("Invalid safety handler selection input: {}", input);
+            logger.warn("Invalid safety handler selection input");
+            String lengthMeta = input == null ? "empty" : String.valueOf(input.length());
+            logger.debug("Invalid safety input length={}", lengthMeta);
             logInfo(CliTextAndInput.INVALID_INPUT);
             return null;
         }

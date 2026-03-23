@@ -4,6 +4,7 @@ import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,7 +74,7 @@ public interface UserStorage {
         return findActive().stream()
                 .filter(u -> !u.getId().equals(excludeId))
                 .filter(u -> genders.contains(u.getGender()))
-                .filter(u -> u.getAge(java.time.ZoneId.systemDefault())
+                .filter(u -> u.getAge(ZoneOffset.UTC)
                         .map(age -> age >= minAge && age <= maxAge)
                         .orElse(false))
                 .filter(u -> !applyDistanceFilter || isWithinDistance(seekerLat, seekerLon, u, maxDistanceKm))
@@ -130,7 +131,7 @@ public interface UserStorage {
      * @return number of rows purged
      */
     default int purgeDeletedBefore(java.time.Instant threshold) {
-        throw new UnsupportedOperationException("UserStorage purgeDeletedBefore is not implemented");
+        return 0;
     }
 
     // ═══════════════════════════════════════════════════════════════

@@ -80,7 +80,11 @@ public final class MigrationRunner {
             new VersionedMigration(
                     5,
                     "Remove profile_views surrogate id and normalize the conversation unique constraint name",
-                    MigrationRunner::applyV5));
+                    MigrationRunner::applyV5),
+            new VersionedMigration(
+                    6,
+                    "Add matches.updated_at column and backfill it from created_at for legacy rows",
+                    MigrationRunner::applyV6));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -127,8 +131,8 @@ public final class MigrationRunner {
     /**
      * V2 migration: creates the {@code daily_picks} persistent cache table.
      *
-     * <p>Fresh databases already have this table from V1 (SchemaInitializer includes it),
-     * so all DDL uses {@code IF NOT EXISTS} — fully idempotent and safe to run on any database state.
+     * <p>Fresh databases create this table through this migration, and the DDL uses
+     * {@code IF NOT EXISTS} — fully idempotent and safe to run on any database state.
      * Existing databases upgrading from the old multi-migration schema get this table added
      * non-destructively, preserving all existing user data.
      */
@@ -184,6 +188,24 @@ public final class MigrationRunner {
         stmt.execute("ALTER TABLE conversations DROP CONSTRAINT IF EXISTS unq_conversation_users");
         stmt.execute("ALTER TABLE conversations DROP CONSTRAINT IF EXISTS uk_conversation_users");
         stmt.execute("ALTER TABLE conversations ADD CONSTRAINT uk_conversation_users UNIQUE (user_a, user_b)");
+    }
+
+    /**
+     * V6 migration: adds {@code updated_at} to {@code matches} for legacy databases that
+     * predate the column, then backfills missing values from {@code created_at}.
+     */
+    private static void applyV6(Statement stmt) throws SQLException {
+        if (!hasTable(stmt, "MATCHES")) {
+            return;
+        }
+        stmt.execute("ALTER TABLE matches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP");
+        stmt.execute("UPDATE matches SET updated_at = COALESCE(updated_at, created_at)");
+    }
+
+    private static boolean hasTable(Statement stmt, String tableName) throws SQLException {
+        try (ResultSet rs = stmt.getConnection().getMetaData().getTables(null, null, tableName, null)) {
+            return rs.next();
+        }
     }
 
     private static boolean hasPrimaryKey(Statement stmt, String tableName) throws SQLException {

@@ -9,7 +9,12 @@ public final class SanitizerUtils {
     /** Policy that strips all HTML markup (for profile fields). */
     static final PolicyFactory STRICT_TEXT = new HtmlPolicyBuilder().toFactory();
 
-    /** Policy that allows safe formatting tags for messages. */
+    /**
+     * Policy that allows only safe inline formatting tags for messages.
+     *
+     * <p>Unsafe attributes and content such as event handlers, scripts, styles, malformed markup,
+     * and URL-bearing attributes are stripped rather than preserved.
+     */
     static final PolicyFactory MESSAGE_TEXT =
             new HtmlPolicyBuilder().allowElements("b", "i", "em", "strong", "u").toFactory();
 

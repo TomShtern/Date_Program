@@ -294,10 +294,11 @@ public class ProfileController extends BaseController implements Initializable {
     private static final int BIO_WARNING_THRESHOLD = 400;
 
     private final ProfileViewModel viewModel;
-    private final ProfileFormValidator formValidator = new ProfileFormValidator();
+    private final ProfileFormValidator formValidator;
 
     public ProfileController(ProfileViewModel viewModel) {
         this.viewModel = viewModel;
+        this.formValidator = new ProfileFormValidator(viewModel.getValidationService());
     }
 
     @Override

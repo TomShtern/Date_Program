@@ -29,7 +29,7 @@ public final class JdbiAccountCleanupStorage implements AccountCleanupStorage {
 
         try {
             jdbi.useTransaction(handle -> {
-                softDeleteUser(handle, user.getId(), user.getState(), deletedAt);
+                softDeleteUser(handle, user.getId(), deletedAt);
                 softDeleteLikes(handle, user.getId(), deletedAt);
                 softDeleteMatches(handle, user.getId(), deletedAt);
                 softDeleteConversations(handle, user.getId(), deletedAt);
@@ -43,7 +43,7 @@ public final class JdbiAccountCleanupStorage implements AccountCleanupStorage {
         }
     }
 
-    private static void softDeleteUser(Handle handle, UUID userId, User.UserState state, Instant deletedAt) {
+    private static void softDeleteUser(Handle handle, UUID userId, Instant deletedAt) {
         try (var update = handle.createUpdate("""
             UPDATE users
             SET state = :state,
@@ -52,7 +52,7 @@ public final class JdbiAccountCleanupStorage implements AccountCleanupStorage {
             WHERE id = :userId AND deleted_at IS NULL
             """)) {
             update.bind(USER_ID_BIND, userId)
-                    .bind(STATE_BIND, state.name())
+                    .bind(STATE_BIND, User.UserState.BANNED.name())
                     .bind(DELETED_AT_BIND, deletedAt)
                     .execute();
         }

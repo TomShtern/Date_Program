@@ -40,6 +40,9 @@ import org.junit.jupiter.api.Timeout;
 class StandoutsServiceTest {
 
     private TestStorages.Users userStorage;
+    private TestStorages.Interactions interactionStorage;
+    private TestStorages.TrustSafety trustSafetyStorage;
+    private TestStorages.Analytics analyticsStorage;
     private TestStandoutStorage standoutStorage;
     private CandidateFinder candidateFinder;
     private ProfileService profileCompletionService;
@@ -52,9 +55,9 @@ class StandoutsServiceTest {
         TestClock.setFixed(FIXED_INSTANT);
         config = AppConfig.defaults();
         userStorage = new TestStorages.Users();
-        var interactionStorage = new TestStorages.Interactions();
-        var trustSafetyStorage = new TestStorages.TrustSafety();
-        var analyticsStorage = new TestStorages.Analytics();
+        interactionStorage = new TestStorages.Interactions();
+        trustSafetyStorage = new TestStorages.TrustSafety();
+        analyticsStorage = new TestStorages.Analytics();
         standoutStorage = new TestStandoutStorage();
         candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
         profileCompletionService =
@@ -270,9 +273,9 @@ class StandoutsServiceTest {
             AppConfig customConfig = AppConfig.builder().standoutMinScore(50).build();
             RecommendationService customService = RecommendationService.builder()
                     .userStorage(userStorage)
-                    .interactionStorage(new TestStorages.Interactions())
-                    .trustSafetyStorage(new TestStorages.TrustSafety())
-                    .analyticsStorage(new TestStorages.Analytics())
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .analyticsStorage(analyticsStorage)
                     .candidateFinder(candidateFinder)
                     .standoutStorage(new TestStandoutStorage())
                     .profileService(profileCompletionService)

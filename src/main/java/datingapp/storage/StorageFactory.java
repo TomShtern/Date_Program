@@ -1,6 +1,5 @@
 package datingapp.storage;
 
-import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.event.handlers.AchievementEventHandler;
@@ -142,12 +141,6 @@ public final class StorageFactory {
         new AchievementEventHandler(achievementService).register(eventBus);
         new MetricsEventHandler(activityMetricsService).register(eventBus);
         new NotificationEventHandler(communicationStorage).register(eventBus);
-        eventBus.subscribe(
-                AppEvent.ProfileSaved.class,
-                ignoredEvent -> {
-                    // Intentionally no-op: keeps one REQUIRED policy subscription in production wiring.
-                },
-                AppEventBus.HandlerPolicy.REQUIRED);
 
         ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
         RelationshipWorkflowPolicy workflowPolicy = new RelationshipWorkflowPolicy();

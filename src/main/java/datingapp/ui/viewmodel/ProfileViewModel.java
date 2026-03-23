@@ -16,6 +16,7 @@ import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ProfileService.CompletionResult;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.ProfileActivationPolicy.ActivationResult;
 import datingapp.ui.LocalPhotoStore;
@@ -143,7 +144,7 @@ public class ProfileViewModel {
                 null,
                 config,
                 session,
-                new LocationService(new datingapp.core.profile.ValidationService(config)),
+                new LocationService(new ValidationService(config)),
                 new JavaFxUiThreadDispatcher(),
                 new ProfileActivationPolicy()));
     }
@@ -160,7 +161,7 @@ public class ProfileViewModel {
                 profileUseCases,
                 config,
                 session,
-                new LocationService(new datingapp.core.profile.ValidationService(config)),
+                new LocationService(new ValidationService(config)),
                 new JavaFxUiThreadDispatcher(),
                 new ProfileActivationPolicy()));
     }
@@ -178,7 +179,7 @@ public class ProfileViewModel {
                 profileUseCases,
                 config,
                 session,
-                new LocationService(new datingapp.core.profile.ValidationService(config)),
+                new LocationService(new ValidationService(config)),
                 uiDispatcher,
                 new ProfileActivationPolicy()));
     }
@@ -197,7 +198,7 @@ public class ProfileViewModel {
                 profileUseCases,
                 config,
                 session,
-                new LocationService(new datingapp.core.profile.ValidationService(config)),
+                new LocationService(new ValidationService(config)),
                 uiDispatcher,
                 activationPolicy));
     }
@@ -677,6 +678,11 @@ public class ProfileViewModel {
      */
     public int getMaxHeightCm() {
         return config.validation().maxHeightCm();
+    }
+
+    /** Returns a ValidationService bound to this view model's runtime config. */
+    public ValidationService getValidationService() {
+        return new ValidationService(config);
     }
 
     private void logInfo(String message, Object... args) {

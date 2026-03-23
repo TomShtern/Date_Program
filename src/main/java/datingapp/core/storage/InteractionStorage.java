@@ -229,7 +229,7 @@ public interface InteractionStorage {
     }
 
     default int purgeDeletedBefore(Instant threshold) {
-        throw new UnsupportedOperationException("InteractionStorage purgeDeletedBefore is not implemented");
+        return 0;
     }
 
     /**

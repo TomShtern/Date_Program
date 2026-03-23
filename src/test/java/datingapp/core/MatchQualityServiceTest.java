@@ -49,28 +49,6 @@ class MatchQualityServiceTest {
         TestClock.reset();
     }
 
-    private MatchQuality createWithScore(int score) {
-        return new MatchQuality(
-                "test-match-id",
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                AppClock.now(),
-                0.8,
-                0.9,
-                0.5,
-                0.7,
-                0.6,
-                0.5,
-                10.5,
-                5,
-                List.of(),
-                List.of(),
-                Duration.ZERO,
-                "Good Sync",
-                score,
-                List.of());
-    }
-
     @Nested
     @DisplayName("Score Calculations")
     class ScoreCalculationTests {
@@ -454,10 +432,55 @@ class MatchQualityServiceTest {
                     .starFairThreshold(50)
                     .build();
 
-            new MatchQualityService(userStorage, likeStorage, config);
+            MatchQualityService customService =
+                    new MatchQualityService(userStorage, likeStorage, config, new CompatibilityCalculator() {
+                        @Override
+                        public double calculateAgeScore(User me, User them) {
+                            return 0.9;
+                        }
 
-            MatchQuality quality = createWithScore(90);
+                        @Override
+                        public double calculateInterestScore(User me, User them) {
+                            return 0.9;
+                        }
 
+                        @Override
+                        public double calculateLifestyleScore(User me, User them) {
+                            return 0.9;
+                        }
+
+                        @Override
+                        public double calculateDistanceScore(double distanceKm, int maxDistanceKm) {
+                            return 0.9;
+                        }
+
+                        @Override
+                        public double calculateResponseScore(Duration timeBetweenLikes) {
+                            return 0.9;
+                        }
+
+                        @Override
+                        public double calculatePaceScore(PacePreferences a, PacePreferences b) {
+                            return 0.9;
+                        }
+
+                        @Override
+                        public double calculateActivityScore(User candidate) {
+                            return 0.9;
+                        }
+                    });
+
+            User alice = createUser("Alice", 25, 32.0, 34.0);
+            User bob = createUser("Bob", 26, 32.0, 34.0);
+            userStorage.save(alice);
+            userStorage.save(bob);
+            addMutualLikes(alice.getId(), bob.getId());
+
+            MatchQuality quality = customService
+                    .computeQuality(Match.create(alice.getId(), bob.getId()), alice.getId())
+                    .orElseThrow();
+
+            assertEquals(90, quality.compatibilityScore());
             assertEquals(4, quality.getStarRating());
             assertEquals("Great Match", quality.getCompatibilityLabel());
         }

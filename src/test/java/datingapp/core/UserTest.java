@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -148,8 +149,9 @@ class UserTest {
     @DisplayName("Setting too many photo URLs throws")
     void setPhotoUrlsAboveLimitThrows() {
         User user = new User(UUID.randomUUID(), "Hannah");
-        List<String> tooManyPhotos = List.of(
-                "photo1.jpg", "photo2.jpg", "photo3.jpg", "photo4.jpg", "photo5.jpg", "photo6.jpg", "photo7.jpg");
+        List<String> tooManyPhotos = IntStream.rangeClosed(1, User.MAX_PHOTOS + 1)
+                .mapToObj(i -> "photo" + i + ".jpg")
+                .toList();
 
         IllegalArgumentException ex =
                 assertThrows(IllegalArgumentException.class, () -> user.setPhotoUrls(tooManyPhotos));
@@ -315,7 +317,7 @@ class UserTest {
     @DisplayName("markDeleted refreshes updatedAt")
     void markDeletedRefreshesUpdatedAt() {
         User user = new User(UUID.randomUUID(), "Soft Delete User");
-        Instant createdAt = user.getUpdatedAt();
+        Instant initialUpdatedAt = user.getUpdatedAt();
         Instant deletedAt = FIXED_INSTANT.plusSeconds(45);
         TestClock.setFixed(deletedAt);
 
@@ -323,7 +325,7 @@ class UserTest {
 
         assertEquals(deletedAt, user.getDeletedAt());
         assertEquals(deletedAt, user.getUpdatedAt());
-        assertTrue(user.getUpdatedAt().isAfter(createdAt) || user.getUpdatedAt().equals(deletedAt));
+        assertTrue(deletedAt.isAfter(initialUpdatedAt));
     }
 
     private User createCompleteUser(String name) {

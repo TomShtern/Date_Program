@@ -29,9 +29,7 @@ public class MatchQualityService {
     private final InteractionStorage interactionStorage;
     private final AppConfig config;
     private final CompatibilityCalculator calculator;
-
-    private static volatile StarThresholdPolicy starThresholdPolicy =
-            StarThresholdPolicy.from(AppConfig.defaults().algorithm());
+    private final StarThresholdPolicy starThresholdPolicy;
     private static final String LABEL_EXCELLENT = "Excellent Match";
     private static final String LABEL_GREAT = "Great Match";
     private static final String LABEL_GOOD = "Good Match";
@@ -85,8 +83,49 @@ public class MatchQualityService {
             // === Aggregates ===
             String paceSyncLevel, // e.g., "Perfect Sync", "Good Sync", etc.
             int compatibilityScore, // 0-100
-            List<String> highlights // Human-readable highlights
-            ) {
+            List<String> highlights, // Human-readable highlights
+            StarThresholdPolicy starThresholdPolicy) {
+        public MatchQuality(
+                String matchId,
+                UUID perspectiveUserId,
+                UUID otherUserId,
+                Instant computedAt,
+                double distanceScore,
+                double ageScore,
+                double interestScore,
+                double lifestyleScore,
+                double paceScore,
+                double responseScore,
+                double distanceKm,
+                int ageDifference,
+                List<String> sharedInterests,
+                List<String> lifestyleMatches,
+                Duration timeBetweenLikes,
+                String paceSyncLevel,
+                int compatibilityScore,
+                List<String> highlights) {
+            this(
+                    matchId,
+                    perspectiveUserId,
+                    otherUserId,
+                    computedAt,
+                    distanceScore,
+                    ageScore,
+                    interestScore,
+                    lifestyleScore,
+                    paceScore,
+                    responseScore,
+                    distanceKm,
+                    ageDifference,
+                    sharedInterests,
+                    lifestyleMatches,
+                    timeBetweenLikes,
+                    paceSyncLevel,
+                    compatibilityScore,
+                    highlights,
+                    StarThresholdPolicy.from(AppConfig.defaults().algorithm()));
+        }
+
         public MatchQuality {
             Objects.requireNonNull(matchId, "matchId cannot be null");
             Objects.requireNonNull(perspectiveUserId, "perspectiveUserId cannot be null");
@@ -114,6 +153,7 @@ public class MatchQualityService {
             }
             Objects.requireNonNull(timeBetweenLikes, "timeBetweenLikes cannot be null");
             Objects.requireNonNull(paceSyncLevel, "paceSyncLevel cannot be null");
+            Objects.requireNonNull(starThresholdPolicy, "starThresholdPolicy cannot be null");
 
             // Defensive copies
             sharedInterests = sharedInterests == null ? List.of() : List.copyOf(sharedInterests);
@@ -198,11 +238,7 @@ public class MatchQualityService {
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.calculator = Objects.requireNonNull(calculator, "calculator cannot be null");
-        refreshStarThresholdPolicy(this.config);
-    }
-
-    private static synchronized void refreshStarThresholdPolicy(AppConfig config) {
-        starThresholdPolicy = StarThresholdPolicy.from(config.algorithm());
+        this.starThresholdPolicy = StarThresholdPolicy.from(this.config.algorithm());
     }
 
     // === Public API ===
@@ -300,7 +336,8 @@ public class MatchQualityService {
                 timeBetweenLikes,
                 paceSyncLevel,
                 compatibilityScore,
-                highlights));
+                highlights,
+                starThresholdPolicy));
     }
 
     // === Score Calculation Methods ===

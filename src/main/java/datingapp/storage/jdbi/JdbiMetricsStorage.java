@@ -353,9 +353,10 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         List<PlatformStats> getPlatformStatsHistory(@Bind("limit") int limit);
 
         @SqlUpdate("""
-                INSERT INTO profile_views (viewer_id, viewed_id, viewed_at)
-                VALUES (:viewerId, :viewedId, :viewedAt)
-                """)
+            MERGE INTO profile_views (viewer_id, viewed_id, viewed_at)
+            KEY (viewer_id, viewed_id, viewed_at)
+            VALUES (:viewerId, :viewedId, :viewedAt)
+            """)
         void insertView(
                 @Bind("viewerId") UUID viewerId, @Bind("viewedId") UUID viewedId, @Bind("viewedAt") Instant viewedAt);
 
