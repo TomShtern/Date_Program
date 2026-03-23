@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.LongAdder;
 
 /**
  * Consolidated service for session tracking and metrics/statistics computation.
@@ -30,6 +31,10 @@ public class ActivityMetricsService {
     private final AnalyticsStorage analyticsStorage;
     private final AppConfig config;
     private final Object[] lockStripes;
+    private final LongAdder swipeLimitBlockedCount = new LongAdder();
+    private final LongAdder velocityWarningCount = new LongAdder();
+    private final LongAdder recordMatchNoOpCount = new LongAdder();
+    private final LongAdder endSessionNoOpCount = new LongAdder();
 
     /** Canonical constructor — all dependencies are required. */
     public ActivityMetricsService(
@@ -75,6 +80,7 @@ public class ActivityMetricsService {
             Session session = getOrCreateSession(userId);
 
             if (session.getSwipeCount() >= config.matching().maxSwipesPerSession()) {
+                swipeLimitBlockedCount.increment();
                 return SwipeGateResult.blocked(session, "Session swipe limit reached. Take a break!");
             }
 
@@ -85,6 +91,7 @@ public class ActivityMetricsService {
             if (session.getSwipeCount() >= 10
                     && session.getSwipesPerMinute() > config.matching().suspiciousSwipeVelocity()) {
                 warning = "Unusually fast swiping detected. Take a moment to review profiles!";
+                velocityWarningCount.increment();
             }
 
             return SwipeGateResult.success(session, warning);
@@ -108,6 +115,8 @@ public class ActivityMetricsService {
                 Session session = active.get();
                 session.incrementMatchCount();
                 analyticsStorage.saveSession(session);
+            } else {
+                recordMatchNoOpCount.increment();
             }
         }
     }
@@ -118,7 +127,17 @@ public class ActivityMetricsService {
             Session session = active.get();
             session.end();
             analyticsStorage.saveSession(session);
+        } else {
+            endSessionNoOpCount.increment();
         }
+    }
+
+    public DiagnosticsSnapshot getDiagnosticsSnapshot() {
+        return new DiagnosticsSnapshot(
+                swipeLimitBlockedCount.sum(),
+                velocityWarningCount.sum(),
+                recordMatchNoOpCount.sum(),
+                endSessionNoOpCount.sum());
     }
 
     public Optional<Session> getCurrentSession(UUID userId) {
@@ -280,6 +299,20 @@ public class ActivityMetricsService {
 
         public boolean hasWarning() {
             return warning != null;
+        }
+    }
+
+    public static record DiagnosticsSnapshot(
+            long swipeLimitBlockedCount,
+            long velocityWarningCount,
+            long recordMatchNoOpCount,
+            long endSessionNoOpCount) {
+        public long totalNotableEvents() {
+            return swipeLimitBlockedCount + velocityWarningCount + recordMatchNoOpCount + endSessionNoOpCount;
+        }
+
+        public boolean hasAnyEvents() {
+            return totalNotableEvents() > 0;
         }
     }
 }

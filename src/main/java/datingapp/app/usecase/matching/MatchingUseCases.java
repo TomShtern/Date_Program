@@ -21,6 +21,7 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.PageData;
 import datingapp.core.storage.UserStorage;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +35,7 @@ import java.util.UUID;
 public class MatchingUseCases {
 
     private static final String CONTEXT_REQUIRED = "Context is required";
+    private static final String INTERACTION_STORAGE_REQUIRED = "InteractionStorage is not configured";
 
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
@@ -272,6 +274,33 @@ public class MatchingUseCases {
         }
     }
 
+    public UseCaseResult<PagedMatchesResult> listPagedMatches(ListPagedMatchesQuery query) {
+        if (query == null || query.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        if (query.limit() <= 0) {
+            return UseCaseResult.failure(UseCaseError.validation("limit must be greater than 0"));
+        }
+        if (query.offset() < 0) {
+            return UseCaseResult.failure(UseCaseError.validation("offset must be non-negative"));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency("UserStorage is required"));
+        }
+        try {
+            UUID userId = query.context().userId();
+            PageData<Match> page = matchingService.getPageOfMatchesForUser(userId, query.offset(), query.limit());
+            Set<UUID> otherIds = new HashSet<>();
+            for (Match match : page.items()) {
+                otherIds.add(match.getOtherUser(userId));
+            }
+            Map<UUID, User> usersById = userStorage.findByIds(otherIds);
+            return UseCaseResult.success(new PagedMatchesResult(page, usersById));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to list matches: " + e.getMessage()));
+        }
+    }
+
     public UseCaseResult<List<MatchingService.PendingLiker>> pendingLikers(PendingLikersQuery query) {
         if (query == null || query.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
@@ -363,7 +392,7 @@ public class MatchingUseCases {
             return UseCaseResult.failure(UseCaseError.validation("Context and likeId are required"));
         }
         if (interactionStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("InteractionStorage is not configured"));
+            return UseCaseResult.failure(UseCaseError.dependency(INTERACTION_STORAGE_REQUIRED));
         }
         try {
             interactionStorage.delete(command.likeId());
@@ -392,12 +421,29 @@ public class MatchingUseCases {
         }
     }
 
+    public UseCaseResult<MatchQualityService.MatchQuality> getMatchQuality(MatchQualityByIdQuery query) {
+        if (query == null || query.context() == null || query.matchId() == null) {
+            return UseCaseResult.failure(UseCaseError.validation("Context and matchId are required"));
+        }
+        if (interactionStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(INTERACTION_STORAGE_REQUIRED));
+        }
+        Match match = interactionStorage.get(query.matchId()).orElse(null);
+        if (match == null) {
+            return UseCaseResult.failure(UseCaseError.notFound("Match not found"));
+        }
+        if (!match.involves(query.context().userId())) {
+            return UseCaseResult.failure(UseCaseError.forbidden("Match does not belong to current user"));
+        }
+        return matchQuality(new MatchQualityQuery(query.context(), match));
+    }
+
     public UseCaseResult<Void> archiveMatch(ArchiveMatchCommand command) {
         if (command == null || command.context() == null || command.matchId() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and matchId are required"));
         }
         if (interactionStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("InteractionStorage is not configured"));
+            return UseCaseResult.failure(UseCaseError.dependency(INTERACTION_STORAGE_REQUIRED));
         }
         Match match = interactionStorage.get(command.matchId()).orElse(null);
         if (match == null) {
@@ -433,6 +479,8 @@ public class MatchingUseCases {
 
     public static record ActiveMatchesResult(List<Match> matches, Map<UUID, User> usersById) {}
 
+    public static record PagedMatchesResult(PageData<Match> page, Map<UUID, User> usersById) {}
+
     public static record PendingLikersQuery(UserContext context) {}
 
     public static record StandoutsQuery(UserContext context, User currentUser) {}
@@ -450,7 +498,11 @@ public class MatchingUseCases {
 
     public static record MatchQualityQuery(UserContext context, Match match) {}
 
+    public static record MatchQualityByIdQuery(UserContext context, String matchId) {}
+
     public static record ArchiveMatchCommand(UserContext context, String matchId) {}
+
+    public static record ListPagedMatchesQuery(UserContext context, int limit, int offset) {}
 
     public static DailyLimitService wrapDailyLimitService(RecommendationService recommendationService) {
         if (recommendationService == null) {

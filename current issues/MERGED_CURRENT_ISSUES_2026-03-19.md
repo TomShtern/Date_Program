@@ -606,7 +606,7 @@ FK constraints are **comprehensively defined** across all tables in `SchemaIniti
 - **Severity / Category:** high / architecture
 - **Mentions (total):** 7
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                                          | Value                                                         |
@@ -641,7 +641,7 @@ FK constraints are **comprehensively defined** across all tables in `SchemaIniti
 - **Severity / Category:** high / performance
 - **Mentions (total):** 6
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                                 |
@@ -685,7 +685,7 @@ FK constraints are **comprehensively defined** across all tables in `SchemaIniti
 - **Severity / Category:** high / performance
 - **Mentions (total):** 6
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                                                          |
@@ -1077,7 +1077,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** high / maintainability
 - **Mentions (total):** 2
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                                          | Value                                              |
@@ -1131,7 +1131,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** high / architecture
 - **Mentions (total):** 2
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                              | Value                              |
@@ -2236,7 +2236,7 @@ The claim that `isRunning()` "reads without synchronization" is technically true
 - **Severity / Category:** medium / performance
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                              | Value         |
@@ -2261,7 +2261,7 @@ The claim that `isRunning()` "reads without synchronization" is technically true
 - **Severity / Category:** medium / performance
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                              | Value         |
@@ -2311,7 +2311,7 @@ The claim that `isRunning()` "reads without synchronization" is technically true
 - **Severity / Category:** medium / performance
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                                      | Value                                      |
@@ -2428,7 +2428,7 @@ The claim calls these "magic numbers" but they are properly declared named const
 - **Severity / Category:** medium / maintainability
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                              | Value        |
@@ -2478,7 +2478,7 @@ The claim calls these "magic numbers" but they are properly declared named const
 - **Severity / Category:** medium / architecture
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                              | Value         |
@@ -2528,7 +2528,7 @@ The claim calls these "magic numbers" but they are properly declared named const
 - **Severity / Category:** medium / maintainability
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                              | Value         |
@@ -2613,7 +2613,7 @@ This is an intentional design gap — the app uses soft-delete for users but har
 - **Severity / Category:** medium / architecture
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                              | Value         |
@@ -2638,7 +2638,7 @@ This is an intentional design gap — the app uses soft-delete for users but har
 - **Severity / Category:** medium / performance
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                              | Value        |
@@ -2740,7 +2740,7 @@ This is an intentional design gap — the app uses soft-delete for users but har
 - **Severity / Category:** low / maintainability
 - **Mentions (total):** 2
 - **Cross-report conflict:** no
-- **Completion status:** 🟠 <span style="color: orange">IN PROGRESS - NOT STARTED YET (a plan exists)</span>
+- **Completion status:** ✅ Implemented (2026-03-23 harder/longer plan)
 
 #### Report Context
 | Type                  | Key                                              | Value         |

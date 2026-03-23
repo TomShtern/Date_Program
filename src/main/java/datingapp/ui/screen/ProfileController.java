@@ -48,7 +48,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
-import javafx.stage.Modality;
 import javafx.util.StringConverter;
 import org.kordamp.ikonli.javafx.FontIcon;
 import org.slf4j.Logger;
@@ -63,7 +62,6 @@ public class ProfileController extends BaseController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(ProfileController.class);
     private static final String GENDER_OTHER_LABEL = "Other / Non-binary";
     private static final String DEALBREAKER_HEADER = "Only show people who:";
-    private static final String DARK_PANEL_STYLE = "-fx-background-color: #1e293b;";
     private static final String PRIMARY_ACCENT_COLOR = "#667eea";
     private static final String SUCCESS_ACCENT_COLOR = "#10b981";
     private static final String STYLE_CLASS_TEXT_SECONDARY = "text-secondary";
@@ -424,62 +422,31 @@ public class ProfileController extends BaseController implements Initializable {
      * Sets up lifestyle ComboBoxes with enum values and display converters.
      */
     private void setupLifestyleComboBoxes() {
-        // Smoking ComboBox
-        if (smokingCombo != null) {
-            smokingCombo.setItems(FXCollections.observableArrayList(Lifestyle.Smoking.values()));
-            smokingCombo.setConverter(UiUtils.createEnumStringConverter(Lifestyle.Smoking::getDisplayName));
-            smokingCombo.setButtonCell(UiUtils.createDisplayCell(Lifestyle.Smoking::getDisplayName));
-        }
-
-        // Drinking ComboBox
-        if (drinkingCombo != null) {
-            drinkingCombo.setItems(FXCollections.observableArrayList(Lifestyle.Drinking.values()));
-            drinkingCombo.setConverter(UiUtils.createEnumStringConverter(Lifestyle.Drinking::getDisplayName));
-            drinkingCombo.setButtonCell(UiUtils.createDisplayCell(Lifestyle.Drinking::getDisplayName));
-        }
-
-        // Wants Kids ComboBox
-        if (wantsKidsCombo != null) {
-            wantsKidsCombo.setItems(FXCollections.observableArrayList(Lifestyle.WantsKids.values()));
-            wantsKidsCombo.setConverter(UiUtils.createEnumStringConverter(Lifestyle.WantsKids::getDisplayName));
-            wantsKidsCombo.setButtonCell(UiUtils.createDisplayCell(Lifestyle.WantsKids::getDisplayName));
-        }
-
-        // Looking For ComboBox
-        if (lookingForCombo != null) {
-            lookingForCombo.setItems(FXCollections.observableArrayList(Lifestyle.LookingFor.values()));
-            lookingForCombo.setConverter(UiUtils.createEnumStringConverter(Lifestyle.LookingFor::getDisplayName));
-            lookingForCombo.setButtonCell(UiUtils.createDisplayCell(Lifestyle.LookingFor::getDisplayName));
-        }
+        UiUtils.configureEnumComboBox(smokingCombo, Lifestyle.Smoking.values(), Lifestyle.Smoking::getDisplayName);
+        UiUtils.configureEnumComboBox(drinkingCombo, Lifestyle.Drinking.values(), Lifestyle.Drinking::getDisplayName);
+        UiUtils.configureEnumComboBox(
+                wantsKidsCombo, Lifestyle.WantsKids.values(), Lifestyle.WantsKids::getDisplayName);
+        UiUtils.configureEnumComboBox(
+                lookingForCombo, Lifestyle.LookingFor.values(), Lifestyle.LookingFor::getDisplayName);
     }
 
     private void setupPacePreferenceComboBoxes() {
-        configurePaceCombo(
+        UiUtils.configureEnumComboBox(
                 messagingFrequencyCombo,
                 PacePreferences.MessagingFrequency.values(),
                 PacePreferences.MessagingFrequency::getDisplayName);
-        configurePaceCombo(
+        UiUtils.configureEnumComboBox(
                 timeToFirstDateCombo,
                 PacePreferences.TimeToFirstDate.values(),
                 PacePreferences.TimeToFirstDate::getDisplayName);
-        configurePaceCombo(
+        UiUtils.configureEnumComboBox(
                 communicationStyleCombo,
                 PacePreferences.CommunicationStyle.values(),
                 PacePreferences.CommunicationStyle::getDisplayName);
-        configurePaceCombo(
+        UiUtils.configureEnumComboBox(
                 depthPreferenceCombo,
                 PacePreferences.DepthPreference.values(),
                 PacePreferences.DepthPreference::getDisplayName);
-    }
-
-    private <T extends Enum<T>> void configurePaceCombo(
-            ComboBox<T> comboBox, T[] values, java.util.function.Function<T, String> displayMapper) {
-        if (comboBox == null) {
-            return;
-        }
-        comboBox.setItems(FXCollections.observableArrayList(values));
-        comboBox.setConverter(UiUtils.createEnumStringConverter(displayMapper));
-        comboBox.setButtonCell(UiUtils.createDisplayCell(displayMapper));
     }
 
     /**
@@ -574,12 +541,15 @@ public class ProfileController extends BaseController implements Initializable {
     private void updateInterestedInLabel() {
         if (interestedInLabel != null) {
             int count = viewModel.getInterestedInGenders().size();
+            if (!interestedInLabel.getStyleClass().contains(STYLE_CLASS_TEXT_SECONDARY)) {
+                interestedInLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
+            }
             if (count == 0) {
                 interestedInLabel.setText("Select at least one");
                 interestedInLabel.setStyle("-fx-text-fill: #f87171;"); // Red warning
             } else {
                 interestedInLabel.setText(count + " selected");
-                interestedInLabel.setStyle("-fx-text-fill: #94a3b8;"); // Normal
+                interestedInLabel.setStyle("");
             }
         }
     }
@@ -591,15 +561,15 @@ public class ProfileController extends BaseController implements Initializable {
         addSubscription(heightField.textProperty().subscribe(newVal -> {
             if (newVal == null || newVal.isBlank()) {
                 viewModel.heightProperty().set(null);
-                applyValidationMessage(heightErrorLabel, null);
+                UiUtils.setLabelMessage(heightErrorLabel, null);
                 return;
             }
             try {
                 int height = Integer.parseInt(newVal.trim());
                 viewModel.heightProperty().set(height);
-                applyValidationMessage(heightErrorLabel, null);
+                UiUtils.setLabelMessage(heightErrorLabel, null);
             } catch (NumberFormatException _) {
-                applyValidationMessage(heightErrorLabel, "Height must be a whole number in centimeters.");
+                UiUtils.setLabelMessage(heightErrorLabel, "Height must be a whole number in centimeters.");
             }
             viewModel.refreshUnsavedChangesFlag();
         }));
@@ -612,7 +582,7 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     private void validateHeightRange() {
-        applyValidationMessage(
+        UiUtils.setLabelMessage(
                 heightErrorLabel,
                 formValidator.validateHeight(
                         heightField.getText(), viewModel.getMinHeightCm(), viewModel.getMaxHeightCm()));
@@ -650,7 +620,7 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     private void validateSearchPreferenceRange() {
-        applyValidationMessage(
+        UiUtils.setLabelMessage(
                 searchPreferencesErrorLabel,
                 formValidator.validateSearchPreferences(
                         minAgeField.getText(), maxAgeField.getText(), maxDistanceField.getText()));
@@ -900,21 +870,19 @@ public class ProfileController extends BaseController implements Initializable {
     @FXML
     @SuppressWarnings("unused")
     private void handleEditInterests() {
-        Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle("Select Interests");
-        dialog.setHeaderText("Choose up to " + Interest.MAX_PER_USER + " interests");
+        Dialog<Void> dialog = UiUtils.createThemedDialog(
+                rootPane, "Select Interests", "Choose up to " + Interest.MAX_PER_USER + " interests");
 
         // Create content
         VBox content = new VBox(UiConstants.SPACING_LARGE);
         content.setPadding(new Insets(UiConstants.PADDING_XLARGE));
-        content.setStyle(DARK_PANEL_STYLE);
+        UiUtils.applyDarkPanelStyle(content);
 
         // Group interests by category
         for (Interest.Category category : Interest.Category.values()) {
             VBox categoryBox = new VBox(UiConstants.SPACING_SMALL);
 
-            Label categoryLabel = new Label(category.getDisplayName());
-            categoryLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: white; -fx-font-size: 14px;");
+            Label categoryLabel = UiUtils.createSectionTitleLabel(category.getDisplayName());
             categoryBox.getChildren().add(categoryLabel);
 
             FlowPane interestPane = new FlowPane(UiConstants.SPACING_SMALL, UiConstants.SPACING_SMALL);
@@ -939,7 +907,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-        dialog.getDialogPane().setStyle(DARK_PANEL_STYLE);
+        UiUtils.applyDarkPanelStyle(dialog.getDialogPane());
         dialog.getDialogPane()
                 .lookupButton(ButtonType.CLOSE)
                 .setStyle("-fx-background-color: " + PRIMARY_ACCENT_COLOR + "; -fx-text-fill: white;");
@@ -990,7 +958,8 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private void handleSetLocation() {
-        Dialog<ButtonType> dialog = createThemedDialog("Set Location", "Choose where you want to discover people");
+        Dialog<ButtonType> dialog =
+                UiUtils.createThemedDialog(rootPane, "Set Location", "Choose where you want to discover people");
 
         VBox content = new VBox(UiConstants.SPACING_LARGE);
         content.setPadding(new Insets(UiConstants.PADDING_XLARGE));
@@ -998,9 +967,10 @@ public class ProfileController extends BaseController implements Initializable {
         LocationService locationService = viewModel.getLocationService();
         Country defaultCountry = locationService.getDefaultCountry();
 
-        Label helperLabel = createSecondaryLabel("Choose a country, then select a city or enter a ZIP code.");
-        Label exampleLabel = createSecondaryLabel("Coordinates stay internal; you only choose human-friendly places.");
-        Label currentLocationLabel = createSecondaryLabel(buildCurrentLocationSummary());
+        Label helperLabel = UiUtils.createSecondaryLabel("Choose a country, then select a city or enter a ZIP code.");
+        Label exampleLabel =
+                UiUtils.createSecondaryLabel("Coordinates stay internal; you only choose human-friendly places.");
+        Label currentLocationLabel = UiUtils.createSecondaryLabel(buildCurrentLocationSummary());
 
         ComboBox<Country> countryCombo = createCountryCombo(locationService, defaultCountry);
 
@@ -1011,13 +981,11 @@ public class ProfileController extends BaseController implements Initializable {
         TextField zipField = new TextField();
         zipField.setPromptText("Israeli ZIP code (7 digits)");
 
-        Label previewLabel = createSecondaryLabel("");
+        Label previewLabel = UiUtils.createSecondaryLabel("");
 
         Label errorLabel = new Label();
         errorLabel.getStyleClass().add("dialog-error-label");
-        errorLabel.setWrapText(true);
-        errorLabel.setManaged(false);
-        errorLabel.setVisible(false);
+        UiUtils.setLabelMessage(errorLabel, null);
 
         content.getChildren()
                 .addAll(
@@ -1053,7 +1021,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         confirmButton.addEventFilter(ActionEvent.ACTION, event -> {
             if (pendingLocation[0] == null) {
-                showLocationDialogError(
+                UiUtils.setLabelMessage(
                         dialogRefs.errorLabel(), "Please choose a supported city or ZIP code before saving.");
                 event.consume();
                 return;
@@ -1063,13 +1031,6 @@ public class ProfileController extends BaseController implements Initializable {
         });
 
         dialog.showAndWait();
-    }
-
-    private Label createSecondaryLabel(String text) {
-        Label label = new Label(text);
-        label.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
-        label.setWrapText(true);
-        return label;
     }
 
     private String buildCurrentLocationSummary() {
@@ -1145,7 +1106,7 @@ public class ProfileController extends BaseController implements Initializable {
         dialogRefs.countryCombo().valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !newVal.available()) {
                 dialogRefs.countryCombo().getSelectionModel().select(oldVal != null ? oldVal : defaultCountry);
-                showLocationDialogError(
+                UiUtils.setLabelMessage(
                         dialogRefs.errorLabel(), newVal.name() + " is coming soon. Please choose Israel for now.");
                 return;
             }
@@ -1177,7 +1138,7 @@ public class ProfileController extends BaseController implements Initializable {
     private void refreshLocationValidation(
             LocationService locationService, LocationDialogRefs dialogRefs, ResolvedLocation[] pendingLocation) {
         pendingLocation[0] = null;
-        hideLocationDialogError(dialogRefs.errorLabel());
+        UiUtils.setLabelMessage(dialogRefs.errorLabel(), null);
 
         Country selectedCountry = dialogRefs.countryCombo().getValue();
         if (selectedCountry == null) {
@@ -1191,7 +1152,7 @@ public class ProfileController extends BaseController implements Initializable {
                     dialogRefs.previewLabel(),
                     true,
                     "This country will be available in a future update.");
-            showLocationDialogError(
+            UiUtils.setLabelMessage(
                     dialogRefs.errorLabel(), "This country is coming soon. Please choose Israel for now.");
             return;
         }
@@ -1226,7 +1187,7 @@ public class ProfileController extends BaseController implements Initializable {
                     dialogRefs.previewLabel(),
                     true,
                     "Enter a valid supported ZIP code to continue.");
-            showLocationDialogError(dialogRefs.errorLabel(), lookupResult.message());
+            UiUtils.setLabelMessage(dialogRefs.errorLabel(), lookupResult.message());
             return;
         }
         Optional<ResolvedLocation> resolvedLocation = lookupResult.resolvedLocation();
@@ -1244,7 +1205,7 @@ public class ProfileController extends BaseController implements Initializable {
                 dialogRefs.previewLabel(),
                 true,
                 "ZIP format is valid, but we do not support that area yet.");
-        showLocationDialogError(dialogRefs.errorLabel(), lookupResult.message());
+        UiUtils.setLabelMessage(dialogRefs.errorLabel(), lookupResult.message());
     }
 
     private void setLocationDialogState(
@@ -1262,27 +1223,16 @@ public class ProfileController extends BaseController implements Initializable {
             Label previewLabel,
             Label errorLabel) {}
 
-    private void showLocationDialogError(Label errorLabel, String message) {
-        errorLabel.setText(message);
-        errorLabel.setManaged(true);
-        errorLabel.setVisible(true);
-    }
-
-    private void hideLocationDialogError(Label errorLabel) {
-        errorLabel.setText("");
-        errorLabel.setManaged(false);
-        errorLabel.setVisible(false);
-    }
-
     /**
      * Opens a dialog to configure dealbreakers.
      * Users can set hard filters like smoking, drinking, height, etc.
      */
     @FXML
     private void handleEditDealbreakers() {
-        Dialog<Dealbreakers> dialog = new Dialog<>();
-        dialog.setTitle("Configure Dealbreakers");
-        dialog.setHeaderText("Set hard filters to exclude profiles that don't match your preferences");
+        Dialog<Dealbreakers> dialog = UiUtils.createThemedDialog(
+                rootPane,
+                "Configure Dealbreakers",
+                "Set hard filters to exclude profiles that don't match your preferences");
 
         // Get current dealbreakers
         Dealbreakers current = viewModel.getDealbreakers();
@@ -1293,7 +1243,7 @@ public class ProfileController extends BaseController implements Initializable {
         // Create scrollable content
         VBox content = new VBox(UiConstants.SPACING_LARGE);
         content.setPadding(new Insets(UiConstants.PADDING_XLARGE));
-        content.setStyle(DARK_PANEL_STYLE);
+        UiUtils.applyDarkPanelStyle(content);
         content.setPrefWidth(450);
 
         // Track selected values for each category using EnumSet for performance
@@ -1372,11 +1322,11 @@ public class ProfileController extends BaseController implements Initializable {
         ScrollPane scrollPane = new ScrollPane(content);
         scrollPane.setFitToWidth(true);
         scrollPane.setPrefHeight(400);
-        scrollPane.setStyle(DARK_PANEL_STYLE);
+        UiUtils.applyDarkPanelStyle(scrollPane);
 
         dialog.getDialogPane().setContent(scrollPane);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        dialog.getDialogPane().setStyle(DARK_PANEL_STYLE);
+        UiUtils.applyDarkPanelStyle(dialog.getDialogPane());
 
         // Style buttons
         Button okBtn = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
@@ -1415,7 +1365,7 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     private void validateBirthDateField() {
-        applyValidationMessage(
+        UiUtils.setLabelMessage(
                 birthDateErrorLabel,
                 formValidator.validateBirthDate(birthDatePicker == null ? null : birthDatePicker.getValue()));
     }
@@ -1429,7 +1379,7 @@ public class ProfileController extends BaseController implements Initializable {
                 && viewModel.timeToFirstDateProperty().get() != null
                 && viewModel.communicationStyleProperty().get() != null
                 && viewModel.depthPreferenceProperty().get() != null;
-        applyValidationMessage(pacePreferencesErrorLabel, formValidator.validatePacePreferences(anySet, allSet));
+        UiUtils.setLabelMessage(pacePreferencesErrorLabel, formValidator.validatePacePreferences(anySet, allSet));
     }
 
     private boolean hasValidationErrors() {
@@ -1441,16 +1391,6 @@ public class ProfileController extends BaseController implements Initializable {
 
     private boolean hasMessage(Label label) {
         return label != null && label.getText() != null && !label.getText().isBlank();
-    }
-
-    private void applyValidationMessage(Label label, String message) {
-        if (label == null) {
-            return;
-        }
-        boolean visible = message != null && !message.isBlank();
-        label.setText(visible ? message : "");
-        label.setManaged(visible);
-        label.setVisible(visible);
     }
 
     private boolean confirmDiscardUnsavedChanges() {
@@ -1550,7 +1490,8 @@ public class ProfileController extends BaseController implements Initializable {
         try {
             ProfileViewModel.ProfilePreviewSnapshot snapshot = viewModel.buildPreviewSnapshot();
 
-            Dialog<ButtonType> dialog = createThemedDialog("Profile Preview", "How your profile appears to others");
+            Dialog<ButtonType> dialog =
+                    UiUtils.createThemedDialog(rootPane, "Profile Preview", "How your profile appears to others");
             VBox content = new VBox(UiConstants.SPACING_XLARGE - UiConstants.SPACING_XSMALL);
             content.setPadding(new Insets(UiConstants.PADDING_XXLARGE));
             content.setPrefWidth(420);
@@ -1584,12 +1525,9 @@ public class ProfileController extends BaseController implements Initializable {
             Label locationLabel = new Label("📍 " + snapshot.location());
             locationLabel.getStyleClass().add("card-distance");
 
-            Label lookingForLabel = new Label("Looking for: " + snapshot.lookingFor());
-            lookingForLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
+            Label lookingForLabel = UiUtils.createSecondaryLabel("Looking for: " + snapshot.lookingFor());
 
-            Label bioPreviewLabel = new Label(snapshot.bio());
-            bioPreviewLabel.setWrapText(true);
-            bioPreviewLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
+            Label bioPreviewLabel = UiUtils.createSecondaryLabel(snapshot.bio());
 
             FlowPane interestPane = new FlowPane(UiConstants.SPACING_SMALL, UiConstants.SPACING_SMALL);
             interestPane.getStyleClass().add("interests-container");
@@ -1623,7 +1561,8 @@ public class ProfileController extends BaseController implements Initializable {
         try {
             var completion = viewModel.calculateCurrentCompletion();
 
-            Dialog<ButtonType> dialog = createThemedDialog("Profile Score", "Your profile quality breakdown");
+            Dialog<ButtonType> dialog =
+                    UiUtils.createThemedDialog(rootPane, "Profile Score", "Your profile quality breakdown");
             VBox scoreContent = new VBox(UiConstants.SPACING_LARGE);
             scoreContent.setPadding(new Insets(UiConstants.PADDING_XXLARGE));
             scoreContent.setPrefWidth(460);
@@ -1688,24 +1627,5 @@ public class ProfileController extends BaseController implements Initializable {
             logError("Failed to calculate profile score", e);
             UiFeedbackService.showError("Unable to calculate profile score: " + e.getMessage());
         }
-    }
-
-    private Dialog<ButtonType> createThemedDialog(String title, String headerText) {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle(title);
-        dialog.setHeaderText(headerText);
-        dialog.initModality(Modality.WINDOW_MODAL);
-        if (rootPane != null
-                && rootPane.getScene() != null
-                && rootPane.getScene().getWindow() != null) {
-            dialog.initOwner(rootPane.getScene().getWindow());
-            dialog.getDialogPane().getStylesheets().setAll(rootPane.getScene().getStylesheets());
-        } else {
-            URL themeUrl = getClass().getResource("/css/theme.css");
-            if (themeUrl != null) {
-                dialog.getDialogPane().getStylesheets().add(themeUrl.toExternalForm());
-            }
-        }
-        return dialog;
     }
 }

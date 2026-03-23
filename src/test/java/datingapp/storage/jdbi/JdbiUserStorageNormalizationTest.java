@@ -9,15 +9,22 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
+import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.DevDataSeeder;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 import org.junit.jupiter.api.AfterEach;
@@ -35,6 +42,7 @@ class JdbiUserStorageNormalizationTest {
 
     private JdbiUserStorage storage;
     private Jdbi jdbi;
+    private CountingConnectionFactory connectionFactory;
     private UUID userId;
 
     @BeforeEach
@@ -43,14 +51,9 @@ class JdbiUserStorageNormalizationTest {
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1");
         DatabaseManager dbManager = DatabaseManager.getInstance();
 
-        jdbi = Jdbi.create(() -> {
-                    try {
-                        return dbManager.getConnection();
-                    } catch (java.sql.SQLException e) {
-                        throw new DatabaseManager.StorageException("Failed to get database connection", e);
-                    }
-                })
-                .installPlugin(new SqlObjectPlugin());
+        connectionFactory = new CountingConnectionFactory(dbManager);
+
+        jdbi = Jdbi.create(connectionFactory::open).installPlugin(new SqlObjectPlugin());
 
         jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
@@ -65,6 +68,7 @@ class JdbiUserStorageNormalizationTest {
         userId = UUID.randomUUID();
         User user = new User(userId, "TestUser");
         storage.save(user);
+        connectionFactory.reset();
     }
 
     @AfterEach
@@ -145,6 +149,90 @@ class JdbiUserStorageNormalizationTest {
         assertEquals(7, db.maxAgeDifference());
         assertTrue(db.acceptableSmoking().contains(Lifestyle.Smoking.NEVER));
         assertTrue(db.acceptableDrinking().contains(Lifestyle.Drinking.SOCIALLY));
+    }
+
+    @Test
+    @DisplayName("findByIds batches normalized reads and preserves profile data")
+    void findByIdsBatchesNormalizedReadsAndPreservesProfileData() {
+        User first = createActiveUser(UUID.randomUUID(), "BatchOne", Gender.FEMALE, Set.of(Gender.MALE), true);
+        first.setPhotoUrls(List.of("https://example.com/one-a.jpg", "https://example.com/one-b.jpg"));
+        first.setInterests(Set.of(Interest.MUSIC, Interest.TRAVEL));
+        first.setDealbreakers(Dealbreakers.builder()
+                .minHeight(165)
+                .maxHeight(185)
+                .acceptSmoking(Lifestyle.Smoking.NEVER)
+                .acceptDrinking(Lifestyle.Drinking.SOCIALLY)
+                .build());
+
+        User second = createActiveUser(UUID.randomUUID(), "BatchTwo", Gender.MALE, Set.of(Gender.FEMALE), true);
+        second.setPhotoUrls(List.of("https://example.com/two-a.jpg"));
+        second.setInterests(Set.of(Interest.COOKING));
+        second.setDealbreakers(Dealbreakers.builder()
+                .maxAgeDifference(4)
+                .acceptKidsStance(Lifestyle.WantsKids.OPEN)
+                .requireEducation(Lifestyle.Education.BACHELORS)
+                .build());
+
+        storage.save(first);
+        storage.save(second);
+        connectionFactory.reset();
+
+        Map<UUID, User> loaded = storage.findByIds(Set.of(first.getId(), second.getId()));
+
+        assertEquals(9, connectionFactory.statementCount());
+        assertEquals(2, loaded.size());
+
+        User loadedFirst = loaded.get(first.getId());
+        assertNotNull(loadedFirst);
+        assertEquals(first.getPhotoUrls(), loadedFirst.getPhotoUrls());
+        assertEquals(first.getInterests(), loadedFirst.getInterests());
+        assertEquals(first.getInterestedIn(), loadedFirst.getInterestedIn());
+        assertEquals(165, loadedFirst.getDealbreakers().minHeightCm());
+        assertEquals(185, loadedFirst.getDealbreakers().maxHeightCm());
+        assertTrue(loadedFirst.getDealbreakers().acceptableSmoking().contains(Lifestyle.Smoking.NEVER));
+
+        User loadedSecond = loaded.get(second.getId());
+        assertNotNull(loadedSecond);
+        assertEquals(second.getPhotoUrls(), loadedSecond.getPhotoUrls());
+        assertEquals(second.getInterests(), loadedSecond.getInterests());
+        assertEquals(second.getInterestedIn(), loadedSecond.getInterestedIn());
+        assertEquals(4, loadedSecond.getDealbreakers().maxAgeDifference());
+        assertTrue(loadedSecond.getDealbreakers().acceptableKidsStance().contains(Lifestyle.WantsKids.OPEN));
+    }
+
+    @Test
+    @DisplayName("findActive hydrates normalized profile data for multiple users")
+    void findActiveHydratesNormalizedProfileDataForMultipleUsers() {
+        User first = createActiveUser(UUID.randomUUID(), "ActiveOne", Gender.FEMALE, Set.of(Gender.MALE), true);
+        first.setPhotoUrls(List.of("https://example.com/active-one.jpg"));
+        first.setInterests(Set.of(Interest.MUSIC));
+        first.setDealbreakers(
+                Dealbreakers.builder().acceptSmoking(Lifestyle.Smoking.NEVER).build());
+
+        User second = createActiveUser(UUID.randomUUID(), "ActiveTwo", Gender.MALE, Set.of(Gender.FEMALE), true);
+        second.setPhotoUrls(List.of("https://example.com/active-two-a.jpg", "https://example.com/active-two-b.jpg"));
+        second.setInterests(Set.of(Interest.TRAVEL, Interest.COOKING));
+        second.setDealbreakers(Dealbreakers.builder()
+                .acceptDrinking(Lifestyle.Drinking.SOCIALLY)
+                .requireEducation(Lifestyle.Education.MASTERS)
+                .build());
+
+        storage.save(first);
+        storage.save(second);
+
+        List<User> activeUsers = storage.findActive();
+
+        assertEquals(2, activeUsers.size());
+        assertTrue(activeUsers.stream()
+                .anyMatch(user -> user.getId().equals(first.getId())
+                        && user.getPhotoUrls().equals(first.getPhotoUrls())
+                        && user.getInterests().equals(first.getInterests())
+                        && user.getDealbreakers().acceptableSmoking().contains(Lifestyle.Smoking.NEVER)));
+        assertTrue(activeUsers.stream()
+                .anyMatch(user -> user.getId().equals(second.getId())
+                        && user.getPhotoUrls().equals(second.getPhotoUrls())
+                        && user.getInterests().equals(second.getInterests())
+                        && user.getDealbreakers().acceptableDrinking().contains(Lifestyle.Drinking.SOCIALLY)));
     }
 
     @Test
@@ -303,5 +391,57 @@ class JdbiUserStorageNormalizationTest {
         }
 
         return builder.build();
+    }
+
+    private static final class CountingConnectionFactory {
+        private final DatabaseManager dbManager;
+        private final AtomicInteger statementCount = new AtomicInteger();
+
+        private CountingConnectionFactory(DatabaseManager dbManager) {
+            this.dbManager = dbManager;
+        }
+
+        Connection open() {
+            try {
+                return (Connection) Proxy.newProxyInstance(
+                        Connection.class.getClassLoader(),
+                        new Class<?>[] {Connection.class},
+                        new CountingConnectionHandler(dbManager.getConnection()));
+            } catch (java.sql.SQLException e) {
+                throw new DatabaseManager.StorageException("Failed to get database connection", e);
+            }
+        }
+
+        void reset() {
+            statementCount.set(0);
+        }
+
+        int statementCount() {
+            return statementCount.get();
+        }
+
+        private final class CountingConnectionHandler implements InvocationHandler {
+            private final Connection delegate;
+
+            private CountingConnectionHandler(Connection delegate) {
+                this.delegate = delegate;
+            }
+
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                String methodName = method.getName();
+                if (methodName.startsWith("prepareStatement")
+                        || methodName.startsWith("prepareCall")
+                        || methodName.equals("createStatement")) {
+                    statementCount.incrementAndGet();
+                }
+
+                try {
+                    return method.invoke(delegate, args);
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    throw e.getCause();
+                }
+            }
+        }
     }
 }

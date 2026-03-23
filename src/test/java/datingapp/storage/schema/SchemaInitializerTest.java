@@ -55,49 +55,37 @@ class SchemaInitializerTest {
 
             Set<String> tables = getTableNames();
 
-            // Core tables
-            assertTrue(tables.contains("USERS"), "Missing table: users");
-            assertTrue(tables.contains("LIKES"), "Missing table: likes");
-            assertTrue(tables.contains("MATCHES"), "Missing table: matches");
-            assertTrue(tables.contains("SWIPE_SESSIONS"), "Missing table: swipe_sessions");
+            Set<String> expectedTables = Set.of(
+                    "USERS",
+                    "LIKES",
+                    "MATCHES",
+                    "SWIPE_SESSIONS",
+                    "USER_STATS",
+                    "PLATFORM_STATS",
+                    "DAILY_PICK_VIEWS",
+                    "USER_ACHIEVEMENTS",
+                    "CONVERSATIONS",
+                    "MESSAGES",
+                    "FRIEND_REQUESTS",
+                    "NOTIFICATIONS",
+                    "BLOCKS",
+                    "REPORTS",
+                    "PROFILE_NOTES",
+                    "PROFILE_VIEWS",
+                    "STANDOUTS",
+                    "UNDO_STATES",
+                    "USER_PHOTOS",
+                    "USER_INTERESTS",
+                    "USER_INTERESTED_IN",
+                    "USER_DB_SMOKING",
+                    "USER_DB_DRINKING",
+                    "USER_DB_WANTS_KIDS",
+                    "USER_DB_LOOKING_FOR",
+                    "USER_DB_EDUCATION");
 
-            // Stats tables
-            assertTrue(tables.contains("USER_STATS"), "Missing table: user_stats");
-            assertTrue(tables.contains("PLATFORM_STATS"), "Missing table: platform_stats");
-
-            // Feature tables
-            assertTrue(tables.contains("DAILY_PICK_VIEWS"), "Missing table: daily_pick_views");
-            assertTrue(tables.contains("USER_ACHIEVEMENTS"), "Missing table: user_achievements");
-
-            // Messaging
-            assertTrue(tables.contains("CONVERSATIONS"), "Missing table: conversations");
-            assertTrue(tables.contains("MESSAGES"), "Missing table: messages");
-
-            // Social
-            assertTrue(tables.contains("FRIEND_REQUESTS"), "Missing table: friend_requests");
-            assertTrue(tables.contains("NOTIFICATIONS"), "Missing table: notifications");
-
-            // Moderation
-            assertTrue(tables.contains("BLOCKS"), "Missing table: blocks");
-            assertTrue(tables.contains("REPORTS"), "Missing table: reports");
-
-            // Profile
-            assertTrue(tables.contains("PROFILE_NOTES"), "Missing table: profile_notes");
-            assertTrue(tables.contains("PROFILE_VIEWS"), "Missing table: profile_views");
-
-            // Standouts & Undo
-            assertTrue(tables.contains("STANDOUTS"), "Missing table: standouts");
-            assertTrue(tables.contains("UNDO_STATES"), "Missing table: undo_states");
-
-            // Normalized profile tables (V3)
-            assertTrue(tables.contains("USER_PHOTOS"), "Missing table: user_photos");
-            assertTrue(tables.contains("USER_INTERESTS"), "Missing table: user_interests");
-            assertTrue(tables.contains("USER_INTERESTED_IN"), "Missing table: user_interested_in");
-            assertTrue(tables.contains("USER_DB_SMOKING"), "Missing table: user_db_smoking");
-            assertTrue(tables.contains("USER_DB_DRINKING"), "Missing table: user_db_drinking");
-            assertTrue(tables.contains("USER_DB_WANTS_KIDS"), "Missing table: user_db_wants_kids");
-            assertTrue(tables.contains("USER_DB_LOOKING_FOR"), "Missing table: user_db_looking_for");
-            assertTrue(tables.contains("USER_DB_EDUCATION"), "Missing table: user_db_education");
+            Set<String> missingTables = new HashSet<>(expectedTables);
+            missingTables.removeAll(tables);
+            assertTrue(missingTables.isEmpty(), "Missing tables: " + missingTables);
         }
 
         @Test
@@ -135,6 +123,7 @@ class SchemaInitializerTest {
             // Additional indexes
             assertTrue(indexes.contains("IDX_ACHIEVEMENTS_USER_ID"), "Missing index: idx_achievements_user_id");
             assertTrue(indexes.contains("IDX_MESSAGES_SENDER_ID"), "Missing index: idx_messages_sender_id");
+            assertTrue(indexes.contains("IDX_MESSAGES_CONVERSATION_ID"), "Missing index: idx_messages_conversation_id");
 
             // Normalized profile table indexes (V3)
             assertTrue(indexes.contains("IDX_USER_INTERESTS_INTEREST"), "Missing index: idx_user_interests_interest");
@@ -266,6 +255,36 @@ class SchemaInitializerTest {
             Set<String> uniqueConstraints = getUniqueConstraintNames("CONVERSATIONS");
             assertTrue(uniqueConstraints.contains("UK_CONVERSATION_USERS"));
             assertFalse(uniqueConstraints.contains("UNQ_CONVERSATION_USERS"));
+        }
+
+        @Test
+        @DisplayName("should add standalone messages conversation index when upgrading a legacy database")
+        void v7MigrationAddsMessagesConversationIdIndex() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                SchemaInitializer.createAllTables(stmt);
+                stmt.execute("CREATE TABLE schema_version ("
+                        + "version INT PRIMARY KEY, "
+                        + "applied_at TIMESTAMP NOT NULL, "
+                        + "description VARCHAR(255)"
+                        + ")");
+                stmt.execute("INSERT INTO schema_version(version, applied_at, description) VALUES "
+                        + "(1, CURRENT_TIMESTAMP(), 'V1 baseline schema'), "
+                        + "(2, CURRENT_TIMESTAMP(), 'V2 daily picks cache table'), "
+                        + "(3, CURRENT_TIMESTAMP(), 'V3 normalized profile cleanup'), "
+                        + "(4, CURRENT_TIMESTAMP(), 'V4 soft-delete columns'), "
+                        + "(5, CURRENT_TIMESTAMP(), 'V5 profile view primary key'), "
+                        + "(6, CURRENT_TIMESTAMP(), 'V6 matches updated_at backfill')");
+
+                MigrationRunner.runAllPending(stmt);
+            }
+
+            Set<String> indexes = getIndexNames();
+            assertTrue(
+                    indexes.contains("IDX_MESSAGES_CONVERSATION_ID"),
+                    "Migration should add idx_messages_conversation_id");
+            assertTrue(
+                    indexes.contains("IDX_MESSAGES_CONVERSATION_CREATED"),
+                    "Migration should preserve idx_messages_conversation_created");
         }
     }
 

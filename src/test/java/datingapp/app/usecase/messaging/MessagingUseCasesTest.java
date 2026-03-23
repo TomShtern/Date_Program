@@ -7,12 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.messaging.MessagingUseCases.ArchiveConversationCommand;
+import datingapp.app.usecase.messaging.MessagingUseCases.CountMessagesByConversationIdsQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.DeleteConversationCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.DeleteMessageCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.LoadConversationQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
 import datingapp.core.AppConfig;
+import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
@@ -99,6 +101,21 @@ class MessagingUseCasesTest {
         assertTrue(result.success());
         assertFalse(result.data().conversations().isEmpty());
         assertEquals(1, result.data().totalUnreadCount());
+    }
+
+    @Test
+    @DisplayName("countMessagesByConversationIds returns batch message counts")
+    void countMessagesByConversationIdsReturnsBatchCounts() {
+        var sendResult = useCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(sender.getId()), recipient.getId(), "Batch count"));
+        assertTrue(sendResult.success());
+
+        String conversationId = Conversation.generateId(sender.getId(), recipient.getId());
+        var result = useCases.countMessagesByConversationIds(new CountMessagesByConversationIdsQuery(
+                UserContext.cli(sender.getId()), java.util.Set.of(conversationId)));
+
+        assertTrue(result.success());
+        assertEquals(1, result.data().get(conversationId));
     }
 
     @Test

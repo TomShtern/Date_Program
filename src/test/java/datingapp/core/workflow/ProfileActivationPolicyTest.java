@@ -186,12 +186,23 @@ class ProfileActivationPolicyTest {
         void missingFieldsListsAllGaps() {
             User u = TestUserFactory.createIncompleteUser("Bare");
             List<String> missing = policy.missingFields(u);
-            assertTrue(missing.contains("bio"));
-            assertTrue(missing.contains("birthDate"));
-            assertTrue(missing.contains("gender"));
-            assertTrue(missing.contains("interestedIn"));
-            assertTrue(missing.contains("photoUrls"));
-            assertTrue(missing.contains("pacePreferences"));
+            assertEquals(u.getMissingProfileFields(), missing);
+        }
+
+        @Test
+        @DisplayName("delegates missing fields to the User domain rules")
+        void missingFieldsDelegatesToUserDomainRules() {
+            User u = User.StorageBuilder.create(UUID.randomUUID(), "Bare", AppClock.now())
+                    .state(UserState.INCOMPLETE)
+                    .bio("Has bio")
+                    .birthDate(AppClock.today().minusYears(25))
+                    .gender(Gender.MALE)
+                    .interestedIn(Set.of(Gender.FEMALE))
+                    .maxDistanceKm(50)
+                    .ageRange(18, 40)
+                    .build();
+
+            assertEquals(u.getMissingProfileFields(), policy.missingFields(u));
         }
 
         @Test

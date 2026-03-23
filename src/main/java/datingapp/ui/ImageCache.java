@@ -3,6 +3,14 @@ package datingapp.ui;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
@@ -23,8 +31,27 @@ public final class ImageCache {
     /** Maximum number of images to cache before eviction. */
     private static final int MAX_CACHE_SIZE = UiConstants.IMAGE_CACHE_MAX_SIZE;
 
+    /** Maximum number of queued preload requests waiting behind the worker. */
+    private static final int PRELOAD_QUEUE_CAPACITY = Math.max(16, MAX_CACHE_SIZE / 2);
+
     /** Path to default avatar resource. */
     private static final String DEFAULT_AVATAR_PATH = UiConstants.DEFAULT_AVATAR_PATH;
+
+    /**
+     * Single bounded preload worker that prevents repeated calls from creating
+     * an unbounded number of blocked threads.
+     */
+    private static final ExecutorService PRELOAD_EXECUTOR = new ThreadPoolExecutor(
+            1,
+            1,
+            0L,
+            TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(PRELOAD_QUEUE_CAPACITY),
+            new PreloadThreadFactory(),
+            new ThreadPoolExecutor.AbortPolicy());
+
+    /** Tracks in-flight preload requests so repeated calls for the same image stay cheap. */
+    private static final Set<String> IN_FLIGHT_PRELOADS = ConcurrentHashMap.newKeySet();
 
     /**
      * Thread-safe LRU cache using LinkedHashMap with access-order.
@@ -70,7 +97,7 @@ public final class ImageCache {
             return getDefaultAvatar(width, height);
         }
 
-        String key = path + "@" + width + "x" + height;
+        String key = cacheKey(path, width, height);
 
         // Synchronized access for thread safety with LinkedHashMap
         synchronized (CACHE) {
@@ -106,7 +133,7 @@ public final class ImageCache {
 
     /** Returns the default avatar placeholder image. */
     private static Image getDefaultAvatar(double width, double height) {
-        String key = "default@" + width + "x" + height;
+        String key = cacheKey("default", width, height);
 
         synchronized (CACHE) {
             Image cached = CACHE.get(key);
@@ -220,12 +247,45 @@ public final class ImageCache {
             return;
         }
 
-        // getImage() already handles cache-check atomically in its synchronized block,
-        // so there is no need to pre-check containsKey outside the lock.
-        Thread.ofVirtual().name("image-preload").start(() -> {
-            getImage(path, width, height);
-            logDebug("Preloaded image: {}", path);
-        });
+        String key = cacheKey(path, width, height);
+        synchronized (CACHE) {
+            if (CACHE.containsKey(key)) {
+                return;
+            }
+        }
+
+        if (!IN_FLIGHT_PRELOADS.add(key)) {
+            return;
+        }
+
+        try {
+            PRELOAD_EXECUTOR.execute(() -> {
+                try {
+                    getImage(path, width, height);
+                    logDebug("Preloaded image: {}", path);
+                } finally {
+                    IN_FLIGHT_PRELOADS.remove(key);
+                }
+            });
+        } catch (RejectedExecutionException _) {
+            IN_FLIGHT_PRELOADS.remove(key);
+            logDebug("Dropped preload request for {} because the queue is full", path);
+        }
+    }
+
+    private static String cacheKey(String path, double width, double height) {
+        return path + "@" + width + "x" + height;
+    }
+
+    private static final class PreloadThreadFactory implements ThreadFactory {
+
+        @Override
+        public Thread newThread(Runnable runnable) {
+            Thread thread =
+                    Thread.ofPlatform().name("image-preload-worker", 0).daemon().unstarted(runnable);
+            thread.setPriority(Thread.NORM_PRIORITY - 1);
+            return thread;
+        }
     }
 
     private static void logWarn(String message, Object... args) {

@@ -719,6 +719,15 @@ public final class TestStorages {
         }
 
         @Override
+        public int countPendingFriendRequestsForUser(UUID userId) {
+            Objects.requireNonNull(userId, "userId cannot be null");
+            return (int) friendRequests.values().stream()
+                    .filter(request -> request.status() == FriendRequest.Status.PENDING)
+                    .filter(request -> request.toUserId().equals(userId))
+                    .count();
+        }
+
+        @Override
         public void deleteFriendRequest(UUID id) {
             friendRequests.remove(id);
         }

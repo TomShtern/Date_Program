@@ -5,8 +5,10 @@ import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -97,6 +99,11 @@ public interface UserStorage {
      * Finds multiple users by their IDs in a single batch query.
      * Returns a map of user ID to User. Missing IDs are not included in the map.
      *
+     * <p>
+     * The default implementation performs a single in-memory scan over
+     * {@link #findAll()} and filters the requested IDs. Storage adapters should
+     * override this method with a real indexed batch query when possible.
+     *
      * @param ids the user IDs to look up
      * @return map of found users keyed by their ID
      */
@@ -104,9 +111,12 @@ public interface UserStorage {
         if (ids == null || ids.isEmpty()) {
             return Map.of();
         }
-        Map<UUID, User> result = new java.util.HashMap<>();
-        for (UUID id : ids) {
-            get(id).ifPresent(user -> result.put(id, user));
+        Set<UUID> requestedIds = Set.copyOf(ids);
+        Map<UUID, User> result = new HashMap<>();
+        for (User user : findAll()) {
+            if (requestedIds.contains(user.getId())) {
+                result.put(user.getId(), user);
+            }
         }
         return result;
     }
@@ -131,7 +141,9 @@ public interface UserStorage {
      * @return number of rows purged
      */
     default int purgeDeletedBefore(java.time.Instant threshold) {
-        return 0;
+        Objects.requireNonNull(threshold, "threshold cannot be null");
+        throw new UnsupportedOperationException(
+                "UserStorage implementation must override purgeDeletedBefore(Instant) to support cleanup");
     }
 
     // ═══════════════════════════════════════════════════════════════

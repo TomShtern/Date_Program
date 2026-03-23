@@ -18,8 +18,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Composite service that delegates to specific recommendation and limit services.
- * Maintains backward compatibility with existing callers.
+ * Stable coordination facade for recommendation-related features.
+ *
+ * <p>It composes the daily limit, daily pick, and standout services, then adapts their
+ * result types into the legacy RecommendationService records used by callers.
  */
 public final class RecommendationService {
 
@@ -130,16 +132,7 @@ public final class RecommendationService {
 
     /** Current daily status including counts and time to reset. */
     public DailyStatus getStatus(UUID userId) {
-        DailyLimitService.DailyStatus status = dailyLimitService.getStatus(userId);
-        return new DailyStatus(
-                status.likesUsed(),
-                status.likesRemaining(),
-                status.superLikesUsed(),
-                status.superLikesRemaining(),
-                status.passesUsed(),
-                status.passesRemaining(),
-                status.date(),
-                status.resetsAt());
+        return toDailyStatus(dailyLimitService.getStatus(userId));
     }
 
     /** Time remaining until next daily reset (midnight local time). */
@@ -165,9 +158,7 @@ public final class RecommendationService {
 
     /** Get the daily pick for a user if available. */
     public Optional<DailyPick> getDailyPick(User seeker) {
-        return dailyPickService
-                .getDailyPick(seeker)
-                .map(pick -> new DailyPick(pick.user(), pick.date(), pick.reason(), pick.alreadySeen()));
+        return dailyPickService.getDailyPick(seeker).map(RecommendationService::toDailyPick);
     }
 
     /** Check whether user has viewed today's daily pick. */
@@ -187,8 +178,7 @@ public final class RecommendationService {
 
     /** Get today's standouts for a user. */
     public Result getStandouts(User seeker) {
-        StandoutService.Result result = standoutService.getStandouts(seeker);
-        return new Result(result.standouts(), result.totalCandidates(), result.fromCache(), result.message());
+        return toResult(standoutService.getStandouts(seeker));
     }
 
     /** Mark a standout as interacted after like/pass. */
@@ -263,5 +253,25 @@ public final class RecommendationService {
         public static Result of(List<Standout> standouts, int total, boolean cached) {
             return new Result(standouts, total, cached, null);
         }
+    }
+
+    private static DailyStatus toDailyStatus(DailyLimitService.DailyStatus status) {
+        return new DailyStatus(
+                status.likesUsed(),
+                status.likesRemaining(),
+                status.superLikesUsed(),
+                status.superLikesRemaining(),
+                status.passesUsed(),
+                status.passesRemaining(),
+                status.date(),
+                status.resetsAt());
+    }
+
+    private static DailyPick toDailyPick(DailyPickService.DailyPick pick) {
+        return new DailyPick(pick.user(), pick.date(), pick.reason(), pick.alreadySeen());
+    }
+
+    private static Result toResult(StandoutService.Result result) {
+        return new Result(result.standouts(), result.totalCandidates(), result.fromCache(), result.message());
     }
 }

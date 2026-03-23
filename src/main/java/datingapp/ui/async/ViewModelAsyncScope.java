@@ -52,6 +52,7 @@ public final class ViewModelAsyncScope {
     private final Object keyedTaskRegistrationLock = new Object();
 
     private final AtomicReference<Consumer<Boolean>> loadingStateConsumer = new AtomicReference<>();
+    private final DiagnosticsTracker diagnostics = new DiagnosticsTracker();
 
     public ViewModelAsyncScope(String scopeName, UiThreadDispatcher dispatcher, AsyncErrorRouter errorRouter) {
         this.scopeName = Objects.requireNonNull(scopeName, "scopeName cannot be null");
@@ -70,10 +71,15 @@ public final class ViewModelAsyncScope {
         return disposed.get();
     }
 
+    public DiagnosticsSnapshot diagnosticsSnapshot() {
+        return diagnostics.snapshot();
+    }
+
     public void onError(String taskName, Throwable throwable) {
         if (isDisposed()) {
             return;
         }
+        diagnostics.recordRoutedError();
         errorRouter.onError(taskName, throwable);
     }
 
@@ -122,13 +128,14 @@ public final class ViewModelAsyncScope {
 
         String safeTaskName = normalizeTaskName(taskName);
         if (isDisposed()) {
+            diagnostics.recordCancelledBeforeDelivery();
             return PollingTaskHandle.cancelled(safeTaskName, interval);
         }
 
         PollingTaskHandle handle = new PollingTaskHandle(safeTaskName, interval);
         activeHandles.add(handle);
 
-        long version = registerLatestTask(taskKey, handle);
+        long version = registerLatestTask(taskKey, TaskPolicy.POLLING, handle);
 
         Runnable execution = () -> executePollingTask(handle, taskKey, version, safeTaskName, backgroundWork);
         Thread thread = Thread.ofVirtual().name(threadName(safeTaskName)).unstarted(execution);
@@ -161,17 +168,19 @@ public final class ViewModelAsyncScope {
         String safeTaskName = normalizeTaskName(taskName);
 
         if (isDisposed()) {
+            diagnostics.recordCancelledBeforeDelivery();
             return ScopeTaskHandle.cancelled(safeTaskName, policy);
         }
 
         ScopeTaskHandle handle = new ScopeTaskHandle(safeTaskName, policy);
         activeHandles.add(handle);
 
-        long version = registerLatestTask(taskKey, handle);
-
         if (policy.trackLoading()) {
+            handle.markLoadingStarted();
             beginLoading();
         }
+
+        long version = registerLatestTask(taskKey, policy, handle);
 
         Runnable execution =
                 () -> executeTask(handle, taskKey, version, safeTaskName, policy, backgroundWork, onSuccess);
@@ -181,15 +190,19 @@ public final class ViewModelAsyncScope {
         return handle;
     }
 
-    private long registerLatestTask(String taskKey, TaskHandle handle) {
-        if (taskKey == null) {
+    private long registerLatestTask(String taskKey, TaskPolicy policy, TaskHandle handle) {
+        if (taskKey == null || !policy.isKeyed()) {
             return -1L;
         }
         synchronized (keyedTaskRegistrationLock) {
             long version = nextVersion(taskKey);
             TaskHandle previous = latestHandles.put(taskKey, handle);
             if (previous != null) {
+                diagnostics.recordSupersededTask();
                 previous.cancel();
+                if (previous instanceof ScopeTaskHandle previousHandle && previousHandle.releaseLoading()) {
+                    endLoading();
+                }
             }
             return version;
         }
@@ -204,18 +217,18 @@ public final class ViewModelAsyncScope {
             ThrowingSupplier<T> backgroundWork,
             Consumer<T> onSuccess) {
         try {
-            if (!canDeliver(handle, taskKey, version)) {
+            if (!canDeliverOrRecordCancelledBeforeDelivery(handle, taskKey, version)) {
                 return;
             }
 
             T result = backgroundWork.get();
 
-            if (!canDeliver(handle, taskKey, version)) {
+            if (!canDeliverOrRecordCancelledBeforeDelivery(handle, taskKey, version)) {
                 return;
             }
 
             dispatchToUi(() -> {
-                if (!canDeliver(handle, taskKey, version)) {
+                if (!canDeliverOrRecordCallbackSuppressed(handle, taskKey, version)) {
                     return;
                 }
                 try {
@@ -227,6 +240,8 @@ public final class ViewModelAsyncScope {
         } catch (RuntimeException error) {
             if (canDeliver(handle, taskKey, version)) {
                 onError(taskName, error);
+            } else {
+                diagnostics.recordCancelledBeforeDelivery();
             }
         } finally {
             handle.markDone();
@@ -234,7 +249,7 @@ public final class ViewModelAsyncScope {
             if (taskKey != null) {
                 latestHandles.remove(taskKey, handle);
             }
-            if (policy.trackLoading()) {
+            if (policy.trackLoading() && handle.releaseLoading()) {
                 endLoading();
             }
         }
@@ -242,8 +257,10 @@ public final class ViewModelAsyncScope {
 
     private void executePollingTask(
             PollingTaskHandle handle, String taskKey, long version, String taskName, ThrowingRunnable backgroundWork) {
+        boolean executedAtLeastOnce = false;
         try {
             while (canDeliver(handle, taskKey, version)) {
+                executedAtLeastOnce = true;
                 try {
                     backgroundWork.run();
                 } catch (RuntimeException error) {
@@ -262,6 +279,9 @@ public final class ViewModelAsyncScope {
                 }
             }
         } finally {
+            if (!executedAtLeastOnce) {
+                diagnostics.recordCancelledBeforeDelivery();
+            }
             handle.markDone();
             activeHandles.remove(handle);
             latestHandles.remove(taskKey, handle);
@@ -289,6 +309,22 @@ public final class ViewModelAsyncScope {
         return current != null && current.get() == expectedVersion;
     }
 
+    private boolean canDeliverOrRecordCancelledBeforeDelivery(TaskHandle handle, String taskKey, long expectedVersion) {
+        if (canDeliver(handle, taskKey, expectedVersion)) {
+            return true;
+        }
+        diagnostics.recordCancelledBeforeDelivery();
+        return false;
+    }
+
+    private boolean canDeliverOrRecordCallbackSuppressed(TaskHandle handle, String taskKey, long expectedVersion) {
+        if (canDeliver(handle, taskKey, expectedVersion)) {
+            return true;
+        }
+        diagnostics.recordCallbackSuppressed();
+        return false;
+    }
+
     private void beginLoading() {
         if (loadingCount.incrementAndGet() == 1) {
             pushLoadingState(true);
@@ -296,6 +332,9 @@ public final class ViewModelAsyncScope {
     }
 
     private void endLoading() {
+        if (disposed.get()) {
+            return;
+        }
         int remaining = loadingCount.decrementAndGet();
         if (remaining <= 0) {
             loadingCount.set(0);
@@ -322,11 +361,49 @@ public final class ViewModelAsyncScope {
         return taskName.trim();
     }
 
+    public record DiagnosticsSnapshot(
+            long supersededTaskCount,
+            long cancelledBeforeDeliveryCount,
+            long callbackSuppressedCount,
+            long routedErrorCount) {}
+
+    private static final class DiagnosticsTracker {
+        private final AtomicLong supersededTaskCount = new AtomicLong();
+        private final AtomicLong cancelledBeforeDeliveryCount = new AtomicLong();
+        private final AtomicLong callbackSuppressedCount = new AtomicLong();
+        private final AtomicLong routedErrorCount = new AtomicLong();
+
+        private void recordSupersededTask() {
+            supersededTaskCount.incrementAndGet();
+        }
+
+        private void recordCancelledBeforeDelivery() {
+            cancelledBeforeDeliveryCount.incrementAndGet();
+        }
+
+        private void recordCallbackSuppressed() {
+            callbackSuppressedCount.incrementAndGet();
+        }
+
+        private void recordRoutedError() {
+            routedErrorCount.incrementAndGet();
+        }
+
+        private DiagnosticsSnapshot snapshot() {
+            return new DiagnosticsSnapshot(
+                    supersededTaskCount.get(),
+                    cancelledBeforeDeliveryCount.get(),
+                    callbackSuppressedCount.get(),
+                    routedErrorCount.get());
+        }
+    }
+
     private static final class ScopeTaskHandle implements TaskHandle {
         private final String taskName;
         private final TaskPolicy policy;
         private final AtomicBoolean cancelled = new AtomicBoolean(false);
         private final AtomicBoolean done = new AtomicBoolean(false);
+        private final AtomicBoolean loading = new AtomicBoolean(false);
 
         private final AtomicReference<Thread> thread = new AtomicReference<>();
 
@@ -348,6 +425,14 @@ public final class ViewModelAsyncScope {
 
         private void markDone() {
             done.set(true);
+        }
+
+        private void markLoadingStarted() {
+            loading.set(true);
+        }
+
+        private boolean releaseLoading() {
+            return loading.compareAndSet(true, false);
         }
 
         @Override

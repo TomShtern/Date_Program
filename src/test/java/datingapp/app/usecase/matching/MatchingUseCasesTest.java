@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.ListActiveMatchesQuery;
+import datingapp.app.usecase.matching.MatchingUseCases.ListPagedMatchesQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoSwipeCommand;
 import datingapp.core.AppClock;
@@ -145,6 +146,19 @@ class MatchingUseCasesTest {
 
         assertTrue(result.success());
         assertEquals(1, result.data().matches().size());
+        assertTrue(result.data().usersById().containsKey(candidate.getId()));
+    }
+
+    @Test
+    @DisplayName("listPagedMatches should return page data and resolved users")
+    void listPagedMatchesReturnsPageDataAndResolvedUsers() {
+        interactionStorage.save(Match.create(currentUser.getId(), candidate.getId()));
+
+        var result = useCases.listPagedMatches(new ListPagedMatchesQuery(UserContext.cli(currentUser.getId()), 20, 0));
+
+        assertTrue(result.success());
+        assertEquals(1, result.data().page().items().size());
+        assertEquals(1, result.data().page().totalCount());
         assertTrue(result.data().usersById().containsKey(candidate.getId()));
     }
 

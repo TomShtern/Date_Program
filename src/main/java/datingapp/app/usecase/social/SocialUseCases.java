@@ -27,6 +27,14 @@ public class SocialUseCases {
     private static final String CONTEXT_AND_TARGET_REQUIRED = "Context and target user are required";
     private static final String CONNECTION_SERVICE_NOT_CONFIGURED = "ConnectionService is not configured";
 
+    private enum RelationshipTransitionState {
+        MATCHED,
+        UNMATCHED,
+        FRIEND_ZONE_REQUESTED,
+        ACTIVE,
+        GRACEFUL_EXIT
+    }
+
     private final ConnectionService connectionService;
     private final TrustSafetyService trustSafetyService;
     private final CommunicationStorage communicationStorage;
@@ -72,10 +80,9 @@ public class SocialUseCases {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
             logModerationAction("block", command.context().userId(), command.targetUserId(), null);
-            if (eventBus != null) {
-                eventBus.publish(
-                        new AppEvent.UserBlocked(command.context().userId(), command.targetUserId(), AppClock.now()));
-            }
+            publishEvent(
+                    "user blocked",
+                    new AppEvent.UserBlocked(command.context().userId(), command.targetUserId(), AppClock.now()));
             return UseCaseResult.success(result);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to block user: " + e.getMessage()));
@@ -107,14 +114,14 @@ public class SocialUseCases {
                     command.context().userId(),
                     command.targetUserId(),
                     command.reason().name());
-            if (eventBus != null) {
-                eventBus.publish(new AppEvent.UserReported(
-                        command.context().userId(),
-                        command.targetUserId(),
-                        command.reason().name(),
-                        command.blockUser(),
-                        AppClock.now()));
-            }
+            publishEvent(
+                    "user reported",
+                    new AppEvent.UserReported(
+                            command.context().userId(),
+                            command.targetUserId(),
+                            command.reason().name(),
+                            command.blockUser(),
+                            AppClock.now()));
             return UseCaseResult.success(result);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to report user: " + e.getMessage()));
@@ -134,16 +141,11 @@ public class SocialUseCases {
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
-            if (eventBus != null) {
-                String matchId = Match.generateId(command.context().userId(), command.targetUserId());
-                eventBus.publish(new AppEvent.RelationshipTransitioned(
-                        matchId,
-                        command.context().userId(),
-                        command.targetUserId(),
-                        "MATCHED",
-                        "UNMATCHED",
-                        AppClock.now()));
-            }
+            publishRelationshipTransitionEvent(
+                    command.context().userId(),
+                    command.targetUserId(),
+                    RelationshipTransitionState.MATCHED,
+                    RelationshipTransitionState.UNMATCHED);
             return UseCaseResult.success(result);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to unmatch users: " + e.getMessage()));
@@ -163,16 +165,11 @@ public class SocialUseCases {
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
-            if (eventBus != null) {
-                String matchId = Match.generateId(command.context().userId(), command.targetUserId());
-                eventBus.publish(new AppEvent.RelationshipTransitioned(
-                        matchId,
-                        command.context().userId(),
-                        command.targetUserId(),
-                        "MATCHED",
-                        "FRIEND_ZONE_REQUESTED",
-                        AppClock.now()));
-            }
+            publishRelationshipTransitionEvent(
+                    command.context().userId(),
+                    command.targetUserId(),
+                    RelationshipTransitionState.MATCHED,
+                    RelationshipTransitionState.FRIEND_ZONE_REQUESTED);
             return UseCaseResult.success(result);
         } catch (Exception e) {
             return UseCaseResult.failure(
@@ -193,16 +190,11 @@ public class SocialUseCases {
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
-            if (eventBus != null) {
-                String matchId = Match.generateId(command.context().userId(), command.targetUserId());
-                eventBus.publish(new AppEvent.RelationshipTransitioned(
-                        matchId,
-                        command.context().userId(),
-                        command.targetUserId(),
-                        "ACTIVE",
-                        "GRACEFUL_EXIT",
-                        AppClock.now()));
-            }
+            publishRelationshipTransitionEvent(
+                    command.context().userId(),
+                    command.targetUserId(),
+                    RelationshipTransitionState.ACTIVE,
+                    RelationshipTransitionState.GRACEFUL_EXIT);
             return UseCaseResult.success(result);
         } catch (Exception e) {
             return UseCaseResult.failure(
@@ -247,11 +239,13 @@ public class SocialUseCases {
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
-            if (eventBus != null && command.action() == FriendRequestAction.ACCEPT && result.friendRequest() != null) {
+            if (command.action() == FriendRequestAction.ACCEPT && result.friendRequest() != null) {
                 var req = result.friendRequest();
                 String matchId = Match.generateId(req.fromUserId(), req.toUserId());
-                eventBus.publish(new AppEvent.FriendRequestAccepted(
-                        req.id(), req.fromUserId(), req.toUserId(), matchId, AppClock.now()));
+                publishEvent(
+                        "friend request accepted",
+                        new AppEvent.FriendRequestAccepted(
+                                req.id(), req.fromUserId(), req.toUserId(), matchId, AppClock.now()));
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {
@@ -327,6 +321,31 @@ public class SocialUseCases {
             return;
         }
         logger.info("Moderation action={} actorId={} targetUserId={} reason={}", action, actorId, targetUserId, reason);
+    }
+
+    private void publishRelationshipTransitionEvent(
+            UUID initiatorId,
+            UUID targetUserId,
+            RelationshipTransitionState fromState,
+            RelationshipTransitionState toState) {
+        String matchId = Match.generateId(initiatorId, targetUserId);
+        publishEvent(
+                "relationship transition",
+                new AppEvent.RelationshipTransitioned(
+                        matchId, initiatorId, targetUserId, fromState.name(), toState.name(), AppClock.now()));
+    }
+
+    private void publishEvent(String eventName, AppEvent event) {
+        if (eventBus == null) {
+            return;
+        }
+        try {
+            eventBus.publish(event);
+        } catch (Exception e) {
+            if (logger.isWarnEnabled()) {
+                logger.warn("Failed to publish {} event: {}", eventName, e.getMessage(), e);
+            }
+        }
     }
 
     public static record RelationshipCommand(UserContext context, UUID targetUserId) {}

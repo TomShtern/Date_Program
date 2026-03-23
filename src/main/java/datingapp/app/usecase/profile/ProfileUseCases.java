@@ -289,6 +289,34 @@ public class ProfileUseCases {
         return saveProfile(new SaveProfileCommand(command.context(), user));
     }
 
+    public UseCaseResult<List<User>> listUsers() {
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+        try {
+            return UseCaseResult.success(userStorage.findAll());
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to list users: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<User> getUserById(UUID userId) {
+        if (userId == null) {
+            return UseCaseResult.failure(UseCaseError.validation("User ID is required"));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+        try {
+            return userStorage
+                    .get(userId)
+                    .map(UseCaseResult::success)
+                    .orElseGet(() -> UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND)));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to load user: " + e.getMessage()));
+        }
+    }
+
     public UseCaseResult<AchievementSnapshot> getAchievements(AchievementsQuery query) {
         if (query == null || query.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));

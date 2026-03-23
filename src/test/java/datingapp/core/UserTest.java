@@ -241,6 +241,22 @@ class UserTest {
     }
 
     @Test
+    @DisplayName("missing profile fields follow the same completeness rules as isComplete")
+    void missingProfileFieldsFollowCompletenessRules() {
+        User partialUser = new User(UUID.randomUUID(), "PartialUser");
+        partialUser.setBio("A short bio");
+        partialUser.setBirthDate(LocalDate.of(1991, 6, 15));
+        partialUser.setGender(Gender.FEMALE);
+
+        assertFalse(partialUser.isComplete());
+        assertEquals(List.of("interestedIn", "photoUrls", "pacePreferences"), partialUser.getMissingProfileFields());
+
+        User completeUser = createCompleteUser("CompleteUser");
+        assertTrue(completeUser.isComplete());
+        assertTrue(completeUser.getMissingProfileFields().isEmpty());
+    }
+
+    @Test
     @DisplayName("getInterests returns defensive copy")
     void getInterests_returnsDefensiveCopy() {
         User user = new User(UUID.randomUUID(), "Eve");

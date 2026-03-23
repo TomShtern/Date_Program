@@ -56,8 +56,111 @@ class ViewModelAsyncScopeTest {
         });
 
         assertTrue(latch.await(2, TimeUnit.SECONDS));
+        assertTrue(waitUntil(
+                () -> scope.diagnosticsSnapshot().cancelledBeforeDeliveryCount() == 1L, Duration.ofSeconds(2)));
         assertEquals("second", delivered.get());
         assertEquals(1, callbackCount.get());
+
+        ViewModelAsyncScope.DiagnosticsSnapshot diagnostics = scope.diagnosticsSnapshot();
+        assertEquals(1L, diagnostics.supersededTaskCount());
+        assertEquals(1L, diagnostics.cancelledBeforeDeliveryCount());
+        assertEquals(0L, diagnostics.callbackSuppressedCount());
+        assertEquals(0L, diagnostics.routedErrorCount());
+
+        scope.dispose();
+    }
+
+    @Test
+    @DisplayName("runLatest releases loading when an older keyed task is superseded")
+    void runLatestReleasesLoadingWhenOlderKeyedTaskIsSuperseded() throws InterruptedException {
+        TestUiThreadDispatcher dispatcher = new TestUiThreadDispatcher();
+        ViewModelAsyncScope scope = createScope(dispatcher, message -> {
+            throw new AssertionError("Unexpected error: " + message);
+        });
+
+        List<Boolean> loadingStates = new CopyOnWriteArrayList<>();
+        scope.setLoadingStateConsumer(loadingStates::add);
+
+        AtomicBoolean releaseFirst = new AtomicBoolean(false);
+        CountDownLatch firstStarted = new CountDownLatch(1);
+        CountDownLatch firstFinished = new CountDownLatch(1);
+        CountDownLatch secondDelivered = new CountDownLatch(1);
+        AtomicReference<String> delivered = new AtomicReference<>();
+
+        scope.runLatest(
+                "refresh",
+                "first refresh",
+                () -> {
+                    firstStarted.countDown();
+                    try {
+                        while (!releaseFirst.get()) {
+                            pauseMillis(10);
+                            if (Thread.currentThread().isInterrupted()) {
+                                Thread.interrupted();
+                            }
+                        }
+                        return "stale";
+                    } finally {
+                        firstFinished.countDown();
+                    }
+                },
+                value -> {
+                    throw new AssertionError("Stale callback should not run: " + value);
+                });
+
+        assertTrue(firstStarted.await(2, TimeUnit.SECONDS));
+        assertTrue(waitUntil(() -> loadingStates.contains(Boolean.TRUE), Duration.ofSeconds(2)));
+
+        scope.runLatest("refresh", "second refresh", () -> "fresh", value -> {
+            delivered.set(value);
+            secondDelivered.countDown();
+        });
+
+        assertTrue(secondDelivered.await(2, TimeUnit.SECONDS));
+        assertTrue(waitUntil(
+                () -> !loadingStates.isEmpty() && Boolean.FALSE.equals(loadingStates.get(loadingStates.size() - 1)),
+                Duration.ofSeconds(2)));
+        assertEquals("fresh", delivered.get());
+        assertEquals(List.of(Boolean.FALSE, Boolean.TRUE, Boolean.FALSE), loadingStates);
+
+        releaseFirst.set(true);
+        assertTrue(firstFinished.await(2, TimeUnit.SECONDS));
+        assertEquals(List.of(Boolean.FALSE, Boolean.TRUE, Boolean.FALSE), loadingStates);
+
+        ViewModelAsyncScope.DiagnosticsSnapshot diagnostics = scope.diagnosticsSnapshot();
+        assertEquals(1L, diagnostics.supersededTaskCount());
+        assertEquals(1L, diagnostics.cancelledBeforeDeliveryCount());
+        assertEquals(0L, diagnostics.callbackSuppressedCount());
+        assertEquals(0L, diagnostics.routedErrorCount());
+
+        scope.dispose();
+    }
+
+    @Test
+    @DisplayName("callback suppression is recorded when latest delivery is overtaken before UI dispatch")
+    void callbackSuppressionIsRecordedWhenLatestDeliveryIsOvertakenBeforeUiDispatch() throws InterruptedException {
+        QueuedUiThreadDispatcher dispatcher = new QueuedUiThreadDispatcher();
+        ViewModelAsyncScope scope = createScope(dispatcher, message -> {
+            throw new AssertionError("Unexpected error: " + message);
+        });
+
+        AtomicInteger callbackCount = new AtomicInteger(0);
+
+        scope.runLatestSilently("refresh", "first refresh", () -> "first", value -> callbackCount.incrementAndGet());
+
+        assertTrue(dispatcher.awaitFirstDispatchQueued());
+
+        scope.dispose();
+        dispatcher.drainAll();
+
+        assertTrue(waitUntil(() -> scope.diagnosticsSnapshot().callbackSuppressedCount() == 1L, Duration.ofSeconds(2)));
+        assertEquals(0, callbackCount.get());
+
+        ViewModelAsyncScope.DiagnosticsSnapshot diagnostics = scope.diagnosticsSnapshot();
+        assertEquals(0L, diagnostics.supersededTaskCount());
+        assertEquals(0L, diagnostics.cancelledBeforeDeliveryCount());
+        assertEquals(1L, diagnostics.callbackSuppressedCount());
+        assertEquals(0L, diagnostics.routedErrorCount());
 
         scope.dispose();
     }
@@ -142,6 +245,12 @@ class ViewModelAsyncScopeTest {
         assertTrue(errorMessage.get().contains("explode"));
         assertTrue(errorMessage.get().contains("boom"));
 
+        ViewModelAsyncScope.DiagnosticsSnapshot diagnostics = scope.diagnosticsSnapshot();
+        assertEquals(0L, diagnostics.supersededTaskCount());
+        assertEquals(0L, diagnostics.cancelledBeforeDeliveryCount());
+        assertEquals(0L, diagnostics.callbackSuppressedCount());
+        assertEquals(1L, diagnostics.routedErrorCount());
+
         scope.dispose();
     }
 
@@ -206,7 +315,7 @@ class ViewModelAsyncScopeTest {
         scope.dispose();
     }
 
-    private static ViewModelAsyncScope createScope(TestUiThreadDispatcher dispatcher, ViewModelErrorSink sink) {
+    private static ViewModelAsyncScope createScope(UiThreadDispatcher dispatcher, ViewModelErrorSink sink) {
         AsyncErrorRouter router = new AsyncErrorRouter(dispatcher, () -> sink, (_, _) -> {});
         return new ViewModelAsyncScope("test", dispatcher, router);
     }
@@ -261,6 +370,46 @@ class ViewModelAsyncScopeTest {
                 action.run();
             } finally {
                 uiThread.set(previous);
+            }
+        }
+    }
+
+    private static final class QueuedUiThreadDispatcher implements UiThreadDispatcher {
+        private final java.util.concurrent.ConcurrentLinkedQueue<Runnable> queuedActions =
+                new java.util.concurrent.ConcurrentLinkedQueue<>();
+        private final ThreadLocal<Boolean> uiThread = ThreadLocal.withInitial(() -> false);
+        private final CountDownLatch firstDispatchQueued = new CountDownLatch(1);
+
+        @Override
+        public boolean isUiThread() {
+            return uiThread.get();
+        }
+
+        @Override
+        public void dispatch(Runnable action) {
+            queuedActions.add(action);
+            firstDispatchQueued.countDown();
+        }
+
+        private boolean awaitFirstDispatchQueued() {
+            try {
+                return firstDispatchQueued.await(2, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+
+        private void drainAll() {
+            Runnable action;
+            while ((action = queuedActions.poll()) != null) {
+                boolean previous = uiThread.get();
+                uiThread.set(true);
+                try {
+                    action.run();
+                } finally {
+                    uiThread.set(previous);
+                }
             }
         }
     }

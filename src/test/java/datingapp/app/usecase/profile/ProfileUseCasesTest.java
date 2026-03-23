@@ -198,6 +198,23 @@ class ProfileUseCasesTest {
     }
 
     @Test
+    @DisplayName("listUsers and getUserById should return stored users")
+    void listUsersAndGetUserByIdReturnStoredUsers() {
+        User first = TestUserFactory.createActiveUser(UUID.randomUUID(), "First User");
+        User second = TestUserFactory.createActiveUser(UUID.randomUUID(), "Second User");
+        userStorage.save(first);
+        userStorage.save(second);
+
+        var listResult = useCases.listUsers();
+        var getResult = useCases.getUserById(first.getId());
+
+        assertTrue(listResult.success());
+        assertTrue(getResult.success());
+        assertEquals(2, listResult.data().size());
+        assertEquals(first.getId(), getResult.data().getId());
+    }
+
+    @Test
     @DisplayName("getAchievements and getOrComputeStats should return successful snapshots")
     void achievementsAndStatsQueriesSucceed() {
         User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Stats User");

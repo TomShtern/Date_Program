@@ -84,7 +84,11 @@ public final class MigrationRunner {
             new VersionedMigration(
                     6,
                     "Add matches.updated_at column and backfill it from created_at for legacy rows",
-                    MigrationRunner::applyV6));
+                    MigrationRunner::applyV6),
+            new VersionedMigration(
+                    7,
+                    "Add standalone messages(conversation_id) index alongside the composite message index",
+                    MigrationRunner::applyV7));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -200,6 +204,18 @@ public final class MigrationRunner {
         }
         stmt.execute("ALTER TABLE matches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP");
         stmt.execute("UPDATE matches SET updated_at = COALESCE(updated_at, created_at)");
+    }
+
+    /**
+     * V7 migration: adds a dedicated index on {@code messages(conversation_id)}
+     * for conversation lookups while preserving the existing composite
+     * conversation/created_at index.
+     */
+    private static void applyV7(Statement stmt) throws SQLException {
+        if (!hasTable(stmt, "MESSAGES")) {
+            return;
+        }
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id)");
     }
 
     private static boolean hasTable(Statement stmt, String tableName) throws SQLException {

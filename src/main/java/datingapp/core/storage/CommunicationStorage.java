@@ -135,12 +135,13 @@ public interface CommunicationStorage {
      * Returns the number of pending friend requests directed at {@code userId}.
      *
      * <p>
-     * Default implementation counts from the full list — override with a
-     * {@code SELECT COUNT(*)}
-     * for better performance.
+     * Default implementation fails fast so storage implementations must provide a
+     * real count query.
      */
     default int countPendingFriendRequestsForUser(UUID userId) {
-        return getPendingFriendRequestsForUser(userId).size();
+        Objects.requireNonNull(userId, "userId cannot be null");
+        throw new UnsupportedOperationException(
+                "CommunicationStorage implementation must override countPendingFriendRequestsForUser(UUID) to support efficient counting");
     }
 
     void deleteFriendRequest(UUID id);

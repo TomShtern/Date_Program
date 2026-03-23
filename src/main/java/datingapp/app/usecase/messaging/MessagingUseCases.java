@@ -12,7 +12,9 @@ import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.model.Match.MatchArchiveReason;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +24,7 @@ public class MessagingUseCases {
 
     private static final Logger logger = LoggerFactory.getLogger(MessagingUseCases.class);
     private static final int DEFAULT_LIMIT = 50;
+    private static final String CONTEXT_REQUIRED = "Context is required";
 
     private final ConnectionService connectionService;
     private final AppEventBus eventBus;
@@ -33,7 +36,7 @@ public class MessagingUseCases {
 
     public UseCaseResult<ConversationListResult> listConversations(ListConversationsQuery query) {
         if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context is required"));
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
         int limit = query.limit() > 0 ? query.limit() : DEFAULT_LIMIT;
         int offset = Math.max(0, query.offset());
@@ -86,23 +89,27 @@ public class MessagingUseCases {
 
             String conversationId = Conversation.generateId(query.context().userId(), query.otherUserId());
             if (query.markAsRead()) {
-                try {
-                    connectionService.markAsRead(query.context().userId(), conversationId);
-                } catch (Exception markReadError) {
-                    if (logger.isWarnEnabled()) {
-                        logger.warn(
-                                "markAsRead failed for conversation {} and user {}: {}",
-                                conversationId,
-                                query.context().userId(),
-                                markReadError.getMessage());
-                    }
-                }
+                markConversationAsReadBestEffort(query.context().userId(), conversationId);
             }
             boolean canMessage = connectionService.canMessage(query.context().userId(), query.otherUserId());
 
             return UseCaseResult.success(new ConversationThread(result.messages(), canMessage, conversationId));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to load conversation: " + e.getMessage()));
+        }
+    }
+
+    private void markConversationAsReadBestEffort(UUID userId, String conversationId) {
+        try {
+            connectionService.markAsRead(userId, conversationId);
+        } catch (Exception markReadError) {
+            if (logger.isWarnEnabled()) {
+                logger.warn(
+                        "markAsRead failed for conversation {} and user {}: {}",
+                        conversationId,
+                        userId,
+                        markReadError.getMessage());
+            }
         }
     }
 
@@ -113,38 +120,45 @@ public class MessagingUseCases {
         if (command.content() == null || command.content().isBlank()) {
             return UseCaseResult.failure(UseCaseError.validation("Message content cannot be empty"));
         }
+        ConnectionService.SendResult result;
         try {
-            ConnectionService.SendResult result =
+            result =
                     connectionService.sendMessage(command.context().userId(), command.recipientId(), command.content());
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
-            publishMessageSentEvent(command, result);
-            return UseCaseResult.success(result);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to send message: " + e.getMessage()));
         }
+
+        try {
+            publishMessageSentEvent(command, result);
+        } catch (Exception publishEx) {
+            logMessageSentEventFailure(command, result, publishEx);
+        }
+        return UseCaseResult.success(result);
     }
 
     private void publishMessageSentEvent(SendMessageCommand command, ConnectionService.SendResult result) {
         if (eventBus == null) {
             return;
         }
-        try {
-            eventBus.publish(new AppEvent.MessageSent(
+        eventBus.publish(new AppEvent.MessageSent(
+                command.context().userId(),
+                command.recipientId(),
+                result.message().id(),
+                AppClock.now()));
+    }
+
+    private void logMessageSentEventFailure(
+            SendMessageCommand command, ConnectionService.SendResult result, Exception publishEx) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(
+                    "Event publish failed for message {} from {} to {}: {}",
+                    result.message().id(),
                     command.context().userId(),
                     command.recipientId(),
-                    result.message().id(),
-                    AppClock.now()));
-        } catch (Exception publishEx) {
-            if (logger.isWarnEnabled()) {
-                logger.warn(
-                        "Event publish failed for message {} from {} to {}: {}",
-                        result.message().id(),
-                        command.context().userId(),
-                        command.recipientId(),
-                        publishEx.getMessage());
-            }
+                    publishEx.getMessage());
         }
     }
 
@@ -163,12 +177,28 @@ public class MessagingUseCases {
 
     public UseCaseResult<Integer> totalUnreadCount(UserContext context) {
         if (context == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context is required"));
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
         try {
             return UseCaseResult.success(connectionService.getTotalUnreadCount(context.userId()));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to compute unread count: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<Map<String, Integer>> countMessagesByConversationIds(
+            CountMessagesByConversationIdsQuery query) {
+        if (query == null || query.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        if (query.conversationIds() == null) {
+            return UseCaseResult.failure(UseCaseError.validation("conversationIds are required"));
+        }
+        try {
+            return UseCaseResult.success(connectionService.countMessagesByConversationIds(query.conversationIds()));
+        } catch (Exception e) {
+            return UseCaseResult.failure(
+                    UseCaseError.internal("Failed to count messages by conversation IDs: " + e.getMessage()));
         }
     }
 
@@ -236,6 +266,8 @@ public class MessagingUseCases {
     public static record ConversationThread(List<Message> messages, boolean canMessage, String conversationId) {}
 
     public static record SendMessageCommand(UserContext context, UUID recipientId, String content) {}
+
+    public static record CountMessagesByConversationIdsQuery(UserContext context, Set<String> conversationIds) {}
 
     public static record MarkConversationReadCommand(UserContext context, String conversationId) {}
 

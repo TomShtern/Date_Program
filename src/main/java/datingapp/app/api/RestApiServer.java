@@ -7,13 +7,15 @@ import datingapp.app.bootstrap.ApplicationStartup;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.ArchiveMatchCommand;
-import datingapp.app.usecase.matching.MatchingUseCases.MatchQualityQuery;
+import datingapp.app.usecase.matching.MatchingUseCases.ListPagedMatchesQuery;
+import datingapp.app.usecase.matching.MatchingUseCases.MatchQualityByIdQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.PendingLikersQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.StandoutsQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoSwipeCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases;
 import datingapp.app.usecase.messaging.MessagingUseCases.ArchiveConversationCommand;
+import datingapp.app.usecase.messaging.MessagingUseCases.CountMessagesByConversationIdsQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.DeleteConversationCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.DeleteMessageCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
@@ -54,7 +56,6 @@ import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
-import datingapp.core.profile.ProfileService;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
@@ -104,7 +105,6 @@ public class RestApiServer {
     private static final int DEFAULT_MESSAGE_LIMIT = 50;
     private static final int DEFAULT_MATCHES_LIMIT = 20;
     private static final String UNKNOWN_USER = "Unknown";
-    private static final String USER_NOT_FOUND = "User not found";
     private static final String BAD_REQUEST = "BAD_REQUEST";
     private static final String CONFLICT = "CONFLICT";
     private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
@@ -130,11 +130,7 @@ public class RestApiServer {
 
     private static final String PARAM_OFFSET = "offset";
 
-    private final ProfileService profileService;
     private final CandidateFinder candidateFinder;
-    private final MatchingService matchingService;
-
-    private final ConnectionService messagingService;
     private final MatchingUseCases matchingUseCases;
     private final MessagingUseCases messagingUseCases;
     private final ProfileUseCases profileUseCases;
@@ -151,10 +147,7 @@ public class RestApiServer {
 
     /** Creates a server with the given services and port. */
     public RestApiServer(ServiceRegistry services, int port) {
-        this.profileService = services.getProfileService();
         this.candidateFinder = services.getCandidateFinder();
-        this.matchingService = services.getMatchingService();
-        this.messagingService = services.getConnectionService();
         this.matchingUseCases = services.getMatchingUseCases();
         this.messagingUseCases = services.getMessagingUseCases();
         this.profileUseCases = services.getProfileUseCases();
@@ -232,26 +225,31 @@ public class RestApiServer {
     // ── User Handlers ───────────────────────────────────────────────────
 
     private void listUsers(Context ctx) {
-        // Deliberate exception: read-only local admin/discovery route.
-        // There is no dedicated profile list use case yet, so this adapter currently
-        // projects directly from ProfileService.
-        List<UserSummary> users = profileService.listUsers().stream()
+        var result = profileUseCases.listUsers();
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        List<UserSummary> users = result.data().stream()
                 .map(user -> UserSummary.from(user, userTimeZone))
                 .toList();
         ctx.json(users);
     }
 
     private void getUser(Context ctx) {
-        // Deliberate exception: read-only local profile lookup route.
-        // This stays service-backed until a dedicated profile read use case exists.
         UUID id = parseUuid(ctx.pathParam("id"));
-        User user = profileService.getUserById(id).orElseThrow(() -> new NotFoundResponse(USER_NOT_FOUND));
+        User user = loadUser(ctx, id);
+        if (user == null) {
+            return;
+        }
         ctx.json(UserDetail.from(user, userTimeZone));
     }
 
     private void updateProfile(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
         ProfileUpdateRequest request = ctx.bodyAsClass(ProfileUpdateRequest.class);
 
         var result = profileUseCases.updateProfile(new UpdateProfileCommand(
@@ -285,8 +283,11 @@ public class RestApiServer {
         // browseCandidates() adds daily-pick semantics; this route intentionally returns
         // only the direct candidate list for local tooling/API clients.
         UUID id = parseUuid(ctx.pathParam("id"));
-        User user = profileService.getUserById(id).orElseThrow(() -> new NotFoundResponse(USER_NOT_FOUND));
-        List<UserSummary> candidates = candidateFinder.findCandidatesForUser(user).stream()
+        User user = loadUser(ctx, id);
+        if (user == null) {
+            return;
+        }
+        List<UserSummary> candidates = readCandidateSummaries(user).stream()
                 .map(candidate -> UserSummary.from(candidate, userTimeZone))
                 .toList();
         ctx.json(candidates);
@@ -295,9 +296,6 @@ public class RestApiServer {
     // ── Match Handlers ──────────────────────────────────────────────────
 
     private void getMatches(Context ctx) {
-        // Deliberate exception: this route needs paginated match reads and lightweight name
-        // projection. The current use-case layer has listActiveMatches() but not the full
-        // paginated all-matches API shape exposed here.
         UUID userId = parseUuid(ctx.pathParam("id"));
         int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MATCHES_LIMIT);
         int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
@@ -307,17 +305,21 @@ public class RestApiServer {
         if (offset < 0) {
             throw new IllegalArgumentException("offset must be non-negative");
         }
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
-        // Use paginated query — prevents OOM for users with thousands of matches.
-        var page = matchingService.getPageOfMatchesForUser(userId, offset, limit);
-        Set<UUID> otherUserIds = page.items().stream()
-                .map(match -> match.getOtherUser(userId))
-                .collect(java.util.stream.Collectors.toSet());
-        Map<UUID, String> userNamesById = profileService.getUsersByIds(otherUserIds).values().stream()
-                .collect(java.util.stream.Collectors.toMap(User::getId, User::getName));
+        var result =
+                matchingUseCases.listPagedMatches(new ListPagedMatchesQuery(UserContext.api(userId), limit, offset));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+
+        var page = result.data().page();
+        Map<UUID, User> usersById = result.data().usersById();
         List<MatchSummary> items = page.items().stream()
-                .map(match -> toMatchSummary(match, userId, userNamesById))
+                .map(match -> toMatchSummary(match, userId, usersById))
                 .toList();
         ctx.json(new PagedMatchResponse(items, page.totalCount(), offset, limit, page.hasMore()));
     }
@@ -325,8 +327,9 @@ public class RestApiServer {
     private void likeUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        validateUserExists(userId);
-        validateUserExists(targetId);
+        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+            return;
+        }
 
         var result = matchingUseCases.recordLike(new RecordLikeCommand(
                 UserContext.api(userId),
@@ -353,8 +356,9 @@ public class RestApiServer {
     private void passUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        validateUserExists(userId);
-        validateUserExists(targetId);
+        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+            return;
+        }
 
         var result = matchingUseCases.recordLike(new RecordLikeCommand(
                 UserContext.api(userId),
@@ -372,7 +376,9 @@ public class RestApiServer {
 
     private void undoSwipe(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
         var result = matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.api(userId)));
         if (!result.success()) {
@@ -384,7 +390,9 @@ public class RestApiServer {
 
     private void getPendingLikers(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
         var result = matchingUseCases.pendingLikers(new PendingLikersQuery(UserContext.api(userId)));
         if (!result.success()) {
@@ -398,7 +406,10 @@ public class RestApiServer {
 
     private void getStandouts(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        User currentUser = profileService.getUserById(userId).orElseThrow(() -> new NotFoundResponse(USER_NOT_FOUND));
+        User currentUser = loadUser(ctx, userId);
+        if (currentUser == null) {
+            return;
+        }
 
         var result = matchingUseCases.standouts(new StandoutsQuery(UserContext.api(userId), currentUser));
         if (!result.success()) {
@@ -419,7 +430,9 @@ public class RestApiServer {
     private void archiveMatch(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String matchId = ctx.pathParam(PATH_MATCH_ID);
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
         var result = matchingUseCases.archiveMatch(new ArchiveMatchCommand(UserContext.api(userId), matchId));
         if (!result.success()) {
@@ -432,13 +445,11 @@ public class RestApiServer {
     private void getMatchQuality(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String matchId = ctx.pathParam(PATH_MATCH_ID);
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
-        Match match = matchingService.getMatchesForUser(userId).stream()
-                .filter(candidateMatch -> candidateMatch.getId().equals(matchId))
-                .findFirst()
-                .orElseThrow(() -> new NotFoundResponse("Match not found"));
-        var result = matchingUseCases.matchQuality(new MatchQualityQuery(UserContext.api(userId), match));
+        var result = matchingUseCases.getMatchQuality(new MatchQualityByIdQuery(UserContext.api(userId), matchId));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -448,7 +459,9 @@ public class RestApiServer {
 
     private void getStats(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
         var result = profileUseCases.getOrComputeStats(new StatsQuery(UserContext.api(userId)));
         if (!result.success()) {
@@ -460,7 +473,9 @@ public class RestApiServer {
 
     private void getAchievements(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
         boolean checkForNew =
                 ctx.queryParamAsClass("checkForNew", Boolean.class).getOrDefault(false);
 
@@ -474,7 +489,9 @@ public class RestApiServer {
 
     private void getNotifications(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
         boolean unreadOnly = ctx.queryParamAsClass("unreadOnly", Boolean.class).getOrDefault(false);
 
         var result = socialUseCases.notifications(new NotificationsQuery(UserContext.api(userId), unreadOnly));
@@ -488,7 +505,9 @@ public class RestApiServer {
     private void markNotificationRead(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID notificationId = parseUuid(ctx.pathParam(PATH_NOTIFICATION_ID));
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
         var result = socialUseCases.markNotificationRead(
                 new MarkNotificationReadCommand(UserContext.api(userId), notificationId));
@@ -501,7 +520,9 @@ public class RestApiServer {
 
     private void markAllNotificationsRead(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
         var result =
                 socialUseCases.markAllNotificationsRead(new MarkAllNotificationsReadCommand(UserContext.api(userId)));
@@ -515,8 +536,9 @@ public class RestApiServer {
     private void requestFriendZone(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        validateUserExists(userId);
-        validateUserExists(targetId);
+        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+            return;
+        }
 
         var result = socialUseCases.requestFriendZone(new RelationshipCommand(UserContext.api(userId), targetId));
         if (!result.success()) {
@@ -538,7 +560,9 @@ public class RestApiServer {
     private void respondToFriendRequest(Context ctx, FriendRequestAction action) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID requestId = parseUuid(ctx.pathParam("requestId"));
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
         var result = socialUseCases.respondToFriendRequest(
                 new RespondFriendRequestCommand(UserContext.api(userId), requestId, action));
@@ -552,8 +576,9 @@ public class RestApiServer {
     private void gracefulExit(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        validateUserExists(userId);
-        validateUserExists(targetId);
+        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+            return;
+        }
 
         var result = socialUseCases.gracefulExit(new RelationshipCommand(UserContext.api(userId), targetId));
         if (!result.success()) {
@@ -566,8 +591,9 @@ public class RestApiServer {
     private void unmatch(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        validateUserExists(userId);
-        validateUserExists(targetId);
+        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+            return;
+        }
 
         var result = socialUseCases.unmatch(new RelationshipCommand(UserContext.api(userId), targetId));
         if (!result.success()) {
@@ -580,8 +606,9 @@ public class RestApiServer {
     private void blockUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        validateUserExists(userId);
-        validateUserExists(targetId);
+        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+            return;
+        }
 
         var result = socialUseCases.blockUser(new RelationshipCommand(UserContext.api(userId), targetId));
         if (!result.success()) {
@@ -595,8 +622,9 @@ public class RestApiServer {
     private void reportUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        validateUserExists(userId);
-        validateUserExists(targetId);
+        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+            return;
+        }
 
         ReportUserRequest request = ctx.bodyAsClass(ReportUserRequest.class);
         if (request.reason() == null) {
@@ -628,7 +656,9 @@ public class RestApiServer {
         if (offset < 0) {
             throw new IllegalArgumentException("offset must be non-negative");
         }
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
         var listResult =
                 messagingUseCases.listConversations(new ListConversationsQuery(UserContext.api(userId), limit, offset));
         if (!listResult.success()) {
@@ -640,7 +670,13 @@ public class RestApiServer {
         Set<String> conversationIds = previews.stream()
                 .map(preview -> preview.conversation().getId())
                 .collect(java.util.stream.Collectors.toSet());
-        Map<String, Integer> messageCounts = messagingService.countMessagesByConversationIds(conversationIds);
+        var countResult = messagingUseCases.countMessagesByConversationIds(
+                new CountMessagesByConversationIdsQuery(UserContext.api(userId), conversationIds));
+        if (!countResult.success()) {
+            handleUseCaseFailure(ctx, countResult.error());
+            return;
+        }
+        Map<String, Integer> messageCounts = countResult.data();
 
         List<ConversationSummary> conversations = previews.stream()
                 .map(preview -> toConversationSummary(preview, messageCounts))
@@ -651,7 +687,9 @@ public class RestApiServer {
     private void deleteConversation(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
         var result = messagingUseCases.deleteConversation(
                 new DeleteConversationCommand(UserContext.api(userId), conversationId));
@@ -665,7 +703,9 @@ public class RestApiServer {
     private void archiveConversation(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
-        validateUserExists(userId);
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
 
         ArchiveConversationRequest request = Optional.ofNullable(ctx.body())
                 .filter(body -> !body.isBlank())
@@ -751,6 +791,9 @@ public class RestApiServer {
 
     private void listProfileNotes(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
+        if (loadUser(ctx, authorId) == null) {
+            return;
+        }
         var result = profileUseCases.listProfileNotes(new ProfileNotesQuery(UserContext.api(authorId)));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
@@ -762,6 +805,9 @@ public class RestApiServer {
     private void getProfileNote(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
         UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
+        if (loadUser(ctx, authorId) == null) {
+            return;
+        }
         var result = profileUseCases.getProfileNote(new ProfileNoteQuery(UserContext.api(authorId), subjectId));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
@@ -773,6 +819,9 @@ public class RestApiServer {
     private void upsertProfileNote(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
         UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
+        if (loadUser(ctx, authorId) == null || loadUser(ctx, subjectId) == null) {
+            return;
+        }
         ProfileNoteUpsertRequest request = ctx.bodyAsClass(ProfileNoteUpsertRequest.class);
         if (request.content() == null) {
             throw new IllegalArgumentException("content is required");
@@ -790,6 +839,9 @@ public class RestApiServer {
     private void deleteProfileNote(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
         UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
+        if (loadUser(ctx, authorId) == null || loadUser(ctx, subjectId) == null) {
+            return;
+        }
         var result =
                 profileUseCases.deleteProfileNote(new DeleteProfileNoteCommand(UserContext.api(authorId), subjectId));
         if (!result.success()) {
@@ -809,15 +861,26 @@ public class RestApiServer {
         }
     }
 
-    private void validateUserExists(UUID userId) {
-        if (profileService.getUserById(userId).isEmpty()) {
-            throw new NotFoundResponse("User not found: " + userId);
+    private User loadUser(Context ctx, UUID userId) {
+        var result = profileUseCases.getUserById(userId);
+        if (result.success()) {
+            return result.data();
         }
+        handleUseCaseFailure(ctx, result.error());
+        return null;
     }
 
-    private MatchSummary toMatchSummary(Match match, UUID currentUserId, Map<UUID, String> userNamesById) {
+    private List<User> readCandidateSummaries(User user) {
+        // Deliberate exception: this is the remaining direct-read adapter.
+        // The route intentionally exposes the raw candidate projection rather than
+        // the browseCandidates() daily-pick flow.
+        return candidateFinder.findCandidatesForUser(user);
+    }
+
+    private MatchSummary toMatchSummary(Match match, UUID currentUserId, Map<UUID, User> usersById) {
         UUID otherUserId = match.getOtherUser(currentUserId);
-        String otherUserName = userNamesById.getOrDefault(otherUserId, UNKNOWN_USER);
+        User otherUser = usersById.get(otherUserId);
+        String otherUserName = otherUser != null ? otherUser.getName() : UNKNOWN_USER;
         return new MatchSummary(
                 match.getId(), otherUserId, otherUserName, match.getState().name(), match.getCreatedAt());
     }

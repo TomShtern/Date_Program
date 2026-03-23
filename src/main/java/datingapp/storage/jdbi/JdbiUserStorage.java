@@ -16,6 +16,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,6 +45,8 @@ public final class JdbiUserStorage implements UserStorage {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JdbiUserStorage.class);
     private static final String USER_ID_BIND = "userId";
+    private static final String NORMALIZED_VALUE_COLUMN = "value";
+    private static final String GENDER_COLUMN = "gender";
     private static final String USER_DB_SMOKING = "user_db_smoking";
     private static final String USER_DB_DRINKING = "user_db_drinking";
     private static final String USER_DB_WANTS_KIDS = "user_db_wants_kids";
@@ -69,12 +72,16 @@ public final class JdbiUserStorage implements UserStorage {
 
     @Override
     public Optional<User> get(UUID id) {
-        return dao.get(id).map(this::applyNormalizedProfileData);
+        return jdbi.withHandle(
+                (Handle handle) -> handle.attach(Dao.class).get(id).map(user -> applyNormalizedProfileDataBatch(
+                                handle, List.of(user))
+                        .get(0)));
     }
 
     @Override
     public List<User> findActive() {
-        return applyNormalizedProfileData(dao.findActive());
+        return jdbi.withHandle((Handle handle) ->
+                applyNormalizedProfileDataBatch(handle, handle.attach(Dao.class).findActive()));
     }
 
     @Override
@@ -106,23 +113,26 @@ public final class JdbiUserStorage implements UserStorage {
                     .append(" AND lat BETWEEN :latMin AND :latMax")
                     .append(" AND lon BETWEEN :lonMin AND :lonMax");
 
-            return applyNormalizedProfileData(handle.createQuery(sql.toString())
-                    .bindList("genders", genderNames)
-                    .bind("excludeId", excludeId)
-                    .bind("minAge", minAge)
-                    .bind("maxAge", maxAge)
-                    .bind("latMin", seekerLat - latDelta)
-                    .bind("latMax", seekerLat + latDelta)
-                    .bind("lonMin", seekerLon - lonDelta)
-                    .bind("lonMax", seekerLon + lonDelta)
-                    .map(new Mapper())
-                    .list());
+            return applyNormalizedProfileDataBatch(
+                    handle,
+                    handle.createQuery(sql.toString())
+                            .bindList("genders", genderNames)
+                            .bind("excludeId", excludeId)
+                            .bind("minAge", minAge)
+                            .bind("maxAge", maxAge)
+                            .bind("latMin", seekerLat - latDelta)
+                            .bind("latMax", seekerLat + latDelta)
+                            .bind("lonMin", seekerLon - lonDelta)
+                            .bind("lonMax", seekerLon + lonDelta)
+                            .map(new Mapper())
+                            .list());
         });
     }
 
     @Override
     public List<User> findAll() {
-        return applyNormalizedProfileData(dao.findAll());
+        return jdbi.withHandle((Handle handle) ->
+                applyNormalizedProfileDataBatch(handle, handle.attach(Dao.class).findAll()));
     }
 
     @Override
@@ -136,7 +146,7 @@ public final class JdbiUserStorage implements UserStorage {
                     .bindList("userIds", new ArrayList<>(ids))
                     .map(new Mapper())
                     .list();
-            applyNormalizedProfileData(users);
+            applyNormalizedProfileDataBatch(handle, users);
 
             Map<UUID, User> result = new HashMap<>();
             for (User user : users) {
@@ -318,7 +328,7 @@ public final class JdbiUserStorage implements UserStorage {
         try (var batch =
                 handle.prepareBatch("INSERT INTO user_interested_in (user_id, gender) VALUES (:userId, :gender)")) {
             for (String gender : genders) {
-                batch.bind(USER_ID_BIND, userId).bind("gender", gender).add();
+                batch.bind(USER_ID_BIND, userId).bind(GENDER_COLUMN, gender).add();
             }
             batch.execute();
         }
@@ -333,54 +343,125 @@ public final class JdbiUserStorage implements UserStorage {
         try (var batch =
                 handle.prepareBatch("INSERT INTO " + tableName + " (user_id, \"value\") VALUES (:userId, :value)")) {
             for (String value : values) {
-                batch.bind(USER_ID_BIND, userId).bind("value", value).add();
+                batch.bind(USER_ID_BIND, userId)
+                        .bind(NORMALIZED_VALUE_COLUMN, value)
+                        .add();
             }
             batch.execute();
         }
     }
 
-    private List<User> applyNormalizedProfileData(List<User> users) {
-        users.forEach(this::applyNormalizedProfileData);
+    private List<User> applyNormalizedProfileDataBatch(Handle handle, List<User> users) {
+        if (users == null || users.isEmpty()) {
+            return users;
+        }
+
+        List<UUID> userIds = users.stream().map(User::getId).toList();
+        Map<UUID, List<String>> photoUrlsByUserId = loadUserValues(
+                handle,
+                "SELECT user_id, url FROM user_photos WHERE user_id IN (<userIds>) ORDER BY user_id, position",
+                "url",
+                userIds);
+        Map<UUID, List<String>> interestsByUserId = loadUserValues(
+                handle,
+                "SELECT user_id, interest FROM user_interests WHERE user_id IN (<userIds>) ORDER BY user_id, interest",
+                "interest",
+                userIds);
+        Map<UUID, List<String>> interestedInByUserId = loadUserValues(
+                handle,
+                "SELECT user_id, gender FROM user_interested_in WHERE user_id IN (<userIds>) ORDER BY user_id, gender",
+                GENDER_COLUMN,
+                userIds);
+        Map<UUID, List<String>> smokingByUserId = loadUserValues(
+                handle,
+                "SELECT user_id, \"value\" FROM user_db_smoking WHERE user_id IN (<userIds>) ORDER BY user_id, \"value\"",
+                NORMALIZED_VALUE_COLUMN,
+                userIds);
+        Map<UUID, List<String>> drinkingByUserId = loadUserValues(
+                handle,
+                "SELECT user_id, \"value\" FROM user_db_drinking WHERE user_id IN (<userIds>) ORDER BY user_id, \"value\"",
+                NORMALIZED_VALUE_COLUMN,
+                userIds);
+        Map<UUID, List<String>> wantsKidsByUserId = loadUserValues(
+                handle,
+                "SELECT user_id, \"value\" FROM user_db_wants_kids WHERE user_id IN (<userIds>) ORDER BY user_id, \"value\"",
+                NORMALIZED_VALUE_COLUMN,
+                userIds);
+        Map<UUID, List<String>> lookingForByUserId = loadUserValues(
+                handle,
+                "SELECT user_id, \"value\" FROM user_db_looking_for WHERE user_id IN (<userIds>) ORDER BY user_id, \"value\"",
+                NORMALIZED_VALUE_COLUMN,
+                userIds);
+        Map<UUID, List<String>> educationByUserId = loadUserValues(
+                handle,
+                "SELECT user_id, \"value\" FROM user_db_education WHERE user_id IN (<userIds>) ORDER BY user_id, \"value\"",
+                NORMALIZED_VALUE_COLUMN,
+                userIds);
+
+        for (User user : users) {
+            UUID userId = user.getId();
+            user.setPhotoUrls(photoUrlsByUserId.getOrDefault(userId, List.of()));
+            user.setInterests(
+                    parseEnumNames(new HashSet<>(interestsByUserId.getOrDefault(userId, List.of())), Interest.class));
+            user.setInterestedIn(
+                    parseEnumNames(new HashSet<>(interestedInByUserId.getOrDefault(userId, List.of())), Gender.class));
+
+            Dealbreakers existing = user.getDealbreakers();
+            Dealbreakers.Builder builder = (existing != null ? existing : Dealbreakers.none()).toBuilder();
+
+            Set<Lifestyle.Smoking> smoking = parseEnumNames(
+                    new HashSet<>(smokingByUserId.getOrDefault(userId, List.of())), Lifestyle.Smoking.class);
+            builder.clearSmoking();
+            builder.acceptSmoking(smoking.toArray(Lifestyle.Smoking[]::new));
+
+            Set<Lifestyle.Drinking> drinking = parseEnumNames(
+                    new HashSet<>(drinkingByUserId.getOrDefault(userId, List.of())), Lifestyle.Drinking.class);
+            builder.clearDrinking();
+            builder.acceptDrinking(drinking.toArray(Lifestyle.Drinking[]::new));
+
+            Set<Lifestyle.WantsKids> kids = parseEnumNames(
+                    new HashSet<>(wantsKidsByUserId.getOrDefault(userId, List.of())), Lifestyle.WantsKids.class);
+            builder.clearKids();
+            builder.acceptKidsStance(kids.toArray(Lifestyle.WantsKids[]::new));
+
+            Set<Lifestyle.LookingFor> lookingFor = parseEnumNames(
+                    new HashSet<>(lookingForByUserId.getOrDefault(userId, List.of())), Lifestyle.LookingFor.class);
+            builder.clearLookingFor();
+            builder.acceptLookingFor(lookingFor.toArray(Lifestyle.LookingFor[]::new));
+
+            Set<Lifestyle.Education> education = parseEnumNames(
+                    new HashSet<>(educationByUserId.getOrDefault(userId, List.of())), Lifestyle.Education.class);
+            builder.clearEducation();
+            builder.requireEducation(education.toArray(Lifestyle.Education[]::new));
+            user.setDealbreakers(builder.build());
+        }
+
         return users;
     }
 
-    private User applyNormalizedProfileData(User user) {
-        UUID userId = user.getId();
-        user.setPhotoUrls(loadUserPhotos(userId));
-        user.setInterests(parseEnumNames(loadUserInterests(userId), Interest.class));
-        user.setInterestedIn(parseEnumNames(loadUserInterestedIn(userId), Gender.class));
+    private Map<UUID, List<String>> loadUserValues(
+            Handle handle, String sql, String valueColumn, Collection<UUID> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
 
-        Dealbreakers existing = user.getDealbreakers();
-        Dealbreakers.Builder builder = (existing != null ? existing : Dealbreakers.none()).toBuilder();
+        try (var query = handle.createQuery(sql)) {
+            List<UserValueRow> rows = query.bindList("userIds", new ArrayList<>(userIds))
+                    .map((rs, ctx) -> new UserValueRow(
+                            JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_id"), rs.getString(valueColumn)))
+                    .list();
 
-        Set<Lifestyle.Smoking> smoking =
-                parseEnumNames(loadDealbreaker(userId, USER_DB_SMOKING), Lifestyle.Smoking.class);
-        builder.clearSmoking();
-        builder.acceptSmoking(smoking.toArray(Lifestyle.Smoking[]::new));
-
-        Set<Lifestyle.Drinking> drinking =
-                parseEnumNames(loadDealbreaker(userId, USER_DB_DRINKING), Lifestyle.Drinking.class);
-        builder.clearDrinking();
-        builder.acceptDrinking(drinking.toArray(Lifestyle.Drinking[]::new));
-
-        Set<Lifestyle.WantsKids> kids =
-                parseEnumNames(loadDealbreaker(userId, USER_DB_WANTS_KIDS), Lifestyle.WantsKids.class);
-        builder.clearKids();
-        builder.acceptKidsStance(kids.toArray(Lifestyle.WantsKids[]::new));
-
-        Set<Lifestyle.LookingFor> lookingFor =
-                parseEnumNames(loadDealbreaker(userId, USER_DB_LOOKING_FOR), Lifestyle.LookingFor.class);
-        builder.clearLookingFor();
-        builder.acceptLookingFor(lookingFor.toArray(Lifestyle.LookingFor[]::new));
-
-        Set<Lifestyle.Education> education =
-                parseEnumNames(loadDealbreaker(userId, USER_DB_EDUCATION), Lifestyle.Education.class);
-        builder.clearEducation();
-        builder.requireEducation(education.toArray(Lifestyle.Education[]::new));
-        user.setDealbreakers(builder.build());
-
-        return user;
+            Map<UUID, List<String>> valuesByUserId = new HashMap<>();
+            for (UserValueRow row : rows) {
+                valuesByUserId
+                        .computeIfAbsent(row.userId(), key -> new ArrayList<>())
+                        .add(row.value());
+            }
+            return valuesByUserId;
+        }
     }
+
+    private record UserValueRow(UUID userId, String value) {}
 
     private static Set<String> enumNames(Set<? extends Enum<?>> values) {
         if (values == null || values.isEmpty()) {
@@ -524,7 +605,7 @@ public final class JdbiUserStorage implements UserStorage {
                             JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at"))
                     .bio(rs.getString("bio"))
                     .birthDate(JdbiTypeCodecs.SqlRowReaders.readLocalDate(rs, "birth_date"))
-                    .gender(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "gender", Gender.class))
+                    .gender(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, GENDER_COLUMN, Gender.class))
                     .location(lat != null ? lat : 0.0, lon != null ? lon : 0.0)
                     .hasLocationSet(hasLocationSet)
                     .maxDistanceKm(rs.getInt("max_distance_km"))

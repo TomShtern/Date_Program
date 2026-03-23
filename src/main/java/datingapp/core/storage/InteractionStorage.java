@@ -12,7 +12,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Consolidated storage for user interactions: likes, matches, and transactional
@@ -126,14 +125,13 @@ public interface InteractionStorage {
      * (active and ended, excluding soft-deleted matches).
      *
      * <p>
-     * Default fallback derives IDs from {@link #getAllMatchesFor(UUID)}.
-     * Implementations should override with a UUID-only projection for efficiency.
+     * Implementations must override this with a UUID-only projection for
+     * efficiency.
      */
     default Set<UUID> getMatchedCounterpartIds(UUID userId) {
         Objects.requireNonNull(userId, "userId cannot be null");
-        return getAllMatchesFor(userId).stream()
-                .map(match -> match.getOtherUser(userId))
-                .collect(Collectors.toUnmodifiableSet());
+        throw new UnsupportedOperationException(
+                "InteractionStorage implementation must override getMatchedCounterpartIds(UUID) to support efficient lookup");
     }
 
     default Optional<Match> getByUsers(UUID userA, UUID userB) {
@@ -229,7 +227,9 @@ public interface InteractionStorage {
     }
 
     default int purgeDeletedBefore(Instant threshold) {
-        return 0;
+        Objects.requireNonNull(threshold, "threshold cannot be null");
+        throw new UnsupportedOperationException(
+                "InteractionStorage implementation must override purgeDeletedBefore(Instant) to support cleanup");
     }
 
     /**

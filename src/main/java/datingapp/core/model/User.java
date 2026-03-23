@@ -775,20 +775,47 @@ public class User {
      * fields filled.
      */
     public boolean isComplete() {
-        return name != null
-                && !name.isBlank()
-                && bio != null
-                && !bio.isBlank()
-                && birthDate != null
-                && gender != null
-                && interestedIn != null
-                && !interestedIn.isEmpty()
-                && maxDistanceKm > 0
-                && minAge > 0
-                && maxAge >= minAge
-                && photoUrls != null
-                && !photoUrls.isEmpty()
-                && hasCompletePace();
+        return getMissingProfileFields().isEmpty();
+    }
+
+    /**
+     * Returns the profile fields that are still missing for completeness.
+     *
+     * <p>This is the single source of truth for profile completeness rules.
+     */
+    public List<String> getMissingProfileFields() {
+        List<String> missing = new ArrayList<>();
+        if (name == null || name.isBlank()) {
+            missing.add("name");
+        }
+        if (bio == null || bio.isBlank()) {
+            missing.add("bio");
+        }
+        if (birthDate == null) {
+            missing.add("birthDate");
+        }
+        if (gender == null) {
+            missing.add("gender");
+        }
+        if (interestedIn == null || interestedIn.isEmpty()) {
+            missing.add("interestedIn");
+        }
+        if (maxDistanceKm <= 0) {
+            missing.add("maxDistanceKm");
+        }
+        if (minAge <= 0) {
+            missing.add("minAge");
+        }
+        if (maxAge < minAge) {
+            missing.add("maxAge");
+        }
+        if (photoUrls == null || photoUrls.isEmpty()) {
+            missing.add("photoUrls");
+        }
+        if (!hasCompletePace()) {
+            missing.add("pacePreferences");
+        }
+        return List.copyOf(missing);
     }
 
     /** Checks if the user has completed their pace MatchPreferences. */
