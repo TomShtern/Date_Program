@@ -7,10 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.profile.*;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
@@ -184,6 +184,27 @@ class ProfileCompletionServiceTest {
             assertTrue(interestsScoreSome > interestsScoreEmpty);
             assertEquals(100, interestsScoreFull);
         }
+
+        @Test
+        @DisplayName("preferences uses hasLocation semantics for equator coordinates")
+        void preferencesUsesHasLocationSemanticsForEquatorCoordinates() {
+            user.setLocation(0.0, 34.8);
+            user.setAgeRange(
+                    25,
+                    35,
+                    AppConfig.defaults().validation().minAge(),
+                    AppConfig.defaults().validation().maxAge());
+
+            ProfileService.CompletionResult result = service.calculate(user);
+
+            int preferencesScore = result.breakdown().stream()
+                    .filter(b -> b.category().equals("Preferences"))
+                    .findFirst()
+                    .orElseThrow()
+                    .score();
+
+            assertEquals(100, preferencesScore);
+        }
     }
 
     @Nested
@@ -254,6 +275,20 @@ class ProfileCompletionServiceTest {
             progressUser.setHeightCm(180);
             int score3 = service.calculateCompleteness(progressUser).percentage();
             assertTrue(score3 > score2, "Adding height should increase score");
+        }
+
+        @Test
+        @DisplayName("uses hasLocation contract when evaluating location completeness")
+        void usesHasLocationContractWhenEvaluatingLocationCompleteness() {
+            User malformedStoredUser = User.StorageBuilder.create(UUID.randomUUID(), "Geo Ghost", FIXED_INSTANT)
+                    .location(Double.NaN, 34.8)
+                    .hasLocationSet(false)
+                    .build();
+
+            ProfileService.ProfileCompleteness result = service.calculateCompleteness(malformedStoredUser);
+
+            assertTrue(result.missingFields().contains("Location"));
+            assertFalse(result.filledFields().contains("Location"));
         }
     }
 

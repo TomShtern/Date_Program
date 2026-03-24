@@ -26,17 +26,17 @@ import org.slf4j.LoggerFactory;
 public final class TrustSafetyService {
 
     private static final Logger logger = LoggerFactory.getLogger(TrustSafetyService.class);
-    private static final String AUDIT_KEY_BLOCK_REQUESTED = "blockRequested";
-    private static final String AUDIT_KEY_BAN_PERSISTED = "banPersisted";
-    private static final String AUDIT_KEY_BLOCK_REMOVED = "blockRemoved";
-    private static final String AUDIT_KEY_CONVERSATION_STORAGE_CONFIGURED = "conversationStorageConfigured";
-    private static final String AUDIT_KEY_DESCRIPTION_LENGTH = "descriptionLength";
-    private static final String AUDIT_KEY_DESCRIPTION_PROVIDED = "descriptionProvided";
-    private static final String AUDIT_KEY_ERROR_CODE = "errorCode";
-    private static final String AUDIT_KEY_MATCH_UPDATED = "matchUpdated";
-    private static final String AUDIT_KEY_MAX_DESCRIPTION_LENGTH = "maxDescriptionLength";
-    private static final String AUDIT_KEY_REASON = "reason";
-    private static final String AUDIT_KEY_REPORT_COUNT = "reportCount";
+    private static final String AUDIT_KEY_BLOCK_REQUESTED = "block_requested";
+    private static final String AUDIT_KEY_BAN_PERSISTED = "ban_persisted";
+    private static final String AUDIT_KEY_BLOCK_REMOVED = "block_removed";
+    private static final String AUDIT_KEY_CONVERSATION_STORAGE_CONFIGURED = "conversation_storage_configured";
+    private static final String AUDIT_KEY_DESCRIPTION_LENGTH = "description_length";
+    private static final String AUDIT_KEY_DESCRIPTION_PROVIDED = "description_provided";
+    private static final String AUDIT_KEY_ERROR_CODE = "error_code";
+    private static final String AUDIT_KEY_MATCH_UPDATED = "match_updated";
+    private static final String AUDIT_KEY_MAX_DESCRIPTION_LENGTH = "max_description_length";
+    private static final String AUDIT_KEY_MODERATION_REASON_CODE = "moderation_reason_code";
+    private static final String AUDIT_KEY_REPORT_COUNT = "report_count";
     private static final String AUDIT_KEY_THRESHOLD = "threshold";
     public static final Duration DEFAULT_VERIFICATION_TTL = Duration.ofMinutes(15);
 
@@ -288,7 +288,7 @@ public final class TrustSafetyService {
                 reporterId,
                 reportedUserId,
                 contextOf(
-                        AUDIT_KEY_REASON,
+                        AUDIT_KEY_MODERATION_REASON_CODE,
                         reason,
                         AUDIT_KEY_BLOCK_REQUESTED,
                         blockUser,
@@ -300,7 +300,15 @@ public final class TrustSafetyService {
         boolean autoBanned = applyAutoBanIfThreshold(reportedUserId);
 
         if (blockUser && !trustSafetyStorage.isBlocked(reporterId, reportedUserId)) {
-            block(reporterId, reportedUserId);
+            BlockResult blockResult = block(reporterId, reportedUserId);
+            if (!blockResult.success() && logger.isWarnEnabled()) {
+                logger.warn(
+                        "Report succeeded but follow-up block failed (reporterId={}, reportedUserId={}, blockUser={}) with error={}",
+                        reporterId,
+                        reportedUserId,
+                        blockUser,
+                        blockResult.errorMessage());
+            }
         }
 
         return new ReportResult(true, autoBanned, null);
@@ -325,7 +333,7 @@ public final class TrustSafetyService {
                                 reportCount,
                                 AUDIT_KEY_THRESHOLD,
                                 config.safety().autoBanThreshold(),
-                                AUDIT_KEY_REASON,
+                                AUDIT_KEY_MODERATION_REASON_CODE,
                                 "below_threshold"));
                 result[0] = false;
                 return;
@@ -346,7 +354,7 @@ public final class TrustSafetyService {
                                 reportCount,
                                 AUDIT_KEY_THRESHOLD,
                                 config.safety().autoBanThreshold(),
-                                AUDIT_KEY_REASON,
+                                AUDIT_KEY_MODERATION_REASON_CODE,
                                 latestReported == null ? "user_missing" : "already_banned"));
                 result[0] = false;
                 return;
@@ -384,7 +392,7 @@ public final class TrustSafetyService {
                                 reportCount,
                                 AUDIT_KEY_THRESHOLD,
                                 config.safety().autoBanThreshold(),
-                                AUDIT_KEY_REASON,
+                                AUDIT_KEY_MODERATION_REASON_CODE,
                                 "save_failed"));
                 result[0] = false;
             }

@@ -39,7 +39,7 @@ class ModerationAuditLoggerTest {
                     targetId,
                     ModerationAuditEvent.Action.BLOCK,
                     ModerationAuditEvent.Outcome.SUCCESS,
-                    Map.of("matchUpdated", "true", "conversationArchived", "false"));
+                    Map.of("match_updated", "true", "conversation_archived", "false"));
 
             auditLogger.log(event);
 

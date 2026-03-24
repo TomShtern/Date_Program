@@ -227,6 +227,38 @@ class AppConfigTest {
             assertEquals(91, config.safety().softDeleteRetentionDays());
         }
 
+        @Test
+        @DisplayName("Builder rejects non-monotonic response time thresholds")
+        void builderRejectsNonMonotonicResponseTimeThresholds() {
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, this::buildWithNonMonotonicResponseTimeThresholds);
+
+            assertEquals("responseTimeExcellentHours must be <= responseTimeGreatHours", ex.getMessage());
+        }
+
+        @Test
+        @DisplayName("Builder rejects non-monotonic safety achievement tiers")
+        void builderRejectsNonMonotonicSafetyAchievementTiers() {
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, this::buildWithNonMonotonicSafetyAchievementTiers);
+
+            assertEquals("achievementMatchTier1 must be <= achievementMatchTier2", ex.getMessage());
+        }
+
+        private void buildWithNonMonotonicResponseTimeThresholds() {
+            AppConfig.builder()
+                    .responseTimeExcellentHours(6)
+                    .responseTimeGreatHours(2)
+                    .build();
+        }
+
+        private void buildWithNonMonotonicSafetyAchievementTiers() {
+            AppConfig.builder()
+                    .achievementMatchTier1(5)
+                    .achievementMatchTier2(4)
+                    .build();
+        }
+
         private AppConfig createCustomConfig() {
             return AppConfig.builder()
                     .dailyLikeLimit(111)

@@ -83,6 +83,17 @@ class TrustSafetyServiceAuditTest {
             assertTrue(result.success());
             assertFalse(result.userWasBanned());
 
+            // AUTO_BAN here indicates the threshold check was audited; outcome should be FAILURE below threshold.
+            List<String> outcomes = appender.list.stream()
+                    .map(event -> event.getKeyValuePairs().stream()
+                            .filter(pair -> pair.key.equals("outcome"))
+                            .findFirst()
+                            .orElseThrow()
+                            .value
+                            .toString())
+                    .toList();
+            assertEquals(ModerationAuditEvent.Outcome.FAILURE.name(), outcomes.get(1));
+
             List<String> actions = appender.list.stream()
                     .map(event -> event.getKeyValuePairs().stream()
                             .filter(pair -> pair.key.equals("action"))
@@ -152,8 +163,8 @@ class TrustSafetyServiceAuditTest {
             assertTrue(deleted);
             assertEquals(1, appender.list.size());
             assertTrue(appender.list.get(0).getKeyValuePairs().stream()
-                    .anyMatch(pair ->
-                            pair.key.equals("action") && pair.value.equals(ModerationAuditEvent.Action.UNBLOCK)));
+                    .anyMatch(pair -> pair.key.equals("action")
+                            && pair.value.toString().equals(ModerationAuditEvent.Action.UNBLOCK.name())));
         } finally {
             logger.detachAppender(appender);
             logger.setLevel(previousLevel);
@@ -194,8 +205,8 @@ class TrustSafetyServiceAuditTest {
             assertTrue(result.success());
             assertTrue(result.userWasBanned());
             assertTrue(appender.list.stream().anyMatch(event -> event.getKeyValuePairs().stream()
-                    .anyMatch(pair ->
-                            pair.key.equals("action") && pair.value.equals(ModerationAuditEvent.Action.AUTO_BAN))));
+                    .anyMatch(pair -> pair.key.equals("action")
+                            && pair.value.toString().equals(ModerationAuditEvent.Action.AUTO_BAN.name()))));
         } finally {
             logger.detachAppender(appender);
             logger.setLevel(previousLevel);

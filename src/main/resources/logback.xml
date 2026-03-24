@@ -9,6 +9,7 @@
 <configuration>
     <!-- Variable for log level, default INFO, override with environment variable -->
     <variable name="LOG_LEVEL" value="${DATING_APP_LOG_LEVEL:-DEBUG}" />
+    <variable name="AUDIT_RETENTION_DAYS" value="${DATING_APP_AUDIT_RETENTION_DAYS:-30}" />
 
     <!-- Console appender for CLI output - simple format -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
@@ -36,6 +37,24 @@
         <encoder>
             <charset>UTF-8</charset>
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!--
+      Dedicated moderation audit sink (restricted access, bounded retention).
+      This logger is intentionally non-additive so sensitive audit records are
+      not duplicated to STDOUT/root appenders or broad analytics pipelines.
+    -->
+    <appender name="AUDIT_MODERATION_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/audit/moderation-audit.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/audit/moderation-audit.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>${AUDIT_RETENTION_DAYS}</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %logger - %kvp %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -67,6 +86,11 @@
     <logger name="datingapp.core.PerformanceMonitor" level="${LOG_LEVEL}" additivity="false">
         <appender-ref ref="DEBUG_STDOUT" />
         <appender-ref ref="FILE" />
+    </logger>
+
+    <!-- Restricted moderation audit channel (PII-containing event IDs) -->
+    <logger name="audit.moderation" level="INFO" additivity="false">
+        <appender-ref ref="AUDIT_MODERATION_FILE" />
     </logger>
 
     <!-- Third-party libraries - keep quiet -->

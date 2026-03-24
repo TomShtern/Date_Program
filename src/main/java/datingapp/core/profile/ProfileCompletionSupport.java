@@ -89,6 +89,10 @@ final class ProfileCompletionSupport {
             new FieldCheck("Kids preference", LIFESTYLE_FIELD_POINTS, user -> user.getWantsKids() != null),
             new FieldCheck("Looking for", LIFESTYLE_FIELD_POINTS, user -> user.getLookingFor() != null));
 
+    private static final List<FieldCheck> PREFERENCES_FIELDS = List.of(
+            new FieldCheck(FIELD_LOCATION, PREFERENCES_FIELD_POINTS, User::hasLocation),
+            new FieldCheck("Age", PREFERENCES_FIELD_POINTS, user -> user.getMinAge() > 0));
+
     ProfileService.CompletionResult calculate(User user) {
         CategoryResult basic = scoreBasicInfo(user);
         CategoryResult interests = scoreInterests(user);
@@ -144,7 +148,7 @@ final class ProfileCompletionSupport {
                 user.getInterestedIn() != null && !user.getInterestedIn().isEmpty(),
                 filled,
                 missing);
-        checkField(FIELD_LOCATION, user.getLat() != 0.0 || user.getLon() != 0.0, filled, missing);
+        checkField(FIELD_LOCATION, user.hasLocation(), filled, missing);
         checkField("Photo", !photoUrls.isEmpty(), filled, missing);
 
         checkField("Height", user.getHeightCm() != null, filled, missing);
@@ -263,32 +267,7 @@ final class ProfileCompletionSupport {
     }
 
     private CategoryResult scorePreferences(User user) {
-        int earnedPoints = 0;
-        List<String> filled = new ArrayList<>();
-        List<String> missing = new ArrayList<>();
-
-        if (user.getLat() != 0.0) {
-            earnedPoints += PREFERENCES_FIELD_POINTS;
-            filled.add(FIELD_LOCATION);
-        } else {
-            missing.add(FIELD_LOCATION);
-        }
-
-        if (user.getMinAge() > 0) {
-            earnedPoints += PREFERENCES_FIELD_POINTS;
-            filled.add("Age");
-        } else {
-            missing.add("Age");
-        }
-
-        int score = filled.isEmpty() ? 0 : filled.size() * 100 / (filled.size() + missing.size());
-        return new CategoryResult(
-                earnedPoints,
-                PREFERENCES_FIELD_POINTS * 2,
-                filled.size(),
-                2,
-                new ProfileService.CategoryBreakdown("Preferences", score, filled, missing),
-                List.of());
+        return scoreCategory("Preferences", PREFERENCES_FIELDS, user);
     }
 
     private CategoryResult scoreCategory(String name, List<FieldCheck> fields, User user) {

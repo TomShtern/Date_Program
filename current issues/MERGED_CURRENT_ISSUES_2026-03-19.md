@@ -24,7 +24,7 @@ This document is split for fast triage and deep implementation work:
 
 - In valid claims, `Status note` captures conflicting historical report labels and **does not override** the current `Validation status`.
 - 🟠 `IN PROGRESS - NOT STARTED YET (a plan exists)` means the claim is covered by an active implementation plan, but work has not started yet.
-- ✅ **2026-03-24 completion batch applied for V014, V020, V025, V033, V034, V042, V053, V085, V087, V092**
+- ✅ **2026-03-24 completion batch applied for V006, V014, V020, V025, V033, V034, V042, V053, V085, V087, V092**
 
 ### How to use this register
 
@@ -2998,7 +2998,7 @@ The `errorSink` nullability is a **deliberate null-object pattern with fallback 
 - **Severity / Category:** low / maintainability
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
-- **Completion status:** 🟡 Deferred (low-priority maintainability refactor)
+- **Completion status:** ✅ Implemented (2026-03-24 completion batch)
 
 #### Report Context
 | Type                  | Key                                         | Value                                 |
@@ -3007,11 +3007,11 @@ The `errorSink` nullability is a **deliberate null-object pattern with fallback 
 | section_reference     | `#1`                                        | Refactoring Plan Status (Task 1 note) |
 
 #### Details and Context
-- Task says scorePreferences still uses standalone logic and does not call scoreCategory.
-- Only scoreBasicInfo and scoreLifestyle are currently routed through shared scoreCategory logic.
+- Historical note indicated `scorePreferences` used standalone scoring logic.
+- Current implementation routes `scorePreferences` through shared `scoreCategory(...)` and also aligns location completeness evaluation to the same `User.hasLocation()` contract, removing split semantics.
 
 #### Recommended Actions
-- No immediate code change required (historical/resolved context).
+- No immediate code change required (implemented).
 
 <details><summary>Evidence snippets</summary>
 

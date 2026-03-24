@@ -320,39 +320,51 @@ output.println("Type a message, or /help for commands.");
 
 **Implementation:**
 
-1. **Add a `ConcurrentHashMap`-based cache** with TTL and size bound:
+1. **Add a bounded TTL cache** with deterministic eviction:
    ```java
-   private final Map<UUID, CacheEntry<User>> userCache = new ConcurrentHashMap<>();
+   private final Map<UUID, CacheEntry<User>> userCache = new LinkedHashMap<>(16, 0.75f, true);
    private static final int MAX_CACHE_SIZE = 500;
    private static final Duration CACHE_TTL = Duration.ofMinutes(5);
 
    private record CacheEntry<T>(T value, Instant expiresAt) {
-       boolean isExpired(Instant now) { return now.isAfter(expiresAt); }
+       boolean isExpired(Instant now) { return !now.isBefore(expiresAt); }
    }
    ```
 
-2. **Wrap `get(UUID id)`** with cache-aside logic:
+2. **Wrap `get(UUID id)`** with synchronized cache-aside logic and opportunistic cleanup:
    ```java
    @Override
    public Optional<User> get(UUID id) {
-       CacheEntry<User> entry = userCache.get(id);
        Instant now = AppClock.now();
-       if (entry != null && !entry.isExpired(now)) {
-           return Optional.of(entry.value());
+       synchronized (userCache) {
+           pruneExpiredEntriesLocked(now);
+           CacheEntry<User> entry = userCache.get(id);
+           if (entry != null) {
+               return Optional.of(entry.value());
+           }
        }
-       Optional<User> user = fetchFromDb(id);
-       user.ifPresent(u -> {
-           if (userCache.size() < MAX_CACHE_SIZE) {
-               userCache.put(id, new CacheEntry<>(u, now.plus(CACHE_TTL)));
+
+       Optional<User> loaded = fetchFromDb(id);
+       loaded.ifPresent(user -> {
+           Instant writeNow = AppClock.now();
+           synchronized (userCache) {
+               pruneExpiredEntriesLocked(writeNow);
+               if (!userCache.containsKey(id) && userCache.size() >= MAX_CACHE_SIZE) {
+                   evictOldestEntryLocked();
+               }
+               userCache.put(id, new CacheEntry<>(user, writeNow.plus(CACHE_TTL)));
            }
        });
-       return user;
+       return loaded;
    }
    ```
 
 3. **Invalidate on write:** In `save(User)`, `delete(UUID)`, and any other mutating method, call `userCache.remove(id)`.
 
-4. **Add cache-clear method** for tests and cleanup: `public void clearCache()`.
+4. **Add cache helpers** for tests and deterministic behavior:
+    - `clearCache()`
+    - `pruneExpiredEntriesLocked(Instant now)`
+    - `evictOldestEntryLocked()`
 
 **IMPORTANT constraints:**
 - Use `AppClock.now()` (not `Instant.now()`) for TTL checks — testable with `TestClock`.
@@ -435,17 +447,26 @@ public final class ModerationAuditLogger {
     private ModerationAuditLogger() {}
 
     public static void log(ModerationAuditEvent event) {
+        Set<String> mdcKeys = new LinkedHashSet<>();
         try {
             MDC.put("actor", event.actorId().toString());
+            mdcKeys.add("actor");
             MDC.put("target", event.targetId().toString());
+            mdcKeys.add("target");
             MDC.put("action", event.action().name());
+            mdcKeys.add("action");
             MDC.put("outcome", event.outcome().name());
-            event.context().forEach(MDC::put);
+            mdcKeys.add("outcome");
+            event.context().forEach((key, value) -> {
+                MDC.put(key, value);
+                mdcKeys.add(key);
+            });
 
             AUDIT.info("[MODERATION] {} by {} on {} — {}",
                 event.action(), event.actorId(), event.targetId(), event.outcome());
         } finally {
-            MDC.clear();
+            // Remove only keys added in this method; preserve caller MDC context.
+            mdcKeys.forEach(MDC::remove);
         }
     }
 }

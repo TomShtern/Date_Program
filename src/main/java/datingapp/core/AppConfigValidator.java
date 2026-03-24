@@ -133,6 +133,18 @@ final class AppConfigValidator {
         requireNonNegative("responseTimeGoodHours", responseTimeGoodHours);
         requireNonNegative("responseTimeWeekHours", responseTimeWeekHours);
         requireNonNegative("responseTimeMonthHours", responseTimeMonthHours);
+        if (responseTimeExcellentHours > responseTimeGreatHours) {
+            throw new IllegalArgumentException("responseTimeExcellentHours must be <= responseTimeGreatHours");
+        }
+        if (responseTimeGreatHours > responseTimeGoodHours) {
+            throw new IllegalArgumentException("responseTimeGreatHours must be <= responseTimeGoodHours");
+        }
+        if (responseTimeGoodHours > responseTimeWeekHours) {
+            throw new IllegalArgumentException("responseTimeGoodHours must be <= responseTimeWeekHours");
+        }
+        if (responseTimeWeekHours > responseTimeMonthHours) {
+            throw new IllegalArgumentException("responseTimeWeekHours must be <= responseTimeMonthHours");
+        }
     }
 
     static void validateAlgorithmStandoutPolicy(
@@ -196,6 +208,18 @@ final class AppConfigValidator {
         requireNonNegative("achievementMatchTier4", achievementMatchTier4);
         requireNonNegative("achievementMatchTier5", achievementMatchTier5);
         requireNonNegative("minSwipesForBehaviorAchievement", minSwipesForBehaviorAchievement);
+        if (achievementMatchTier1 > achievementMatchTier2) {
+            throw new IllegalArgumentException("achievementMatchTier1 must be <= achievementMatchTier2");
+        }
+        if (achievementMatchTier2 > achievementMatchTier3) {
+            throw new IllegalArgumentException("achievementMatchTier2 must be <= achievementMatchTier3");
+        }
+        if (achievementMatchTier3 > achievementMatchTier4) {
+            throw new IllegalArgumentException("achievementMatchTier3 must be <= achievementMatchTier4");
+        }
+        if (achievementMatchTier4 > achievementMatchTier5) {
+            throw new IllegalArgumentException("achievementMatchTier4 must be <= achievementMatchTier5");
+        }
     }
 
     static void validateSafetyBehaviorThresholds(
