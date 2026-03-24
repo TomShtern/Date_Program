@@ -1,6 +1,7 @@
 package datingapp.core.profile;
 
 import datingapp.core.AppConfig;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
@@ -24,7 +25,7 @@ public final class ProfileService {
     private final TrustSafetyStorage trustSafetyStorage;
     private final UserStorage userStorage;
     private final ProfileCompletionSupport completionSupport;
-    private final DefaultAchievementService legacyAchievementService;
+    private final AchievementService achievementService;
 
     public ProfileService(
             AppConfig config,
@@ -38,7 +39,7 @@ public final class ProfileService {
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.completionSupport = new ProfileCompletionSupport();
-        this.legacyAchievementService = new DefaultAchievementService(
+        this.achievementService = new DefaultAchievementService(
                 this.config,
                 this.analyticsStorage,
                 this.interactionStorage,
@@ -164,22 +165,22 @@ public final class ProfileService {
     }
 
     public List<UserAchievement> checkAndUnlock(UUID userId) {
-        return legacyAchievementService.checkAndUnlock(userId);
+        return achievementService.checkAndUnlock(userId);
     }
 
     public List<UserAchievement> getUnlocked(UUID userId) {
-        return legacyAchievementService.getUnlocked(userId);
+        return achievementService.getUnlocked(userId);
     }
 
     public List<AchievementProgress> getProgress(UUID userId) {
-        return legacyAchievementService.getProgress(userId).stream()
+        return achievementService.getProgress(userId).stream()
                 .map(progress -> new AchievementProgress(
                         progress.achievement(), progress.current(), progress.target(), progress.unlocked()))
                 .toList();
     }
 
     public Map<Achievement.Category, List<AchievementProgress>> getProgressByCategory(UUID userId) {
-        return legacyAchievementService.getProgressByCategory(userId).entrySet().stream()
+        return achievementService.getProgressByCategory(userId).entrySet().stream()
                 .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().stream()
                         .map(progress -> new AchievementProgress(
                                 progress.achievement(), progress.current(), progress.target(), progress.unlocked()))
@@ -187,6 +188,6 @@ public final class ProfileService {
     }
 
     public int countUnlocked(UUID userId) {
-        return legacyAchievementService.countUnlocked(userId);
+        return achievementService.countUnlocked(userId);
     }
 }

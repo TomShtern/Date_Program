@@ -259,8 +259,8 @@ public class MessagingHandler implements LoggingSupport {
 
         logInfo("{}", CliTextAndInput.MENU_DIVIDER);
         if (canMessage) {
-            logInfo("Commands: /back  /older  /block  /unmatch");
-            logInfo("\nType your message:");
+            logInfo("Commands: /help  /back  /older  /block  /unmatch");
+            logInfo("\nType a message, or /help for commands.");
         } else {
             logInfo("[B] Back");
         }
@@ -283,6 +283,11 @@ public class MessagingHandler implements LoggingSupport {
 
         if (isOlderCommand(userInput)) {
             return ConversationAction.SHOW_OLDER;
+        }
+
+        if (isHelpCommand(userInput)) {
+            printConversationHelp(canMessage);
+            return ConversationAction.CONTINUE;
         }
 
         if (!canMessage) {
@@ -342,6 +347,10 @@ public class MessagingHandler implements LoggingSupport {
         return "/older".equalsIgnoreCase(userInput);
     }
 
+    private boolean isHelpCommand(String userInput) {
+        return "/help".equalsIgnoreCase(userInput);
+    }
+
     private boolean isBlockCommand(String userInput) {
         return "/block".equalsIgnoreCase(userInput);
     }
@@ -358,6 +367,17 @@ public class MessagingHandler implements LoggingSupport {
 
         logInfo("\n   [{}] {}:", timestamp, sender);
         logInfo("   {}", message.content());
+    }
+
+    private void printConversationHelp(boolean canMessage) {
+        logInfo("\nAvailable commands:");
+        logInfo("  /help    Show this help");
+        logInfo("  /back    Exit conversation");
+        logInfo("  /older   Load older messages");
+        if (canMessage) {
+            logInfo("  /block   Block this user");
+            logInfo("  /unmatch Unmatch this user");
+        }
     }
 
     /** Truncates a message for preview. */

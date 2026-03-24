@@ -24,6 +24,7 @@ This document is split for fast triage and deep implementation work:
 
 - In valid claims, `Status note` captures conflicting historical report labels and **does not override** the current `Validation status`.
 - 🟠 `IN PROGRESS - NOT STARTED YET (a plan exists)` means the claim is covered by an active implementation plan, but work has not started yet.
+- ✅ **2026-03-24 completion batch applied for V014, V020, V025, V033, V034, V042, V053, V085, V087, V092**
 
 ### How to use this register
 
@@ -306,6 +307,7 @@ This document is split for fast triage and deep implementation work:
 - **Severity / Category:** critical / security
 - **Mentions (total):** 11
 - **Cross-report conflict:** no
+- **Completion status:** 🟡 Deferred (no full auth yet; acting-user hardening remains pending before production)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                                                                                 |
@@ -431,6 +433,7 @@ This document is split for fast triage and deep implementation work:
 - **Mentions (total):** 5
 - **Cross-report conflict:** yes
 - **Status note:** RESOLVED/VERIFIED (2026-03-22)
+- **Completion status:** ✅ Implemented (2026-03-22 verified)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                                              |
@@ -508,6 +511,7 @@ This document is split for fast triage and deep implementation work:
 - **Mentions (total):** 1
 - **Cross-report conflict:** status-only
 - **Status note:** RESOLVED/HISTORICAL (re-open only if flake is reproducible now)
+- **Completion status:** ❌ Not applicable (false positive)
 
 #### Report Context
 | Type                  | Key                                                          | Value         |
@@ -549,6 +553,7 @@ FK constraints are **comprehensively defined** across all tables in `SchemaIniti
 - **Mentions (total):** 26
 - **Cross-report conflict:** yes
 - **Status note:** INVALID, RESOLVED/HISTORICAL
+- **Completion status:** ✅ Closed as invalid/historical
 
 #### Report Context
 | Type                  | Key                                                          | Value                                                                                                                                                                                     |
@@ -725,6 +730,7 @@ FK constraints are **comprehensively defined** across all tables in `SchemaIniti
 - **Severity / Category:** high / maintainability
 - **Mentions (total):** 4
 - **Cross-report conflict:** no
+- **Completion status:** ❌ Not applicable (false positive)
 
 #### Report Context
 | Type                  | Key                                         | Value                            |
@@ -796,6 +802,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** high / security
 - **Mentions (total):** 4
 - **Cross-report conflict:** no
+- **Completion status:** ✅ Implemented (2026-03-24 docs/marker completion)
 
 #### Report Context
 | Type                  | Key                                                      | Value                                                                                                             |
@@ -971,6 +978,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** high / security
 - **Mentions (total):** 2
 - **Cross-report conflict:** no
+- **Completion status:** ✅ Implemented (2026-03-24 docs/marker completion)
 
 #### Report Context
 | Type                  | Key                                                          | Value                                 |
@@ -1111,6 +1119,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** high / security
 - **Mentions (total):** 2
 - **Cross-report conflict:** no
+- **Completion status:** ✅ Implemented (2026-03-24 docs/marker completion)
 
 #### Report Context
 | Type                  | Key                                         | Value                                                                   |
@@ -1248,6 +1257,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Mentions (total):** 1
 - **Cross-report conflict:** status-only
 - **Status note:** RESOLVED/HISTORICAL
+- **Completion status:** ❌ Not applicable (false positive)
 
 #### Report Context
 | Type                  | Key                                                          | Value                                 |
@@ -1346,6 +1356,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** high / security
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** ✅ Implemented (2026-03-24 docs/marker completion)
 
 #### Report Context
 | Type                  | Key                                             | Value                                      |
@@ -1370,6 +1381,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** medium / security
 - **Mentions (total):** 4
 - **Cross-report conflict:** no
+- **Completion status:** ✅ Implemented (2026-03-24 complex-plan completion)
 
 #### Report Context
 | Type                  | Key                                                      | Value                                       |
@@ -1611,6 +1623,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** medium / maintainability
 - **Mentions (total):** 2
 - **Cross-report conflict:** no
+- **Completion status:** ✅ Implemented (2026-03-24 complex-plan completion)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                                                                              |
@@ -1831,6 +1844,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** medium / ui-ux
 - **Mentions (total):** 2
 - **Cross-report conflict:** no
+- **Completion status:** 🟡 Deferred backlog (real-time push/WebSocket not yet implemented)
 
 #### Report Context
 | Type                  | Key                                                          | Value                                 |
@@ -1912,6 +1926,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - **Severity / Category:** medium / bug
 - **Mentions (total):** 2
 - **Cross-report conflict:** no
+- **Completion status:** ✅ Implemented (2026-03-24 complex-plan completion)
 
 #### Report Context
 | Type                  | Key                                              | Value                           |
@@ -1978,6 +1993,7 @@ No `logger.error()` call — stack traces from `atomicUndoDelete()` failures (DB
 - **Severity / Category:** medium / maintainability
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** ❌ Not applicable (false positive)
 
 #### Report Context
 | Type                  | Key                                              | Value         |
@@ -2065,6 +2081,7 @@ Achievement thresholds are **centralized in `AppConfig.SafetyConfig`** (lines 14
 - **Severity / Category:** medium / ui-ux
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** ❌ Not applicable (false positive)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                               |
@@ -2135,6 +2152,7 @@ Achievement thresholds are **centralized in `AppConfig.SafetyConfig`** (lines 14
 - **Mentions (total):** 1
 - **Cross-report conflict:** status-only
 - **Status note:** RESOLVED/HISTORICAL
+- **Completion status:** ❌ Not applicable (false positive)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                               |
@@ -2232,6 +2250,7 @@ The claim that `isRunning()` "reads without synchronization" is technically true
 - **Severity / Category:** medium / bug
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** 🔴 Not implemented (DST-safe reset policy still pending)
 
 #### Report Context
 | Type                  | Key                                              | Value        |
@@ -2406,6 +2425,7 @@ The claim that `isRunning()` "reads without synchronization" is technically true
 - **Severity / Category:** medium / maintainability
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** ❌ Not applicable (false positive)
 
 #### Report Context
 | Type                  | Key                                              | Value         |
@@ -2812,6 +2832,7 @@ This is an intentional design gap — the app uses soft-delete for users but har
 - **Severity / Category:** low / performance
 - **Mentions (total):** 2
 - **Cross-report conflict:** no
+- **Completion status:** ✅ Implemented (2026-03-24 complex-plan completion)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                                                                     |
@@ -2823,7 +2844,7 @@ This is an intentional design gap — the app uses soft-delete for users but har
 - Report states all storage access goes directly to DB with no caching strategy.
 
 #### Recommended Actions
-- Add caching for frequently accessed data.
+- Caching layer implemented: JdbiUserStorage now features bounded TTL read-through cache for user get() operations (max 500 entries, 5-minute TTL, AppClock-based decay, invalidation on save/delete); see JdbiUserStorage.java (2026-03-24 completion batch).
 
 <details><summary>Evidence snippets</summary>
 
@@ -2836,6 +2857,7 @@ This is an intentional design gap — the app uses soft-delete for users but har
 - **Severity / Category:** low / maintainability
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** ❌ Not applicable (false positive)
 
 #### Report Context
 | Type                  | Key                                              | Value        |
@@ -2875,6 +2897,7 @@ The `errorSink` nullability is a **deliberate null-object pattern with fallback 
 - **Severity / Category:** low / ui-ux
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** ✅ Implemented (2026-03-24 complex-plan completion)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                               |
@@ -2886,7 +2909,7 @@ The `errorSink` nullability is a **deliberate null-object pattern with fallback 
 - Only four slash commands recognized; no in-chat help command.
 
 #### Recommended Actions
-- Add command discovery/help in messaging CLI.
+- Command parser ergonomics completed: MessagingHandler now supports expanded command set and inline help documentation; see MessagingHandler.java for implementation details.
 
 <details><summary>Evidence snippets</summary>
 
@@ -2975,6 +2998,7 @@ The `errorSink` nullability is a **deliberate null-object pattern with fallback 
 - **Severity / Category:** low / maintainability
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** 🟡 Deferred (low-priority maintainability refactor)
 
 #### Report Context
 | Type                  | Key                                         | Value                                 |
@@ -3001,6 +3025,7 @@ The `errorSink` nullability is a **deliberate null-object pattern with fallback 
 - **Severity / Category:** low / maintainability
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** ✅ Implemented (2026-03-24 complex-plan completion)
 
 #### Report Context
 | Type                  | Key                                              | Value        |
@@ -3012,7 +3037,7 @@ The `errorSink` nullability is a **deliberate null-object pattern with fallback 
 - Display count is embedded constant, reducing configurability.
 
 #### Recommended Actions
-- Externalize preview count to config/UI policy.
+- Preview count externalized to AppConfig.MatchingConfig via config-backed sharedInterestsPreviewCount (default 3, bounds: 1..Interest.count); changes in AppConfig.java, AppConfigValidator.java, and config/app-config.json; InterestMatcher.formatSharedInterests() now accepts explicit previewCount overload; validated in MatchingHandler, MatchQualityService, and MatchingCliPresenter (2026-03-24 completion batch).
 
 <details><summary>Evidence snippets</summary>
 
@@ -3025,6 +3050,7 @@ The `errorSink` nullability is a **deliberate null-object pattern with fallback 
 - **Severity / Category:** low / ui-ux
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** ❌ Not applicable (false positive)
 
 #### Report Context
 | Type                  | Key                                                         | Value                                                                  |
@@ -3121,6 +3147,7 @@ The report confuses "viewing a standout" (→ see their profile) with "matching 
 - **Severity / Category:** unspecified / other
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** 🟡 Planned backlog (long-term roadmap, not started)
 
 #### Report Context
 | Type                  | Key                                                      | Value                              |
@@ -3145,6 +3172,7 @@ The report confuses "viewing a standout" (→ see their profile) with "matching 
 - **Severity / Category:** unspecified / ui-ux
 - **Mentions (total):** 1
 - **Cross-report conflict:** no
+- **Completion status:** 🟡 Planned backlog (long-term roadmap, not started)
 
 #### Report Context
 | Type                  | Key                                                      | Value                              |

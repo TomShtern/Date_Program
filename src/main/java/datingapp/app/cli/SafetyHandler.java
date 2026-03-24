@@ -26,8 +26,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles user blocking, reporting, and profile verification operations in the
- * CLI.
+ * Handles user blocking, reporting, and profile verification operations in the CLI.
+ *
+ * <p><b>Simulation Mode:</b> All moderation operations (block, unblock, report, verification) are
+ * simulated and do not persist beyond the current session. See operation messages for [SIMULATED]
+ * markers.
  */
 public class SafetyHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(SafetyHandler.class);
@@ -93,7 +96,7 @@ public class SafetyHandler implements LoggingSupport {
                 var result = socialUseCases.blockUser(
                         new RelationshipCommand(UserContext.cli(currentUser.getId()), toBlock.getId()));
                 if (result.success()) {
-                    logInfo("🚫 Blocked {}.\n", toBlock.getName());
+                    logInfo("🚫 [SIMULATED] Blocked {}.", toBlock.getName());
                 } else {
                     logInfo("❌ {}\n", result.error().message());
                 }
@@ -199,7 +202,7 @@ public class SafetyHandler implements LoggingSupport {
                 boolean success = trustSafetyService.unblock(currentUser.getId(), toUnblock.getId());
 
                 if (success) {
-                    logInfo("✅ Unblocked {}.\n", toUnblock.getName());
+                    logInfo("✅ [SIMULATED] Unblocked {}.", toUnblock.getName());
                 } else {
                     logInfo("❌ Failed to unblock user.\n");
                 }
@@ -248,7 +251,7 @@ public class SafetyHandler implements LoggingSupport {
         }
 
         TrustSafetyService.ReportResult reportResult = result.data();
-        logInfo("\n✅ Report submitted. {} has been blocked.", reportedUser.getName());
+        logInfo("\n✅ [SIMULATED] Report submitted. {} has been blocked.", reportedUser.getName());
         if (reportResult.userWasBanned()) {
             logInfo("⚠️  This user has been automatically BANNED due to multiple reports.");
         }
@@ -295,7 +298,7 @@ public class SafetyHandler implements LoggingSupport {
             User currentUser = session.getCurrentUser();
 
             if (currentUser.isVerified()) {
-                logInfo("\n✅ Profile already verified ({}).\n", currentUser.getVerifiedAt());
+                logInfo("\n✅ [SIMULATED] Profile already verified ({}).\n", currentUser.getVerifiedAt());
                 return;
             }
 
@@ -356,6 +359,6 @@ public class SafetyHandler implements LoggingSupport {
 
         user.markVerified();
         userStorage.save(user);
-        logInfo("✅ Profile verified!\n");
+        logInfo("✅ [SIMULATED] Profile verified!\n");
     }
 }

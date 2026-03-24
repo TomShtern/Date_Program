@@ -1,6 +1,8 @@
 package datingapp.storage.schema;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -188,6 +190,12 @@ class SchemaInitializerTest {
             Set<String> tables = getTableNames();
             assertTrue(tables.contains("USERS"));
             assertTrue(tables.contains("DAILY_PICKS"));
+        }
+
+        @Test
+        @DisplayName("should treat a missing schema_version table as not applied")
+        void missingSchemaVersionTableIsNotApplied() throws SQLException {
+            assertFalse(MigrationRunner.isVersionApplied(connection, 1));
         }
 
         @Test

@@ -247,7 +247,11 @@ public class MatchingHandler implements LoggingSupport {
 
     private void displayCandidateProfile(User candidate, User currentUser, double distance) {
         logLines(presenter.candidateProfileLines(
-                candidate, currentUser, distance, config.safety().userTimeZone()));
+                candidate,
+                currentUser,
+                distance,
+                config.safety().userTimeZone(),
+                config.matching().sharedInterestsPreviewCount()));
     }
 
     private void displaySwipeResult(MatchingService.SwipeResult result, User candidate) {
@@ -574,7 +578,10 @@ public class MatchingHandler implements LoggingSupport {
         InterestMatcher.MatchResult matchResult =
                 InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
         if (!matchResult.shared().isEmpty() && logger.isInfoEnabled()) {
-            logInfo("│ ✨ You both like: {}", InterestMatcher.formatSharedInterests(matchResult.shared()));
+            logInfo(
+                    "│ ✨ You both like: {}",
+                    InterestMatcher.formatSharedInterests(
+                            matchResult.shared(), config.matching().sharedInterestsPreviewCount()));
         }
         logInfo(CliTextAndInput.BOX_BOTTOM);
         logInfo("");

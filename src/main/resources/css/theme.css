@@ -447,12 +447,6 @@
     -fx-border-color: transparent;
 }
 
-.login-search-field:focused {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent;
-    -fx-effect: none;
-}
-
 .login-search-icon {
     -fx-icon-color: #94a3b8;
 }

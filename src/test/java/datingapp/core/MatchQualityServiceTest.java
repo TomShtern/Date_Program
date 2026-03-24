@@ -1,10 +1,13 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Like;
-import datingapp.core.matching.*;
+import datingapp.core.matching.CompatibilityCalculator;
 import datingapp.core.matching.InterestMatcher;
+import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchQualityService.MatchQuality;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
@@ -20,9 +23,18 @@ import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.EnumSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Tests for MatchQualityService. */
 @DisplayName("MatchQualityService Tests")
@@ -602,6 +614,14 @@ class MatchQualityServiceTest {
             String formatted = InterestMatcher.formatSharedInterests(shared);
             // Sorted alphabetically: Coffee, Hiking, Movies (3 shown), and 1 more (Travel)
             assertEquals("Coffee, Hiking, Movies, and 1 more", formatted);
+        }
+
+        @Test
+        @DisplayName("Custom preview count truncates accordingly")
+        void customPreviewCount_truncatesAccordingly() {
+            Set<Interest> shared = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL, Interest.MOVIES);
+            String formatted = InterestMatcher.formatSharedInterests(shared, 2);
+            assertEquals("Coffee, Hiking, and 2 more", formatted);
         }
 
         @Test

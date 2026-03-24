@@ -31,6 +31,10 @@ class AppConfigTest {
             assertEquals(3, defaults.safety().autoBanThreshold(), "Default auto-ban threshold should be 3");
             assertEquals(100, defaults.matching().dailyLikeLimit(), "Default daily like limit should be 100");
             assertEquals(1, defaults.matching().dailySuperLikeLimit(), "Default super like limit should be 1");
+            assertEquals(
+                    3,
+                    defaults.matching().sharedInterestsPreviewCount(),
+                    "Default shared interests preview count should be 3");
             assertEquals(30, defaults.storage().queryTimeoutSeconds(), "Default query timeout should be 30");
             assertEquals(10, defaults.validation().maxInterests(), "Default max interests should be 10");
             assertEquals(
@@ -69,12 +73,14 @@ class AppConfigTest {
                     .autoBanThreshold(5)
                     .dailyLikeLimit(50)
                     .dailySuperLikeLimit(3)
+                    .sharedInterestsPreviewCount(4)
                     .maxInterests(10)
                     .build();
 
             assertEquals(5, config.safety().autoBanThreshold());
             assertEquals(50, config.matching().dailyLikeLimit());
             assertEquals(3, config.matching().dailySuperLikeLimit());
+            assertEquals(4, config.matching().sharedInterestsPreviewCount());
             assertEquals(10, config.validation().maxInterests());
         }
 
@@ -102,6 +108,7 @@ class AppConfigTest {
             assertSame(builder, builder.autoBanThreshold(1));
             assertSame(builder, builder.dailyLikeLimit(1));
             assertSame(builder, builder.dailySuperLikeLimit(1));
+            assertSame(builder, builder.sharedInterestsPreviewCount(1));
             assertSame(builder, builder.maxInterests(1));
             assertSame(builder, builder.maxPhotos(1));
             assertSame(builder, builder.maxBioLength(1));
@@ -134,6 +141,7 @@ class AppConfigTest {
             assertEquals(0.15, config.matching().paceWeight(), 0.001);
             assertEquals(0.10, config.matching().responseWeight(), 0.001);
             assertEquals(9, config.matching().minSharedInterests());
+            assertEquals(4, config.matching().sharedInterestsPreviewCount());
             assertEquals(444, config.matching().maxDistanceKm());
         }
 
@@ -233,6 +241,7 @@ class AppConfigTest {
                     .paceWeight(0.15)
                     .responseWeight(0.10)
                     .minSharedInterests(9)
+                    .sharedInterestsPreviewCount(4)
                     .maxDistanceKm(444)
                     .minAge(21)
                     .maxAge(87)

@@ -9,6 +9,17 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Application session singleton for managing the currently logged-in user.
+ *
+ * <p><b>Simulated Session Model:</b> This class implements a simplified, in-memory session model for
+ * development and testing. It does not provide robust authentication enforcement or persistence. The
+ * session is stored in-memory and is lost on application shutdown.
+ *
+ * <p><b>Not for Production:</b> This session model is not suitable for production applications. In a
+ * production system, sessions would typically be persisted, cryptographically signed, and managed via
+ * a dedicated session store (e.g., Redis or a database).
+ */
 @SuppressWarnings("java:S6548")
 public final class AppSession {
     private static final AppSession INSTANCE = new AppSession();

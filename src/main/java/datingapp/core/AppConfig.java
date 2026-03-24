@@ -36,21 +36,20 @@ public record AppConfig(
             double paceWeight,
             double responseWeight,
             int minSharedInterests,
+            int sharedInterestsPreviewCount,
             int maxDistanceKm) {
         public MatchingConfig {
-            AppConfigValidator.validateMatching(
-                    dailyLikeLimit,
-                    dailySuperLikeLimit,
-                    dailyPassLimit,
-                    maxSwipesPerSession,
+            AppConfigValidator.validateMatchingLimits(
+                    dailyLikeLimit, dailySuperLikeLimit, dailyPassLimit, maxSwipesPerSession);
+            AppConfigValidator.validateMatchingWeights(
                     suspiciousSwipeVelocity,
                     distanceWeight,
                     ageWeight,
                     interestWeight,
                     lifestyleWeight,
                     paceWeight,
-                    responseWeight,
-                    minSharedInterests);
+                    responseWeight);
+            AppConfigValidator.validateMatchingInterestPolicy(minSharedInterests, sharedInterestsPreviewCount);
         }
     }
 
@@ -78,19 +77,11 @@ public record AppConfig(
             int chatActivePollSeconds,
             int maxStandouts) {
         public ValidationConfig {
-            AppConfigValidator.validateValidation(
-                    minAge,
-                    maxAge,
-                    minHeightCm,
-                    maxHeightCm,
-                    maxBioLength,
-                    maxReportDescLength,
-                    maxNameLength,
-                    maxMessageLength,
-                    maxProfileNoteLength,
-                    minAgeRangeSpan,
-                    minDistanceKm,
-                    maxDistanceKm,
+            AppConfigValidator.validateValidationAgeAndHeight(minAge, maxAge, minHeightCm, maxHeightCm);
+            AppConfigValidator.validateValidationTextLimits(
+                    maxBioLength, maxReportDescLength, maxNameLength, maxMessageLength, maxProfileNoteLength);
+            AppConfigValidator.validateValidationDiscoveryRanges(minAgeRangeSpan, minDistanceKm, maxDistanceKm);
+            AppConfigValidator.validateValidationMediaAndPaging(
                     maxInterests,
                     maxPhotos,
                     messageMaxPageSize,
@@ -128,23 +119,22 @@ public record AppConfig(
             double standoutCompletenessWeight,
             double standoutActivityWeight) {
         public AlgorithmConfig {
-            AppConfigValidator.validateAlgorithm(
-                    nearbyDistanceKm,
-                    closeDistanceKm,
-                    similarAgeDiff,
-                    compatibleAgeDiff,
-                    paceCompatibilityThreshold,
+            AppConfigValidator.validateAlgorithmDistance(
+                    nearbyDistanceKm, closeDistanceKm, similarAgeDiff, compatibleAgeDiff, paceCompatibilityThreshold);
+            AppConfigValidator.validateAlgorithmResponseTimes(
                     responseTimeExcellentHours,
                     responseTimeGreatHours,
                     responseTimeGoodHours,
                     responseTimeWeekHours,
-                    responseTimeMonthHours,
+                    responseTimeMonthHours);
+            AppConfigValidator.validateAlgorithmStandoutPolicy(
                     standoutDiversityDays,
                     standoutMinScore,
                     starExcellentThreshold,
                     starGreatThreshold,
                     starGoodThreshold,
-                    starFairThreshold,
+                    starFairThreshold);
+            AppConfigValidator.validateAlgorithmWeights(
                     standoutDistanceWeight,
                     standoutAgeWeight,
                     standoutInterestWeight,
@@ -186,17 +176,16 @@ public record AppConfig(
             int cleanupRetentionDays,
             int softDeleteRetentionDays) {
         public SafetyConfig {
-            AppConfigValidator.validateSafety(
-                    autoBanThreshold,
-                    userTimeZone,
-                    sessionTimeoutMinutes,
-                    undoWindowSeconds,
+            AppConfigValidator.validateSafetySession(
+                    autoBanThreshold, userTimeZone, sessionTimeoutMinutes, undoWindowSeconds);
+            AppConfigValidator.validateSafetyAchievementThresholds(
                     achievementMatchTier1,
                     achievementMatchTier2,
                     achievementMatchTier3,
                     achievementMatchTier4,
                     achievementMatchTier5,
-                    minSwipesForBehaviorAchievement,
+                    minSwipesForBehaviorAchievement);
+            AppConfigValidator.validateSafetyBehaviorThresholds(
                     selectiveThreshold,
                     openMindedThreshold,
                     bioAchievementLength,
@@ -270,6 +259,7 @@ public record AppConfig(
         private double paceWeight = 0.15;
         private double responseWeight = 0.10;
         private int minSharedInterests = 3;
+        private int sharedInterestsPreviewCount = 3;
         private int maxDistanceKm = 500;
         // ValidationConfig fields
         private int minAge = 18;
@@ -424,6 +414,11 @@ public record AppConfig(
 
         public Builder minSharedInterests(int v) {
             this.minSharedInterests = v;
+            return this;
+        }
+
+        public Builder sharedInterestsPreviewCount(int v) {
+            this.sharedInterestsPreviewCount = v;
             return this;
         }
 
@@ -700,6 +695,7 @@ public record AppConfig(
                     paceWeight,
                     responseWeight,
                     minSharedInterests,
+                    sharedInterestsPreviewCount,
                     maxDistanceKm);
         }
 

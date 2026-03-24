@@ -2,6 +2,7 @@ package datingapp.storage.jdbi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.ProfileNote;
@@ -11,6 +12,7 @@ import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
+import datingapp.core.testutil.TestClock;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.DevDataSeeder;
 import java.lang.reflect.InvocationHandler;
@@ -18,6 +20,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -73,7 +76,64 @@ class JdbiUserStorageNormalizationTest {
 
     @AfterEach
     void tearDown() {
+        TestClock.reset();
+        storage.clearCache();
         DatabaseManager.resetInstance();
+    }
+
+    @Test
+    @DisplayName("get caches repeated reads until invalidated")
+    void getCachesRepeatedReadsUntilInvalidated() {
+        storage.clearCache();
+        connectionFactory.reset();
+
+        User first = storage.get(userId).orElseThrow();
+        int afterFirstRead = connectionFactory.statementCount();
+
+        User second = storage.get(userId).orElseThrow();
+
+        assertEquals(afterFirstRead, connectionFactory.statementCount());
+        assertNotSame(first, second);
+        assertEquals(first.getId(), second.getId());
+        assertEquals(first.getName(), second.getName());
+    }
+
+    @Test
+    @DisplayName("save invalidates cached user reads")
+    void saveInvalidatesCachedUserReads() {
+        storage.clearCache();
+        connectionFactory.reset();
+
+        User cached = storage.get(userId).orElseThrow();
+        cached.setBio("Updated bio");
+        storage.save(cached);
+
+        connectionFactory.reset();
+
+        User reloaded = storage.get(userId).orElseThrow();
+
+        assertEquals("Updated bio", reloaded.getBio());
+        assertTrue(connectionFactory.statementCount() > 0);
+    }
+
+    @Test
+    @DisplayName("get expires cached users after the TTL")
+    void getExpiresCachedUsersAfterTtl() {
+        storage.clearCache();
+        Instant now = Instant.parse("2026-03-24T12:00:00Z");
+        TestClock.setFixed(now);
+        connectionFactory.reset();
+
+        User first = storage.get(userId).orElseThrow();
+        assertTrue(connectionFactory.statementCount() > 0);
+
+        TestClock.setFixed(now.plus(Duration.ofMinutes(6)));
+        connectionFactory.reset();
+
+        User second = storage.get(userId).orElseThrow();
+
+        assertEquals(first.getName(), second.getName());
+        assertTrue(connectionFactory.statementCount() > 0);
     }
 
     @Test

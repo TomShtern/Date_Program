@@ -2,6 +2,10 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.*;
 import datingapp.core.connection.ConnectionModels.Conversation;
@@ -110,6 +114,43 @@ class MessagingHandlerTest {
             MessagingHandler handler = createHandler("b\n");
 
             assertDoesNotThrow(handler::showConversations);
+        }
+
+        @Test
+        @DisplayName("Shows help without sending a message")
+        void showsHelpWithoutSendingMessage() {
+            User otherUser = createActiveUser("HelpUser" + UUID.randomUUID());
+            userStorage.save(otherUser);
+
+            Match match = Match.create(testUser.getId(), otherUser.getId());
+            interactionStorage.save(match);
+
+            Conversation convo = Conversation.create(testUser.getId(), otherUser.getId());
+            communicationStorage.saveConversation(convo);
+
+            MessagingHandler handler = createHandler("1\n/help\n/back\nb\n");
+            Logger handlerLogger = (Logger) org.slf4j.LoggerFactory.getLogger(MessagingHandler.class);
+            Level previousLevel = handlerLogger.getLevel();
+            handlerLogger.setLevel(Level.INFO);
+            ListAppender<ILoggingEvent> appender = new ListAppender<>();
+            appender.start();
+            handlerLogger.addAppender(appender);
+
+            try {
+                handler.showConversations();
+
+                assertEquals(0, communicationStorage.countMessages(convo.getId()));
+                assertTrue(appender.list.stream()
+                        .map(ILoggingEvent::getFormattedMessage)
+                        .anyMatch(message -> message.contains("Type a message, or /help for commands.")));
+                assertTrue(appender.list.stream()
+                        .map(ILoggingEvent::getFormattedMessage)
+                        .anyMatch(message -> message.contains("Available commands")));
+            } finally {
+                handlerLogger.detachAppender(appender);
+                handlerLogger.setLevel(previousLevel);
+                appender.stop();
+            }
         }
     }
 

@@ -12,8 +12,12 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class UndoService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(UndoService.class);
 
     private final InteractionStorage interactionStorage;
     private final Undo.Storage undoStorage;
@@ -137,6 +141,9 @@ public class UndoService {
             return UndoResult.success(state.like(), matchDeleted);
 
         } catch (Exception e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("atomicUndoDelete failed for action {}", state.like().id(), e);
+            }
             // Return error but don't clear state (user might retry)
             return UndoResult.failure("Failed to undo: %s".formatted(e.getMessage()));
         }

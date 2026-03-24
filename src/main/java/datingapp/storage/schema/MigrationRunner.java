@@ -1,11 +1,10 @@
 package datingapp.storage.schema;
 
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Versioned migration runner: applies schema migrations in version order, each
@@ -30,7 +29,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class MigrationRunner {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MigrationRunner.class);
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(MigrationRunner.class);
 
     private MigrationRunner() {
         // Utility class — static methods only
@@ -105,7 +104,7 @@ public final class MigrationRunner {
         createSchemaVersionTable(stmt);
 
         for (VersionedMigration migration : MIGRATIONS) {
-            if (!isVersionApplied(stmt, migration.version())) {
+            if (!isVersionApplied(stmt.getConnection(), migration.version())) {
                 if (LOG.isInfoEnabled()) {
                     LOG.info("Applying migration V{}: {}", migration.version(), migration.description());
                 }
@@ -250,9 +249,12 @@ public final class MigrationRunner {
      *
      * @return {@code true} if the version row exists, {@code false} otherwise
      */
-    static boolean isVersionApplied(Statement stmt, int version) throws SQLException {
-        try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = " + version)) {
-            return rs.next() && rs.getInt(1) > 0;
+    static boolean isVersionApplied(Connection conn, int version) throws SQLException {
+        try (var pstmt = conn.prepareStatement("SELECT COUNT(*) FROM schema_version WHERE version = ?")) {
+            pstmt.setInt(1, version);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
         } catch (SQLException e) {
             if (isMissingTable(e)) {
                 return false;
@@ -284,9 +286,12 @@ public final class MigrationRunner {
 
     /**
      * Checks if the {@link SQLException} indicates a missing table (H2 error code
-     * 42102 / SQL state 42S02).
+     * 42102 / 42104 / SQL state 42S02 / 42S04).
      */
     private static boolean isMissingTable(SQLException e) {
-        return "42S02".equals(e.getSQLState()) || e.getErrorCode() == 42102;
+        return "42S02".equals(e.getSQLState())
+                || "42S04".equals(e.getSQLState())
+                || e.getErrorCode() == 42102
+                || e.getErrorCode() == 42104;
     }
 }

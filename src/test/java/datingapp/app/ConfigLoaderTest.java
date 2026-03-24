@@ -83,6 +83,7 @@ class ConfigLoaderTest {
                       "dailyLikeLimit": 50,
                       "dailySuperLikeLimit": 3,
                       "dailyPassLimit": 200,
+                      "sharedInterestsPreviewCount": 4,
                       "maxInterests": 15,
                       "maxPhotos": 6,
                       "maxBioLength": 1000,
@@ -97,6 +98,7 @@ class ConfigLoaderTest {
             assertEquals(50, config.matching().dailyLikeLimit());
             assertEquals(3, config.matching().dailySuperLikeLimit());
             assertEquals(200, config.matching().dailyPassLimit());
+            assertEquals(4, config.matching().sharedInterestsPreviewCount());
             assertEquals(15, config.validation().maxInterests());
             assertEquals(6, config.validation().maxPhotos());
             assertEquals(1000, config.validation().maxBioLength());
@@ -238,6 +240,9 @@ class ConfigLoaderTest {
             AppConfig defaults = AppConfig.defaults();
 
             assertEquals(defaults.matching().dailyLikeLimit(), config.matching().dailyLikeLimit());
+            assertEquals(
+                    defaults.matching().sharedInterestsPreviewCount(),
+                    config.matching().sharedInterestsPreviewCount());
             assertEquals(defaults.validation().minAge(), config.validation().minAge());
             assertEquals(defaults.validation().maxAge(), config.validation().maxAge());
             assertEquals(
@@ -316,6 +321,22 @@ class ConfigLoaderTest {
             assertEquals(5, config.validation().minDistanceKm());
             assertEquals(100, config.validation().maxNameLength());
             assertEquals(3, config.validation().minAgeRangeSpan());
+        }
+
+        @Test
+        @DisplayName("Should parse matching preview settings")
+        void parsesMatchingPreviewSettings() {
+            String json = """
+                    {
+                      "sharedInterestsPreviewCount": 5,
+                      "minSharedInterests": 2
+                    }
+                    """;
+
+            AppConfig config = ApplicationStartup.fromJson(json);
+
+            assertEquals(5, config.matching().sharedInterestsPreviewCount());
+            assertEquals(2, config.matching().minSharedInterests());
         }
 
         @Test

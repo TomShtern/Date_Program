@@ -18,8 +18,23 @@ class AppConfigValidatorTest {
     void validateMatchingRejectsInvalidWeightSum() {
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateMatching(10, 2, 10, 100, 3.0, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 1));
+                () -> new AppConfig.MatchingConfig(10, 2, 10, 100, 3.0, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 1, 3, 500));
         org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("sum to 1.0"));
+    }
+
+    @Test
+    @DisplayName("validateMatching rejects preview counts below 1")
+    void validateMatchingRejectsInvalidPreviewCount() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new AppConfig.MatchingConfig(10, 2, 10, 100, 3.0, 0.3, 0.3, 0.2, 0.1, 0.05, 0.05, 1, 0, 500));
+    }
+
+    @Test
+    @DisplayName("validateMatching accepts configured preview count")
+    void validateMatchingAcceptsPreviewCount() {
+        assertDoesNotThrow(
+                () -> new AppConfig.MatchingConfig(10, 2, 10, 100, 3.0, 0.3, 0.3, 0.2, 0.1, 0.05, 0.05, 1, 3, 500));
     }
 
     @Test
@@ -27,7 +42,7 @@ class AppConfigValidatorTest {
     void validateValidationRejectsInvalidAgeRange() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateValidation(
+                () -> new AppConfig.ValidationConfig(
                         40,
                         20,
                         100,
@@ -53,7 +68,7 @@ class AppConfigValidatorTest {
     void validateValidationRejectsInvalidPhotoLimit() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateValidation(
+                () -> new AppConfig.ValidationConfig(
                         18,
                         50,
                         100,
@@ -77,7 +92,7 @@ class AppConfigValidatorTest {
     @Test
     @DisplayName("validateValidation accepts the entity photo limit")
     void validateValidationAcceptsEntityPhotoLimit() {
-        assertDoesNotThrow(() -> AppConfigValidator.validateValidation(
+        assertDoesNotThrow(() -> new AppConfig.ValidationConfig(
                 18,
                 50,
                 100,
@@ -103,7 +118,7 @@ class AppConfigValidatorTest {
     void validateValidationRejectsInvalidDistanceOrdering() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateValidation(
+                () -> new AppConfig.ValidationConfig(
                         18,
                         50,
                         100,
@@ -127,7 +142,7 @@ class AppConfigValidatorTest {
     @Test
     @DisplayName("validateValidation accepts valid distance ordering")
     void validateValidationAcceptsValidDistanceOrdering() {
-        assertDoesNotThrow(() -> AppConfigValidator.validateValidation(
+        assertDoesNotThrow(() -> new AppConfig.ValidationConfig(
                 18,
                 50,
                 100,
@@ -153,7 +168,7 @@ class AppConfigValidatorTest {
     void validateValidationRejectsInvalidMessageLengthLowerBound() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateValidation(
+                () -> new AppConfig.ValidationConfig(
                         18,
                         50,
                         100,
@@ -179,7 +194,7 @@ class AppConfigValidatorTest {
     void validateValidationRejectsInvalidMessageLengthUpperBound() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateValidation(
+                () -> new AppConfig.ValidationConfig(
                         18,
                         50,
                         100,
@@ -205,7 +220,7 @@ class AppConfigValidatorTest {
     void validateValidationRejectsInvalidProfileNoteLengthLowerBound() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateValidation(
+                () -> new AppConfig.ValidationConfig(
                         18,
                         50,
                         100,
@@ -231,7 +246,7 @@ class AppConfigValidatorTest {
     void validateValidationRejectsInvalidProfileNoteLengthUpperBound() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateValidation(
+                () -> new AppConfig.ValidationConfig(
                         18,
                         50,
                         100,
@@ -269,7 +284,7 @@ class AppConfigValidatorTest {
     void validateAlgorithmRejectsInvalidDistanceOrdering() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateAlgorithm(
+                () -> new AppConfig.AlgorithmConfig(
                         100, 50, 2, 5, 50, 1, 24, 72, 168, 720, 3, 40, 90, 75, 60, 40, 0.20, 0.15, 0.25, 0.20, 0.10,
                         0.10));
     }
@@ -279,7 +294,7 @@ class AppConfigValidatorTest {
     void validateAlgorithmRejectsInvalidStandoutPolicy() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateAlgorithm(
+                () -> new AppConfig.AlgorithmConfig(
                         5, 10, 2, 5, 50, 1, 24, 72, 168, 720, 0, 101, 90, 75, 60, 40, 0.20, 0.15, 0.25, 0.20, 0.10,
                         0.10));
     }
@@ -287,7 +302,7 @@ class AppConfigValidatorTest {
     @Test
     @DisplayName("validateAlgorithm accepts valid standout policy ranges")
     void validateAlgorithmAcceptsValidStandoutPolicy() {
-        assertDoesNotThrow(() -> AppConfigValidator.validateAlgorithm(
+        assertDoesNotThrow(() -> new AppConfig.AlgorithmConfig(
                 5, 10, 2, 5, 50, 1, 24, 72, 168, 720, 3, 40, 90, 75, 60, 40, 0.20, 0.15, 0.25, 0.20, 0.10, 0.10));
     }
 
@@ -296,7 +311,7 @@ class AppConfigValidatorTest {
     void validateAlgorithmRejectsNonDescendingStarThresholds() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> AppConfigValidator.validateAlgorithm(
+                () -> new AppConfig.AlgorithmConfig(
                         5, 10, 2, 5, 50, 1, 24, 72, 168, 720, 3, 40, 80, 85, 60, 40, 0.20, 0.15, 0.25, 0.20, 0.10,
                         0.10));
     }
@@ -305,7 +320,7 @@ class AppConfigValidatorTest {
     @DisplayName("validateSafety accepts valid safety parameters")
     void validateSafetyAcceptsValidValues() {
         ZoneId utc = ZoneId.of("UTC");
-        assertDoesNotThrow(() ->
-                AppConfigValidator.validateSafety(3, utc, 30, 60, 1, 5, 10, 25, 50, 20, 0.35, 0.65, 100, 4, 30, 90));
+        assertDoesNotThrow(
+                () -> new AppConfig.SafetyConfig(3, utc, 30, 60, 1, 5, 10, 25, 50, 20, 0.35, 0.65, 100, 4, 30, 90));
     }
 }

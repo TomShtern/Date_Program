@@ -14,7 +14,9 @@ import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
@@ -24,6 +26,18 @@ import org.slf4j.LoggerFactory;
 public final class TrustSafetyService {
 
     private static final Logger logger = LoggerFactory.getLogger(TrustSafetyService.class);
+    private static final String AUDIT_KEY_BLOCK_REQUESTED = "blockRequested";
+    private static final String AUDIT_KEY_BAN_PERSISTED = "banPersisted";
+    private static final String AUDIT_KEY_BLOCK_REMOVED = "blockRemoved";
+    private static final String AUDIT_KEY_CONVERSATION_STORAGE_CONFIGURED = "conversationStorageConfigured";
+    private static final String AUDIT_KEY_DESCRIPTION_LENGTH = "descriptionLength";
+    private static final String AUDIT_KEY_DESCRIPTION_PROVIDED = "descriptionProvided";
+    private static final String AUDIT_KEY_ERROR_CODE = "errorCode";
+    private static final String AUDIT_KEY_MATCH_UPDATED = "matchUpdated";
+    private static final String AUDIT_KEY_MAX_DESCRIPTION_LENGTH = "maxDescriptionLength";
+    private static final String AUDIT_KEY_REASON = "reason";
+    private static final String AUDIT_KEY_REPORT_COUNT = "reportCount";
+    private static final String AUDIT_KEY_THRESHOLD = "threshold";
     public static final Duration DEFAULT_VERIFICATION_TTL = Duration.ofMinutes(15);
 
     private final TrustSafetyStorage trustSafetyStorage;
@@ -34,6 +48,7 @@ public final class TrustSafetyService {
     private final Duration verificationTtl;
     private final Random random;
     private final RelationshipWorkflowPolicy workflowPolicy;
+    private final ModerationAuditLogger moderationAuditLogger = new ModerationAuditLogger();
     private CandidateFinder candidateFinder;
 
     public static Builder builder() {
@@ -175,19 +190,57 @@ public final class TrustSafetyService {
             UUID reporterId, UUID reportedUserId, Report.Reason reason, String description, boolean blockUser) {
 
         if (reporterId == null) {
+            auditModeration(
+                    ModerationAuditEvent.Action.REPORT,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    null,
+                    reportedUserId,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "missing_reporter_id", AUDIT_KEY_BLOCK_REQUESTED, blockUser));
             return new ReportResult(false, false, "reporterId is required");
         }
         if (reportedUserId == null) {
+            auditModeration(
+                    ModerationAuditEvent.Action.REPORT,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    reporterId,
+                    null,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "missing_reported_user_id", AUDIT_KEY_BLOCK_REQUESTED, blockUser));
             return new ReportResult(false, false, "reportedUserId is required");
         }
         if (reason == null) {
+            auditModeration(
+                    ModerationAuditEvent.Action.REPORT,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    reporterId,
+                    reportedUserId,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "missing_report_reason", AUDIT_KEY_BLOCK_REQUESTED, blockUser));
             return new ReportResult(false, false, "reason is required");
         }
         if (reporterId.equals(reportedUserId)) {
+            auditModeration(
+                    ModerationAuditEvent.Action.REPORT,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    reporterId,
+                    reportedUserId,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "self_report", AUDIT_KEY_BLOCK_REQUESTED, blockUser));
             return new ReportResult(false, false, "Cannot report yourself");
         }
         // Validate description length against configured maximum
         if (description != null && description.length() > config.validation().maxReportDescLength()) {
+            auditModeration(
+                    ModerationAuditEvent.Action.REPORT,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    reporterId,
+                    reportedUserId,
+                    contextOf(
+                            AUDIT_KEY_ERROR_CODE,
+                            "description_too_long",
+                            AUDIT_KEY_BLOCK_REQUESTED,
+                            blockUser,
+                            AUDIT_KEY_DESCRIPTION_LENGTH,
+                            description.length(),
+                            AUDIT_KEY_MAX_DESCRIPTION_LENGTH,
+                            config.validation().maxReportDescLength()));
             return new ReportResult(
                     false,
                     false,
@@ -196,27 +249,58 @@ public final class TrustSafetyService {
 
         User reporter = userStorage.get(reporterId).orElse(null);
         if (reporter == null || reporter.getState() != UserState.ACTIVE) {
+            auditModeration(
+                    ModerationAuditEvent.Action.REPORT,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    reporterId,
+                    reportedUserId,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "inactive_reporter", AUDIT_KEY_BLOCK_REQUESTED, blockUser));
             return new ReportResult(false, false, "Reporter must be active user");
         }
 
         User reported = userStorage.get(reportedUserId).orElse(null);
         if (reported == null) {
+            auditModeration(
+                    ModerationAuditEvent.Action.REPORT,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    reporterId,
+                    reportedUserId,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "reported_user_not_found", AUDIT_KEY_BLOCK_REQUESTED, blockUser));
             return new ReportResult(false, false, "Reported user not found");
         }
 
         if (trustSafetyStorage.hasReported(reporterId, reportedUserId)) {
+            auditModeration(
+                    ModerationAuditEvent.Action.REPORT,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    reporterId,
+                    reportedUserId,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "duplicate_report", AUDIT_KEY_BLOCK_REQUESTED, blockUser));
             return new ReportResult(false, false, "Already reported this user");
         }
 
         Report report = Report.create(reporterId, reportedUserId, reason, description);
         trustSafetyStorage.save(report);
 
+        auditModeration(
+                ModerationAuditEvent.Action.REPORT,
+                ModerationAuditEvent.Outcome.SUCCESS,
+                reporterId,
+                reportedUserId,
+                contextOf(
+                        AUDIT_KEY_REASON,
+                        reason,
+                        AUDIT_KEY_BLOCK_REQUESTED,
+                        blockUser,
+                        AUDIT_KEY_DESCRIPTION_PROVIDED,
+                        description != null,
+                        AUDIT_KEY_DESCRIPTION_LENGTH,
+                        description == null ? null : description.length()));
+
         boolean autoBanned = applyAutoBanIfThreshold(reportedUserId);
 
-        if (!autoBanned && blockUser && !trustSafetyStorage.isBlocked(reporterId, reportedUserId)) {
-            Block block = Block.create(reporterId, reportedUserId);
-            trustSafetyStorage.save(block);
-            updateMatchStateForBlock(reporterId, reportedUserId);
+        if (blockUser && !trustSafetyStorage.isBlocked(reporterId, reportedUserId)) {
+            block(reporterId, reportedUserId);
         }
 
         return new ReportResult(true, autoBanned, null);
@@ -231,6 +315,18 @@ public final class TrustSafetyService {
         userStorage.executeWithUserLock(reportedUserId, () -> {
             int reportCount = trustSafetyStorage.countReportsAgainst(reportedUserId);
             if (reportCount < config.safety().autoBanThreshold()) {
+                auditModeration(
+                        ModerationAuditEvent.Action.AUTO_BAN,
+                        ModerationAuditEvent.Outcome.FAILURE,
+                        null,
+                        reportedUserId,
+                        contextOf(
+                                AUDIT_KEY_REPORT_COUNT,
+                                reportCount,
+                                AUDIT_KEY_THRESHOLD,
+                                config.safety().autoBanThreshold(),
+                                AUDIT_KEY_REASON,
+                                "below_threshold"));
                 result[0] = false;
                 return;
             }
@@ -240,6 +336,18 @@ public final class TrustSafetyService {
                     .map(TrustSafetyService::copyUser)
                     .orElse(null);
             if (latestReported == null || latestReported.getState() == UserState.BANNED) {
+                auditModeration(
+                        ModerationAuditEvent.Action.AUTO_BAN,
+                        ModerationAuditEvent.Outcome.FAILURE,
+                        null,
+                        reportedUserId,
+                        contextOf(
+                                AUDIT_KEY_REPORT_COUNT,
+                                reportCount,
+                                AUDIT_KEY_THRESHOLD,
+                                config.safety().autoBanThreshold(),
+                                AUDIT_KEY_REASON,
+                                latestReported == null ? "user_missing" : "already_banned"));
                 result[0] = false;
                 return;
             }
@@ -247,13 +355,37 @@ public final class TrustSafetyService {
             latestReported.ban();
             try {
                 userStorage.save(latestReported);
+                auditModeration(
+                        ModerationAuditEvent.Action.AUTO_BAN,
+                        ModerationAuditEvent.Outcome.SUCCESS,
+                        null,
+                        reportedUserId,
+                        contextOf(
+                                AUDIT_KEY_REPORT_COUNT,
+                                reportCount,
+                                AUDIT_KEY_THRESHOLD,
+                                config.safety().autoBanThreshold(),
+                                AUDIT_KEY_BAN_PERSISTED,
+                                true));
                 result[0] = true;
-            } catch (RuntimeException ex) {
+            } catch (RuntimeException exception) {
                 logger.error(
                         "Auto-ban save failed for user {} after {} reports; ban was not persisted",
                         reportedUserId,
                         reportCount,
-                        ex);
+                        exception);
+                auditModeration(
+                        ModerationAuditEvent.Action.AUTO_BAN,
+                        ModerationAuditEvent.Outcome.FAILURE,
+                        null,
+                        reportedUserId,
+                        contextOf(
+                                AUDIT_KEY_REPORT_COUNT,
+                                reportCount,
+                                AUDIT_KEY_THRESHOLD,
+                                config.safety().autoBanThreshold(),
+                                AUDIT_KEY_REASON,
+                                "save_failed"));
                 result[0] = false;
             }
         });
@@ -339,26 +471,59 @@ public final class TrustSafetyService {
         }
 
         if (blockerId.equals(blockedId)) {
+            auditModeration(
+                    ModerationAuditEvent.Action.BLOCK,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    blockerId,
+                    blockedId,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "self_block"));
             return new BlockResult(false, "Cannot block yourself");
         }
 
         User blocker = userStorage.get(blockerId).orElse(null);
         if (blocker == null || blocker.getState() != UserState.ACTIVE) {
+            auditModeration(
+                    ModerationAuditEvent.Action.BLOCK,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    blockerId,
+                    blockedId,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "inactive_blocker"));
             return new BlockResult(false, "Blocker must be an active user");
         }
 
         User blocked = userStorage.get(blockedId).orElse(null);
         if (blocked == null) {
+            auditModeration(
+                    ModerationAuditEvent.Action.BLOCK,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    blockerId,
+                    blockedId,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "blocked_user_not_found"));
             return new BlockResult(false, "User to block not found");
         }
 
         if (trustSafetyStorage.isBlocked(blockerId, blockedId)) {
+            auditModeration(
+                    ModerationAuditEvent.Action.BLOCK,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    blockerId,
+                    blockedId,
+                    contextOf(AUDIT_KEY_ERROR_CODE, "already_blocked"));
             return new BlockResult(false, "User is already blocked");
         }
 
         Block block = Block.create(blockerId, blockedId);
         trustSafetyStorage.save(block);
         updateMatchStateForBlock(blockerId, blockedId);
+
+        auditModeration(
+                ModerationAuditEvent.Action.BLOCK,
+                ModerationAuditEvent.Outcome.SUCCESS,
+                blockerId,
+                blockedId,
+                contextOf(
+                        AUDIT_KEY_MATCH_UPDATED, interactionStorage != null,
+                        AUDIT_KEY_CONVERSATION_STORAGE_CONFIGURED, communicationStorage != null));
 
         logger.info("User {} blocked user {}", blockerId, blockedId);
         return new BlockResult(true, null);
@@ -406,10 +571,52 @@ public final class TrustSafetyService {
         boolean deleted = trustSafetyStorage.deleteBlock(blockerId, blockedId);
         if (deleted) {
             logger.info("User {} unblocked user {}", blockerId, blockedId);
+            auditModeration(
+                    ModerationAuditEvent.Action.UNBLOCK,
+                    ModerationAuditEvent.Outcome.SUCCESS,
+                    blockerId,
+                    blockedId,
+                    contextOf(AUDIT_KEY_BLOCK_REMOVED, true));
         } else {
             logger.debug("No block found between {} and {}", blockerId, blockedId);
+            auditModeration(
+                    ModerationAuditEvent.Action.UNBLOCK,
+                    ModerationAuditEvent.Outcome.FAILURE,
+                    blockerId,
+                    blockedId,
+                    contextOf(AUDIT_KEY_BLOCK_REMOVED, false));
         }
         return deleted;
+    }
+
+    private void auditModeration(
+            ModerationAuditEvent.Action action,
+            ModerationAuditEvent.Outcome outcome,
+            UUID actorId,
+            UUID targetId,
+            Map<String, String> context) {
+        moderationAuditLogger.log(
+                new ModerationAuditEvent(AppClock.now(), actorId, targetId, action, outcome, context));
+    }
+
+    private static Map<String, String> contextOf(Object... keyValues) {
+        if (keyValues == null || keyValues.length == 0) {
+            return Map.of();
+        }
+        if (keyValues.length % 2 != 0) {
+            throw new IllegalArgumentException("context keyValues must contain an even number of entries");
+        }
+
+        Map<String, String> context = new LinkedHashMap<>();
+        for (int i = 0; i < keyValues.length; i += 2) {
+            Object key = keyValues[i];
+            Object value = keyValues[i + 1];
+            if (key == null || value == null) {
+                continue;
+            }
+            context.put(String.valueOf(key), String.valueOf(value));
+        }
+        return context.isEmpty() ? Map.of() : Map.copyOf(context);
     }
 
     /**

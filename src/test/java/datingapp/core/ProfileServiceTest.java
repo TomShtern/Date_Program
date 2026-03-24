@@ -13,8 +13,8 @@ import org.junit.jupiter.api.Test;
 class ProfileServiceTest {
 
     @Test
-    @DisplayName("caches the legacy achievement service instance")
-    void cachesLegacyAchievementServiceInstance() throws ReflectiveOperationException {
+    @DisplayName("caches the achievement service instance")
+    void cachesAchievementServiceInstance() throws ReflectiveOperationException {
         ProfileService service = new ProfileService(
                 AppConfig.defaults(),
                 new TestStorages.Analytics(),
@@ -22,15 +22,15 @@ class ProfileServiceTest {
                 new TestStorages.TrustSafety(),
                 new TestStorages.Users());
 
-        Object first = legacyAchievementService(service);
-        Object second = legacyAchievementService(service);
+        Object first = achievementService(service);
+        Object second = achievementService(service);
 
         assertNotNull(first);
         assertSame(first, second);
     }
 
-    private static Object legacyAchievementService(ProfileService service) throws ReflectiveOperationException {
-        Field field = ProfileService.class.getDeclaredField("legacyAchievementService");
+    private static Object achievementService(ProfileService service) throws ReflectiveOperationException {
+        Field field = ProfileService.class.getDeclaredField("achievementService");
         field.setAccessible(true);
         return field.get(service);
     }

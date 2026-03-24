@@ -3,6 +3,7 @@ package datingapp.core;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
+import datingapp.core.profile.MatchPreferences.Interest;
 import java.time.ZoneId;
 import java.util.Objects;
 
@@ -11,19 +12,8 @@ final class AppConfigValidator {
 
     private AppConfigValidator() {}
 
-    static void validateMatching(
-            int dailyLikeLimit,
-            int dailySuperLikeLimit,
-            int dailyPassLimit,
-            int maxSwipesPerSession,
-            double suspiciousSwipeVelocity,
-            double distanceWeight,
-            double ageWeight,
-            double interestWeight,
-            double lifestyleWeight,
-            double paceWeight,
-            double responseWeight,
-            int minSharedInterests) {
+    static void validateMatchingLimits(
+            int dailyLikeLimit, int dailySuperLikeLimit, int dailyPassLimit, int maxSwipesPerSession) {
         if (dailyLikeLimit < -1) {
             throw new IllegalArgumentException("dailyLikeLimit must be >= -1");
         }
@@ -32,6 +22,16 @@ final class AppConfigValidator {
         }
         requireNonNegative("dailySuperLikeLimit", dailySuperLikeLimit);
         requireNonNegative("maxSwipesPerSession", maxSwipesPerSession);
+    }
+
+    static void validateMatchingWeights(
+            double suspiciousSwipeVelocity,
+            double distanceWeight,
+            double ageWeight,
+            double interestWeight,
+            double lifestyleWeight,
+            double paceWeight,
+            double responseWeight) {
         requireNonNegative("suspiciousSwipeVelocity", suspiciousSwipeVelocity);
         requireNonNegative("distanceWeight", distanceWeight);
         requireNonNegative("ageWeight", ageWeight);
@@ -39,7 +39,6 @@ final class AppConfigValidator {
         requireNonNegative("lifestyleWeight", lifestyleWeight);
         requireNonNegative("paceWeight", paceWeight);
         requireNonNegative("responseWeight", responseWeight);
-        requireNonNegative("minSharedInterests", minSharedInterests);
 
         double weightSum = distanceWeight + ageWeight + interestWeight + lifestyleWeight + paceWeight + responseWeight;
         if (Math.abs(weightSum - 1.0) > 0.01) {
@@ -47,25 +46,12 @@ final class AppConfigValidator {
         }
     }
 
-    static void validateValidation(
-            int minAge,
-            int maxAge,
-            int minHeightCm,
-            int maxHeightCm,
-            int maxBioLength,
-            int maxReportDescLength,
-            int maxNameLength,
-            int maxMessageLength,
-            int maxProfileNoteLength,
-            int minAgeRangeSpan,
-            int minDistanceKm,
-            int maxDistanceKm,
-            int maxInterests,
-            int maxPhotos,
-            int messageMaxPageSize,
-            int chatBackgroundPollSeconds,
-            int chatActivePollSeconds,
-            int maxStandouts) {
+    static void validateMatchingInterestPolicy(int minSharedInterests, int sharedInterestsPreviewCount) {
+        requireNonNegative("minSharedInterests", minSharedInterests);
+        requireInRange(sharedInterestsPreviewCount, 1, Interest.count(), "sharedInterestsPreviewCount");
+    }
+
+    static void validateValidationAgeAndHeight(int minAge, int maxAge, int minHeightCm, int maxHeightCm) {
         requireNonNegative("minAge", minAge);
         requireNonNegative("maxAge", maxAge);
         if (minAge > maxAge) {
@@ -76,11 +62,22 @@ final class AppConfigValidator {
         if (minHeightCm > maxHeightCm) {
             throw new IllegalArgumentException("minHeightCm must be <= maxHeightCm");
         }
+    }
+
+    static void validateValidationTextLimits(
+            int maxBioLength,
+            int maxReportDescLength,
+            int maxNameLength,
+            int maxMessageLength,
+            int maxProfileNoteLength) {
         requireNonNegative("maxBioLength", maxBioLength);
         requireNonNegative("maxReportDescLength", maxReportDescLength);
         requireNonNegative("maxNameLength", maxNameLength);
         requireInRange(maxMessageLength, 1, Message.MAX_LENGTH, "maxMessageLength");
         requireInRange(maxProfileNoteLength, 1, ProfileNote.MAX_LENGTH, "maxProfileNoteLength");
+    }
+
+    static void validateValidationDiscoveryRanges(int minAgeRangeSpan, int minDistanceKm, int maxDistanceKm) {
         requireNonNegative("minAgeRangeSpan", minAgeRangeSpan);
         requireNonNegative("minDistanceKm", minDistanceKm);
         requireNonNegative("maxDistanceKm", maxDistanceKm);
@@ -88,6 +85,15 @@ final class AppConfigValidator {
             throw new IllegalArgumentException(
                     "minDistanceKm (" + minDistanceKm + ") must not exceed maxDistanceKm (" + maxDistanceKm + ")");
         }
+    }
+
+    static void validateValidationMediaAndPaging(
+            int maxInterests,
+            int maxPhotos,
+            int messageMaxPageSize,
+            int chatBackgroundPollSeconds,
+            int chatActivePollSeconds,
+            int maxStandouts) {
         requireNonNegative("maxInterests", maxInterests);
         requireNonNegative("maxPhotos", maxPhotos);
         if (maxPhotos != User.MAX_PHOTOS) {
@@ -99,29 +105,12 @@ final class AppConfigValidator {
         requireInRange(maxStandouts, 1, 100, "maxStandouts");
     }
 
-    static void validateAlgorithm(
+    static void validateAlgorithmDistance(
             int nearbyDistanceKm,
             int closeDistanceKm,
             int similarAgeDiff,
             int compatibleAgeDiff,
-            int paceCompatibilityThreshold,
-            int responseTimeExcellentHours,
-            int responseTimeGreatHours,
-            int responseTimeGoodHours,
-            int responseTimeWeekHours,
-            int responseTimeMonthHours,
-            int standoutDiversityDays,
-            int standoutMinScore,
-            int starExcellentThreshold,
-            int starGreatThreshold,
-            int starGoodThreshold,
-            int starFairThreshold,
-            double standoutDistanceWeight,
-            double standoutAgeWeight,
-            double standoutInterestWeight,
-            double standoutLifestyleWeight,
-            double standoutCompletenessWeight,
-            double standoutActivityWeight) {
+            int paceCompatibilityThreshold) {
         requireNonNegative("nearbyDistanceKm", nearbyDistanceKm);
         requireNonNegative("closeDistanceKm", closeDistanceKm);
         if (nearbyDistanceKm > closeDistanceKm) {
@@ -131,11 +120,28 @@ final class AppConfigValidator {
         requireNonNegative("similarAgeDiff", similarAgeDiff);
         requireNonNegative("compatibleAgeDiff", compatibleAgeDiff);
         requireNonNegative("paceCompatibilityThreshold", paceCompatibilityThreshold);
+    }
+
+    static void validateAlgorithmResponseTimes(
+            int responseTimeExcellentHours,
+            int responseTimeGreatHours,
+            int responseTimeGoodHours,
+            int responseTimeWeekHours,
+            int responseTimeMonthHours) {
         requireNonNegative("responseTimeExcellentHours", responseTimeExcellentHours);
         requireNonNegative("responseTimeGreatHours", responseTimeGreatHours);
         requireNonNegative("responseTimeGoodHours", responseTimeGoodHours);
         requireNonNegative("responseTimeWeekHours", responseTimeWeekHours);
         requireNonNegative("responseTimeMonthHours", responseTimeMonthHours);
+    }
+
+    static void validateAlgorithmStandoutPolicy(
+            int standoutDiversityDays,
+            int standoutMinScore,
+            int starExcellentThreshold,
+            int starGreatThreshold,
+            int starGoodThreshold,
+            int starFairThreshold) {
         requireInRange(standoutDiversityDays, 1, 30, "standoutDiversityDays");
         requireInRange(standoutMinScore, 0, 100, "standoutMinScore");
         requireInRange(starExcellentThreshold, 0, 100, "starExcellentThreshold");
@@ -148,6 +154,15 @@ final class AppConfigValidator {
             throw new IllegalArgumentException(
                     "Star thresholds must be descending: excellent >= great >= good >= fair");
         }
+    }
+
+    static void validateAlgorithmWeights(
+            double standoutDistanceWeight,
+            double standoutAgeWeight,
+            double standoutInterestWeight,
+            double standoutLifestyleWeight,
+            double standoutCompletenessWeight,
+            double standoutActivityWeight) {
         requireNonNegative("standoutDistanceWeight", standoutDistanceWeight);
         requireNonNegative("standoutAgeWeight", standoutAgeWeight);
         requireNonNegative("standoutInterestWeight", standoutInterestWeight);
@@ -160,33 +175,36 @@ final class AppConfigValidator {
         requireInRange(queryTimeoutSeconds, 1, 600, "queryTimeoutSeconds");
     }
 
-    static void validateSafety(
-            int autoBanThreshold,
-            ZoneId userTimeZone,
-            int sessionTimeoutMinutes,
-            int undoWindowSeconds,
+    static void validateSafetySession(
+            int autoBanThreshold, ZoneId userTimeZone, int sessionTimeoutMinutes, int undoWindowSeconds) {
+        Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
+        requireNonNegative("autoBanThreshold", autoBanThreshold);
+        requireNonNegative("sessionTimeoutMinutes", sessionTimeoutMinutes);
+        requireNonNegative("undoWindowSeconds", undoWindowSeconds);
+    }
+
+    static void validateSafetyAchievementThresholds(
             int achievementMatchTier1,
             int achievementMatchTier2,
             int achievementMatchTier3,
             int achievementMatchTier4,
             int achievementMatchTier5,
-            int minSwipesForBehaviorAchievement,
-            double selectiveThreshold,
-            double openMindedThreshold,
-            int bioAchievementLength,
-            int lifestyleFieldTarget,
-            int cleanupRetentionDays,
-            int softDeleteRetentionDays) {
-        Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
-        requireNonNegative("autoBanThreshold", autoBanThreshold);
-        requireNonNegative("sessionTimeoutMinutes", sessionTimeoutMinutes);
-        requireNonNegative("undoWindowSeconds", undoWindowSeconds);
+            int minSwipesForBehaviorAchievement) {
         requireNonNegative("achievementMatchTier1", achievementMatchTier1);
         requireNonNegative("achievementMatchTier2", achievementMatchTier2);
         requireNonNegative("achievementMatchTier3", achievementMatchTier3);
         requireNonNegative("achievementMatchTier4", achievementMatchTier4);
         requireNonNegative("achievementMatchTier5", achievementMatchTier5);
         requireNonNegative("minSwipesForBehaviorAchievement", minSwipesForBehaviorAchievement);
+    }
+
+    static void validateSafetyBehaviorThresholds(
+            double selectiveThreshold,
+            double openMindedThreshold,
+            int bioAchievementLength,
+            int lifestyleFieldTarget,
+            int cleanupRetentionDays,
+            int softDeleteRetentionDays) {
         requireNonNegative("selectiveThreshold", selectiveThreshold);
         requireNonNegative("openMindedThreshold", openMindedThreshold);
         requireNonNegative("bioAchievementLength", bioAchievementLength);

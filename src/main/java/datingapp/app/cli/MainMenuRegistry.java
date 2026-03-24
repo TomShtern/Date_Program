@@ -7,7 +7,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
-/** Centralized immutable registry of CLI main-menu options and dispatch metadata. */
+/**
+ * Centralized immutable registry of CLI main-menu options and dispatch metadata.
+ *
+ * <p><b>Simulation Mode:</b> Menu options in this registry include simulated operations such as
+ * blocking, reporting, and profile verification. These operations do not persist beyond the current
+ * session. See individual handlers for [SIMULATED] markers in user-facing messages.
+ */
 public final class MainMenuRegistry {
 
     public static final String EXIT_KEY = "0";

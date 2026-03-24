@@ -864,6 +864,52 @@ public class User {
         return deletedAt;
     }
 
+    /** Returns a deep copy of this user, including dealbreakers and mutable collections. */
+    public User copy() {
+        User copy = StorageBuilder.create(id, name, createdAt)
+                .bio(bio)
+                .birthDate(birthDate)
+                .gender(gender)
+                .interestedIn(interestedIn)
+                .location(lat, lon)
+                .hasLocationSet(hasLocationSet)
+                .maxDistanceKm(maxDistanceKm)
+                .ageRange(minAge, maxAge)
+                .photoUrls(photoUrls)
+                .state(state)
+                .updatedAt(updatedAt)
+                .interests(interests)
+                .smoking(smoking)
+                .drinking(drinking)
+                .wantsKids(wantsKids)
+                .lookingFor(lookingFor)
+                .education(education)
+                .heightCm(heightCm)
+                .email(email)
+                .phone(phone)
+                .verified(isVerified)
+                .verificationMethod(verificationMethod)
+                .verificationCode(verificationCode)
+                .verificationSentAt(verificationSentAt)
+                .verifiedAt(verifiedAt)
+                .pacePreferences(pacePreferences)
+                .deletedAt(deletedAt)
+                .build();
+
+        if (dealbreakers != null) {
+            copy.dealbreakers = new MatchPreferences.Dealbreakers(
+                    dealbreakers.acceptableSmoking(),
+                    dealbreakers.acceptableDrinking(),
+                    dealbreakers.acceptableKidsStance(),
+                    dealbreakers.acceptableLookingFor(),
+                    dealbreakers.acceptableEducation(),
+                    dealbreakers.minHeightCm(),
+                    dealbreakers.maxHeightCm(),
+                    dealbreakers.maxAgeDifference());
+        }
+        return copy;
+    }
+
     /** Marks this entity as soft-deleted at the given instant. */
     public void markDeleted(Instant deletedAt) {
         this.deletedAt = Objects.requireNonNull(deletedAt, "deletedAt cannot be null");

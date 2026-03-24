@@ -13,6 +13,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.storage.UserStorage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -20,6 +21,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,6 +46,8 @@ import org.slf4j.LoggerFactory;
 public final class JdbiUserStorage implements UserStorage {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JdbiUserStorage.class);
+    private static final int MAX_CACHE_SIZE = 500;
+    private static final Duration CACHE_TTL = Duration.ofMinutes(5);
     private static final String USER_ID_BIND = "userId";
     private static final String NORMALIZED_VALUE_COLUMN = "value";
     private static final String GENDER_COLUMN = "gender";
@@ -56,25 +60,37 @@ public final class JdbiUserStorage implements UserStorage {
     private final Jdbi jdbi;
     private final Dao dao;
     private final ThreadLocal<Handle> lockedHandle = new ThreadLocal<>();
+    private final Map<UUID, CacheEntry<User>> userCache = new LinkedHashMap<>(16, 0.75f, true);
 
     public JdbiUserStorage(Jdbi jdbi) {
         this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
         this.dao = jdbi.onDemand(Dao.class);
     }
 
+    /** Clears the user read cache. Primarily for tests. */
+    public void clearCache() {
+        synchronized (userCache) {
+            userCache.clear();
+        }
+    }
+
     @Override
     public void save(User user) {
         Objects.requireNonNull(user, "user cannot be null");
-        @SuppressWarnings("java:S2092")
-        Handle locked = lockedHandle.get(); // NOPMD - handle is wrapped by transaction context
-        if (locked != null) {
-            locked.attach(Dao.class).save(new UserSqlBindings(user));
-            saveNormalizedProfileData(locked, user);
-        } else {
-            jdbi.useTransaction(handle -> {
-                handle.attach(Dao.class).save(new UserSqlBindings(user));
-                saveNormalizedProfileData(handle, user);
-            });
+        try {
+            @SuppressWarnings("java:S2092")
+            Handle locked = lockedHandle.get(); // NOPMD - handle is wrapped by transaction context
+            if (locked != null) {
+                locked.attach(Dao.class).save(new UserSqlBindings(user));
+                saveNormalizedProfileData(locked, user);
+            } else {
+                jdbi.useTransaction(handle -> {
+                    handle.attach(Dao.class).save(new UserSqlBindings(user));
+                    saveNormalizedProfileData(handle, user);
+                });
+            }
+        } finally {
+            invalidateCachedUser(user.getId());
         }
     }
 
@@ -82,13 +98,16 @@ public final class JdbiUserStorage implements UserStorage {
     public Optional<User> get(UUID id) {
         Handle locked = lockedHandle.get(); // NOPMD - handle is wrapped by transaction context
         if (locked != null) {
-            return locked.attach(Dao.class).get(id).map(user -> applyNormalizedProfileDataBatch(locked, List.of(user))
-                    .get(0));
+            return loadUser(locked, id);
         }
-        return jdbi.withHandle(
-                (Handle handle) -> handle.attach(Dao.class).get(id).map(user -> applyNormalizedProfileDataBatch(
-                                handle, List.of(user))
-                        .get(0)));
+        Optional<User> cached = getCachedUser(id);
+        if (cached.isPresent()) {
+            return cached.map(JdbiUserStorage::copyUser);
+        }
+
+        Optional<User> loaded = jdbi.withHandle(handle -> loadUser(handle, id));
+        loaded.ifPresent(user -> cacheUser(id, user));
+        return loaded.map(JdbiUserStorage::copyUser);
     }
 
     @Override
@@ -171,7 +190,11 @@ public final class JdbiUserStorage implements UserStorage {
 
     @Override
     public void delete(UUID id) {
-        dao.delete(id);
+        try {
+            dao.delete(id);
+        } finally {
+            invalidateCachedUser(id);
+        }
     }
 
     @Override
@@ -206,18 +229,18 @@ public final class JdbiUserStorage implements UserStorage {
         if (lockedHandle.get() != null) {
             throw new IllegalStateException("Nested executeWithUserLock is not supported");
         }
-        jdbi.useTransaction(handle -> {
-            handle.createQuery("SELECT id FROM users WHERE id = :userId FOR UPDATE")
-                    .bind(USER_ID_BIND, userId)
-                    .mapTo(UUID.class)
-                    .first();
-            lockedHandle.set(handle);
-            try {
+        try {
+            jdbi.useTransaction(handle -> {
+                handle.createQuery("SELECT id FROM users WHERE id = :userId FOR UPDATE")
+                        .bind(USER_ID_BIND, userId)
+                        .mapTo(UUID.class)
+                        .first();
+                lockedHandle.set(handle);
                 operation.run();
-            } finally {
-                lockedHandle.remove();
-            }
-        });
+            });
+        } finally {
+            lockedHandle.remove();
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -229,7 +252,11 @@ public final class JdbiUserStorage implements UserStorage {
      * table. Uses delete-then-insert within a transaction to ensure atomicity.
      */
     public void saveUserPhotos(UUID userId, List<String> urls) {
-        jdbi.useTransaction(handle -> saveUserPhotos(handle, userId, urls));
+        try {
+            jdbi.useTransaction(handle -> saveUserPhotos(handle, userId, urls));
+        } finally {
+            invalidateCachedUser(userId);
+        }
     }
 
     /**
@@ -249,7 +276,11 @@ public final class JdbiUserStorage implements UserStorage {
      * table.
      */
     public void saveUserInterests(UUID userId, Set<String> interests) {
-        jdbi.useTransaction(handle -> saveUserInterests(handle, userId, interests));
+        try {
+            jdbi.useTransaction(handle -> saveUserInterests(handle, userId, interests));
+        } finally {
+            invalidateCachedUser(userId);
+        }
     }
 
     /** Loads all interests for a user from the normalized table. */
@@ -266,7 +297,11 @@ public final class JdbiUserStorage implements UserStorage {
      * {@code user_interested_in} table.
      */
     public void saveUserInterestedIn(UUID userId, Set<String> genders) {
-        jdbi.useTransaction(handle -> saveUserInterestedIn(handle, userId, genders));
+        try {
+            jdbi.useTransaction(handle -> saveUserInterestedIn(handle, userId, genders));
+        } finally {
+            invalidateCachedUser(userId);
+        }
     }
 
     /** Loads all gender preferences for a user from the normalized table. */
@@ -286,7 +321,70 @@ public final class JdbiUserStorage implements UserStorage {
      */
     public void saveDealbreaker(UUID userId, String tableName, Set<String> values) {
         validateNormalizedTable(tableName);
-        jdbi.useTransaction(handle -> saveDealbreaker(handle, userId, tableName, values));
+        try {
+            jdbi.useTransaction(handle -> saveDealbreaker(handle, userId, tableName, values));
+        } finally {
+            invalidateCachedUser(userId);
+        }
+    }
+
+    private Optional<User> loadUser(Handle handle, UUID id) {
+        return handle.attach(Dao.class).get(id).map(user -> applyNormalizedProfileDataBatch(handle, List.of(user))
+                .get(0));
+    }
+
+    private Optional<User> getCachedUser(UUID id) {
+        Instant now = AppClock.now();
+        synchronized (userCache) {
+            pruneExpiredEntriesLocked(now);
+            CacheEntry<User> entry = userCache.get(id);
+            return entry != null ? Optional.of(entry.value()) : Optional.empty();
+        }
+    }
+
+    private void cacheUser(UUID id, User user) {
+        Instant now = AppClock.now();
+        synchronized (userCache) {
+            pruneExpiredEntriesLocked(now);
+            if (!userCache.containsKey(id) && userCache.size() >= MAX_CACHE_SIZE) {
+                evictOldestEntryLocked();
+            }
+            userCache.put(id, new CacheEntry<>(user, now.plus(CACHE_TTL)));
+        }
+    }
+
+    private void invalidateCachedUser(UUID id) {
+        synchronized (userCache) {
+            userCache.remove(id);
+        }
+    }
+
+    private void pruneExpiredEntriesLocked(Instant now) {
+        var iterator = userCache.entrySet().iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().getValue().isExpired(now)) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private void evictOldestEntryLocked() {
+        var iterator = userCache.entrySet().iterator();
+        if (iterator.hasNext()) {
+            iterator.next();
+            iterator.remove();
+        }
+    }
+
+    private static User copyUser(User source) {
+        return source.copy();
+    }
+
+    private record CacheEntry<T>(T value, Instant expiresAt) {
+
+        private boolean isExpired(Instant now) {
+            return !now.isBefore(expiresAt);
+        }
     }
 
     private void saveNormalizedProfileData(Handle handle, User user) {

@@ -97,7 +97,8 @@ final class MatchingCliPresenter {
         return List.of(I18n.text("cli.matching.standout.pass", candidateName), "");
     }
 
-    List<String> candidateProfileLines(User candidate, User currentUser, double distance, ZoneId userTimeZone) {
+    List<String> candidateProfileLines(
+            User candidate, User currentUser, double distance, ZoneId userTimeZone, int sharedInterestsPreviewCount) {
         List<String> lines = new ArrayList<>();
         lines.add(CliTextAndInput.BOX_TOP);
         boolean verified = candidate.isVerified();
@@ -110,7 +111,8 @@ final class MatchingCliPresenter {
         InterestMatcher.MatchResult matchResult =
                 InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
         if (matchResult.hasSharedInterests()) {
-            String sharedInterests = InterestMatcher.formatSharedInterests(matchResult.shared());
+            String sharedInterests =
+                    InterestMatcher.formatSharedInterests(matchResult.shared(), sharedInterestsPreviewCount);
             lines.add("│ " + getMutualInterestsBadge(matchResult.sharedCount()) + " " + matchResult.sharedCount()
                     + " shared interest" + (matchResult.sharedCount() > 1 ? "s" : "") + ": " + sharedInterests);
         }

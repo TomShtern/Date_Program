@@ -13,7 +13,6 @@ import datingapp.ui.async.UiThreadDispatcher;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -22,7 +21,12 @@ import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
-/** ViewModel for the Safety & Privacy screen. */
+/**
+ * ViewModel for the Safety & Privacy screen.
+ *
+ * <p><b>Simulation Mode:</b> All blocking and verification operations are simulated and do not
+ * persist beyond the current session. Status messages include [SIMULATED] markers.
+ */
 public final class SafetyViewModel extends BaseViewModel {
 
     private final TrustSafetyService trustSafetyService;
@@ -34,7 +38,7 @@ public final class SafetyViewModel extends BaseViewModel {
             new SimpleObjectProperty<>(VerificationMethod.EMAIL);
     private final StringProperty verificationContact = new SimpleStringProperty("");
     private final StringProperty verificationCode = new SimpleStringProperty("");
-    private final BooleanProperty accountDeleted = new SimpleBooleanProperty(false);
+    private final SimpleBooleanProperty accountDeleted = new SimpleBooleanProperty(false);
     private ViewModelErrorSink errorHandler;
 
     public record BlockedUserEntry(UUID userId, String name, String blockedAtLabel) {}
@@ -87,7 +91,7 @@ public final class SafetyViewModel extends BaseViewModel {
         return verificationCode;
     }
 
-    public BooleanProperty accountDeletedProperty() {
+    public SimpleBooleanProperty accountDeletedProperty() {
         return accountDeleted;
     }
 
@@ -144,7 +148,8 @@ public final class SafetyViewModel extends BaseViewModel {
                                 .map(BlockedUserEntry::name)
                                 .findFirst()
                                 .orElse("User");
-                        return new UnblockResult(updatedEntries, blockedUserName + " has been unblocked.");
+                        return new UnblockResult(
+                                updatedEntries, "[SIMULATED] " + blockedUserName + " has been unblocked.");
                     } catch (RuntimeException ex) {
                         reportError(ex.getMessage());
                         return new UnblockResult(blockedUsers.stream().toList(), "");
@@ -180,7 +185,7 @@ public final class SafetyViewModel extends BaseViewModel {
             }
             session.setCurrentUser(result.data().user());
             syncVerificationFieldsFromSession();
-            statusMessage.set("Verification code generated. Local/dev code: " + generatedCode);
+            statusMessage.set("[SIMULATED] Verification code generated. Local/dev code: " + generatedCode);
         } catch (IllegalArgumentException e) {
             reportError(e.getMessage());
         }
@@ -210,7 +215,7 @@ public final class SafetyViewModel extends BaseViewModel {
         session.setCurrentUser(result.data().user());
         verificationCode.set("");
         syncVerificationFieldsFromSession();
-        statusMessage.set("Profile verified successfully.");
+        statusMessage.set("[SIMULATED] Profile verified successfully.");
     }
 
     public void deleteCurrentAccount() {
@@ -232,7 +237,7 @@ public final class SafetyViewModel extends BaseViewModel {
         blockedUsers.clear();
         session.reset();
         accountDeleted.set(true);
-        statusMessage.set("Account deleted. You have been signed out.");
+        statusMessage.set("[SIMULATED] Account deleted. You have been signed out.");
     }
 
     @Override

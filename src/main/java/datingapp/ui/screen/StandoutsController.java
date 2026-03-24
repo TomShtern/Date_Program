@@ -55,8 +55,6 @@ public class StandoutsController extends BaseController implements Initializable
     private TextField filterTextField;
 
     private final StandoutsViewModel viewModel;
-    private FilteredList<StandoutEntry> filteredStandouts;
-    private SortedList<StandoutEntry> sortedStandouts;
 
     public StandoutsController(StandoutsViewModel viewModel) {
         this.viewModel = viewModel;
@@ -66,11 +64,11 @@ public class StandoutsController extends BaseController implements Initializable
     public void initialize(URL location, ResourceBundle resources) {
         viewModel.setErrorHandler(UiFeedbackService::showError);
 
-        filteredStandouts = new FilteredList<>(viewModel.getStandouts(), entry -> true);
-        sortedStandouts = new SortedList<>(filteredStandouts, comparatorFor(SORT_RANK));
+        FilteredList<StandoutEntry> filteredStandouts = new FilteredList<>(viewModel.getStandouts(), entry -> true);
+        SortedList<StandoutEntry> sortedStandouts = new SortedList<>(filteredStandouts, comparatorFor(SORT_RANK));
         standoutsListView.setItems(sortedStandouts);
         standoutsListView.setCellFactory(lv -> new StandoutListCell(this::handleViewProfileClicked));
-        configureSortAndFilterControls();
+        configureSortAndFilterControls(filteredStandouts, sortedStandouts);
 
         // Show status message (e.g. "No standouts today") when list is empty
         addSubscription(viewModel.statusMessageProperty().subscribe(msg -> {
@@ -86,7 +84,8 @@ public class StandoutsController extends BaseController implements Initializable
         UiAnimations.fadeIn(rootPane, 800);
     }
 
-    private void configureSortAndFilterControls() {
+    private void configureSortAndFilterControls(
+            FilteredList<StandoutEntry> filteredStandouts, SortedList<StandoutEntry> sortedStandouts) {
         sortComboBox.getItems().setAll(SORT_RANK, SORT_SCORE, SORT_NAME_AZ);
         sortComboBox.getSelectionModel().select(SORT_RANK);
         sortComboBox

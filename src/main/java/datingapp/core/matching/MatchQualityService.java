@@ -440,7 +440,8 @@ public class MatchQualityService {
             highlights.add("You share "
                     + sharedInterests.size()
                     + " interests: "
-                    + InterestMatcher.formatSharedInterests(result.shared()));
+                    + InterestMatcher.formatSharedInterests(
+                            result.shared(), config.matching().sharedInterestsPreviewCount()));
         }
     }
 

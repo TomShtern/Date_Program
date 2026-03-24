@@ -26,6 +26,7 @@
   "similarAgeDiff": 2,
   "compatibleAgeDiff": 5,
   "minSharedInterests": 3,
+  "sharedInterestsPreviewCount": 3,
   "paceCompatibilityThreshold": 50,
   "maxDistanceKm": 500,
   "distanceWeight": 0.15,

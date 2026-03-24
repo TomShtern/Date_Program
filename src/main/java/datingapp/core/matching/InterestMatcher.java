@@ -23,7 +23,7 @@ import java.util.Set;
  */
 public final class InterestMatcher {
 
-    private static final int SHARED_INTERESTS_PREVIEW_COUNT = 3;
+    private static final int DEFAULT_SHARED_INTERESTS_PREVIEW_COUNT = 3;
 
     private InterestMatcher() {
         // Utility class - prevent instantiation
@@ -92,35 +92,49 @@ public final class InterestMatcher {
         return new MatchResult(shared, sharedCount, overlapRatio, jaccardIndex);
     }
 
+    public static String formatSharedInterests(Set<Interest> shared) {
+        return formatSharedInterests(shared, DEFAULT_SHARED_INTERESTS_PREVIEW_COUNT);
+    }
+
     /**
-     * Formats shared interests as a human-readable string. Shows up to 3 interests, with "and X
-     * more" if exceeded.
+     * Formats shared interests as a human-readable string.
      *
      * @param shared set of shared interests
+     * @param previewCount maximum number of interests to show before truncating with "and X more"
      * @return formatted string like "Hiking, Coffee, and 2 more" or empty string if none
      */
-    public static String formatSharedInterests(Set<Interest> shared) {
+    public static String formatSharedInterests(Set<Interest> shared, int previewCount) {
         if (shared == null || shared.isEmpty()) {
             return "";
+        }
+        if (previewCount < 1) {
+            throw new IllegalArgumentException("previewCount must be at least 1");
         }
 
         List<String> names = shared.stream()
                 .sorted(Comparator.comparing(Interest::getDisplayName))
-                .limit(SHARED_INTERESTS_PREVIEW_COUNT)
+                .limit(previewCount)
                 .map(Interest::getDisplayName)
                 .toList();
 
-        int remaining = shared.size() - SHARED_INTERESTS_PREVIEW_COUNT;
+        int remaining = shared.size() - previewCount;
 
         if (remaining > 0) {
-            return String.join(", ", names) + ", and " + remaining + " more";
-        } else if (names.size() == 1) {
-            return names.getFirst();
-        } else if (names.size() == 2) {
-            return names.getFirst() + " and " + names.get(1);
-        } else {
-            return names.getFirst() + ", " + names.get(1) + ", and " + names.get(2);
+            return names.size() == 1
+                    ? names.getFirst() + " and " + remaining + " more"
+                    : String.join(", ", names) + ", and " + remaining + " more";
         }
+
+        return joinWithOxfordComma(names);
+    }
+
+    private static String joinWithOxfordComma(List<String> names) {
+        return switch (names.size()) {
+            case 0 -> "";
+            case 1 -> names.getFirst();
+            case 2 -> names.getFirst() + " and " + names.get(1);
+            default -> String.join(", ", names.subList(0, names.size() - 1)) + ", and " + names.getLast();
+        };
     }
 
     /**
