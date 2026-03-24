@@ -60,6 +60,15 @@ class AchievementEventHandlerTest {
     }
 
     @Test
+    void profileNoteSavedTriggersAchievementCheck() {
+        UUID authorId = UUID.randomUUID();
+
+        bus.publish(new AppEvent.ProfileNoteSaved(authorId, UUID.randomUUID(), 12, Instant.now()));
+
+        assertEquals(List.of(authorId), achievementService.checkedUserIds);
+    }
+
+    @Test
     void handlerRegistersWithBestEffortPolicy() {
         // Verify handler doesn't propagate exceptions through the bus
         bus.subscribe(

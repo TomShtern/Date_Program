@@ -10,6 +10,7 @@ import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
+import java.util.List;
 import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.UUID;
@@ -29,6 +30,7 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
@@ -246,9 +248,30 @@ public class MatchingController extends BaseController implements Initializable 
     private void updateCandidatePhoto(String url) {
         if (url != null && !url.isBlank()) {
             candidatePhoto.setImage(ImageCache.getImage(url, 400, 350));
+            preloadAdjacentCandidatePhotos();
             return;
         }
         candidatePhoto.setImage(null);
+    }
+
+    private void preloadAdjacentCandidatePhotos() {
+        List<String> photoUrls = viewModel.currentCandidatePhotoUrlsProperty().get();
+        if (photoUrls == null || photoUrls.size() < 2) {
+            return;
+        }
+        int currentIndex = viewModel.currentCandidatePhotoIndexProperty().get();
+        preloadPhotoAtIndex(photoUrls, currentIndex - 1, 400, 350);
+        preloadPhotoAtIndex(photoUrls, currentIndex + 1, 400, 350);
+    }
+
+    private static void preloadPhotoAtIndex(List<String> photoUrls, int index, double width, double height) {
+        if (index < 0 || index >= photoUrls.size()) {
+            return;
+        }
+        String photoUrl = photoUrls.get(index);
+        if (photoUrl != null && !photoUrl.isBlank()) {
+            ImageCache.preload(photoUrl, width, height);
+        }
     }
 
     private void updatePhotoControlsVisibility() {
@@ -418,15 +441,34 @@ public class MatchingController extends BaseController implements Initializable 
                 return;
             }
 
+            // Ignore swipe shortcuts when editing text (note editor, etc)
+            Object target = e.getTarget();
+            if (target instanceof TextInputControl) {
+                return;
+            }
+
             if (e.isControlDown() && e.getCode() == KeyCode.Z) {
                 handleUndo();
+                e.consume();
                 return;
             }
             switch (e.getCode()) {
-                case LEFT -> handlePass();
-                case RIGHT -> handleLike();
-                case UP -> handleSuperLike();
-                case ESCAPE -> handleBack();
+                case LEFT -> {
+                    handlePass();
+                    e.consume();
+                }
+                case RIGHT -> {
+                    handleLike();
+                    e.consume();
+                }
+                case UP -> {
+                    handleSuperLike();
+                    e.consume();
+                }
+                case ESCAPE -> {
+                    handleBack();
+                    e.consume();
+                }
                 default -> {
                     /* no action */
                 }

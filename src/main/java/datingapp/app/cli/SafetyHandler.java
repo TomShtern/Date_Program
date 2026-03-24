@@ -5,6 +5,7 @@ import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
+import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
@@ -36,18 +37,21 @@ public class SafetyHandler implements LoggingSupport {
     private final SocialUseCases socialUseCases;
     private final AppSession session;
     private final InputReader inputReader;
+    private final AppConfig config;
 
     public SafetyHandler(
             UserStorage userStorage,
             TrustSafetyService trustSafetyService,
             SocialUseCases socialUseCases,
             AppSession session,
-            InputReader inputReader) {
+            InputReader inputReader,
+            AppConfig config) {
         this.userStorage = Objects.requireNonNull(userStorage);
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
         this.socialUseCases = Objects.requireNonNull(socialUseCases);
         this.session = Objects.requireNonNull(session);
         this.inputReader = Objects.requireNonNull(inputReader);
+        this.config = Objects.requireNonNull(config);
     }
 
     public static SafetyHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
@@ -57,7 +61,8 @@ public class SafetyHandler implements LoggingSupport {
                 services.getTrustSafetyService(),
                 services.getSocialUseCases(),
                 session,
-                inputReader);
+                inputReader,
+                services.getConfig());
     }
 
     @Override
@@ -126,8 +131,8 @@ public class SafetyHandler implements LoggingSupport {
                 return;
             }
 
-            String description =
-                    normalizeReportDescription(inputReader.readLine("Additional details (optional, max 500 chars): "));
+            String description = normalizeReportDescription(inputReader.readLine(
+                    "Additional details (optional, max " + config.validation().maxReportDescLength() + " chars): "));
             String blockResponse = inputReader
                     .readLine("Do you also want to block them? (y/n)> ")
                     .trim()
@@ -231,7 +236,8 @@ public class SafetyHandler implements LoggingSupport {
         if (normalized.isEmpty()) {
             return null;
         }
-        return normalized.length() > 500 ? normalized.substring(0, 500) : normalized;
+        int maxLength = config.validation().maxReportDescLength();
+        return normalized.length() > maxLength ? normalized.substring(0, maxLength) : normalized;
     }
 
     private void handleReportResult(

@@ -85,7 +85,9 @@ class ConfigLoaderTest {
                       "dailyPassLimit": 200,
                       "maxInterests": 15,
                       "maxPhotos": 6,
-                      "maxBioLength": 1000
+                      "maxBioLength": 1000,
+                      "maxMessageLength": 900,
+                      "maxProfileNoteLength": 400
                     }
                     """;
 
@@ -98,6 +100,8 @@ class ConfigLoaderTest {
             assertEquals(15, config.validation().maxInterests());
             assertEquals(6, config.validation().maxPhotos());
             assertEquals(1000, config.validation().maxBioLength());
+            assertEquals(900, config.validation().maxMessageLength());
+            assertEquals(400, config.validation().maxProfileNoteLength());
         }
 
         @Test
@@ -236,6 +240,12 @@ class ConfigLoaderTest {
             assertEquals(defaults.matching().dailyLikeLimit(), config.matching().dailyLikeLimit());
             assertEquals(defaults.validation().minAge(), config.validation().minAge());
             assertEquals(defaults.validation().maxAge(), config.validation().maxAge());
+            assertEquals(
+                    defaults.validation().maxMessageLength(),
+                    config.validation().maxMessageLength());
+            assertEquals(
+                    defaults.validation().maxProfileNoteLength(),
+                    config.validation().maxProfileNoteLength());
         }
 
         @Test

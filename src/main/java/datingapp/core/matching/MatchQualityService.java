@@ -30,6 +30,8 @@ public class MatchQualityService {
     private final AppConfig config;
     private final CompatibilityCalculator calculator;
     private final StarThresholdPolicy starThresholdPolicy;
+    private static final StarThresholdPolicy DEFAULT_STAR_THRESHOLD_POLICY =
+            StarThresholdPolicy.from(AppConfig.builder().build().algorithm());
     private static final String LABEL_EXCELLENT = "Excellent Match";
     private static final String LABEL_GREAT = "Great Match";
     private static final String LABEL_GOOD = "Good Match";
@@ -123,7 +125,7 @@ public class MatchQualityService {
                     paceSyncLevel,
                     compatibilityScore,
                     highlights,
-                    StarThresholdPolicy.from(AppConfig.defaults().algorithm()));
+                    DEFAULT_STAR_THRESHOLD_POLICY);
         }
 
         public MatchQuality {

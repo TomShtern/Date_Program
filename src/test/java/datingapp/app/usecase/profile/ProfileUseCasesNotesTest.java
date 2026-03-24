@@ -73,4 +73,26 @@ class ProfileUseCasesNotesTest {
         assertFalse(result.success());
         assertEquals("Subject user not found", result.error().message());
     }
+
+    @Test
+    @DisplayName("upsert rejects content above configured limit")
+    void upsertRejectsContentAboveConfiguredLimit() {
+        TestStorages.Users users = new TestStorages.Users();
+        UUID authorId = UUID.randomUUID();
+        UUID subjectId = UUID.randomUUID();
+        users.save(new User(authorId, "Author"));
+        users.save(new User(subjectId, "Subject"));
+
+        AppConfig config = AppConfig.builder().maxProfileNoteLength(5).build();
+        ProfileUseCases useCases =
+                new ProfileUseCases(users, null, null, null, null, config, new ProfileActivationPolicy(), null);
+
+        var result = useCases.upsertProfileNote(
+                new ProfileUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), subjectId, "123456"));
+
+        assertFalse(result.success());
+        assertEquals(
+                "Note content exceeds maximum length of 5 characters",
+                result.error().message());
+    }
 }

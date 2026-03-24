@@ -174,10 +174,6 @@ public final class StorageFactory {
                 .build();
     }
 
-    public static ServiceRegistry buildH2(DatabaseManager dbManager) {
-        return buildH2(dbManager, AppConfig.defaults());
-    }
-
     public static ServiceRegistry buildInMemory(AppConfig config) {
         return buildH2(DatabaseManager.getInstance(), config);
     }

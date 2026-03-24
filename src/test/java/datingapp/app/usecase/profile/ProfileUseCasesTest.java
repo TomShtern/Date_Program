@@ -9,6 +9,7 @@ import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
+import datingapp.app.usecase.profile.ProfileUseCases.DeleteProfileNoteCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.UpdateDiscoveryPreferencesCommand;
@@ -17,6 +18,7 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle;
@@ -30,6 +32,7 @@ import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -182,6 +185,70 @@ class ProfileUseCasesTest {
     }
 
     @Test
+    @DisplayName("upsertProfileNote should publish ProfileNoteSaved on success")
+    void upsertProfileNotePublishesProfileNoteSavedEvent() {
+        User author = TestUserFactory.createActiveUser(UUID.randomUUID(), "Author");
+        User subject = TestUserFactory.createActiveUser(UUID.randomUUID(), "Subject");
+        userStorage.save(author);
+        userStorage.save(subject);
+
+        List<AppEvent> publishedEvents = new ArrayList<>();
+        ProfileUseCases eventUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                capturingEventBus(publishedEvents));
+
+        var result = eventUseCases.upsertProfileNote(
+                new UpsertProfileNoteCommand(UserContext.cli(author.getId()), subject.getId(), "<b>Keep</b>"));
+
+        assertTrue(result.success());
+        assertEquals(1, publishedEvents.size());
+        assertTrue(publishedEvents.getFirst() instanceof AppEvent.ProfileNoteSaved);
+        AppEvent.ProfileNoteSaved event = (AppEvent.ProfileNoteSaved) publishedEvents.getFirst();
+        assertEquals(author.getId(), event.authorId());
+        assertEquals(subject.getId(), event.subjectId());
+        assertEquals("Keep".length(), event.contentLength());
+    }
+
+    @Test
+    @DisplayName("deleteProfileNote should publish ProfileNoteDeleted on success")
+    void deleteProfileNotePublishesProfileNoteDeletedEvent() {
+        User author = TestUserFactory.createActiveUser(UUID.randomUUID(), "Author");
+        User subject = TestUserFactory.createActiveUser(UUID.randomUUID(), "Subject");
+        userStorage.save(author);
+        userStorage.save(subject);
+        userStorage.saveProfileNote(ProfileNote.create(author.getId(), subject.getId(), "Legacy note"));
+
+        List<AppEvent> publishedEvents = new ArrayList<>();
+        ProfileUseCases eventUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                capturingEventBus(publishedEvents));
+
+        var result = eventUseCases.deleteProfileNote(
+                new DeleteProfileNoteCommand(UserContext.cli(author.getId()), subject.getId()));
+
+        assertTrue(result.success());
+        assertTrue(result.data());
+        assertEquals(1, publishedEvents.size());
+        assertTrue(publishedEvents.getFirst() instanceof AppEvent.ProfileNoteDeleted);
+        AppEvent.ProfileNoteDeleted event = (AppEvent.ProfileNoteDeleted) publishedEvents.getFirst();
+        assertEquals(author.getId(), event.authorId());
+        assertEquals(subject.getId(), event.subjectId());
+        assertNotNull(event.occurredAt());
+    }
+
+    @Test
     @DisplayName("updateDiscoveryPreferences should clamp out-of-range values")
     void updateDiscoveryPreferencesClampsValues() {
         User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Preference User");
@@ -255,6 +322,36 @@ class ProfileUseCasesTest {
         assertTrue(cleanupStorage.userSnapshot.get().isDeleted());
         assertEquals(User.UserState.PAUSED, cleanupStorage.userSnapshot.get().getState());
         assertTrue(userStorage.get(user.getId()).orElseThrow().isDeleted());
+    }
+
+    @Test
+    @DisplayName("deleteAccount should publish AccountDeleted on success")
+    void deleteAccountPublishesAccountDeletedEvent() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Delete Me");
+        userStorage.save(user);
+
+        List<AppEvent> publishedEvents = new ArrayList<>();
+        RecordingAccountCleanupStorage cleanupStorage = new RecordingAccountCleanupStorage();
+        ProfileUseCases eventUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                capturingEventBus(publishedEvents),
+                cleanupStorage);
+
+        var result = eventUseCases.deleteAccount(new DeleteAccountCommand(UserContext.cli(user.getId()), "privacy"));
+
+        assertTrue(result.success());
+        assertEquals(1, publishedEvents.size());
+        assertTrue(publishedEvents.getFirst() instanceof AppEvent.AccountDeleted);
+        AppEvent.AccountDeleted event = (AppEvent.AccountDeleted) publishedEvents.getFirst();
+        assertEquals(user.getId(), event.userId());
+        assertEquals("privacy", event.reason());
+        assertEquals(cleanupStorage.deletedAt.get(), event.occurredAt());
     }
 
     private static AchievementService noOpAchievementService() {
@@ -349,6 +446,26 @@ class ProfileUseCasesTest {
             public void publish(AppEvent event) {
                 published.set(true);
                 throw new IllegalStateException("event publication failed");
+            }
+
+            @Override
+            public <T extends AppEvent> void subscribe(Class<T> eventType, AppEventHandler<T> handler) {
+                // Not needed for these tests.
+            }
+
+            @Override
+            public <T extends AppEvent> void subscribe(
+                    Class<T> eventType, AppEventHandler<T> handler, HandlerPolicy policy) {
+                // Not needed for these tests.
+            }
+        };
+    }
+
+    private static AppEventBus capturingEventBus(List<AppEvent> publishedEvents) {
+        return new AppEventBus() {
+            @Override
+            public void publish(AppEvent event) {
+                publishedEvents.add(event);
             }
 
             @Override

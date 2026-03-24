@@ -5,10 +5,7 @@ import datingapp.app.event.AppEventBus;
 import datingapp.core.metrics.AchievementService;
 import java.util.Objects;
 
-/**
- * Listens for {@link AppEvent.SwipeRecorded} events and checks achievement
- * eligibility when a swipe results in a match.
- */
+/** Listens for profile and swipe events and checks achievement eligibility. */
 public final class AchievementEventHandler {
 
     private final AchievementService achievementService;
@@ -21,6 +18,8 @@ public final class AchievementEventHandler {
     public void register(AppEventBus eventBus) {
         eventBus.subscribe(AppEvent.SwipeRecorded.class, this::onSwipeRecorded, AppEventBus.HandlerPolicy.BEST_EFFORT);
         eventBus.subscribe(AppEvent.ProfileSaved.class, this::onProfileSaved, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(
+                AppEvent.ProfileNoteSaved.class, this::onProfileNoteSaved, AppEventBus.HandlerPolicy.BEST_EFFORT);
     }
 
     void onSwipeRecorded(AppEvent.SwipeRecorded event) {
@@ -31,5 +30,9 @@ public final class AchievementEventHandler {
 
     void onProfileSaved(AppEvent.ProfileSaved event) {
         achievementService.checkAndUnlock(event.userId());
+    }
+
+    void onProfileNoteSaved(AppEvent.ProfileNoteSaved event) {
+        achievementService.checkAndUnlock(event.authorId());
     }
 }

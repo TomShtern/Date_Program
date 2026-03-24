@@ -1,5 +1,36 @@
 package datingapp.app.api;
 
+import static datingapp.app.api.RestApiDtos.AchievementSnapshotDto;
+import static datingapp.app.api.RestApiDtos.ArchiveConversationRequest;
+import static datingapp.app.api.RestApiDtos.ConversationSummary;
+import static datingapp.app.api.RestApiDtos.ErrorResponse;
+import static datingapp.app.api.RestApiDtos.HealthResponse;
+import static datingapp.app.api.RestApiDtos.LikeResponse;
+import static datingapp.app.api.RestApiDtos.MarkAllNotificationsReadResponse;
+import static datingapp.app.api.RestApiDtos.MatchQualityDto;
+import static datingapp.app.api.RestApiDtos.MatchSummary;
+import static datingapp.app.api.RestApiDtos.MessageDto;
+import static datingapp.app.api.RestApiDtos.ModerationResponse;
+import static datingapp.app.api.RestApiDtos.NotificationDto;
+import static datingapp.app.api.RestApiDtos.PagedMatchResponse;
+import static datingapp.app.api.RestApiDtos.PassResponse;
+import static datingapp.app.api.RestApiDtos.PendingLikerDto;
+import static datingapp.app.api.RestApiDtos.PendingLikersResponse;
+import static datingapp.app.api.RestApiDtos.ProfileNoteDto;
+import static datingapp.app.api.RestApiDtos.ProfileNoteUpsertRequest;
+import static datingapp.app.api.RestApiDtos.ProfileUpdateRequest;
+import static datingapp.app.api.RestApiDtos.ProfileUpdateResponse;
+import static datingapp.app.api.RestApiDtos.ReportResponse;
+import static datingapp.app.api.RestApiDtos.ReportUserRequest;
+import static datingapp.app.api.RestApiDtos.SendMessageRequest;
+import static datingapp.app.api.RestApiDtos.StandoutDto;
+import static datingapp.app.api.RestApiDtos.StandoutsResponse;
+import static datingapp.app.api.RestApiDtos.TransitionResponse;
+import static datingapp.app.api.RestApiDtos.UndoResponse;
+import static datingapp.app.api.RestApiDtos.UserDetail;
+import static datingapp.app.api.RestApiDtos.UserStatsDto;
+import static datingapp.app.api.RestApiDtos.UserSummary;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -39,23 +70,10 @@ import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.app.usecase.social.SocialUseCases.RespondFriendRequestCommand;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.Conversation;
-import datingapp.core.connection.ConnectionModels.FriendRequest;
-import datingapp.core.connection.ConnectionModels.Message;
-import datingapp.core.connection.ConnectionModels.Notification;
-import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
-import datingapp.core.matching.MatchQualityService;
-import datingapp.core.matching.MatchingService;
-import datingapp.core.matching.Standout;
-import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
-import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.Match;
-import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.profile.MatchPreferences.Dealbreakers;
-import datingapp.core.profile.MatchPreferences.Interest;
-import datingapp.core.profile.MatchPreferences.Lifestyle;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
@@ -63,7 +81,6 @@ import io.javalin.json.JavalinJackson;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
@@ -1061,377 +1078,6 @@ public class RestApiServer {
             ctx.json(new ErrorResponse(INTERNAL_ERROR, "An unexpected error occurred"));
         });
     }
-
-    // ── Response Records ────────────────────────────────────────────────
-
-    /** Health check response. */
-    public static record HealthResponse(String status, long timestamp) {}
-
-    /** Error response. */
-    public static record ErrorResponse(String code, String message) {}
-
-    /** Minimal user info for lists. */
-    public static record UserSummary(UUID id, String name, int age, String state) {
-        /**
-         * Creates a UserSummary from a User entity.
-         * Uses the provided timezone for age calculation.
-         */
-        public static UserSummary from(User user, ZoneId userTimeZone) {
-            return new UserSummary(
-                    user.getId(), user.getName(),
-                    user.getAge(userTimeZone).orElse(0), user.getState().name());
-        }
-    }
-
-    /** Full user detail for single-user queries. */
-    public static record UserDetail(
-            UUID id,
-            String name,
-            int age,
-            String bio,
-            String gender,
-            List<String> interestedIn,
-            double latitude,
-            double longitude,
-            int maxDistanceKm,
-            List<String> photoUrls,
-            String state) {
-        /**
-         * Creates a UserDetail from a User entity.
-         * Uses the provided timezone for age calculation.
-         */
-        public static UserDetail from(User user, ZoneId userTimeZone) {
-            return new UserDetail(
-                    user.getId(),
-                    user.getName(),
-                    user.getAge(userTimeZone).orElse(0),
-                    user.getBio(),
-                    user.getGender() != null ? user.getGender().name() : null,
-                    user.getInterestedIn().stream().map(Enum::name).toList(),
-                    user.getLat(),
-                    user.getLon(),
-                    user.getMaxDistanceKm(),
-                    user.getPhotoUrls(),
-                    user.getState().name());
-        }
-    }
-
-    /** Match summary for API responses. */
-    public static record MatchSummary(
-            String matchId, UUID otherUserId, String otherUserName, String state, Instant createdAt) {
-        public static MatchSummary from(Match match, UUID currentUserId) {
-            UUID otherUserId = match.getOtherUser(currentUserId);
-            return new MatchSummary(
-                    match.getId(), otherUserId, UNKNOWN_USER, match.getState().name(), match.getCreatedAt());
-        }
-    }
-
-    /** Response for like action. */
-    public static record LikeResponse(boolean isMatch, String message, MatchSummary match) {}
-
-    /** Response for pass action. */
-    public static record PassResponse(String message) {}
-
-    /** Response for undo action. */
-    public static record UndoResponse(boolean success, String message, boolean matchDeleted) {
-        public static UndoResponse from(datingapp.core.matching.UndoService.UndoResult result) {
-            return new UndoResponse(result.success(), result.message(), result.matchDeleted());
-        }
-    }
-
-    /**
-     * Paginated match list response.
-     *
-     * @param matches    the matches on this page
-     * @param totalCount total number of matches across all pages
-     * @param offset     zero-based start index of this page
-     * @param limit      maximum items per page that was requested
-     * @param hasMore    {@code true} if another page exists
-     */
-    public static record PagedMatchResponse(
-            List<MatchSummary> matches, int totalCount, int offset, int limit, boolean hasMore) {}
-
-    /** Conversation summary for API responses. */
-    public static record ConversationSummary(
-            String id, UUID otherUserId, String otherUserName, int messageCount, Instant lastMessageAt) {}
-
-    /** Pending liker DTO for API responses. */
-    public static record PendingLikerDto(UUID userId, String name, int age, Instant likedAt) {
-        public static PendingLikerDto from(MatchingService.PendingLiker pendingLiker, ZoneId userTimeZone) {
-            return new PendingLikerDto(
-                    pendingLiker.user().getId(),
-                    pendingLiker.user().getName(),
-                    pendingLiker.user().getAge(userTimeZone).orElse(0),
-                    pendingLiker.likedAt());
-        }
-    }
-
-    /** Pending likers response. */
-    public static record PendingLikersResponse(List<PendingLikerDto> pendingLikers) {}
-
-    /** Standout DTO for API responses. */
-    public static record StandoutDto(
-            UUID id,
-            UUID standoutUserId,
-            String standoutUserName,
-            int standoutUserAge,
-            int rank,
-            int score,
-            String reason,
-            Instant createdAt,
-            Instant interactedAt) {
-        public static StandoutDto from(Standout standout, Map<UUID, User> usersById, ZoneId userTimeZone) {
-            User user = usersById.get(standout.standoutUserId());
-            return new StandoutDto(
-                    standout.id(),
-                    standout.standoutUserId(),
-                    user != null ? user.getName() : UNKNOWN_USER,
-                    user != null ? user.getAge(userTimeZone).orElse(0) : 0,
-                    standout.rank(),
-                    standout.score(),
-                    standout.reason(),
-                    standout.createdAt(),
-                    standout.interactedAt());
-        }
-    }
-
-    /** Standouts response. */
-    public static record StandoutsResponse(
-            List<StandoutDto> standouts, int totalCandidates, boolean fromCache, String message) {}
-
-    /** Notification DTO. */
-    public static record NotificationDto(
-            UUID id,
-            String type,
-            String title,
-            String message,
-            Instant createdAt,
-            boolean isRead,
-            Map<String, String> data) {
-        public static NotificationDto from(Notification notification) {
-            return new NotificationDto(
-                    notification.id(),
-                    notification.type().name(),
-                    notification.title(),
-                    notification.message(),
-                    notification.createdAt(),
-                    notification.isRead(),
-                    notification.data());
-        }
-    }
-
-    /** Mark-all-notifications-read response. */
-    public static record MarkAllNotificationsReadResponse(int updatedCount) {}
-
-    /** Message DTO for API responses. */
-    public static record MessageDto(UUID id, String conversationId, UUID senderId, String content, Instant sentAt) {
-        public static MessageDto from(Message message) {
-            return new MessageDto(
-                    message.id(), message.conversationId(), message.senderId(), message.content(), message.createdAt());
-        }
-    }
-
-    /** Request body for sending a message. */
-    public static record SendMessageRequest(UUID senderId, String content) {}
-
-    /** Request body for archiving a conversation. */
-    public static record ArchiveConversationRequest(Match.MatchArchiveReason reason) {}
-
-    /** Request body for profile updates. */
-    public static record ProfileUpdateRequest(
-            String bio,
-            java.time.LocalDate birthDate,
-            User.Gender gender,
-            Set<User.Gender> interestedIn,
-            Double latitude,
-            Double longitude,
-            Integer maxDistanceKm,
-            Integer minAge,
-            Integer maxAge,
-            Integer heightCm,
-            Lifestyle.Smoking smoking,
-            Lifestyle.Drinking drinking,
-            Lifestyle.WantsKids wantsKids,
-            Lifestyle.LookingFor lookingFor,
-            Lifestyle.Education education,
-            Set<Interest> interests,
-            Dealbreakers dealbreakers) {}
-
-    /** Response body for profile updates. */
-    public static record ProfileUpdateResponse(
-            UUID id,
-            String name,
-            int age,
-            String bio,
-            String gender,
-            List<String> interestedIn,
-            double latitude,
-            double longitude,
-            int maxDistanceKm,
-            String state,
-            boolean activated) {
-        public static ProfileUpdateResponse from(User user, boolean activated, ZoneId userTimeZone) {
-            return new ProfileUpdateResponse(
-                    user.getId(),
-                    user.getName(),
-                    user.getAge(userTimeZone).orElse(0),
-                    user.getBio(),
-                    user.getGender() != null ? user.getGender().name() : null,
-                    user.getInterestedIn().stream().map(Enum::name).toList(),
-                    user.getLat(),
-                    user.getLon(),
-                    user.getMaxDistanceKm(),
-                    user.getState().name(),
-                    activated);
-        }
-    }
-
-    /** Match quality response. */
-    public static record MatchQualityDto(
-            String matchId,
-            UUID perspectiveUserId,
-            UUID otherUserId,
-            int compatibilityScore,
-            String compatibilityLabel,
-            String starDisplay,
-            String paceSyncLevel,
-            double distanceKm,
-            int ageDifference,
-            List<String> highlights) {
-        public static MatchQualityDto from(MatchQualityService.MatchQuality quality) {
-            return new MatchQualityDto(
-                    quality.matchId(),
-                    quality.perspectiveUserId(),
-                    quality.otherUserId(),
-                    quality.compatibilityScore(),
-                    quality.getCompatibilityLabel(),
-                    quality.getStarDisplay(),
-                    quality.paceSyncLevel(),
-                    quality.distanceKm(),
-                    quality.ageDifference(),
-                    quality.highlights());
-        }
-    }
-
-    /** Response for relationship transitions. */
-    public static record TransitionResponse(boolean success, UUID friendRequestId, String errorMessage) {
-        public static TransitionResponse from(ConnectionService.TransitionResult result) {
-            FriendRequest request = result.friendRequest();
-            return new TransitionResponse(
-                    result.success(), request != null ? request.id() : null, result.errorMessage());
-        }
-    }
-
-    /** Response for moderation operations. */
-    public static record ModerationResponse(boolean success, boolean alreadyHandled, String errorMessage) {}
-
-    /** Response for reporting a user. */
-    public static record ReportResponse(
-            boolean success, boolean autoBanned, String errorMessage, boolean blockedByReporter) {}
-
-    /** User stats DTO. */
-    public static record UserStatsDto(
-            UUID userId,
-            Instant computedAt,
-            int totalSwipesGiven,
-            int likesGiven,
-            int passesGiven,
-            String likeRatio,
-            int totalSwipesReceived,
-            int likesReceived,
-            int passesReceived,
-            String incomingLikeRatio,
-            int totalMatches,
-            int activeMatches,
-            String matchRate,
-            int blocksGiven,
-            int blocksReceived,
-            int reportsGiven,
-            int reportsReceived,
-            String reciprocityScore,
-            double selectivenessScore,
-            double attractivenessScore) {
-        public static UserStatsDto from(UserStats stats) {
-            return new UserStatsDto(
-                    stats.userId(),
-                    stats.computedAt(),
-                    stats.totalSwipesGiven(),
-                    stats.likesGiven(),
-                    stats.passesGiven(),
-                    stats.getLikeRatioDisplay(),
-                    stats.totalSwipesReceived(),
-                    stats.likesReceived(),
-                    stats.passesReceived(),
-                    stats.incomingLikeRatio() * 100 + "%",
-                    stats.totalMatches(),
-                    stats.activeMatches(),
-                    stats.getMatchRateDisplay(),
-                    stats.blocksGiven(),
-                    stats.blocksReceived(),
-                    stats.reportsGiven(),
-                    stats.reportsReceived(),
-                    stats.getReciprocityDisplay(),
-                    stats.selectivenessScore(),
-                    stats.attractivenessScore());
-        }
-    }
-
-    /** Achievement unlocked DTO. */
-    public static record AchievementUnlockedDto(
-            UUID id,
-            String achievementName,
-            String description,
-            String icon,
-            String iconLiteral,
-            String category,
-            int xp,
-            Instant unlockedAt) {
-        public static AchievementUnlockedDto from(UserAchievement achievement) {
-            return new AchievementUnlockedDto(
-                    achievement.id(),
-                    achievement.achievement().getDisplayName(),
-                    achievement.achievement().getDescription(),
-                    achievement.achievement().getIcon(),
-                    achievement.achievement().getIconLiteral(),
-                    achievement.achievement().getCategory().name(),
-                    achievement.achievement().getXp(),
-                    achievement.unlockedAt());
-        }
-    }
-
-    /** Achievement snapshot DTO. */
-    public static record AchievementSnapshotDto(
-            List<AchievementUnlockedDto> unlocked,
-            List<AchievementUnlockedDto> newlyUnlocked,
-            int unlockedCount,
-            int newlyUnlockedCount) {
-        public static AchievementSnapshotDto from(ProfileUseCases.AchievementSnapshot snapshot) {
-            return new AchievementSnapshotDto(
-                    snapshot.unlocked().stream()
-                            .map(AchievementUnlockedDto::from)
-                            .toList(),
-                    snapshot.newlyUnlocked().stream()
-                            .map(AchievementUnlockedDto::from)
-                            .toList(),
-                    snapshot.unlocked().size(),
-                    snapshot.newlyUnlocked().size());
-        }
-    }
-
-    /** Private profile note DTO. */
-    public static record ProfileNoteDto(
-            UUID authorId, UUID subjectId, String content, Instant createdAt, Instant updatedAt) {
-        public static ProfileNoteDto from(ProfileNote note) {
-            return new ProfileNoteDto(
-                    note.authorId(), note.subjectId(), note.content(), note.createdAt(), note.updatedAt());
-        }
-    }
-
-    /** Request body for creating or updating a private profile note. */
-    public static record ProfileNoteUpsertRequest(String content) {}
-
-    /** Request body for reporting a user. */
-    public static record ReportUserRequest(Report.Reason reason, String description, boolean blockUser) {}
 
     private record ConversationParticipants(UUID firstUserId, UUID secondUserId) {
         private boolean involves(UUID userId) {

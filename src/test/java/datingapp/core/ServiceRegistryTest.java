@@ -2,6 +2,7 @@ package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.StorageFactory;
@@ -65,11 +66,21 @@ class ServiceRegistryTest {
         }
 
         @Test
-        @DisplayName("Uses default config when not specified")
-        void usesDefaultConfig() {
-            ServiceRegistry defaultRegistry = StorageFactory.buildH2(dbManager);
+        @DisplayName("Uses explicit builder default config")
+        void usesExplicitBuilderDefaultConfig() {
+            AppConfig defaultConfig = AppConfig.builder().build();
+            ServiceRegistry defaultRegistry = StorageFactory.buildH2(dbManager, defaultConfig);
 
             assertNotNull(defaultRegistry.getConfig());
+            assertSame(defaultConfig, defaultRegistry.getConfig());
+        }
+
+        @Test
+        @DisplayName("buildH2(DatabaseManager) overload no longer exists")
+        void buildH2OverloadRemovedWithoutAppConfig() {
+            assertThrows(
+                    NoSuchMethodException.class,
+                    () -> StorageFactory.class.getMethod("buildH2", DatabaseManager.class));
         }
     }
 

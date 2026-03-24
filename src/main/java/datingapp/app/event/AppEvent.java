@@ -11,6 +11,9 @@ public sealed interface AppEvent
         permits AppEvent.SwipeRecorded,
                 AppEvent.MatchCreated,
                 AppEvent.ProfileSaved,
+                AppEvent.ProfileNoteSaved,
+                AppEvent.ProfileNoteDeleted,
+                AppEvent.AccountDeleted,
                 AppEvent.FriendRequestAccepted,
                 AppEvent.RelationshipTransitioned,
                 AppEvent.MessageSent,
@@ -25,6 +28,12 @@ public sealed interface AppEvent
     record MatchCreated(String matchId, UUID userA, UUID userB, Instant occurredAt) implements AppEvent {}
 
     record ProfileSaved(UUID userId, boolean activated, Instant occurredAt) implements AppEvent {}
+
+    record ProfileNoteSaved(UUID authorId, UUID subjectId, int contentLength, Instant occurredAt) implements AppEvent {}
+
+    record ProfileNoteDeleted(UUID authorId, UUID subjectId, Instant occurredAt) implements AppEvent {}
+
+    record AccountDeleted(UUID userId, String reason, Instant occurredAt) implements AppEvent {}
 
     record FriendRequestAccepted(UUID requestId, UUID fromUserId, UUID toUserId, String matchId, Instant occurredAt)
             implements AppEvent {}

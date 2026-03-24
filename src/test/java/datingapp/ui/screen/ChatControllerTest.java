@@ -323,6 +323,28 @@ class ChatControllerTest {
         AppSession.getInstance().reset();
     }
 
+    @Test
+    @DisplayName("cleanup is safe and idempotent")
+    void cleanupIsSafeAndIdempotent() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.seedConversationWithNote("Known chat note");
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/chat.fxml", () -> new ChatController(fixture.viewModel));
+        ChatController controller = (ChatController) loaded.controller();
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            controller.cleanup();
+            controller.cleanup();
+        });
+
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(() -> loaded.root().getScene() != null));
+
+        fixture.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
     private static final class Fixture {
         private final TestStorages.Users users = new TestStorages.Users();
         private final TestStorages.Interactions interactions = new TestStorages.Interactions();

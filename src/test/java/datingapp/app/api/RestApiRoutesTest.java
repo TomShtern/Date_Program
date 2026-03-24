@@ -1,5 +1,10 @@
 package datingapp.app.api;
 
+import static datingapp.app.api.RestApiDtos.ErrorResponse;
+import static datingapp.app.api.RestApiDtos.HealthResponse;
+import static datingapp.app.api.RestApiDtos.MessageDto;
+import static datingapp.app.api.RestApiDtos.UserDetail;
+import static datingapp.app.api.RestApiDtos.UserSummary;
 import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.model.User;
@@ -36,7 +41,7 @@ class RestApiRoutesTest {
     }
 
     @Nested
-    @DisplayName("RestApiServer.MessageDto")
+    @DisplayName("MessageDto")
     class MessageDtoTests {
 
         @Test
@@ -47,7 +52,7 @@ class RestApiRoutesTest {
             datingapp.core.connection.ConnectionModels.Message message =
                     datingapp.core.connection.ConnectionModels.Message.create(conversationId, senderId, "Hello!");
 
-            RestApiServer.MessageDto dto = RestApiServer.MessageDto.from(message);
+            MessageDto dto = MessageDto.from(message);
 
             assertEquals(message.id(), dto.id());
             assertEquals(conversationId, dto.conversationId());
@@ -58,13 +63,13 @@ class RestApiRoutesTest {
     }
 
     @Nested
-    @DisplayName("RestApiServer.ErrorResponse")
+    @DisplayName("ErrorResponse")
     class ErrorResponseTests {
 
         @Test
         @DisplayName("Creates error response")
         void createsErrorResponse() {
-            RestApiServer.ErrorResponse error = new RestApiServer.ErrorResponse("NOT_FOUND", "User not found");
+            ErrorResponse error = new ErrorResponse("NOT_FOUND", "User not found");
 
             assertEquals("NOT_FOUND", error.code());
             assertEquals("User not found", error.message());
@@ -72,13 +77,13 @@ class RestApiRoutesTest {
     }
 
     @Nested
-    @DisplayName("RestApiServer.HealthResponse")
+    @DisplayName("HealthResponse")
     class HealthResponseTests {
 
         @Test
         @DisplayName("Creates health response")
         void createsHealthResponse() {
-            RestApiServer.HealthResponse health = new RestApiServer.HealthResponse("ok", 12345L);
+            HealthResponse health = new HealthResponse("ok", 12345L);
 
             assertEquals("ok", health.status());
             assertEquals(12345L, health.timestamp());
@@ -96,8 +101,8 @@ class RestApiRoutesTest {
             ZoneId utc = ZoneId.of("UTC");
             ZoneId losAngeles = ZoneId.of("America/Los_Angeles");
 
-            RestApiServer.UserSummary utcSummary = RestApiServer.UserSummary.from(user, utc);
-            RestApiServer.UserSummary laSummary = RestApiServer.UserSummary.from(user, losAngeles);
+            UserSummary utcSummary = UserSummary.from(user, utc);
+            UserSummary laSummary = UserSummary.from(user, losAngeles);
 
             assertEquals(user.getAge(utc).orElseThrow(), utcSummary.age());
             assertEquals(user.getAge(losAngeles).orElseThrow(), laSummary.age());
@@ -112,8 +117,8 @@ class RestApiRoutesTest {
             ZoneId utc = ZoneId.of("UTC");
             ZoneId losAngeles = ZoneId.of("America/Los_Angeles");
 
-            RestApiServer.UserDetail utcDetail = RestApiServer.UserDetail.from(user, utc);
-            RestApiServer.UserDetail laDetail = RestApiServer.UserDetail.from(user, losAngeles);
+            UserDetail utcDetail = UserDetail.from(user, utc);
+            UserDetail laDetail = UserDetail.from(user, losAngeles);
 
             assertEquals(user.getAge(utc).orElseThrow(), utcDetail.age());
             assertEquals(user.getAge(losAngeles).orElseThrow(), laDetail.age());

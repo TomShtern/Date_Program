@@ -13,6 +13,13 @@ import java.util.Objects;
  */
 public final class NotificationEventHandler {
 
+    private static final String DATA_MATCH_ID = "matchId";
+    private static final String DATA_OTHER_USER_ID = "otherUserId";
+    private static final String DATA_SENDER_ID = "senderId";
+    private static final String DATA_MESSAGE_ID = "messageId";
+    private static final String DATA_REQUEST_ID = "requestId";
+    private static final String DATA_ACCEPTER_USER_ID = "accepterUserId";
+
     private final CommunicationStorage communicationStorage;
 
     public NotificationEventHandler(CommunicationStorage communicationStorage) {
@@ -27,6 +34,10 @@ public final class NotificationEventHandler {
                 AppEventBus.HandlerPolicy.BEST_EFFORT);
         eventBus.subscribe(AppEvent.MatchCreated.class, this::onMatchCreated, AppEventBus.HandlerPolicy.BEST_EFFORT);
         eventBus.subscribe(AppEvent.MessageSent.class, this::onMessageSent, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(
+                AppEvent.FriendRequestAccepted.class,
+                this::onFriendRequestAccepted,
+                AppEventBus.HandlerPolicy.BEST_EFFORT);
     }
 
     void onRelationshipTransitioned(AppEvent.RelationshipTransitioned event) {
@@ -61,13 +72,21 @@ public final class NotificationEventHandler {
                 Notification.Type.MATCH_FOUND,
                 "New Match!",
                 "You have a new match!",
-                Map.of("matchId", event.matchId(), "otherUserId", event.userB().toString())));
+                Map.of(
+                        DATA_MATCH_ID,
+                        event.matchId(),
+                        DATA_OTHER_USER_ID,
+                        event.userB().toString())));
         saveNotification(Notification.create(
                 event.userB(),
                 Notification.Type.MATCH_FOUND,
                 "New Match!",
                 "You have a new match!",
-                Map.of("matchId", event.matchId(), "otherUserId", event.userA().toString())));
+                Map.of(
+                        DATA_MATCH_ID,
+                        event.matchId(),
+                        DATA_OTHER_USER_ID,
+                        event.userA().toString())));
     }
 
     void onMessageSent(AppEvent.MessageSent event) {
@@ -77,8 +96,20 @@ public final class NotificationEventHandler {
                 "New Message",
                 "Someone sent you a new message.",
                 Map.of(
-                        "senderId", event.senderId().toString(),
-                        "messageId", event.messageId().toString())));
+                        DATA_SENDER_ID, event.senderId().toString(),
+                        DATA_MESSAGE_ID, event.messageId().toString())));
+    }
+
+    void onFriendRequestAccepted(AppEvent.FriendRequestAccepted event) {
+        saveNotification(Notification.create(
+                event.fromUserId(),
+                Notification.Type.FRIEND_REQUEST_ACCEPTED,
+                "Friend Request Accepted",
+                "Your friend request was accepted.",
+                Map.of(
+                        DATA_REQUEST_ID, event.requestId().toString(),
+                        DATA_ACCEPTER_USER_ID, event.toUserId().toString(),
+                        DATA_MATCH_ID, event.matchId())));
     }
 
     private void saveNotification(Notification notification) {

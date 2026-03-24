@@ -175,6 +175,23 @@ class MessagingServiceTest {
         }
 
         @Test
+        @DisplayName("should honor configured message length limit")
+        void honorConfiguredMessageLengthLimit() {
+            AppConfig customConfig = AppConfig.builder().maxMessageLength(5).build();
+            ConnectionService customService =
+                    new ConnectionService(customConfig, messagingStorage, matchStorage, userStorage);
+
+            Match match = Match.create(userA, userB);
+            matchStorage.save(match);
+
+            ConnectionService.SendResult result = customService.sendMessage(userA, userB, "123456");
+
+            assertFalse(result.success());
+            assertEquals(ConnectionService.SendResult.ErrorCode.MESSAGE_TOO_LONG, result.errorCode());
+            assertEquals("Message too long (max 5 characters)", result.errorMessage());
+        }
+
+        @Test
         @DisplayName("should fail if sender not found")
         void failIfSenderNotFound() {
             UUID unknownUser = UUID.randomUUID();

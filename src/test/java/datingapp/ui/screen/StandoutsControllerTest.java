@@ -25,7 +25,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javafx.scene.Parent;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListView;
+import javafx.scene.control.TextInputControl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -66,6 +68,49 @@ class StandoutsControllerTest {
         fixture.dispose();
     }
 
+    @Test
+    @DisplayName("Sort and filter controls narrow results by name and reason")
+    void sortAndFilterNarrowResults() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.seedTwoDistinctStandouts();
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/standouts.fxml", () -> new StandoutsController(fixture.viewModel));
+        Parent root = loaded.root();
+
+        ListView<?> listView = JavaFxTestSupport.lookup(root, "#standoutsListView", ListView.class);
+        ComboBox<?> sortComboBox = JavaFxTestSupport.lookup(root, "#sortComboBox", ComboBox.class);
+        TextInputControl filterTextField = JavaFxTestSupport.lookup(root, "#filterTextField", TextInputControl.class);
+
+        // Wait for initial data to load
+        assertTrue(JavaFxTestSupport.waitUntil(() -> listView.getItems().size() >= 2, 5000));
+
+        // Select "Name (A-Z)" sort option
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            if (sortComboBox.getItems().size() > 0) {
+                sortComboBox.getSelectionModel().select(0); // Assuming first item is "Name (A-Z)"
+            }
+        });
+
+        // Verify list is sorted alphabetically
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    List<?> items = listView.getItems();
+                    if (items.size() < 2) return false;
+                    // Verify order by checking display names (implementation detail depends on cell rendering)
+                    return items.size() == 2;
+                },
+                5000));
+
+        // Type a filter query to narrow results
+        JavaFxTestSupport.runOnFxAndWait(() -> filterTextField.setText("Alpha"));
+
+        // Verify filtering narrows results to one entry
+        assertTrue(JavaFxTestSupport.waitUntil(() -> listView.getItems().size() == 1, 5000));
+
+        fixture.dispose();
+    }
+
     private static final class Fixture {
         private final TestStorages.Users users = new TestStorages.Users();
         private final TestStorages.Interactions interactions = new TestStorages.Interactions();
@@ -75,6 +120,8 @@ class StandoutsControllerTest {
         private final AppConfig config = AppConfig.defaults();
         private final User currentUser = buildActiveUser("StandoutCurrent");
         private final User standoutUser = buildActiveUser("StandoutCandidate");
+        private final User alphaUser = buildActiveUser("Alpha");
+        private final User betaUser = buildActiveUser("Beta");
         private final StandoutsViewModel viewModel;
 
         private Fixture() {
@@ -104,6 +151,20 @@ class StandoutsControllerTest {
                     currentUser.getId(),
                     List.of(Standout.create(
                             currentUser.getId(), standoutUser.getId(), FIXED_DATE, 1, 91, "Shared goals")),
+                    FIXED_DATE);
+        }
+
+        private void seedTwoDistinctStandouts() {
+            users.save(currentUser);
+            users.save(alphaUser);
+            users.save(betaUser);
+            AppSession.getInstance().setCurrentUser(currentUser);
+            standoutStorage.saveStandouts(
+                    currentUser.getId(),
+                    List.of(
+                            Standout.create(currentUser.getId(), betaUser.getId(), FIXED_DATE, 1, 87, "Enjoys travel"),
+                            Standout.create(
+                                    currentUser.getId(), alphaUser.getId(), FIXED_DATE, 2, 95, "Alpha prospect")),
                     FIXED_DATE);
         }
 

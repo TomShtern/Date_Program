@@ -216,6 +216,41 @@ class MatchingViewModelTest {
         viewModel.dispose();
     }
 
+    @Test
+    @DisplayName("superLike records SUPER_LIKE and advances exactly once")
+    void superLikeRecordsSuperLikeAndAdvancesExactlyOnce() {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+
+        MatchingViewModel viewModel = fixture.createViewModel();
+        viewModel.initialize(fixture.prioritizedCandidate.getId());
+
+        waitUntil(() -> viewModel.currentCandidateProperty().get() != null, 5000);
+
+        assertEquals(
+                fixture.prioritizedCandidate.getId(),
+                viewModel.currentCandidateProperty().get().getId());
+
+        viewModel.superLike();
+
+        waitUntil(
+                () -> fixture.fallbackCandidate
+                        .getId()
+                        .equals(viewModel.currentCandidateProperty().get().getId()),
+                5000);
+
+        assertEquals(
+                1,
+                fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.SUPER_LIKE),
+                "superLike should record exactly one SUPER_LIKE");
+        assertEquals(
+                0,
+                fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.LIKE),
+                "LIKE count should remain 0");
+
+        viewModel.dispose();
+    }
+
     private static void drainUntil(
             CheckedBooleanSupplier condition, QueuedUiDispatcher dispatcher, long timeoutMillis) {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);

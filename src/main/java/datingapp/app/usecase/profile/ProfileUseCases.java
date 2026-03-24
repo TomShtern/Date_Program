@@ -42,6 +42,7 @@ public class ProfileUseCases {
     private static final String USER_NOT_FOUND = "User not found";
     private static final String AUTHOR_NOT_FOUND = "Author not found";
     private static final String CONTEXT_AND_SUBJECT_REQUIRED = "Context and subjectId are required";
+    private static final String PROFILE_NOTE_TOO_LONG = "Note content exceeds maximum length of %d characters";
 
     private final UserStorage userStorage;
     private final ProfileService profileService;
@@ -203,15 +204,9 @@ public class ProfileUseCases {
             }
         }
 
-        try {
-            if (eventBus != null) {
-                eventBus.publish(new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()));
-            }
-        } catch (Exception e) {
-            if (logger.isWarnEnabled()) {
-                logger.warn("Post-save event publication failed for user {}: {}", user.getId(), e.getMessage(), e);
-            }
-        }
+        publishEvent(
+                new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()),
+                "Post-save event publication failed for user " + user.getId());
 
         return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
     }
@@ -408,6 +403,9 @@ public class ProfileUseCases {
             if (logger.isInfoEnabled()) {
                 logger.info("Account soft-deleted for user {} (reason={})", user.getId(), command.reason());
             }
+            publishEvent(
+                    new AppEvent.AccountDeleted(user.getId(), command.reason(), deletedAt),
+                    "Post-account-delete event publication failed for user " + user.getId());
             return UseCaseResult.success(true);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to delete account: " + e.getMessage()));
@@ -468,12 +466,25 @@ public class ProfileUseCases {
 
         try {
             String sanitizedContent = SanitizerUtils.sanitize(command.content());
+            int maxProfileNoteLength = config.validation().maxProfileNoteLength();
+            if (sanitizedContent != null && sanitizedContent.length() > maxProfileNoteLength) {
+                return UseCaseResult.failure(
+                        UseCaseError.validation(PROFILE_NOTE_TOO_LONG.formatted(maxProfileNoteLength)));
+            }
             ProfileNote note = userStorage
                     .getProfileNote(command.context().userId(), command.subjectId())
                     .map(existing -> existing.withContent(sanitizedContent))
                     .orElseGet(() ->
                             ProfileNote.create(command.context().userId(), command.subjectId(), sanitizedContent));
             userStorage.saveProfileNote(note);
+            publishEvent(
+                    new AppEvent.ProfileNoteSaved(
+                            command.context().userId(),
+                            command.subjectId(),
+                            note.content().length(),
+                            AppClock.now()),
+                    "Post-profile-note-save event publication failed for author "
+                            + command.context().userId());
             return UseCaseResult.success(note);
         } catch (IllegalArgumentException | NullPointerException e) {
             return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
@@ -497,6 +508,10 @@ public class ProfileUseCases {
             if (!deleted) {
                 return UseCaseResult.failure(UseCaseError.notFound("Profile note not found"));
             }
+            publishEvent(
+                    new AppEvent.ProfileNoteDeleted(command.context().userId(), command.subjectId(), AppClock.now()),
+                    "Post-profile-note-delete event publication failed for author "
+                            + command.context().userId());
             return UseCaseResult.success(true);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to delete profile note: " + e.getMessage()));
@@ -553,6 +568,19 @@ public class ProfileUseCases {
     private static void sanitizeProfileText(User user) {
         user.setName(SanitizerUtils.sanitize(user.getName()));
         user.setBio(SanitizerUtils.sanitize(user.getBio()));
+    }
+
+    private void publishEvent(AppEvent event, String failureMessage) {
+        if (eventBus == null) {
+            return;
+        }
+        try {
+            eventBus.publish(event);
+        } catch (Exception e) {
+            if (logger.isWarnEnabled()) {
+                logger.warn("{}: {}", failureMessage, e.getMessage(), e);
+            }
+        }
     }
 
     private List<UserAchievement> unlockAchievements(UUID userId) {

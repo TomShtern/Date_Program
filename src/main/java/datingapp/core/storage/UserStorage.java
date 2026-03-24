@@ -182,4 +182,21 @@ public interface UserStorage {
      * @return true if a note was deleted
      */
     boolean deleteProfileNote(UUID authorId, UUID subjectId);
+
+    /**
+     * Executes an operation under a database-level row lock for the given user.
+     * Implementations should acquire a distributed lock (e.g., FOR UPDATE clause)
+     * to ensure atomicity across multiple instances. The operation runs within the
+     * lock context, and any get/save calls within it should reuse the same
+     * transaction handle.
+     *
+     * @param userId    the user ID to lock
+     * @param operation the operation to execute within the lock
+     * @throws IllegalArgumentException if userId or operation is null
+     */
+    default void executeWithUserLock(UUID userId, Runnable operation) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(operation, "operation cannot be null");
+        operation.run();
+    }
 }

@@ -19,6 +19,8 @@ import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import javafx.scene.Parent;
 import javafx.scene.control.ListView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -57,6 +59,64 @@ class SocialControllerTest {
 
         assertTrue(JavaFxTestSupport.waitUntil(() -> !notifications.getItems().isEmpty(), 5000));
         assertTrue(JavaFxTestSupport.waitUntil(() -> !requests.getItems().isEmpty(), 5000));
+
+        fixture.dispose();
+    }
+
+    @Test
+    @DisplayName("Empty social data: lists remain empty with no notifications or friend requests")
+    void emptySocialDataKeepsListsEmpty() throws Exception {
+        Fixture fixture = new Fixture();
+        User currentUser = TestUserFactory.createActiveUser("EmptySocialUser");
+        fixture.users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/social.fxml", () -> new SocialController(fixture.viewModel));
+        Parent root = loaded.root();
+
+        ListView<?> notifications = JavaFxTestSupport.lookup(root, "#notificationsListView", ListView.class);
+        ListView<?> requests = JavaFxTestSupport.lookup(root, "#requestsListView", ListView.class);
+
+        assertTrue(notifications.getItems().isEmpty());
+        assertTrue(requests.getItems().isEmpty());
+
+        fixture.dispose();
+    }
+
+    @Test
+    @DisplayName("Pressing Enter or Space on unread notification marks it as read")
+    void keyboardEnterOnUnreadNotificationMarksAsRead() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.seedData();
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/social.fxml", () -> new SocialController(fixture.viewModel));
+        Parent root = loaded.root();
+        @SuppressWarnings("unchecked")
+        ListView<Notification> notificationsListView =
+                JavaFxTestSupport.lookup(root, "#notificationsListView", ListView.class);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> !notificationsListView.getItems().isEmpty(), 5000));
+
+        Notification selectedNotification = JavaFxTestSupport.callOnFxAndWait(
+                () -> notificationsListView.getItems().get(0));
+        assertTrue(JavaFxTestSupport.waitUntil(() -> !selectedNotification.isRead(), 5000));
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            notificationsListView.getSelectionModel().select(selectedNotification);
+            KeyEvent enterEvent = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false);
+            notificationsListView.fireEvent(enterEvent);
+        });
+
+        // Verify notification is marked as read
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> fixture.communications
+                        .getNotification(selectedNotification.id())
+                        .map(Notification::isRead)
+                        .orElse(false),
+                5000));
 
         fixture.dispose();
     }

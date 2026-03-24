@@ -680,6 +680,16 @@ public class ProfileViewModel {
         return config.validation().maxHeightCm();
     }
 
+    /** Returns the configured maximum number of interests allowed. */
+    public int getMaxInterests() {
+        return config.validation().maxInterests();
+    }
+
+    /** Returns the configured maximum bio length. */
+    public int getMaxBioLength() {
+        return config.validation().maxBioLength();
+    }
+
     /** Returns a ValidationService bound to this view model's runtime config. */
     public ValidationService getValidationService() {
         return new ValidationService(config);
@@ -988,12 +998,13 @@ public class ProfileViewModel {
             updateInterestsDisplay();
             return false;
         } else {
-            if (selectedInterests.size() < Interest.MAX_PER_USER) {
+            int maxInterests = getMaxInterests();
+            if (selectedInterests.size() < maxInterests) {
                 selectedInterests.add(interest);
                 updateInterestsDisplay();
                 return true;
             } else {
-                UiFeedbackService.showWarning("Maximum " + Interest.MAX_PER_USER + " interests allowed");
+                UiFeedbackService.showWarning("Maximum " + maxInterests + " interests allowed");
                 return false;
             }
         }

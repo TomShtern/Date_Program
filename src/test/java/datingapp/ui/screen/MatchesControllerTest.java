@@ -1,6 +1,7 @@
 package datingapp.ui.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -23,12 +24,14 @@ import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.MatchesViewModel;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
+import java.lang.reflect.Field;
 import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
+import javafx.scene.layout.Pane;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,6 +72,31 @@ class MatchesControllerTest {
                 .consumeNavigationContext(NavigationService.ViewType.CHAT, UUID.class)
                 .orElseThrow();
         assertEquals(fixture.otherUser.getId(), targetUserId);
+
+        fixture.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("cleanup clears observable particle resources and remains safe")
+    void cleanupClearsObservableParticleResourcesAndRemainsSafe() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.seedCurrentUserOnly();
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/matches.fxml", () -> new MatchesController(fixture.viewModel));
+        MatchesController controller = (MatchesController) loaded.controller();
+        Pane particleLayer = JavaFxTestSupport.callOnFxAndWait(() -> getPrivateField(controller, "particleLayer"));
+
+        assertNotNull(particleLayer);
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            controller.cleanup();
+            controller.cleanup();
+        });
+
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(particleLayer::getChildren).isEmpty());
 
         fixture.dispose();
         NavigationService.getInstance().clearHistory();
@@ -146,6 +174,11 @@ class MatchesControllerTest {
                     new datingapp.ui.async.JavaFxUiThreadDispatcher());
         }
 
+        private void seedCurrentUserOnly() {
+            users.save(currentUser);
+            AppSession.getInstance().setCurrentUser(currentUser);
+        }
+
         private void seedSingleMatch() {
             users.save(currentUser);
             users.save(otherUser);
@@ -175,5 +208,11 @@ class MatchesControllerTest {
             user.activate();
             return user;
         }
+    }
+
+    private static Pane getPrivateField(MatchesController controller, String fieldName) throws Exception {
+        Field field = MatchesController.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return (Pane) field.get(controller);
     }
 }

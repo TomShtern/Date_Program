@@ -19,6 +19,8 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TabPane;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -58,12 +60,24 @@ public class SocialController extends BaseController implements Initializable {
 
         notificationsListView.setItems(viewModel.getNotifications());
         notificationsListView.setCellFactory(lv -> createNotificationCell());
+        notificationsListView.setOnKeyPressed(this::handleNotificationsListKeyPress);
 
         requestsListView.setItems(viewModel.getPendingRequests());
         requestsListView.setCellFactory(lv -> createRequestCell());
 
         viewModel.initialize();
         UiAnimations.fadeIn(rootPane, 800);
+    }
+
+    @SuppressWarnings("PMD.UnusedPrivateMethod")
+    private void handleNotificationsListKeyPress(KeyEvent e) {
+        if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
+            Notification item = notificationsListView.getSelectionModel().getSelectedItem();
+            if (item != null && !item.isRead()) {
+                viewModel.markNotificationRead(item);
+            }
+            e.consume();
+        }
     }
 
     private ListCell<Notification> createNotificationCell() {

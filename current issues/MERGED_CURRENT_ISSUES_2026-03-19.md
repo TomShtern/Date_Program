@@ -486,6 +486,8 @@ This document is split for fast triage and deep implementation work:
 - Finding reports same call performing auto-block and auto-ban behavior.
 - Addendum later states report() was refactored to conditional branch logic.
 
+#### Completion status: ✅ Implemented (2026-03-24 complex-plan completion)
+
 #### Recommended Actions
 - Use DB-level atomic transitions/locking for distributed safety workflows.
 - Use distributed/centralized concurrency control for auto-ban operations in multi-node deployments.
@@ -775,6 +777,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - Report flags REST server as existing but with unclear implementation depth.
 - Immediate priority list repeats this as a top completion item.
 
+#### Completion status: ✅ Implemented (2026-03-23 complex-plan completion)
+
 #### Recommended Actions
 - Complete REST API implementation and clarify endpoint behavior/contracts.
 - Complete REST API implementation.
@@ -886,6 +890,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 #### Details and Context
 - Large classes with mixed concerns are highlighted (handlers/entities/preferences).
 - Broad interfaces are noted as amplifying regression risk and change impact.
+
+#### Completion status: ✅ Implemented (2026-03-24 complex-plan completion)
 
 #### Recommended Actions
 - Split large classes into smaller, focused single-responsibility components/services.
@@ -1447,6 +1453,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - Standouts were reported as core/CLI feature with missing JavaFX surface.
 - Addendum later describes ViewModel/Controller/FXML and dashboard navigation wiring.
 
+#### Completion status: ✅ Implemented (2026-03-23 complex-plan completion)
+
 #### Recommended Actions
 - No immediate code change required (historical/resolved context).
 
@@ -1500,6 +1508,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 #### Details and Context
 - Screen reader and related accessibility coverage is called out as limited.
 - Accessibility gap is explicitly identified for assistive technologies.
+
+#### Completion status: ✅ Implemented (2026-03-24 complex-plan completion)
 
 #### Recommended Actions
 - Improve accessibility semantics, keyboard navigation, and assistive-tech validation.
@@ -1581,6 +1591,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 #### Details and Context
 - Some business constraints are embedded in code, reducing runtime flexibility.
 - Report calls out embedded rules that reduce runtime tunability.
+- Completion expanded on 2026-03-24: message/note length limits externalized via AppConfig validation.
 
 #### Completion status: ✅ Implemented (2026-03-22 batch)
 
@@ -1772,6 +1783,7 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 - The event system itself exists and is actively used.
 - Remaining work is contract-level: extend event payloads/types only when a concrete feature requires them.
 - This is not a baseline architecture gap.
+- Completion expanded on 2026-03-24: profile-note/account lifecycle events were added and wired to handlers/tests.
 
 #### Completion status: ✅ Implemented (2026-03-22 batch)
 
@@ -1801,6 +1813,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 #### Details and Context
 - Report states profile notes were CLI-only.
 - Later notes dedicated Notes view/screen implementation and inline editing.
+
+#### Completion status: ✅ Implemented (2026-03-24 complex-plan completion)
 
 #### Recommended Actions
 - No immediate code change required (historical/resolved context).
@@ -1880,6 +1894,8 @@ The Builder class (lines 224-670 of `AppConfig.java`) is **essential infrastruct
 #### Details and Context
 - Originally characterized as mostly untested beyond CSS checks.
 - Revalidation says coverage improved substantially but some screens remain lighter.
+
+#### Completion status: ✅ Implemented (2026-03-24 complex-plan completion)
 
 #### Recommended Actions
 - No immediate code change required (historical/resolved context).
@@ -2171,6 +2187,9 @@ The claim that `isRunning()` "reads without synchronization" is technically true
 - Birth date invalid input may be silently skipped.
 - Message send path lacks length/profanity checks.
 
+#### Completion status: ✅ Implemented (2026-03-24 complex-plan completion)
+- Completion expanded on 2026-03-24: CLI validation/error-handling paths were standardized (including safe EOF handling in messaging flows).
+
 #### Recommended Actions
 - Add explicit validation feedback and content constraints.
 
@@ -2195,6 +2214,7 @@ The claim that `isRunning()` "reads without synchronization" is technically true
 
 #### Details and Context
 - Some flows rely on later `saveProfile()` calls; interruption can drop modifications.
+- Completion expanded on 2026-03-24: CLI note mutation paths were routed through profile use-cases with regression coverage.
 
 #### Completion status: ✅ Implemented (2026-03-22 batch)
 

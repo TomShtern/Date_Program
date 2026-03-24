@@ -14,13 +14,12 @@
 
 <BorderPane fx:id="rootPane" prefHeight="700.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21"
     xmlns:fx="http://javafx.com/fxml/1" fx:controller="datingapp.ui.screen.SocialController">
-
   <top>
     <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="header-surface">
-      <Button onAction="#handleBack" styleClass="button-transparent" text="← Back"/>
-      <Label styleClass="screen-title" text="Social"/>
+      <Button onAction="#handleBack" styleClass="button-transparent" text="← Back" accessibleText="Back to Dashboard"/>
+      <Label styleClass="screen-title" text="Social" accessibleText="Social screen - notifications and friend requests"/>
       <Region HBox.hgrow="ALWAYS"/>
-      <Button onAction="#handleRefresh" styleClass="button-transparent">
+      <Button onAction="#handleRefresh" styleClass="button-transparent" accessibleText="Refresh notifications and friend requests">
         <graphic>
           <FontIcon iconLiteral="mdi2r-refresh" iconSize="20" iconColor="white"/>
         </graphic>
@@ -30,7 +29,6 @@
 
   <center>
     <TabPane fx:id="tabPane" tabClosingPolicy="UNAVAILABLE">
-
       <!-- Notifications Tab -->
       <Tab text="Notifications">
         <graphic>
@@ -42,10 +40,9 @@
           </padding>
           <Label styleClass="text-secondary" text="Tap a notification to mark it as read"/>
           <ListView fx:id="notificationsListView" VBox.vgrow="ALWAYS" prefHeight="580"
-                    styleClass="transparent-scroll"/>
+                              styleClass="transparent-scroll" accessibleText="Notifications list - press Enter or Space to mark notification as read"/>
         </VBox>
       </Tab>
-
       <!-- Friend Requests Tab -->
       <Tab text="Friend Requests">
         <graphic>
@@ -57,11 +54,9 @@
           </padding>
           <Label styleClass="text-secondary" text="Pending requests from your matches"/>
           <ListView fx:id="requestsListView" VBox.vgrow="ALWAYS" prefHeight="580"
-                    styleClass="transparent-scroll"/>
+                              styleClass="transparent-scroll"/>
         </VBox>
       </Tab>
-
     </TabPane>
   </center>
-
 </BorderPane>

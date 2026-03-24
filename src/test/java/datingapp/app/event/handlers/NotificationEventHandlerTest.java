@@ -112,6 +112,26 @@ class NotificationEventHandlerTest {
     }
 
     @Test
+    void friendRequestAcceptedCreatesNotificationForRequester() {
+        UUID requesterId = UUID.randomUUID();
+        UUID accepterId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        String matchId = "match-" + UUID.randomUUID();
+
+        bus.publish(new AppEvent.FriendRequestAccepted(requestId, requesterId, accepterId, matchId, Instant.now()));
+
+        assertEquals(1, savedNotifications.size());
+        Notification notification = savedNotifications.getFirst();
+        assertEquals(requesterId, notification.userId());
+        assertEquals(Notification.Type.FRIEND_REQUEST_ACCEPTED, notification.type());
+        assertEquals("Friend Request Accepted", notification.title());
+        assertEquals("Your friend request was accepted.", notification.message());
+        assertEquals(requestId.toString(), notification.data().get("requestId"));
+        assertEquals(accepterId.toString(), notification.data().get("accepterUserId"));
+        assertEquals(matchId, notification.data().get("matchId"));
+    }
+
+    @Test
     void handlerExceptionsDoNotPropagate() {
         bus.subscribe(
                 AppEvent.RelationshipTransitioned.class,

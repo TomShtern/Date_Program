@@ -188,7 +188,9 @@ public class MessagingHandler implements LoggingSupport {
 
                 String userInput = input.readLine("> ").trim();
 
-                if (!userInput.isEmpty()) {
+                if (input.wasInputExhausted()) {
+                    active = false;
+                } else if (!userInput.isEmpty()) {
                     ConversationAction action = processConversationInput(userInput, canMessage, currentUser, otherUser);
                     if (action == ConversationAction.EXIT) {
                         active = false;
@@ -408,12 +410,20 @@ public class MessagingHandler implements LoggingSupport {
 
     private int getTotalUnreadCount(User currentUser) {
         var result = messagingUseCases.totalUnreadCount(UserContext.cli(currentUser.getId()));
-        return result.success() ? result.data() : 0;
+        if (!result.success()) {
+            logWarn("Failed to retrieve unread count: {}", result.error().message());
+            return 0;
+        }
+        return result.data();
     }
 
     private List<ConversationPreview> loadConversationPreviews(User currentUser) {
         var result = messagingUseCases.listConversations(
                 new MessagingUseCases.ListConversationsQuery(UserContext.cli(currentUser.getId()), 50, 0));
-        return result.success() ? result.data().conversations() : List.of();
+        if (!result.success()) {
+            logWarn("Failed to load conversations: {}", result.error().message());
+            return List.of();
+        }
+        return result.data().conversations();
     }
 }

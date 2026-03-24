@@ -820,8 +820,13 @@ public class MatchingHandler implements LoggingSupport {
             String status = n.isRead() ? "  " : "🆕";
             logInfo("{} [{}] {}: {}", status, n.createdAt(), n.title(), n.message());
             if (!n.isRead()) {
-                socialUseCases.markNotificationRead(
+                var markResult = socialUseCases.markNotificationRead(
                         new MarkNotificationReadCommand(UserContext.cli(currentUser.getId()), n.id()));
+                if (!markResult.success()) {
+                    logWarn(
+                            "Failed to mark notification as read: {}",
+                            markResult.error().message());
+                }
             }
         }
 

@@ -49,12 +49,16 @@ class SafetyHandlerTest {
     }
 
     private SafetyHandler createHandler(String input) {
+        return createHandler(input, AppConfig.defaults());
+    }
+
+    private SafetyHandler createHandler(String input, AppConfig config) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
-                        trustSafetyStorage, interactionStorage, userStorage, AppConfig.defaults())
+                        trustSafetyStorage, interactionStorage, userStorage, config)
                 .build();
         return new SafetyHandler(
-                userStorage, trustSafetyService, new SocialUseCases(trustSafetyService), session, inputReader);
+                userStorage, trustSafetyService, new SocialUseCases(trustSafetyService), session, inputReader, config);
     }
 
     @SuppressWarnings("unused")
@@ -243,6 +247,22 @@ class SafetyHandlerTest {
             handler.reportUser();
 
             assertEquals(0, trustSafetyStorage.countReportsBy(testUser.getId()));
+        }
+
+        @Test
+        @DisplayName("Truncates report description using configured max length")
+        void truncatesReportDescriptionUsingConfiguredMaxLength() {
+            User otherUser = createActiveUser("OtherUser");
+            userStorage.save(otherUser);
+
+            AppConfig customConfig = AppConfig.builder().maxReportDescLength(5).build();
+            SafetyHandler handler = createHandler("1\n1\n123456789\nn\n", customConfig);
+
+            handler.reportUser();
+
+            var reports = trustSafetyStorage.getReportsAgainst(otherUser.getId());
+            assertEquals(1, reports.size());
+            assertEquals("12345", reports.getFirst().description());
         }
     }
 

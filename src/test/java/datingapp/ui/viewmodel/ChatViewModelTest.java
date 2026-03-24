@@ -40,6 +40,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -210,7 +211,7 @@ class ChatViewModelTest {
         assertEquals(0, viewModel.totalUnreadCountProperty().get());
     }
 
-    @Test
+    @RepeatedTest(10)
     @DisplayName("rapid selection skips stale background loads")
     void shouldSkipStaleBackgroundLoads() throws InterruptedException {
         User user3 = createActiveUser("User3");

@@ -991,7 +991,7 @@
 /* Character Counter for Bio */
 .char-counter {
     -fx-font-size: 12px;
-    -fx-text-fill: #64748b;
+    -fx-text-fill: #cbd5e1;
 }
 
 .char-counter-warning {
@@ -1996,7 +1996,7 @@
 .empty-state-label {
     -fx-font-size: 11px;
     -fx-font-weight: bold;
-    -fx-text-fill: #64748b;
+    -fx-text-fill: #cbd5e1;
 }
 
 /* Action Suggestion Labels */
@@ -2045,7 +2045,7 @@
 /* Match Card Timestamp */
 .match-timestamp {
     -fx-font-size: 11px;
-    -fx-text-fill: #475569;
+    -fx-text-fill: #cbd5e1;
 }
 
 /* Match Count Badge */

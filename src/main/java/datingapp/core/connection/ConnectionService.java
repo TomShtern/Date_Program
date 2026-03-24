@@ -92,9 +92,10 @@ public class ConnectionService {
             return SendResult.failure(EMPTY_MESSAGE, SendResult.ErrorCode.EMPTY_MESSAGE);
         }
         content = content.trim();
-        if (content.length() > Message.MAX_LENGTH) {
+        int maxMessageLength = config.validation().maxMessageLength();
+        if (content.length() > maxMessageLength) {
             return SendResult.failure(
-                    MESSAGE_TOO_LONG.formatted(Message.MAX_LENGTH), SendResult.ErrorCode.MESSAGE_TOO_LONG);
+                    MESSAGE_TOO_LONG.formatted(maxMessageLength), SendResult.ErrorCode.MESSAGE_TOO_LONG);
         }
 
         String conversationId = Conversation.generateId(senderId, recipientId);

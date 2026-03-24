@@ -373,6 +373,31 @@ class JdbiUserStorageNormalizationTest {
         assertEquals(1, storage.getProfileNotesByAuthor(userId).size());
     }
 
+    @Test
+    @DisplayName("executeWithUserLock supports get and save within lock context")
+    void executeWithUserLockSupportsGetAndSaveWithinLock() {
+        // Create and save a user
+        User original = new User(userId, "TestUser");
+        original.setBio("Original bio");
+        storage.save(original);
+
+        // Execute within lock: get user, modify, and save
+        storage.executeWithUserLock(userId, () -> {
+            // Get within lock
+            User locked = storage.get(userId).orElseThrow(() -> new RuntimeException("User not found"));
+
+            // Modify within lock
+            locked.setBio("Modified bio");
+
+            // Save within lock (reuses same transaction)
+            storage.save(locked);
+        });
+
+        // Verify that the modification was persisted
+        User reloaded = storage.get(userId).orElseThrow();
+        assertEquals("Modified bio", reloaded.getBio(), "Bio should be persisted after lock-based modification");
+    }
+
     private static User createActiveUser(
             UUID id, String name, Gender gender, Set<Gender> interestedIn, boolean withLocation) {
         User.StorageBuilder builder = User.StorageBuilder.create(id, name, Instant.now())

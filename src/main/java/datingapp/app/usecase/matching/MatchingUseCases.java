@@ -35,7 +35,91 @@ import java.util.UUID;
 public class MatchingUseCases {
 
     private static final String CONTEXT_REQUIRED = "Context is required";
-    private static final String INTERACTION_STORAGE_REQUIRED = "InteractionStorage is not configured";
+    private static final AppEventBus NO_OP_EVENT_BUS = new AppEventBus() {
+        @Override
+        public void publish(AppEvent event) {
+            // no-op: optional event bus substitution intentionally drops events.
+        }
+
+        @Override
+        public <T extends AppEvent> void subscribe(Class<T> eventType, AppEventBus.AppEventHandler<T> handler) {
+            // no-op: optional event bus substitution intentionally ignores subscriptions.
+        }
+
+        @Override
+        public <T extends AppEvent> void subscribe(
+                Class<T> eventType, AppEventBus.AppEventHandler<T> handler, AppEventBus.HandlerPolicy policy) {
+            // no-op: optional event bus substitution intentionally ignores subscriptions.
+        }
+    };
+    private static final DailyLimitService NO_OP_DAILY_LIMIT_SERVICE = new DailyLimitService() {
+        @Override
+        public boolean canLike(UUID userId) {
+            return true;
+        }
+
+        @Override
+        public boolean canSuperLike(UUID userId) {
+            return true;
+        }
+
+        @Override
+        public boolean canPass(UUID userId) {
+            return true;
+        }
+
+        @Override
+        public DailyStatus getStatus(UUID userId) {
+            return new DailyStatus(0, -1, 0, -1, 0, -1, AppClock.today(), AppClock.now());
+        }
+
+        @Override
+        public java.time.Duration getTimeUntilReset() {
+            return java.time.Duration.ZERO;
+        }
+
+        @Override
+        public String formatDuration(java.time.Duration duration) {
+            return RecommendationService.formatDuration(duration);
+        }
+    };
+    private static final DailyPickService NO_OP_DAILY_PICK_SERVICE = new DailyPickService() {
+        @Override
+        public Optional<DailyPick> getDailyPick(User seeker) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean hasViewedDailyPick(UUID userId) {
+            return false;
+        }
+
+        @Override
+        public void markDailyPickViewed(UUID userId) {
+            // no-op: null recommendation-service wrapper intentionally does nothing.
+        }
+
+        @Override
+        public int cleanupOldDailyPickViews(java.time.LocalDate before) {
+            return 0;
+        }
+    };
+    private static final StandoutService NO_OP_STANDOUT_SERVICE = new StandoutService() {
+        @Override
+        public Result getStandouts(User seeker) {
+            return Result.empty("No standout service configured");
+        }
+
+        @Override
+        public void markInteracted(UUID seekerId, UUID standoutUserId) {
+            // no-op: null recommendation-service wrapper intentionally does nothing.
+        }
+
+        @Override
+        public Map<UUID, User> resolveUsers(List<Standout> standouts) {
+            return Map.of();
+        }
+    };
 
     private final CandidateFinder candidateFinder;
     private final MatchingService matchingService;
@@ -64,16 +148,16 @@ public class MatchingUseCases {
             UserStorage userStorage,
             MatchQualityService matchQualityService,
             AppEventBus eventBus) {
-        this.candidateFinder = candidateFinder;
+        this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
-        this.dailyLimitService = dailyLimitService;
-        this.dailyPickService = dailyPickService;
-        this.standoutService = standoutService;
-        this.undoService = undoService;
-        this.interactionStorage = interactionStorage;
-        this.userStorage = userStorage;
-        this.matchQualityService = matchQualityService;
-        this.eventBus = eventBus;
+        this.dailyLimitService = Objects.requireNonNull(dailyLimitService, "dailyLimitService cannot be null");
+        this.dailyPickService = Objects.requireNonNull(dailyPickService, "dailyPickService cannot be null");
+        this.standoutService = Objects.requireNonNull(standoutService, "standoutService cannot be null");
+        this.undoService = Objects.requireNonNull(undoService, "undoService cannot be null");
+        this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+        this.matchQualityService = Objects.requireNonNull(matchQualityService, "matchQualityService cannot be null");
+        this.eventBus = eventBus == null ? NO_OP_EVENT_BUS : eventBus;
     }
 
     public static final class Builder {
@@ -170,17 +254,10 @@ public class MatchingUseCases {
         if (currentUser.getState() != UserState.ACTIVE) {
             return UseCaseResult.failure(UseCaseError.conflict("User must be ACTIVE to browse candidates"));
         }
-        if (candidateFinder == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("CandidateFinder is not configured"));
-        }
 
         try {
-            Optional<DailyPick> dailyPick = Optional.empty();
-            boolean dailyPickViewed = true;
-            if (dailyPickService != null) {
-                dailyPick = dailyPickService.getDailyPick(currentUser);
-                dailyPickViewed = dailyPickService.hasViewedDailyPick(currentUser.getId());
-            }
+            Optional<DailyPick> dailyPick = dailyPickService.getDailyPick(currentUser);
+            boolean dailyPickViewed = dailyPickService.hasViewedDailyPick(currentUser.getId());
 
             if (!currentUser.hasLocationSet()) {
                 return UseCaseResult.success(new BrowseCandidatesResult(List.of(), dailyPick, dailyPickViewed, true));
@@ -201,7 +278,7 @@ public class MatchingUseCases {
             return UseCaseResult.failure(UseCaseError.validation("Context, current user and candidate are required"));
         }
         try {
-            if (command.markDailyPickViewed() && dailyPickService != null) {
+            if (command.markDailyPickViewed()) {
                 dailyPickService.markDailyPickViewed(command.context().userId());
             }
             MatchingService.SwipeResult result = matchingService.processSwipe(
@@ -209,19 +286,17 @@ public class MatchingUseCases {
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.message()));
             }
-            if (eventBus != null) {
-                eventBus.publish(new AppEvent.SwipeRecorded(
-                        command.context().userId(),
-                        command.candidate().getId(),
-                        result.like().direction().name(),
-                        result.matched(),
-                        AppClock.now()));
-                if (result.matched()) {
-                    Match m = result.match();
-                    Objects.requireNonNull(m, "match cannot be null when matched() is true");
-                    eventBus.publish(new AppEvent.MatchCreated(
-                            m.getId(), result.like().whoLikes(), result.like().whoGotLiked(), AppClock.now()));
-                }
+            eventBus.publish(new AppEvent.SwipeRecorded(
+                    command.context().userId(),
+                    command.candidate().getId(),
+                    result.like().direction().name(),
+                    result.matched(),
+                    AppClock.now()));
+            if (result.matched()) {
+                Match m = result.match();
+                Objects.requireNonNull(m, "match cannot be null when matched() is true");
+                eventBus.publish(new AppEvent.MatchCreated(
+                        m.getId(), result.like().whoLikes(), result.like().whoGotLiked(), AppClock.now()));
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {
@@ -232,9 +307,6 @@ public class MatchingUseCases {
     public UseCaseResult<UndoService.UndoResult> undoSwipe(UndoSwipeCommand command) {
         if (command == null || command.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
-        }
-        if (undoService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("UndoService is not configured"));
         }
 
         UUID userId = command.context().userId();
@@ -255,9 +327,6 @@ public class MatchingUseCases {
     public UseCaseResult<ActiveMatchesResult> listActiveMatches(ListActiveMatchesQuery query) {
         if (query == null || query.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
-        }
-        if (interactionStorage == null || userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("InteractionStorage and UserStorage are required"));
         }
 
         try {
@@ -283,9 +352,6 @@ public class MatchingUseCases {
         }
         if (query.offset() < 0) {
             return UseCaseResult.failure(UseCaseError.validation("offset must be non-negative"));
-        }
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("UserStorage is required"));
         }
         try {
             UUID userId = query.context().userId();
@@ -317,9 +383,6 @@ public class MatchingUseCases {
         if (query == null || query.context() == null || query.currentUser() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and current user are required"));
         }
-        if (standoutService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("StandoutService is not configured"));
-        }
         try {
             StandoutService.Result result = standoutService.getStandouts(query.currentUser());
             Map<UUID, User> users = standoutService.resolveUsers(result.standouts());
@@ -332,9 +395,6 @@ public class MatchingUseCases {
     public UseCaseResult<Void> markStandoutInteracted(StandoutInteractionCommand command) {
         if (command == null || command.context() == null || command.standoutUserId() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and standout user are required"));
-        }
-        if (standoutService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("StandoutService is not configured"));
         }
         try {
             standoutService.markInteracted(command.context().userId(), command.standoutUserId());
@@ -354,13 +414,11 @@ public class MatchingUseCases {
         }
         if (command.enforceDailyLimit()
                 && command.direction() == Like.Direction.LIKE
-                && dailyLimitService != null
                 && !dailyLimitService.canLike(command.context().userId())) {
             return UseCaseResult.failure(UseCaseError.conflict("Daily like limit reached"));
         }
         if (command.enforceDailyLimit()
                 && command.direction() == Like.Direction.SUPER_LIKE
-                && dailyLimitService != null
                 && !dailyLimitService.canSuperLike(command.context().userId())) {
             return UseCaseResult.failure(UseCaseError.conflict("Daily super-like limit reached"));
         }
@@ -368,18 +426,12 @@ public class MatchingUseCases {
         try {
             Like like = Like.create(command.context().userId(), command.targetUserId(), command.direction());
             Optional<Match> match = matchingService.recordLike(like);
-            if (eventBus != null) {
-                eventBus.publish(new AppEvent.SwipeRecorded(
-                        like.whoLikes(),
-                        like.whoGotLiked(),
-                        like.direction().name(),
-                        match.isPresent(),
-                        AppClock.now()));
-                if (match.isPresent()) {
-                    Match m = match.get();
-                    eventBus.publish(
-                            new AppEvent.MatchCreated(m.getId(), like.whoLikes(), like.whoGotLiked(), AppClock.now()));
-                }
+            eventBus.publish(new AppEvent.SwipeRecorded(
+                    like.whoLikes(), like.whoGotLiked(), like.direction().name(), match.isPresent(), AppClock.now()));
+            if (match.isPresent()) {
+                Match m = match.get();
+                eventBus.publish(
+                        new AppEvent.MatchCreated(m.getId(), like.whoLikes(), like.whoGotLiked(), AppClock.now()));
             }
             return UseCaseResult.success(new RecordLikeResult(like, match));
         } catch (Exception e) {
@@ -390,9 +442,6 @@ public class MatchingUseCases {
     public UseCaseResult<Void> removeLike(RemoveLikeCommand command) {
         if (command == null || command.context() == null || command.likeId() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and likeId are required"));
-        }
-        if (interactionStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(INTERACTION_STORAGE_REQUIRED));
         }
         try {
             interactionStorage.delete(command.likeId());
@@ -405,9 +454,6 @@ public class MatchingUseCases {
     public UseCaseResult<MatchQualityService.MatchQuality> matchQuality(MatchQualityQuery query) {
         if (query == null || query.context() == null || query.match() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and match are required"));
-        }
-        if (matchQualityService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("MatchQualityService is not configured"));
         }
         try {
             Optional<MatchQualityService.MatchQuality> quality = matchQualityService.computeQuality(
@@ -425,9 +471,6 @@ public class MatchingUseCases {
         if (query == null || query.context() == null || query.matchId() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and matchId are required"));
         }
-        if (interactionStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(INTERACTION_STORAGE_REQUIRED));
-        }
         Match match = interactionStorage.get(query.matchId()).orElse(null);
         if (match == null) {
             return UseCaseResult.failure(UseCaseError.notFound("Match not found"));
@@ -441,9 +484,6 @@ public class MatchingUseCases {
     public UseCaseResult<Void> archiveMatch(ArchiveMatchCommand command) {
         if (command == null || command.context() == null || command.matchId() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and matchId are required"));
-        }
-        if (interactionStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(INTERACTION_STORAGE_REQUIRED));
         }
         Match match = interactionStorage.get(command.matchId()).orElse(null);
         if (match == null) {
@@ -506,7 +546,7 @@ public class MatchingUseCases {
 
     public static DailyLimitService wrapDailyLimitService(RecommendationService recommendationService) {
         if (recommendationService == null) {
-            return null;
+            return NO_OP_DAILY_LIMIT_SERVICE;
         }
         return new DailyLimitService() {
             @Override
@@ -552,7 +592,7 @@ public class MatchingUseCases {
 
     public static DailyPickService wrapDailyPickService(RecommendationService recommendationService) {
         if (recommendationService == null) {
-            return null;
+            return NO_OP_DAILY_PICK_SERVICE;
         }
         return new DailyPickService() {
             @Override
@@ -581,7 +621,7 @@ public class MatchingUseCases {
 
     public static StandoutService wrapStandoutService(RecommendationService recommendationService) {
         if (recommendationService == null) {
-            return null;
+            return NO_OP_STANDOUT_SERVICE;
         }
         return new StandoutService() {
             @Override

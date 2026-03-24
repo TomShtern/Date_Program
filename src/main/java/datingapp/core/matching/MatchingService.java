@@ -30,12 +30,12 @@ public final class MatchingService {
     private final TrustSafetyStorage trustSafetyStorage;
     private final UserStorage userStorage;
     private final Map<String, Object> swipeInFlight = new ConcurrentHashMap<>();
-    private final ActivityMetricsService activityMetricsService; // Optional
+    private final Optional<ActivityMetricsService> activityMetricsService;
     private final UndoService undoService;
     private final RecommendationService dailyService;
     private final CandidateFinder candidateFinder;
 
-    /** Constructor with all dependencies (optional dependencies may be null). */
+    /** Constructor with all dependencies except CandidateFinder and ActivityMetricsService. */
     public MatchingService(
             InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
@@ -67,7 +67,7 @@ public final class MatchingService {
         this.undoService = Objects.requireNonNull(undoService, "undoService cannot be null");
         this.dailyService = Objects.requireNonNull(dailyService, "dailyService cannot be null");
         this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
-        this.activityMetricsService = activityMetricsService;
+        this.activityMetricsService = Optional.ofNullable(activityMetricsService);
     }
 
     public static Builder builder() {
@@ -141,8 +141,8 @@ public final class MatchingService {
     public Optional<Match> recordLike(Like like) {
         Objects.requireNonNull(like, LIKE_REQUIRED);
         InteractionStorage.LikeMatchWriteResult writeResult = interactionStorage.saveLikeAndMaybeCreateMatch(like);
-        if (activityMetricsService != null && writeResult.createdMatch().isPresent()) {
-            activityMetricsService.recordSwipe(like.whoLikes(), like.direction(), true);
+        if (writeResult.createdMatch().isPresent()) {
+            activityMetricsService.ifPresent(svc -> svc.recordSwipe(like.whoLikes(), like.direction(), true));
         }
         return writeResult.createdMatch();
     }
@@ -176,7 +176,7 @@ public final class MatchingService {
 
     /** Get the session service (for UI access to session info). */
     public Optional<ActivityMetricsService> getActivityMetricsService() {
-        return Optional.ofNullable(activityMetricsService);
+        return activityMetricsService;
     }
 
     /**

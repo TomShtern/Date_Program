@@ -2,6 +2,7 @@ package datingapp.app.usecase.matching;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.usecase.common.UserContext;
@@ -15,6 +16,7 @@ import datingapp.core.AppConfig;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.DailyPickService;
+import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
@@ -67,6 +69,7 @@ class MatchingUseCasesTest {
                 interactionStorage,
                 trustSafetyStorage,
                 config.safety().userTimeZone());
+        var matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
         var undoService = new UndoService(interactionStorage, undoStorage, config);
         var matchingService = MatchingService.builder()
                 .interactionStorage(interactionStorage)
@@ -86,7 +89,7 @@ class MatchingUseCasesTest {
                 undoService,
                 interactionStorage,
                 userStorage,
-                null,
+                matchQualityService,
                 null);
     }
 
@@ -160,6 +163,38 @@ class MatchingUseCasesTest {
         assertEquals(1, result.data().page().items().size());
         assertEquals(1, result.data().page().totalCount());
         assertTrue(result.data().usersById().containsKey(candidate.getId()));
+    }
+
+    @Test
+    @DisplayName("wrapDailyLimitService(null) returns non-null permissive service")
+    void wrapDailyLimitServiceNullReturnsNonNullPermissiveService() {
+        var wrappedService = MatchingUseCases.wrapDailyLimitService(null);
+
+        assertNotNull(wrappedService);
+        assertTrue(wrappedService.canLike(currentUser.getId()));
+        assertTrue(wrappedService.canPass(currentUser.getId()));
+        assertTrue(wrappedService.canSuperLike(currentUser.getId()));
+    }
+
+    @Test
+    @DisplayName("wrapDailyPickService(null) returns non-null empty service")
+    void wrapDailyPickServiceNullReturnsNonNullEmptyService() {
+        var wrappedService = MatchingUseCases.wrapDailyPickService(null);
+
+        assertNotNull(wrappedService);
+        assertTrue(wrappedService.getDailyPick(currentUser).isEmpty());
+        assertFalse(wrappedService.hasViewedDailyPick(currentUser.getId()));
+        assertEquals(0, wrappedService.cleanupOldDailyPickViews(AppClock.today()));
+    }
+
+    @Test
+    @DisplayName("wrapStandoutService(null) returns non-null empty service")
+    void wrapStandoutServiceNullReturnsNonNullEmptyService() {
+        var wrappedService = MatchingUseCases.wrapStandoutService(null);
+
+        assertNotNull(wrappedService);
+        assertEquals(0, wrappedService.getStandouts(currentUser).standouts().size());
+        assertEquals(0, wrappedService.resolveUsers(List.of()).size());
     }
 
     private static DailyLimitService alwaysAllowDailyLimitService() {

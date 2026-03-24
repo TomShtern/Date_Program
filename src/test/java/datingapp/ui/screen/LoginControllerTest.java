@@ -101,6 +101,45 @@ class LoginControllerTest {
         viewModel.dispose();
     }
 
+    @Test
+    @DisplayName("Empty user repository keeps login button disabled")
+    void emptyUserRepositoryKeepsLoginButtonDisabled() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+
+        // No users saved - repository is empty
+
+        LoginViewModel viewModel = new LoginViewModel(new StorageUiUserStore(users), config, AppSession.getInstance());
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/login.fxml", () -> new LoginController(viewModel, profileService));
+        Parent root = loaded.root();
+        Button loginButton = JavaFxTestSupport.lookup(root, "#loginButton", Button.class);
+        @SuppressWarnings("unchecked")
+        ListView<User> userListView = JavaFxTestSupport.lookup(root, "#userListView", ListView.class);
+
+        // Wait briefly to allow any async initialization
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return JavaFxTestSupport.callOnFxAndWait(
+                                        () -> userListView.getItems().size())
+                                == 0;
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+
+        assertEquals(true, JavaFxTestSupport.callOnFxAndWait(loginButton::isDisabled));
+
+        viewModel.dispose();
+    }
+
     private static User createActiveUser(String name, Gender gender, EnumSet<Gender> interestedIn) {
         User user = new User(UUID.randomUUID(), name);
         user.setBirthDate(AppClock.today().minusYears(25));

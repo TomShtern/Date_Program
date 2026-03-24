@@ -367,6 +367,64 @@ class ProfileViewModelTest {
         viewModel.dispose();
     }
 
+    @Test
+    @DisplayName("toggleInterest honors the configured maximum interests limit")
+    void toggleInterestHonorsConfiguredMaximumInterests() {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        AppConfig config = AppConfig.builder().maxInterests(1).build();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+
+        User currentUser = createActiveUser("InterestLimitUser");
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                (datingapp.app.usecase.profile.ProfileUseCases) null,
+                config,
+                session,
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy());
+
+        assertTrue(viewModel.toggleInterest(datingapp.core.profile.MatchPreferences.Interest.values()[0]));
+        assertFalse(viewModel.toggleInterest(datingapp.core.profile.MatchPreferences.Interest.values()[1]));
+        assertEquals(1, viewModel.getSelectedInterests().size());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("getMaxBioLength returns the configured bio length limit")
+    void getMaxBioLengthReturnsConfiguredLimit() {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        AppConfig config = AppConfig.builder().maxBioLength(320).build();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+
+        User currentUser = createActiveUser("BioLimitUser");
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                (datingapp.app.usecase.profile.ProfileUseCases) null,
+                config,
+                session,
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy());
+
+        assertEquals(320, viewModel.getMaxBioLength());
+
+        viewModel.dispose();
+    }
+
     private static Path createTempImageFile(String prefix) throws Exception {
         Path file = Files.createTempFile(prefix, ".png");
         Files.write(file, java.util.Base64.getDecoder().decode(SAMPLE_PNG_BASE64));

@@ -9,6 +9,8 @@
   "maxBioLength": 500,
   "maxReportDescLength": 500,
   "maxNameLength": 100,
+  "maxMessageLength": 1000,
+  "maxProfileNoteLength": 500,
   "minAgeRangeSpan": 5,
   "minDistanceKm": 1,
   "maxPhotos": 6,

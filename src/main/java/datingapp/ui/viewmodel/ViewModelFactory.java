@@ -19,7 +19,6 @@ import datingapp.ui.screen.SafetyController;
 import datingapp.ui.screen.SocialController;
 import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
-import datingapp.ui.viewmodel.UiDataAdapters.FeatureFlaggedNoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
@@ -49,13 +48,6 @@ import org.slf4j.LoggerFactory;
 public class ViewModelFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(ViewModelFactory.class);
-    /**
-     * System-property feature flag for presence indicators.
-     *
-     * <p>Key: {@code datingapp.ui.presence.enabled}
-     * <p>Default: {@code false} (presence UI is disabled unless explicitly enabled)
-     */
-    private static final String PRESENCE_FLAG_KEY = "datingapp.ui.presence.enabled";
 
     private final ServiceRegistry services;
     private final AppSession session;
@@ -368,11 +360,6 @@ public class ViewModelFactory {
     }
 
     private UiPresenceDataAccess createUiPresenceDataAccess() {
-        boolean presenceEnabled = Boolean.parseBoolean(System.getProperty(PRESENCE_FLAG_KEY, "false"));
-        if (!presenceEnabled) {
-            logInfo("Presence indicators disabled via system property: {}", PRESENCE_FLAG_KEY);
-            return new FeatureFlaggedNoOpUiPresenceDataAccess("Presence indicators are disabled in this build.");
-        }
         return new NoOpUiPresenceDataAccess();
     }
 
@@ -391,12 +378,6 @@ public class ViewModelFactory {
     private void logWarn(String message, Object... args) {
         if (logger.isWarnEnabled()) {
             logger.warn(message, args);
-        }
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
         }
     }
 }

@@ -136,6 +136,24 @@ class MessagingHandlerTest {
         }
 
         @Test
+        @DisplayName("Exits conversation on EOF without hanging")
+        void exitsConversationOnEOFWithoutHanging() {
+            User otherUser = createActiveUser("EOFTestUser" + UUID.randomUUID());
+            userStorage.save(otherUser);
+
+            Match match = Match.create(testUser.getId(), otherUser.getId());
+            interactionStorage.save(match);
+
+            Conversation convo = Conversation.create(testUser.getId(), otherUser.getId());
+            communicationStorage.saveConversation(convo);
+
+            // True EOF after selecting the conversation should exit cleanly.
+            MessagingHandler handler = createHandler("1\n");
+
+            assertDoesNotThrow(handler::showConversations);
+        }
+
+        @Test
         @DisplayName("Shows messages in conversation")
         void showsMessagesInConversation() {
             User otherUser = createActiveUser("OtherMsgUser" + UUID.randomUUID());

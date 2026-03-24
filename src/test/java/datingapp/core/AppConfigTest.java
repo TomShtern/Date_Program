@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import datingapp.core.connection.ConnectionModels.Message;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import java.time.ZoneId;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +37,14 @@ class AppConfigTest {
                     User.MAX_PHOTOS,
                     defaults.validation().maxPhotos(),
                     "Default max photos should match User.MAX_PHOTOS");
+            assertEquals(
+                    Message.MAX_LENGTH,
+                    defaults.validation().maxMessageLength(),
+                    "Default max message length should match Message.MAX_LENGTH");
+            assertEquals(
+                    ProfileNote.MAX_LENGTH,
+                    defaults.validation().maxProfileNoteLength(),
+                    "Default max profile note length should match ProfileNote.MAX_LENGTH");
             assertEquals(500, defaults.validation().maxBioLength(), "Default max bio length should be 500");
             assertEquals(500, defaults.validation().maxReportDescLength(), "Default report desc length should be 500");
             assertEquals(
@@ -76,6 +86,11 @@ class AppConfigTest {
             assertEquals(10, config.safety().autoBanThreshold(), "Custom value should be set");
             assertEquals(100, config.matching().dailyLikeLimit(), "Unset value should use default");
             assertEquals(500, config.validation().maxBioLength(), "Unset value should use default");
+            assertEquals(Message.MAX_LENGTH, config.validation().maxMessageLength(), "Unset value should use default");
+            assertEquals(
+                    ProfileNote.MAX_LENGTH,
+                    config.validation().maxProfileNoteLength(),
+                    "Unset value should use default");
         }
 
         @Test
@@ -91,6 +106,8 @@ class AppConfigTest {
             assertSame(builder, builder.maxPhotos(1));
             assertSame(builder, builder.maxBioLength(1));
             assertSame(builder, builder.maxReportDescLength(1));
+            assertSame(builder, builder.maxMessageLength(1));
+            assertSame(builder, builder.maxProfileNoteLength(1));
             assertSame(builder, builder.queryTimeoutSeconds(1));
             assertSame(builder, builder.standoutDiversityDays(1));
             assertSame(builder, builder.standoutMinScore(1));
@@ -132,6 +149,8 @@ class AppConfigTest {
             assertEquals(777, config.validation().maxBioLength());
             assertEquals(778, config.validation().maxReportDescLength());
             assertEquals(88, config.validation().maxNameLength());
+            assertEquals(901, config.validation().maxMessageLength());
+            assertEquals(402, config.validation().maxProfileNoteLength());
             assertEquals(6, config.validation().minAgeRangeSpan());
             assertEquals(3, config.validation().minDistanceKm());
             assertEquals(17, config.validation().maxInterests());
@@ -222,6 +241,8 @@ class AppConfigTest {
                     .maxBioLength(777)
                     .maxReportDescLength(778)
                     .maxNameLength(88)
+                    .maxMessageLength(901)
+                    .maxProfileNoteLength(402)
                     .minAgeRangeSpan(6)
                     .minDistanceKm(3)
                     .maxInterests(17)

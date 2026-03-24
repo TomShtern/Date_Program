@@ -2,13 +2,16 @@ package datingapp.ui.viewmodel;
 
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.ProfileUseCases.DeleteProfileNoteCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.ProfileNotesQuery;
+import datingapp.app.usecase.profile.ProfileUseCases.UpsertProfileNoteCommand;
 import datingapp.core.AppSession;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -16,6 +19,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
@@ -29,9 +38,12 @@ public final class NotesViewModel extends BaseViewModel {
     private final UiUserStore userStore;
     private final AppSession session;
     private final ObservableList<NoteEntry> notes = FXCollections.observableArrayList();
+    private final ObjectProperty<NoteEntry> selectedNote = new SimpleObjectProperty<>();
+    private final StringProperty selectedNoteContent = new SimpleStringProperty("");
+    private final BooleanProperty selectedNoteBusy = new SimpleBooleanProperty(false);
     private ViewModelErrorSink errorHandler;
 
-    public record NoteEntry(UUID userId, String userName, String content, String lastModified) {}
+    public record NoteEntry(UUID userId, String userName, String content, Instant updatedAt, String lastModified) {}
 
     public NotesViewModel(ProfileUseCases profileUseCases, UiUserStore userStore, AppSession session) {
         this(profileUseCases, userStore, session, new JavaFxUiThreadDispatcher());
@@ -60,6 +72,26 @@ public final class NotesViewModel extends BaseViewModel {
         return notes;
     }
 
+    public ObjectProperty<NoteEntry> selectedNoteProperty() {
+        return selectedNote;
+    }
+
+    public StringProperty selectedNoteContentProperty() {
+        return selectedNoteContent;
+    }
+
+    public BooleanProperty selectedNoteBusyProperty() {
+        return selectedNoteBusy;
+    }
+
+    public void selectNote(NoteEntry note) {
+        if (isDisposed()) {
+            return;
+        }
+        selectedNote.set(note);
+        selectedNoteContent.set(note == null ? "" : note.content());
+    }
+
     public void refresh() {
         if (isDisposed()) {
             return;
@@ -67,6 +99,7 @@ public final class NotesViewModel extends BaseViewModel {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) {
             notes.clear();
+            selectNote(null);
             return;
         }
 
@@ -87,6 +120,79 @@ public final class NotesViewModel extends BaseViewModel {
     @Override
     protected void onDispose() {
         notes.clear();
+        selectedNote.set(null);
+        selectedNoteContent.set("");
+        selectedNoteBusy.set(false);
+    }
+
+    public void saveSelectedNote() {
+        User currentUser = session.getCurrentUser();
+        NoteEntry note = selectedNote.get();
+        String content = selectedNoteContent.get();
+        if (currentUser == null || note == null || content == null || content.isBlank()) {
+            return;
+        }
+
+        selectedNoteBusy.set(true);
+        UUID authorId = currentUser.getId();
+        UUID subjectId = note.userId();
+        asyncScope.runFireAndForget("save selected note", () -> {
+            try {
+                var result = profileUseCases.upsertProfileNote(
+                        new UpsertProfileNoteCommand(UserContext.ui(authorId), subjectId, content));
+                if (!result.success()) {
+                    reportError(result.error().message());
+                    asyncScope.dispatchToUi(() -> selectedNoteBusy.set(false));
+                    return;
+                }
+
+                ProfileNote savedNote = result.data();
+                asyncScope.dispatchToUi(() -> {
+                    upsertNoteEntry(savedNote);
+                    if (isSelectedNote(subjectId)) {
+                        selectNote(createNoteEntry(savedNote, resolveUserName(subjectId)));
+                    }
+                    selectedNoteBusy.set(false);
+                });
+            } catch (RuntimeException ex) {
+                reportError(ex.getMessage());
+                asyncScope.dispatchToUi(() -> selectedNoteBusy.set(false));
+            }
+        });
+    }
+
+    public void deleteSelectedNote() {
+        User currentUser = session.getCurrentUser();
+        NoteEntry note = selectedNote.get();
+        if (currentUser == null || note == null) {
+            return;
+        }
+
+        selectedNoteBusy.set(true);
+        UUID authorId = currentUser.getId();
+        UUID subjectId = note.userId();
+        asyncScope.runFireAndForget("delete selected note", () -> {
+            try {
+                var result = profileUseCases.deleteProfileNote(
+                        new DeleteProfileNoteCommand(UserContext.ui(authorId), subjectId));
+                if (!result.success()) {
+                    reportError(result.error().message());
+                    asyncScope.dispatchToUi(() -> selectedNoteBusy.set(false));
+                    return;
+                }
+
+                asyncScope.dispatchToUi(() -> {
+                    removeNoteEntry(subjectId);
+                    if (isSelectedNote(subjectId)) {
+                        selectNote(null);
+                    }
+                    selectedNoteBusy.set(false);
+                });
+            } catch (RuntimeException ex) {
+                reportError(ex.getMessage());
+                asyncScope.dispatchToUi(() -> selectedNoteBusy.set(false));
+            }
+        });
     }
 
     private List<NoteEntry> loadNotes(UUID currentUserId) {
@@ -101,14 +207,57 @@ public final class NotesViewModel extends BaseViewModel {
 
         return profileNotes.stream()
                 .sorted((left, right) -> right.updatedAt().compareTo(left.updatedAt()))
-                .map(note -> new NoteEntry(
-                        note.subjectId(),
-                        usersById
-                                .getOrDefault(note.subjectId(), new User(note.subjectId(), "Unknown User"))
-                                .getName(),
-                        note.getPreview(),
-                        DATE_FORMATTER.format(note.updatedAt())))
+                .map(note -> createNoteEntry(note, resolveUserName(note.subjectId(), usersById)))
                 .toList();
+    }
+
+    private NoteEntry createNoteEntry(ProfileNote note, String userName) {
+        return new NoteEntry(
+                note.subjectId(), userName, note.content(), note.updatedAt(), DATE_FORMATTER.format(note.updatedAt()));
+    }
+
+    private String resolveUserName(UUID subjectId) {
+        return userStore
+                .findByIds(Set.of(subjectId))
+                .getOrDefault(subjectId, new User(subjectId, "Unknown User"))
+                .getName();
+    }
+
+    private String resolveUserName(UUID subjectId, Map<UUID, User> usersById) {
+        return usersById
+                .getOrDefault(subjectId, new User(subjectId, "Unknown User"))
+                .getName();
+    }
+
+    private void upsertNoteEntry(ProfileNote savedNote) {
+        NoteEntry updatedEntry = createNoteEntry(savedNote, resolveUserName(savedNote.subjectId()));
+        int index = indexOfNote(savedNote.subjectId());
+        if (index >= 0) {
+            notes.set(index, updatedEntry);
+            return;
+        }
+        notes.add(updatedEntry);
+    }
+
+    private void removeNoteEntry(UUID subjectId) {
+        int index = indexOfNote(subjectId);
+        if (index >= 0) {
+            notes.remove(index);
+        }
+    }
+
+    private int indexOfNote(UUID subjectId) {
+        for (int i = 0; i < notes.size(); i++) {
+            if (notes.get(i).userId().equals(subjectId)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private boolean isSelectedNote(UUID subjectId) {
+        NoteEntry currentSelection = selectedNote.get();
+        return currentSelection != null && currentSelection.userId().equals(subjectId);
     }
 
     private void reportError(String message) {

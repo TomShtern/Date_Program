@@ -1,5 +1,7 @@
 package datingapp.core;
 
+import datingapp.core.connection.ConnectionModels.Message;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import java.time.Duration;
 import java.time.ZoneId;
@@ -64,6 +66,8 @@ public record AppConfig(
             int maxBioLength,
             int maxReportDescLength,
             int maxNameLength,
+            int maxMessageLength,
+            int maxProfileNoteLength,
             int minAgeRangeSpan,
             int minDistanceKm,
             int maxDistanceKm,
@@ -82,6 +86,8 @@ public record AppConfig(
                     maxBioLength,
                     maxReportDescLength,
                     maxNameLength,
+                    maxMessageLength,
+                    maxProfileNoteLength,
                     minAgeRangeSpan,
                     minDistanceKm,
                     maxDistanceKm,
@@ -273,6 +279,8 @@ public record AppConfig(
         private int maxBioLength = 500;
         private int maxReportDescLength = 500;
         private int maxNameLength = 100;
+        private int maxMessageLength = Message.MAX_LENGTH;
+        private int maxProfileNoteLength = ProfileNote.MAX_LENGTH;
         private int minAgeRangeSpan = 5;
         private int minDistanceKm = 1;
         private int maxInterests = 10;
@@ -544,6 +552,16 @@ public record AppConfig(
             return this;
         }
 
+        public Builder maxMessageLength(int v) {
+            this.maxMessageLength = v;
+            return this;
+        }
+
+        public Builder maxProfileNoteLength(int v) {
+            this.maxProfileNoteLength = v;
+            return this;
+        }
+
         public Builder minAgeRangeSpan(int v) {
             this.minAgeRangeSpan = v;
             return this;
@@ -694,6 +712,8 @@ public record AppConfig(
                     maxBioLength,
                     maxReportDescLength,
                     maxNameLength,
+                    maxMessageLength,
+                    maxProfileNoteLength,
                     minAgeRangeSpan,
                     minDistanceKm,
                     maxDistanceKm,

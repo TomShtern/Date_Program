@@ -84,6 +84,26 @@ class ProfileHandlerTest {
     }
 
     @Test
+    @DisplayName("addNote rejects overlong notes using configured limit")
+    void addNoteRejectsOverlongNotesUsingConfiguredLimit() throws Exception {
+        AppConfig customConfig = AppConfig.builder().maxProfileNoteLength(5).build();
+        InputReader inputReader = new InputReader(new Scanner(new StringReader(repeat('n', 6) + "\n")));
+        ProfileHandler handler =
+                new ProfileHandler(userStorage, validationService, profileUseCases, customConfig, session, inputReader);
+
+        UUID authorId = UUID.randomUUID();
+        UUID subjectId = UUID.randomUUID();
+        userStorage.save(new User(authorId, "Author"));
+        userStorage.save(new User(subjectId, "Subject"));
+
+        Method method = ProfileHandler.class.getDeclaredMethod("addNote", UUID.class, UUID.class, String.class);
+        method.setAccessible(true);
+        method.invoke(handler, authorId, subjectId, "Subject");
+
+        assertTrue(userStorage.getProfileNote(authorId, subjectId).isEmpty());
+    }
+
+    @Test
     @DisplayName("completeProfile keeps session user unchanged when save fails")
     void completeProfileKeepsSessionUserUnchangedWhenSaveFails() {
         User original = createEditableUser();

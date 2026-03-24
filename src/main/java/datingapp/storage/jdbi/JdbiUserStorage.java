@@ -55,6 +55,7 @@ public final class JdbiUserStorage implements UserStorage {
 
     private final Jdbi jdbi;
     private final Dao dao;
+    private final ThreadLocal<Handle> lockedHandle = new ThreadLocal<>();
 
     public JdbiUserStorage(Jdbi jdbi) {
         this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
@@ -64,14 +65,26 @@ public final class JdbiUserStorage implements UserStorage {
     @Override
     public void save(User user) {
         Objects.requireNonNull(user, "user cannot be null");
-        jdbi.useTransaction(handle -> {
-            handle.attach(Dao.class).save(new UserSqlBindings(user));
-            saveNormalizedProfileData(handle, user);
-        });
+        @SuppressWarnings("java:S2092")
+        Handle locked = lockedHandle.get(); // NOPMD - handle is wrapped by transaction context
+        if (locked != null) {
+            locked.attach(Dao.class).save(new UserSqlBindings(user));
+            saveNormalizedProfileData(locked, user);
+        } else {
+            jdbi.useTransaction(handle -> {
+                handle.attach(Dao.class).save(new UserSqlBindings(user));
+                saveNormalizedProfileData(handle, user);
+            });
+        }
     }
 
     @Override
     public Optional<User> get(UUID id) {
+        Handle locked = lockedHandle.get(); // NOPMD - handle is wrapped by transaction context
+        if (locked != null) {
+            return locked.attach(Dao.class).get(id).map(user -> applyNormalizedProfileDataBatch(locked, List.of(user))
+                    .get(0));
+        }
         return jdbi.withHandle(
                 (Handle handle) -> handle.attach(Dao.class).get(id).map(user -> applyNormalizedProfileDataBatch(
                                 handle, List.of(user))
@@ -184,6 +197,24 @@ public final class JdbiUserStorage implements UserStorage {
     @Override
     public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
         return dao.deleteProfileNoteInternal(authorId, subjectId, AppClock.now()) > 0;
+    }
+
+    @Override
+    public void executeWithUserLock(UUID userId, Runnable operation) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(operation, "operation cannot be null");
+        jdbi.useTransaction(handle -> {
+            handle.createQuery("SELECT id FROM users WHERE id = :userId FOR UPDATE")
+                    .bind(USER_ID_BIND, userId)
+                    .mapTo(UUID.class)
+                    .first();
+            lockedHandle.set(handle);
+            try {
+                operation.run();
+            } finally {
+                lockedHandle.remove();
+            }
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════

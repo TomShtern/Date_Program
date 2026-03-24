@@ -7,15 +7,21 @@ import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.StandoutsViewModel;
 import datingapp.ui.viewmodel.StandoutsViewModel.StandoutEntry;
 import java.net.URL;
+import java.util.Comparator;
+import java.util.Locale;
 import java.util.ResourceBundle;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -29,6 +35,10 @@ import javafx.scene.layout.VBox;
  */
 public class StandoutsController extends BaseController implements Initializable {
 
+    private static final String SORT_RANK = "Rank (Top first)";
+    private static final String SORT_SCORE = "Score (High to low)";
+    private static final String SORT_NAME_AZ = "Name (A-Z)";
+
     @FXML
     private BorderPane rootPane;
 
@@ -38,7 +48,15 @@ public class StandoutsController extends BaseController implements Initializable
     @FXML
     private Label statusLabel;
 
+    @FXML
+    private ComboBox<String> sortComboBox;
+
+    @FXML
+    private TextField filterTextField;
+
     private final StandoutsViewModel viewModel;
+    private FilteredList<StandoutEntry> filteredStandouts;
+    private SortedList<StandoutEntry> sortedStandouts;
 
     public StandoutsController(StandoutsViewModel viewModel) {
         this.viewModel = viewModel;
@@ -48,8 +66,11 @@ public class StandoutsController extends BaseController implements Initializable
     public void initialize(URL location, ResourceBundle resources) {
         viewModel.setErrorHandler(UiFeedbackService::showError);
 
-        standoutsListView.setItems(viewModel.getStandouts());
+        filteredStandouts = new FilteredList<>(viewModel.getStandouts(), entry -> true);
+        sortedStandouts = new SortedList<>(filteredStandouts, comparatorFor(SORT_RANK));
+        standoutsListView.setItems(sortedStandouts);
         standoutsListView.setCellFactory(lv -> new StandoutListCell(this::handleViewProfileClicked));
+        configureSortAndFilterControls();
 
         // Show status message (e.g. "No standouts today") when list is empty
         addSubscription(viewModel.statusMessageProperty().subscribe(msg -> {
@@ -63,6 +84,44 @@ public class StandoutsController extends BaseController implements Initializable
 
         viewModel.initialize();
         UiAnimations.fadeIn(rootPane, 800);
+    }
+
+    private void configureSortAndFilterControls() {
+        sortComboBox.getItems().setAll(SORT_RANK, SORT_SCORE, SORT_NAME_AZ);
+        sortComboBox.getSelectionModel().select(SORT_RANK);
+        sortComboBox
+                .valueProperty()
+                .addListener((obs, previous, next) -> sortedStandouts.setComparator(comparatorFor(next)));
+
+        filterTextField
+                .textProperty()
+                .addListener(
+                        (obs, previous, query) -> filteredStandouts.setPredicate(entry -> matchesFilter(entry, query)));
+    }
+
+    private static Comparator<StandoutEntry> comparatorFor(String sortOption) {
+        if (SORT_NAME_AZ.equals(sortOption)) {
+            return Comparator.comparing(entry -> entry.displayName().toLowerCase(Locale.ROOT));
+        }
+        if (SORT_SCORE.equals(sortOption)) {
+            return Comparator.comparingInt(StandoutEntry::score).reversed().thenComparingInt(StandoutEntry::rank);
+        }
+        return Comparator.comparingInt(StandoutEntry::rank)
+                .thenComparing(Comparator.comparingInt(StandoutEntry::score).reversed())
+                .thenComparing(entry -> entry.displayName().toLowerCase(Locale.ROOT));
+    }
+
+    private static boolean matchesFilter(StandoutEntry entry, String query) {
+        if (entry == null) {
+            return false;
+        }
+        if (query == null || query.isBlank()) {
+            return true;
+        }
+        String normalizedQuery = query.trim().toLowerCase(Locale.ROOT);
+        String name = entry.displayName() == null ? "" : entry.displayName().toLowerCase(Locale.ROOT);
+        String reason = entry.reason() == null ? "" : entry.reason().toLowerCase(Locale.ROOT);
+        return name.contains(normalizedQuery) || reason.contains(normalizedQuery);
     }
 
     private void handleViewProfileClicked(StandoutEntry entry) {
@@ -87,6 +146,12 @@ public class StandoutsController extends BaseController implements Initializable
         }
         if (statusLabel != null) {
             statusLabel.setAccessibleText("Standouts status message");
+        }
+        if (sortComboBox != null) {
+            sortComboBox.setAccessibleText("Sort standout profiles");
+        }
+        if (filterTextField != null) {
+            filterTextField.setAccessibleText("Filter standout profiles by name or reason");
         }
     }
 

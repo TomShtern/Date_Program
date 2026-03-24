@@ -118,6 +118,81 @@ class NotesViewModelTest {
         viewModel.dispose();
     }
 
+    @Test
+    @DisplayName("saveSelectedNote updates storage and the observable note list")
+    void saveSelectedNoteUpdatesStorageAndList() throws InterruptedException {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
+
+        User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        User subject = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        users.save(author);
+        users.save(subject);
+        users.saveProfileNote(ProfileNote.create(author.getId(), subject.getId(), "Thoughtful and funny"));
+        AppSession.getInstance().setCurrentUser(author);
+
+        NotesViewModel viewModel = new NotesViewModel(
+                profileUseCases, new StorageUiUserStore(users), AppSession.getInstance(), TEST_DISPATCHER);
+        viewModel.initialize();
+
+        assertTrue(waitUntil(() -> viewModel.getNotes().size() == 1, 5000));
+        viewModel.selectNote(viewModel.getNotes().get(0));
+        viewModel.selectedNoteContentProperty().set("Updated note content for Riley");
+        viewModel.saveSelectedNote();
+
+        assertTrue(waitUntil(
+                () -> "Updated note content for Riley"
+                        .equals(viewModel.getNotes().get(0).content()),
+                5000));
+        assertTrue(waitUntil(
+                () -> fixtureNoteContent(users, author.getId(), subject.getId())
+                        .filter("Updated note content for Riley"::equals)
+                        .isPresent(),
+                5000));
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("deleteSelectedNote removes storage and the observable note list")
+    void deleteSelectedNoteRemovesStorageAndList() throws InterruptedException {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
+
+        User author = createUser("Jordan", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        User subject = createUser("Taylor", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        users.save(author);
+        users.save(subject);
+        users.saveProfileNote(ProfileNote.create(author.getId(), subject.getId(), "Great travel stories"));
+        AppSession.getInstance().setCurrentUser(author);
+
+        NotesViewModel viewModel = new NotesViewModel(
+                profileUseCases, new StorageUiUserStore(users), AppSession.getInstance(), TEST_DISPATCHER);
+        viewModel.initialize();
+
+        assertTrue(waitUntil(() -> viewModel.getNotes().size() == 1, 5000));
+        viewModel.selectNote(viewModel.getNotes().get(0));
+        viewModel.deleteSelectedNote();
+
+        assertTrue(waitUntil(viewModel.getNotes()::isEmpty, 5000));
+        assertTrue(waitUntil(
+                () -> fixtureNoteContent(users, author.getId(), subject.getId()).isEmpty(), 5000));
+
+        viewModel.dispose();
+    }
+
     private static boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
         while (System.nanoTime() < deadline) {
@@ -156,5 +231,10 @@ class NotesViewModelTest {
                 PacePreferences.DepthPreference.DEEP_CHAT));
         user.activate();
         return user;
+    }
+
+    private static java.util.Optional<String> fixtureNoteContent(
+            TestStorages.Users users, UUID authorId, UUID subjectId) {
+        return users.getProfileNote(authorId, subjectId).map(ProfileNote::content);
     }
 }

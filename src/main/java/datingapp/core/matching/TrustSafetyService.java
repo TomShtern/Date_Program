@@ -223,14 +223,16 @@ public final class TrustSafetyService {
     }
 
     /**
-     * Applies auto-ban decision atomically inside this service instance to avoid
-     * check-then-act races during concurrent reports.
+     * Applies auto-ban decision under distributed lock to coordinate concurrent
+     * reports across multiple instances.
      */
     private boolean applyAutoBanIfThreshold(UUID reportedUserId) {
-        synchronized (this) {
+        final boolean[] result = {false};
+        userStorage.executeWithUserLock(reportedUserId, () -> {
             int reportCount = trustSafetyStorage.countReportsAgainst(reportedUserId);
             if (reportCount < config.safety().autoBanThreshold()) {
-                return false;
+                result[0] = false;
+                return;
             }
 
             User latestReported = userStorage
@@ -238,22 +240,23 @@ public final class TrustSafetyService {
                     .map(TrustSafetyService::copyUser)
                     .orElse(null);
             if (latestReported == null || latestReported.getState() == UserState.BANNED) {
-                return false;
+                result[0] = false;
+                return;
             }
 
             latestReported.ban();
             try {
                 userStorage.save(latestReported);
-                return true;
-            } catch (RuntimeException e) {
+                result[0] = true;
+            } catch (RuntimeException _) {
                 logger.error(
                         "Auto-ban save failed for user {} after {} reports; ban was not persisted",
                         reportedUserId,
-                        reportCount,
-                        e);
-                return false;
+                        reportCount);
+                result[0] = false;
             }
-        }
+        });
+        return result[0];
     }
 
     private static User copyUser(User user) {

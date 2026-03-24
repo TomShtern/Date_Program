@@ -176,6 +176,45 @@ class MatchingControllerTest {
     }
 
     @Test
+    @DisplayName("super like button still advances to the next candidate after animated exit")
+    void superLikeButtonStillAdvancesAfterAnimation() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+
+        MatchingViewModel viewModel = fixture.createViewModel();
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/matching.fxml", () -> new MatchingController(viewModel));
+        Parent root = loaded.root();
+        Button superLikeButton = JavaFxTestSupport.lookup(root, "#superLikeButton", Button.class);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> viewModel.currentCandidateProperty().get() != null
+                        && fixture.prioritizedCandidate
+                                .getId()
+                                .equals(viewModel
+                                        .currentCandidateProperty()
+                                        .get()
+                                        .getId()),
+                5000));
+
+        JavaFxTestSupport.runOnFxAndWait(superLikeButton::fire);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> viewModel.currentCandidateProperty().get() != null
+                        && fixture.fallbackCandidate
+                                .getId()
+                                .equals(viewModel
+                                        .currentCandidateProperty()
+                                        .get()
+                                        .getId()),
+                5000));
+
+        viewModel.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
     @DisplayName("undo button becomes enabled and shows countdown after swipe")
     void undoButtonBecomesEnabledAndShowsCountdownAfterSwipe() throws Exception {
         Fixture fixture = new Fixture();

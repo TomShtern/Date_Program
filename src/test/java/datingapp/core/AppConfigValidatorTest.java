@@ -3,6 +3,8 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import datingapp.core.connection.ConnectionModels.Message;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import java.time.ZoneId;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +28,24 @@ class AppConfigValidatorTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> AppConfigValidator.validateValidation(
-                        40, 20, 100, 220, 500, 500, 50, 2, 1, 50, 10, User.MAX_PHOTOS, 50, 15, 5, 10));
+                        40,
+                        20,
+                        100,
+                        220,
+                        500,
+                        500,
+                        50,
+                        Message.MAX_LENGTH,
+                        ProfileNote.MAX_LENGTH,
+                        2,
+                        1,
+                        50,
+                        10,
+                        User.MAX_PHOTOS,
+                        50,
+                        15,
+                        5,
+                        10));
     }
 
     @Test
@@ -35,14 +54,48 @@ class AppConfigValidatorTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> AppConfigValidator.validateValidation(
-                        18, 50, 100, 220, 500, 500, 50, 2, 1, 50, 10, 8, 50, 15, 5, 10));
+                        18,
+                        50,
+                        100,
+                        220,
+                        500,
+                        500,
+                        50,
+                        Message.MAX_LENGTH,
+                        ProfileNote.MAX_LENGTH,
+                        2,
+                        1,
+                        50,
+                        10,
+                        8,
+                        50,
+                        15,
+                        5,
+                        10));
     }
 
     @Test
     @DisplayName("validateValidation accepts the entity photo limit")
     void validateValidationAcceptsEntityPhotoLimit() {
         assertDoesNotThrow(() -> AppConfigValidator.validateValidation(
-                18, 50, 100, 220, 500, 500, 50, 2, 1, 50, 10, User.MAX_PHOTOS, 50, 15, 5, 10));
+                18,
+                50,
+                100,
+                220,
+                500,
+                500,
+                50,
+                Message.MAX_LENGTH,
+                ProfileNote.MAX_LENGTH,
+                2,
+                1,
+                50,
+                10,
+                User.MAX_PHOTOS,
+                50,
+                15,
+                5,
+                10));
     }
 
     @Test
@@ -51,14 +104,152 @@ class AppConfigValidatorTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> AppConfigValidator.validateValidation(
-                        18, 50, 100, 220, 500, 500, 50, 2, 100, 50, 10, User.MAX_PHOTOS, 50, 15, 5, 10));
+                        18,
+                        50,
+                        100,
+                        220,
+                        500,
+                        500,
+                        50,
+                        Message.MAX_LENGTH,
+                        ProfileNote.MAX_LENGTH,
+                        2,
+                        100,
+                        50,
+                        10,
+                        User.MAX_PHOTOS,
+                        50,
+                        15,
+                        5,
+                        10));
     }
 
     @Test
     @DisplayName("validateValidation accepts valid distance ordering")
     void validateValidationAcceptsValidDistanceOrdering() {
         assertDoesNotThrow(() -> AppConfigValidator.validateValidation(
-                18, 50, 100, 220, 500, 500, 50, 2, 1, 500, 10, User.MAX_PHOTOS, 50, 15, 5, 10));
+                18,
+                50,
+                100,
+                220,
+                500,
+                500,
+                50,
+                Message.MAX_LENGTH,
+                ProfileNote.MAX_LENGTH,
+                2,
+                1,
+                500,
+                10,
+                User.MAX_PHOTOS,
+                50,
+                15,
+                5,
+                10));
+    }
+
+    @Test
+    @DisplayName("validateValidation rejects message length below minimum")
+    void validateValidationRejectsInvalidMessageLengthLowerBound() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateValidation(
+                        18,
+                        50,
+                        100,
+                        220,
+                        500,
+                        500,
+                        50,
+                        0,
+                        ProfileNote.MAX_LENGTH,
+                        2,
+                        1,
+                        50,
+                        10,
+                        User.MAX_PHOTOS,
+                        50,
+                        15,
+                        5,
+                        10));
+    }
+
+    @Test
+    @DisplayName("validateValidation rejects message length above hard cap")
+    void validateValidationRejectsInvalidMessageLengthUpperBound() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateValidation(
+                        18,
+                        50,
+                        100,
+                        220,
+                        500,
+                        500,
+                        50,
+                        Message.MAX_LENGTH + 1,
+                        ProfileNote.MAX_LENGTH,
+                        2,
+                        1,
+                        50,
+                        10,
+                        User.MAX_PHOTOS,
+                        50,
+                        15,
+                        5,
+                        10));
+    }
+
+    @Test
+    @DisplayName("validateValidation rejects profile note length below minimum")
+    void validateValidationRejectsInvalidProfileNoteLengthLowerBound() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateValidation(
+                        18,
+                        50,
+                        100,
+                        220,
+                        500,
+                        500,
+                        50,
+                        Message.MAX_LENGTH,
+                        0,
+                        2,
+                        1,
+                        50,
+                        10,
+                        User.MAX_PHOTOS,
+                        50,
+                        15,
+                        5,
+                        10));
+    }
+
+    @Test
+    @DisplayName("validateValidation rejects profile note length above hard cap")
+    void validateValidationRejectsInvalidProfileNoteLengthUpperBound() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateValidation(
+                        18,
+                        50,
+                        100,
+                        220,
+                        500,
+                        500,
+                        50,
+                        Message.MAX_LENGTH,
+                        ProfileNote.MAX_LENGTH + 1,
+                        2,
+                        1,
+                        50,
+                        10,
+                        User.MAX_PHOTOS,
+                        50,
+                        15,
+                        5,
+                        10));
     }
 
     @Test

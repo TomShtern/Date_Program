@@ -78,6 +78,32 @@
     -fx-text-fill: #94a3b8;
 }
 
+/* Light theme: override white text for light surfaces */
+.header-bar .subheading,
+.header-surface .subheading {
+    -fx-text-fill: #0f172a;
+}
+
+.section-title {
+    -fx-text-fill: #0f172a;
+}
+
+.stats-section-header {
+    -fx-text-fill: #0f172a;
+}
+
+.action-label {
+    -fx-text-fill: #0f172a;
+}
+
+.dashboard-card-label {
+    -fx-text-fill: #1e293b;
+}
+
+.match-count-badge {
+    -fx-text-fill: #dc2626;
+}
+
 /* List cells */
 .list-cell:filled {
     -fx-background-color: transparent;

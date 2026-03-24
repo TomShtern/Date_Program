@@ -1055,7 +1055,8 @@ public class ProfileHandler implements LoggingSupport {
     }
 
     private void addNote(UUID authorId, UUID subjectId, String subjectName) {
-        logInfo("\nEnter your note about {} (max {} chars):", subjectName, ProfileNote.MAX_LENGTH);
+        int maxProfileNoteLength = config.validation().maxProfileNoteLength();
+        logInfo("\nEnter your note about {} (max {} chars):", subjectName, maxProfileNoteLength);
         logInfo("Examples: \"Met at coffee shop\", \"Loves hiking\", \"Dinner Thursday 7pm\"");
         String content = inputReader.readLine("\nNote: ");
 
@@ -1064,17 +1065,17 @@ public class ProfileHandler implements LoggingSupport {
             return;
         }
 
-        if (content.length() > ProfileNote.MAX_LENGTH) {
-            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), ProfileNote.MAX_LENGTH);
+        if (content.length() > maxProfileNoteLength) {
+            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), maxProfileNoteLength);
             return;
         }
 
-        try {
-            ProfileNote note = ProfileNote.create(authorId, subjectId, content);
-            userStorage.saveProfileNote(note);
+        var result = profileUseCases.upsertProfileNote(
+                new ProfileUseCases.UpsertProfileNoteCommand(UserContext.cli(authorId), subjectId, content));
+        if (result.success()) {
             logInfo("✅ Note saved!\n");
-        } catch (IllegalArgumentException e) {
-            logInfo(ERROR_MESSAGE_FORMAT, e.getMessage());
+        } else {
+            logInfo(ERROR_MESSAGE_FORMAT, result.error().message());
         }
     }
 
@@ -1082,30 +1083,33 @@ public class ProfileHandler implements LoggingSupport {
         logInfo("\nCurrent note: \"{}\"\n", existing.content());
         logInfo("Enter new note (or press Enter to keep current):");
         String content = inputReader.readLine("Note: ");
+        int maxProfileNoteLength = config.validation().maxProfileNoteLength();
 
         if (content.isBlank()) {
             logInfo("✓ Note unchanged.\n");
             return;
         }
 
-        if (content.length() > ProfileNote.MAX_LENGTH) {
-            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), ProfileNote.MAX_LENGTH);
+        if (content.length() > maxProfileNoteLength) {
+            logInfo("⚠️  Note is too long ({} chars). Max is {} chars.", content.length(), maxProfileNoteLength);
             return;
         }
 
-        try {
-            ProfileNote updated = existing.withContent(content);
-            userStorage.saveProfileNote(updated);
+        var result = profileUseCases.upsertProfileNote(new ProfileUseCases.UpsertProfileNoteCommand(
+                UserContext.cli(existing.authorId()), existing.subjectId(), content));
+        if (result.success()) {
             logInfo("✅ Note updated!\n");
-        } catch (IllegalArgumentException e) {
-            logInfo(ERROR_MESSAGE_FORMAT, e.getMessage());
+        } else {
+            logInfo(ERROR_MESSAGE_FORMAT, result.error().message());
         }
     }
 
     private void deleteNote(UUID authorId, UUID subjectId, String subjectName) {
         String confirm = inputReader.readLine("Delete note about " + subjectName + "? (y/n): ");
         if ("y".equalsIgnoreCase(confirm)) {
-            if (userStorage.deleteProfileNote(authorId, subjectId)) {
+            var result = profileUseCases.deleteProfileNote(
+                    new ProfileUseCases.DeleteProfileNoteCommand(UserContext.cli(authorId), subjectId));
+            if (result.success() && result.data()) {
                 logInfo("✅ Note deleted.\n");
             } else {
                 logInfo("⚠️  Note not found.\n");

@@ -19,6 +19,7 @@ import datingapp.ui.UiUtils;
 import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
 import java.net.URL;
+import java.util.List;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import javafx.beans.property.ObjectProperty;
@@ -287,9 +288,6 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private Button cancelButton;
-
-    private static final int BIO_MAX_LENGTH = 500;
-    private static final int BIO_WARNING_THRESHOLD = 400;
 
     private final ProfileViewModel viewModel;
     private final ProfileFormValidator formValidator;
@@ -632,7 +630,7 @@ public class ProfileController extends BaseController implements Initializable {
     private void updateInterestCountLabel() {
         if (interestCountLabel != null) {
             int count = viewModel.getSelectedInterests().size();
-            interestCountLabel.setText(count + "/" + Interest.MAX_PER_USER + " selected");
+            interestCountLabel.setText(count + "/" + viewModel.getMaxInterests() + " selected");
         }
     }
 
@@ -655,6 +653,27 @@ public class ProfileController extends BaseController implements Initializable {
         profileImageView.setVisible(true);
         if (avatarPlaceholderIcon != null) {
             avatarPlaceholderIcon.setVisible(false);
+        }
+        preloadAdjacentProfilePhotos();
+    }
+
+    private void preloadAdjacentProfilePhotos() {
+        List<String> photoUrls = viewModel.getPhotoUrls();
+        if (photoUrls == null || photoUrls.size() < 2) {
+            return;
+        }
+        int currentIndex = viewModel.currentPhotoIndexProperty().get();
+        preloadPhotoAtIndex(photoUrls, currentIndex - 1, 200, 200);
+        preloadPhotoAtIndex(photoUrls, currentIndex + 1, 200, 200);
+    }
+
+    private static void preloadPhotoAtIndex(List<String> photoUrls, int index, double width, double height) {
+        if (index < 0 || index >= photoUrls.size()) {
+            return;
+        }
+        String photoUrl = photoUrls.get(index);
+        if (photoUrl != null && !photoUrl.isBlank()) {
+            ImageCache.preload(photoUrl, width, height);
         }
     }
 
@@ -783,15 +802,17 @@ public class ProfileController extends BaseController implements Initializable {
     /** Updates the character counter label with appropriate styling. */
     private void updateCharCounter(String text) {
         int length = text == null ? 0 : text.length();
-        charCountLabel.setText(length + "/" + BIO_MAX_LENGTH);
+        int maxBioLength = viewModel.getMaxBioLength();
+        int warningThreshold = Math.max(1, (int) Math.floor(maxBioLength * 0.8d));
+        charCountLabel.setText(length + "/" + maxBioLength);
 
         // Remove existing style classes
         charCountLabel.getStyleClass().removeAll("char-counter-warning", "char-counter-limit");
 
         // Add appropriate warning class
-        if (length >= BIO_MAX_LENGTH) {
+        if (length >= maxBioLength) {
             charCountLabel.getStyleClass().add("char-counter-limit");
-        } else if (length >= BIO_WARNING_THRESHOLD) {
+        } else if (length >= warningThreshold) {
             charCountLabel.getStyleClass().add("char-counter-warning");
         }
     }
@@ -871,7 +892,7 @@ public class ProfileController extends BaseController implements Initializable {
     @SuppressWarnings("unused")
     private void handleEditInterests() {
         Dialog<Void> dialog = UiUtils.createThemedDialog(
-                rootPane, "Select Interests", "Choose up to " + Interest.MAX_PER_USER + " interests");
+                rootPane, "Select Interests", "Choose up to " + viewModel.getMaxInterests() + " interests");
 
         // Create content
         VBox content = new VBox(UiConstants.SPACING_LARGE);

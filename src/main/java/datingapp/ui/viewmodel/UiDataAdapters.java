@@ -330,38 +330,4 @@ public final class UiDataAdapters {
             return "Presence indicators are currently unavailable.";
         }
     }
-
-    /**
-     * Feature-flagged presence adapter used when presence is intentionally disabled
-     * for a deployment/runtime.
-     */
-    public static final class FeatureFlaggedNoOpUiPresenceDataAccess implements UiPresenceDataAccess {
-
-        private final String reason;
-
-        public FeatureFlaggedNoOpUiPresenceDataAccess(String reason) {
-            this.reason =
-                    reason == null || reason.isBlank() ? "Presence indicators are currently unavailable." : reason;
-        }
-
-        @Override
-        public PresenceStatus getPresence(UUID userId) {
-            return PresenceStatus.UNKNOWN;
-        }
-
-        @Override
-        public boolean isTyping(UUID userId) {
-            return false;
-        }
-
-        @Override
-        public boolean isSupported() {
-            return false;
-        }
-
-        @Override
-        public String unsupportedReason() {
-            return reason;
-        }
-    }
 }

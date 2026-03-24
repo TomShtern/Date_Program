@@ -1,5 +1,7 @@
 package datingapp.core;
 
+import datingapp.core.connection.ConnectionModels.Message;
+import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import java.time.ZoneId;
 import java.util.Objects;
@@ -53,6 +55,8 @@ final class AppConfigValidator {
             int maxBioLength,
             int maxReportDescLength,
             int maxNameLength,
+            int maxMessageLength,
+            int maxProfileNoteLength,
             int minAgeRangeSpan,
             int minDistanceKm,
             int maxDistanceKm,
@@ -75,6 +79,8 @@ final class AppConfigValidator {
         requireNonNegative("maxBioLength", maxBioLength);
         requireNonNegative("maxReportDescLength", maxReportDescLength);
         requireNonNegative("maxNameLength", maxNameLength);
+        requireInRange(maxMessageLength, 1, Message.MAX_LENGTH, "maxMessageLength");
+        requireInRange(maxProfileNoteLength, 1, ProfileNote.MAX_LENGTH, "maxProfileNoteLength");
         requireNonNegative("minAgeRangeSpan", minAgeRangeSpan);
         requireNonNegative("minDistanceKm", minDistanceKm);
         requireNonNegative("maxDistanceKm", maxDistanceKm);

@@ -37,5 +37,12 @@
             textbook-correct uses of volatile.
         -->
         <exclude name="AvoidUsingVolatile" />
+        <!--
+            MissingStaticMethodInNonInstantiatableClass: Flags non-instantiable classes (private constructor, final).
+            Our utility classes like RestApiDtos are non-instantiable holders of static members,
+            where having a static method is not always applicable or necessary.
+        -->
+        <exclude name="MissingStaticMethodInNonInstantiatableClass" />
     </rule>
 </ruleset>
+

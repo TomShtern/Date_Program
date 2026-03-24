@@ -5,10 +5,7 @@ import datingapp.app.event.AppEventBus;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.ActivityMetricsService;
 
-/**
- * Listens for swipe and message events and forwards them to
- * {@link ActivityMetricsService} for session metrics tracking.
- */
+/** Listens for activity-producing events and forwards them to session metrics tracking. */
 public final class MetricsEventHandler {
 
     private final ActivityMetricsService activityMetricsService;
@@ -24,6 +21,9 @@ public final class MetricsEventHandler {
         }
         eventBus.subscribe(AppEvent.SwipeRecorded.class, this::onSwipeRecorded, AppEventBus.HandlerPolicy.BEST_EFFORT);
         eventBus.subscribe(AppEvent.MessageSent.class, this::onMessageSent, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(AppEvent.ProfileSaved.class, this::onProfileSaved, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(
+                AppEvent.ProfileNoteSaved.class, this::onProfileNoteSaved, AppEventBus.HandlerPolicy.BEST_EFFORT);
     }
 
     void onSwipeRecorded(AppEvent.SwipeRecorded event) {
@@ -33,5 +33,13 @@ public final class MetricsEventHandler {
 
     void onMessageSent(AppEvent.MessageSent event) {
         activityMetricsService.recordActivity(event.senderId());
+    }
+
+    void onProfileSaved(AppEvent.ProfileSaved event) {
+        activityMetricsService.recordActivity(event.userId());
+    }
+
+    void onProfileNoteSaved(AppEvent.ProfileNoteSaved event) {
+        activityMetricsService.recordActivity(event.authorId());
     }
 }

@@ -32,6 +32,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
@@ -214,6 +215,41 @@ class TrustSafetyServiceTest {
                         userStorage.get(reportedUser.getId()).orElseThrow().getState(),
                         "Stored user must remain ACTIVE when the ban save fails");
                 assertEquals(3, trustSafetyStorage.countReportsAgainst(reportedUser.getId()));
+            }
+
+            @Test
+            @DisplayName("Auto-ban invokes distributed lock")
+            void autoBanInvokesDistributedLock() {
+                User reporter2 = createActiveUser("Reporter2");
+                User reporter3 = createActiveUser("Reporter3");
+                userStorage.save(reporter2);
+                userStorage.save(reporter3);
+
+                int initialLockCount = userStorage.getLockInvocationCount();
+
+                // Each report triggers lock, even if it doesn't cause auto-ban
+                trustSafetyService.report(activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
+                assertEquals(
+                        initialLockCount + 1,
+                        userStorage.getLockInvocationCount(),
+                        "Lock should be invoked on the first report");
+
+                int lockCountAfterSecond = userStorage.getLockInvocationCount();
+                trustSafetyService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
+                assertEquals(
+                        lockCountAfterSecond + 1,
+                        userStorage.getLockInvocationCount(),
+                        "Lock should be invoked on the second report");
+
+                int lockCountBeforeBan = userStorage.getLockInvocationCount();
+                var result = trustSafetyService.report(
+                        reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
+
+                assertTrue(result.userWasBanned(), "Third report should trigger ban");
+                assertEquals(
+                        lockCountBeforeBan + 1,
+                        userStorage.getLockInvocationCount(),
+                        "Lock should be invoked exactly once per report call");
             }
         }
 
@@ -542,9 +578,14 @@ class TrustSafetyServiceTest {
         private final Map<UUID, User> users = new HashMap<>();
         private final Map<String, ProfileNote> profileNotes = new java.util.concurrent.ConcurrentHashMap<>();
         private boolean failNextSave;
+        private int lockInvocationCount = 0;
 
         private static String noteKey(UUID authorId, UUID subjectId) {
             return authorId + "_" + subjectId;
+        }
+
+        int getLockInvocationCount() {
+            return lockInvocationCount;
         }
 
         @Override
@@ -599,6 +640,14 @@ class TrustSafetyServiceTest {
         @Override
         public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
             return profileNotes.remove(noteKey(authorId, subjectId)) != null;
+        }
+
+        @Override
+        public void executeWithUserLock(UUID userId, Runnable operation) {
+            Objects.requireNonNull(userId, "userId cannot be null");
+            Objects.requireNonNull(operation, "operation cannot be null");
+            lockInvocationCount++;
+            operation.run();
         }
     }
 }

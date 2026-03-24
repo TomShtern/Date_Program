@@ -41,6 +41,11 @@ class InProcessAppEventBusTest {
     }
 
     @Test
+    void publishWithNoSubscribersIsANoop() {
+        assertDoesNotThrow(() -> bus.publish(new AppEvent.AccountDeleted(UUID.randomUUID(), "cleanup", Instant.now())));
+    }
+
+    @Test
     void bestEffortHandlerExceptionDoesNotPropagate() {
         bus.subscribe(
                 AppEvent.SwipeRecorded.class,

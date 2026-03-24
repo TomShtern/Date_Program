@@ -1,6 +1,7 @@
 package datingapp.ui.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -128,6 +129,162 @@ class DashboardControllerTest {
                 },
                 5000));
         assertEquals(candidate.getName() + ", 25", JavaFxTestSupport.callOnFxAndWait(dailyPickLabel::getText));
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("FXML safely handles no daily pick available edge case")
+    void fxmlHandlesNoDailyPickAvailable() throws Exception {
+        TestClock.setFixed(FIXED_INSTANT);
+
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Analytics analyticsStorage = new TestStorages.Analytics();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        TestStorages.Standouts standoutStorage = new TestStorages.Standouts();
+        AppConfig config = AppConfig.defaults();
+
+        CandidateFinder candidateFinder =
+                new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
+        ProfileService profileService =
+                new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
+        RecommendationService dailyService = RecommendationService.builder()
+                .interactionStorage(interactions)
+                .userStorage(users)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(standoutStorage)
+                .profileService(profileService)
+                .config(config)
+                .build();
+
+        ConnectionService messagingService = new ConnectionService(config, communications, interactions, users);
+
+        User currentUser = createActiveUser("DashboardUser", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        DashboardViewModel viewModel = new DashboardViewModel(
+                new DashboardViewModel.Dependencies(
+                        dailyService,
+                        new StorageUiMatchDataAccess(interactions, trustSafetyStorage),
+                        profileService,
+                        messagingService,
+                        profileService,
+                        config),
+                AppSession.getInstance());
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/dashboard.fxml", () -> new DashboardController(viewModel));
+        Parent root = loaded.root();
+        Label dailyPickLabel = JavaFxTestSupport.lookup(root, "#dailyPickLabel", Label.class);
+        Label dailyPickSeenLabel = JavaFxTestSupport.lookup(root, "#dailyPickSeenLabel", Label.class);
+        Button dailyPickButton = JavaFxTestSupport.lookup(root, "#dailyPickButton", Button.class);
+
+        // Wait for viewModel to attempt daily pick loading and UI to stabilize:
+        // button disabled + label populated with fallback text
+        assertTrue(
+                JavaFxTestSupport.waitUntil(
+                        () -> {
+                            try {
+                                boolean buttonDisabled = JavaFxTestSupport.callOnFxAndWait(dailyPickButton::isDisabled);
+                                String labelText = JavaFxTestSupport.callOnFxAndWait(dailyPickLabel::getText);
+                                return buttonDisabled && labelText != null && !labelText.isEmpty();
+                            } catch (InterruptedException e) {
+                                throw new IllegalStateException(e);
+                            }
+                        },
+                        5000),
+                "UI should stabilize with disabled button and non-empty label text");
+
+        // Verify button remains disabled with no candidate
+        assertTrue(
+                JavaFxTestSupport.callOnFxAndWait(dailyPickButton::isDisabled),
+                "Daily pick button should stay disabled when no candidate available");
+
+        // Verify label shows deterministic fallback text (not null, not crash)
+        String labelText = JavaFxTestSupport.callOnFxAndWait(dailyPickLabel::getText);
+        assertTrue(
+                labelText != null && !labelText.isEmpty(),
+                "Daily pick label should show fallback/empty-safe text, not null or empty");
+
+        // Verify seen label is not visible
+        boolean seenLabelVisible = JavaFxTestSupport.callOnFxAndWait(dailyPickSeenLabel::isVisible);
+        assertTrue(!seenLabelVisible, "Daily pick seen label should not be visible when no daily pick available");
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("setCompactMode toggles compact style and secondary stats visibility")
+    void setCompactModeTogglesCompactStyleAndSecondaryStatsVisibility() throws Exception {
+        TestClock.setFixed(FIXED_INSTANT);
+
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Analytics analyticsStorage = new TestStorages.Analytics();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        TestStorages.Standouts standoutStorage = new TestStorages.Standouts();
+        AppConfig config = AppConfig.defaults();
+
+        CandidateFinder candidateFinder =
+                new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
+        ProfileService profileService =
+                new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
+        RecommendationService dailyService = RecommendationService.builder()
+                .interactionStorage(interactions)
+                .userStorage(users)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(standoutStorage)
+                .profileService(profileService)
+                .config(config)
+                .build();
+
+        ConnectionService messagingService = new ConnectionService(config, communications, interactions, users);
+
+        User currentUser = createActiveUser("DashboardUser", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        DashboardViewModel viewModel = new DashboardViewModel(
+                new DashboardViewModel.Dependencies(
+                        dailyService,
+                        new StorageUiMatchDataAccess(interactions, trustSafetyStorage),
+                        profileService,
+                        messagingService,
+                        profileService,
+                        config),
+                AppSession.getInstance());
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/dashboard.fxml", () -> new DashboardController(viewModel));
+        Parent root = loaded.root();
+        DashboardController controller = (DashboardController) loaded.controller();
+        Label totalMatchesLabel = JavaFxTestSupport.lookup(root, "#totalMatchesLabel", Label.class);
+
+        assertFalse(JavaFxTestSupport.callOnFxAndWait(() -> root.getStyleClass().contains("viewport-compact")));
+
+        JavaFxTestSupport.runOnFxAndWait(() -> controller.setCompactMode(true));
+
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(() -> root.getStyleClass().contains("viewport-compact")));
+        assertFalse(JavaFxTestSupport.callOnFxAndWait(
+                () -> totalMatchesLabel.getParent().isVisible()));
+        assertFalse(JavaFxTestSupport.callOnFxAndWait(
+                () -> totalMatchesLabel.getParent().isManaged()));
+
+        JavaFxTestSupport.runOnFxAndWait(() -> controller.setCompactMode(false));
+
+        assertFalse(JavaFxTestSupport.callOnFxAndWait(() -> root.getStyleClass().contains("viewport-compact")));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(
+                () -> totalMatchesLabel.getParent().isVisible()));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(
+                () -> totalMatchesLabel.getParent().isManaged()));
 
         viewModel.dispose();
     }
