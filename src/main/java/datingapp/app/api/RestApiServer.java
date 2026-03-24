@@ -121,7 +121,6 @@ public class RestApiServer {
             InetAddress.getLoopbackAddress().getHostAddress();
     private static final int DEFAULT_MESSAGE_LIMIT = 50;
     private static final int DEFAULT_MATCHES_LIMIT = 20;
-    private static final String UNKNOWN_USER = "Unknown";
     private static final String BAD_REQUEST = "BAD_REQUEST";
     private static final String CONFLICT = "CONFLICT";
     private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
@@ -344,7 +343,9 @@ public class RestApiServer {
     private void likeUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+        User currentUser = loadUser(ctx, userId);
+        User targetUser = loadUser(ctx, targetId);
+        if (currentUser == null || targetUser == null) {
             return;
         }
 
@@ -363,7 +364,10 @@ public class RestApiServer {
 
         if (match.isPresent()) {
             ctx.status(201);
-            ctx.json(new LikeResponse(true, "It's a match!", MatchSummary.from(match.get(), userId)));
+            ctx.json(new LikeResponse(
+                    true,
+                    "It's a match!",
+                    MatchSummary.from(match.get(), userId, Map.of(targetUser.getId(), targetUser))));
         } else {
             ctx.status(200);
             ctx.json(new LikeResponse(false, "Like recorded", null));
@@ -895,11 +899,7 @@ public class RestApiServer {
     }
 
     private MatchSummary toMatchSummary(Match match, UUID currentUserId, Map<UUID, User> usersById) {
-        UUID otherUserId = match.getOtherUser(currentUserId);
-        User otherUser = usersById.get(otherUserId);
-        String otherUserName = otherUser != null ? otherUser.getName() : UNKNOWN_USER;
-        return new MatchSummary(
-                match.getId(), otherUserId, otherUserName, match.getState().name(), match.getCreatedAt());
+        return MatchSummary.from(match, currentUserId, usersById);
     }
 
     private ConversationSummary toConversationSummary(

@@ -38,9 +38,9 @@
           <padding>
             <Insets top="16" right="16" bottom="16" left="16"/>
           </padding>
-          <Label styleClass="text-secondary" text="Tap a notification to mark it as read"/>
+          <Label styleClass="text-secondary" text="Select a notification and press Enter or Space to mark it as read"/>
           <ListView fx:id="notificationsListView" VBox.vgrow="ALWAYS" prefHeight="580"
-                              styleClass="transparent-scroll" accessibleText="Notifications list - press Enter or Space to mark notification as read"/>
+                                        styleClass="transparent-scroll" accessibleText="Notifications list - press Enter or Space to mark notification as read"/>
         </VBox>
       </Tab>
       <!-- Friend Requests Tab -->
@@ -54,7 +54,7 @@
           </padding>
           <Label styleClass="text-secondary" text="Pending requests from your matches"/>
           <ListView fx:id="requestsListView" VBox.vgrow="ALWAYS" prefHeight="580"
-                              styleClass="transparent-scroll"/>
+                                        styleClass="transparent-scroll"/>
         </VBox>
       </Tab>
     </TabPane>

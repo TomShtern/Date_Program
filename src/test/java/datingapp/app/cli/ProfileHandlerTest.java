@@ -87,9 +87,19 @@ class ProfileHandlerTest {
     @DisplayName("addNote rejects overlong notes using configured limit")
     void addNoteRejectsOverlongNotesUsingConfiguredLimit() throws Exception {
         AppConfig customConfig = AppConfig.builder().maxProfileNoteLength(5).build();
+        ValidationService customValidationService = new ValidationService(customConfig);
+        ProfileUseCases customProfileUseCases = new ProfileUseCases(
+                userStorage,
+                null,
+                customValidationService,
+                null,
+                null,
+                customConfig,
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                null);
         InputReader inputReader = new InputReader(new Scanner(new StringReader(repeat('n', 6) + "\n")));
-        ProfileHandler handler =
-                new ProfileHandler(userStorage, validationService, profileUseCases, customConfig, session, inputReader);
+        ProfileHandler handler = new ProfileHandler(
+                userStorage, customValidationService, customProfileUseCases, customConfig, session, inputReader);
 
         UUID authorId = UUID.randomUUID();
         UUID subjectId = UUID.randomUUID();

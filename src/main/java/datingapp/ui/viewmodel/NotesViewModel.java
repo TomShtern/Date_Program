@@ -234,9 +234,28 @@ public final class NotesViewModel extends BaseViewModel {
         int index = indexOfNote(savedNote.subjectId());
         if (index >= 0) {
             notes.set(index, updatedEntry);
+            sortNotesByUpdatedAtDescending();
             return;
         }
         notes.add(updatedEntry);
+        sortNotesByUpdatedAtDescending();
+    }
+
+    private void sortNotesByUpdatedAtDescending() {
+        notes.sort((left, right) -> {
+            Instant leftUpdatedAt = left.updatedAt();
+            Instant rightUpdatedAt = right.updatedAt();
+            if (leftUpdatedAt == null && rightUpdatedAt == null) {
+                return 0;
+            }
+            if (leftUpdatedAt == null) {
+                return 1;
+            }
+            if (rightUpdatedAt == null) {
+                return -1;
+            }
+            return rightUpdatedAt.compareTo(leftUpdatedAt);
+        });
     }
 
     private void removeNoteEntry(UUID subjectId) {

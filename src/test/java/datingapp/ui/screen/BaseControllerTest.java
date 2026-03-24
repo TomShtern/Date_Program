@@ -51,7 +51,8 @@ class BaseControllerTest {
         assertFalse(navigationService.canGoBack());
         JavaFxTestSupport.runOnFxAndWait(controller::invokeHandleBack);
 
-        Deque<NavigationService.ViewType> history = history(navigationService);
+        Deque<NavigationService.ViewType> history = getHistory(navigationService);
+        clearHistory(navigationService);
         history.addLast(NavigationService.ViewType.CHAT);
         history.addLast(NavigationService.ViewType.DASHBOARD);
 
@@ -59,13 +60,17 @@ class BaseControllerTest {
         JavaFxTestSupport.runOnFxAndWait(controller::invokeHandleBack);
     }
 
-    private static Deque<NavigationService.ViewType> history(NavigationService navigationService) throws Exception {
+    private static Deque<NavigationService.ViewType> getHistory(NavigationService navigationService) throws Exception {
         Field field = NavigationService.class.getDeclaredField("navigationHistory");
         field.setAccessible(true);
         @SuppressWarnings("unchecked")
         Deque<NavigationService.ViewType> history = (Deque<NavigationService.ViewType>) field.get(navigationService);
-        history.clear();
         return history;
+    }
+
+    private static void clearHistory(NavigationService navigationService) throws Exception {
+        Deque<NavigationService.ViewType> history = getHistory(navigationService);
+        history.clear();
     }
 
     private static final class TestController extends BaseController {

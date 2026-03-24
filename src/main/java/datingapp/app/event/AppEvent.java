@@ -22,6 +22,13 @@ public sealed interface AppEvent
 
     Instant occurredAt();
 
+    enum DeletionReason {
+        USER_REQUEST,
+        PRIVACY_REQUEST,
+        SAFETY_ACTION,
+        ANONYMIZED_CODE
+    }
+
     record SwipeRecorded(UUID swiperId, UUID targetId, String direction, boolean resultedInMatch, Instant occurredAt)
             implements AppEvent {}
 
@@ -33,7 +40,7 @@ public sealed interface AppEvent
 
     record ProfileNoteDeleted(UUID authorId, UUID subjectId, Instant occurredAt) implements AppEvent {}
 
-    record AccountDeleted(UUID userId, String reason, Instant occurredAt) implements AppEvent {}
+    record AccountDeleted(UUID userId, DeletionReason reason, Instant occurredAt) implements AppEvent {}
 
     record FriendRequestAccepted(UUID requestId, UUID fromUserId, UUID toUserId, String matchId, Instant occurredAt)
             implements AppEvent {}

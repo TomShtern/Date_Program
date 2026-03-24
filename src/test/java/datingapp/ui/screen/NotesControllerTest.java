@@ -224,6 +224,7 @@ class NotesControllerTest {
                 },
                 5000));
         assertNotNull(openSelectedButton);
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(openSelectedButton::isDisabled));
     }
 
     @Test
@@ -253,6 +254,7 @@ class NotesControllerTest {
         // Clear navigation history and record the view before
         NavigationService navigationService = NavigationService.getInstance();
         navigationService.clearHistory();
+        navigationService.setNavigationContext(NavigationService.ViewType.MATCHING, null);
 
         // Fire Enter key event on the list view - this should trigger openSelectedNote
         JavaFxTestSupport.runOnFxAndWait(() -> {
@@ -260,11 +262,11 @@ class NotesControllerTest {
             notesListView.fireEvent(enterEvent);
         });
 
-        // Verify the note remains selected after keyboard event (proves handler was invoked)
-        NotesViewModel.NoteEntry stillSelected =
-                JavaFxTestSupport.callOnFxAndWait(notesListView.getSelectionModel()::getSelectedItem);
-        assertNotNull(stillSelected);
-        assertEquals(selectedNote, stillSelected);
+        UUID openedUserId = JavaFxTestSupport.callOnFxAndWait(() -> navigationService
+                .consumeNavigationContext(NavigationService.ViewType.MATCHING, UUID.class)
+                .orElse(null));
+        assertNotNull(openedUserId);
+        assertEquals(selectedNote.userId(), openedUserId);
     }
 
     private static User createUser(String name, Gender gender, EnumSet<Gender> interestedIn) {

@@ -32,6 +32,8 @@ class MatchQualityTest {
     private static final UUID USER_B = UUID.randomUUID();
     private static final List<String> EMPTY_LIST = List.of();
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+    private static final MatchQualityService.StarThresholdPolicy STAR_THRESHOLD_POLICY =
+            MatchQualityService.StarThresholdPolicy.from(AppConfig.defaults().algorithm());
 
     @BeforeEach
     void setUpClock() {
@@ -69,7 +71,8 @@ class MatchQualityTest {
                     Duration.ofHours(2),
                     "Perfect Sync",
                     75,
-                    List.of("Great match"));
+                    List.of("Great match"),
+                    STAR_THRESHOLD_POLICY);
 
             assertEquals(MATCH_ID, quality.matchId());
             assertEquals(75, quality.compatibilityScore());
@@ -99,7 +102,8 @@ class MatchQualityTest {
                             Duration.ZERO,
                             "Good Sync",
                             75,
-                            EMPTY_LIST));
+                            EMPTY_LIST,
+                            STAR_THRESHOLD_POLICY));
         }
 
         @Test
@@ -126,7 +130,8 @@ class MatchQualityTest {
                             Duration.ZERO,
                             "Good Sync",
                             75,
-                            EMPTY_LIST));
+                            EMPTY_LIST,
+                            STAR_THRESHOLD_POLICY));
         }
 
         @Test
@@ -153,7 +158,8 @@ class MatchQualityTest {
                             Duration.ZERO,
                             "Good Sync",
                             75,
-                            EMPTY_LIST));
+                            EMPTY_LIST,
+                            STAR_THRESHOLD_POLICY));
         }
 
         @Test
@@ -181,7 +187,8 @@ class MatchQualityTest {
                             "Good Sync",
                             101,
                             EMPTY_LIST // > 100
-                            ));
+                            ,
+                            STAR_THRESHOLD_POLICY));
         }
 
         @Test
@@ -205,7 +212,8 @@ class MatchQualityTest {
                     Duration.ZERO,
                     "Good Sync",
                     75,
-                    null);
+                    null,
+                    STAR_THRESHOLD_POLICY);
 
             assertNotNull(quality.sharedInterests());
             assertNotNull(quality.lifestyleMatches());
@@ -298,7 +306,8 @@ class MatchQualityTest {
                     Duration.ZERO,
                     "Good Sync",
                     75,
-                    List.of("First highlight", "Second"));
+                    List.of("First highlight", "Second"),
+                    STAR_THRESHOLD_POLICY);
             assertEquals("First highlight", quality.getShortSummary());
         }
 
@@ -325,7 +334,8 @@ class MatchQualityTest {
                     Duration.ZERO,
                     "Good Sync",
                     75,
-                    List.of(longHighlight));
+                    List.of(longHighlight),
+                    STAR_THRESHOLD_POLICY);
             String summary = quality.getShortSummary();
             assertTrue(summary.endsWith("..."));
             assertTrue(summary.length() <= 40);
@@ -358,6 +368,7 @@ class MatchQualityTest {
                 Duration.ZERO,
                 "Good Sync",
                 score,
-                EMPTY_LIST);
+                EMPTY_LIST,
+                STAR_THRESHOLD_POLICY);
     }
 }

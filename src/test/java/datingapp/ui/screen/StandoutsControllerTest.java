@@ -1,5 +1,6 @@
 package datingapp.ui.screen;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -17,6 +18,7 @@ import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.viewmodel.StandoutsViewModel;
+import datingapp.ui.viewmodel.StandoutsViewModel.StandoutEntry;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -78,8 +80,10 @@ class StandoutsControllerTest {
                 JavaFxTestSupport.loadFxml("/fxml/standouts.fxml", () -> new StandoutsController(fixture.viewModel));
         Parent root = loaded.root();
 
-        ListView<?> listView = JavaFxTestSupport.lookup(root, "#standoutsListView", ListView.class);
-        ComboBox<?> sortComboBox = JavaFxTestSupport.lookup(root, "#sortComboBox", ComboBox.class);
+        @SuppressWarnings("unchecked")
+        ListView<StandoutEntry> listView = JavaFxTestSupport.lookup(root, "#standoutsListView", ListView.class);
+        @SuppressWarnings("unchecked")
+        ComboBox<String> sortComboBox = JavaFxTestSupport.lookup(root, "#sortComboBox", ComboBox.class);
         TextInputControl filterTextField = JavaFxTestSupport.lookup(root, "#filterTextField", TextInputControl.class);
 
         // Wait for initial data to load
@@ -87,20 +91,28 @@ class StandoutsControllerTest {
 
         // Select "Name (A-Z)" sort option
         JavaFxTestSupport.runOnFxAndWait(() -> {
-            if (sortComboBox.getItems().size() > 0) {
-                sortComboBox.getSelectionModel().select(0); // Assuming first item is "Name (A-Z)"
+            if (sortComboBox.getItems().isEmpty()) {
+                throw new AssertionError("Sort combo box has no items; cannot exercise sort UI");
             }
+            int nameSortIndex = sortComboBox.getItems().indexOf("Name (A-Z)");
+            if (nameSortIndex < 0) {
+                throw new AssertionError("Sort combo box does not contain expected 'Name (A-Z)' option");
+            }
+            sortComboBox.getSelectionModel().select(nameSortIndex);
         });
 
         // Verify list is sorted alphabetically
         assertTrue(JavaFxTestSupport.waitUntil(
                 () -> {
-                    List<?> items = listView.getItems();
-                    if (items.size() < 2) return false;
-                    // Verify order by checking display names (implementation detail depends on cell rendering)
-                    return items.size() == 2;
+                    List<String> names = listView.getItems().stream()
+                            .map(StandoutEntry::displayName)
+                            .toList();
+                    return names.equals(List.of("Alpha", "Beta"));
                 },
                 5000));
+        assertEquals(
+                List.of("Alpha", "Beta"),
+                listView.getItems().stream().map(StandoutEntry::displayName).toList());
 
         // Type a filter query to narrow results
         JavaFxTestSupport.runOnFxAndWait(() -> filterTextField.setText("Alpha"));

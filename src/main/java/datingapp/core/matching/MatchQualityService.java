@@ -30,8 +30,6 @@ public class MatchQualityService {
     private final AppConfig config;
     private final CompatibilityCalculator calculator;
     private final StarThresholdPolicy starThresholdPolicy;
-    private static final StarThresholdPolicy DEFAULT_STAR_THRESHOLD_POLICY =
-            StarThresholdPolicy.from(AppConfig.builder().build().algorithm());
     private static final String LABEL_EXCELLENT = "Excellent Match";
     private static final String LABEL_GREAT = "Great Match";
     private static final String LABEL_GOOD = "Good Match";
@@ -45,9 +43,9 @@ public class MatchQualityService {
     private static final int AGE_SIMILAR_YEARS = 2;
     private static final int QUICK_MUTUAL_INTEREST_HOURS = 24;
 
-    private record StarThresholdPolicy(
+    public static record StarThresholdPolicy(
             int excellentThreshold, int greatThreshold, int goodThreshold, int fairThreshold) {
-        private static StarThresholdPolicy from(AppConfig.AlgorithmConfig algorithm) {
+        public static StarThresholdPolicy from(AppConfig.AlgorithmConfig algorithm) {
             return new StarThresholdPolicy(
                     algorithm.starExcellentThreshold(),
                     algorithm.starGreatThreshold(),
@@ -87,47 +85,6 @@ public class MatchQualityService {
             int compatibilityScore, // 0-100
             List<String> highlights, // Human-readable highlights
             StarThresholdPolicy starThresholdPolicy) {
-        public MatchQuality(
-                String matchId,
-                UUID perspectiveUserId,
-                UUID otherUserId,
-                Instant computedAt,
-                double distanceScore,
-                double ageScore,
-                double interestScore,
-                double lifestyleScore,
-                double paceScore,
-                double responseScore,
-                double distanceKm,
-                int ageDifference,
-                List<String> sharedInterests,
-                List<String> lifestyleMatches,
-                Duration timeBetweenLikes,
-                String paceSyncLevel,
-                int compatibilityScore,
-                List<String> highlights) {
-            this(
-                    matchId,
-                    perspectiveUserId,
-                    otherUserId,
-                    computedAt,
-                    distanceScore,
-                    ageScore,
-                    interestScore,
-                    lifestyleScore,
-                    paceScore,
-                    responseScore,
-                    distanceKm,
-                    ageDifference,
-                    sharedInterests,
-                    lifestyleMatches,
-                    timeBetweenLikes,
-                    paceSyncLevel,
-                    compatibilityScore,
-                    highlights,
-                    DEFAULT_STAR_THRESHOLD_POLICY);
-        }
-
         public MatchQuality {
             Objects.requireNonNull(matchId, "matchId cannot be null");
             Objects.requireNonNull(perspectiveUserId, "perspectiveUserId cannot be null");

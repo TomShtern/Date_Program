@@ -35,7 +35,7 @@ public final class MatchingService {
     private final RecommendationService dailyService;
     private final CandidateFinder candidateFinder;
 
-    /** Constructor with all dependencies except CandidateFinder and ActivityMetricsService. */
+    /** Constructor with all dependencies except CandidateFinder; ActivityMetricsService is optional. */
     public MatchingService(
             InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,

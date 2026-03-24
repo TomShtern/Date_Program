@@ -42,7 +42,8 @@ class InProcessAppEventBusTest {
 
     @Test
     void publishWithNoSubscribersIsANoop() {
-        assertDoesNotThrow(() -> bus.publish(new AppEvent.AccountDeleted(UUID.randomUUID(), "cleanup", Instant.now())));
+        assertDoesNotThrow(() -> bus.publish(new AppEvent.AccountDeleted(
+                UUID.randomUUID(), AppEvent.DeletionReason.ANONYMIZED_CODE, Instant.now())));
     }
 
     @Test

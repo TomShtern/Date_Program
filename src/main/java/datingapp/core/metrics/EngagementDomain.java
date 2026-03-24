@@ -248,6 +248,10 @@ public final class EngagementDomain {
             return String.format(PERCENT_FORMAT, matchRate * 100);
         }
 
+        public String getIncomingLikeRatioDisplay() {
+            return String.format(PERCENT_FORMAT, incomingLikeRatio * 100);
+        }
+
         public String getReciprocityDisplay() {
             return String.format(PERCENT_FORMAT, reciprocityScore * 100);
         }

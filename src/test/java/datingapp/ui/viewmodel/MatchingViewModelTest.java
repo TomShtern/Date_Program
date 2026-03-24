@@ -234,9 +234,10 @@ class MatchingViewModelTest {
         viewModel.superLike();
 
         waitUntil(
-                () -> fixture.fallbackCandidate
-                        .getId()
-                        .equals(viewModel.currentCandidateProperty().get().getId()),
+                () -> {
+                    var current = viewModel.currentCandidateProperty().get();
+                    return current != null && fixture.fallbackCandidate.getId().equals(current.getId());
+                },
                 5000);
 
         assertEquals(

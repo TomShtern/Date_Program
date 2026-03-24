@@ -156,6 +156,13 @@ public final class TestStorages {
             return profileNotes.remove(profileNoteKey(authorId, subjectId)) != null;
         }
 
+        @Override
+        public synchronized void executeWithUserLock(UUID userId, Runnable operation) {
+            Objects.requireNonNull(userId, "userId cannot be null");
+            Objects.requireNonNull(operation, "operation cannot be null");
+            operation.run();
+        }
+
         public void clear() {
             users.clear();
             profileNotes.clear();

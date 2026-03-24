@@ -248,11 +248,12 @@ public final class TrustSafetyService {
             try {
                 userStorage.save(latestReported);
                 result[0] = true;
-            } catch (RuntimeException _) {
+            } catch (RuntimeException ex) {
                 logger.error(
                         "Auto-ban save failed for user {} after {} reports; ban was not persisted",
                         reportedUserId,
-                        reportCount);
+                        reportCount,
+                        ex);
                 result[0] = false;
             }
         });

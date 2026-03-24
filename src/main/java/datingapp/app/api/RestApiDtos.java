@@ -19,6 +19,7 @@ import datingapp.core.profile.MatchPreferences.Lifestyle;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -32,6 +33,8 @@ import java.util.UUID;
  */
 final class RestApiDtos {
     private static final String UNKNOWN_USER = "Unknown";
+    private static final double APPROXIMATE_COORDINATE_SCALE = 10.0;
+    private static final String APPROXIMATE_COORDINATE_FORMAT = "%.1f, %.1f";
 
     private RestApiDtos() {}
 
@@ -64,8 +67,7 @@ final class RestApiDtos {
             String bio,
             String gender,
             List<String> interestedIn,
-            double latitude,
-            double longitude,
+            String approximateLocation,
             int maxDistanceKm,
             List<String> photoUrls,
             String state) {
@@ -81,8 +83,7 @@ final class RestApiDtos {
                     user.getBio(),
                     user.getGender() != null ? user.getGender().name() : null,
                     user.getInterestedIn().stream().map(Enum::name).toList(),
-                    user.getLat(),
-                    user.getLon(),
+                    toApproximateLocation(user),
                     user.getMaxDistanceKm(),
                     user.getPhotoUrls(),
                     user.getState().name());
@@ -92,10 +93,15 @@ final class RestApiDtos {
     /** Match summary for API responses. */
     static record MatchSummary(
             String matchId, UUID otherUserId, String otherUserName, String state, Instant createdAt) {
-        static MatchSummary from(Match match, UUID currentUserId) {
+        static MatchSummary from(Match match, UUID currentUserId, Map<UUID, User> usersById) {
             UUID otherUserId = match.getOtherUser(currentUserId);
+            User otherUser = usersById.get(otherUserId);
             return new MatchSummary(
-                    match.getId(), otherUserId, UNKNOWN_USER, match.getState().name(), match.getCreatedAt());
+                    match.getId(),
+                    otherUserId,
+                    otherUser != null ? otherUser.getName() : UNKNOWN_USER,
+                    match.getState().name(),
+                    match.getCreatedAt());
         }
     }
 
@@ -238,8 +244,7 @@ final class RestApiDtos {
             String bio,
             String gender,
             List<String> interestedIn,
-            double latitude,
-            double longitude,
+            String approximateLocation,
             int maxDistanceKm,
             String state,
             boolean activated) {
@@ -251,8 +256,7 @@ final class RestApiDtos {
                     user.getBio(),
                     user.getGender() != null ? user.getGender().name() : null,
                     user.getInterestedIn().stream().map(Enum::name).toList(),
-                    user.getLat(),
-                    user.getLon(),
+                    toApproximateLocation(user),
                     user.getMaxDistanceKm(),
                     user.getState().name(),
                     activated);
@@ -334,7 +338,7 @@ final class RestApiDtos {
                     stats.totalSwipesReceived(),
                     stats.likesReceived(),
                     stats.passesReceived(),
-                    stats.incomingLikeRatio() * 100 + "%",
+                    stats.getIncomingLikeRatioDisplay(),
                     stats.totalMatches(),
                     stats.activeMatches(),
                     stats.getMatchRateDisplay(),
@@ -346,6 +350,19 @@ final class RestApiDtos {
                     stats.selectivenessScore(),
                     stats.attractivenessScore());
         }
+    }
+
+    private static String toApproximateLocation(User user) {
+        if (user == null || !user.hasLocationSet()) {
+            return null;
+        }
+        double coarseLat = coarsenCoordinate(user.getLat());
+        double coarseLon = coarsenCoordinate(user.getLon());
+        return String.format(Locale.ENGLISH, APPROXIMATE_COORDINATE_FORMAT, coarseLat, coarseLon);
+    }
+
+    private static double coarsenCoordinate(double value) {
+        return Math.round(value * APPROXIMATE_COORDINATE_SCALE) / APPROXIMATE_COORDINATE_SCALE;
     }
 
     /** Achievement unlocked DTO. */

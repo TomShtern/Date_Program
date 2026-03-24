@@ -350,7 +350,7 @@ class ProfileUseCasesTest {
         assertTrue(publishedEvents.getFirst() instanceof AppEvent.AccountDeleted);
         AppEvent.AccountDeleted event = (AppEvent.AccountDeleted) publishedEvents.getFirst();
         assertEquals(user.getId(), event.userId());
-        assertEquals("privacy", event.reason());
+        assertEquals("PRIVACY_REQUEST", event.reason().name());
         assertEquals(cleanupStorage.deletedAt.get(), event.occurredAt());
     }
 

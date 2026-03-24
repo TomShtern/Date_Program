@@ -192,11 +192,14 @@ public interface UserStorage {
      *
      * @param userId    the user ID to lock
      * @param operation the operation to execute within the lock
-     * @throws IllegalArgumentException if userId or operation is null
+     * @throws NullPointerException          if userId or operation is null
+     * @throws UnsupportedOperationException if the implementation does not provide
+     *                                       a lock-aware implementation
      */
     default void executeWithUserLock(UUID userId, Runnable operation) {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(operation, "operation cannot be null");
-        operation.run();
+        throw new UnsupportedOperationException(
+                "executeWithUserLock must be implemented with database-level locking by the storage implementation");
     }
 }

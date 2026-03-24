@@ -25,6 +25,7 @@ import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -395,16 +396,17 @@ public class ProfileUseCases {
             if (user.getState() == User.UserState.ACTIVE) {
                 user.pause();
             }
+            AppEvent.DeletionReason deletionReason = sanitizeDeletionReason(command.reason());
             if (accountCleanupStorage != null) {
                 accountCleanupStorage.softDeleteAccount(user, deletedAt);
             } else {
                 userStorage.save(user);
             }
             if (logger.isInfoEnabled()) {
-                logger.info("Account soft-deleted for user {} (reason={})", user.getId(), command.reason());
+                logger.info("Account soft-deleted for user {} (reasonCode={})", user.getId(), deletionReason);
             }
             publishEvent(
-                    new AppEvent.AccountDeleted(user.getId(), command.reason(), deletedAt),
+                    new AppEvent.AccountDeleted(user.getId(), deletionReason, deletedAt),
                     "Post-account-delete event publication failed for user " + user.getId());
             return UseCaseResult.success(true);
         } catch (Exception e) {
@@ -477,12 +479,10 @@ public class ProfileUseCases {
                     .orElseGet(() ->
                             ProfileNote.create(command.context().userId(), command.subjectId(), sanitizedContent));
             userStorage.saveProfileNote(note);
+            int safeContentLength = sanitizedContent == null ? 0 : sanitizedContent.length();
             publishEvent(
                     new AppEvent.ProfileNoteSaved(
-                            command.context().userId(),
-                            command.subjectId(),
-                            note.content().length(),
-                            AppClock.now()),
+                            command.context().userId(), command.subjectId(), safeContentLength, AppClock.now()),
                     "Post-profile-note-save event publication failed for author "
                             + command.context().userId());
             return UseCaseResult.success(note);
@@ -581,6 +581,30 @@ public class ProfileUseCases {
                 logger.warn("{}: {}", failureMessage, e.getMessage(), e);
             }
         }
+    }
+
+    private static AppEvent.DeletionReason sanitizeDeletionReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return AppEvent.DeletionReason.ANONYMIZED_CODE;
+        }
+        String normalized = reason.trim().toLowerCase(Locale.ROOT);
+        if (normalized.contains("privacy")
+                || normalized.contains("erase")
+                || normalized.contains("gdpr")
+                || normalized.contains("right-to-erasure")) {
+            return AppEvent.DeletionReason.PRIVACY_REQUEST;
+        }
+        if (normalized.contains("safety")
+                || normalized.contains("abuse")
+                || normalized.contains("policy")
+                || normalized.contains("moderation")
+                || normalized.contains("ban")) {
+            return AppEvent.DeletionReason.SAFETY_ACTION;
+        }
+        if (normalized.contains("user") || normalized.contains("self")) {
+            return AppEvent.DeletionReason.USER_REQUEST;
+        }
+        return AppEvent.DeletionReason.ANONYMIZED_CODE;
     }
 
     private List<UserAchievement> unlockAchievements(UUID userId) {

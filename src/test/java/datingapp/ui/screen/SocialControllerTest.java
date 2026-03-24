@@ -26,6 +26,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 @Timeout(value = 10, unit = TimeUnit.SECONDS)
 @DisplayName("SocialController wiring and rendering")
@@ -78,15 +80,30 @@ class SocialControllerTest {
         ListView<?> notifications = JavaFxTestSupport.lookup(root, "#notificationsListView", ListView.class);
         ListView<?> requests = JavaFxTestSupport.lookup(root, "#requestsListView", ListView.class);
 
-        assertTrue(notifications.getItems().isEmpty());
-        assertTrue(requests.getItems().isEmpty());
+        JavaFxTestSupport.runOnFxAndWait(fixture.viewModel::refresh);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(() ->
+                                        fixture.viewModel.loadingProperty().get())
+                                && JavaFxTestSupport.callOnFxAndWait(notifications.getItems()::isEmpty)
+                                && JavaFxTestSupport.callOnFxAndWait(requests.getItems()::isEmpty);
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
 
         fixture.dispose();
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(
+            value = KeyCode.class,
+            names = {"ENTER", "SPACE"})
     @DisplayName("Pressing Enter or Space on unread notification marks it as read")
-    void keyboardEnterOnUnreadNotificationMarksAsRead() throws Exception {
+    void keyboardEnterOrSpaceOnUnreadNotificationMarksAsRead(KeyCode keyCode) throws Exception {
         Fixture fixture = new Fixture();
         fixture.seedData();
 
@@ -106,7 +123,7 @@ class SocialControllerTest {
 
         JavaFxTestSupport.runOnFxAndWait(() -> {
             notificationsListView.getSelectionModel().select(selectedNotification);
-            KeyEvent enterEvent = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false);
+            KeyEvent enterEvent = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", keyCode, false, false, false, false);
             notificationsListView.fireEvent(enterEvent);
         });
 

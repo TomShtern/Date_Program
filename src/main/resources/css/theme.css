@@ -1362,7 +1362,7 @@
 /* Match Time Label */
 .match-time-label {
     -fx-font-size: 12px;
-    -fx-text-fill: #64748b;
+    -fx-text-fill: #cbd5e1;
 }
 
 /* New Match Badge - For matches < 24h */
@@ -1499,7 +1499,7 @@
 
 .like-time-label {
     -fx-font-size: 11px;
-    -fx-text-fill: #64748b;
+    -fx-text-fill: #cbd5e1;
 }
 
 .like-status-label {

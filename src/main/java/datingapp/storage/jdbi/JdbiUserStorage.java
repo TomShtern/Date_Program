@@ -203,6 +203,9 @@ public final class JdbiUserStorage implements UserStorage {
     public void executeWithUserLock(UUID userId, Runnable operation) {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(operation, "operation cannot be null");
+        if (lockedHandle.get() != null) {
+            throw new IllegalStateException("Nested executeWithUserLock is not supported");
+        }
         jdbi.useTransaction(handle -> {
             handle.createQuery("SELECT id FROM users WHERE id = :userId FOR UPDATE")
                     .bind(USER_ID_BIND, userId)

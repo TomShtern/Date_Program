@@ -101,14 +101,21 @@ public class StandoutsController extends BaseController implements Initializable
 
     private static Comparator<StandoutEntry> comparatorFor(String sortOption) {
         if (SORT_NAME_AZ.equals(sortOption)) {
-            return Comparator.comparing(entry -> entry.displayName().toLowerCase(Locale.ROOT));
+            return Comparator.comparing(StandoutsController::normalizedDisplayName);
         }
         if (SORT_SCORE.equals(sortOption)) {
             return Comparator.comparingInt(StandoutEntry::score).reversed().thenComparingInt(StandoutEntry::rank);
         }
         return Comparator.comparingInt(StandoutEntry::rank)
                 .thenComparing(Comparator.comparingInt(StandoutEntry::score).reversed())
-                .thenComparing(entry -> entry.displayName().toLowerCase(Locale.ROOT));
+                .thenComparing(StandoutsController::normalizedDisplayName);
+    }
+
+    private static String normalizedDisplayName(StandoutEntry entry) {
+        if (entry == null || entry.displayName() == null) {
+            return "";
+        }
+        return entry.displayName().toLowerCase(Locale.ROOT);
     }
 
     private static boolean matchesFilter(StandoutEntry entry, String query) {

@@ -25,7 +25,7 @@
       <FontIcon iconLiteral="mdi2n-note-text-outline" iconSize="24" iconColor="#38bdf8"/>
       <Label styleClass="subheading" text="My Notes" accessibleText="My Notes browser"/>
       <Region HBox.hgrow="ALWAYS"/>
-      <Button onAction="#handleOpenSelected" styleClass="button-secondary" text="Open Selected" accessibleText="Open the selected note in Matching"/>
+      <Button fx:id="openSelectedButton" onAction="#handleOpenSelected" styleClass="button-secondary" text="Open Selected" accessibleText="Open the selected note in Matching"/>
     </HBox>
   </top>
 
@@ -47,8 +47,8 @@
         <TextArea fx:id="noteEditorArea" prefRowCount="16" promptText="Select a note to edit its full content." VBox.vgrow="ALWAYS" wrapText="true" accessibleText="Note content editor"/>
         <Label styleClass="text-secondary" text="Edit the full note, then save or delete it from here." wrapText="true"/>
         <HBox alignment="CENTER_RIGHT" spacing="12">
-          <Button fx:id="deleteSelectedNoteButton" onAction="#handleDeleteSelectedNote" styleClass="button-danger" text="Delete"/>
-          <Button fx:id="saveSelectedNoteButton" onAction="#handleSaveSelectedNote" styleClass="button-secondary" text="Save"/>
+          <Button fx:id="deleteSelectedNoteButton" onAction="#handleDeleteSelectedNote" styleClass="button-danger" text="Delete" accessibleText="Delete selected note"/>
+          <Button fx:id="saveSelectedNoteButton" onAction="#handleSaveSelectedNote" styleClass="button-secondary" text="Save" accessibleText="Save selected note"/>
         </HBox>
       </VBox>
     </HBox>

@@ -390,6 +390,8 @@ class ProfileViewModelTest {
                 TEST_DISPATCHER,
                 new datingapp.core.workflow.ProfileActivationPolicy());
 
+        viewModel.loadCurrentUser();
+
         assertTrue(viewModel.toggleInterest(datingapp.core.profile.MatchPreferences.Interest.values()[0]));
         assertFalse(viewModel.toggleInterest(datingapp.core.profile.MatchPreferences.Interest.values()[1]));
         assertEquals(1, viewModel.getSelectedInterests().size());

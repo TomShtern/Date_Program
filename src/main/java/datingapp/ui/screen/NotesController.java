@@ -46,6 +46,9 @@ public final class NotesController extends BaseController implements Initializab
     @FXML
     private Button deleteSelectedNoteButton;
 
+    @FXML
+    private Button openSelectedButton;
+
     private final NotesViewModel viewModel;
 
     public NotesController(NotesViewModel viewModel) {
@@ -135,6 +138,9 @@ public final class NotesController extends BaseController implements Initializab
     }
 
     private void bindEditorControls() {
+        if (openSelectedButton != null) {
+            openSelectedButton.disableProperty().bind(Bindings.isEmpty(viewModel.getNotes()));
+        }
         if (noteEditorArea != null) {
             noteEditorArea.textProperty().bindBidirectional(viewModel.selectedNoteContentProperty());
             noteEditorArea
