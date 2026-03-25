@@ -422,6 +422,11 @@ public class MatchingUseCases {
                 && !dailyLimitService.canSuperLike(command.context().userId())) {
             return UseCaseResult.failure(UseCaseError.conflict("Daily super-like limit reached"));
         }
+        if (command.enforceDailyLimit()
+                && command.direction() == Like.Direction.PASS
+                && !dailyLimitService.canPass(command.context().userId())) {
+            return UseCaseResult.failure(UseCaseError.conflict("Daily pass limit reached"));
+        }
 
         try {
             Like like = Like.create(command.context().userId(), command.targetUserId(), command.direction());

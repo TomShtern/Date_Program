@@ -3,6 +3,7 @@ package datingapp.storage.jdbi;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.model.ProfileNote;
@@ -12,6 +13,7 @@ import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
+import datingapp.core.storage.PageData;
 import datingapp.core.testutil.TestClock;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.DevDataSeeder;
@@ -42,6 +44,11 @@ import org.junit.jupiter.api.Timeout;
  */
 @Timeout(10)
 class JdbiUserStorageNormalizationTest {
+
+    private static final String SUBJECT_USER_NAME = "SubjectUser";
+    private static final String ACTIVE_OLD_PHOTO_URL = "https://example.com/active-old.jpg";
+    private static final String ACTIVE_NEW_PHOTO_URL = "https://example.com/active-new.jpg";
+    private static final String PAUSED_NEWEST_PHOTO_URL = "https://example.com/paused-newest.jpg";
 
     private JdbiUserStorage storage;
     private Jdbi jdbi;
@@ -296,6 +303,150 @@ class JdbiUserStorageNormalizationTest {
     }
 
     @Test
+    @DisplayName("getPageOfActiveUsers applies SQL paging and normalized enrichment")
+    void getPageOfActiveUsersAppliesSqlPagingAndNormalizedEnrichment() {
+        Instant base = Instant.parse("2026-03-25T10:00:00Z");
+
+        User oldest = createPagedUser(
+                UUID.randomUUID(), "ActiveOld", Gender.FEMALE, Set.of(Gender.MALE), UserState.ACTIVE, base, true);
+        oldest.setPhotoUrls(List.of(ACTIVE_OLD_PHOTO_URL));
+        oldest.setInterests(Set.of(Interest.COOKING));
+
+        User middle = createPagedUser(
+                UUID.randomUUID(),
+                "ActiveMid",
+                Gender.MALE,
+                Set.of(Gender.FEMALE),
+                UserState.ACTIVE,
+                base.plusSeconds(60),
+                true);
+        middle.setPhotoUrls(List.of("https://example.com/active-mid-a.jpg", "https://example.com/active-mid-b.jpg"));
+        middle.setInterests(Set.of(Interest.MUSIC, Interest.TRAVEL));
+        middle.setDealbreakers(
+                Dealbreakers.builder().acceptSmoking(Lifestyle.Smoking.NEVER).build());
+
+        User newestActive = createPagedUser(
+                UUID.randomUUID(),
+                "ActiveNew",
+                Gender.OTHER,
+                Set.of(Gender.MALE),
+                UserState.ACTIVE,
+                base.plusSeconds(120),
+                true);
+        newestActive.setPhotoUrls(List.of(ACTIVE_NEW_PHOTO_URL));
+        newestActive.setInterests(Set.of(Interest.GYM));
+
+        User newestButInactive = createPagedUser(
+                UUID.randomUUID(),
+                "PausedNewest",
+                Gender.FEMALE,
+                Set.of(Gender.MALE),
+                UserState.PAUSED,
+                base.plusSeconds(180),
+                true);
+        newestButInactive.setPhotoUrls(List.of(PAUSED_NEWEST_PHOTO_URL));
+        newestButInactive.setInterests(Set.of(Interest.READING));
+
+        storage.save(oldest);
+        storage.save(middle);
+        storage.save(newestActive);
+        storage.save(newestButInactive);
+
+        PageData<User> page = storage.getPageOfActiveUsers(1, 10);
+
+        assertEquals(3, page.totalCount());
+        assertEquals(1, page.offset());
+        assertEquals(10, page.limit());
+        assertEquals(List.of(middle, oldest), page.items());
+        assertEquals(
+                List.of("https://example.com/active-mid-a.jpg", "https://example.com/active-mid-b.jpg"),
+                page.items().get(0).getPhotoUrls());
+        assertEquals(
+                Set.of(Interest.MUSIC, Interest.TRAVEL), page.items().get(0).getInterests());
+        assertTrue(page.items().get(0).getDealbreakers().acceptableSmoking().contains(Lifestyle.Smoking.NEVER));
+        assertEquals(List.of(ACTIVE_OLD_PHOTO_URL), page.items().get(1).getPhotoUrls());
+        assertEquals(Set.of(Interest.COOKING), page.items().get(1).getInterests());
+    }
+
+    @Test
+    @DisplayName("getPageOfAllUsers applies SQL paging and returns empty pages past the end")
+    void getPageOfAllUsersAppliesSqlPagingAndReturnsEmptyPagesPastTheEnd() {
+        int baselineTotalCount = storage.getPageOfAllUsers(0, 100).totalCount();
+        Instant base = Instant.parse("2026-03-25T10:00:00Z");
+
+        User newestInactive = createPagedUser(
+                UUID.randomUUID(),
+                "PausedNewest",
+                Gender.FEMALE,
+                Set.of(Gender.MALE),
+                UserState.PAUSED,
+                base.plusSeconds(180),
+                true);
+        newestInactive.setPhotoUrls(List.of(PAUSED_NEWEST_PHOTO_URL));
+        newestInactive.setInterests(Set.of(Interest.READING));
+
+        User newestActive = createPagedUser(
+                UUID.randomUUID(),
+                "ActiveNew",
+                Gender.OTHER,
+                Set.of(Gender.FEMALE),
+                UserState.ACTIVE,
+                base.plusSeconds(120),
+                true);
+        newestActive.setPhotoUrls(List.of(ACTIVE_NEW_PHOTO_URL));
+        newestActive.setInterests(Set.of(Interest.GYM));
+
+        User middleActive = createPagedUser(
+                UUID.randomUUID(),
+                "ActiveMid",
+                Gender.MALE,
+                Set.of(Gender.FEMALE),
+                UserState.ACTIVE,
+                base.plusSeconds(60),
+                true);
+        middleActive.setPhotoUrls(List.of("https://example.com/active-mid.jpg"));
+        middleActive.setInterests(Set.of(Interest.MUSIC));
+
+        User oldestActive = createPagedUser(
+                UUID.randomUUID(), "ActiveOld", Gender.FEMALE, Set.of(Gender.MALE), UserState.ACTIVE, base, true);
+        oldestActive.setPhotoUrls(List.of(ACTIVE_OLD_PHOTO_URL));
+        oldestActive.setInterests(Set.of(Interest.COOKING));
+
+        storage.save(newestInactive);
+        storage.save(newestActive);
+        storage.save(middleActive);
+        storage.save(oldestActive);
+
+        PageData<User> page = storage.getPageOfAllUsers(baselineTotalCount, 2);
+
+        int expectedTotalCount = baselineTotalCount + 4;
+        assertEquals(expectedTotalCount, page.totalCount());
+        assertEquals(baselineTotalCount, page.offset());
+        assertEquals(2, page.limit());
+        assertEquals(List.of(newestInactive, newestActive), page.items());
+        assertEquals(List.of(PAUSED_NEWEST_PHOTO_URL), page.items().get(0).getPhotoUrls());
+        assertEquals(Set.of(Interest.READING), page.items().get(0).getInterests());
+        assertEquals(List.of(ACTIVE_NEW_PHOTO_URL), page.items().get(1).getPhotoUrls());
+        assertEquals(Set.of(Interest.GYM), page.items().get(1).getInterests());
+
+        PageData<User> empty = storage.getPageOfAllUsers(expectedTotalCount, 10);
+
+        assertTrue(empty.isEmpty());
+        assertEquals(expectedTotalCount, empty.totalCount());
+        assertEquals(0, empty.offset());
+        assertEquals(10, empty.limit());
+    }
+
+    @Test
+    @DisplayName("getPage methods reject invalid arguments")
+    void getPageMethodsRejectInvalidArguments() {
+        assertThrows(IllegalArgumentException.class, () -> storage.getPageOfActiveUsers(-1, 1));
+        assertThrows(IllegalArgumentException.class, () -> storage.getPageOfActiveUsers(0, 0));
+        assertThrows(IllegalArgumentException.class, () -> storage.getPageOfAllUsers(-1, 1));
+        assertThrows(IllegalArgumentException.class, () -> storage.getPageOfAllUsers(0, -1));
+    }
+
+    @Test
     @DisplayName("findCandidates keeps DB-side location narrowing even at very large radius")
     void findCandidatesKeepsLocationNarrowingAtVeryLargeRadius() {
         UUID seekerId = UUID.randomUUID();
@@ -346,7 +497,7 @@ class JdbiUserStorageNormalizationTest {
     @DisplayName("should save and update profile notes with record binding")
     void saveAndUpdateProfileNoteRoundTrip() {
         UUID subjectId = UUID.randomUUID();
-        storage.save(new User(subjectId, "SubjectUser"));
+        storage.save(new User(subjectId, SUBJECT_USER_NAME));
 
         storage.saveProfileNote(ProfileNote.create(userId, subjectId, "First note"));
 
@@ -381,7 +532,7 @@ class JdbiUserStorageNormalizationTest {
     @DisplayName("should soft-delete profile note and hide from queries")
     void shouldSoftDeleteProfileNote() {
         UUID subjectId = UUID.randomUUID();
-        storage.save(new User(subjectId, "SubjectUser"));
+        storage.save(new User(subjectId, SUBJECT_USER_NAME));
 
         // Save a profile note
         ProfileNote note = ProfileNote.create(userId, subjectId, "Test note");
@@ -399,12 +550,14 @@ class JdbiUserStorageNormalizationTest {
         assertTrue(storage.getProfileNote(userId, subjectId).isEmpty());
         assertTrue(storage.getProfileNotesByAuthor(userId).isEmpty());
 
-        Instant deletedAt = jdbi.withHandle(handle -> handle.createQuery("""
-                SELECT deleted_at
-                FROM profile_notes
-                WHERE author_id = :authorId
-                  AND subject_id = :subjectId
-                """)
+        String deletedAtSql = """
+            SELECT deleted_at
+            FROM profile_notes
+            WHERE author_id = :authorId
+              AND subject_id = :subjectId
+            """;
+
+        Instant deletedAt = jdbi.withHandle(handle -> handle.createQuery(deletedAtSql)
                 .bind("authorId", userId)
                 .bind("subjectId", subjectId)
                 .mapTo(Instant.class)
@@ -416,7 +569,7 @@ class JdbiUserStorageNormalizationTest {
     @DisplayName("should revive soft-deleted profile note when re-saved")
     void shouldReviveSoftDeletedProfileNoteOnResave() {
         UUID subjectId = UUID.randomUUID();
-        storage.save(new User(subjectId, "SubjectUser"));
+        storage.save(new User(subjectId, SUBJECT_USER_NAME));
 
         // Save, delete, then re-save a profile note
         storage.saveProfileNote(ProfileNote.create(userId, subjectId, "Original note"));
@@ -460,14 +613,41 @@ class JdbiUserStorageNormalizationTest {
 
     private static User createActiveUser(
             UUID id, String name, Gender gender, Set<Gender> interestedIn, boolean withLocation) {
-        User.StorageBuilder builder = User.StorageBuilder.create(id, name, Instant.now())
+        return createActiveUser(id, name, gender, interestedIn, withLocation, Instant.now());
+    }
+
+    private static User createPagedUser(
+            UUID id,
+            String name,
+            Gender gender,
+            Set<Gender> interestedIn,
+            UserState state,
+            Instant createdAt,
+            boolean withLocation) {
+        return createUser(id, name, gender, interestedIn, withLocation, createdAt, state);
+    }
+
+    private static User createActiveUser(
+            UUID id, String name, Gender gender, Set<Gender> interestedIn, boolean withLocation, Instant createdAt) {
+        return createUser(id, name, gender, interestedIn, withLocation, createdAt, UserState.ACTIVE);
+    }
+
+    private static User createUser(
+            UUID id,
+            String name,
+            Gender gender,
+            Set<Gender> interestedIn,
+            boolean withLocation,
+            Instant createdAt,
+            UserState state) {
+        User.StorageBuilder builder = User.StorageBuilder.create(id, name, createdAt)
                 .birthDate(LocalDate.now().minusYears(28))
                 .gender(gender)
                 .interestedIn(interestedIn)
                 .maxDistanceKm(500)
                 .ageRange(18, 99)
-                .state(UserState.ACTIVE)
-                .updatedAt(Instant.now());
+                .state(state)
+                .updatedAt(createdAt);
 
         if (withLocation) {
             builder.location(32.0853, 34.7818).hasLocationSet(true);

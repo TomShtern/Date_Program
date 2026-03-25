@@ -30,21 +30,21 @@
       <VBox styleClass="card card-stack-2" visible="false" managed="false" maxWidth="400.0"/>
       <!-- Candidate Card (front) -->
       <VBox fx:id="candidateCard" alignment="TOP_CENTER" maxWidth="400.0" spacing="0.0"
-                                                                                  styleClass="card card-stack-1">
+                                                                                        styleClass="card card-stack-1">
         <!-- Swipe Overlays -->
         <StackPane>
           <!-- LIKE Overlay -->
           <Label fx:id="likeOverlay" text="LIKE" visible="false" managed="false"
-                                                                                                 styleClass="swipe-overlay swipe-like-overlay swipe-overlay-text"
-                                                                                                 StackPane.alignment="TOP_LEFT">
+                                                                                                           styleClass="swipe-overlay swipe-like-overlay swipe-overlay-text"
+                                                                                                           StackPane.alignment="TOP_LEFT">
             <StackPane.margin>
               <javafx.geometry.Insets top="20" left="20"/>
             </StackPane.margin>
           </Label>
           <!-- PASS Overlay -->
           <Label fx:id="passOverlay" text="NOPE" visible="false" managed="false"
-                                                                                                 styleClass="swipe-overlay swipe-pass-overlay swipe-overlay-text"
-                                                                                                 StackPane.alignment="TOP_RIGHT">
+                                                                                                           styleClass="swipe-overlay swipe-pass-overlay swipe-overlay-text"
+                                                                                                           StackPane.alignment="TOP_RIGHT">
             <StackPane.margin>
               <javafx.geometry.Insets top="20" right="20"/>
             </StackPane.margin>
@@ -75,7 +75,7 @@
           </HBox>
           <Label fx:id="distanceLabel" styleClass="card-distance" text="📍 3km away"/>
           <Label fx:id="bioLabel" prefHeight="80.0" wrapText="true"
-                                                                                                                                      text="Lover of hiking, coding and good coffee. Always looking for the next adventure!" accessibleText="Profile bio and interests"/>
+                                                                                                                                                text="Lover of hiking, coding and good coffee. Always looking for the next adventure!" accessibleText="Profile bio and interests"/>
           <Separator/>
           <Label styleClass="text-secondary conversation-section-label" text="PRIVATE NOTE"/>
           <TextArea fx:id="noteTextArea" prefRowCount="3" promptText="Add a private note about this profile..." wrapText="true" accessibleText="Private note editor for this profile"/>
@@ -84,11 +84,17 @@
             <Button fx:id="deleteNoteButton" onAction="#handleDeleteNote" styleClass="button-transparent" text="Delete"/>
             <Label fx:id="noteStatusLabel" styleClass="text-secondary" wrapText="true" HBox.hgrow="ALWAYS"/>
           </HBox>
+          <Separator/>
+          <Button fx:id="viewFullProfileButton"
+                            onAction="#handleViewFullProfile"
+                            styleClass="button-secondary"
+                            maxWidth="Infinity"
+                            text="View Full Profile"/>
         </VBox>
       </VBox>
       <!-- Empty State: No More Candidates (Enhanced) -->
       <VBox fx:id="noCandidatesContainer" alignment="CENTER" spacing="24" visible="false"
-                                                                        styleClass="matches-empty-container" maxWidth="450">
+                                                                              styleClass="matches-empty-container" maxWidth="450">
         <padding>
           <Insets top="40" right="48" bottom="40" left="48"/>
         </padding>
@@ -98,7 +104,7 @@
         </StackPane>
         <Label fx:id="noCandidatesHeading" styleClass="empty-state-heading" text="No more people around you!"/>
         <Label fx:id="noCandidatesBody" styleClass="empty-state-body" wrapText="true" maxWidth="350"
-                                                                                       text="You've seen everyone nearby. Try expanding your search or check back later!"/>
+                                                                                               text="You've seen everyone nearby. Try expanding your search or check back later!"/>
         <!-- Separator -->
         <Region styleClass="matches-separator" prefHeight="1" prefWidth="200">
           <VBox.margin>

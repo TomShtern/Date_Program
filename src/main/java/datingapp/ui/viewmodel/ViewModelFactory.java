@@ -19,12 +19,10 @@ import datingapp.ui.screen.SafetyController;
 import datingapp.ui.screen.SocialController;
 import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
-import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
@@ -230,16 +228,7 @@ public class ViewModelFactory {
         return getViewModel(
                 ChatViewModel.class,
                 () -> new ChatViewModel(
-                        services.getMessagingUseCases(),
-                        services.getSocialUseCases(),
-                        session,
-                        uiDispatcher,
-                        java.time.Duration.ofSeconds(
-                                services.getConfig().validation().chatBackgroundPollSeconds()),
-                        java.time.Duration.ofSeconds(
-                                services.getConfig().validation().chatActivePollSeconds()),
-                        new ChatViewModel.ChatUiDependencies(
-                                createUiProfileNoteDataAccess(), createUiPresenceDataAccess())));
+                        services.getMessagingUseCases(), services.getSocialUseCases(), session, services.getConfig()));
     }
 
     public StatsViewModel getStatsViewModel() {
@@ -357,10 +346,6 @@ public class ViewModelFactory {
 
     private UiProfileNoteDataAccess createUiProfileNoteDataAccess() {
         return new UseCaseUiProfileNoteDataAccess(services.getProfileUseCases());
-    }
-
-    private UiPresenceDataAccess createUiPresenceDataAccess() {
-        return new NoOpUiPresenceDataAccess();
     }
 
     private void logDebug(String message, Object... args) {

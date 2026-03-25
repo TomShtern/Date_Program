@@ -1,6 +1,9 @@
 package datingapp.core.storage;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
@@ -8,6 +11,8 @@ import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
+import datingapp.core.model.User;
+import datingapp.core.model.User.UserState;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
 import java.util.List;
@@ -21,10 +26,65 @@ import org.junit.jupiter.api.Test;
 @DisplayName("Storage contract defaults")
 class StorageContractTest {
 
+    private static final String USER_ALPHA = "Alpha";
+
+    @Test
+    @DisplayName("UserStorage default active pagination slices in memory")
+    void userStorageDefaultActivePaginationSlicesInMemory() {
+        User alpha = user(USER_ALPHA, UserState.ACTIVE);
+        User bravo = user("Bravo", UserState.ACTIVE);
+        User charlie = user("Charlie", UserState.ACTIVE);
+
+        UserStorage storage = new PagedUsers(List.of(alpha, bravo, charlie), List.of(alpha, bravo, charlie));
+
+        PageData<User> page = storage.getPageOfActiveUsers(1, 2);
+
+        assertEquals(List.of(bravo, charlie), page.items());
+        assertEquals(3, page.totalCount());
+        assertEquals(1, page.offset());
+        assertEquals(2, page.limit());
+        assertFalse(page.hasMore());
+    }
+
+    @Test
+    @DisplayName("UserStorage default all-pagination returns empty page past the end")
+    void userStorageDefaultAllPaginationReturnsEmptyPagePastEnd() {
+        User alpha = user(USER_ALPHA, UserState.ACTIVE);
+        User bravo = user("Bravo", UserState.PAUSED);
+        User charlie = user("Charlie", UserState.ACTIVE);
+
+        UserStorage storage = new PagedUsers(List.of(alpha, charlie), List.of(alpha, bravo, charlie));
+
+        PageData<User> page = storage.getPageOfAllUsers(3, 10);
+
+        assertTrue(page.isEmpty());
+        assertEquals(3, page.totalCount());
+        assertEquals(3, page.offset());
+        assertEquals(10, page.limit());
+        assertFalse(page.hasMore());
+    }
+
+    @Test
+    @DisplayName("UserStorage default pagination rejects invalid offset and limit values")
+    void userStorageDefaultPaginationRejectsInvalidArguments() {
+        User alpha = user(USER_ALPHA, UserState.ACTIVE);
+        UserStorage storage = new PagedUsers(List.of(alpha), List.of(alpha));
+
+        assertThrows(IllegalArgumentException.class, () -> storage.getPageOfActiveUsers(-1, 1));
+        assertThrows(IllegalArgumentException.class, () -> storage.getPageOfActiveUsers(0, 0));
+        assertThrows(IllegalArgumentException.class, () -> storage.getPageOfAllUsers(-1, 1));
+        assertThrows(IllegalArgumentException.class, () -> storage.getPageOfAllUsers(0, -1));
+    }
+
     @Test
     @DisplayName("UserStorage purgeDeletedBefore fails fast when unsupported")
     void userStoragePurgeDeletedBeforeFailsFast() {
-        UserStorage storage = new TestStorages.Users();
+        UserStorage storage = new TestStorages.Users() {
+            @Override
+            public int purgeDeletedBefore(Instant threshold) {
+                throw new UnsupportedOperationException("unsupported in this contract test");
+            }
+        };
 
         assertThrows(UnsupportedOperationException.class, () -> storage.purgeDeletedBefore(Instant.EPOCH));
     }
@@ -53,6 +113,33 @@ class StorageContractTest {
         UUID userId = UUID.randomUUID();
 
         assertThrows(UnsupportedOperationException.class, () -> storage.countPendingFriendRequestsForUser(userId));
+    }
+
+    private static User user(String name, UserState state) {
+        return User.StorageBuilder.create(UUID.randomUUID(), name, Instant.EPOCH)
+                .state(state)
+                .build();
+    }
+
+    private static final class PagedUsers extends TestStorages.Users {
+
+        private final List<User> activeUsers;
+        private final List<User> allUsers;
+
+        private PagedUsers(List<User> activeUsers, List<User> allUsers) {
+            this.activeUsers = List.copyOf(activeUsers);
+            this.allUsers = List.copyOf(allUsers);
+        }
+
+        @Override
+        public List<User> findActive() {
+            return activeUsers;
+        }
+
+        @Override
+        public List<User> findAll() {
+            return allUsers;
+        }
     }
 
     private static final class UnsupportedInteractionStorage implements InteractionStorage {

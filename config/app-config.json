@@ -21,6 +21,7 @@
   "chatActivePollSeconds": 5,
   "maxSwipesPerSession": 500,
   "suspiciousSwipeVelocity": 30.0,
+  "suspiciousSwipeVelocityBlockingEnabled": true,
   "nearbyDistanceKm": 5,
   "closeDistanceKm": 10,
   "similarAgeDiff": 2,

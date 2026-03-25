@@ -10,6 +10,7 @@ import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.storage.PageData;
 import datingapp.core.storage.UserStorage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -165,6 +166,36 @@ public final class JdbiUserStorage implements UserStorage {
     public List<User> findAll() {
         return jdbi.withHandle((Handle handle) ->
                 applyNormalizedProfileDataBatch(handle, handle.attach(Dao.class).findAll()));
+    }
+
+    @Override
+    public PageData<User> getPageOfActiveUsers(int offset, int limit) {
+        validatePageArguments(offset, limit);
+        return jdbi.withHandle(handle -> {
+            Dao localDao = handle.attach(Dao.class);
+            int total = localDao.countActiveUsers();
+            if (offset >= total) {
+                return PageData.empty(limit, total);
+            }
+
+            List<User> page = applyNormalizedProfileDataBatch(handle, localDao.getPageOfActiveUsers(offset, limit));
+            return new PageData<>(page, total, offset, limit);
+        });
+    }
+
+    @Override
+    public PageData<User> getPageOfAllUsers(int offset, int limit) {
+        validatePageArguments(offset, limit);
+        return jdbi.withHandle(handle -> {
+            Dao localDao = handle.attach(Dao.class);
+            int total = localDao.countAllUsers();
+            if (offset >= total) {
+                return PageData.empty(limit, total);
+            }
+
+            List<User> page = applyNormalizedProfileDataBatch(handle, localDao.getPageOfAllUsers(offset, limit));
+            return new PageData<>(page, total, offset, limit);
+        });
     }
 
     @Override
@@ -602,6 +633,15 @@ public final class JdbiUserStorage implements UserStorage {
         return values.stream().map(Enum::name).collect(Collectors.toSet());
     }
 
+    private static void validatePageArguments(int offset, int limit) {
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must be >= 0");
+        }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be > 0");
+        }
+    }
+
     private static <E extends Enum<E>> Set<E> parseEnumNames(Set<String> values, Class<E> enumType) {
         if (values == null || values.isEmpty()) {
             return EnumSet.noneOf(enumType);
@@ -684,6 +724,24 @@ public final class JdbiUserStorage implements UserStorage {
 
         @SqlQuery("SELECT * FROM users WHERE deleted_at IS NULL")
         List<User> findAll();
+
+        @SqlQuery("SELECT COUNT(*) FROM users WHERE state = 'ACTIVE' AND deleted_at IS NULL")
+        int countActiveUsers();
+
+        @SqlQuery("SELECT COUNT(*) FROM users WHERE deleted_at IS NULL")
+        int countAllUsers();
+
+        @SqlQuery("SELECT * FROM users"
+                + " WHERE state = 'ACTIVE' AND deleted_at IS NULL"
+                + " ORDER BY created_at DESC, id ASC"
+                + " LIMIT :limit OFFSET :offset")
+        List<User> getPageOfActiveUsers(@Bind("offset") int offset, @Bind("limit") int limit);
+
+        @SqlQuery("SELECT * FROM users"
+                + " WHERE deleted_at IS NULL"
+                + " ORDER BY created_at DESC, id ASC"
+                + " LIMIT :limit OFFSET :offset")
+        List<User> getPageOfAllUsers(@Bind("offset") int offset, @Bind("limit") int limit);
 
         @SqlUpdate("DELETE FROM users WHERE id = :id")
         void delete(@Bind("id") UUID id);

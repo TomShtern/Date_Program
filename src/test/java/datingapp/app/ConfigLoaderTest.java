@@ -114,7 +114,8 @@ class ConfigLoaderTest {
                       "sessionTimeoutMinutes": 60,
                 "queryTimeoutSeconds": 45,
                       "maxSwipesPerSession": 200,
-                      "suspiciousSwipeVelocity": 2.5
+                      "suspiciousSwipeVelocity": 2.5,
+                      "suspiciousSwipeVelocityBlockingEnabled": false
                     }
                     """;
 
@@ -124,6 +125,7 @@ class ConfigLoaderTest {
             assertEquals(45, config.storage().queryTimeoutSeconds());
             assertEquals(200, config.matching().maxSwipesPerSession());
             assertEquals(2.5, config.matching().suspiciousSwipeVelocity(), 0.01);
+            assertFalse(config.matching().suspiciousSwipeVelocityBlockingEnabled());
         }
 
         @Test

@@ -168,6 +168,11 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
     }
 
     @Override
+    public boolean markStandoutInteracted(UUID standoutId, Instant timestamp) {
+        return standoutDao.markStandoutInteractedRaw(standoutId, timestamp) > 0;
+    }
+
+    @Override
     public void saveSession(Session session) {
         sessionDao.save(session);
     }
@@ -584,6 +589,9 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
         @SqlUpdate("DELETE FROM standouts WHERE created_at < :cutoff")
         int deleteExpiredStandouts(@Bind("cutoff") Instant cutoff);
+
+        @SqlUpdate("UPDATE standouts SET interacted_at = :timestamp WHERE id = :id AND interacted_at IS NULL")
+        int markStandoutInteractedRaw(@Bind("id") UUID standoutId, @Bind("timestamp") Instant timestamp);
     }
 
     public static class UserStatsMapper implements RowMapper<UserStats> {

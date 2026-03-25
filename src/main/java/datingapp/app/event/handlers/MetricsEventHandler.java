@@ -24,6 +24,10 @@ public final class MetricsEventHandler {
         eventBus.subscribe(AppEvent.ProfileSaved.class, this::onProfileSaved, AppEventBus.HandlerPolicy.BEST_EFFORT);
         eventBus.subscribe(
                 AppEvent.ProfileNoteSaved.class, this::onProfileNoteSaved, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(
+                AppEvent.ProfileNoteDeleted.class, this::onProfileNoteDeleted, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(
+                AppEvent.AccountDeleted.class, this::onAccountDeleted, AppEventBus.HandlerPolicy.BEST_EFFORT);
     }
 
     void onSwipeRecorded(AppEvent.SwipeRecorded event) {
@@ -41,5 +45,13 @@ public final class MetricsEventHandler {
 
     void onProfileNoteSaved(AppEvent.ProfileNoteSaved event) {
         activityMetricsService.recordActivity(event.authorId());
+    }
+
+    void onProfileNoteDeleted(AppEvent.ProfileNoteDeleted event) {
+        activityMetricsService.recordActivity(event.authorId());
+    }
+
+    void onAccountDeleted(AppEvent.AccountDeleted event) {
+        activityMetricsService.endSession(event.userId());
     }
 }

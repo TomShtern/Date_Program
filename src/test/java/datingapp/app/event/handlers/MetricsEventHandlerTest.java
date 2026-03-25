@@ -113,4 +113,42 @@ class MetricsEventHandlerTest {
 
         assertNotNull(service.getCurrentSession(authorId).orElse(null));
     }
+
+    @Test
+    void profileNoteDeletedTriggersRecordActivity() {
+        UUID authorId = UUID.randomUUID();
+        ActivityMetricsService service = new ActivityMetricsService(
+                new TestStorages.Interactions(),
+                new TestStorages.TrustSafety(),
+                new TestStorages.Analytics(),
+                AppConfig.defaults());
+        InProcessAppEventBus eventBus = new InProcessAppEventBus();
+        new MetricsEventHandler(service).register(eventBus);
+
+        eventBus.publish(new AppEvent.ProfileNoteDeleted(authorId, UUID.randomUUID(), Instant.now()));
+
+        assertNotNull(service.getCurrentSession(authorId).orElse(null));
+    }
+
+    @Test
+    void accountDeletedEndsSession() {
+        UUID userId = UUID.randomUUID();
+        ActivityMetricsService service = new ActivityMetricsService(
+                new TestStorages.Interactions(),
+                new TestStorages.TrustSafety(),
+                new TestStorages.Analytics(),
+                AppConfig.defaults());
+        InProcessAppEventBus eventBus = new InProcessAppEventBus();
+        new MetricsEventHandler(service).register(eventBus);
+
+        // Create a session first
+        eventBus.publish(new AppEvent.ProfileSaved(userId, true, Instant.now()));
+        assertTrue(service.getCurrentSession(userId).isPresent());
+
+        // Now delete the account
+        eventBus.publish(new AppEvent.AccountDeleted(userId, AppEvent.DeletionReason.USER_REQUEST, Instant.now()));
+
+        // Session should still exist but be ended (endSession is best-effort)
+        assertTrue(service.getCurrentSession(userId).isEmpty());
+    }
 }

@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import datingapp.app.api.RestApiDtos.AchievementSnapshotDto;
 import datingapp.app.api.RestApiDtos.ArchiveConversationRequest;
+import datingapp.app.api.RestApiDtos.BrowseCandidatesResponse;
 import datingapp.app.api.RestApiDtos.ConversationSummary;
 import datingapp.app.api.RestApiDtos.ErrorResponse;
+import datingapp.app.api.RestApiDtos.FriendRequestsResponse;
 import datingapp.app.api.RestApiDtos.HealthResponse;
 import datingapp.app.api.RestApiDtos.LikeResponse;
 import datingapp.app.api.RestApiDtos.MarkAllNotificationsReadResponse;
@@ -37,6 +39,7 @@ import datingapp.app.bootstrap.ApplicationStartup;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.ArchiveMatchCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.ListPagedMatchesQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.MatchQualityByIdQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.PendingLikersQuery;
@@ -53,6 +56,7 @@ import datingapp.app.usecase.messaging.MessagingUseCases.LoadConversationQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
+import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.DeleteProfileNoteCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.ProfileNoteQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.ProfileNotesQuery;
@@ -61,6 +65,7 @@ import datingapp.app.usecase.profile.ProfileUseCases.UpdateProfileCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.UpsertProfileNoteCommand;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.FriendRequestAction;
+import datingapp.app.usecase.social.SocialUseCases.FriendRequestsQuery;
 import datingapp.app.usecase.social.SocialUseCases.MarkAllNotificationsReadCommand;
 import datingapp.app.usecase.social.SocialUseCases.MarkNotificationReadCommand;
 import datingapp.app.usecase.social.SocialUseCases.NotificationsQuery;
@@ -73,6 +78,7 @@ import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
+import datingapp.core.model.User.UserState;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
@@ -103,10 +109,13 @@ import org.slf4j.LoggerFactory;
  * <li>GET /api/health - Health check</li>
  * <li>GET /api/users - List all users</li>
  * <li>GET /api/users/{id} - Get user by ID</li>
+ * <li>GET /api/users/{id}/browse - Browse matching candidates for user</li>
  * <li>GET /api/users/{id}/candidates - Get matching candidates for user</li>
+ * <li>DELETE /api/users/{id} - Delete user account</li>
  * <li>GET /api/users/{id}/matches - Get matches for user</li>
  * <li>POST /api/users/{id}/like/{targetId} - Like a user</li>
  * <li>POST /api/users/{id}/pass/{targetId} - Pass on a user</li>
+ * <li>GET /api/users/{id}/friend-requests - Get pending friend requests</li>
  * <li>GET /api/users/{id}/conversations - Get conversations</li>
  * <li>GET /api/conversations/{conversationId}/messages - Get messages</li>
  * <li>POST /api/conversations/{conversationId}/messages - Send message</li>
@@ -260,6 +269,22 @@ public class RestApiServer {
         ctx.json(UserDetail.from(user, userTimeZone));
     }
 
+    private void browseCandidates(Context ctx) {
+        UUID id = parseUuid(ctx.pathParam("id"));
+        User user = loadUser(ctx, id);
+        if (user == null) {
+            return;
+        }
+        ensureActiveCandidateBrowser(user);
+
+        var result = matchingUseCases.browseCandidates(new BrowseCandidatesCommand(UserContext.api(id), user));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(BrowseCandidatesResponse.from(result.data(), userTimeZone));
+    }
+
     private void updateProfile(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
@@ -293,15 +318,27 @@ public class RestApiServer {
         ctx.json(ProfileUpdateResponse.from(result.data().user(), result.data().activated(), userTimeZone));
     }
 
+    private void deleteUser(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
+
+        var result = profileUseCases.deleteAccount(new DeleteAccountCommand(UserContext.api(userId), "user_request"));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.status(204);
+    }
+
     private void getCandidates(Context ctx) {
-        // Deliberate exception: read-only candidate projection route.
-        // browseCandidates() adds daily-pick semantics; this route intentionally returns
-        // only the direct candidate list for local tooling/API clients.
         UUID id = parseUuid(ctx.pathParam("id"));
         User user = loadUser(ctx, id);
         if (user == null) {
             return;
         }
+        ensureActiveCandidateBrowser(user);
         List<UserSummary> candidates = readCandidateSummaries(user).stream()
                 .map(candidate -> UserSummary.from(candidate, userTimeZone))
                 .toList();
@@ -337,6 +374,20 @@ public class RestApiServer {
                 .map(match -> toMatchSummary(match, userId, usersById))
                 .toList();
         ctx.json(new PagedMatchResponse(items, page.totalCount(), offset, limit, page.hasMore()));
+    }
+
+    private void getFriendRequests(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
+
+        var result = socialUseCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.api(userId)));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(FriendRequestsResponse.from(result.data()));
     }
 
     private void likeUser(Context ctx) {
@@ -384,7 +435,7 @@ public class RestApiServer {
                 UserContext.api(userId),
                 targetId,
                 datingapp.core.connection.ConnectionModels.Like.Direction.PASS,
-                false));
+                true));
         if (!result.success()) {
             ctx.status(409);
             ctx.json(new ErrorResponse(CONFLICT, result.error().message()));
@@ -930,10 +981,17 @@ public class RestApiServer {
             return;
         }
         String key = ctx.ip() + '|' + ctx.method();
-        if (rateLimiter.tryAcquire(key)) {
+        RateLimitDecision decision = rateLimiter.tryAcquire(key);
+        if (decision.allowed()) {
             return;
         }
-        throw new ApiTooManyRequestsException("Local API rate limit exceeded");
+        throw new ApiTooManyRequestsException("Local API rate limit exceeded", decision.status());
+    }
+
+    private void ensureActiveCandidateBrowser(User user) {
+        if (user.getState() != UserState.ACTIVE) {
+            throw new IllegalStateException("User must be ACTIVE to browse candidates");
+        }
     }
 
     private void enforceScopedIdentity(Context ctx) {
@@ -1050,6 +1108,10 @@ public class RestApiServer {
         });
 
         app.exception(ApiTooManyRequestsException.class, (e, ctx) -> {
+            RateLimitStatus status = e.status();
+            ctx.header("Retry-After", String.valueOf(status.retryAfterSeconds()));
+            ctx.header("X-RateLimit-Limit", String.valueOf(status.limit()));
+            ctx.header("X-RateLimit-Used", String.valueOf(status.used()));
             ctx.status(429);
             ctx.json(new ErrorResponse(TOO_MANY_REQUESTS, e.getMessage()));
         });
@@ -1110,7 +1172,7 @@ public class RestApiServer {
             this.maxRequests = maxRequests;
         }
 
-        private boolean tryAcquire(String key) {
+        private RateLimitDecision tryAcquire(String key) {
             long now = System.currentTimeMillis();
             Window window = windows.compute(key, (ignored, current) -> {
                 if (current == null || now - current.windowStartedAtMillis >= windowMillis) {
@@ -1118,11 +1180,19 @@ public class RestApiServer {
                 }
                 return new Window(current.windowStartedAtMillis, current.requestCount + 1);
             });
-            return window.requestCount <= maxRequests;
+            long retryAfterMillis = Math.max(0L, windowMillis - (now - window.windowStartedAtMillis));
+            long retryAfterSeconds = Math.max(1L, (retryAfterMillis + 999L) / 1000L);
+            return new RateLimitDecision(
+                    window.requestCount <= maxRequests,
+                    new RateLimitStatus(maxRequests, window.requestCount, retryAfterSeconds));
         }
 
         private record Window(long windowStartedAtMillis, int requestCount) {}
     }
+
+    private record RateLimitDecision(boolean allowed, RateLimitStatus status) {}
+
+    private record RateLimitStatus(int limit, int used, long retryAfterSeconds) implements java.io.Serializable {}
 
     private static final class ApiForbiddenException extends RuntimeException {
         private ApiForbiddenException(String message) {
@@ -1131,8 +1201,15 @@ public class RestApiServer {
     }
 
     private static final class ApiTooManyRequestsException extends RuntimeException {
-        private ApiTooManyRequestsException(String message) {
+        private final RateLimitStatus status;
+
+        private ApiTooManyRequestsException(String message, RateLimitStatus status) {
             super(message);
+            this.status = status;
+        }
+
+        private RateLimitStatus status() {
+            return status;
         }
     }
 
@@ -1166,8 +1243,10 @@ public class RestApiServer {
         public void register() {
             app.get("/api/users", server::listUsers);
             app.get("/api/users/{id}", server::getUser);
+            app.get("/api/users/{id}/browse", server::browseCandidates);
             app.put("/api/users/{id}/profile", server::updateProfile);
             app.get("/api/users/{id}/candidates", server::getCandidates);
+            app.delete("/api/users/{id}", server::deleteUser);
         }
     }
 
@@ -1209,6 +1288,7 @@ public class RestApiServer {
             app.get("/api/users/{id}/notifications", server::getNotifications);
             app.post("/api/users/{id}/notifications/read-all", server::markAllNotificationsRead);
             app.post("/api/users/{id}/notifications/{notificationId}/read", server::markNotificationRead);
+            app.get("/api/users/{id}/friend-requests", server::getFriendRequests);
             app.post("/api/users/{id}/friend-requests/{targetId}", server::requestFriendZone);
             app.post("/api/users/{id}/friend-requests/{requestId}/accept", server::acceptFriendRequest);
             app.post("/api/users/{id}/friend-requests/{requestId}/decline", server::declineFriendRequest);

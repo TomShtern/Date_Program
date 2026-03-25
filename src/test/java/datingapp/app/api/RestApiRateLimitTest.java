@@ -1,10 +1,9 @@
 package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.app.event.InProcessAppEventBus;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -29,7 +28,6 @@ import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.SwipeState.Undo;
-import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
@@ -57,10 +55,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("REST API direct read routes")
-class RestApiReadRoutesTest {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+@DisplayName("REST API rate limit headers")
+class RestApiRateLimitTest {
 
     private RestApiServer server;
 
@@ -73,133 +69,35 @@ class RestApiReadRoutesTest {
     }
 
     @Test
-    @DisplayName("list users, get user, get candidates, and get matches remain available")
-    void listUsersGetUserGetCandidatesAndGetMatchesRemainAvailable() throws Exception {
-        TestStorages.Users userStorage = new TestStorages.Users();
-        TestStorages.Communications communicationStorage = new TestStorages.Communications();
-        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
-        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
-
-        UUID aliceId = UUID.randomUUID();
-        UUID bobId = UUID.randomUUID();
-        User alice = activeUser(aliceId, "Alice", Gender.FEMALE, EnumSet.of(Gender.MALE));
-        User bob = activeUser(bobId, "Bob", Gender.MALE, EnumSet.of(Gender.FEMALE));
-        userStorage.save(alice);
-        userStorage.save(bob);
-        interactionStorage.save(Match.create(aliceId, bobId));
-
-        server = new RestApiServer(services, 0);
-        server.start();
-        int port = server.getApp().port();
-        HttpClient client = HttpClient.newHttpClient();
-
-        HttpResponse<String> usersResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, usersResponse.statusCode());
-        assertEquals(2, MAPPER.readTree(usersResponse.body()).size());
-
-        HttpResponse<String> userResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, userResponse.statusCode());
-        JsonNode userJson = MAPPER.readTree(userResponse.body());
-        assertEquals("Alice", userJson.get("name").asText());
-
-        HttpResponse<String> candidatesResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/candidates"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, candidatesResponse.statusCode());
-        JsonNode candidatesJson = MAPPER.readTree(candidatesResponse.body());
-        assertEquals(1, candidatesJson.size());
-        assertEquals(bobId.toString(), candidatesJson.get(0).get("id").asText());
-
-        HttpResponse<String> matchesResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/matches"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, matchesResponse.statusCode());
-        JsonNode matchesJson = MAPPER.readTree(matchesResponse.body());
-        assertEquals(1, matchesJson.get("matches").size());
-    }
-
-    @Test
-    @DisplayName("browse users route returns browse results and candidates route rejects inactive users")
-    void browseRouteReturnsBrowseResultsAndCandidatesRouteRejectsInactiveUsers() throws Exception {
-        TestStorages.Users userStorage = new TestStorages.Users();
-        TestStorages.Communications communicationStorage = new TestStorages.Communications();
-        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
-        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
-
-        UUID activeId = UUID.randomUUID();
-        UUID candidateId = UUID.randomUUID();
-        UUID inactiveId = UUID.randomUUID();
-        User active = activeUser(activeId, "Active", Gender.FEMALE, EnumSet.of(Gender.MALE));
-        User candidate = activeUser(candidateId, "Candidate", Gender.MALE, EnumSet.of(Gender.FEMALE));
-        User inactive = activeUser(inactiveId, "Inactive", Gender.FEMALE, EnumSet.of(Gender.MALE));
-        inactive.pause();
-        userStorage.save(active);
-        userStorage.save(candidate);
-        userStorage.save(inactive);
-
-        server = new RestApiServer(services, 0);
-        server.start();
-        int port = server.getApp().port();
-        HttpClient client = HttpClient.newHttpClient();
-
-        HttpResponse<String> browseResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + activeId + "/browse"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, browseResponse.statusCode());
-        JsonNode browseJson = MAPPER.readTree(browseResponse.body());
-        assertEquals(1, browseJson.get("candidates").size());
-        assertEquals(
-                candidateId.toString(),
-                browseJson.get("candidates").get(0).get("id").asText());
-        assertTrue(browseJson.get("locationMissing").isBoolean());
-        assertTrue(!browseJson.get("locationMissing").asBoolean());
-
-        HttpResponse<String> inactiveCandidatesResponse = client.send(
-                HttpRequest.newBuilder(
-                                URI.create("http://localhost:" + port + "/api/users/" + inactiveId + "/candidates"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(409, inactiveCandidatesResponse.statusCode());
-    }
-
-    @Test
-    @DisplayName("delete user route returns no content and soft deletes the account")
-    void deleteUserRouteReturnsNoContentAndSoftDeletesTheAccount() throws Exception {
+    @DisplayName("rate limit 429 responses include retry and quota headers")
+    void rateLimitResponsesIncludeRetryAndQuotaHeaders() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
         TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
         ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
 
         UUID userId = UUID.randomUUID();
-        userStorage.save(activeUser(userId, "DeleteMe", Gender.FEMALE, EnumSet.of(Gender.MALE)));
+        userStorage.save(activeUser(userId, "RateLimit", Gender.FEMALE, EnumSet.of(Gender.MALE)));
 
         server = new RestApiServer(services, 0);
         server.start();
         int port = server.getApp().port();
         HttpClient client = HttpClient.newHttpClient();
 
-        HttpResponse<String> deleteResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userId))
-                        .DELETE()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(204, deleteResponse.statusCode());
-        assertTrue(userStorage.get(userId).orElseThrow().isDeleted());
+        HttpResponse<String> response = null;
+        for (int i = 0; i < 241; i++) {
+            response = client.send(
+                    HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userId))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+        }
+
+        assertNotNull(response);
+        assertEquals(429, response.statusCode());
+        assertFalse(response.headers().firstValue("Retry-After").orElse("").isBlank());
+        assertEquals("240", response.headers().firstValue("X-RateLimit-Limit").orElseThrow());
+        assertEquals("241", response.headers().firstValue("X-RateLimit-Used").orElseThrow());
     }
 
     private static ServiceRegistry createServices(

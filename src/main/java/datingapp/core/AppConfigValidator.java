@@ -51,6 +51,10 @@ final class AppConfigValidator {
         requireInRange(sharedInterestsPreviewCount, 1, Interest.count(), "sharedInterestsPreviewCount");
     }
 
+    static void validateMatchingBehaviorFlags() {
+        // Boolean flag is intrinsically valid; this hook keeps matching-related validation centralized.
+    }
+
     static void validateValidationAgeAndHeight(int minAge, int maxAge, int minHeightCm, int maxHeightCm) {
         requireNonNegative("minAge", minAge);
         requireNonNegative("maxAge", maxAge);

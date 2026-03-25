@@ -294,6 +294,47 @@ class SchemaInitializerTest {
                     indexes.contains("IDX_MESSAGES_CONVERSATION_CREATED"),
                     "Migration should preserve idx_messages_conversation_created");
         }
+
+        @Test
+        @DisplayName("should add query-optimization indexes in V8 and record the migration")
+        void v8MigrationAddsQueryOptimizationIndexes() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                SchemaInitializer.createAllTables(stmt);
+                stmt.execute("CREATE TABLE schema_version ("
+                        + "version INT PRIMARY KEY, "
+                        + "applied_at TIMESTAMP NOT NULL, "
+                        + "description VARCHAR(255)"
+                        + ")");
+                stmt.execute("INSERT INTO schema_version(version, applied_at, description) VALUES "
+                        + "(1, CURRENT_TIMESTAMP(), 'V1 baseline schema'), "
+                        + "(2, CURRENT_TIMESTAMP(), 'V2 daily picks cache table'), "
+                        + "(3, CURRENT_TIMESTAMP(), 'V3 normalized profile cleanup'), "
+                        + "(4, CURRENT_TIMESTAMP(), 'V4 soft-delete columns'), "
+                        + "(5, CURRENT_TIMESTAMP(), 'V5 profile view primary key'), "
+                        + "(6, CURRENT_TIMESTAMP(), 'V6 matches updated_at backfill'), "
+                        + "(7, CURRENT_TIMESTAMP(), 'V7 messages conversation index')");
+
+                MigrationRunner.runAllPending(stmt);
+            }
+
+            Set<String> indexes = getIndexNames();
+            assertTrue(indexes.contains("IDX_LIKES_DIRECTION_CREATED"), "Missing idx_likes_direction_created");
+            assertTrue(indexes.contains("IDX_LIKES_RECEIVED_CREATED"), "Missing idx_likes_received_created");
+            assertTrue(
+                    indexes.contains("IDX_CONVERSATIONS_USER_A_LAST_MSG"), "Missing idx_conversations_user_a_last_msg");
+            assertTrue(
+                    indexes.contains("IDX_CONVERSATIONS_USER_B_LAST_MSG"), "Missing idx_conversations_user_b_last_msg");
+            assertTrue(indexes.contains("IDX_MESSAGES_SENDER_CREATED"), "Missing idx_messages_sender_created");
+            assertTrue(indexes.contains("IDX_SESSIONS_STARTED_AT_DESC"), "Missing idx_sessions_started_at_desc");
+            assertTrue(indexes.contains("IDX_USER_STATS_COMPUTED_DESC"), "Missing idx_user_stats_computed_desc");
+            assertTrue(indexes.contains("IDX_STANDOUTS_INTERACTED_AT"), "Missing idx_standouts_interacted_at");
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 8")) {
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1), "Schema version 8 should be recorded");
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════

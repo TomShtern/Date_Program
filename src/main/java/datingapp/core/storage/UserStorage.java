@@ -34,6 +34,23 @@ public interface UserStorage {
     List<User> findActive();
 
     /**
+     * Returns a single page of active users using the implementation's natural
+     * {@link #findActive()} ordering.
+     *
+     * <p>
+     * Default implementation loads all active users and slices in memory.
+     * Storage adapters should override this with a count + ordered page query for
+     * production-scale datasets.
+     *
+     * @param offset zero-based index of the first item (must be &ge; 0)
+     * @param limit maximum items to return (must be &gt; 0)
+     * @return a page of active users and pagination metadata
+     */
+    default PageData<User> getPageOfActiveUsers(int offset, int limit) {
+        return pageUsers(findActive(), offset, limit);
+    }
+
+    /**
      * Pre-filtered candidate query for a given seeker's basic criteria.
      * Filters applied in SQL: active state, gender, age range, and optional
      * bounding-box distance.
@@ -96,6 +113,23 @@ public interface UserStorage {
     List<User> findAll();
 
     /**
+     * Returns a single page of all users using the implementation's natural
+     * {@link #findAll()} ordering.
+     *
+     * <p>
+     * Default implementation loads all users and slices in memory. Storage
+     * adapters should override this with a count + ordered page query for
+     * production-scale datasets.
+     *
+     * @param offset zero-based index of the first item (must be &ge; 0)
+     * @param limit maximum items to return (must be &gt; 0)
+     * @return a page of all users and pagination metadata
+     */
+    default PageData<User> getPageOfAllUsers(int offset, int limit) {
+        return pageUsers(findAll(), offset, limit);
+    }
+
+    /**
      * Finds multiple users by their IDs in a single batch query.
      * Returns a map of user ID to User. Missing IDs are not included in the map.
      *
@@ -119,6 +153,24 @@ public interface UserStorage {
             }
         }
         return result;
+    }
+
+    private static PageData<User> pageUsers(List<User> users, int offset, int limit) {
+        Objects.requireNonNull(users, "users cannot be null");
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must be >= 0");
+        }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be > 0");
+        }
+
+        int total = users.size();
+        if (offset >= total) {
+            return new PageData<>(List.of(), total, total, limit);
+        }
+
+        int end = (int) Math.min((long) offset + limit, total);
+        return new PageData<>(users.subList(offset, end), total, offset, limit);
     }
 
     /**

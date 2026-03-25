@@ -36,6 +36,7 @@ public final class RecommendationService {
     public static final class Builder {
         private UserStorage userStorage;
         private InteractionStorage interactionStorage;
+        private TrustSafetyStorage trustSafetyStorage;
         private AnalyticsStorage analyticsStorage;
         private CandidateFinder candidateFinder;
         private Standout.Storage standoutStorage;
@@ -55,6 +56,7 @@ public final class RecommendationService {
 
         public Builder trustSafetyStorage(TrustSafetyStorage trustSafetyStorage) {
             Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
+            this.trustSafetyStorage = trustSafetyStorage;
             return this;
         }
 
@@ -91,15 +93,28 @@ public final class RecommendationService {
         public RecommendationService build() {
             AppConfig resolvedConfig = Objects.requireNonNull(config, "config cannot be null");
             Clock resolvedClock = clock != null ? clock : AppClock.clock();
+            CandidateFinder resolvedCandidateFinder = candidateFinder;
+            if (resolvedCandidateFinder == null) {
+                resolvedCandidateFinder = new CandidateFinder(
+                        Objects.requireNonNull(userStorage, "userStorage cannot be null"),
+                        Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null"),
+                        Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null"),
+                        resolvedConfig.safety().userTimeZone());
+            }
             CompatibilityCalculator calculator = new DefaultCompatibilityCalculator(resolvedConfig, resolvedClock);
             DailyLimitService dailyLimitService =
                     new DefaultDailyLimitService(interactionStorage, resolvedConfig, resolvedClock);
             DailyPickService dailyPickService = new DefaultDailyPickService(
-                    userStorage, interactionStorage, analyticsStorage, candidateFinder, resolvedConfig, resolvedClock);
+                    userStorage,
+                    interactionStorage,
+                    analyticsStorage,
+                    resolvedCandidateFinder,
+                    resolvedConfig,
+                    resolvedClock);
             StandoutService standoutService = new DefaultStandoutService(
                     calculator,
                     userStorage,
-                    candidateFinder,
+                    resolvedCandidateFinder,
                     standoutStorage,
                     profileService,
                     resolvedConfig,

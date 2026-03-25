@@ -208,6 +208,11 @@ public class ProfileUseCases {
         publishEvent(
                 new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()),
                 "Post-save event publication failed for user " + user.getId());
+        if (activated) {
+            publishEvent(
+                    new AppEvent.ProfileCompleted(user.getId(), AppClock.now()),
+                    "Post-profile-completed event failed for user " + user.getId());
+        }
 
         return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
     }
@@ -273,6 +278,10 @@ public class ProfileUseCases {
             return UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND));
         }
 
+        boolean locationWasSet = user.hasLocationSet();
+        double previousLatitude = user.getLat();
+        double previousLongitude = user.getLon();
+
         try {
             applyProfileTextAndIdentityFields(user, command);
             applyProfileLocationFields(user, command);
@@ -282,7 +291,18 @@ public class ProfileUseCases {
             return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
         }
 
-        return saveProfile(new SaveProfileCommand(command.context(), user));
+        UseCaseResult<ProfileSaveResult> saveResult = saveProfile(new SaveProfileCommand(command.context(), user));
+        if (saveResult.success()
+                && command.latitude() != null
+                && command.longitude() != null
+                && (!locationWasSet
+                        || Double.compare(previousLatitude, command.latitude()) != 0
+                        || Double.compare(previousLongitude, command.longitude()) != 0)) {
+            publishEvent(
+                    new AppEvent.LocationUpdated(user.getId(), command.latitude(), command.longitude(), AppClock.now()),
+                    "Post-location-updated event failed for user " + user.getId());
+        }
+        return saveResult;
     }
 
     public UseCaseResult<List<User>> listUsers() {

@@ -27,6 +27,7 @@ class ActivityMetricsServiceDiagnosticsTest {
         AppConfig config = AppConfig.builder()
                 .maxSwipesPerSession(10)
                 .suspiciousSwipeVelocity(5.0)
+                .suspiciousSwipeVelocityBlockingEnabled(false)
                 .build();
         service = new ActivityMetricsService(
                 new TestStorages.Interactions(), new TestStorages.TrustSafety(), new TestStorages.Analytics(), config);
@@ -59,6 +60,7 @@ class ActivityMetricsServiceDiagnosticsTest {
         assertEquals("Session swipe limit reached. Take a break!", blocked.blockedReason());
         assertEquals(1L, snapshot.swipeLimitBlockedCount());
         assertEquals(1L, snapshot.velocityWarningCount());
+        assertEquals(0L, snapshot.velocityBlockedCount());
         assertEquals(1L, snapshot.recordMatchNoOpCount());
         assertEquals(1L, snapshot.endSessionNoOpCount());
     }

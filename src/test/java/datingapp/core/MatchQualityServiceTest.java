@@ -345,6 +345,54 @@ class MatchQualityServiceTest {
                     5, // HIGHLIGHT_MAX_COUNT
                     quality.highlights().size());
         }
+
+        @Test
+        @DisplayName("Nearby distance highlight uses config threshold")
+        void nearbyDistanceHighlightUsesConfigThreshold() {
+            AppConfig config =
+                    AppConfig.builder().nearbyDistanceKm(25).closeDistanceKm(30).build();
+            MatchQualityService customService = new MatchQualityService(userStorage, likeStorage, config);
+
+            User alice = createUser("Alice", 25, 32.0, 34.0);
+            User bob = createUser("Bob", 26, 32.18, 34.0);
+            alice.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
+            bob.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
+
+            userStorage.save(alice);
+            userStorage.save(bob);
+
+            Match match = Match.create(alice.getId(), bob.getId());
+            addMutualLikes(alice.getId(), bob.getId());
+
+            MatchQuality quality =
+                    customService.computeQuality(match, alice.getId()).orElseThrow();
+
+            assertTrue(quality.highlights().stream().anyMatch(h -> h.contains("nearby")));
+        }
+
+        @Test
+        @DisplayName("Close distance highlight uses config threshold")
+        void closeDistanceHighlightUsesConfigThreshold() {
+            AppConfig config =
+                    AppConfig.builder().nearbyDistanceKm(5).closeDistanceKm(25).build();
+            MatchQualityService customService = new MatchQualityService(userStorage, likeStorage, config);
+
+            User alice = createUser("Alice", 25, 32.0, 34.0);
+            User bob = createUser("Bob", 26, 32.18, 34.0);
+            alice.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
+            bob.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
+
+            userStorage.save(alice);
+            userStorage.save(bob);
+
+            Match match = Match.create(alice.getId(), bob.getId());
+            addMutualLikes(alice.getId(), bob.getId());
+
+            MatchQuality quality =
+                    customService.computeQuality(match, alice.getId()).orElseThrow();
+
+            assertTrue(quality.highlights().stream().anyMatch(h -> h.contains("km away")));
+        }
     }
 
     @Nested
@@ -618,7 +666,7 @@ class MatchQualityServiceTest {
 
         @Test
         @DisplayName("Custom preview count truncates accordingly")
-        void customPreviewCount_truncatesAccordingly() {
+        void customPreviewCountTruncatesAccordingly() {
             Set<Interest> shared = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL, Interest.MOVIES);
             String formatted = InterestMatcher.formatSharedInterests(shared, 2);
             assertEquals("Coffee, Hiking, and 2 more", formatted);

@@ -152,6 +152,17 @@ class NotificationEventHandlerTest {
         assertEquals(1, savedNotifications.size());
     }
 
+    @Test
+    void accountDeletedLogsAndContinues() {
+        UUID userId = UUID.randomUUID();
+
+        bus.publish(new AppEvent.AccountDeleted(userId, AppEvent.DeletionReason.USER_REQUEST, Instant.now()));
+
+        // No exception should be thrown in BEST_EFFORT mode
+        // The handler logs but doesn't fail if no cleanup method exists
+        assertEquals(0, savedNotifications.size());
+    }
+
     /** Minimal stub that only captures saveNotification calls. */
     private class CapturingStorage implements CommunicationStorage {
 

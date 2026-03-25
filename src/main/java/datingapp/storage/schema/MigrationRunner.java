@@ -30,6 +30,7 @@ import java.util.List;
 public final class MigrationRunner {
 
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(MigrationRunner.class);
+    private static final String WHERE_NOT_DELETED = " WHERE deleted_at IS NULL";
 
     private MigrationRunner() {
         // Utility class — static methods only
@@ -87,7 +88,11 @@ public final class MigrationRunner {
             new VersionedMigration(
                     7,
                     "Add standalone messages(conversation_id) index alongside the composite message index",
-                    MigrationRunner::applyV7));
+                    MigrationRunner::applyV7),
+            new VersionedMigration(
+                    8,
+                    "Add query-optimization indexes for likes, conversations, messages, sessions, stats, standouts",
+                    MigrationRunner::applyV8));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -217,6 +222,73 @@ public final class MigrationRunner {
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id)");
     }
 
+    /**
+     * V8 migration: adds query-optimization indexes for hot read paths.
+     *
+     * <p>Partial indexes are used when supported. H2 does not support the WHERE
+     * clause syntax, so each index falls back to a non-partial equivalent.
+     */
+    private static void applyV8(Statement stmt) throws SQLException {
+        if (hasTable(stmt, "LIKES")) {
+            createIndexWithFallback(
+                    stmt,
+                    "CREATE INDEX IF NOT EXISTS idx_likes_direction_created ON likes(direction, created_at DESC)"
+                            + WHERE_NOT_DELETED,
+                    "CREATE INDEX IF NOT EXISTS idx_likes_direction_created ON likes(direction, created_at DESC)");
+            createIndexWithFallback(
+                    stmt,
+                    "CREATE INDEX IF NOT EXISTS idx_likes_received_created ON likes(who_got_liked, created_at DESC)"
+                            + WHERE_NOT_DELETED,
+                    "CREATE INDEX IF NOT EXISTS idx_likes_received_created ON likes(who_got_liked, created_at DESC)");
+        }
+
+        if (hasTable(stmt, "CONVERSATIONS")) {
+            if (hasColumn(stmt, "CONVERSATIONS", "LAST_MESSAGE_AT")) {
+                createIndexWithFallback(
+                        stmt,
+                        "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg ON conversations(user_a, last_message_at DESC)"
+                                + WHERE_NOT_DELETED,
+                        "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg ON conversations(user_a, last_message_at DESC)");
+                createIndexWithFallback(
+                        stmt,
+                        "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg ON conversations(user_b, last_message_at DESC)"
+                                + WHERE_NOT_DELETED,
+                        "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg ON conversations(user_b, last_message_at DESC)");
+            } else {
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg ON conversations(user_a)");
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg ON conversations(user_b)");
+            }
+        }
+
+        if (hasTable(stmt, "MESSAGES")) {
+            createIndexWithFallback(
+                    stmt,
+                    "CREATE INDEX IF NOT EXISTS idx_messages_sender_created ON messages(sender_id, created_at DESC)"
+                            + WHERE_NOT_DELETED,
+                    "CREATE INDEX IF NOT EXISTS idx_messages_sender_created ON messages(sender_id, created_at DESC)");
+        }
+
+        if (hasTable(stmt, "SWIPE_SESSIONS")) {
+            createIndexWithFallback(
+                    stmt,
+                    "CREATE INDEX IF NOT EXISTS idx_sessions_started_at_desc ON swipe_sessions(started_at DESC)"
+                            + " WHERE state = 'ACTIVE'",
+                    "CREATE INDEX IF NOT EXISTS idx_sessions_started_at_desc ON swipe_sessions(started_at DESC)");
+        }
+
+        if (hasTable(stmt, "USER_STATS")) {
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_user_stats_computed_desc ON user_stats(computed_at DESC)");
+        }
+
+        if (hasTable(stmt, "STANDOUTS")) {
+            createIndexWithFallback(
+                    stmt,
+                    "CREATE INDEX IF NOT EXISTS idx_standouts_interacted_at ON standouts(seeker_id, interacted_at DESC)"
+                            + " WHERE interacted_at IS NOT NULL",
+                    "CREATE INDEX IF NOT EXISTS idx_standouts_interacted_at ON standouts(seeker_id, interacted_at DESC)");
+        }
+    }
+
     private static boolean hasTable(Statement stmt, String tableName) throws SQLException {
         try (ResultSet rs = stmt.getConnection().getMetaData().getTables(null, null, tableName, null)) {
             return rs.next();
@@ -226,6 +298,26 @@ public final class MigrationRunner {
     private static boolean hasPrimaryKey(Statement stmt, String tableName) throws SQLException {
         try (ResultSet rs = stmt.getConnection().getMetaData().getPrimaryKeys(null, null, tableName)) {
             return rs.next();
+        }
+    }
+
+    private static boolean hasColumn(Statement stmt, String tableName, String columnName) throws SQLException {
+        try (ResultSet rs = stmt.getConnection().getMetaData().getColumns(null, null, tableName, columnName)) {
+            return rs.next();
+        }
+    }
+
+    private static void createIndexWithFallback(Statement stmt, String partialSql, String fallbackSql)
+            throws SQLException {
+        try {
+            stmt.execute(partialSql);
+        } catch (SQLException partialFailure) {
+            try {
+                stmt.execute(fallbackSql);
+            } catch (SQLException fallbackFailure) {
+                fallbackFailure.addSuppressed(partialFailure);
+                throw fallbackFailure;
+            }
         }
     }
 

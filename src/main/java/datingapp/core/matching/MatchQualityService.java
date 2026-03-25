@@ -30,6 +30,8 @@ public class MatchQualityService {
     private final AppConfig config;
     private final CompatibilityCalculator calculator;
     private final StarThresholdPolicy starThresholdPolicy;
+    private final int nearbyDistanceKm;
+    private final int closeDistanceKm;
     private static final String LABEL_EXCELLENT = "Excellent Match";
     private static final String LABEL_GREAT = "Great Match";
     private static final String LABEL_GOOD = "Good Match";
@@ -38,8 +40,6 @@ public class MatchQualityService {
     private static final int SUMMARY_MAX_LENGTH = 40;
     private static final int SUMMARY_TRUNCATE_LENGTH = 37;
     private static final int HIGHLIGHT_MAX_COUNT = 5;
-    private static final int NEARBY_DISTANCE_KM = 5;
-    private static final int MID_DISTANCE_KM = 15;
     private static final int AGE_SIMILAR_YEARS = 2;
     private static final int QUICK_MUTUAL_INTEREST_HOURS = 24;
 
@@ -198,6 +198,8 @@ public class MatchQualityService {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.calculator = Objects.requireNonNull(calculator, "calculator cannot be null");
         this.starThresholdPolicy = StarThresholdPolicy.from(this.config.algorithm());
+        this.nearbyDistanceKm = this.config.algorithm().nearbyDistanceKm();
+        this.closeDistanceKm = this.config.algorithm().closeDistanceKm();
     }
 
     // === Public API ===
@@ -422,9 +424,9 @@ public class MatchQualityService {
     }
 
     private void addDistanceHighlight(List<String> highlights, double distanceKm) {
-        if (distanceKm >= 0 && distanceKm < NEARBY_DISTANCE_KM) {
+        if (distanceKm >= 0 && distanceKm < nearbyDistanceKm) {
             highlights.add(String.format("Lives nearby (%.1f km away)", distanceKm));
-        } else if (distanceKm >= 0 && distanceKm < MID_DISTANCE_KM) {
+        } else if (distanceKm >= 0 && distanceKm < closeDistanceKm) {
             highlights.add(String.format("%.0f km away", distanceKm));
         }
     }

@@ -31,7 +31,10 @@ class ActivityMetricsServiceConcurrencyTest {
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED);
-        AppConfig config = AppConfig.builder().maxSwipesPerSession(10_000).build();
+        AppConfig config = AppConfig.builder()
+                .maxSwipesPerSession(10_000)
+                .suspiciousSwipeVelocityBlockingEnabled(false)
+                .build();
         service = new ActivityMetricsService(
                 new TestStorages.Interactions(), new TestStorages.TrustSafety(), new TestStorages.Analytics(), config);
     }
@@ -43,7 +46,7 @@ class ActivityMetricsServiceConcurrencyTest {
 
     @Test
     @DisplayName("Concurrent recordMatch preserves every increment")
-    void concurrentRecordMatch_preservesEveryIncrement() throws Exception {
+    void concurrentRecordMatchPreservesEveryIncrement() throws Exception {
         UUID userId = UUID.randomUUID();
         int threads = 16;
         int matchesPerThread = 250;

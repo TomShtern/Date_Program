@@ -3,11 +3,14 @@ package datingapp.core.matching;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.matching.DailyLimitService.DailyStatus;
 import datingapp.core.matching.DailyPickService.DailyPick;
 import datingapp.core.model.User;
+import datingapp.core.testutil.TestStorages;
+import java.lang.reflect.Field;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -150,6 +153,19 @@ class RecommendationServiceTest {
         assertEquals(1, standoutService.getStandoutsCalls);
         assertEquals(1, standoutService.resolveUsersCalls);
         assertEquals(1, standoutService.markInteractedCalls);
+    }
+
+    @Test
+    @DisplayName("builder stores trustSafetyStorage values")
+    void builderStoresTrustSafetyStorage() throws Exception {
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+
+        RecommendationService.Builder builder = RecommendationService.builder().trustSafetyStorage(trustSafetyStorage);
+
+        Field field = RecommendationService.Builder.class.getDeclaredField("trustSafetyStorage");
+        field.setAccessible(true);
+
+        assertSame(trustSafetyStorage, field.get(builder));
     }
 
     @ParameterizedTest(name = "formatDuration({0}) -> {1}")

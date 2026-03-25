@@ -131,35 +131,18 @@ public class MessagingUseCases {
             return UseCaseResult.failure(UseCaseError.internal("Failed to send message: " + e.getMessage()));
         }
 
-        try {
-            publishMessageSentEvent(command, result);
-        } catch (Exception publishEx) {
-            logMessageSentEventFailure(command, result, publishEx);
-        }
+        publishMessageSentEvent(command, result);
         return UseCaseResult.success(result);
     }
 
     private void publishMessageSentEvent(SendMessageCommand command, ConnectionService.SendResult result) {
-        if (eventBus == null) {
-            return;
-        }
-        eventBus.publish(new AppEvent.MessageSent(
-                command.context().userId(),
-                command.recipientId(),
-                result.message().id(),
-                AppClock.now()));
-    }
-
-    private void logMessageSentEventFailure(
-            SendMessageCommand command, ConnectionService.SendResult result, Exception publishEx) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(
-                    "Event publish failed for message {} from {} to {}: {}",
-                    result.message().id(),
-                    command.context().userId(),
-                    command.recipientId(),
-                    publishEx.getMessage());
-        }
+        publishEvent(
+                new AppEvent.MessageSent(
+                        command.context().userId(),
+                        command.recipientId(),
+                        result.message().id(),
+                        AppClock.now()),
+                "Event publish failed for message " + result.message().id());
     }
 
     public UseCaseResult<Void> markConversationRead(MarkConversationReadCommand command) {
@@ -226,6 +209,10 @@ public class MessagingUseCases {
         try {
             connectionService.archiveConversation(
                     command.conversationId(), command.context().userId(), command.reason());
+            publishEvent(
+                    new AppEvent.ConversationArchived(
+                            command.conversationId(), command.context().userId(), AppClock.now()),
+                    "Event publish failed for archived conversation " + command.conversationId());
             return UseCaseResult.success(null);
         } catch (IllegalArgumentException e) {
             return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
@@ -277,4 +264,17 @@ public class MessagingUseCases {
             UserContext context, String conversationId, MatchArchiveReason reason) {}
 
     public static record DeleteMessageCommand(UserContext context, String conversationId, UUID messageId) {}
+
+    private void publishEvent(AppEvent event, String failureMessage) {
+        if (eventBus == null) {
+            return;
+        }
+        try {
+            eventBus.publish(event);
+        } catch (Exception e) {
+            if (logger.isWarnEnabled()) {
+                logger.warn("{}: {}", failureMessage, e.getMessage(), e);
+            }
+        }
+    }
 }

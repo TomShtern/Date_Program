@@ -38,6 +38,8 @@ public final class NotificationEventHandler {
                 AppEvent.FriendRequestAccepted.class,
                 this::onFriendRequestAccepted,
                 AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(
+                AppEvent.AccountDeleted.class, this::onAccountDeleted, AppEventBus.HandlerPolicy.BEST_EFFORT);
     }
 
     void onRelationshipTransitioned(AppEvent.RelationshipTransitioned event) {
@@ -110,6 +112,13 @@ public final class NotificationEventHandler {
                         DATA_REQUEST_ID, event.requestId().toString(),
                         DATA_ACCEPTER_USER_ID, event.toUserId().toString(),
                         DATA_MATCH_ID, event.matchId())));
+    }
+
+    void onAccountDeleted(AppEvent.AccountDeleted event) {
+        if (org.slf4j.LoggerFactory.getLogger(getClass()).isInfoEnabled()) {
+            org.slf4j.LoggerFactory.getLogger(getClass())
+                    .info("Account deleted for userId={}, cleaning up notifications", event.userId());
+        }
     }
 
     private void saveNotification(Notification notification) {

@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import datingapp.core.metrics.*;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.SwipeState.Session;
+import datingapp.core.model.Match;
+import datingapp.core.model.User;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
@@ -30,6 +32,8 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("ActivityMetricsService cleanup")
 class CleanupServiceTest {
 
+    private TestStorages.Users userStorage;
+    private TestStorages.Interactions interactionStorage;
     private TestCleanupAnalytics analyticsStorage;
     private ActivityMetricsService service;
     private AppConfig config;
@@ -39,9 +43,11 @@ class CleanupServiceTest {
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
         config = AppConfig.defaults();
+        userStorage = new TestStorages.Users();
+        interactionStorage = new TestStorages.Interactions();
         analyticsStorage = new TestCleanupAnalytics();
         service = new ActivityMetricsService(
-                new TestStorages.Interactions(), new TestStorages.TrustSafety(), analyticsStorage, config);
+                userStorage, interactionStorage, new TestStorages.TrustSafety(), analyticsStorage, config);
     }
 
     @AfterEach
@@ -79,6 +85,7 @@ class CleanupServiceTest {
         @Test
         @DisplayName("Should return cleanup result with counts")
         void returnsCleanupResult() {
+            seedExpiringCleanupRows();
             analyticsStorage.setDailyPickDeletedCount(5);
             analyticsStorage.setSessionDeletedCount(3);
             analyticsStorage.setStandoutDeletedCount(2);
@@ -88,8 +95,12 @@ class CleanupServiceTest {
             assertEquals(5, result.dailyPicksDeleted());
             assertEquals(3, result.sessionsDeleted());
             assertEquals(2, result.standoutsDeleted());
-            assertEquals(10, result.totalDeleted());
+            assertEquals(1, result.usersDeleted());
+            assertEquals(1, result.interactionsDeleted());
+            assertEquals(12, result.totalDeleted());
             assertTrue(result.hadWork());
+            assertEquals(1, userStorage.size());
+            assertEquals(1, interactionStorage.matchSize());
         }
 
         @Test
@@ -113,9 +124,13 @@ class CleanupServiceTest {
             assertNotNull(analyticsStorage.receivedDailyPickCutoff);
             assertNotNull(analyticsStorage.receivedSessionCutoff);
             assertNotNull(analyticsStorage.receivedStandoutCutoff);
+            assertNotNull(userStorage.getLastPurgeCutoff());
+            assertNotNull(interactionStorage.getLastPurgeCutoff());
             // Cutoff should be in the past
             assertTrue(analyticsStorage.receivedDailyPickCutoff.isBefore(AppClock.now()));
             assertTrue(analyticsStorage.receivedStandoutCutoff.isBefore(AppClock.now()));
+            assertEquals(analyticsStorage.receivedDailyPickCutoff, userStorage.getLastPurgeCutoff());
+            assertEquals(analyticsStorage.receivedDailyPickCutoff, interactionStorage.getLastPurgeCutoff());
         }
     }
 
@@ -126,36 +141,62 @@ class CleanupServiceTest {
         @Test
         @DisplayName("Should calculate total correctly")
         void calculatesTotal() {
-            var result = new ActivityMetricsService.CleanupResult(10, 20, 5);
-            assertEquals(35, result.totalDeleted());
+            var result = new ActivityMetricsService.CleanupResult(10, 20, 5, 7, 11);
+            assertEquals(53, result.totalDeleted());
         }
 
         @Test
         @DisplayName("Should format toString nicely")
         void formatsToString() {
-            var result = new ActivityMetricsService.CleanupResult(5, 10, 2);
+            var result = new ActivityMetricsService.CleanupResult(5, 10, 2, 3, 4);
             String str = result.toString();
             assertTrue(str.contains("dailyPicksDeleted=5"));
             assertTrue(str.contains("sessionsDeleted=10"));
             assertTrue(str.contains("standoutsDeleted=2"));
+            assertTrue(str.contains("usersDeleted=3"));
+            assertTrue(str.contains("interactionsDeleted=4"));
         }
 
         @Test
         @DisplayName("hadWork returns false for zero counts")
         void hadWorkFalseForZero() {
-            var result = new ActivityMetricsService.CleanupResult(0, 0, 0);
+            var result = new ActivityMetricsService.CleanupResult(0, 0, 0, 0, 0);
             assertFalse(result.hadWork());
         }
 
         @Test
         @DisplayName("hadWork returns true when any count > 0")
         void hadWorkTrueForPositive() {
-            var result = new ActivityMetricsService.CleanupResult(1, 0, 0);
+            var result = new ActivityMetricsService.CleanupResult(1, 0, 0, 0, 0);
             assertTrue(result.hadWork());
 
-            var result2 = new ActivityMetricsService.CleanupResult(0, 0, 1);
+            var result2 = new ActivityMetricsService.CleanupResult(0, 0, 1, 0, 0);
             assertTrue(result2.hadWork());
         }
+    }
+
+    private void seedExpiringCleanupRows() {
+        Instant deletedBeforeCutoff =
+                FIXED_INSTANT.minus(Duration.ofDays(config.safety().cleanupRetentionDays() + 1L));
+        Instant deletedAfterCutoff =
+                FIXED_INSTANT.minus(Duration.ofDays(config.safety().cleanupRetentionDays() - 1L));
+
+        userStorage.save(User.StorageBuilder.create(UUID.randomUUID(), "Expired User", FIXED_INSTANT)
+                .state(User.UserState.ACTIVE)
+                .deletedAt(deletedBeforeCutoff)
+                .build());
+        userStorage.save(User.StorageBuilder.create(UUID.randomUUID(), "Recent User", FIXED_INSTANT)
+                .state(User.UserState.ACTIVE)
+                .deletedAt(deletedAfterCutoff)
+                .build());
+
+        Match expiredMatch = Match.create(UUID.randomUUID(), UUID.randomUUID());
+        expiredMatch.markDeleted(deletedBeforeCutoff);
+        interactionStorage.save(expiredMatch);
+
+        Match recentMatch = Match.create(UUID.randomUUID(), UUID.randomUUID());
+        recentMatch.markDeleted(deletedAfterCutoff);
+        interactionStorage.save(recentMatch);
     }
 
     // === Test Double ===
@@ -200,6 +241,11 @@ class CleanupServiceTest {
         public int deleteExpiredStandouts(Instant cutoff) {
             this.receivedStandoutCutoff = cutoff;
             return standoutDeletedCount;
+        }
+
+        @Override
+        public boolean markStandoutInteracted(UUID standoutId, Instant timestamp) {
+            return true;
         }
 
         @Override

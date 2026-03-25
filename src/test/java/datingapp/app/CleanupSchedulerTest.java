@@ -27,7 +27,7 @@ class CleanupSchedulerTest {
         CleanupScheduler scheduler = new CleanupScheduler(Duration.ofMillis(100), () -> {
             calls.incrementAndGet();
             latch.countDown();
-            return new ActivityMetricsService.CleanupResult(0, 0, 0);
+            return new ActivityMetricsService.CleanupResult(0, 0, 0, 0, 0);
         });
 
         scheduler.start();

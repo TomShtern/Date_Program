@@ -285,7 +285,12 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                     archived_at_b AS user_b_archived_at, archive_reason_b AS user_b_archive_reason,
                     visible_to_user_a, visible_to_user_b
                 FROM conversations
-                WHERE (user_a = :userId OR user_b = :userId) AND deleted_at IS NULL
+                WHERE (user_a = :userId OR user_b = :userId)
+                  AND deleted_at IS NULL
+                  AND (
+                    (user_a = :userId AND visible_to_user_a = TRUE) OR
+                    (user_b = :userId AND visible_to_user_b = TRUE)
+                  )
                 ORDER BY COALESCE(last_message_at, created_at) DESC
                 LIMIT :limit OFFSET :offset
                 """)
@@ -299,7 +304,12 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                     archived_at_b AS user_b_archived_at, archive_reason_b AS user_b_archive_reason,
                     visible_to_user_a, visible_to_user_b
                 FROM conversations
-                WHERE (user_a = :userId OR user_b = :userId) AND deleted_at IS NULL
+                WHERE (user_a = :userId OR user_b = :userId)
+                  AND deleted_at IS NULL
+                  AND (
+                    (user_a = :userId AND visible_to_user_a = TRUE) OR
+                    (user_b = :userId AND visible_to_user_b = TRUE)
+                  )
                 ORDER BY COALESCE(last_message_at, created_at) DESC
                 """)
         List<Conversation> getAllConversationsFor(@Bind("userId") UUID userId);

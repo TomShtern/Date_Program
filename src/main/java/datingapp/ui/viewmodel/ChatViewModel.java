@@ -9,6 +9,7 @@ import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
+import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Report;
@@ -192,6 +193,18 @@ public class ChatViewModel {
             }
         };
         selectedConversation.addListener(selectionListener);
+    }
+
+    public ChatViewModel(
+            MessagingUseCases messagingUseCases, SocialUseCases socialUseCases, AppSession session, AppConfig config) {
+        this(
+                messagingUseCases,
+                socialUseCases,
+                session,
+                new JavaFxUiThreadDispatcher(),
+                Duration.ofSeconds(config.validation().chatBackgroundPollSeconds()),
+                Duration.ofSeconds(config.validation().chatActivePollSeconds()),
+                ChatUiDependencies.noOp());
     }
 
     /**

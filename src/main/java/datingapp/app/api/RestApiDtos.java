@@ -5,6 +5,7 @@ import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionService;
+import datingapp.core.matching.DailyPickService.DailyPick;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.Standout;
@@ -17,6 +18,7 @@ import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
@@ -90,6 +92,37 @@ final class RestApiDtos {
         }
     }
 
+    /** Candidate browsing response. */
+    static record BrowseCandidatesResponse(
+            List<UserSummary> candidates, DailyPickDto dailyPick, boolean dailyPickViewed, boolean locationMissing) {
+        static BrowseCandidatesResponse from(
+                datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesResult result, ZoneId userTimeZone) {
+            return new BrowseCandidatesResponse(
+                    result.candidates().stream()
+                            .map(candidate -> UserSummary.from(candidate, userTimeZone))
+                            .toList(),
+                    result.dailyPick()
+                            .map(dailyPick -> DailyPickDto.from(dailyPick, userTimeZone))
+                            .orElse(null),
+                    result.dailyPickViewed(),
+                    result.locationMissing());
+        }
+    }
+
+    /** Daily pick DTO. */
+    static record DailyPickDto(
+            UUID userId, String userName, int userAge, LocalDate date, String reason, boolean alreadySeen) {
+        static DailyPickDto from(DailyPick dailyPick, ZoneId userTimeZone) {
+            return new DailyPickDto(
+                    dailyPick.user().getId(),
+                    dailyPick.user().getName(),
+                    dailyPick.user().getAge(userTimeZone).orElse(0),
+                    dailyPick.date(),
+                    dailyPick.reason(),
+                    dailyPick.alreadySeen());
+        }
+    }
+
     /** Match summary for API responses. */
     static record MatchSummary(
             String matchId, UUID otherUserId, String otherUserName, String state, Instant createdAt) {
@@ -147,6 +180,28 @@ final class RestApiDtos {
 
     /** Pending likers response. */
     static record PendingLikersResponse(List<PendingLikerDto> pendingLikers) {}
+
+    /** Friend request DTO for API responses. */
+    static record FriendRequestDto(
+            UUID id, UUID fromUserId, UUID toUserId, Instant createdAt, String status, Instant respondedAt) {
+        static FriendRequestDto from(FriendRequest request) {
+            return new FriendRequestDto(
+                    request.id(),
+                    request.fromUserId(),
+                    request.toUserId(),
+                    request.createdAt(),
+                    request.status().name(),
+                    request.respondedAt());
+        }
+    }
+
+    /** Friend request listing response. */
+    static record FriendRequestsResponse(List<FriendRequestDto> friendRequests) {
+        static FriendRequestsResponse from(List<FriendRequest> requests) {
+            return new FriendRequestsResponse(
+                    requests.stream().map(FriendRequestDto::from).toList());
+        }
+    }
 
     /** Standout DTO for API responses. */
     static record StandoutDto(
@@ -219,7 +274,7 @@ final class RestApiDtos {
     /** Request body for profile updates. */
     static record ProfileUpdateRequest(
             String bio,
-            java.time.LocalDate birthDate,
+            LocalDate birthDate,
             User.Gender gender,
             Set<User.Gender> interestedIn,
             Double latitude,

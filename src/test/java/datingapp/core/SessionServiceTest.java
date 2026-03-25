@@ -44,6 +44,7 @@ class SessionServiceTest {
                 .sessionTimeoutMinutes(5)
                 .maxSwipesPerSession(100)
                 .suspiciousSwipeVelocity(30.0)
+                .suspiciousSwipeVelocityBlockingEnabled(false)
                 .build();
         service = new ActivityMetricsService(
                 new TestStorages.Interactions(), new TestStorages.TrustSafety(), analyticsStorage, config);

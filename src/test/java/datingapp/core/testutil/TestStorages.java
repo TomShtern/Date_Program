@@ -51,6 +51,7 @@ public final class TestStorages {
     private static final String NOTE_DELIMITER = ":";
     private static final String DAILY_PICK_DELIMITER = "|";
     private static final String STANDOUT_DELIMITER = "|";
+    private static final String USER_ID_NULL_MESSAGE = "userId cannot be null";
 
     private TestStorages() {}
 
@@ -69,6 +70,7 @@ public final class TestStorages {
     public static class Users implements UserStorage {
         private final Map<UUID, User> users = new HashMap<>();
         private final Map<String, ProfileNote> profileNotes = new HashMap<>();
+        private Instant lastPurgeCutoff;
 
         @Override
         public void save(User user) {
@@ -134,6 +136,18 @@ public final class TestStorages {
         }
 
         @Override
+        public int purgeDeletedBefore(Instant threshold) {
+            Objects.requireNonNull(threshold, "threshold cannot be null");
+            lastPurgeCutoff = threshold;
+            int before = users.size();
+            users.entrySet().removeIf(entry -> {
+                Instant deletedAt = entry.getValue().getDeletedAt();
+                return deletedAt != null && deletedAt.isBefore(threshold);
+            });
+            return before - users.size();
+        }
+
+        @Override
         public void saveProfileNote(ProfileNote note) {
             profileNotes.put(profileNoteKey(note.authorId(), note.subjectId()), note);
         }
@@ -158,7 +172,7 @@ public final class TestStorages {
 
         @Override
         public synchronized void executeWithUserLock(UUID userId, Runnable operation) {
-            Objects.requireNonNull(userId, "userId cannot be null");
+            Objects.requireNonNull(userId, USER_ID_NULL_MESSAGE);
             Objects.requireNonNull(operation, "operation cannot be null");
             operation.run();
         }
@@ -171,12 +185,17 @@ public final class TestStorages {
         public int size() {
             return users.size();
         }
+
+        public Instant getLastPurgeCutoff() {
+            return lastPurgeCutoff;
+        }
     }
 
     public static class Interactions implements InteractionStorage {
         private final Map<UUID, Like> likes = new HashMap<>();
         private final Map<String, Match> matches = new HashMap<>();
         private final CommunicationStorage communicationStorage;
+        private Instant lastPurgeCutoff;
 
         public Interactions() {
             this(null);
@@ -356,7 +375,7 @@ public final class TestStorages {
 
         @Override
         public Set<UUID> getMatchedCounterpartIds(UUID userId) {
-            Objects.requireNonNull(userId, "userId cannot be null");
+            Objects.requireNonNull(userId, USER_ID_NULL_MESSAGE);
             return matches.values().stream()
                     .filter(match -> match.getDeletedAt() == null)
                     .filter(match -> match.involves(userId))
@@ -392,7 +411,7 @@ public final class TestStorages {
          */
         @Override
         public PageData<Match> getPageOfMatchesFor(UUID userId, int offset, int limit) {
-            Objects.requireNonNull(userId, "userId cannot be null");
+            Objects.requireNonNull(userId, USER_ID_NULL_MESSAGE);
             if (offset < 0) throw new IllegalArgumentException("offset must be >= 0");
             if (limit <= 0) throw new IllegalArgumentException("limit must be > 0");
 
@@ -416,7 +435,7 @@ public final class TestStorages {
          */
         @Override
         public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
-            Objects.requireNonNull(userId, "userId cannot be null");
+            Objects.requireNonNull(userId, USER_ID_NULL_MESSAGE);
             if (offset < 0) throw new IllegalArgumentException("offset must be >= 0");
             if (limit <= 0) throw new IllegalArgumentException("limit must be > 0");
 
@@ -445,6 +464,7 @@ public final class TestStorages {
 
         @Override
         public int purgeDeletedBefore(Instant threshold) {
+            lastPurgeCutoff = threshold;
             int before = matches.size();
             matches.entrySet().removeIf(entry -> {
                 Instant deletedAt = entry.getValue().getDeletedAt();
@@ -514,6 +534,10 @@ public final class TestStorages {
 
         public int size() {
             return likes.size() + matches.size();
+        }
+
+        public Instant getLastPurgeCutoff() {
+            return lastPurgeCutoff;
         }
     }
 
@@ -727,7 +751,7 @@ public final class TestStorages {
 
         @Override
         public int countPendingFriendRequestsForUser(UUID userId) {
-            Objects.requireNonNull(userId, "userId cannot be null");
+            Objects.requireNonNull(userId, USER_ID_NULL_MESSAGE);
             return (int) friendRequests.values().stream()
                     .filter(request -> request.status() == FriendRequest.Status.PENDING)
                     .filter(request -> request.toUserId().equals(userId))
@@ -794,6 +818,7 @@ public final class TestStorages {
         private final List<PlatformStats> platformStatsHistory = new ArrayList<>();
         private final List<ProfileViewEvent> profileViews = new ArrayList<>();
         private final Map<UUID, List<UserAchievement>> achievements = new HashMap<>();
+        private final Map<UUID, Instant> standoutInteractions = new HashMap<>();
         private final Set<String> dailyPickViews = new HashSet<>();
         private final Map<String, UUID> dailyPicks = new HashMap<>();
         private final Map<UUID, Session> sessions = new HashMap<>();
@@ -983,7 +1008,15 @@ public final class TestStorages {
 
         @Override
         public int deleteExpiredStandouts(Instant cutoff) {
-            return 0;
+            int before = standoutInteractions.size();
+            standoutInteractions.entrySet().removeIf(entry -> entry.getValue().isBefore(cutoff));
+            return before - standoutInteractions.size();
+        }
+
+        @Override
+        public boolean markStandoutInteracted(UUID standoutId, Instant timestamp) {
+            standoutInteractions.put(standoutId, timestamp);
+            return true;
         }
 
         @Override

@@ -140,6 +140,44 @@ class RestApiRelationshipRoutesTest {
     }
 
     @Test
+    @DisplayName("friend request list route returns pending requests for a user")
+    void friendRequestListRouteReturnsPendingRequestsForAUser() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        userStorage.save(activeUser(userA, "Alice"));
+        userStorage.save(activeUser(userB, "Bob"));
+        interactionStorage.save(Match.create(userA, userB));
+
+        connectionStorageSeedFriendRequest(communicationStorage, userA, userB);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> listResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + userB + "/friend-requests"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, listResponse.statusCode());
+        JsonNode json = MAPPER.readTree(listResponse.body());
+        assertEquals(1, json.get("friendRequests").size());
+        assertEquals(
+                userA.toString(),
+                json.get("friendRequests").get(0).get("fromUserId").asText());
+        assertEquals(
+                userB.toString(),
+                json.get("friendRequests").get(0).get("toUserId").asText());
+    }
+
+    @Test
     @DisplayName("relationship and moderation routes support graceful exit unmatch block and report")
     void relationshipAndModerationRoutesSupportGracefulExitUnmatchBlockAndReport() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
@@ -311,6 +349,11 @@ class RestApiRelationshipRoutesTest {
     private static ServiceRegistry createServices(
             UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
         return createServices(userStorage, interactionStorage, communicationStorage, new TestStorages.TrustSafety());
+    }
+
+    private static void connectionStorageSeedFriendRequest(
+            TestStorages.Communications communicationStorage, UUID fromUserId, UUID toUserId) {
+        communicationStorage.saveFriendRequest(ConnectionModels.FriendRequest.create(fromUserId, toUserId));
     }
 
     private static ServiceRegistry createServices(

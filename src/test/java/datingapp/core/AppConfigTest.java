@@ -1,9 +1,11 @@
 package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.model.ProfileNote;
@@ -18,6 +20,8 @@ import org.junit.jupiter.api.Timeout;
 /** Unit tests for AppConfig configuration. */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class AppConfigTest {
+
+    private static final String UNSET_VALUE_MESSAGE = "Unset value should use default";
 
     @Nested
     @DisplayName("Default Configuration")
@@ -35,6 +39,9 @@ class AppConfigTest {
                     3,
                     defaults.matching().sharedInterestsPreviewCount(),
                     "Default shared interests preview count should be 3");
+            assertTrue(
+                    defaults.matching().suspiciousSwipeVelocityBlockingEnabled(),
+                    "Default suspicious swipe blocking should be enabled");
             assertEquals(30, defaults.storage().queryTimeoutSeconds(), "Default query timeout should be 30");
             assertEquals(10, defaults.validation().maxInterests(), "Default max interests should be 10");
             assertEquals(
@@ -90,13 +97,10 @@ class AppConfigTest {
             AppConfig config = AppConfig.builder().autoBanThreshold(10).build();
 
             assertEquals(10, config.safety().autoBanThreshold(), "Custom value should be set");
-            assertEquals(100, config.matching().dailyLikeLimit(), "Unset value should use default");
-            assertEquals(500, config.validation().maxBioLength(), "Unset value should use default");
-            assertEquals(Message.MAX_LENGTH, config.validation().maxMessageLength(), "Unset value should use default");
-            assertEquals(
-                    ProfileNote.MAX_LENGTH,
-                    config.validation().maxProfileNoteLength(),
-                    "Unset value should use default");
+            assertEquals(100, config.matching().dailyLikeLimit(), UNSET_VALUE_MESSAGE);
+            assertEquals(500, config.validation().maxBioLength(), UNSET_VALUE_MESSAGE);
+            assertEquals(Message.MAX_LENGTH, config.validation().maxMessageLength(), UNSET_VALUE_MESSAGE);
+            assertEquals(ProfileNote.MAX_LENGTH, config.validation().maxProfileNoteLength(), UNSET_VALUE_MESSAGE);
         }
 
         @Test
@@ -109,6 +113,7 @@ class AppConfigTest {
             assertSame(builder, builder.dailyLikeLimit(1));
             assertSame(builder, builder.dailySuperLikeLimit(1));
             assertSame(builder, builder.sharedInterestsPreviewCount(1));
+            assertSame(builder, builder.suspiciousSwipeVelocityBlockingEnabled(true));
             assertSame(builder, builder.maxInterests(1));
             assertSame(builder, builder.maxPhotos(1));
             assertSame(builder, builder.maxBioLength(1));
@@ -134,6 +139,7 @@ class AppConfigTest {
             assertEquals(222, config.matching().dailyPassLimit());
             assertEquals(333, config.matching().maxSwipesPerSession());
             assertEquals(4.5, config.matching().suspiciousSwipeVelocity(), 0.001);
+            assertFalse(config.matching().suspiciousSwipeVelocityBlockingEnabled());
             assertEquals(0.10, config.matching().distanceWeight(), 0.001);
             assertEquals(0.20, config.matching().ageWeight(), 0.001);
             assertEquals(0.30, config.matching().interestWeight(), 0.001);
@@ -266,6 +272,7 @@ class AppConfigTest {
                     .dailyPassLimit(222)
                     .maxSwipesPerSession(333)
                     .suspiciousSwipeVelocity(4.5)
+                    .suspiciousSwipeVelocityBlockingEnabled(false)
                     .distanceWeight(0.10)
                     .ageWeight(0.20)
                     .interestWeight(0.30)

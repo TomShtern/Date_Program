@@ -46,6 +46,9 @@ import org.junit.jupiter.api.Test;
 @DisplayName("ProfileUseCases")
 class ProfileUseCasesTest {
 
+    private static final String AUTHOR_NAME = "Author";
+    private static final String SUBJECT_NAME = "Subject";
+
     private AppConfig config;
     private TestStorages.Users userStorage;
     private ProfileService profileService;
@@ -103,6 +106,49 @@ class ProfileUseCasesTest {
         assertTrue(result.success());
         assertTrue(result.data().activated());
         assertEquals(User.UserState.ACTIVE, result.data().user().getState());
+    }
+
+    @Test
+    @DisplayName("saveProfile should publish ProfileCompleted when activation succeeds")
+    void saveProfilePublishesProfileCompletedEventWhenActivated() {
+        User user = User.StorageBuilder.create(UUID.randomUUID(), "Ready User", AppClock.now())
+                .state(User.UserState.INCOMPLETE)
+                .bio("Complete profile bio")
+                .birthDate(AppClock.today().minusYears(25))
+                .gender(User.Gender.MALE)
+                .interestedIn(Set.of(User.Gender.FEMALE))
+                .photoUrls(List.of("http://example.com/photo.jpg"))
+                .location(32.0853, 34.7818)
+                .hasLocationSet(true)
+                .maxDistanceKm(config.matching().maxDistanceKm())
+                .ageRange(config.validation().minAge(), config.validation().maxAge())
+                .pacePreferences(new PacePreferences(
+                        MessagingFrequency.OFTEN,
+                        TimeToFirstDate.FEW_DAYS,
+                        CommunicationStyle.MIX_OF_EVERYTHING,
+                        DepthPreference.DEEP_CHAT))
+                .build();
+
+        List<AppEvent> publishedEvents = new ArrayList<>();
+        ProfileUseCases eventUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                capturingEventBus(publishedEvents));
+
+        var result = eventUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
+
+        assertTrue(result.success());
+        assertEquals(2, publishedEvents.size());
+        assertTrue(publishedEvents.getFirst() instanceof AppEvent.ProfileSaved);
+        assertTrue(publishedEvents.get(1) instanceof AppEvent.ProfileCompleted);
+        AppEvent.ProfileCompleted event = (AppEvent.ProfileCompleted) publishedEvents.get(1);
+        assertEquals(user.getId(), event.userId());
+        assertNotNull(event.occurredAt());
     }
 
     @Test
@@ -172,8 +218,8 @@ class ProfileUseCasesTest {
     @Test
     @DisplayName("upsertProfileNote should sanitize note content")
     void upsertProfileNoteSanitizesContent() {
-        User author = TestUserFactory.createActiveUser(UUID.randomUUID(), "Author");
-        User subject = TestUserFactory.createActiveUser(UUID.randomUUID(), "Subject");
+        User author = TestUserFactory.createActiveUser(UUID.randomUUID(), AUTHOR_NAME);
+        User subject = TestUserFactory.createActiveUser(UUID.randomUUID(), SUBJECT_NAME);
         userStorage.save(author);
         userStorage.save(subject);
 
@@ -187,8 +233,8 @@ class ProfileUseCasesTest {
     @Test
     @DisplayName("upsertProfileNote should publish ProfileNoteSaved on success")
     void upsertProfileNotePublishesProfileNoteSavedEvent() {
-        User author = TestUserFactory.createActiveUser(UUID.randomUUID(), "Author");
-        User subject = TestUserFactory.createActiveUser(UUID.randomUUID(), "Subject");
+        User author = TestUserFactory.createActiveUser(UUID.randomUUID(), AUTHOR_NAME);
+        User subject = TestUserFactory.createActiveUser(UUID.randomUUID(), SUBJECT_NAME);
         userStorage.save(author);
         userStorage.save(subject);
 
@@ -218,8 +264,8 @@ class ProfileUseCasesTest {
     @Test
     @DisplayName("deleteProfileNote should publish ProfileNoteDeleted on success")
     void deleteProfileNotePublishesProfileNoteDeletedEvent() {
-        User author = TestUserFactory.createActiveUser(UUID.randomUUID(), "Author");
-        User subject = TestUserFactory.createActiveUser(UUID.randomUUID(), "Subject");
+        User author = TestUserFactory.createActiveUser(UUID.randomUUID(), AUTHOR_NAME);
+        User subject = TestUserFactory.createActiveUser(UUID.randomUUID(), SUBJECT_NAME);
         userStorage.save(author);
         userStorage.save(subject);
         userStorage.saveProfileNote(ProfileNote.create(author.getId(), subject.getId(), "Legacy note"));
@@ -352,6 +398,55 @@ class ProfileUseCasesTest {
         assertEquals(user.getId(), event.userId());
         assertEquals("PRIVACY_REQUEST", event.reason().name());
         assertEquals(cleanupStorage.deletedAt.get(), event.occurredAt());
+    }
+
+    @Test
+    @DisplayName("updateProfile should publish LocationUpdated when coordinates change")
+    void updateProfilePublishesLocationUpdatedEvent() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Location User");
+        user.setLocation(32.0700, 34.8000);
+        userStorage.save(user);
+
+        List<AppEvent> publishedEvents = new ArrayList<>();
+        ProfileUseCases eventUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                capturingEventBus(publishedEvents));
+
+        var result = eventUseCases.updateProfile(new ProfileUseCases.UpdateProfileCommand(
+                UserContext.cli(user.getId()),
+                null,
+                null,
+                null,
+                null,
+                32.0853,
+                34.7818,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+        assertTrue(result.success());
+        assertEquals(2, publishedEvents.size());
+        assertTrue(publishedEvents.getFirst() instanceof AppEvent.ProfileSaved);
+        assertTrue(publishedEvents.get(1) instanceof AppEvent.LocationUpdated);
+        AppEvent.LocationUpdated event = (AppEvent.LocationUpdated) publishedEvents.get(1);
+        assertEquals(user.getId(), event.userId());
+        assertEquals(32.0853, event.latitude(), 0.0000001);
+        assertEquals(34.7818, event.longitude(), 0.0000001);
+        assertNotNull(event.occurredAt());
     }
 
     private static AchievementService noOpAchievementService() {

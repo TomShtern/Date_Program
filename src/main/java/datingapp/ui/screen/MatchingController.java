@@ -93,6 +93,9 @@ public class MatchingController extends BaseController implements Initializable 
     private Label matchScoreLabel;
 
     @FXML
+    private Button viewFullProfileButton;
+
+    @FXML
     private VBox noCandidatesContainer;
 
     @FXML
@@ -527,6 +530,11 @@ public class MatchingController extends BaseController implements Initializable 
                 handleImproveProfile();
             });
         }
+        if (viewFullProfileButton != null) {
+            viewFullProfileButton
+                    .disableProperty()
+                    .bind(viewModel.currentCandidateProperty().isNull());
+        }
     }
 
     /** Super like action - triggered by button or UP key. */
@@ -710,6 +718,18 @@ public class MatchingController extends BaseController implements Initializable 
     private void handleImproveProfile() {
         logInfo("User clicked Improve Profile - navigating to Profile");
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE);
+    }
+
+    @SuppressWarnings("unused")
+    @FXML
+    private void handleViewFullProfile() {
+        User candidate = viewModel.currentCandidateProperty().get();
+        if (candidate == null) {
+            return;
+        }
+        NavigationService nav = NavigationService.getInstance();
+        nav.setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, candidate.getId());
+        nav.navigateTo(NavigationService.ViewType.PROFILE_VIEW);
     }
 
     private String resolveStylesheet(String path) {

@@ -110,8 +110,8 @@ public final class StorageFactory {
         RecommendationService recommendationService =
                 new RecommendationService(dailyLimitService, dailyPickService, standoutService);
         UndoService undoService = new UndoService(interactionStorage, undoStorage, config);
-        ActivityMetricsService activityMetricsService =
-                new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
+        ActivityMetricsService activityMetricsService = new ActivityMetricsService(
+                userStorage, interactionStorage, trustSafetyStorage, analyticsStorage, config);
 
         MatchingService matchingService = MatchingService.builder()
                 .interactionStorage(interactionStorage)

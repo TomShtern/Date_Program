@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.AppEvent;
+import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.messaging.MessagingUseCases.ArchiveConversationCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.CountMessagesByConversationIdsQuery;
@@ -21,6 +23,8 @@ import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -153,6 +157,31 @@ class MessagingUseCasesTest {
     }
 
     @Test
+    @DisplayName("archiveConversation should publish ConversationArchived on success")
+    void archiveConversationPublishesConversationArchivedEvent() {
+        var sendResult = useCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(sender.getId()), recipient.getId(), "Archive me"));
+        assertTrue(sendResult.success());
+
+        String conversationId = sendResult.data().message().conversationId();
+        List<AppEvent> publishedEvents = new ArrayList<>();
+        MessagingUseCases eventUseCases = new MessagingUseCases(
+                new ConnectionService(AppConfig.defaults(), communicationStorage, interactionStorage, userStorage),
+                capturingEventBus(publishedEvents));
+
+        var archiveResult = eventUseCases.archiveConversation(new ArchiveConversationCommand(
+                UserContext.cli(sender.getId()), conversationId, MatchArchiveReason.UNMATCH));
+
+        assertTrue(archiveResult.success());
+        assertEquals(1, publishedEvents.size());
+        assertTrue(publishedEvents.getFirst() instanceof AppEvent.ConversationArchived);
+        AppEvent.ConversationArchived event = (AppEvent.ConversationArchived) publishedEvents.getFirst();
+        assertEquals(conversationId, event.conversationId());
+        assertEquals(sender.getId(), event.archivedByUserId());
+        assertNotNull(event.occurredAt());
+    }
+
+    @Test
     @DisplayName("deleteConversation removes conversation and messages")
     void deleteConversationRemovesConversationAndMessages() {
         var sendResult = useCases.sendMessage(
@@ -189,5 +218,25 @@ class MessagingUseCasesTest {
 
         assertTrue(loadResult.success());
         assertEquals(1, loadResult.data().messages().size());
+    }
+
+    private static AppEventBus capturingEventBus(List<AppEvent> publishedEvents) {
+        return new AppEventBus() {
+            @Override
+            public void publish(AppEvent event) {
+                publishedEvents.add(event);
+            }
+
+            @Override
+            public <T extends AppEvent> void subscribe(Class<T> eventType, AppEventHandler<T> handler) {
+                // Not needed for these tests.
+            }
+
+            @Override
+            public <T extends AppEvent> void subscribe(
+                    Class<T> eventType, AppEventHandler<T> handler, HandlerPolicy policy) {
+                // Not needed for these tests.
+            }
+        };
     }
 }

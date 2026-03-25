@@ -7,7 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -474,6 +476,43 @@ class RestApiPhaseTwoRoutesTest {
     }
 
     @Test
+    @DisplayName("pass route forwards daily-limit enforcement on record-like commands")
+    void passRouteForwardsDailyLimitEnforcementOnRecordLikeCommands() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
+        SeededStandoutStorage standoutStorage = new SeededStandoutStorage();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, standoutStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        userStorage.save(activeUser(aliceId, "Alice Pass"));
+        userStorage.save(activeUser(bobId, "Bob Pass"));
+
+        CapturingMatchingUseCases matchingUseCases = new CapturingMatchingUseCases(services);
+        server = new RestApiServer(services, 0);
+        replaceMatchingUseCases(server, matchingUseCases);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> passResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/pass/" + bobId))
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, passResponse.statusCode());
+        assertNotNull(matchingUseCases.lastCommand);
+        assertEquals(UserContext.api(aliceId), matchingUseCases.lastCommand.context());
+        assertEquals(bobId, matchingUseCases.lastCommand.targetUserId());
+        assertEquals(Like.Direction.PASS, matchingUseCases.lastCommand.direction());
+        assertTrue(matchingUseCases.lastCommand.enforceDailyLimit());
+    }
+
+    @Test
     @DisplayName("report-plus-block flow prevents follow-up messaging and preserves moderation state")
     void reportAndBlockFlowPreventsFollowUpMessaging() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
@@ -607,6 +646,43 @@ class RestApiPhaseTwoRoutesTest {
                 .state(UserState.ACTIVE)
                 .birthDate(LocalDate.of(1998, 1, 1))
                 .build();
+    }
+
+    private static void replaceMatchingUseCases(RestApiServer server, MatchingUseCases matchingUseCases) {
+        try {
+            java.lang.reflect.Field field = RestApiServer.class.getDeclaredField("matchingUseCases");
+            field.setAccessible(true);
+            field.set(server, matchingUseCases);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to replace matching use cases in RestApiServer", e);
+        }
+    }
+
+    private static final class CapturingMatchingUseCases extends MatchingUseCases {
+        private datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand lastCommand;
+
+        private CapturingMatchingUseCases(ServiceRegistry services) {
+            super(
+                    services.getCandidateFinder(),
+                    services.getMatchingService(),
+                    services.getDailyLimitService(),
+                    services.getDailyPickService(),
+                    services.getStandoutService(),
+                    services.getUndoService(),
+                    services.getInteractionStorage(),
+                    services.getUserStorage(),
+                    services.getMatchQualityService(),
+                    services.getEventBus());
+        }
+
+        @Override
+        public UseCaseResult<datingapp.app.usecase.matching.MatchingUseCases.RecordLikeResult> recordLike(
+                datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand command) {
+            lastCommand = command;
+            Like like = Like.create(command.context().userId(), command.targetUserId(), command.direction());
+            return UseCaseResult.success(
+                    new datingapp.app.usecase.matching.MatchingUseCases.RecordLikeResult(like, Optional.empty()));
+        }
     }
 
     private static final class InMemoryUndoStorage implements Undo.Storage {

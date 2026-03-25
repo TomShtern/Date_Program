@@ -29,6 +29,7 @@ public record AppConfig(
             int dailyPassLimit,
             int maxSwipesPerSession,
             double suspiciousSwipeVelocity,
+            boolean suspiciousSwipeVelocityBlockingEnabled,
             double distanceWeight,
             double ageWeight,
             double interestWeight,
@@ -50,6 +51,7 @@ public record AppConfig(
                     paceWeight,
                     responseWeight);
             AppConfigValidator.validateMatchingInterestPolicy(minSharedInterests, sharedInterestsPreviewCount);
+            AppConfigValidator.validateMatchingBehaviorFlags();
         }
     }
 
@@ -252,6 +254,7 @@ public record AppConfig(
         private int dailyPassLimit = -1;
         private int maxSwipesPerSession = 500;
         private double suspiciousSwipeVelocity = 30.0;
+        private boolean suspiciousSwipeVelocityBlockingEnabled = true;
         private double distanceWeight = 0.15;
         private double ageWeight = 0.10;
         private double interestWeight = 0.25;
@@ -384,6 +387,11 @@ public record AppConfig(
 
         public Builder suspiciousSwipeVelocity(double v) {
             this.suspiciousSwipeVelocity = v;
+            return this;
+        }
+
+        public Builder suspiciousSwipeVelocityBlockingEnabled(boolean v) {
+            this.suspiciousSwipeVelocityBlockingEnabled = v;
             return this;
         }
 
@@ -688,6 +696,7 @@ public record AppConfig(
                     dailyPassLimit,
                     maxSwipesPerSession,
                     suspiciousSwipeVelocity,
+                    suspiciousSwipeVelocityBlockingEnabled,
                     distanceWeight,
                     ageWeight,
                     interestWeight,

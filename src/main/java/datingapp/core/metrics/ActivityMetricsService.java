@@ -10,6 +10,7 @@ import datingapp.core.model.Match;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
+import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -25,7 +26,11 @@ import java.util.concurrent.atomic.LongAdder;
 public class ActivityMetricsService {
 
     private static final int LOCK_STRIPE_COUNT = 256;
+    private static final String SUSPICIOUS_VELOCITY_WARNING =
+            "Unusually fast swiping detected. Take a moment to review profiles!";
+    private static final String SUSPICIOUS_VELOCITY_BLOCKED = "Unusually fast swiping detected. Swipe blocked for now.";
 
+    private final UserStorage userStorage;
     private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
     private final AnalyticsStorage analyticsStorage;
@@ -33,6 +38,7 @@ public class ActivityMetricsService {
     private final Object[] lockStripes;
     private final LongAdder swipeLimitBlockedCount = new LongAdder();
     private final LongAdder velocityWarningCount = new LongAdder();
+    private final LongAdder velocityBlockedCount = new LongAdder();
     private final LongAdder recordMatchNoOpCount = new LongAdder();
     private final LongAdder endSessionNoOpCount = new LongAdder();
 
@@ -42,6 +48,28 @@ public class ActivityMetricsService {
             TrustSafetyStorage trustSafetyStorage,
             AnalyticsStorage analyticsStorage,
             AppConfig config) {
+        this(null, interactionStorage, trustSafetyStorage, analyticsStorage, config, false);
+    }
+
+    /** Canonical constructor — all dependencies are required. */
+    public ActivityMetricsService(
+            UserStorage userStorage,
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            AnalyticsStorage analyticsStorage,
+            AppConfig config) {
+        this(userStorage, interactionStorage, trustSafetyStorage, analyticsStorage, config, true);
+    }
+
+    private ActivityMetricsService(
+            UserStorage userStorage,
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            AnalyticsStorage analyticsStorage,
+            AppConfig config,
+            boolean requireUserStorage) {
+        this.userStorage =
+                requireUserStorage ? Objects.requireNonNull(userStorage, "userStorage cannot be null") : userStorage;
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.analyticsStorage = Objects.requireNonNull(analyticsStorage, "analyticsStorage cannot be null");
@@ -84,18 +112,40 @@ public class ActivityMetricsService {
                 return SwipeGateResult.blocked(session, "Session swipe limit reached. Take a break!");
             }
 
-            session.recordSwipe(direction, matched);
-            analyticsStorage.saveSession(session);
+            int projectedSwipeCount = session.getSwipeCount() + 1;
+            if (isSuspiciousSwipeVelocity(session, projectedSwipeCount)) {
+                if (config.matching().suspiciousSwipeVelocityBlockingEnabled()) {
+                    velocityBlockedCount.increment();
+                    return SwipeGateResult.blocked(session, SUSPICIOUS_VELOCITY_BLOCKED);
+                }
 
-            String warning = null;
-            if (session.getSwipeCount() >= 10
-                    && session.getSwipesPerMinute() > config.matching().suspiciousSwipeVelocity()) {
-                warning = "Unusually fast swiping detected. Take a moment to review profiles!";
+                persistSwipe(session, direction, matched);
                 velocityWarningCount.increment();
+                return SwipeGateResult.success(session, SUSPICIOUS_VELOCITY_WARNING);
             }
 
-            return SwipeGateResult.success(session, warning);
+            persistSwipe(session, direction, matched);
+            return SwipeGateResult.success(session, null);
         }
+    }
+
+    private void persistSwipe(Session session, Like.Direction direction, boolean matched) {
+        session.recordSwipe(direction, matched);
+        analyticsStorage.saveSession(session);
+    }
+
+    private boolean isSuspiciousSwipeVelocity(Session session, int projectedSwipeCount) {
+        return projectedSwipeCount >= 10
+                && getProjectedSwipesPerMinute(session, projectedSwipeCount)
+                        > config.matching().suspiciousSwipeVelocity();
+    }
+
+    private static double getProjectedSwipesPerMinute(Session session, int projectedSwipeCount) {
+        long durationSeconds = session.getDurationSeconds();
+        if (durationSeconds == 0) {
+            return projectedSwipeCount;
+        }
+        return projectedSwipeCount * 60.0 / durationSeconds;
     }
 
     public void recordActivity(UUID userId) {
@@ -136,6 +186,7 @@ public class ActivityMetricsService {
         return new DiagnosticsSnapshot(
                 swipeLimitBlockedCount.sum(),
                 velocityWarningCount.sum(),
+                velocityBlockedCount.sum(),
                 recordMatchNoOpCount.sum(),
                 endSessionNoOpCount.sum());
     }
@@ -168,7 +219,10 @@ public class ActivityMetricsService {
         int dailyPicksDeleted = analyticsStorage.deleteExpiredDailyPickViews(cutoffDate);
         int sessionsDeleted = analyticsStorage.deleteExpiredSessions(cutoffDate);
         int standoutsDeleted = analyticsStorage.deleteExpiredStandouts(cutoffDate);
-        return new CleanupResult(dailyPicksDeleted, sessionsDeleted, standoutsDeleted);
+        int usersDeleted = userStorage != null ? userStorage.purgeDeletedBefore(cutoffDate) : 0;
+        int interactionsDeleted = interactionStorage.purgeDeletedBefore(cutoffDate);
+        return new CleanupResult(
+                dailyPicksDeleted, sessionsDeleted, standoutsDeleted, usersDeleted, interactionsDeleted);
     }
 
     public UserStats computeAndSaveStats(UUID userId) {
@@ -270,9 +324,14 @@ public class ActivityMetricsService {
         return analyticsStorage.getLatestPlatformStats();
     }
 
-    public static record CleanupResult(int dailyPicksDeleted, int sessionsDeleted, int standoutsDeleted) {
+    public static record CleanupResult(
+            int dailyPicksDeleted,
+            int sessionsDeleted,
+            int standoutsDeleted,
+            int usersDeleted,
+            int interactionsDeleted) {
         public int totalDeleted() {
-            return dailyPicksDeleted + sessionsDeleted + standoutsDeleted;
+            return dailyPicksDeleted + sessionsDeleted + standoutsDeleted + usersDeleted + interactionsDeleted;
         }
 
         public boolean hadWork() {
@@ -284,6 +343,8 @@ public class ActivityMetricsService {
             return "CleanupResult[dailyPicksDeleted=" + dailyPicksDeleted
                     + ", sessionsDeleted=" + sessionsDeleted
                     + ", standoutsDeleted=" + standoutsDeleted
+                    + ", usersDeleted=" + usersDeleted
+                    + ", interactionsDeleted=" + interactionsDeleted
                     + ", total=" + totalDeleted() + "]";
         }
     }
@@ -305,10 +366,15 @@ public class ActivityMetricsService {
     public static record DiagnosticsSnapshot(
             long swipeLimitBlockedCount,
             long velocityWarningCount,
+            long velocityBlockedCount,
             long recordMatchNoOpCount,
             long endSessionNoOpCount) {
         public long totalNotableEvents() {
-            return swipeLimitBlockedCount + velocityWarningCount + recordMatchNoOpCount + endSessionNoOpCount;
+            return swipeLimitBlockedCount
+                    + velocityWarningCount
+                    + velocityBlockedCount
+                    + recordMatchNoOpCount
+                    + endSessionNoOpCount;
         }
 
         public boolean hasAnyEvents() {

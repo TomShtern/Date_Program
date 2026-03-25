@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels;
+import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Notification.Type;
@@ -221,6 +222,70 @@ class JdbiCommunicationStorageSocialTest {
             assertTrue(
                     communicationStorage.getConversation(conversation.getId()).isEmpty(),
                     "Soft-deleted conversation should not be retrievable via getConversation");
+        }
+
+        @Test
+        @DisplayName("hidden conversation should not appear in getConversationsFor for hidden user")
+        void hiddenConversationExcludedFromGetConversationsFor() {
+            var conversation = ConnectionModels.Conversation.create(alice.getId(), bob.getId());
+            communicationStorage.saveConversation(conversation);
+
+            // Verify visible to both initially
+            List<Conversation> aliceConversations = communicationStorage.getConversationsFor(alice.getId(), 10, 0);
+            List<Conversation> bobConversations = communicationStorage.getConversationsFor(bob.getId(), 10, 0);
+            assertEquals(1, aliceConversations.size(), "Alice should see conversation initially");
+            assertEquals(1, bobConversations.size(), "Bob should see conversation initially");
+
+            // Hide conversation for Alice
+            communicationStorage.setConversationVisibility(conversation.getId(), alice.getId(), false);
+
+            // Verify hidden conversation doesn't appear for Alice
+            aliceConversations = communicationStorage.getConversationsFor(alice.getId(), 10, 0);
+            assertTrue(aliceConversations.isEmpty(), "Alice should not see hidden conversation in paged query");
+
+            // Verify still visible to Bob
+            bobConversations = communicationStorage.getConversationsFor(bob.getId(), 10, 0);
+            assertEquals(1, bobConversations.size(), "Bob should still see conversation in paged query");
+        }
+
+        @Test
+        @DisplayName("hidden conversation should not appear in getAllConversationsFor for hidden user")
+        void hiddenConversationExcludedFromGetAllConversationsFor() {
+            var conversation = ConnectionModels.Conversation.create(alice.getId(), bob.getId());
+            communicationStorage.saveConversation(conversation);
+
+            // Verify visible to both initially
+            List<Conversation> aliceConversations = communicationStorage.getAllConversationsFor(alice.getId());
+            List<Conversation> bobConversations = communicationStorage.getAllConversationsFor(bob.getId());
+            assertEquals(1, aliceConversations.size(), "Alice should see conversation initially");
+            assertEquals(1, bobConversations.size(), "Bob should see conversation initially");
+
+            // Hide conversation for Bob
+            communicationStorage.setConversationVisibility(conversation.getId(), bob.getId(), false);
+
+            // Verify hidden conversation doesn't appear for Bob
+            bobConversations = communicationStorage.getAllConversationsFor(bob.getId());
+            assertTrue(bobConversations.isEmpty(), "Bob should not see hidden conversation in all-conversations query");
+
+            // Verify still visible to Alice
+            aliceConversations = communicationStorage.getAllConversationsFor(alice.getId());
+            assertEquals(
+                    1, aliceConversations.size(), "Alice should still see conversation in all-conversations query");
+        }
+
+        @Test
+        @DisplayName("re-showing hidden conversation should make it visible again")
+        void rehidingConversationShowsItAgain() {
+            var conversation = ConnectionModels.Conversation.create(alice.getId(), bob.getId());
+            communicationStorage.saveConversation(conversation);
+
+            // Hide and then show conversation for Alice
+            communicationStorage.setConversationVisibility(conversation.getId(), alice.getId(), false);
+            communicationStorage.setConversationVisibility(conversation.getId(), alice.getId(), true);
+
+            // Verify conversation is visible again
+            List<Conversation> aliceConversations = communicationStorage.getConversationsFor(alice.getId(), 10, 0);
+            assertEquals(1, aliceConversations.size(), "Alice should see conversation after re-showing");
         }
     }
 }

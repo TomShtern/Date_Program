@@ -80,6 +80,8 @@ public interface AnalyticsStorage {
 
     int deleteExpiredStandouts(Instant cutoff);
 
+    boolean markStandoutInteracted(UUID standoutId, Instant timestamp);
+
     // ═══ Swipe Sessions ═══
 
     void saveSession(Session session);
