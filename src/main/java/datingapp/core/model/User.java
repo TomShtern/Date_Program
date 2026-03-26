@@ -26,6 +26,7 @@ import java.util.UUID;
 public class User {
 
     public static final int MAX_PHOTOS = 6;
+    private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
     private static final Set<Gender> MATCHABLE_GENDERS =
             Collections.unmodifiableSet(EnumSet.of(Gender.MALE, Gender.FEMALE, Gender.OTHER));
 
@@ -209,7 +210,7 @@ public class User {
         }
 
         public StorageBuilder photoUrls(List<String> photoUrls) {
-            user.photoUrls = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
+            user.photoUrls = normalizePhotoUrls(photoUrls, true);
             return this;
         }
 
@@ -553,6 +554,7 @@ public class User {
     }
 
     public void setInterestedIn(Set<Gender> interestedIn) {
+        // Allow empty set during construction; activate() will enforce completeness
         this.interestedIn = EnumSetUtil.safeCopy(interestedIn, Gender.class);
         touch();
     }
@@ -634,7 +636,7 @@ public class User {
 
     /** Sets photo URLs with null-safe copy. */
     public void setPhotoUrls(List<String> photoUrls) {
-        List<String> normalized = photoUrls != null ? new ArrayList<>(photoUrls) : new ArrayList<>();
+        List<String> normalized = normalizePhotoUrls(photoUrls, true);
         validatePhotoLimit(normalized.size());
         this.photoUrls = normalized;
         touch();
@@ -643,7 +645,7 @@ public class User {
     /** Adds a photo URL. */
     public void addPhotoUrl(String url) {
         validatePhotoLimit(photoUrls.size() + 1);
-        photoUrls.add(url);
+        photoUrls.add(normalizePhotoUrl(url, false));
         touch();
     }
 
@@ -831,6 +833,31 @@ public class User {
         if (photoCount > MAX_PHOTOS) {
             throw new IllegalArgumentException("Cannot set more than " + MAX_PHOTOS + " photos");
         }
+    }
+
+    private static List<String> normalizePhotoUrls(List<String> photoUrls, boolean allowPlaceholder) {
+        if (photoUrls == null || photoUrls.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<String> normalized = new ArrayList<>(photoUrls.size());
+        for (String photoUrl : photoUrls) {
+            normalized.add(normalizePhotoUrl(photoUrl, allowPlaceholder));
+        }
+        return normalized;
+    }
+
+    private static String normalizePhotoUrl(String photoUrl, boolean allowPlaceholder) {
+        if (photoUrl == null) {
+            throw new IllegalArgumentException("Photo URL cannot be null");
+        }
+        String trimmed = photoUrl.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Photo URL cannot be blank");
+        }
+        if (allowPlaceholder && PLACEHOLDER_PHOTO_URL.equals(trimmed)) {
+            return trimmed;
+        }
+        return ValidationService.normalizePhotoUrl(trimmed);
     }
 
     @Override

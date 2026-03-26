@@ -19,6 +19,7 @@ import datingapp.ui.screen.SafetyController;
 import datingapp.ui.screen.SocialController;
 import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
+import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
@@ -228,7 +229,16 @@ public class ViewModelFactory {
         return getViewModel(
                 ChatViewModel.class,
                 () -> new ChatViewModel(
-                        services.getMessagingUseCases(), services.getSocialUseCases(), session, services.getConfig()));
+                        services.getMessagingUseCases(),
+                        services.getSocialUseCases(),
+                        session,
+                        uiDispatcher,
+                        java.time.Duration.ofSeconds(
+                                services.getConfig().validation().chatBackgroundPollSeconds()),
+                        java.time.Duration.ofSeconds(
+                                services.getConfig().validation().chatActivePollSeconds()),
+                        new ChatViewModel.ChatUiDependencies(
+                                createUiProfileNoteDataAccess(), new NoOpUiPresenceDataAccess())));
     }
 
     public StatsViewModel getStatsViewModel() {

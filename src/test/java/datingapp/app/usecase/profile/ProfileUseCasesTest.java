@@ -20,6 +20,8 @@ import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
+import datingapp.core.profile.MatchPreferences.Dealbreakers;
+import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference;
@@ -447,6 +449,77 @@ class ProfileUseCasesTest {
         assertEquals(32.0853, event.latitude(), 0.0000001);
         assertEquals(34.7818, event.longitude(), 0.0000001);
         assertNotNull(event.occurredAt());
+    }
+
+    @Test
+    @DisplayName("updateProfile with dealbreakers roundtrip persists dealbreakers exactly (Task 5 Regression)")
+    void updateProfileWithDealbreakersRoundtrip() {
+        // Arrange - create a user and save it
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Dealbreaker User");
+        userStorage.save(user);
+
+        // Create dealbreakers with explicit values
+        Set<Lifestyle.Smoking> acceptableSmoking = Set.of(Lifestyle.Smoking.NEVER, Lifestyle.Smoking.SOMETIMES);
+        Set<Lifestyle.Drinking> acceptableDrinking = Set.of(Lifestyle.Drinking.SOCIALLY);
+        Set<Lifestyle.WantsKids> acceptableKids = Set.of(Lifestyle.WantsKids.SOMEDAY);
+        Set<Lifestyle.LookingFor> acceptableLooking = Set.of(Lifestyle.LookingFor.LONG_TERM);
+        Set<Lifestyle.Education> acceptableEducation = Set.of(Lifestyle.Education.BACHELORS);
+
+        Dealbreakers dealbreakersToSet = new Dealbreakers(
+                acceptableSmoking,
+                acceptableDrinking,
+                acceptableKids,
+                acceptableLooking,
+                acceptableEducation,
+                160, // minHeightCm
+                200, // maxHeightCm
+                8 // maxAgeDifference
+                );
+
+        // Act - updateProfile with dealbreakers
+        var result = useCases.updateProfile(new ProfileUseCases.UpdateProfileCommand(
+                UserContext.cli(user.getId()),
+                null, // bio
+                null, // birthDate
+                null, // gender
+                null, // interestedIn
+                null, // latitude
+                null, // longitude
+                null, // maxDistanceKm
+                null, // minAge
+                null, // maxAge
+                null, // heightCm
+                null, // smoking
+                null, // drinking
+                null, // wantsKids
+                null, // lookingFor
+                null, // education
+                null, // interests
+                dealbreakersToSet // dealbreakers
+                ));
+
+        // Assert - updateProfile succeeded
+        assertTrue(result.success(), "updateProfile should succeed");
+
+        // Load the user from storage to verify persistence
+        var loadedUser = userStorage.get(user.getId());
+        assertTrue(loadedUser.isPresent(), "User should be found in storage");
+
+        User persistedUser = loadedUser.get();
+        Dealbreakers persistedDealbreakers = persistedUser.getDealbreakers();
+        assertNotNull(persistedDealbreakers, "Dealbreakers should be persisted");
+
+        // Verify all dealbreaker fields match exactly
+        assertEquals(acceptableSmoking, persistedDealbreakers.acceptableSmoking(), "acceptableSmoking should match");
+        assertEquals(acceptableDrinking, persistedDealbreakers.acceptableDrinking(), "acceptableDrinking should match");
+        assertEquals(acceptableKids, persistedDealbreakers.acceptableKidsStance(), "acceptableKidsStance should match");
+        assertEquals(
+                acceptableLooking, persistedDealbreakers.acceptableLookingFor(), "acceptableLookingFor should match");
+        assertEquals(
+                acceptableEducation, persistedDealbreakers.acceptableEducation(), "acceptableEducation should match");
+        assertEquals(160, persistedDealbreakers.minHeightCm(), "minHeightCm should match");
+        assertEquals(200, persistedDealbreakers.maxHeightCm(), "maxHeightCm should match");
+        assertEquals(8, persistedDealbreakers.maxAgeDifference(), "maxAgeDifference should match");
     }
 
     private static AchievementService noOpAchievementService() {

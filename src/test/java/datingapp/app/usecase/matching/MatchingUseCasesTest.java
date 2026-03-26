@@ -24,6 +24,8 @@ import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
+import datingapp.core.model.User.UserState;
+import datingapp.core.storage.InteractionStorage;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import java.time.Duration;
@@ -138,6 +140,121 @@ class MatchingUseCasesTest {
         var undoResult = useCases.undoSwipe(new UndoSwipeCommand(UserContext.cli(currentUser.getId())));
         assertTrue(undoResult.success());
         assertTrue(undoResult.data().success());
+    }
+
+    @Test
+    @DisplayName("duplicate processSwipe stays idempotent and keeps undo valid")
+    void duplicateProcessSwipeStaysIdempotentAndKeepsUndoValid() {
+        var firstSwipe = useCases.processSwipe(new ProcessSwipeCommand(
+                UserContext.cli(currentUser.getId()), currentUser, candidate, true, false, false));
+        assertTrue(firstSwipe.success());
+
+        var duplicateSwipe = useCases.processSwipe(new ProcessSwipeCommand(
+                UserContext.cli(currentUser.getId()), currentUser, candidate, true, false, false));
+
+        assertTrue(duplicateSwipe.success());
+        assertEquals("Already swiped.", duplicateSwipe.data().message());
+
+        var undoResult = useCases.undoSwipe(new UndoSwipeCommand(UserContext.cli(currentUser.getId())));
+        assertTrue(undoResult.success());
+        assertTrue(undoResult.data().success());
+        assertTrue(interactionStorage
+                .getLike(currentUser.getId(), candidate.getId())
+                .isEmpty());
+    }
+
+    @Test
+    @DisplayName("processSwipe fails when context user does not match current user")
+    void processSwipeFailsWhenContextUserDoesNotMatchCurrentUser() {
+        var mismatchedContext = UserContext.cli(UUID.randomUUID());
+
+        var result = useCases.processSwipe(
+                new ProcessSwipeCommand(mismatchedContext, currentUser, candidate, true, false, false));
+
+        assertFalse(result.success());
+        assertEquals("Context user does not match current user", result.error().message());
+    }
+
+    @Test
+    @DisplayName("processSwipe fails when current user is not active")
+    void processSwipeFailsWhenCurrentUserIsNotActive() {
+        User pausedUser = User.StorageBuilder.create(UUID.randomUUID(), "PausedUser", AppClock.now())
+                .state(UserState.PAUSED)
+                .build();
+
+        var result = useCases.processSwipe(new ProcessSwipeCommand(
+                UserContext.cli(pausedUser.getId()), pausedUser, candidate, true, false, false));
+
+        assertFalse(result.success());
+        assertEquals("Current user must be ACTIVE to swipe", result.error().message());
+    }
+
+    @Test
+    @DisplayName("processSwipe fails when candidate is not active")
+    void processSwipeFailsWhenCandidateIsNotActive() {
+        User pausedCandidate = User.StorageBuilder.create(UUID.randomUUID(), "PausedCandidate", AppClock.now())
+                .state(UserState.PAUSED)
+                .build();
+
+        var result = useCases.processSwipe(new ProcessSwipeCommand(
+                UserContext.cli(currentUser.getId()), currentUser, pausedCandidate, true, false, false));
+
+        assertFalse(result.success());
+        assertEquals("Candidate must be ACTIVE to swipe", result.error().message());
+    }
+
+    @Test
+    @DisplayName("processSwipe should not include literal null when exception message is missing")
+    void processSwipeShouldNotIncludeLiteralNullWhenExceptionMessageMissing() {
+        var config = AppConfig.defaults();
+        var trustSafetyStorage = new TestStorages.TrustSafety();
+        var undoStorage = new TestStorages.Undos();
+        DailyLimitService dailyLimitService = alwaysAllowDailyLimitService();
+        DailyPickService dailyPickService = noDailyPickService();
+        StandoutService standoutService = noStandoutService();
+        var recommendationService = new RecommendationService(dailyLimitService, dailyPickService, standoutService);
+
+        InteractionStorage failingInteractionStorage = new TestStorages.Interactions() {
+            @Override
+            public LikeMatchWriteResult saveLikeAndMaybeCreateMatch(
+                    datingapp.core.connection.ConnectionModels.Like like) {
+                throw new RuntimeException();
+            }
+        };
+
+        var candidateFinder = new CandidateFinder(
+                userStorage,
+                failingInteractionStorage,
+                trustSafetyStorage,
+                config.safety().userTimeZone());
+        var undoService = new UndoService(failingInteractionStorage, undoStorage, config);
+        var matchingService = MatchingService.builder()
+                .interactionStorage(failingInteractionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
+                .undoService(undoService)
+                .dailyService(recommendationService)
+                .candidateFinder(candidateFinder)
+                .build();
+
+        var failingUseCases = new MatchingUseCases(
+                candidateFinder,
+                matchingService,
+                dailyLimitService,
+                dailyPickService,
+                standoutService,
+                undoService,
+                failingInteractionStorage,
+                userStorage,
+                new MatchQualityService(userStorage, failingInteractionStorage, config),
+                null);
+
+        var result = failingUseCases.processSwipe(new ProcessSwipeCommand(
+                UserContext.cli(currentUser.getId()), currentUser, candidate, true, false, false));
+
+        assertFalse(result.success());
+        assertNotNull(result.error());
+        assertFalse(result.error().message().contains("null"));
     }
 
     @Test

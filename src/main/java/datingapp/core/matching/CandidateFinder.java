@@ -280,7 +280,7 @@ public class CandidateFinder implements LoggingSupport {
         boolean genderMatch = hasMatchingGenderPreferences(seeker, candidate, seekerInterestedIn);
         if (!genderMatch) {
             logDebug(
-                    "Rejecting {}: GENDER MISMATCH - seeker({})→interestedIn({}), candidate({})→interestedIn({})",
+                    "Rejecting {}: GENDER MISMATCH - seeker({})->interestedIn({}), candidate({})->interestedIn({})",
                     userRef(candidate),
                     seeker.getGender(),
                     seekerInterestedIn,

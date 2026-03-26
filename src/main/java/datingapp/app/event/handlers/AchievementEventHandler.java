@@ -20,6 +20,9 @@ public final class AchievementEventHandler {
         eventBus.subscribe(AppEvent.ProfileSaved.class, this::onProfileSaved, AppEventBus.HandlerPolicy.BEST_EFFORT);
         eventBus.subscribe(
                 AppEvent.ProfileNoteSaved.class, this::onProfileNoteSaved, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(
+                AppEvent.ProfileCompleted.class, this::onProfileCompleted, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(AppEvent.UserReported.class, this::onUserReported, AppEventBus.HandlerPolicy.BEST_EFFORT);
     }
 
     void onSwipeRecorded(AppEvent.SwipeRecorded event) {
@@ -34,5 +37,13 @@ public final class AchievementEventHandler {
 
     void onProfileNoteSaved(AppEvent.ProfileNoteSaved event) {
         achievementService.checkAndUnlock(event.authorId());
+    }
+
+    void onProfileCompleted(AppEvent.ProfileCompleted event) {
+        achievementService.checkAndUnlock(event.userId());
+    }
+
+    void onUserReported(AppEvent.UserReported event) {
+        achievementService.checkAndUnlock(event.reporterId());
     }
 }

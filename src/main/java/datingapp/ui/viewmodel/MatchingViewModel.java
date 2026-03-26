@@ -320,14 +320,19 @@ public class MatchingViewModel extends BaseViewModel {
         noteStatusMessage.set(null);
         asyncScope.runFireAndForget("delete candidate note", () -> {
             try {
-                noteDataAccess.deleteProfileNote(user.getId(), candidate.getId());
+                boolean deleted = noteDataAccess.deleteProfileNote(user.getId(), candidate.getId());
                 int token = noteLoadToken.incrementAndGet();
                 asyncScope.dispatchToUi(() -> {
                     if (!isCurrentCandidate(candidate.getId(), token)) {
                         return;
                     }
-                    noteContent.set("");
-                    noteStatusMessage.set("Private note deleted.");
+                    if (deleted) {
+                        noteContent.set("");
+                        noteStatusMessage.set("Private note deleted.");
+                    } else {
+                        applyNoteFailure(candidate.getId(), token, "Failed to delete note", null);
+                        return;
+                    }
                     noteBusy.set(false);
                 });
             } catch (Exception e) {
@@ -404,7 +409,7 @@ public class MatchingViewModel extends BaseViewModel {
 
         if (!result.success()) {
             logWarn("Swipe failed: {}", result.error().message());
-            // UI handles daily limit messaging elsewhere; no further action here.
+            infoMessage.set(result.error().message());
             swipeInProgress.set(false);
             return;
         }
@@ -428,30 +433,31 @@ public class MatchingViewModel extends BaseViewModel {
             return;
         }
 
-        if (undoService.canUndo(currentUser.getId())) {
-            logInfo(
-                    "Undoing swipe on {}",
-                    lastSwipedCandidate != null ? lastSwipedCandidate.getName() : "previous candidate");
-            var result = matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.ui(currentUser.getId())));
+        logInfo(
+                "Undoing swipe on {}",
+                lastSwipedCandidate != null ? lastSwipedCandidate.getName() : "previous candidate");
+        var result = matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.ui(currentUser.getId())));
 
-            if (result.success()) {
-                stopUndoCountdown();
-                // Return last candidate to view
-                if (lastSwipedCandidate != null) {
-                    currentCandidate.set(lastSwipedCandidate);
-                    List<String> urls = lastSwipedCandidate.getPhotoUrls();
-                    currentCandidatePhotoUrls.set(urls);
-                    currentCandidatePhotoIndex.set(0);
-                    currentCandidatePhotoUrl.set(urls.isEmpty() ? null : urls.get(0));
-                    lastSwipedCandidate = null;
-                    hasMoreCandidates.set(true);
-                    swipeInProgress.set(false);
-                } else {
-                    swipeInProgress.set(false);
-                    refreshCandidates();
-                }
+        if (result.success()) {
+            stopUndoCountdown();
+            // Return last candidate to view
+            if (lastSwipedCandidate != null) {
+                currentCandidate.set(lastSwipedCandidate);
+                List<String> urls = lastSwipedCandidate.getPhotoUrls();
+                currentCandidatePhotoUrls.set(urls);
+                currentCandidatePhotoIndex.set(0);
+                currentCandidatePhotoUrl.set(urls.isEmpty() ? null : urls.get(0));
+                lastSwipedCandidate = null;
+                hasMoreCandidates.set(true);
+                swipeInProgress.set(false);
+            } else {
+                swipeInProgress.set(false);
+                refreshCandidates();
             }
+            return;
         }
+
+        infoMessage.set(result.error().message());
     }
 
     private void startUndoCountdown() {

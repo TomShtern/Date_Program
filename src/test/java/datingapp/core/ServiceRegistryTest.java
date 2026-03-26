@@ -203,4 +203,41 @@ class ServiceRegistryTest {
             assertNotNull(registry.getEventBus());
         }
     }
+
+    @Nested
+    @DisplayName("In-Memory Wiring Regression (Task 5)")
+    class InMemoryWiringRegression {
+
+        @Test
+        @DisplayName("buildInMemory returns usable ServiceRegistry with all core getters non-null")
+        void buildInMemoryReturnsUsableRegistry() {
+            // Arrange
+            AppConfig config = AppConfig.defaults();
+
+            // Act - builtin Memory should wrap buildH2 and return a valid registry
+            ServiceRegistry inMemoryRegistry = StorageFactory.buildInMemory(config);
+
+            // Assert - registry itself is non-null
+            assertNotNull(inMemoryRegistry, "ServiceRegistry should not be null");
+
+            // Storage getters are non-null
+            assertNotNull(inMemoryRegistry.getUserStorage(), "getUserStorage must be non-null");
+            assertNotNull(inMemoryRegistry.getInteractionStorage(), "getInteractionStorage must be non-null");
+            assertNotNull(inMemoryRegistry.getCommunicationStorage(), "getCommunicationStorage must be non-null");
+            assertNotNull(inMemoryRegistry.getAnalyticsStorage(), "getAnalyticsStorage must be non-null");
+
+            // Core services are non-null
+            assertNotNull(inMemoryRegistry.getProfileService(), "getProfileService must be non-null");
+            assertNotNull(inMemoryRegistry.getMatchingService(), "getMatchingService must be non-null");
+            assertNotNull(inMemoryRegistry.getCandidateFinder(), "getCandidateFinder must be non-null");
+
+            // Use-cases are non-null
+            assertNotNull(inMemoryRegistry.getProfileUseCases(), "getProfileUseCases must be non-null");
+            assertNotNull(inMemoryRegistry.getMatchingUseCases(), "getMatchingUseCases must be non-null");
+            assertNotNull(inMemoryRegistry.getMessagingUseCases(), "getMessagingUseCases must be non-null");
+            assertNotNull(inMemoryRegistry.getSocialUseCases(), "getSocialUseCases must be non-null");
+
+            assertNotNull(inMemoryRegistry.getConfig(), "getConfig must be non-null");
+        }
+    }
 }

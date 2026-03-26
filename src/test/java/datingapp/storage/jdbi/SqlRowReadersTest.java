@@ -1,16 +1,34 @@
 package datingapp.storage.jdbi;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.storage.jdbi.JdbiTypeCodecs.SqlRowReaders;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
 import java.net.URL;
-import java.sql.*;
+import java.sql.Array;
+import java.sql.Blob;
+import java.sql.Clob;
+import java.sql.Date;
+import java.sql.NClob;
+import java.sql.Ref;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.RowId;
+import java.sql.SQLException;
+import java.sql.SQLWarning;
+import java.sql.SQLXML;
+import java.sql.Statement;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -228,12 +246,12 @@ class SqlRowReadersTest {
 
         @Override
         public Object getObject(int columnIndex) throws SQLException {
-            return null;
+            return value;
         }
 
         @Override
         public Object getObject(String columnLabel) throws SQLException {
-            return null;
+            return value;
         }
 
         @Override
@@ -1012,6 +1030,26 @@ class SqlRowReadersTest {
 
         TestEnum result = SqlRowReaders.readEnum(rs, "col", TestEnum.class);
         assertNull(result);
+    }
+
+    @Test
+    @DisplayName("readUuid returns parsed UUID from string value")
+    void testReadUuidValid() throws SQLException {
+        MockResultSet rs = new MockResultSet();
+        UUID expected = UUID.randomUUID();
+        rs.setValue(expected.toString());
+
+        UUID result = SqlRowReaders.readUuid(rs, "col");
+        assertEquals(expected, result);
+    }
+
+    @Test
+    @DisplayName("readUuid throws for invalid UUID value")
+    void testReadUuidInvalid() {
+        MockResultSet rs = new MockResultSet();
+        rs.setValue("not-a-uuid");
+
+        assertThrows(SQLException.class, () -> SqlRowReaders.readUuid(rs, "col"));
     }
 
     @Test

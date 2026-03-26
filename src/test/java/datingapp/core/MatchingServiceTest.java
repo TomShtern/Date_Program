@@ -1,7 +1,9 @@
 package datingapp.core;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,6 +16,7 @@ import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
 import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.UndoService;
+import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
@@ -21,14 +24,17 @@ import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +50,7 @@ class MatchingServiceTest {
     private TestStorages.Interactions interactionStorage;
     private TestStorages.TrustSafety trustSafetyStorage;
     private TestStorages.Users userStorage;
+    private TestStorages.Undos undoStorage;
     private CandidateFinder candidateFinder;
     private MatchingService matchingService;
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
@@ -54,7 +61,7 @@ class MatchingServiceTest {
         interactionStorage = new TestStorages.Interactions();
         trustSafetyStorage = new TestStorages.TrustSafety();
         userStorage = new TestStorages.Users();
-        TestStorages.Undos undoStorage = new TestStorages.Undos();
+        undoStorage = new TestStorages.Undos();
         candidateFinder = new CandidateFinder(
                 userStorage,
                 interactionStorage,
@@ -77,6 +84,21 @@ class MatchingServiceTest {
         TestClock.reset();
     }
 
+    @Test
+    @DisplayName("six-argument constructor builds a default candidate finder")
+    void sixArgumentConstructorBuildsDefaultCandidateFinder() {
+        RecommendationService dailyService =
+                new RecommendationService(alwaysAllowDailyLimitService(), noDailyPickService(), noStandoutService());
+
+        assertDoesNotThrow(() -> new MatchingService(
+                interactionStorage,
+                trustSafetyStorage,
+                userStorage,
+                null,
+                new UndoService(interactionStorage, undoStorage, AppConfig.defaults()),
+                dailyService));
+    }
+
     @Nested
     @DisplayName("Recording Likes")
     class LikeProcessing {
@@ -92,6 +114,34 @@ class MatchingServiceTest {
 
             assertTrue(result.isEmpty(), "First like should not create match");
             assertTrue(interactionStorage.exists(alice, bob), "Like should be saved");
+        }
+
+        @Test
+        @DisplayName("recordLike tracks swipe metrics and invalidates cached candidates")
+        void recordLikeTracksMetricsAndInvalidatesCaches() {
+            UUID alice = UUID.randomUUID();
+            UUID bob = UUID.randomUUID();
+
+            TrackingCandidateFinder trackingCandidateFinder =
+                    new TrackingCandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
+            CountingActivityMetricsService activityMetricsService =
+                    new CountingActivityMetricsService(interactionStorage, trustSafetyStorage);
+            MatchingService service = MatchingService.builder()
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(userStorage)
+                    .activityMetricsService(activityMetricsService)
+                    .undoService(new UndoService(interactionStorage, undoStorage, AppConfig.defaults()))
+                    .dailyService(new RecommendationService(
+                            alwaysAllowDailyLimitService(), noDailyPickService(), noStandoutService()))
+                    .candidateFinder(trackingCandidateFinder)
+                    .build();
+
+            Optional<Match> result = service.recordLike(Like.create(alice, bob, Like.Direction.PASS));
+
+            assertTrue(result.isEmpty(), "Pass should never create match");
+            assertEquals(1, activityMetricsService.recordSwipeCount());
+            assertEquals(Set.of(alice, bob), trackingCandidateFinder.invalidatedUserIds());
         }
 
         @Test
@@ -228,6 +278,62 @@ class MatchingServiceTest {
                     assertThrows(NullPointerException.class, () -> matchingService.processSwipe(user, null, true));
 
             assertEquals("candidate cannot be null", error.getMessage());
+        }
+
+        @Test
+        @DisplayName("processSwipe rejects paused current user")
+        void processSwipeRejectsPausedCurrentUser() {
+            User pausedUser = User.StorageBuilder.create(UUID.randomUUID(), "PausedAlice", AppClock.now())
+                    .state(UserState.PAUSED)
+                    .build();
+            User candidate = User.StorageBuilder.create(UUID.randomUUID(), "Bob", AppClock.now())
+                    .state(UserState.ACTIVE)
+                    .build();
+
+            MatchingService.SwipeResult result = matchingService.processSwipe(pausedUser, candidate, true);
+
+            assertFalse(result.success());
+            assertEquals("Current user must be ACTIVE to swipe.", result.message());
+        }
+
+        @Test
+        @DisplayName("processSwipe rejects non-active candidate")
+        void processSwipeRejectsNonActiveCandidate() {
+            User activeUser = User.StorageBuilder.create(UUID.randomUUID(), "Alice", AppClock.now())
+                    .state(UserState.ACTIVE)
+                    .build();
+            User pausedCandidate = User.StorageBuilder.create(UUID.randomUUID(), "PausedBob", AppClock.now())
+                    .state(UserState.PAUSED)
+                    .build();
+
+            MatchingService.SwipeResult result = matchingService.processSwipe(activeUser, pausedCandidate, true);
+
+            assertFalse(result.success());
+            assertEquals("Candidate must be ACTIVE to receive swipes.", result.message());
+        }
+
+        @Test
+        @DisplayName("duplicate processSwipe is idempotent and preserves undo state")
+        void duplicateProcessSwipeIsIdempotentAndPreservesUndoState() {
+            User activeUser = activeUser(UUID.randomUUID(), "Alice");
+            User candidate = activeUser(UUID.randomUUID(), "Bob");
+
+            MatchingService.SwipeResult first = matchingService.processSwipe(activeUser, candidate, true);
+            assertTrue(first.success());
+            UUID firstLikeId = first.like().id();
+
+            var undoAfterFirst = undoStorage.findByUserId(activeUser.getId()).orElseThrow();
+            assertEquals(firstLikeId, undoAfterFirst.like().id());
+
+            MatchingService.SwipeResult duplicate = matchingService.processSwipe(activeUser, candidate, true);
+            assertTrue(duplicate.success());
+            assertEquals("Already swiped.", duplicate.message());
+            assertNull(duplicate.like());
+            assertEquals(1, interactionStorage.countByDirection(activeUser.getId(), Like.Direction.LIKE));
+
+            var undoAfterDuplicate =
+                    undoStorage.findByUserId(activeUser.getId()).orElseThrow();
+            assertEquals(firstLikeId, undoAfterDuplicate.like().id());
         }
 
         @Test
@@ -448,6 +554,53 @@ class MatchingServiceTest {
                 return java.util.Map.of();
             }
         };
+    }
+
+    private static final class TrackingCandidateFinder extends CandidateFinder {
+        private final Set<UUID> invalidatedUserIds = new HashSet<>();
+
+        private TrackingCandidateFinder(
+                TestStorages.Users userStorage,
+                TestStorages.Interactions interactionStorage,
+                TestStorages.TrustSafety trustSafetyStorage) {
+            super(
+                    userStorage,
+                    interactionStorage,
+                    trustSafetyStorage,
+                    AppClock.clock().getZone());
+        }
+
+        @Override
+        public void invalidateCacheFor(UUID userId) {
+            if (userId != null) {
+                invalidatedUserIds.add(userId);
+            }
+            super.invalidateCacheFor(userId);
+        }
+
+        private Set<UUID> invalidatedUserIds() {
+            return Set.copyOf(invalidatedUserIds);
+        }
+    }
+
+    private static final class CountingActivityMetricsService extends ActivityMetricsService {
+        private final AtomicInteger recordSwipeCount = new AtomicInteger();
+
+        private CountingActivityMetricsService(
+                TestStorages.Interactions interactionStorage, TestStorages.TrustSafety trustSafetyStorage) {
+            super(interactionStorage, trustSafetyStorage, new TestStorages.Analytics(), AppConfig.defaults());
+        }
+
+        @Override
+        public ActivityMetricsService.SwipeGateResult recordSwipe(
+                UUID userId, Like.Direction direction, boolean matched) {
+            recordSwipeCount.incrementAndGet();
+            return super.recordSwipe(userId, direction, matched);
+        }
+
+        private int recordSwipeCount() {
+            return recordSwipeCount.get();
+        }
     }
 
     private static final class SlowInteractions extends TestStorages.Interactions {

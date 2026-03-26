@@ -122,7 +122,7 @@ class JdbiUserStorageMigrationTest {
         user.setAgeRange(21, 40, 18, 120);
         user.setMaxDistanceKm(25, 500);
         user.setLocation(40.7128, -74.0060);
-        user.setPhotoUrls(List.of("photo-a.png", "photo-b.png"));
+        user.setPhotoUrls(List.of("https://example.com/photo-a.png", "https://example.com/photo-b.png"));
         user.setInterests(EnumSet.of(Interest.MUSIC, Interest.TRAVEL));
         user.setDealbreakers(
                 Dealbreakers.builder().acceptSmoking(Lifestyle.Smoking.NEVER).build());

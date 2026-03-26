@@ -89,6 +89,17 @@ class NotesControllerTest {
                 },
                 5000));
 
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(saveSelectedNoteButton::isDisabled)
+                                && !JavaFxTestSupport.callOnFxAndWait(deleteSelectedNoteButton::isDisabled);
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+
         assertFalse(JavaFxTestSupport.callOnFxAndWait(saveSelectedNoteButton::isDisabled));
         assertFalse(JavaFxTestSupport.callOnFxAndWait(deleteSelectedNoteButton::isDisabled));
 

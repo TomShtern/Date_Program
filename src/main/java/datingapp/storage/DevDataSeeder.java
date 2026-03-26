@@ -52,6 +52,163 @@ public final class DevDataSeeder {
     private static final Logger LOG = LoggerFactory.getLogger(DevDataSeeder.class);
 
     /**
+     * Immutable definition of a seed user's profile data.
+     * Replaces the 19-parameter build() method with a type-safe record.
+     */
+    public record SeedUserDefinition(
+            UUID id,
+            String name,
+            LocalDate birthDate,
+            Gender gender,
+            Set<Gender> interestedIn,
+            String bio,
+            double lat,
+            double lon,
+            int maxDistanceKm,
+            int minAge,
+            int maxAge,
+            Lifestyle.Smoking smoking,
+            Lifestyle.Drinking drinking,
+            Lifestyle.WantsKids wantsKids,
+            Lifestyle.LookingFor lookingFor,
+            Lifestyle.Education education,
+            int heightCm,
+            Set<Interest> interests,
+            PacePreferences pace) {
+
+        /** Fluent builder for SeedUserDefinition. */
+        public static Builder builder(UUID id, String name, LocalDate birthDate, Gender gender) {
+            return new Builder(id, name, birthDate, gender);
+        }
+
+        public static final class Builder {
+            private final UUID id;
+            private final String name;
+            private final LocalDate birthDate;
+            private final Gender gender;
+            private Set<Gender> interestedIn = EnumSet.noneOf(Gender.class);
+            private String bio = "";
+            private double lat;
+            private double lon;
+            private int maxDistanceKm = 50;
+            private int minAge = 18;
+            private int maxAge = 99;
+            private Lifestyle.Smoking smoking = Lifestyle.Smoking.NEVER;
+            private Lifestyle.Drinking drinking = Lifestyle.Drinking.SOCIALLY;
+            private Lifestyle.WantsKids wantsKids = Lifestyle.WantsKids.OPEN;
+            private Lifestyle.LookingFor lookingFor = Lifestyle.LookingFor.LONG_TERM;
+            private Lifestyle.Education education = Lifestyle.Education.BACHELORS;
+            private int heightCm = 170;
+            private Set<Interest> interests = EnumSet.noneOf(Interest.class);
+            private PacePreferences pace;
+
+            private Builder(UUID id, String name, LocalDate birthDate, Gender gender) {
+                this.id = id;
+                this.name = name;
+                this.birthDate = birthDate;
+                this.gender = gender;
+            }
+
+            public Builder interestedIn(Set<Gender> val) {
+                this.interestedIn = val;
+                return this;
+            }
+
+            public Builder bio(String val) {
+                this.bio = val;
+                return this;
+            }
+
+            public Builder location(double lat, double lon) {
+                this.lat = lat;
+                this.lon = lon;
+                return this;
+            }
+
+            public Builder maxDistanceKm(int val) {
+                this.maxDistanceKm = val;
+                return this;
+            }
+
+            public Builder ageRange(int min, int max) {
+                this.minAge = min;
+                this.maxAge = max;
+                return this;
+            }
+
+            public Builder smoking(Lifestyle.Smoking val) {
+                this.smoking = val;
+                return this;
+            }
+
+            public Builder drinking(Lifestyle.Drinking val) {
+                this.drinking = val;
+                return this;
+            }
+
+            public Builder wantsKids(Lifestyle.WantsKids val) {
+                this.wantsKids = val;
+                return this;
+            }
+
+            public Builder lookingFor(Lifestyle.LookingFor val) {
+                this.lookingFor = val;
+                return this;
+            }
+
+            public Builder education(Lifestyle.Education val) {
+                this.education = val;
+                return this;
+            }
+
+            public Builder heightCm(int val) {
+                this.heightCm = val;
+                return this;
+            }
+
+            public Builder interests(Set<Interest> val) {
+                this.interests = val;
+                return this;
+            }
+
+            public Builder pace(PacePreferences val) {
+                this.pace = val;
+                return this;
+            }
+
+            public SeedUserDefinition build() {
+                if (pace == null) {
+                    pace = new PacePreferences(
+                            MessagingFrequency.OFTEN,
+                            TimeToFirstDate.WEEKS,
+                            CommunicationStyle.TEXT_ONLY,
+                            DepthPreference.SMALL_TALK);
+                }
+                return new SeedUserDefinition(
+                        id,
+                        name,
+                        birthDate,
+                        gender,
+                        interestedIn,
+                        bio,
+                        lat,
+                        lon,
+                        maxDistanceKm,
+                        minAge,
+                        maxAge,
+                        smoking,
+                        drinking,
+                        wantsKids,
+                        lookingFor,
+                        education,
+                        heightCm,
+                        interests,
+                        pace);
+            }
+        }
+    }
+
+    /**
      * The UUID of the very first seed user. If this record already exists in
      * storage, seeding is skipped entirely so the operation is idempotent.
      */
@@ -979,10 +1136,63 @@ public final class DevDataSeeder {
     // ════════════════════════════════════════════════════════════════════════
 
     /**
+     * Constructs a fully-formed, ACTIVE seed user from a definition record.
+     * Uses two-arg setters where the system limit is required.
+     * Throws if the profile is still incomplete when {@code activate()} is called.
+     */
+    @SuppressWarnings("PMD.UnusedPrivateMethod") // Public API for future callers, tests, and migration
+    private static User build(SeedUserDefinition def) {
+        User user = new User(def.id(), def.name());
+        user.setBio(def.bio());
+        user.setBirthDate(def.birthDate());
+        user.setGender(def.gender());
+        user.setInterestedIn(def.interestedIn());
+        user.setLocation(def.lat(), def.lon());
+
+        // Clamp to system-enforced upper limit (500 km)
+        user.setMaxDistanceKm(Math.min(def.maxDistanceKm(), 500), 500);
+
+        // Use two-arg variant with system bounds (18–120)
+        user.setAgeRange(Math.max(def.minAge(), 18), Math.min(def.maxAge(), 120), 18, 120);
+
+        user.setSmoking(def.smoking());
+        user.setDrinking(def.drinking());
+        user.setWantsKids(def.wantsKids());
+        user.setLookingFor(def.lookingFor());
+        user.setEducation(def.education());
+        user.setHeightCm(def.heightCm());
+        user.setInterests(def.interests());
+        user.setPacePreferences(def.pace());
+
+        // Assign 3 deterministic, gender-appropriate portrait photos per user.
+        // randomuser.me serves stable portraits indexed 0-99 by gender path.
+        // The index math below keeps values in the safe 5-94 range.
+        int photoBase = Math.floorMod(def.id().getLeastSignificantBits(), 85) + 5;
+        String portraitGender =
+                switch (def.gender()) {
+                    case MALE -> "men";
+                    case FEMALE -> "women";
+                    case OTHER -> (Math.floorMod(def.id().getLeastSignificantBits(), 2) == 0) ? "men" : "women";
+                };
+        String portraitBaseUrl = "https://randomuser.me/api/portraits/" + portraitGender + "/";
+        user.addPhotoUrl(portraitBaseUrl + photoBase + ".jpg");
+        user.addPhotoUrl(portraitBaseUrl + ((photoBase + 12) % 90 + 5) + ".jpg");
+        user.addPhotoUrl(portraitBaseUrl + ((photoBase + 27) % 90 + 5) + ".jpg");
+
+        // Activate immediately — will throw if any required field is still absent,
+        // making bad seed entries fail loudly at startup rather than silently.
+        user.activate();
+        return user;
+    }
+
+    /**
      * Constructs a fully-formed, ACTIVE seed user. Uses two-arg setters where the
      * system limit is required. Throws if the profile is still incomplete when
      * {@code activate()} is called — surfaces misconfigured seed entries early.
+     *
+     * @deprecated Use {@link #build(SeedUserDefinition)} with builder pattern instead
      */
+    @Deprecated(since = "2026-03", forRemoval = true)
     @SuppressWarnings({"checkstyle:ParameterNumber", "PMD.ExcessiveParameterList"})
     private static User build(
             UUID id,

@@ -568,35 +568,14 @@ public final class JdbiUserStorage implements UserStorage {
                     parseEnumNames(new HashSet<>(interestsByUserId.getOrDefault(userId, List.of())), Interest.class));
             user.setInterestedIn(
                     parseEnumNames(new HashSet<>(interestedInByUserId.getOrDefault(userId, List.of())), Gender.class));
-
-            Dealbreakers existing = user.getDealbreakers();
-            Dealbreakers.Builder builder = (existing != null ? existing : Dealbreakers.none()).toBuilder();
-
-            Set<Lifestyle.Smoking> smoking = parseEnumNames(
-                    new HashSet<>(smokingByUserId.getOrDefault(userId, List.of())), Lifestyle.Smoking.class);
-            builder.clearSmoking();
-            builder.acceptSmoking(smoking.toArray(Lifestyle.Smoking[]::new));
-
-            Set<Lifestyle.Drinking> drinking = parseEnumNames(
-                    new HashSet<>(drinkingByUserId.getOrDefault(userId, List.of())), Lifestyle.Drinking.class);
-            builder.clearDrinking();
-            builder.acceptDrinking(drinking.toArray(Lifestyle.Drinking[]::new));
-
-            Set<Lifestyle.WantsKids> kids = parseEnumNames(
-                    new HashSet<>(wantsKidsByUserId.getOrDefault(userId, List.of())), Lifestyle.WantsKids.class);
-            builder.clearKids();
-            builder.acceptKidsStance(kids.toArray(Lifestyle.WantsKids[]::new));
-
-            Set<Lifestyle.LookingFor> lookingFor = parseEnumNames(
-                    new HashSet<>(lookingForByUserId.getOrDefault(userId, List.of())), Lifestyle.LookingFor.class);
-            builder.clearLookingFor();
-            builder.acceptLookingFor(lookingFor.toArray(Lifestyle.LookingFor[]::new));
-
-            Set<Lifestyle.Education> education = parseEnumNames(
-                    new HashSet<>(educationByUserId.getOrDefault(userId, List.of())), Lifestyle.Education.class);
-            builder.clearEducation();
-            builder.requireEducation(education.toArray(Lifestyle.Education[]::new));
-            user.setDealbreakers(builder.build());
+            user.setDealbreakers(buildDealbreakers(
+                    user,
+                    userId,
+                    smokingByUserId,
+                    drinkingByUserId,
+                    wantsKidsByUserId,
+                    lookingForByUserId,
+                    educationByUserId));
         }
 
         return users;
@@ -625,6 +604,45 @@ public final class JdbiUserStorage implements UserStorage {
     }
 
     private record UserValueRow(UUID userId, String value) {}
+
+    private static Dealbreakers buildDealbreakers(
+            User user,
+            UUID userId,
+            Map<UUID, List<String>> smokingByUserId,
+            Map<UUID, List<String>> drinkingByUserId,
+            Map<UUID, List<String>> wantsKidsByUserId,
+            Map<UUID, List<String>> lookingForByUserId,
+            Map<UUID, List<String>> educationByUserId) {
+        Dealbreakers existing = user != null ? user.getDealbreakers() : null;
+        Dealbreakers.Builder builder = (existing != null ? existing : Dealbreakers.none()).toBuilder();
+
+        Set<Lifestyle.Smoking> smoking =
+                parseEnumNames(new HashSet<>(smokingByUserId.getOrDefault(userId, List.of())), Lifestyle.Smoking.class);
+        builder.clearSmoking();
+        builder.acceptSmoking(smoking.toArray(Lifestyle.Smoking[]::new));
+
+        Set<Lifestyle.Drinking> drinking = parseEnumNames(
+                new HashSet<>(drinkingByUserId.getOrDefault(userId, List.of())), Lifestyle.Drinking.class);
+        builder.clearDrinking();
+        builder.acceptDrinking(drinking.toArray(Lifestyle.Drinking[]::new));
+
+        Set<Lifestyle.WantsKids> kids = parseEnumNames(
+                new HashSet<>(wantsKidsByUserId.getOrDefault(userId, List.of())), Lifestyle.WantsKids.class);
+        builder.clearKids();
+        builder.acceptKidsStance(kids.toArray(Lifestyle.WantsKids[]::new));
+
+        Set<Lifestyle.LookingFor> lookingFor = parseEnumNames(
+                new HashSet<>(lookingForByUserId.getOrDefault(userId, List.of())), Lifestyle.LookingFor.class);
+        builder.clearLookingFor();
+        builder.acceptLookingFor(lookingFor.toArray(Lifestyle.LookingFor[]::new));
+
+        Set<Lifestyle.Education> education = parseEnumNames(
+                new HashSet<>(educationByUserId.getOrDefault(userId, List.of())), Lifestyle.Education.class);
+        builder.clearEducation();
+        builder.requireEducation(education.toArray(Lifestyle.Education[]::new));
+
+        return builder.build();
+    }
 
     private static Set<String> enumNames(Set<? extends Enum<?>> values) {
         if (values == null || values.isEmpty()) {
@@ -828,6 +846,15 @@ public final class JdbiUserStorage implements UserStorage {
             return user;
         }
 
+        private Dealbreakers readDealbreakers(ResultSet rs) throws SQLException {
+            Integer dbMinHeight = JdbiTypeCodecs.SqlRowReaders.readInteger(rs, "db_min_height_cm");
+            Integer dbMaxHeight = JdbiTypeCodecs.SqlRowReaders.readInteger(rs, "db_max_height_cm");
+            Integer dbMaxAgeDiff = JdbiTypeCodecs.SqlRowReaders.readInteger(rs, "db_max_age_diff");
+
+            return new Dealbreakers(
+                    Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), dbMinHeight, dbMaxHeight, dbMaxAgeDiff);
+        }
+
         private PacePreferences readPacePreferences(ResultSet rs) throws SQLException {
             PacePreferences.MessagingFrequency messagingFrequency = JdbiTypeCodecs.SqlRowReaders.readEnum(
                     rs, "pace_messaging_frequency", PacePreferences.MessagingFrequency.class);
@@ -846,15 +873,6 @@ public final class JdbiUserStorage implements UserStorage {
             }
 
             return new PacePreferences(messagingFrequency, timeToFirstDate, communicationStyle, depthPreference);
-        }
-
-        private Dealbreakers readDealbreakers(ResultSet rs) throws SQLException {
-            Integer dbMinHeight = JdbiTypeCodecs.SqlRowReaders.readInteger(rs, "db_min_height_cm");
-            Integer dbMaxHeight = JdbiTypeCodecs.SqlRowReaders.readInteger(rs, "db_max_height_cm");
-            Integer dbMaxAgeDiff = JdbiTypeCodecs.SqlRowReaders.readInteger(rs, "db_max_age_diff");
-
-            return new Dealbreakers(
-                    Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), dbMinHeight, dbMaxHeight, dbMaxAgeDiff);
         }
     }
 
@@ -965,6 +983,27 @@ public final class JdbiUserStorage implements UserStorage {
             return user.getHeightCm();
         }
 
+        public Integer getDealbreakerMinHeightCm() {
+            if (dealbreakers == null) {
+                return null;
+            }
+            return dealbreakers.minHeightCm();
+        }
+
+        public Integer getDealbreakerMaxHeightCm() {
+            if (dealbreakers == null) {
+                return null;
+            }
+            return dealbreakers.maxHeightCm();
+        }
+
+        public Integer getDealbreakerMaxAgeDiff() {
+            if (dealbreakers == null) {
+                return null;
+            }
+            return dealbreakers.maxAgeDifference();
+        }
+
         public String getEmail() {
             return user.getEmail();
         }
@@ -993,27 +1032,6 @@ public final class JdbiUserStorage implements UserStorage {
 
         public Instant getVerifiedAt() {
             return user.getVerifiedAt();
-        }
-
-        public Integer getDealbreakerMinHeightCm() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return dealbreakers.minHeightCm();
-        }
-
-        public Integer getDealbreakerMaxHeightCm() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return dealbreakers.maxHeightCm();
-        }
-
-        public Integer getDealbreakerMaxAgeDiff() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return dealbreakers.maxAgeDifference();
         }
 
         public String getPaceMessagingFrequency() {

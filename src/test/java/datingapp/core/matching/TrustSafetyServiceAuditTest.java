@@ -227,7 +227,7 @@ class TrustSafetyServiceAuditTest {
                 60,
                 AppConfig.defaults().validation().minAge(),
                 AppConfig.defaults().validation().maxAge());
-        user.addPhotoUrl("photo.jpg");
+        user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,

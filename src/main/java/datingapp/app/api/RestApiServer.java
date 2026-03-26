@@ -1344,6 +1344,9 @@ public class RestApiServer {
         RestApiServer server = new RestApiServer(services, port);
         server.start();
 
-        Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            server.stop();
+            ApplicationStartup.shutdown();
+        }));
     }
 }

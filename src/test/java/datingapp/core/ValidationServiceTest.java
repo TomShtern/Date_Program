@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.profile.*;
 import datingapp.core.profile.MatchPreferences.Interest;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.profile.ValidationService.ValidationResult;
 import java.net.IDN;
 import java.util.EnumSet;
@@ -133,6 +133,7 @@ class ValidationServiceTest {
         void validPhotoUrl() {
             assertTrue(
                     validator.validatePhotoUrl("https://example.com/photo.jpg").valid());
+            assertTrue(validator.validatePhotoUrl("file:///tmp/photo.jpg").valid());
         }
 
         @Test

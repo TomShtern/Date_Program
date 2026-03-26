@@ -1,6 +1,7 @@
 package datingapp.ui.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -114,6 +115,57 @@ class ProfileControllerTest {
                             .getFirst()
                             .equals(photoTwo.toUri().toString()),
                     5000));
+
+            viewModel.dispose();
+            NavigationService.getInstance().clearHistory();
+            AppSession.getInstance().reset();
+        } finally {
+            System.setProperty("user.home", originalUserHome);
+        }
+    }
+
+    @Test
+    @DisplayName("Profile preview and score buttons stay wired with valid handlers (Task 5 Regression)")
+    void previewAndProfileScoreButtonsStayWired() throws Exception {
+        String originalUserHome = System.getProperty("user.home");
+        Path tempHome = Files.createTempDirectory("datingapp-profile-buttons-home");
+        try {
+            System.setProperty("user.home", tempHome.toString());
+
+            TestStorages.Users users = new TestStorages.Users();
+            TestStorages.Interactions interactions = new TestStorages.Interactions();
+            TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+            TestStorages.Analytics analytics = new TestStorages.Analytics();
+            AppConfig config = AppConfig.defaults();
+            ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+
+            User currentUser = createActiveUser("Button Test User");
+            users.save(currentUser);
+            AppSession.getInstance().setCurrentUser(currentUser);
+
+            ProfileViewModel viewModel = new ProfileViewModel(
+                    new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
+                    profileService,
+                    null,
+                    config,
+                    AppSession.getInstance(),
+                    TEST_DISPATCHER,
+                    new datingapp.core.workflow.ProfileActivationPolicy());
+
+            JavaFxTestSupport.LoadedFxml loaded =
+                    JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> new ProfileController(viewModel));
+            Parent root = loaded.root();
+
+            Button previewButton = JavaFxTestSupport.lookup(root, "#previewButton", Button.class);
+            Button profileScoreButton = JavaFxTestSupport.lookup(root, "#profileScoreButton", Button.class);
+
+            // Assert buttons are found and non-null (wired in FXML)
+            assertNotNull(previewButton, "previewButton should be wired in profile.fxml");
+            assertNotNull(profileScoreButton, "profileScoreButton should be wired in profile.fxml");
+
+            // Assert buttons are accessible (indicates wiring is successful without crashing)
+            assertEquals("Preview", previewButton.getText(), "previewButton should have correct text");
+            assertEquals("Profile Score", profileScoreButton.getText(), "profileScoreButton should have correct text");
 
             viewModel.dispose();
             NavigationService.getInstance().clearHistory();

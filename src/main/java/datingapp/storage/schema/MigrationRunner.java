@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Versioned migration runner: applies schema migrations in version order, each
@@ -31,6 +32,7 @@ public final class MigrationRunner {
 
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(MigrationRunner.class);
     private static final String WHERE_NOT_DELETED = " WHERE deleted_at IS NULL";
+    private static final String TABLE_MATCHES = "MATCHES";
 
     private MigrationRunner() {
         // Utility class — static methods only
@@ -92,7 +94,15 @@ public final class MigrationRunner {
             new VersionedMigration(
                     8,
                     "Add query-optimization indexes for likes, conversations, messages, sessions, stats, standouts",
-                    MigrationRunner::applyV8));
+                    MigrationRunner::applyV8),
+            new VersionedMigration(
+                    9,
+                    "Repair matches.updated_at for legacy databases with already-recorded earlier versions",
+                    MigrationRunner::applyV9),
+            new VersionedMigration(
+                    10,
+                    "Add named foreign keys for daily_pick_views and user_achievements",
+                    MigrationRunner::applyV10));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -203,11 +213,7 @@ public final class MigrationRunner {
      * predate the column, then backfills missing values from {@code created_at}.
      */
     private static void applyV6(Statement stmt) throws SQLException {
-        if (!hasTable(stmt, "MATCHES")) {
-            return;
-        }
-        stmt.execute("ALTER TABLE matches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP");
-        stmt.execute("UPDATE matches SET updated_at = COALESCE(updated_at, created_at)");
+        repairMatchesUpdatedAtColumn(stmt);
     }
 
     /**
@@ -289,6 +295,41 @@ public final class MigrationRunner {
         }
     }
 
+    /**
+     * V9 migration: re-adds {@code matches.updated_at} when missing and backfills
+     * any null legacy values from {@code created_at}.
+     */
+    private static void applyV9(Statement stmt) throws SQLException {
+        if (!hasTable(stmt, TABLE_MATCHES)) {
+            return;
+        }
+        if (!hasColumn(stmt, TABLE_MATCHES, "UPDATED_AT")) {
+            stmt.execute("ALTER TABLE matches ADD COLUMN updated_at TIMESTAMP");
+        }
+        stmt.execute("UPDATE matches SET updated_at = created_at WHERE updated_at IS NULL");
+    }
+
+    /**
+     * V10 migration: adds deterministic foreign keys to daily_pick_views and
+     * user_achievements with orphan preflight checks.
+     */
+    private static void applyV10(Statement stmt) throws SQLException {
+        if (hasTable(stmt, "DAILY_PICK_VIEWS")) {
+            addForeignKeyIfMissing(stmt, "daily_pick_views", "fk_daily_pick_views_user", "user_id", "users", "id");
+        }
+        if (hasTable(stmt, "USER_ACHIEVEMENTS")) {
+            addForeignKeyIfMissing(stmt, "user_achievements", "fk_user_achievements_user", "user_id", "users", "id");
+        }
+    }
+
+    private static void repairMatchesUpdatedAtColumn(Statement stmt) throws SQLException {
+        if (!hasTable(stmt, TABLE_MATCHES)) {
+            return;
+        }
+        stmt.execute("ALTER TABLE matches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP");
+        stmt.execute("UPDATE matches SET updated_at = COALESCE(updated_at, created_at)");
+    }
+
     private static boolean hasTable(Statement stmt, String tableName) throws SQLException {
         try (ResultSet rs = stmt.getConnection().getMetaData().getTables(null, null, tableName, null)) {
             return rs.next();
@@ -304,6 +345,76 @@ public final class MigrationRunner {
     private static boolean hasColumn(Statement stmt, String tableName, String columnName) throws SQLException {
         try (ResultSet rs = stmt.getConnection().getMetaData().getColumns(null, null, tableName, columnName)) {
             return rs.next();
+        }
+    }
+
+    private static boolean hasForeignKey(Statement stmt, String tableName, String foreignKeyName) throws SQLException {
+        try (ResultSet rs =
+                stmt.getConnection().getMetaData().getImportedKeys(null, null, tableName.toUpperCase(Locale.ROOT))) {
+            while (rs.next()) {
+                if (foreignKeyName.equalsIgnoreCase(rs.getString("FK_NAME"))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private static void addForeignKeyIfMissing(
+            Statement stmt,
+            String tableName,
+            String foreignKeyName,
+            String columnName,
+            String referencedTable,
+            String referencedColumn)
+            throws SQLException {
+        if (hasForeignKey(stmt, tableName, foreignKeyName)) {
+            return;
+        }
+
+        long orphanCount = countOrphanRows(stmt, tableName, columnName, referencedTable, referencedColumn);
+        if (orphanCount > 0) {
+            throw new SQLException("Cannot add foreign key "
+                    + foreignKeyName
+                    + ": "
+                    + orphanCount
+                    + " orphan row(s) found in "
+                    + tableName
+                    + "."
+                    + columnName
+                    + " referencing "
+                    + referencedTable
+                    + "."
+                    + referencedColumn);
+        }
+
+        stmt.execute("ALTER TABLE "
+                + tableName
+                + " ADD CONSTRAINT IF NOT EXISTS "
+                + foreignKeyName
+                + " FOREIGN KEY ("
+                + columnName
+                + ") REFERENCES "
+                + referencedTable
+                + "("
+                + referencedColumn
+                + ") ON DELETE CASCADE");
+    }
+
+    private static long countOrphanRows(
+            Statement stmt, String tableName, String columnName, String referencedTable, String referencedColumn)
+            throws SQLException {
+        String sql = "SELECT COUNT(*) FROM "
+                + tableName
+                + " t WHERE NOT EXISTS (SELECT 1 FROM "
+                + referencedTable
+                + " r WHERE r."
+                + referencedColumn
+                + " = t."
+                + columnName
+                + ")";
+        try (ResultSet rs = stmt.executeQuery(sql)) {
+            return rs.next() ? rs.getLong(1) : 0L;
         }
     }
 

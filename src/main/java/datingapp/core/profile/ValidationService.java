@@ -39,7 +39,7 @@ public class ValidationService {
     private static final Pattern DOMAIN_LABEL_PATTERN =
             Pattern.compile("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$");
     private static final Pattern PHONE_ALLOWED_PATTERN = Pattern.compile("^[+0-9()\\-\\s]+$");
-    private static final Set<String> PHOTO_URL_SCHEMES = Set.of("http", "https");
+    private static final Set<String> PHOTO_URL_SCHEMES = Set.of("http", "https", "file");
 
     /** Shared configuration for validation thresholds. */
     private final AppConfig config;
@@ -358,6 +358,12 @@ public class ValidationService {
         String scheme = uri.getScheme();
         if (scheme == null || !PHOTO_URL_SCHEMES.contains(scheme.toLowerCase(Locale.ROOT))) {
             throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+        if ("file".equalsIgnoreCase(scheme)) {
+            if (uri.getPath() == null || uri.getPath().isBlank()) {
+                throw new IllegalArgumentException(INVALID_PHOTO_URL);
+            }
+            return uri.toASCIIString();
         }
         if (uri.getHost() == null || uri.getHost().isBlank()) {
             throw new IllegalArgumentException(INVALID_PHOTO_URL);

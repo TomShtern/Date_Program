@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
-import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Message;
@@ -111,15 +110,30 @@ class JdbiAccountCleanupStorageTest {
         profileNote = ProfileNote.create(deletedUser.getId(), survivingUser.getId(), "Cleanup note");
         userStorage.saveProfileNote(profileNote);
 
-        Block block = Block.create(deletedUser.getId(), survivingUser.getId());
+        jdbi.useHandle(handle -> handle.createUpdate("""
+            INSERT INTO undo_states (
+                user_id, like_id, who_likes, who_got_liked, direction, like_created_at, match_id, expires_at
+            ) VALUES (:userId, :likeId, :whoLikes, :whoGotLiked, :direction, :likeCreatedAt, NULL, :expiresAt)
+            """)
+                .bind("userId", deletedUser.getId())
+                .bind("likeId", like.id())
+                .bind("whoLikes", like.whoLikes())
+                .bind("whoGotLiked", like.whoGotLiked())
+                .bind("direction", like.direction().name())
+                .bind("likeCreatedAt", Timestamp.from(like.createdAt()))
+                .bind("expiresAt", Timestamp.from(AppClock.now().plusSeconds(3600)))
+                .execute());
+
+        UUID blockId = UUID.randomUUID();
+        Timestamp blockCreatedAt = Timestamp.from(AppClock.now());
         jdbi.useHandle(handle -> handle.createUpdate("""
                 INSERT INTO blocks (id, blocker_id, blocked_id, created_at)
                 VALUES (:id, :blockerId, :blockedId, :createdAt)
                 """)
-                .bind("id", block.id())
-                .bind("blockerId", block.blockerId())
-                .bind("blockedId", block.blockedId())
-                .bind("createdAt", Timestamp.from(block.createdAt()))
+                .bind("id", blockId)
+                .bind("blockerId", deletedUser.getId())
+                .bind("blockedId", survivingUser.getId())
+                .bind("createdAt", blockCreatedAt)
                 .execute());
 
         Report report = Report.create(deletedUser.getId(), survivingUser.getId(), Reason.HARASSMENT, "Cleanup report");
@@ -160,6 +174,7 @@ class JdbiAccountCleanupStorageTest {
         assertTrue(userStorage
                 .getProfileNote(deletedUser.getId(), survivingUser.getId())
                 .isEmpty());
+        assertEquals(0, countUndoStates(deletedUser.getId()));
         assertFalse(trustSafetyStorage.isBlocked(deletedUser.getId(), survivingUser.getId()));
         assertFalse(trustSafetyStorage.hasReported(deletedUser.getId(), survivingUser.getId()));
         assertEquals(0, trustSafetyStorage.countBlocksGiven(deletedUser.getId()));
@@ -207,6 +222,13 @@ class JdbiAccountCleanupStorageTest {
                 .bind("reporterId", firstId)
                 .bind("reportedUserId", secondId)
                 .mapTo(Instant.class)
+                .one());
+    }
+
+    private int countUndoStates(UUID userId) {
+        return jdbi.withHandle(handle -> handle.createQuery("SELECT COUNT(*) FROM undo_states WHERE user_id = :userId")
+                .bind("userId", userId)
+                .mapTo(int.class)
                 .one());
     }
 

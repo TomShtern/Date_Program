@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.core.matching.*;
+import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.ProfileNote;
@@ -530,7 +530,7 @@ class TrustSafetyServiceTest {
                 60,
                 AppConfig.defaults().validation().minAge(),
                 AppConfig.defaults().validation().maxAge());
-        user.addPhotoUrl("photo.jpg");
+        user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,

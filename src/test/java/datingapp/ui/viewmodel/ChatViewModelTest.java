@@ -3,6 +3,7 @@ package datingapp.ui.viewmodel;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
@@ -446,6 +447,41 @@ class ChatViewModelTest {
                 5000));
         assertTrue(users.getProfileNote(currentUser.getId(), otherUser.getId()).isEmpty());
         assertEquals("", viewModel.profileNoteContentProperty().get());
+    }
+
+    @Test
+    @DisplayName("disposing clears profile note state and cancels pending dismiss transition")
+    void disposeClearsProfileNoteStateAndCancelsPendingDismissTransition() throws Exception {
+        connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Hello!");
+
+        viewModel.refreshConversations();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 1, 5000));
+
+        viewModel
+                .selectedConversationProperty()
+                .set(viewModel.getConversations().get(0));
+        assertTrue(waitUntil(() -> !viewModel.profileNoteBusyProperty().get(), 5000));
+
+        viewModel.profileNoteContentProperty().set("Dispose me");
+        viewModel.saveSelectedProfileNote();
+
+        assertTrue(waitUntil(
+                () -> "Private note saved."
+                        .equals(viewModel.profileNoteStatusMessageProperty().get()),
+                5000));
+
+        viewModel.dispose();
+
+        assertEquals("", viewModel.profileNoteContentProperty().get());
+        assertNull(viewModel.profileNoteStatusMessageProperty().get());
+        assertFalse(viewModel.profileNoteBusyProperty().get());
+
+        LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(4));
+        waitForFxEvents();
+
+        assertEquals("", viewModel.profileNoteContentProperty().get());
+        assertNull(viewModel.profileNoteStatusMessageProperty().get());
+        assertFalse(viewModel.profileNoteBusyProperty().get());
     }
 
     @Test

@@ -54,7 +54,7 @@ public final class JdbiTypeCodecs {
                     if (logger.isWarnEnabled()) {
                         logger.warn("Skipping invalid UUID value '{}' in column '{}'", str, column);
                     }
-                    return null;
+                    throw new SQLException("Invalid UUID value in column '" + column + "': '" + str + "'");
                 }
             }
             throw new SQLException("Unexpected UUID type: " + obj.getClass());

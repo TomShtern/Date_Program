@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.ui.viewmodel.ViewModelErrorSink;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -322,8 +321,10 @@ class ViewModelAsyncScopeTest {
 
     private static boolean waitUntil(java.util.function.BooleanSupplier condition, Duration timeout)
             throws InterruptedException {
-        Instant deadline = Instant.now().plus(timeout);
-        while (Instant.now().isBefore(deadline)) {
+        // Use System.nanoTime() instead of Instant.now() for more precise timing
+        // and to avoid system clock adjustments affecting test reliability
+        long deadlineNanos = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadlineNanos) {
             if (condition.getAsBoolean()) {
                 return true;
             }

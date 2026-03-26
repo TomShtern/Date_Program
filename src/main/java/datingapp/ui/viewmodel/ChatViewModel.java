@@ -215,6 +215,7 @@ public class ChatViewModel {
         asyncScope.dispose();
         stopConversationsPolling();
         stopMessagesPolling();
+        clearProfileNoteState();
         selectedConversation.removeListener(selectionListener);
         conversations.clear();
         activeMessages.clear();

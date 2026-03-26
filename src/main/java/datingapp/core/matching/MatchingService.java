@@ -1,5 +1,6 @@
 package datingapp.core.matching;
 
+import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.Match;
@@ -50,7 +51,7 @@ public final class MatchingService {
                 activityMetricsService,
                 undoService,
                 dailyService,
-                null);
+                defaultCandidateFinder(interactionStorage, trustSafetyStorage, userStorage));
     }
 
     public MatchingService(
@@ -140,11 +141,18 @@ public final class MatchingService {
      */
     public Optional<Match> recordLike(Like like) {
         Objects.requireNonNull(like, LIKE_REQUIRED);
-        InteractionStorage.LikeMatchWriteResult writeResult = interactionStorage.saveLikeAndMaybeCreateMatch(like);
-        if (writeResult.createdMatch().isPresent()) {
-            activityMetricsService.ifPresent(svc -> svc.recordSwipe(like.whoLikes(), like.direction(), true));
-        }
+        InteractionStorage.LikeMatchWriteResult writeResult = persistLikeAndMaybeCreateMatch(like);
         return writeResult.createdMatch();
+    }
+
+    private InteractionStorage.LikeMatchWriteResult persistLikeAndMaybeCreateMatch(Like like) {
+        InteractionStorage.LikeMatchWriteResult writeResult = interactionStorage.saveLikeAndMaybeCreateMatch(like);
+        if (writeResult.likePersisted()) {
+            boolean matched = writeResult.createdMatch().isPresent();
+            activityMetricsService.ifPresent(svc -> svc.recordSwipe(like.whoLikes(), like.direction(), matched));
+            invalidateCandidateCaches(like.whoLikes(), like.whoGotLiked());
+        }
+        return writeResult;
     }
 
     public List<Match> getMatchesForUser(UUID userId) {
@@ -196,6 +204,18 @@ public final class MatchingService {
         Objects.requireNonNull(currentUser, "currentUser cannot be null");
         Objects.requireNonNull(candidate, "candidate cannot be null");
 
+        if (currentUser.getState() != UserState.ACTIVE) {
+            return SwipeResult.configError("Current user must be ACTIVE to swipe.");
+        }
+
+        if (candidate.getState() != UserState.ACTIVE) {
+            return SwipeResult.configError("Candidate must be ACTIVE to receive swipes.");
+        }
+
+        if (currentUser.getId().equals(candidate.getId())) {
+            return SwipeResult.configError("Cannot swipe on yourself.");
+        }
+
         if (superLike && !liked) {
             return SwipeResult.configError("Super like requires liked=true");
         }
@@ -219,9 +239,13 @@ public final class MatchingService {
         try {
             Like.Direction direction = resolveDirection(liked, superLike);
             Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
-            Optional<Match> match = recordLike(like);
+            InteractionStorage.LikeMatchWriteResult writeResult = persistLikeAndMaybeCreateMatch(like);
+            if (!writeResult.likePersisted()) {
+                return SwipeResult.alreadySwiped();
+            }
+
+            Optional<Match> match = writeResult.createdMatch();
             undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
-            invalidateCandidateCaches(currentUser.getId(), candidate.getId());
 
             if (match.isPresent()) {
                 return SwipeResult.matched(match.get(), like);
@@ -242,6 +266,15 @@ public final class MatchingService {
     private void invalidateCandidateCaches(UUID firstUserId, UUID secondUserId) {
         candidateFinder.invalidateCacheFor(firstUserId);
         candidateFinder.invalidateCacheFor(secondUserId);
+    }
+
+    private static CandidateFinder defaultCandidateFinder(
+            InteractionStorage interactionStorage, TrustSafetyStorage trustSafetyStorage, UserStorage userStorage) {
+        return new CandidateFinder(
+                Objects.requireNonNull(userStorage, "userStorage cannot be null"),
+                Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null"),
+                Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null"),
+                AppClock.clock().getZone());
     }
 
     // ================== Liker Browser Methods ==================
@@ -335,6 +368,10 @@ public final class MatchingService {
         public static SwipeResult passed(Like l) {
             Objects.requireNonNull(l, LIKE_REQUIRED);
             return new SwipeResult(true, false, null, l, "Passed.");
+        }
+
+        public static SwipeResult alreadySwiped() {
+            return new SwipeResult(true, false, null, null, "Already swiped.");
         }
 
         public static SwipeResult dailyLimitReached() {

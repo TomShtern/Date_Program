@@ -28,6 +28,13 @@ public final class MetricsEventHandler {
                 AppEvent.ProfileNoteDeleted.class, this::onProfileNoteDeleted, AppEventBus.HandlerPolicy.BEST_EFFORT);
         eventBus.subscribe(
                 AppEvent.AccountDeleted.class, this::onAccountDeleted, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(
+                AppEvent.ConversationArchived.class,
+                this::onConversationArchived,
+                AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(AppEvent.UserBlocked.class, this::onUserBlocked, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(AppEvent.UserReported.class, this::onUserReported, AppEventBus.HandlerPolicy.BEST_EFFORT);
+        eventBus.subscribe(AppEvent.MatchExpired.class, this::onMatchExpired, AppEventBus.HandlerPolicy.BEST_EFFORT);
     }
 
     void onSwipeRecorded(AppEvent.SwipeRecorded event) {
@@ -53,5 +60,22 @@ public final class MetricsEventHandler {
 
     void onAccountDeleted(AppEvent.AccountDeleted event) {
         activityMetricsService.endSession(event.userId());
+    }
+
+    void onConversationArchived(AppEvent.ConversationArchived event) {
+        activityMetricsService.recordActivity(event.archivedByUserId());
+    }
+
+    void onUserBlocked(AppEvent.UserBlocked event) {
+        activityMetricsService.recordActivity(event.blockerId());
+    }
+
+    void onUserReported(AppEvent.UserReported event) {
+        activityMetricsService.recordActivity(event.reporterId());
+    }
+
+    void onMatchExpired(AppEvent.MatchExpired event) {
+        activityMetricsService.recordActivity(event.userA());
+        activityMetricsService.recordActivity(event.userB());
     }
 }

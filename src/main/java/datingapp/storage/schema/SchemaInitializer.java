@@ -70,8 +70,6 @@ public final class SchemaInitializer {
     // ═══════════════════════════════════════════════════════════════
 
     static void createUsersTable(Statement stmt) throws SQLException {
-        // COMPATIBILITY WINDOW: keep legacy serialized profile columns alongside the normalized tables for
-        // read/write fallback until a later cleanup migration removes them after rollout validation.
         stmt.execute("CREATE TABLE IF NOT EXISTS users ("
                 + "id UUID PRIMARY KEY, "
                 + "name VARCHAR(100) NOT NULL, "
@@ -95,11 +93,6 @@ public final class SchemaInitializer {
                 + "looking_for VARCHAR(20), "
                 + "education VARCHAR(20), "
                 + "height_cm INT, "
-                + "db_smoking VARCHAR(100), "
-                + "db_drinking VARCHAR(100), "
-                + "db_wants_kids VARCHAR(100), "
-                + "db_looking_for VARCHAR(100), "
-                + "db_education VARCHAR(200), "
                 + "db_min_height_cm INT, "
                 + "db_max_height_cm INT, "
                 + "db_max_age_diff INT, "

@@ -2,6 +2,7 @@ package datingapp.storage.schema;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
@@ -176,6 +177,22 @@ class SchemaInitializerTest {
                 assertTrue(rs.next());
                 assertEquals(1, rs.getInt(1), "Schema version 1 should be recorded");
             }
+
+            Set<String> dailyPickViewsForeignKeys = getForeignKeyNames("DAILY_PICK_VIEWS");
+            assertTrue(
+                    dailyPickViewsForeignKeys.contains("FK_DAILY_PICK_VIEWS_USER"),
+                    "Missing foreign key: fk_daily_pick_views_user");
+
+            Set<String> userAchievementsForeignKeys = getForeignKeyNames("USER_ACHIEVEMENTS");
+            assertTrue(
+                    userAchievementsForeignKeys.contains("FK_USER_ACHIEVEMENTS_USER"),
+                    "Missing foreign key: fk_user_achievements_user");
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 10")) {
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1), "Schema version 10 should be recorded");
+            }
         }
 
         @Test
@@ -190,6 +207,22 @@ class SchemaInitializerTest {
             Set<String> tables = getTableNames();
             assertTrue(tables.contains("USERS"));
             assertTrue(tables.contains("DAILY_PICKS"));
+
+            Set<String> dailyPickViewsForeignKeys = getForeignKeyNames("DAILY_PICK_VIEWS");
+            assertTrue(
+                    dailyPickViewsForeignKeys.contains("FK_DAILY_PICK_VIEWS_USER"),
+                    "Migration should keep fk_daily_pick_views_user on rerun");
+
+            Set<String> userAchievementsForeignKeys = getForeignKeyNames("USER_ACHIEVEMENTS");
+            assertTrue(
+                    userAchievementsForeignKeys.contains("FK_USER_ACHIEVEMENTS_USER"),
+                    "Migration should keep fk_user_achievements_user on rerun");
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 10")) {
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1), "Schema version 10 should still be recorded once");
+            }
         }
 
         @Test
@@ -199,24 +232,122 @@ class SchemaInitializerTest {
         }
 
         @Test
-        @DisplayName("should handle existing database with all versions already applied")
-        void existingDatabaseMigration() throws SQLException {
-            // First run — creates everything, records V1 and V2
+        @DisplayName("should add foreign keys and cascade deletes when upgrading a legacy database")
+        void legacyDatabaseMigrationAddsForeignKeysAndCascadesOnDelete() throws SQLException {
             try (Statement stmt = connection.createStatement()) {
+                stmt.execute("CREATE TABLE users (id UUID PRIMARY KEY)");
+                stmt.execute("CREATE TABLE daily_pick_views ("
+                        + "user_id UUID NOT NULL, "
+                        + "viewed_date DATE NOT NULL, "
+                        + "viewed_at TIMESTAMP NOT NULL, "
+                        + "PRIMARY KEY (user_id, viewed_date)"
+                        + ")");
+                stmt.execute("CREATE TABLE user_achievements ("
+                        + "id UUID PRIMARY KEY, "
+                        + "user_id UUID NOT NULL, "
+                        + "achievement VARCHAR(50) NOT NULL, "
+                        + "unlocked_at TIMESTAMP NOT NULL, "
+                        + "UNIQUE (user_id, achievement)"
+                        + ")");
+                stmt.execute("CREATE TABLE schema_version ("
+                        + "version INT PRIMARY KEY, "
+                        + "applied_at TIMESTAMP NOT NULL, "
+                        + "description VARCHAR(255)"
+                        + ")");
+                stmt.execute("INSERT INTO users(id) VALUES ('11111111-1111-1111-1111-111111111111')");
+                stmt.execute("INSERT INTO daily_pick_views(user_id, viewed_date, viewed_at) VALUES "
+                        + "('11111111-1111-1111-1111-111111111111', DATE '2026-03-26', CURRENT_TIMESTAMP())");
+                stmt.execute("INSERT INTO user_achievements(id, user_id, achievement, unlocked_at) VALUES "
+                        + "('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', "
+                        + "'legacy-achievement', CURRENT_TIMESTAMP())");
+                stmt.execute("INSERT INTO schema_version(version, applied_at, description) VALUES "
+                        + "(1, CURRENT_TIMESTAMP(), 'V1 baseline schema'), "
+                        + "(2, CURRENT_TIMESTAMP(), 'V2 daily picks cache table'), "
+                        + "(3, CURRENT_TIMESTAMP(), 'V3 normalized profile cleanup'), "
+                        + "(4, CURRENT_TIMESTAMP(), 'V4 soft-delete columns'), "
+                        + "(5, CURRENT_TIMESTAMP(), 'V5 profile view primary key'), "
+                        + "(6, CURRENT_TIMESTAMP(), 'V6 matches updated_at backfill'), "
+                        + "(7, CURRENT_TIMESTAMP(), 'V7 messages conversation index'), "
+                        + "(8, CURRENT_TIMESTAMP(), 'V8 query optimization indexes'), "
+                        + "(9, CURRENT_TIMESTAMP(), 'V9 matches updated_at repair')");
+
                 MigrationRunner.runAllPending(stmt);
             }
 
-            // Second run — all versions already recorded, should be entirely no-op
+            Set<String> dailyPickViewsForeignKeys = getForeignKeyNames("DAILY_PICK_VIEWS");
+            assertTrue(
+                    dailyPickViewsForeignKeys.contains("FK_DAILY_PICK_VIEWS_USER"),
+                    "Legacy upgrade should add fk_daily_pick_views_user");
+
+            Set<String> userAchievementsForeignKeys = getForeignKeyNames("USER_ACHIEVEMENTS");
+            assertTrue(
+                    userAchievementsForeignKeys.contains("FK_USER_ACHIEVEMENTS_USER"),
+                    "Legacy upgrade should add fk_user_achievements_user");
+
             try (Statement stmt = connection.createStatement()) {
-                MigrationRunner.runAllPending(stmt);
+                stmt.execute("DELETE FROM users WHERE id = '11111111-1111-1111-1111-111111111111'");
             }
 
-            // Verify schema is still intact
-            Set<String> tables = getTableNames();
-            assertTrue(tables.contains("USERS"));
-            assertTrue(tables.contains("MATCHES"));
-            assertTrue(tables.contains("CONVERSATIONS"));
-            assertTrue(tables.contains("DAILY_PICKS"));
+            try (Statement stmt = connection.createStatement();
+                    ResultSet dailyPickViewsRs = stmt.executeQuery("SELECT COUNT(*) FROM daily_pick_views")) {
+                assertTrue(dailyPickViewsRs.next());
+                assertEquals(0, dailyPickViewsRs.getInt(1), "daily_pick_views rows should cascade delete");
+            }
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet userAchievementsRs = stmt.executeQuery("SELECT COUNT(*) FROM user_achievements")) {
+                assertTrue(userAchievementsRs.next());
+                assertEquals(0, userAchievementsRs.getInt(1), "user_achievements rows should cascade delete");
+            }
+        }
+
+        @Test
+        @DisplayName("should fail fast when orphan rows block foreign key creation")
+        void rejectsOrphanRowsBeforeAddingForeignKeys() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("CREATE TABLE users (id UUID PRIMARY KEY)");
+                stmt.execute("CREATE TABLE daily_pick_views ("
+                        + "user_id UUID NOT NULL, "
+                        + "viewed_date DATE NOT NULL, "
+                        + "viewed_at TIMESTAMP NOT NULL, "
+                        + "PRIMARY KEY (user_id, viewed_date)"
+                        + ")");
+                stmt.execute("CREATE TABLE user_achievements ("
+                        + "id UUID PRIMARY KEY, "
+                        + "user_id UUID NOT NULL, "
+                        + "achievement VARCHAR(50) NOT NULL, "
+                        + "unlocked_at TIMESTAMP NOT NULL, "
+                        + "UNIQUE (user_id, achievement)"
+                        + ")");
+                stmt.execute("CREATE TABLE schema_version ("
+                        + "version INT PRIMARY KEY, "
+                        + "applied_at TIMESTAMP NOT NULL, "
+                        + "description VARCHAR(255)"
+                        + ")");
+                stmt.execute("INSERT INTO daily_pick_views(user_id, viewed_date, viewed_at) VALUES "
+                        + "('33333333-3333-3333-3333-333333333333', DATE '2026-03-26', CURRENT_TIMESTAMP())");
+                stmt.execute("INSERT INTO schema_version(version, applied_at, description) VALUES "
+                        + "(1, CURRENT_TIMESTAMP(), 'V1 baseline schema'), "
+                        + "(2, CURRENT_TIMESTAMP(), 'V2 daily picks cache table'), "
+                        + "(3, CURRENT_TIMESTAMP(), 'V3 normalized profile cleanup'), "
+                        + "(4, CURRENT_TIMESTAMP(), 'V4 soft-delete columns'), "
+                        + "(5, CURRENT_TIMESTAMP(), 'V5 profile view primary key'), "
+                        + "(6, CURRENT_TIMESTAMP(), 'V6 matches updated_at backfill'), "
+                        + "(7, CURRENT_TIMESTAMP(), 'V7 messages conversation index'), "
+                        + "(8, CURRENT_TIMESTAMP(), 'V8 query optimization indexes'), "
+                        + "(9, CURRENT_TIMESTAMP(), 'V9 matches updated_at repair')");
+
+                SQLException exception = assertThrows(SQLException.class, () -> MigrationRunner.runAllPending(stmt));
+                assertEquals(
+                        "Cannot add foreign key fk_daily_pick_views_user: 1 orphan row(s) found in daily_pick_views.user_id referencing users.id",
+                        exception.getMessage());
+            }
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 10")) {
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1), "Schema version 10 must not be recorded when migration fails");
+            }
         }
 
         @Test
@@ -263,6 +394,50 @@ class SchemaInitializerTest {
             Set<String> uniqueConstraints = getUniqueConstraintNames("CONVERSATIONS");
             assertTrue(uniqueConstraints.contains("UK_CONVERSATION_USERS"));
             assertFalse(uniqueConstraints.contains("UNQ_CONVERSATION_USERS"));
+        }
+
+        @Test
+        @DisplayName("should repair missing matches.updated_at even when earlier schema versions are already recorded")
+        void repairsMissingMatchesUpdatedAtForAlreadyVersionedDatabase() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("CREATE TABLE users (id UUID PRIMARY KEY)");
+                stmt.execute("CREATE TABLE matches ("
+                        + "id VARCHAR(100) PRIMARY KEY, "
+                        + "user_a UUID NOT NULL, "
+                        + "user_b UUID NOT NULL, "
+                        + "created_at TIMESTAMP NOT NULL, "
+                        + "state VARCHAR(20) NOT NULL DEFAULT 'ACTIVE', "
+                        + "ended_at TIMESTAMP, "
+                        + "ended_by UUID, "
+                        + "end_reason VARCHAR(30), "
+                        + "deleted_at TIMESTAMP"
+                        + ")");
+                stmt.execute("CREATE TABLE schema_version ("
+                        + "version INT PRIMARY KEY, "
+                        + "applied_at TIMESTAMP NOT NULL, "
+                        + "description VARCHAR(255)"
+                        + ")");
+                stmt.execute("INSERT INTO schema_version(version, applied_at, description) VALUES "
+                        + "(1, CURRENT_TIMESTAMP(), 'V1 baseline schema'), "
+                        + "(2, CURRENT_TIMESTAMP(), 'V2 daily picks cache table'), "
+                        + "(3, CURRENT_TIMESTAMP(), 'V3 normalized profile cleanup'), "
+                        + "(4, CURRENT_TIMESTAMP(), 'V4 soft-delete columns'), "
+                        + "(5, CURRENT_TIMESTAMP(), 'V5 profile view primary key'), "
+                        + "(6, CURRENT_TIMESTAMP(), 'V6 matches updated_at backfill'), "
+                        + "(7, CURRENT_TIMESTAMP(), 'V7 messages conversation index'), "
+                        + "(8, CURRENT_TIMESTAMP(), 'V8 query optimization indexes')");
+
+                MigrationRunner.runAllPending(stmt);
+            }
+
+            Set<String> columns = getColumnNames("MATCHES");
+            assertTrue(columns.contains("UPDATED_AT"), "Migration should re-add missing matches.updated_at column");
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 9")) {
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1), "Schema version 9 should be recorded");
+            }
         }
 
         @Test
@@ -387,6 +562,20 @@ class SchemaInitializerTest {
                         + "WHERE table_name = '" + tableName + "' AND constraint_type = 'UNIQUE'")) {
             while (rs.next()) {
                 constraints.add(rs.getString("CONSTRAINT_NAME"));
+            }
+        }
+        return constraints;
+    }
+
+    private Set<String> getForeignKeyNames(String tableName) throws SQLException {
+        Set<String> constraints = new HashSet<>();
+        DatabaseMetaData meta = connection.getMetaData();
+        try (ResultSet rs = meta.getImportedKeys(null, null, tableName)) {
+            while (rs.next()) {
+                String constraintName = rs.getString("FK_NAME");
+                if (constraintName != null) {
+                    constraints.add(constraintName);
+                }
             }
         }
         return constraints;

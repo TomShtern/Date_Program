@@ -23,7 +23,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Unit tests for CandidateFinder. */
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
@@ -275,7 +280,7 @@ class CandidateFinderTest {
         user.setMaxDistanceKm(100, CONFIG.matching().maxDistanceKm());
         user.setAgeRange(
                 18, 60, CONFIG.validation().minAge(), CONFIG.validation().maxAge());
-        user.addPhotoUrl("photo.jpg");
+        user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
@@ -294,7 +299,7 @@ class CandidateFinderTest {
         user.setMaxDistanceKm(100, CONFIG.matching().maxDistanceKm());
         user.setAgeRange(
                 18, 60, CONFIG.validation().minAge(), CONFIG.validation().maxAge());
-        user.addPhotoUrl("photo.jpg");
+        user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,

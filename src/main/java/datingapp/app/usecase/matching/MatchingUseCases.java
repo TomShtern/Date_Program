@@ -277,6 +277,18 @@ public class MatchingUseCases {
                 || command.candidate() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context, current user and candidate are required"));
         }
+        if (!Objects.equals(command.context().userId(), command.currentUser().getId())) {
+            return UseCaseResult.failure(UseCaseError.forbidden("Context user does not match current user"));
+        }
+        if (command.currentUser().getState() != UserState.ACTIVE) {
+            return UseCaseResult.failure(UseCaseError.conflict("Current user must be ACTIVE to swipe"));
+        }
+        if (command.candidate().getState() != UserState.ACTIVE) {
+            return UseCaseResult.failure(UseCaseError.conflict("Candidate must be ACTIVE to swipe"));
+        }
+        if (Objects.equals(command.currentUser().getId(), command.candidate().getId())) {
+            return UseCaseResult.failure(UseCaseError.validation("Cannot swipe on yourself"));
+        }
         try {
             if (command.markDailyPickViewed()) {
                 dailyPickService.markDailyPickViewed(command.context().userId());
@@ -286,21 +298,25 @@ public class MatchingUseCases {
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.message()));
             }
-            eventBus.publish(new AppEvent.SwipeRecorded(
-                    command.context().userId(),
-                    command.candidate().getId(),
-                    result.like().direction().name(),
-                    result.matched(),
-                    AppClock.now()));
-            if (result.matched()) {
-                Match m = result.match();
-                Objects.requireNonNull(m, "match cannot be null when matched() is true");
-                eventBus.publish(new AppEvent.MatchCreated(
-                        m.getId(), result.like().whoLikes(), result.like().whoGotLiked(), AppClock.now()));
+            if (result.like() != null) {
+                eventBus.publish(new AppEvent.SwipeRecorded(
+                        command.context().userId(),
+                        command.candidate().getId(),
+                        result.like().direction().name(),
+                        result.matched(),
+                        AppClock.now()));
+                if (result.matched()) {
+                    Match m = result.match();
+                    Objects.requireNonNull(m, "match cannot be null when matched() is true");
+                    eventBus.publish(new AppEvent.MatchCreated(
+                            m.getId(), result.like().whoLikes(), result.like().whoGotLiked(), AppClock.now()));
+                }
             }
             return UseCaseResult.success(result);
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to process swipe: " + e.getMessage()));
+            String errorMessage =
+                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            return UseCaseResult.failure(UseCaseError.internal("Failed to process swipe: " + errorMessage));
         }
     }
 

@@ -126,7 +126,7 @@ class UserTest {
     void multiplePhotoUrlsCanBeAdded() {
         User user = new User(UUID.randomUUID(), "Frank");
         for (int i = 1; i <= User.MAX_PHOTOS; i++) {
-            user.addPhotoUrl("photo" + i + ".jpg");
+            user.addPhotoUrl("https://example.com/photo" + i + ".jpg");
         }
 
         assertEquals(User.MAX_PHOTOS, user.getPhotoUrls().size());
@@ -137,12 +137,22 @@ class UserTest {
     void addPhotoAboveLimitThrows() {
         User user = new User(UUID.randomUUID(), "Grace");
         for (int i = 1; i <= User.MAX_PHOTOS; i++) {
-            user.addPhotoUrl("photo" + i + ".jpg");
+            user.addPhotoUrl("https://example.com/photo" + i + ".jpg");
         }
 
-        IllegalArgumentException ex =
-                assertThrows(IllegalArgumentException.class, () -> user.addPhotoUrl("photo-overflow.jpg"));
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class, () -> user.addPhotoUrl("https://example.com/photo-overflow.jpg"));
         assertTrue(ex.getMessage().contains("Cannot set more than " + User.MAX_PHOTOS + " photos"));
+    }
+
+    @Test
+    @DisplayName("Setting placeholder photo URLs preserves the sentinel")
+    void setPhotoUrlsAllowsPlaceholder() {
+        User user = new User(UUID.randomUUID(), "Hannah");
+
+        user.setPhotoUrls(List.of("placeholder://default-avatar"));
+
+        assertEquals(List.of("placeholder://default-avatar"), user.getPhotoUrls());
     }
 
     @Test
@@ -150,7 +160,7 @@ class UserTest {
     void setPhotoUrlsAboveLimitThrows() {
         User user = new User(UUID.randomUUID(), "Hannah");
         List<String> tooManyPhotos = IntStream.rangeClosed(1, User.MAX_PHOTOS + 1)
-                .mapToObj(i -> "photo" + i + ".jpg")
+                .mapToObj(i -> "https://example.com/photo" + i + ".jpg")
                 .toList();
 
         IllegalArgumentException ex =
@@ -353,12 +363,13 @@ class UserTest {
         user.setLocation(32.0, 34.0);
         user.setMaxDistanceKm(50, 500);
         user.setAgeRange(20, 40, 18, 120);
-        user.addPhotoUrl("photo.jpg");
+        user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,
                 DepthPreference.DEEP_CHAT));
+        user.addPhotoUrl("https://example.com/photo.jpg");
         return user;
     }
 
@@ -706,7 +717,7 @@ class UserTest {
                     .location(32.1, 34.8)
                     .maxDistanceKm(50)
                     .ageRange(20, 30)
-                    .photoUrls(List.of("a.jpg", "b.jpg"))
+                    .photoUrls(List.of("https://example.com/a.jpg", "https://example.com/b.jpg"))
                     .state(UserState.ACTIVE)
                     .updatedAt(Instant.parse("2026-01-02T10:00:00Z"))
                     .interests(EnumSet.of(Interest.COFFEE))
@@ -741,7 +752,7 @@ class UserTest {
             assertEquals(50, user.getMaxDistanceKm());
             assertEquals(20, user.getMinAge());
             assertEquals(30, user.getMaxAge());
-            assertEquals(List.of("a.jpg", "b.jpg"), user.getPhotoUrls());
+            assertEquals(List.of("https://example.com/a.jpg", "https://example.com/b.jpg"), user.getPhotoUrls());
             assertEquals(UserState.ACTIVE, user.getState());
         }
 

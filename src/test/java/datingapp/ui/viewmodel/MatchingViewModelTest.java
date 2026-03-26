@@ -1,7 +1,6 @@
 package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -23,10 +22,13 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
 import java.time.ZoneId;
 import java.util.ArrayDeque;
 import java.util.EnumSet;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -88,8 +90,8 @@ class MatchingViewModelTest {
         waitUntil(() -> viewModel.currentCandidateProperty().get() != null, 5000);
         waitUntil(() -> viewModel.infoMessageProperty().get() != null, 5000);
 
-        assertNotNull(viewModel.currentCandidateProperty().get());
         assertTrue(viewModel.infoMessageProperty().get().contains("no longer available"));
+        assertTrue(viewModel.hasMoreCandidatesProperty().get());
         viewModel.dispose();
     }
 
@@ -158,6 +160,31 @@ class MatchingViewModelTest {
     }
 
     @Test
+    @DisplayName("delete note failure keeps note state intact")
+    void deleteCurrentCandidateNoteFailureKeepsStateIntact() {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+
+        MatchingViewModel viewModel = fixture.createViewModel(TEST_DISPATCHER, new NoOpUiProfileNoteDataAccess());
+        viewModel.initialize(fixture.prioritizedCandidate.getId());
+
+        waitUntil(() -> viewModel.currentCandidateProperty().get() != null, 5000);
+        viewModel.noteContentProperty().set("Staged note");
+
+        viewModel.deleteCurrentCandidateNote();
+
+        waitUntil(
+                () -> "Failed to delete note"
+                        .equals(viewModel.noteStatusMessageProperty().get()),
+                5000);
+
+        assertEquals("Staged note", viewModel.noteContentProperty().get());
+        assertEquals(
+                "Failed to delete note", viewModel.noteStatusMessageProperty().get());
+        viewModel.dispose();
+    }
+
+    @Test
     @DisplayName("successful swipe starts undo countdown state")
     void successfulSwipeStartsUndoCountdownState() {
         Fixture fixture = new Fixture();
@@ -177,6 +204,24 @@ class MatchingViewModelTest {
     }
 
     @Test
+    @DisplayName("undo without recent swipe publishes info message")
+    void undoWithoutRecentSwipePublishesInfoMessage() {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+
+        MatchingViewModel viewModel = fixture.createViewModel();
+        viewModel.initialize(fixture.prioritizedCandidate.getId());
+
+        waitUntil(() -> viewModel.currentCandidateProperty().get() != null, 5000);
+        viewModel.undo();
+
+        waitUntil(() -> viewModel.infoMessageProperty().get() != null, 5000);
+
+        assertEquals("No recent swipe to undo", viewModel.infoMessageProperty().get());
+        viewModel.dispose();
+    }
+
+    @Test
     @DisplayName("rapid double like only advances one candidate")
     void rapidDoubleLikeOnlyAdvancesOneCandidate() {
         Fixture fixture = new Fixture();
@@ -190,28 +235,22 @@ class MatchingViewModelTest {
 
         assertEquals(
                 fixture.prioritizedCandidate.getId(),
-                viewModel.currentCandidateProperty().get().getId(),
-                "Prioritized candidate should be shown first");
+                viewModel.currentCandidateProperty().get().getId());
 
         viewModel.like();
         viewModel.like();
 
         assertEquals(
                 fixture.prioritizedCandidate.getId(),
-                viewModel.currentCandidateProperty().get().getId(),
-                "Candidate should not change until queued UI work is processed");
+                viewModel.currentCandidateProperty().get().getId());
 
         dispatcher.drain();
 
         assertEquals(
                 fixture.fallbackCandidate.getId(),
-                viewModel.currentCandidateProperty().get().getId(),
-                "Rapid double-like should only advance to the next candidate once");
-        assertTrue(viewModel.hasMoreCandidatesProperty().get(), "Next candidate should still be available");
-        assertEquals(
-                1,
-                fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.LIKE),
-                "Only one like should be recorded for the original candidate");
+                viewModel.currentCandidateProperty().get().getId());
+        assertTrue(viewModel.hasMoreCandidatesProperty().get());
+        assertEquals(1, fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.LIKE));
 
         viewModel.dispose();
     }
@@ -240,14 +279,8 @@ class MatchingViewModelTest {
                 },
                 5000);
 
-        assertEquals(
-                1,
-                fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.SUPER_LIKE),
-                "superLike should record exactly one SUPER_LIKE");
-        assertEquals(
-                0,
-                fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.LIKE),
-                "LIKE count should remain 0");
+        assertEquals(1, fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.SUPER_LIKE));
+        assertEquals(0, fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.LIKE));
 
         viewModel.dispose();
     }
@@ -323,6 +356,11 @@ class MatchingViewModelTest {
         }
 
         private MatchingViewModel createViewModel(UiThreadDispatcher dispatcher) {
+            return createViewModel(dispatcher, new UseCaseUiProfileNoteDataAccess(createNoteUseCases()));
+        }
+
+        private MatchingViewModel createViewModel(
+                UiThreadDispatcher dispatcher, UiProfileNoteDataAccess noteDataAccess) {
             CandidateFinder candidateFinder =
                     new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
             ProfileService profileService =
@@ -349,17 +387,6 @@ class MatchingViewModelTest {
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                             trustSafetyStorage, interactions, users, config, communications)
                     .build();
-            ProfileService noteProfileService =
-                    new ProfileService(config, analytics, interactions, trustSafetyStorage, users);
-            var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
-                    users,
-                    noteProfileService,
-                    null,
-                    null,
-                    null,
-                    config,
-                    new datingapp.core.workflow.ProfileActivationPolicy(),
-                    new InProcessAppEventBus());
 
             return new MatchingViewModel(
                     new MatchingViewModel.Dependencies(
@@ -382,16 +409,30 @@ class MatchingViewModelTest {
                                     new MatchQualityService(users, interactions, config),
                                     new datingapp.app.event.InProcessAppEventBus()),
                             new datingapp.app.usecase.social.SocialUseCases(trustSafetyService),
-                            new UseCaseUiProfileNoteDataAccess(noteUseCases)),
+                            noteDataAccess),
                     session,
                     dispatcher);
+        }
+
+        private datingapp.app.usecase.profile.ProfileUseCases createNoteUseCases() {
+            ProfileService noteProfileService =
+                    new ProfileService(config, analytics, interactions, trustSafetyStorage, users);
+            return new datingapp.app.usecase.profile.ProfileUseCases(
+                    users,
+                    noteProfileService,
+                    null,
+                    null,
+                    null,
+                    config,
+                    new datingapp.core.workflow.ProfileActivationPolicy(),
+                    new InProcessAppEventBus());
         }
 
         private void saveNote(String content) {
             users.saveProfileNote(ProfileNote.create(currentUser.getId(), prioritizedCandidate.getId(), content));
         }
 
-        private java.util.Optional<ProfileNote> lookupNote() {
+        private Optional<ProfileNote> lookupNote() {
             return users.getProfileNote(currentUser.getId(), prioritizedCandidate.getId());
         }
 

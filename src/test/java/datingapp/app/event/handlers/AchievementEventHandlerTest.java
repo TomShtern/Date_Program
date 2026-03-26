@@ -69,6 +69,24 @@ class AchievementEventHandlerTest {
     }
 
     @Test
+    void profileCompletedTriggersAchievementCheck() {
+        UUID userId = UUID.randomUUID();
+
+        bus.publish(new AppEvent.ProfileCompleted(userId, Instant.now()));
+
+        assertEquals(List.of(userId), achievementService.checkedUserIds);
+    }
+
+    @Test
+    void userReportedTriggersAchievementCheck() {
+        UUID reporterId = UUID.randomUUID();
+
+        bus.publish(new AppEvent.UserReported(reporterId, UUID.randomUUID(), "spam", false, Instant.now()));
+
+        assertEquals(List.of(reporterId), achievementService.checkedUserIds);
+    }
+
+    @Test
     void handlerRegistersWithBestEffortPolicy() {
         // Verify handler doesn't propagate exceptions through the bus
         bus.subscribe(

@@ -276,7 +276,7 @@ class UserSessionTest {
         user.setLocation(32.0, 34.0);
         user.setMaxDistanceKm(50, 500);
         user.setAgeRange(20, 40, 18, 120);
-        user.addPhotoUrl("photo.jpg");
+        user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 MessagingFrequency.OFTEN,
                 TimeToFirstDate.FEW_DAYS,

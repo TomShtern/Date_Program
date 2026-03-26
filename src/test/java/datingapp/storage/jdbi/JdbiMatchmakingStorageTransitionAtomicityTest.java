@@ -1,11 +1,14 @@
 package datingapp.storage.jdbi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
@@ -77,6 +80,60 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
     }
 
     @Test
+    @DisplayName("saveLikeAndMaybeCreateMatch should persist created match with non-null updatedAt")
+    void saveLikeAndMaybeCreateMatchPersistsCreatedMatchWithUpdatedAt() {
+        Like firstLike = Like.create(userA, userB, Like.Direction.LIKE);
+        Like secondLike = Like.create(userB, userA, Like.Direction.LIKE);
+
+        var firstResult = interactionStorage.saveLikeAndMaybeCreateMatch(firstLike);
+        assertTrue(firstResult.likePersisted());
+        assertTrue(firstResult.createdMatch().isEmpty());
+
+        var secondResult = interactionStorage.saveLikeAndMaybeCreateMatch(secondLike);
+        assertTrue(secondResult.likePersisted());
+        assertTrue(secondResult.createdMatch().isPresent());
+
+        Match created = secondResult.createdMatch().orElseThrow();
+        Match persisted = interactionStorage.get(created.getId()).orElseThrow();
+        assertNotNull(persisted.getUpdatedAt());
+        assertTrue(
+                !persisted.getUpdatedAt().isBefore(persisted.getCreatedAt()),
+                "Persisted updatedAt should be at least createdAt for newly created match");
+    }
+
+    @Test
+    @DisplayName("saveLikeAndMaybeCreateMatch treats duplicate swipe as idempotent no-op")
+    void saveLikeAndMaybeCreateMatchTreatsDuplicateSwipeAsIdempotentNoOp() {
+        Like firstLike = Like.create(userA, userB, Like.Direction.LIKE);
+        Like duplicateLike = Like.create(userA, userB, Like.Direction.LIKE);
+
+        var firstResult = interactionStorage.saveLikeAndMaybeCreateMatch(firstLike);
+        var duplicateResult = interactionStorage.saveLikeAndMaybeCreateMatch(duplicateLike);
+
+        assertTrue(firstResult.likePersisted());
+        assertTrue(firstResult.createdMatch().isEmpty());
+        assertFalse(duplicateResult.likePersisted());
+        assertTrue(duplicateResult.createdMatch().isEmpty());
+        assertEquals(1, interactionStorage.countByDirection(userA, Like.Direction.LIKE));
+    }
+
+    @Test
+    @DisplayName("unmatchTransition should persist the match updatedAt value")
+    void unmatchTransitionPersistsUpdatedAt() {
+        Match originalMatch = createPersistedActiveMatchWithOldTimestamp();
+        originalMatch.unmatch(userA);
+
+        boolean success = interactionStorage.unmatchTransition(originalMatch, Optional.empty());
+        assertTrue(success);
+
+        Match persisted = interactionStorage.get(originalMatch.getId()).orElseThrow();
+        assertEquals(MatchState.UNMATCHED, persisted.getState());
+        assertTrue(
+                persisted.getUpdatedAt().isAfter(persisted.getCreatedAt()),
+                "Persisted updatedAt should be advanced on transition");
+    }
+
+    @Test
     @DisplayName("acceptFriendZoneTransition rolls back match update when request update fails")
     void acceptFriendZoneTransitionRollsBackMatchUpdateWhenRequestUpdateFails() {
         Match match = Match.create(userA, userB);
@@ -133,5 +190,25 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
         Match persisted = interactionStorage.get(match.getId()).orElseThrow();
         assertEquals(MatchState.ACTIVE, persisted.getState());
         assertTrue(persisted.getEndedBy() == null || !persisted.getEndedBy().equals(userA));
+    }
+
+    private Match createPersistedActiveMatchWithOldTimestamp() {
+        Instant baseline = Instant.now().minusSeconds(120);
+        UUID firstUser = userA.toString().compareTo(userB.toString()) <= 0 ? userA : userB;
+        UUID secondUser = firstUser.equals(userA) ? userB : userA;
+
+        Match match = new Match(
+                Match.generateId(userA, userB),
+                firstUser,
+                secondUser,
+                baseline,
+                baseline,
+                MatchState.ACTIVE,
+                null,
+                null,
+                null,
+                null);
+        interactionStorage.save(match);
+        return match;
     }
 }

@@ -25,15 +25,26 @@ class TimePolicyArchitectureTest {
     static final Set<String> CONFIG_DEFAULTS_ALLOWLIST = Set.of("ApplicationStartup.java", "StorageFactory.java");
 
     @Test
-    @Disabled("Enable after WU-14 completes timezone rollout")
+    // Keep this guard disabled until the WU-14 timezone rollout removes every runtime
+    // ZoneId.systemDefault() call outside the allowlist. The remaining feature-code
+    // uses are still part of the in-flight TimePolicy migration, so this test serves
+    // as a documented stopgap rather than a false green.
+    // Unblock when: WU-14 is closed, all src/main/java timezone call sites are routed
+    // through TimePolicy/AppClock, the allowlist is down to the approved bootstrap
+    // classes only, and the migration checklist is complete.
+    @Disabled("TRACKER: WU-14 | owner: TimePolicy rollout owner | "
+            + "exit criteria: zero runtime ZoneId.systemDefault() uses outside the allowlist in src/main/java; "
+            + "unblock by routing feature code through TimePolicy/AppClock | "
+            + "TODO deadline: 2026-04-30")
     void noFeatureCodeUsesZoneIdSystemDefault() throws IOException {
         List<String> violations = findViolations("ZoneId.systemDefault()", ZONE_DEFAULT_ALLOWLIST);
         assertTrue(violations.isEmpty(), "ZoneId.systemDefault() violations found:\n" + String.join("\n", violations));
     }
 
     @Test
-    @Disabled("Enable after WU-14 completes config rollout")
     void noFeatureCodeUsesAppConfigDefaults() throws IOException {
+        // This guard can be enabled now: the current src/main/java scan has no runtime
+        // AppConfig.defaults() usage, and the remaining matches are documentation-only.
         List<String> violations = findViolations("AppConfig.defaults()", CONFIG_DEFAULTS_ALLOWLIST);
         assertTrue(violations.isEmpty(), "AppConfig.defaults() violations found:\n" + String.join("\n", violations));
     }

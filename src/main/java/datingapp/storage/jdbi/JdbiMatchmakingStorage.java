@@ -41,6 +41,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     private static final String PARAM_WHO_GOT_LIKED = "whoGotLiked";
     private static final String PARAM_DIRECTION = "direction";
     private static final String PARAM_CREATED_AT = "createdAt";
+    private static final String PARAM_UPDATED_AT = "updatedAt";
     private static final String PARAM_STATE = "state";
     private static final String PARAM_ENDED_AT = "endedAt";
     private static final String PARAM_ENDED_BY = "endedBy";
@@ -87,16 +88,17 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
     private static final String SQL_UPSERT_MATCH = """
             MERGE INTO matches (
-            id, user_a, user_b, created_at, state, ended_at, ended_by, end_reason, deleted_at
+            id, user_a, user_b, created_at, updated_at, state, ended_at, ended_by, end_reason, deleted_at
             ) KEY (id)
             VALUES (
-            :id, :userA, :userB, :createdAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
+            :id, :userA, :userB, :createdAt, :updatedAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
             )
             """;
 
     private static final String SQL_UPDATE_MATCH_TRANSITION = """
             UPDATE matches
             SET state = :state,
+            updated_at = :updatedAt,
             ended_at = :endedAt,
             ended_by = :endedBy,
             end_reason = :endReason,
@@ -205,6 +207,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                         .bind("userA", match.getUserA())
                         .bind("userB", match.getUserB())
                         .bind(PARAM_CREATED_AT, match.getCreatedAt())
+                        .bind(PARAM_UPDATED_AT, match.getUpdatedAt())
                         .bind(PARAM_STATE, match.getState().name())
                         .bind(PARAM_ENDED_AT, match.getEndedAt())
                         .bind(PARAM_ENDED_BY, match.getEndedBy())
@@ -399,6 +402,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
                         .bind(PARAM_ID, updatedMatch.getId())
                         .bind(PARAM_STATE, updatedMatch.getState().name())
+                        .bind(PARAM_UPDATED_AT, updatedMatch.getUpdatedAt())
                         .bind(PARAM_ENDED_AT, updatedMatch.getEndedAt())
                         .bind(PARAM_ENDED_BY, updatedMatch.getEndedBy())
                         .bind(
@@ -444,6 +448,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
                         .bind(PARAM_ID, updatedMatch.getId())
                         .bind(PARAM_STATE, updatedMatch.getState().name())
+                        .bind(PARAM_UPDATED_AT, updatedMatch.getUpdatedAt())
                         .bind(PARAM_ENDED_AT, updatedMatch.getEndedAt())
                         .bind(PARAM_ENDED_BY, updatedMatch.getEndedBy())
                         .bind(
@@ -493,6 +498,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
                         .bind(PARAM_ID, updatedMatch.getId())
                         .bind(PARAM_STATE, updatedMatch.getState().name())
+                        .bind(PARAM_UPDATED_AT, updatedMatch.getUpdatedAt())
                         .bind(PARAM_ENDED_AT, updatedMatch.getEndedAt())
                         .bind(PARAM_ENDED_BY, updatedMatch.getEndedBy())
                         .bind(
