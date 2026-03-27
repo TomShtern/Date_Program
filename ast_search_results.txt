@@ -1,0 +1,17 @@
+Pattern: ZoneId.systemDefault()
+Count: 11
+src/main/java/datingapp/app/cli/MessagingHandler.java:35: DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
+src/main/java/datingapp/app/cli/StatsHandler.java:26: DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
+src/main/java/datingapp/app/cli/StatsHandler.java:28: DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
+src/main/java/datingapp/core/AppConfig.java:312: private ZoneId userTimeZone = ZoneId.systemDefault();
+src/main/java/datingapp/ui/screen/ChatController.java:509: var zonedDateTime = createdAt.atZone(ZoneId.systemDefault());
+src/main/java/datingapp/ui/screen/ChatController.java:623: String time = msg.createdAt().atZone(ZoneId.systemDefault()).format(TIME_FORMAT);
+src/main/java/datingapp/ui/screen/ChatController.java:677: message.createdAt().atZone(ZoneId.systemDefault()).toLocalDate();
+src/main/java/datingapp/ui/screen/ChatController.java:680: : previousMessage.createdAt().atZone(ZoneId.systemDefault()).toLocalDate();
+src/main/java/datingapp/ui/screen/SocialController.java:150: notification.createdAt().atZone(ZoneId.systemDefault()).format(TIME_FORMAT);
+src/main/java/datingapp/ui/viewmodel/NotesViewModel.java:35: DateTimeFormatter.ofPattern("MMM d, yyyy").withZone(ZoneId.systemDefault());
+src/main/java/datingapp/ui/viewmodel/StatsViewModel.java:229: session.getStartedAt().atZone(ZoneId.systemDefault()).toLocalDate())
+
+Pattern: AppConfig.defaults()
+Count: 0
+
