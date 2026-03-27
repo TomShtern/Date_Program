@@ -44,6 +44,8 @@ public final class AchievementEventHandler {
     }
 
     void onUserReported(AppEvent.UserReported event) {
-        achievementService.checkAndUnlock(event.reporterId());
+        if (event.validated()) {
+            achievementService.checkAndUnlock(event.reporterId());
+        }
     }
 }

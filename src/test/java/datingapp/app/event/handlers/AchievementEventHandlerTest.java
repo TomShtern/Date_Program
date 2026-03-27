@@ -78,10 +78,19 @@ class AchievementEventHandlerTest {
     }
 
     @Test
-    void userReportedTriggersAchievementCheck() {
+    void unvalidatedUserReportedDoesNotTriggerAchievementCheck() {
         UUID reporterId = UUID.randomUUID();
 
-        bus.publish(new AppEvent.UserReported(reporterId, UUID.randomUUID(), "spam", false, Instant.now()));
+        bus.publish(new AppEvent.UserReported(reporterId, UUID.randomUUID(), "spam", false, false, Instant.now()));
+
+        assertEquals(List.of(), achievementService.checkedUserIds);
+    }
+
+    @Test
+    void validatedUserReportedTriggersAchievementCheck() {
+        UUID reporterId = UUID.randomUUID();
+
+        bus.publish(new AppEvent.UserReported(reporterId, UUID.randomUUID(), "spam", false, true, Instant.now()));
 
         assertEquals(List.of(reporterId), achievementService.checkedUserIds);
     }

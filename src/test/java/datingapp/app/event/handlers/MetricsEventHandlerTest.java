@@ -173,7 +173,7 @@ class MetricsEventHandlerTest {
         InProcessAppEventBus eventBus = new InProcessAppEventBus();
         new MetricsEventHandler(service).register(eventBus);
 
-        eventBus.publish(new AppEvent.UserReported(reporterId, UUID.randomUUID(), "spam", false, Instant.now()));
+        eventBus.publish(new AppEvent.UserReported(reporterId, UUID.randomUUID(), "spam", false, false, Instant.now()));
 
         assertNotNull(service.getCurrentSession(reporterId).orElse(null));
     }

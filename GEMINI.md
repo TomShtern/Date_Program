@@ -55,8 +55,8 @@ datingapp/
     connection/  # Connection models & services
     matching/    # Recommendations, Scoring, Standouts, Constraints
     profile/     # Preferences, ValidationService
-  storage/
-    jdbi/        # H2 / JDBC implementations. MERGE INTO algorithms.
+    storage/
+        jdbi/        # H2 / JDBC implementations.
     schema/      # Migration runner
   ui/
     async/       # ViewModelAsyncScope, TaskPolicy, UiThreadDispatcher
@@ -163,13 +163,13 @@ public UseCaseResult<MyDto> doAction(MyCommand command) {
 
 ```java
 public class MyViewModel extends ViewModelAsyncScope {
-    
+
     public void onSaveClicked(String input) {
         // 'LATEST_WINS' aborts previous save clicks if spammed.
         // 'STANDARD' blocks new clicks until done.
         launch(TaskPolicy.LATEST_WINS, () -> {
             var result = myUseCase.doAction(new MyCommand(input));
-            
+
             // UI Thread continuation is automatic simply by returning or throwing
             if (result.success()) {
                 viewState.update(result.data());
@@ -198,7 +198,7 @@ public MyEntity executeWrite(String input) {
         handle.createUpdate("INSERT INTO child (pid) VALUES (:pid)")
             .bind("pid", id)
             .execute();
-            
+
         return fetchById(handle, id);
     });
 }

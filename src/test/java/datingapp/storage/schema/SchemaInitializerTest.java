@@ -351,6 +351,62 @@ class SchemaInitializerTest {
         }
 
         @Test
+        @DisplayName("should ignore null FK values during orphan preflight checks")
+        void nullForeignKeyValuesDoNotBlockV10ForeignKeys() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("CREATE TABLE users (id UUID PRIMARY KEY)");
+                stmt.execute("CREATE TABLE daily_pick_views ("
+                        + "user_id UUID, "
+                        + "viewed_date DATE NOT NULL, "
+                        + "viewed_at TIMESTAMP NOT NULL"
+                        + ")");
+                stmt.execute("CREATE TABLE user_achievements ("
+                        + "id UUID PRIMARY KEY, "
+                        + "user_id UUID, "
+                        + "achievement VARCHAR(50) NOT NULL, "
+                        + "unlocked_at TIMESTAMP NOT NULL"
+                        + ")");
+                stmt.execute("CREATE TABLE schema_version ("
+                        + "version INT PRIMARY KEY, "
+                        + "applied_at TIMESTAMP NOT NULL, "
+                        + "description VARCHAR(255)"
+                        + ")");
+                stmt.execute("INSERT INTO daily_pick_views(user_id, viewed_date, viewed_at) VALUES "
+                        + "(NULL, DATE '2026-03-26', CURRENT_TIMESTAMP())");
+                stmt.execute("INSERT INTO user_achievements(id, user_id, achievement, unlocked_at) VALUES "
+                        + "('44444444-4444-4444-4444-444444444444', NULL, 'legacy-achievement', CURRENT_TIMESTAMP())");
+                stmt.execute("INSERT INTO schema_version(version, applied_at, description) VALUES "
+                        + "(1, CURRENT_TIMESTAMP(), 'V1 baseline schema'), "
+                        + "(2, CURRENT_TIMESTAMP(), 'V2 daily picks cache table'), "
+                        + "(3, CURRENT_TIMESTAMP(), 'V3 normalized profile cleanup'), "
+                        + "(4, CURRENT_TIMESTAMP(), 'V4 soft-delete columns'), "
+                        + "(5, CURRENT_TIMESTAMP(), 'V5 profile view primary key'), "
+                        + "(6, CURRENT_TIMESTAMP(), 'V6 matches updated_at backfill'), "
+                        + "(7, CURRENT_TIMESTAMP(), 'V7 messages conversation index'), "
+                        + "(8, CURRENT_TIMESTAMP(), 'V8 query optimization indexes'), "
+                        + "(9, CURRENT_TIMESTAMP(), 'V9 matches updated_at repair')");
+
+                MigrationRunner.runAllPending(stmt);
+            }
+
+            Set<String> dailyPickViewsForeignKeys = getForeignKeyNames("DAILY_PICK_VIEWS");
+            assertTrue(
+                    dailyPickViewsForeignKeys.contains("FK_DAILY_PICK_VIEWS_USER"),
+                    "Null user_id rows should not block fk_daily_pick_views_user");
+
+            Set<String> userAchievementsForeignKeys = getForeignKeyNames("USER_ACHIEVEMENTS");
+            assertTrue(
+                    userAchievementsForeignKeys.contains("FK_USER_ACHIEVEMENTS_USER"),
+                    "Null user_id rows should not block fk_user_achievements_user");
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 10")) {
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1), "Schema version 10 should be recorded when only null FK values exist");
+            }
+        }
+
+        @Test
         @DisplayName("should upgrade legacy profile_views and conversation constraint names on V5")
         void v5MigrationRemovesLegacyProfileViewsIdAndRenamesConversationConstraint() throws SQLException {
             try (Statement stmt = connection.createStatement()) {

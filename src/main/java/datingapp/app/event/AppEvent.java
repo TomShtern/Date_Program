@@ -68,6 +68,12 @@ public sealed interface AppEvent
 
     record UserBlocked(UUID blockerId, UUID blockedUserId, Instant occurredAt) implements AppEvent {}
 
-    record UserReported(UUID reporterId, UUID reportedUserId, String reason, boolean blockedUser, Instant occurredAt)
+    record UserReported(
+            UUID reporterId,
+            UUID reportedUserId,
+            String reason,
+            boolean blockedUser,
+            boolean validated,
+            Instant occurredAt)
             implements AppEvent {}
 }

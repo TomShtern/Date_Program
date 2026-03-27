@@ -162,7 +162,7 @@ public final class JdbiAccountCleanupStorage implements AccountCleanupStorage {
     }
 
     private static void deleteUserStats(Handle handle, UUID userId) {
-        executeHardDelete(handle, "DELETE FROM user_stats WHERE id = :userId", userId);
+        executeHardDelete(handle, "DELETE FROM user_stats WHERE user_id = :userId", userId);
     }
 
     private static void deleteUserAchievements(Handle handle, UUID userId) {

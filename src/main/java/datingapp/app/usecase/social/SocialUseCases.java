@@ -121,6 +121,7 @@ public class SocialUseCases {
                             command.targetUserId(),
                             command.reason().name(),
                             command.blockUser(),
+                            false,
                             AppClock.now()));
             return UseCaseResult.success(result);
         } catch (Exception e) {

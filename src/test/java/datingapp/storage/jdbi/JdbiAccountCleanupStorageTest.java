@@ -61,8 +61,8 @@ class JdbiAccountCleanupStorageTest {
         jdbi = Jdbi.create(() -> {
                     try {
                         return dbManager.getConnection();
-                    } catch (java.sql.SQLException e) {
-                        throw new DatabaseManager.StorageException("Failed to get database connection", e);
+                    } catch (java.sql.SQLException _) {
+                        throw new DatabaseManager.StorageException("Failed to get database connection");
                     }
                 })
                 .installPlugin(new SqlObjectPlugin());
@@ -77,8 +77,8 @@ class JdbiAccountCleanupStorageTest {
         jdbi.useHandle(handle -> {
             try (var stmt = handle.getConnection().createStatement()) {
                 SchemaInitializer.createAllTables(stmt);
-            } catch (java.sql.SQLException e) {
-                throw new DatabaseManager.StorageException("Failed to initialize schema", e);
+            } catch (java.sql.SQLException _) {
+                throw new DatabaseManager.StorageException("Failed to initialize schema");
             }
         });
 
@@ -148,6 +148,24 @@ class JdbiAccountCleanupStorageTest {
                 .bind("description", report.description())
                 .bind("createdAt", Timestamp.from(report.createdAt()))
                 .execute());
+
+        jdbi.useHandle(handle -> handle.createUpdate("""
+                INSERT INTO user_stats (id, user_id, computed_at)
+                VALUES (:id, :userId, :computedAt)
+                """)
+                .bind("id", UUID.randomUUID())
+                .bind("userId", deletedUser.getId())
+                .bind("computedAt", Timestamp.from(AppClock.now()))
+                .execute());
+
+        jdbi.useHandle(handle -> handle.createUpdate("""
+                INSERT INTO user_stats (id, user_id, computed_at)
+                VALUES (:id, :userId, :computedAt)
+                """)
+                .bind("id", UUID.randomUUID())
+                .bind("userId", survivingUser.getId())
+                .bind("computedAt", Timestamp.from(AppClock.now()))
+                .execute());
     }
 
     @AfterEach
@@ -180,6 +198,8 @@ class JdbiAccountCleanupStorageTest {
         assertEquals(0, trustSafetyStorage.countBlocksGiven(deletedUser.getId()));
         assertEquals(0, trustSafetyStorage.countReportsBy(deletedUser.getId()));
         assertEquals(0, trustSafetyStorage.countReportsAgainst(survivingUser.getId()));
+        assertEquals(0, countUserStatsRows(deletedUser.getId()));
+        assertEquals(1, countUserStatsRows(survivingUser.getId()));
 
         assertNotNull(rawDeletedAt("SELECT deleted_at FROM users WHERE id = :id", deletedUser.getId()));
         assertNotNull(rawDeletedAtForLike(
@@ -227,6 +247,13 @@ class JdbiAccountCleanupStorageTest {
 
     private int countUndoStates(UUID userId) {
         return jdbi.withHandle(handle -> handle.createQuery("SELECT COUNT(*) FROM undo_states WHERE user_id = :userId")
+                .bind("userId", userId)
+                .mapTo(int.class)
+                .one());
+    }
+
+    private int countUserStatsRows(UUID userId) {
+        return jdbi.withHandle(handle -> handle.createQuery("SELECT COUNT(*) FROM user_stats WHERE user_id = :userId")
                 .bind("userId", userId)
                 .mapTo(int.class)
                 .one());

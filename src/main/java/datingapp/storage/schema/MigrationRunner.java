@@ -406,7 +406,9 @@ public final class MigrationRunner {
             throws SQLException {
         String sql = "SELECT COUNT(*) FROM "
                 + tableName
-                + " t WHERE NOT EXISTS (SELECT 1 FROM "
+                + " t WHERE t."
+                + columnName
+                + " IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "
                 + referencedTable
                 + " r WHERE r."
                 + referencedColumn

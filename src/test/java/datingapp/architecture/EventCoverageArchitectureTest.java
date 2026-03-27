@@ -1,6 +1,5 @@
 package datingapp.architecture;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.AppEvent;
@@ -60,7 +59,10 @@ class EventCoverageArchitectureTest {
         for (Class<?> permittedSubtype : AppEvent.class.getPermittedSubclasses()) {
             Class<? extends AppEvent> eventType = permittedSubtype.asSubclass(AppEvent.class);
             Ownership expected = OWNERSHIP.get(eventType);
-            assertNotNull(expected, "Missing ownership entry for " + eventType.getSimpleName());
+            if (expected == null) {
+                missingEntries.add("Missing ownership entry for " + eventType.getSimpleName());
+                continue;
+            }
 
             Set<HandlerOwner> actual = actualOwners.getOrDefault(eventType, Set.of());
             if (!actual.equals(expected.owners())) {
@@ -71,7 +73,9 @@ class EventCoverageArchitectureTest {
                 if (expected.reason().isBlank()) {
                     missingEntries.add(eventType.getSimpleName() + " has NO_OP ownership but no reason");
                 }
-                assertTrue(actual.isEmpty(), eventType.getSimpleName() + " should remain unowned, but got " + actual);
+                if (!actual.isEmpty()) {
+                    mismatches.add(eventType.getSimpleName() + " should remain unowned, but got " + actual);
+                }
             }
         }
 
@@ -146,11 +150,23 @@ class EventCoverageArchitectureTest {
                     if (method.getReturnType().equals(boolean.class)) {
                         return false;
                     }
+                    if (method.getReturnType().equals(byte.class)) {
+                        return (byte) 0;
+                    }
+                    if (method.getReturnType().equals(short.class)) {
+                        return (short) 0;
+                    }
+                    if (method.getReturnType().equals(char.class)) {
+                        return '\0';
+                    }
                     if (method.getReturnType().equals(int.class)) {
                         return 0;
                     }
                     if (method.getReturnType().equals(long.class)) {
                         return 0L;
+                    }
+                    if (method.getReturnType().equals(float.class)) {
+                        return 0.0f;
                     }
                     if (method.getReturnType().equals(double.class)) {
                         return 0.0d;

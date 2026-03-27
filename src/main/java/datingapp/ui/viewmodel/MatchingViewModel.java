@@ -447,10 +447,9 @@ public class MatchingViewModel extends BaseViewModel {
                 currentCandidatePhotoUrls.set(urls);
                 currentCandidatePhotoIndex.set(0);
                 currentCandidatePhotoUrl.set(urls.isEmpty() ? null : urls.get(0));
+                loadNoteForCandidate(lastSwipedCandidate);
                 lastSwipedCandidate = null;
                 hasMoreCandidates.set(true);
-                swipeInProgress.set(false);
-            } else {
                 swipeInProgress.set(false);
                 refreshCandidates();
             }

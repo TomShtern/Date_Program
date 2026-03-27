@@ -8,7 +8,9 @@ import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.profile.ValidationService.ValidationResult;
 import java.net.IDN;
+import java.nio.file.Files;
 import java.util.EnumSet;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,11 +19,20 @@ import org.junit.jupiter.api.Test;
 /** Unit tests for ValidationService. */
 class ValidationServiceTest {
 
+    private static final String ALLOW_FILE_URLS_PROPERTY = "datingapp.allowFileUrls";
+    private static final String ALLOWED_FILE_URL_ROOT_PROPERTY = "datingapp.allowedFileUrlRoot";
+
     private ValidationService validator;
 
     @BeforeEach
     void setUp() {
+        clearFileUrlProperties();
         validator = new ValidationService(AppConfig.defaults());
+    }
+
+    @AfterEach
+    void tearDown() {
+        clearFileUrlProperties();
     }
 
     @Nested
@@ -133,7 +144,44 @@ class ValidationServiceTest {
         void validPhotoUrl() {
             assertTrue(
                     validator.validatePhotoUrl("https://example.com/photo.jpg").valid());
-            assertTrue(validator.validatePhotoUrl("file:///tmp/photo.jpg").valid());
+        }
+
+        @Test
+        @DisplayName("File photo URL fails validation by default")
+        void filePhotoUrlRejectedByDefault() {
+            ValidationResult result = validator.validatePhotoUrl("file:///tmp/photo.jpg");
+
+            assertFalse(result.valid());
+            assertEquals("Invalid photo URL", result.errors().getFirst());
+        }
+
+        @Test
+        @DisplayName("File photo URL can pass only with explicit allowlist flag")
+        void filePhotoUrlAllowedOnlyWithFeatureFlag() throws Exception {
+            var allowedRoot = Files.createTempDirectory("photo-allow-root")
+                    .toAbsolutePath()
+                    .normalize();
+            System.setProperty(ALLOW_FILE_URLS_PROPERTY, "true");
+            System.setProperty(ALLOWED_FILE_URL_ROOT_PROPERTY, allowedRoot.toString());
+
+            String fileUrl = allowedRoot.resolve("photo.jpg").toUri().toString();
+            assertTrue(validator.validatePhotoUrl(fileUrl).valid());
+        }
+
+        @Test
+        @DisplayName("File photo URL rejects traversal segments even when flag enabled")
+        void filePhotoUrlRejectsTraversalWhenFeatureFlagEnabled() throws Exception {
+            var allowedRoot = Files.createTempDirectory("photo-allow-root")
+                    .toAbsolutePath()
+                    .normalize();
+            System.setProperty(ALLOW_FILE_URLS_PROPERTY, "true");
+            System.setProperty(ALLOWED_FILE_URL_ROOT_PROPERTY, allowedRoot.toString());
+
+            String traversalUrl = allowedRoot.toUri() + "../escape.jpg";
+            ValidationResult result = validator.validatePhotoUrl(traversalUrl);
+
+            assertFalse(result.valid());
+            assertEquals("Invalid photo URL", result.errors().getFirst());
         }
 
         @Test
@@ -535,5 +583,10 @@ class ValidationServiceTest {
                     "ZIP validation is not available for this country yet",
                     result.errors().getFirst());
         }
+    }
+
+    private static void clearFileUrlProperties() {
+        System.clearProperty(ALLOW_FILE_URLS_PROPERTY);
+        System.clearProperty(ALLOWED_FILE_URL_ROOT_PROPERTY);
     }
 }

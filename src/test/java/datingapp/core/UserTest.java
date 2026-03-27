@@ -369,7 +369,6 @@ class UserTest {
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,
                 DepthPreference.DEEP_CHAT));
-        user.addPhotoUrl("https://example.com/photo.jpg");
         return user;
     }
 

@@ -164,9 +164,14 @@ class ProfileControllerTest {
             assertNotNull(profileScoreButton, "profileScoreButton should be wired in profile.fxml");
 
             // Assert buttons are accessible (indicates wiring is successful without crashing)
-            assertEquals("Preview", previewButton.getText(), "previewButton should have correct text");
-            assertEquals("Profile Score", profileScoreButton.getText(), "profileScoreButton should have correct text");
-
+            assertEquals(
+                    "Preview",
+                    JavaFxTestSupport.callOnFxAndWait(previewButton::getText),
+                    "previewButton should have correct text");
+            assertEquals(
+                    "Profile Score",
+                    JavaFxTestSupport.callOnFxAndWait(profileScoreButton::getText),
+                    "profileScoreButton should have correct text");
             viewModel.dispose();
             NavigationService.getInstance().clearHistory();
             AppSession.getInstance().reset();

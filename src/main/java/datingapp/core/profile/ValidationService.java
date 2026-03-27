@@ -6,6 +6,7 @@ import datingapp.core.profile.MatchPreferences.Interest;
 import java.net.IDN;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Path;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.Period;
@@ -39,7 +40,11 @@ public class ValidationService {
     private static final Pattern DOMAIN_LABEL_PATTERN =
             Pattern.compile("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$");
     private static final Pattern PHONE_ALLOWED_PATTERN = Pattern.compile("^[+0-9()\\-\\s]+$");
-    private static final Set<String> PHOTO_URL_SCHEMES = Set.of("http", "https", "file");
+    private static final Set<String> PHOTO_URL_SCHEMES = Set.of("http", "https");
+    private static final String FILE_URLS_ENABLED_ENV = "DATING_APP_ALLOW_FILE_URLS";
+    private static final String FILE_URLS_ENABLED_PROPERTY = "datingapp.allowFileUrls";
+    private static final String FILE_URL_ROOT_ENV = "DATING_APP_ALLOWED_FILE_URL_ROOT";
+    private static final String FILE_URL_ROOT_PROPERTY = "datingapp.allowedFileUrlRoot";
 
     /** Shared configuration for validation thresholds. */
     private final AppConfig config;
@@ -356,20 +361,84 @@ public class ValidationService {
         }
 
         String scheme = uri.getScheme();
-        if (scheme == null || !PHOTO_URL_SCHEMES.contains(scheme.toLowerCase(Locale.ROOT))) {
+        if (scheme == null) {
             throw new IllegalArgumentException(INVALID_PHOTO_URL);
         }
-        if ("file".equalsIgnoreCase(scheme)) {
-            if (uri.getPath() == null || uri.getPath().isBlank()) {
-                throw new IllegalArgumentException(INVALID_PHOTO_URL);
-            }
-            return uri.toASCIIString();
+
+        String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
+        if ("file".equals(normalizedScheme)) {
+            return normalizeFilePhotoUrl(uri);
+        }
+        if (!PHOTO_URL_SCHEMES.contains(normalizedScheme)) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
         }
         if (uri.getHost() == null || uri.getHost().isBlank()) {
             throw new IllegalArgumentException(INVALID_PHOTO_URL);
         }
 
         return uri.toASCIIString();
+    }
+
+    private static String normalizeFilePhotoUrl(URI uri) {
+        if (!isFilePhotoUrlEnabled()) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+        if (uri.getPath() == null || uri.getPath().isBlank()) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+        if (uri.getAuthority() != null && !uri.getAuthority().isBlank()) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+        if (uri.getPath().contains("..")) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+        if (uri.getQuery() != null || uri.getFragment() != null) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+
+        final Path normalizedPath;
+        try {
+            normalizedPath = Path.of(uri).toAbsolutePath().normalize();
+        } catch (RuntimeException _) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+
+        Path allowedRoot = resolveAllowedFileUrlRoot();
+        if (!normalizedPath.startsWith(allowedRoot)) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+
+        return normalizedPath.toUri().toASCIIString();
+    }
+
+    private static boolean isFilePhotoUrlEnabled() {
+        String configured =
+                firstNonBlank(System.getProperty(FILE_URLS_ENABLED_PROPERTY), System.getenv(FILE_URLS_ENABLED_ENV));
+        return "true".equalsIgnoreCase(configured);
+    }
+
+    private static Path resolveAllowedFileUrlRoot() {
+        String configured = firstNonBlank(System.getProperty(FILE_URL_ROOT_PROPERTY), System.getenv(FILE_URL_ROOT_ENV));
+        try {
+            if (configured != null) {
+                return Path.of(configured).toAbsolutePath().normalize();
+            }
+            return Path.of(System.getProperty("user.home"), ".datingapp", "photos")
+                    .toAbsolutePath()
+                    .normalize();
+        } catch (RuntimeException _) {
+            throw new IllegalArgumentException(INVALID_PHOTO_URL);
+        }
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
     }
 
     private static boolean containsControlCharacters(String value) {
