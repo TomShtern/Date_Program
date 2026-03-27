@@ -1,5 +1,5 @@
 
-> 🚀 **VERIFIED & UPDATED: 2026-03-13**
+> 🚀 **VERIFIED & UPDATED: 2026-03-27**
 > This document has been programmatically verified against the codebase as of this date.
 
 <!--AGENT-DOCSYNC:ON-->
@@ -24,10 +24,9 @@ Guidance for AI coding agents working in this repository.
 - Java 25 + JavaFX 25
 - Maven
 
-## Verified Source Snapshot (2026-03-13)
+## Verified Source Snapshot (2026-03-27)
 
-- Java files: **267 total** (`fd -e java . src/` — includes `src/main` + `src/test`)
-- Java LOC (`tokei src/`): **73,830 total / 58,653 code / 10,562 blank / 4,615 comments**
+- Java files: **296 total** (144 `src/main` + 152 `src/test`, via `find src/ -name "*.java" | wc -l`)
 
 ## Architecture (code-verified)
 
@@ -35,10 +34,9 @@ Guidance for AI coding agents working in this repository.
 datingapp/
   Main.java
   app/
-    api/RestApiServer.java
-    bootstrap/ApplicationStartup.java
+    api/{RestApiServer,RestApiDtos}.java
+    bootstrap/{ApplicationStartup,CleanupScheduler}.java
     cli/{CliTextAndInput,MainMenuRegistry,MatchingCliPresenter,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
-    error/{AppError,AppResult}.java
     event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
     event/handlers/{AchievementEventHandler,MetricsEventHandler,NotificationEventHandler}.java
     usecase/
@@ -49,25 +47,25 @@ datingapp/
       social/SocialUseCases.java
   core/
     AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil
+    i18n/I18n
     model/{User,Match,ProfileNote,LocationModels}
     connection/{ConnectionModels,ConnectionService}
-    matching/{CandidateFinder,CompatibilityCalculator,DefaultCompatibilityCalculator,DailyLimitService,DefaultDailyLimitService,DailyPickService,DefaultDailyPickService,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,StandoutService,DefaultStandoutService,TrustSafetyService,UndoService}
+    matching/{CandidateFinder,CompatibilityCalculator,DefaultCompatibilityCalculator,DailyLimitService,DefaultDailyLimitService,DailyPickService,DefaultDailyPickService,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,ModerationAuditEvent,ModerationAuditLogger,RecommendationService,Standout,StandoutService,DefaultStandoutService,TrustSafetyService,UndoService}
     metrics/{AchievementService,ActivityMetricsService,DefaultAchievementService,EngagementDomain,SwipeState}
-    profile/{MatchPreferences,ProfileCompletionSupport,ProfileService,ValidationService,LocationService}
-    storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
-    time/{DefaultTimePolicy,TimePolicy}
+    profile/{LocationService,MatchPreferences,ProfileCompletionSupport,ProfileService,SanitizerUtils,ValidationService}
+    storage/{AccountCleanupStorage,AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
     workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
   storage/
     DatabaseManager.java
     StorageFactory.java
     DevDataSeeder.java
-    jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
+    jdbi/{JdbiAccountCleanupStorage,JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
     schema/{MigrationRunner,SchemaInitializer}.java
   ui/
-    DatingApp,NavigationService,ImageCache,UiAnimations,UiComponents,UiConstants,UiFeedbackService,UiUtils
-    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
-    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,SafetyController,SocialController,StandoutsController,StatsController}
-    viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,PreferencesViewModel,ProfileViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
+    DatingApp,ImageCache,LocalPhotoStore,NavigationService,UiAnimations,UiComponents,UiConstants,UiDialogs,UiFeedbackService,UiPreferencesStore,UiUtils
+    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,PollingTaskHandle,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
+    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,ProfileFormValidator,ProfileViewController,SafetyController,SocialController,StandoutsController,StatsController}
+    viewmodel/{BaseViewModel,ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,NotesViewModel,PreferencesViewModel,ProfileReadOnlyViewModel,ProfileViewModel,SafetyViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
 ```
 
 ## Critical Gotchas
@@ -173,6 +171,58 @@ mvn spotless:apply verify
 - Construct use-case classes directly — obtain them from `ServiceRegistry`
 - Use `AppConfig.defaults()` in runtime service code — inject via `ServiceRegistry`
 
+## Recent Updates (2026-03-27)
+
+### Package removals
+- `app/error/` (`AppError`, `AppResult`) — **removed**. Do not reference these types.
+- `core/time/` (`DefaultTimePolicy`, `TimePolicy`) — **removed**. Time policy logic is now inline or handled elsewhere.
+
+### Moderation Audit Subsystem (`core/matching/ModerationAuditEvent`, `ModerationAuditLogger`)
+- `ModerationAuditEvent` — record capturing `actorId`, `targetId`, `action`, `outcome`, `context`, `timestamp`.
+- `ModerationAuditLogger` — emits structured SLF4J audit log events (`audit.moderation` logger) with PII classification metadata and 30-day retention policy.
+- Wire report/block/unblock/auto-ban flows through `ModerationAuditLogger`; never log raw user strings to non-audit loggers.
+
+### CleanupScheduler (`app/bootstrap/CleanupScheduler`)
+- Background periodic cleanup for `ActivityMetricsService` retention routines.
+- Configured with a `Duration` interval; started/stopped via lifecycle methods. Wired during `ApplicationStartup`.
+
+### I18n (`core/i18n/I18n`)
+- Shared localization utility for CLI and JavaFX flows.
+- `I18n.bundle()` / `I18n.bundle(Locale)` — loads `i18n/messages` `ResourceBundle`.
+- Use instead of ad-hoc `ResourceBundle.getBundle(...)` calls.
+
+### BaseViewModel (`ui/viewmodel/BaseViewModel`)
+- Abstract base class for all ViewModels; provides `asyncScope`, loading-state `BooleanProperty`, and disposal tracking.
+- All new ViewModels must extend `BaseViewModel`.
+
+### New ViewModels
+- `NotesViewModel` — profile notes CRUD.
+- `SafetyViewModel` — safety/blocking/reporting flows.
+- `ProfileReadOnlyViewModel` — read-only profile view for viewing other users' profiles.
+
+### New Screen/UI classes
+- `ProfileViewController` — controller for read-only profile view screen.
+- `ProfileFormValidator` — client-side field validation for profile edit form; extracted from `ProfileController`.
+- `UiDialogs` — centralised standard dialog factory (confirmation, error, input). Use instead of inline `Alert`/`Dialog` construction.
+- `UiPreferencesStore` — persists UI user preferences (theme, etc.) locally.
+- `LocalPhotoStore` — manages local photo file storage/caching for the UI layer.
+
+### New async primitive
+- `PollingTaskHandle` — `TaskHandle` implementation for long-lived polling tasks managed by `ViewModelAsyncScope`. Use for repeated background polling (e.g., conversation refresh).
+
+### RestApiDtos (`app/api/RestApiDtos`)
+- Dedicated DTO/request-body record types for the REST API. Keeps `RestApiServer` free of inline anonymous records.
+
+### AccountCleanupStorage (`core/storage/AccountCleanupStorage`, `storage/jdbi/JdbiAccountCleanupStorage`)
+- New storage interface + JDBI implementation for account-level cleanup operations (expired-session purge, soft-deleted user removal).
+- Wired via `StorageFactory`; consumed by `CleanupScheduler`.
+
+### SanitizerUtils (`core/profile/SanitizerUtils`)
+- Input sanitization utilities (strip control chars, normalize whitespace, etc.) for profile text fields.
+- Use from `ProfileService` / `ValidationService` instead of inline regex.
+
+---
+
 ## Recent Updates (2026-03-13)
 
 ### Location Feature (`core/model/LocationModels`, `core/profile/LocationService`)
@@ -231,4 +281,5 @@ mvn spotless:apply verify
 29|2026-03-07 00:00:00|agent:claude_code|scope:source-truth-sync|Added event handlers subpackage, InterestMatcher, use-case wiring docs, config access gotcha, updated LOC|CLAUDE.md
 30|2026-03-11 00:00:00|agent:claude_code|scope:architecture-corrections|Removed non-existent PerformanceMonitor and CompatibilityScoring; fixed popup package (MatchPopupController removed, MilestonePopupController moved to screen); added SafetyController and NotesController to screen list; added MatchingCliPresenter to cli list; added Default* matching impls, AchievementService, ProfileCompletionSupport; corrected false RestApiServer claim; added 2 new gotchas (AchievementType enum split, sessionTimeout scope)|CLAUDE.md
 31|2026-03-13 00:00:00|agent:claude_code|scope:code-verified-sync|Updated snapshot (267 files, 73830 LOC via tokei/fd); added LocationModels+LocationService to arch; added DevDataSeeder to storage; added 4 new gotchas (@BindMethods, Locale.ENGLISH, LocationService scope, RestApiServer localhost-only); documented 33 REST endpoints, rate limiter, localhost bind; added ProfileUseCases new commands; added Recent Updates section|CLAUDE.md
+32|2026-03-27 00:00:00|agent:claude_code|scope:code-verified-sync|Updated snapshot to 296 files (144 main+152 test); removed app/error and core/time packages; added RestApiDtos, CleanupScheduler, I18n, ModerationAuditEvent/Logger, SanitizerUtils, AccountCleanupStorage, JdbiAccountCleanupStorage, LocalPhotoStore, UiDialogs, UiPreferencesStore, PollingTaskHandle, ProfileFormValidator, ProfileViewController, BaseViewModel, NotesViewModel, SafetyViewModel, ProfileReadOnlyViewModel to arch; added Recent Updates 2026-03-27 section|CLAUDE.md
 ---AGENT-LOG-END---
