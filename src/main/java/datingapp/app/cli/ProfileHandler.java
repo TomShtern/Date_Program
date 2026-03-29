@@ -628,7 +628,23 @@ public class ProfileHandler implements LoggingSupport {
         }
         if (lookupResult.resolvedLocation().isEmpty()) {
             logInfo(WARNING_MESSAGE_FORMAT, lookupResult.message());
-            return Optional.empty();
+            String approximateChoice = inputReader
+                    .readLine("Use an approximate supported area instead? (y/n): ")
+                    .trim();
+            if (!"y".equalsIgnoreCase(approximateChoice)) {
+                return Optional.empty();
+            }
+            LocationService.ResolveSelectionResult approximateResult =
+                    locationService.resolveSelection(countryCode, null, zipCode, true);
+            if (!approximateResult.valid()
+                    || approximateResult.resolvedLocation().isEmpty()) {
+                logInfo(WARNING_MESSAGE_FORMAT, approximateResult.message());
+                return Optional.empty();
+            }
+            ResolvedLocation approximateLocation =
+                    approximateResult.resolvedLocation().orElseThrow();
+            logInfo("ℹ️  Using approximate location: {}", approximateLocation.label());
+            return Optional.of(approximateLocation);
         }
         return lookupResult.resolvedLocation();
     }

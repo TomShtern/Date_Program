@@ -24,7 +24,6 @@ import java.util.Optional;
 import java.util.ResourceBundle;
 import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
-import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
@@ -979,79 +978,16 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private void handleSetLocation() {
-        Dialog<ButtonType> dialog =
-                UiUtils.createThemedDialog(rootPane, "Set Location", "Choose where you want to discover people");
-
-        VBox content = new VBox(UiConstants.SPACING_LARGE);
-        content.setPadding(new Insets(UiConstants.PADDING_XLARGE));
-
-        LocationService locationService = viewModel.getLocationService();
-        Country defaultCountry = locationService.getDefaultCountry();
-
-        Label helperLabel = UiUtils.createSecondaryLabel("Choose a country, then select a city or enter a ZIP code.");
-        Label exampleLabel =
-                UiUtils.createSecondaryLabel("Coordinates stay internal; you only choose human-friendly places.");
-        Label currentLocationLabel = UiUtils.createSecondaryLabel(buildCurrentLocationSummary());
-
-        ComboBox<Country> countryCombo = createCountryCombo(locationService, defaultCountry);
-
-        TextField citySearchField = new TextField();
-        citySearchField.setPromptText("Search city (for example, Tel Aviv)");
-        ListView<City> cityListView = createCityListView();
-
-        TextField zipField = new TextField();
-        zipField.setPromptText("Israeli ZIP code (7 digits)");
-
-        Label previewLabel = UiUtils.createSecondaryLabel("");
-
-        Label errorLabel = new Label();
-        errorLabel.getStyleClass().add("dialog-error-label");
-        UiUtils.setLabelMessage(errorLabel, null);
-
-        content.getChildren()
-                .addAll(
-                        helperLabel,
-                        exampleLabel,
-                        currentLocationLabel,
-                        new Label("Country"),
-                        countryCombo,
-                        new Label("City"),
-                        citySearchField,
-                        cityListView,
-                        new Label("ZIP code (optional fallback)"),
-                        zipField,
-                        previewLabel,
-                        errorLabel);
-
-        dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-
-        Button confirmButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
-        confirmButton.setText("Save Location");
-
-        final ResolvedLocation[] pendingLocation = new ResolvedLocation[1];
-        LocationDialogRefs dialogRefs = new LocationDialogRefs(
-                countryCombo, citySearchField, cityListView, zipField, confirmButton, previewLabel, errorLabel);
-        Runnable refreshCitySuggestions = () -> refreshCitySuggestions(locationService, dialogRefs);
-        Runnable refreshValidationState = () -> refreshLocationValidation(locationService, dialogRefs, pendingLocation);
-
-        wireLocationDialogInteractions(defaultCountry, dialogRefs, refreshCitySuggestions, refreshValidationState);
-
-        refreshCitySuggestions.run();
-        refreshValidationState.run();
-
-        confirmButton.addEventFilter(ActionEvent.ACTION, event -> {
-            if (pendingLocation[0] == null) {
-                UiUtils.setLabelMessage(
-                        dialogRefs.errorLabel(), "Please choose a supported city or ZIP code before saving.");
-                event.consume();
-                return;
-            }
-            viewModel.setResolvedLocation(pendingLocation[0]);
-            viewModel.refreshUnsavedChangesFlag();
-        });
-
-        dialog.showAndWait();
+        LocationSelectionDialog.show(
+                        rootPane,
+                        viewModel.getLocationService(),
+                        viewModel.hasLocationSet(),
+                        viewModel.getLatitude(),
+                        viewModel.getLongitude())
+                .ifPresent(location -> {
+                    viewModel.setResolvedLocation(location);
+                    viewModel.refreshUnsavedChangesFlag();
+                });
     }
 
     private String buildCurrentLocationSummary() {

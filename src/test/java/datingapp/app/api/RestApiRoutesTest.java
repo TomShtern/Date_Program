@@ -1,12 +1,13 @@
 package datingapp.app.api;
 
-import static datingapp.app.api.RestApiDtos.ErrorResponse;
-import static datingapp.app.api.RestApiDtos.HealthResponse;
-import static datingapp.app.api.RestApiDtos.MessageDto;
-import static datingapp.app.api.RestApiDtos.UserDetail;
-import static datingapp.app.api.RestApiDtos.UserSummary;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import datingapp.app.api.RestApiDtos.ErrorResponse;
+import datingapp.app.api.RestApiDtos.HealthResponse;
+import datingapp.app.api.RestApiDtos.MessageDto;
+import datingapp.app.api.RestApiDtos.UserDetail;
+import datingapp.app.api.RestApiDtos.UserSummary;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.testutil.TestClock;
@@ -117,8 +118,8 @@ class RestApiRoutesTest {
             ZoneId utc = ZoneId.of("UTC");
             ZoneId losAngeles = ZoneId.of("America/Los_Angeles");
 
-            UserDetail utcDetail = UserDetail.from(user, utc);
-            UserDetail laDetail = UserDetail.from(user, losAngeles);
+            UserDetail utcDetail = UserDetail.from(user, utc, null);
+            UserDetail laDetail = UserDetail.from(user, losAngeles, null);
 
             assertEquals(user.getAge(utc).orElseThrow(), utcDetail.age());
             assertEquals(user.getAge(losAngeles).orElseThrow(), laDetail.age());

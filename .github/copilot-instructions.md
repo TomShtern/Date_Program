@@ -316,12 +316,21 @@ datingapp/
 - Use `EnumSetUtil.safeCopy(...)` or equivalent null-safe handling for `EnumSet` values.
 - Keep runtime config injection on `AppConfig` from `ServiceRegistry`; reserve `AppConfig.defaults()` for bootstrap, composition, or tests.
 
+## Location feature parity
+
+- `src/main/java/datingapp/core/profile/LocationService.java` is the single shared location engine. Keep country/city/ZIP search, selection resolution, reverse-selection seeds, approximate ZIP fallback, and display formatting there rather than duplicating rules in adapters.
+- Keep location behavior aligned across JavaFX (`ui/screen/LocationSelectionDialog` + `ProfileController`), CLI (`app/cli/ProfileHandler`), and REST (`app/api/RestApiServer` + `RestApiDtos`). If one surface changes, review the other two.
+- API clients can use `GET /api/location/countries`, `GET /api/location/cities`, and `POST /api/location/resolve`; profile updates support a nested `location` selection object in addition to legacy `latitude` / `longitude`.
+- For user-facing output, prefer `locationService.formatForDisplay(...)`; do not reintroduce coarse or raw coordinate display when a supported location label exists.
+- Only Israel (`IL`) is selectable today; other countries are listed but unavailable. Valid-but-unsupported Israeli ZIP codes can fall back to `Approximate area in Israel` when the caller or user opts in.
+
 ## Runtime gotchas
 
 - `RestApiServer` binds to loopback only by design; do not assume external host access.
 - `DevDataSeeder` is env-gated and idempotent; it should remain safe to call during startup.
 - Record-typed JDBI parameters should use `@BindMethods`, not `@BindBean`.
 - Keep date/time formatting locale-explicit when user-facing text depends on month names or weekday names.
+- `POST /api/location/resolve` is treated as a read-only lookup route and is intentionally exempt from the mutating-route `X-User-Id` requirement.
 
 ## Build and verification order
 
@@ -334,9 +343,12 @@ datingapp/
 ## Key pattern files
 
 - `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java` - bootstrap, config loading, and Jackson mix-in pattern.
+- `src/main/java/datingapp/app/api/RestApiServer.java` and `src/main/java/datingapp/app/api/RestApiDtos.java` - REST route patterns, including location metadata/resolve endpoints and selection-based profile update contracts.
 - `src/main/java/datingapp/core/ServiceRegistry.java` - central service and use-case wiring.
+- `src/main/java/datingapp/core/profile/LocationService.java` - shared built-in location dataset, selection/fallback behavior, reverse lookup, and friendly display formatting.
 - `src/main/java/datingapp/Main.java` - CLI composition root and handler wiring.
 - `src/main/java/datingapp/ui/DatingApp.java` - JavaFX composition root.
+- `src/main/java/datingapp/ui/screen/LocationSelectionDialog.java` - shared JavaFX location selection helper used by `ProfileController`.
 - `src/main/java/datingapp/ui/viewmodel/ChatViewModel.java`, `MatchesViewModel.java`, and `ProfileViewModel.java` - current async ViewModel patterns.
 
 ## Keep these out of new work

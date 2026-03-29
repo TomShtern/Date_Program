@@ -686,6 +686,87 @@ class RestApiPhaseTwoRoutesTest {
         assertEquals(409, blockedMessageResponse.statusCode());
     }
 
+    @Test
+    @DisplayName("location lookup routes and selection-based profile updates support API parity")
+    void locationLookupRoutesAndSelectionBasedProfileUpdatesSupportApiParity() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        SeededStandoutStorage standoutStorage = new SeededStandoutStorage();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, standoutStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        User alice = activeUser(aliceId, "Alice Parity");
+        userStorage.save(alice);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> countriesResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/location/countries"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, countriesResponse.statusCode());
+        JsonNode countriesJson = MAPPER.readTree(countriesResponse.body());
+        assertEquals("IL", countriesJson.get(0).get("code").asText());
+
+        HttpResponse<String> citiesResponse = client.send(
+                HttpRequest.newBuilder(URI.create(
+                                "http://localhost:" + port + "/api/location/cities?countryCode=IL&query=tel"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, citiesResponse.statusCode());
+        JsonNode citiesJson = MAPPER.readTree(citiesResponse.body());
+        assertEquals("Tel Aviv", citiesJson.get(0).get("name").asText());
+
+        HttpResponse<String> resolveResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/location/resolve"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString("""
+                                {
+                                  \"countryCode\":\"IL\",
+                                  \"zipCode\":\"9999999\",
+                                  \"allowApproximate\":true
+                                }
+                                """))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, resolveResponse.statusCode());
+        JsonNode resolveJson = MAPPER.readTree(resolveResponse.body());
+        assertTrue(resolveJson.get("approximate").asBoolean());
+        assertTrue(resolveJson.get("label").asText().contains("Approximate"));
+
+        HttpResponse<String> updateProfileResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/profile"))
+                        .header("X-User-Id", aliceId.toString())
+                        .header("Content-Type", "application/json")
+                        .PUT(HttpRequest.BodyPublishers.ofString("""
+                                {
+                                  \"bio\":\"Updated bio\",
+                                  \"location\":{
+                                    \"countryCode\":\"IL\",
+                                    \"cityName\":\"Tel Aviv\"
+                                  }
+                                }
+                                """))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, updateProfileResponse.statusCode());
+        JsonNode profileJson = MAPPER.readTree(updateProfileResponse.body());
+        assertEquals(
+                "Tel Aviv, Tel Aviv District",
+                profileJson.get("approximateLocation").asText());
+
+        User savedAlice = userStorage.get(aliceId).orElseThrow();
+        assertEquals(32.0853, savedAlice.getLat(), 0.0001);
+        assertEquals(34.7818, savedAlice.getLon(), 0.0001);
+    }
+
     private static ServiceRegistry createServices(
             UserStorage userStorage,
             InteractionStorage interactionStorage,

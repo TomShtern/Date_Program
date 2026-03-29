@@ -50,7 +50,7 @@
         <Label fx:id="completionLabel" styleClass="notification-badge profile-completion-percent" text="20%"/>
         <Label styleClass="profile-completion-text" text="complete"/>
         <Label fx:id="completionDetailsLabel" maxWidth="180" styleClass="text-secondary" text="Missing: --"
-                                                                       wrapText="true"/>
+                                                                               wrapText="true"/>
       </VBox>
     </HBox>
   </top>
@@ -131,7 +131,7 @@
             <Label fx:id="charCountLabel" styleClass="char-counter" text="0/500"/>
           </HBox>
           <TextArea fx:id="bioArea" prefHeight="100" promptText="Tell others about yourself..."
-                                                                                                                            wrapText="true" styleClass="bio-textarea" accessibleText="Profile biography editor"/>
+                                                                                                                                      wrapText="true" styleClass="bio-textarea" accessibleText="Profile biography editor"/>
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Birth date:" prefWidth="120"/>
             <DatePicker fx:id="birthDatePicker" promptText="YYYY-MM-DD" prefWidth="180"/>
@@ -148,11 +148,11 @@
           </HBox>
           <HBox spacing="12" alignment="CENTER_LEFT">
             <FontIcon iconLiteral="mdi2m-map-marker-outline" iconSize="20" iconColor="#64748b"/>
-            <TextField fx:id="locationField" editable="false" focusTraversable="false" promptText="Set your coordinates" styleClass="profile-location-field"
-                                                                                                                                                    HBox.hgrow="ALWAYS"/>
+            <TextField fx:id="locationField" editable="false" focusTraversable="false" promptText="Choose your location" styleClass="profile-location-field"
+                                                                                                                                                                HBox.hgrow="ALWAYS"/>
             <Button fx:id="setLocationButton" onAction="#handleSetLocation" styleClass="button-secondary-small" text="Set Location"/>
           </HBox>
-          <Label styleClass="text-secondary" text="Use validated latitude and longitude values. No raw parsing surprises." wrapText="true"/>
+          <Label styleClass="text-secondary" text="Pick a city or ZIP-based area to improve distance matching." wrapText="true"/>
         </VBox>
         <!-- Gender &amp; Preferences Section - CRITICAL for matching -->
         <VBox styleClass="section-glass-card" spacing="16">

@@ -420,7 +420,7 @@ public class ProfileViewModel {
 
     private void updateLocationDisplay() {
         if (hasLocation.get() && !Double.isNaN(latitude.get()) && !Double.isNaN(longitude.get())) {
-            locationDisplay.set(formatLocation(latitude.get(), longitude.get()));
+            locationDisplay.set(locationService.formatForDisplay(latitude.get(), longitude.get()));
             return;
         }
         locationDisplay.set("");
@@ -1372,7 +1372,7 @@ public class ProfileViewModel {
         if (user == null || !user.hasLocation()) {
             return "Location not set";
         }
-        return formatLocation(user.getLat(), user.getLon());
+        return locationService.formatForDisplay(user.getLat(), user.getLon());
     }
 
     public record ProfilePreviewSnapshot(

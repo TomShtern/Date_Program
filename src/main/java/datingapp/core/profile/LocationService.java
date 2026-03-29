@@ -18,7 +18,9 @@ import java.util.Optional;
  * geocoding services.
  */
 public final class LocationService {
+    private static final String RESOLVED_LOCATION_REQUIRED = "resolvedLocation cannot be null";
     private static final String COUNTRY_IL = "IL";
+    private static final String APPROXIMATE_ISRAEL_LABEL = "Approximate area in Israel";
     private static final String CITY_TEL_AVIV = "Tel Aviv";
     private static final String DISTRICT_TEL_AVIV = "Tel Aviv District";
     private static final String CITY_JERUSALEM = "Jerusalem";
@@ -31,6 +33,8 @@ public final class LocationService {
     private static final int DEFAULT_RESULT_LIMIT = 10;
     private static final double ZIP_MATCH_MAX_KM = 3.0;
     private static final double CITY_MATCH_MAX_KM = 12.0;
+    private static final double APPROXIMATE_IL_LATITUDE = 31.4117;
+    private static final double APPROXIMATE_IL_LONGITUDE = 35.0818;
 
     private static final List<Country> COUNTRIES = List.of(
             new Country(COUNTRY_IL, "Israel", "🇮🇱", true, true),
@@ -90,6 +94,15 @@ public final class LocationService {
         return COUNTRIES;
     }
 
+    public Optional<Country> findCountry(String countryCode) {
+        if (countryCode == null || countryCode.isBlank()) {
+            return Optional.empty();
+        }
+        return COUNTRIES.stream()
+                .filter(country -> country.code().equalsIgnoreCase(countryCode.trim()))
+                .findFirst();
+    }
+
     public Country getDefaultCountry() {
         return COUNTRIES.stream().filter(Country::defaultSelection).findFirst().orElse(COUNTRIES.getFirst());
     }
@@ -133,6 +146,70 @@ public final class LocationService {
         return new ResolvedLocation(city.latitude(), city.longitude(), city.displayName(), Precision.CITY);
     }
 
+    public ResolveSelectionResult resolveSelection(
+            String countryCode, String cityName, String zipCode, boolean allowApproximate) {
+        Country country = findCountry(countryCode).orElse(null);
+        if (country == null) {
+            return ResolveSelectionResult.invalid("Country is required");
+        }
+        if (!country.available()) {
+            return ResolveSelectionResult.invalid(country.name() + " is not supported yet.");
+        }
+
+        if (cityName != null && !cityName.isBlank()) {
+            return findCityByName(country.code(), cityName)
+                    .map(this::resolveCity)
+                    .map(ResolveSelectionResult::supported)
+                    .orElseGet(() -> ResolveSelectionResult.invalid("Selected city is not supported."));
+        }
+
+        if (zipCode == null || zipCode.isBlank()) {
+            return ResolveSelectionResult.invalid("Choose a city or ZIP code first.");
+        }
+
+        ZipLookupResult zipLookupResult = lookupZip(country.code(), zipCode);
+        if (!zipLookupResult.valid()) {
+            return ResolveSelectionResult.invalid(zipLookupResult.message());
+        }
+        if (zipLookupResult.resolvedLocation().isPresent()) {
+            return ResolveSelectionResult.supported(
+                    zipLookupResult.resolvedLocation().orElseThrow(), zipLookupResult.message());
+        }
+        if (!allowApproximate) {
+            return ResolveSelectionResult.invalid(zipLookupResult.message());
+        }
+        return approximateZipFallback(country.code(), zipLookupResult.normalizedZip());
+    }
+
+    public Optional<SelectionSeed> seedSelection(double latitude, double longitude) {
+        Country country = getDefaultCountry();
+        Optional<ZipRange> zipRange = findZipRangeForCoordinates(latitude, longitude);
+        if (zipRange.isPresent()) {
+            ZipRange range = zipRange.orElseThrow();
+            return Optional.of(new SelectionSeed(
+                    country,
+                    findCityByName(range.countryCode(), range.city()),
+                    Optional.of(range.prefix()),
+                    new ResolvedLocation(range.latitude(), range.longitude(), range.displayName(), Precision.ZIP)));
+        }
+
+        Optional<City> city = findCityForCoordinates(latitude, longitude);
+        if (city.isPresent()) {
+            City matchedCity = city.orElseThrow();
+            return Optional.of(new SelectionSeed(
+                    country,
+                    Optional.of(matchedCity),
+                    Optional.empty(),
+                    new ResolvedLocation(
+                            matchedCity.latitude(),
+                            matchedCity.longitude(),
+                            matchedCity.displayName(),
+                            Precision.CITY)));
+        }
+
+        return Optional.empty();
+    }
+
     public ZipLookupResult lookupZip(String countryCode, String zipCode) {
         ValidationService.ValidationResult validationResult = validationService.validateZipCode(zipCode, countryCode);
         if (!validationResult.valid()) {
@@ -151,22 +228,13 @@ public final class LocationService {
     }
 
     public Optional<ResolvedLocation> reverseLookup(double latitude, double longitude) {
-        Optional<ResolvedLocation> zipMatch = zipRangesFor(COUNTRY_IL).stream()
-                .map(range -> new CandidateMatch(
-                        distanceKm(latitude, longitude, range.latitude(), range.longitude()),
-                        new ResolvedLocation(range.latitude(), range.longitude(), range.displayName(), Precision.ZIP)))
-                .filter(match -> match.distanceKm() <= ZIP_MATCH_MAX_KM)
-                .min(Comparator.comparingDouble(CandidateMatch::distanceKm))
-                .map(CandidateMatch::location);
+        Optional<ResolvedLocation> zipMatch = findZipRangeForCoordinates(latitude, longitude)
+                .map(range ->
+                        new ResolvedLocation(range.latitude(), range.longitude(), range.displayName(), Precision.ZIP));
         if (zipMatch.isPresent()) {
             return zipMatch;
         }
-        return citiesFor(COUNTRY_IL).stream()
-                .map(city -> new CandidateMatch(
-                        distanceKm(latitude, longitude, city.latitude(), city.longitude()), resolveCity(city)))
-                .filter(match -> match.distanceKm() <= CITY_MATCH_MAX_KM)
-                .min(Comparator.comparingDouble(CandidateMatch::distanceKm))
-                .map(CandidateMatch::location);
+        return findCityForCoordinates(latitude, longitude).map(this::resolveCity);
     }
 
     public String formatForDisplay(double latitude, double longitude) {
@@ -186,6 +254,37 @@ public final class LocationService {
     private boolean matches(City city, String normalizedQuery) {
         return normalizeText(city.name()).contains(normalizedQuery)
                 || normalizeText(city.district()).contains(normalizedQuery);
+    }
+
+    private ResolveSelectionResult approximateZipFallback(String countryCode, String normalizedZip) {
+        if (!COUNTRY_IL.equalsIgnoreCase(countryCode)) {
+            return ResolveSelectionResult.invalid("Approximate ZIP fallback is not available for this country yet.");
+        }
+        String message = normalizedZip == null || normalizedZip.isBlank()
+                ? "Using an approximate supported area in Israel."
+                : "Using an approximate supported area in Israel for ZIP " + normalizedZip + ".";
+        return ResolveSelectionResult.approximate(
+                new ResolvedLocation(
+                        APPROXIMATE_IL_LATITUDE, APPROXIMATE_IL_LONGITUDE, APPROXIMATE_ISRAEL_LABEL, Precision.ZIP),
+                message);
+    }
+
+    private Optional<ZipRange> findZipRangeForCoordinates(double latitude, double longitude) {
+        return zipRangesFor(COUNTRY_IL).stream()
+                .map(range -> new ZipRangeCandidate(
+                        distanceKm(latitude, longitude, range.latitude(), range.longitude()), range))
+                .filter(candidate -> candidate.distanceKm() <= ZIP_MATCH_MAX_KM)
+                .min(Comparator.comparingDouble(ZipRangeCandidate::distanceKm))
+                .map(ZipRangeCandidate::range);
+    }
+
+    private Optional<City> findCityForCoordinates(double latitude, double longitude) {
+        return citiesFor(COUNTRY_IL).stream()
+                .map(city ->
+                        new CityCandidate(distanceKm(latitude, longitude, city.latitude(), city.longitude()), city))
+                .filter(candidate -> candidate.distanceKm() <= CITY_MATCH_MAX_KM)
+                .min(Comparator.comparingDouble(CityCandidate::distanceKm))
+                .map(CityCandidate::city);
     }
 
     private static String normalizeText(String text) {
@@ -216,7 +315,7 @@ public final class LocationService {
         public ZipLookupResult {
             message = message == null ? "" : message;
             normalizedZip = normalizedZip == null ? "" : normalizedZip;
-            Objects.requireNonNull(resolvedLocation, "resolvedLocation cannot be null");
+            Objects.requireNonNull(resolvedLocation, RESOLVED_LOCATION_REQUIRED);
         }
 
         public static ZipLookupResult invalid(String message) {
@@ -232,5 +331,41 @@ public final class LocationService {
         }
     }
 
-    private record CandidateMatch(double distanceKm, ResolvedLocation location) {}
+    public record ResolveSelectionResult(
+            boolean valid, String message, Optional<ResolvedLocation> resolvedLocation, boolean approximate) {
+        public ResolveSelectionResult {
+            message = message == null ? "" : message;
+            Objects.requireNonNull(resolvedLocation, RESOLVED_LOCATION_REQUIRED);
+        }
+
+        public static ResolveSelectionResult invalid(String message) {
+            return new ResolveSelectionResult(false, message, Optional.empty(), false);
+        }
+
+        public static ResolveSelectionResult supported(ResolvedLocation resolvedLocation) {
+            return supported(resolvedLocation, "");
+        }
+
+        public static ResolveSelectionResult supported(ResolvedLocation resolvedLocation, String message) {
+            return new ResolveSelectionResult(true, message, Optional.of(resolvedLocation), false);
+        }
+
+        public static ResolveSelectionResult approximate(ResolvedLocation resolvedLocation, String message) {
+            return new ResolveSelectionResult(true, message, Optional.of(resolvedLocation), true);
+        }
+    }
+
+    public record SelectionSeed(
+            Country country, Optional<City> city, Optional<String> zipPrefix, ResolvedLocation resolvedLocation) {
+        public SelectionSeed {
+            Objects.requireNonNull(country, "country cannot be null");
+            Objects.requireNonNull(city, "city cannot be null");
+            Objects.requireNonNull(zipPrefix, "zipPrefix cannot be null");
+            Objects.requireNonNull(resolvedLocation, RESOLVED_LOCATION_REQUIRED);
+        }
+    }
+
+    private record ZipRangeCandidate(double distanceKm, ZipRange range) {}
+
+    private record CityCandidate(double distanceKm, City city) {}
 }

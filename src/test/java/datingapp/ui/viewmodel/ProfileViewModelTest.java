@@ -339,6 +339,39 @@ class ProfileViewModelTest {
     }
 
     @Test
+    @DisplayName("profile preview snapshot uses human friendly labels for supported locations")
+    void profilePreviewSnapshotUsesHumanFriendlyLabelsForSupportedLocations() {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+
+        User currentUser = createActiveUser("Preview Location User");
+        currentUser.setLocation(32.0853, 34.7818);
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                (datingapp.app.usecase.profile.ProfileUseCases) null,
+                config,
+                session,
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy());
+
+        viewModel.loadCurrentUser();
+
+        ProfileViewModel.ProfilePreviewSnapshot snapshot = viewModel.buildPreviewSnapshot();
+
+        assertEquals("Tel Aviv, Tel Aviv District", snapshot.location());
+
+        viewModel.dispose();
+    }
+
+    @Test
     @DisplayName("oversized photos are rejected before any upload work starts")
     void oversizedPhotosAreRejectedBeforeUpload() throws Exception {
         originalUserHome = System.getProperty("user.home");

@@ -11,6 +11,10 @@ import datingapp.app.api.RestApiDtos.ErrorResponse;
 import datingapp.app.api.RestApiDtos.FriendRequestsResponse;
 import datingapp.app.api.RestApiDtos.HealthResponse;
 import datingapp.app.api.RestApiDtos.LikeResponse;
+import datingapp.app.api.RestApiDtos.LocationCityDto;
+import datingapp.app.api.RestApiDtos.LocationCountryDto;
+import datingapp.app.api.RestApiDtos.LocationResolveRequest;
+import datingapp.app.api.RestApiDtos.LocationResolveResponse;
 import datingapp.app.api.RestApiDtos.MarkAllNotificationsReadResponse;
 import datingapp.app.api.RestApiDtos.MatchQualityDto;
 import datingapp.app.api.RestApiDtos.MatchSummary;
@@ -79,6 +83,7 @@ import datingapp.core.matching.CandidateFinder;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
+import datingapp.core.profile.LocationService;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
@@ -159,6 +164,7 @@ public class RestApiServer {
     private final MessagingUseCases messagingUseCases;
     private final ProfileUseCases profileUseCases;
     private final SocialUseCases socialUseCases;
+    private final LocationService locationService;
     private final ZoneId userTimeZone;
     private final LocalRateLimiter rateLimiter;
     private final int port;
@@ -176,6 +182,7 @@ public class RestApiServer {
         this.messagingUseCases = services.getMessagingUseCases();
         this.profileUseCases = services.getProfileUseCases();
         this.socialUseCases = services.getSocialUseCases();
+        this.locationService = services.getLocationService();
         this.userTimeZone = services.getConfig().safety().userTimeZone();
         this.rateLimiter = new LocalRateLimiter(DEFAULT_RATE_LIMIT_WINDOW, DEFAULT_RATE_LIMIT_REQUESTS);
         this.port = port;
@@ -228,6 +235,7 @@ public class RestApiServer {
         // ────────────────────────────────────────────────────────────────────
 
         new HealthRoutes(app).register();
+        new LocationRoutes(app, this).register();
         new UserRoutes(app, this).register();
         new MatchingRoutes(app, this).register();
         new SocialRoutes(app, this).register();
@@ -267,7 +275,42 @@ public class RestApiServer {
         if (user == null) {
             return;
         }
-        ctx.json(UserDetail.from(user, userTimeZone));
+        ctx.json(UserDetail.from(user, userTimeZone, locationLabel(user)));
+    }
+
+    private void listLocationCountries(Context ctx) {
+        ctx.json(locationService.getAvailableCountries().stream()
+                .map(LocationCountryDto::from)
+                .toList());
+    }
+
+    private void listLocationCities(Context ctx) {
+        String countryCode = Optional.ofNullable(ctx.queryParam("countryCode"))
+                .filter(value -> !value.isBlank())
+                .orElse(locationService.getDefaultCountry().code());
+        String query = Optional.ofNullable(ctx.queryParam("query")).orElse("");
+        int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(10);
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be greater than 0");
+        }
+        ctx.json(locationService.searchCities(countryCode, query, limit).stream()
+                .map(LocationCityDto::from)
+                .toList());
+    }
+
+    private void resolveLocationSelection(Context ctx) {
+        LocationResolveRequest request = ctx.bodyAsClass(LocationResolveRequest.class);
+        var result = locationService.resolveSelection(
+                request.countryCode(),
+                request.cityName(),
+                request.zipCode(),
+                Boolean.TRUE.equals(request.allowApproximate()));
+        if (!result.valid() || result.resolvedLocation().isEmpty()) {
+            ctx.status(400).json(new ErrorResponse(BAD_REQUEST, result.message()));
+            return;
+        }
+        ctx.json(LocationResolveResponse.from(
+                result.resolvedLocation().orElseThrow(), result.approximate(), result.message()));
     }
 
     private void browseCandidates(Context ctx) {
@@ -293,14 +336,27 @@ public class RestApiServer {
         }
         ProfileUpdateRequest request = ctx.bodyAsClass(ProfileUpdateRequest.class);
 
+        Optional<ResolvedProfileLocation> resolvedLocation;
+        try {
+            resolvedLocation = resolveProfileLocation(request);
+        } catch (IllegalArgumentException e) {
+            ctx.status(400).json(new ErrorResponse(BAD_REQUEST, e.getMessage()));
+            return;
+        }
+
+        Double latitude =
+                resolvedLocation.map(ResolvedProfileLocation::latitude).orElse(request.latitude());
+        Double longitude =
+                resolvedLocation.map(ResolvedProfileLocation::longitude).orElse(request.longitude());
+
         var result = profileUseCases.updateProfile(new UpdateProfileCommand(
                 UserContext.api(userId),
                 request.bio(),
                 request.birthDate(),
                 request.gender(),
                 request.interestedIn(),
-                request.latitude(),
-                request.longitude(),
+                latitude,
+                longitude,
                 request.maxDistanceKm(),
                 request.minAge(),
                 request.maxAge(),
@@ -316,7 +372,11 @@ public class RestApiServer {
             handleUseCaseFailure(ctx, result.error());
             return;
         }
-        ctx.json(ProfileUpdateResponse.from(result.data().user(), result.data().activated(), userTimeZone));
+        ctx.json(ProfileUpdateResponse.from(
+                result.data().user(),
+                result.data().activated(),
+                userTimeZone,
+                locationLabel(result.data().user())));
     }
 
     private void deleteUser(Context ctx) {
@@ -344,6 +404,30 @@ public class RestApiServer {
                 .map(candidate -> UserSummary.from(candidate, userTimeZone))
                 .toList();
         ctx.json(candidates);
+    }
+
+    private Optional<ResolvedProfileLocation> resolveProfileLocation(ProfileUpdateRequest request) {
+        if (request.location() == null) {
+            return Optional.empty();
+        }
+        var location = request.location();
+        var result = locationService.resolveSelection(
+                location.countryCode(),
+                location.cityName(),
+                location.zipCode(),
+                Boolean.TRUE.equals(location.allowApproximate()));
+        if (!result.valid() || result.resolvedLocation().isEmpty()) {
+            throw new IllegalArgumentException(result.message());
+        }
+        var resolvedLocation = result.resolvedLocation().orElseThrow();
+        return Optional.of(new ResolvedProfileLocation(resolvedLocation.latitude(), resolvedLocation.longitude()));
+    }
+
+    private String locationLabel(User user) {
+        if (user == null || !user.hasLocationSet()) {
+            return null;
+        }
+        return locationService.formatForDisplay(user.getLat(), user.getLon());
     }
 
     // ── Match Handlers ──────────────────────────────────────────────────
@@ -1013,7 +1097,7 @@ public class RestApiServer {
 
     private boolean requiresActingUserIdentity(Context ctx) {
         return switch (ctx.method()) {
-            case POST, PUT, DELETE -> !HEALTH_ROUTE.equals(ctx.path());
+            case POST, PUT, DELETE -> !HEALTH_ROUTE.equals(ctx.path()) && !"/api/location/resolve".equals(ctx.path());
             default -> false;
         };
     }
@@ -1262,6 +1346,23 @@ public class RestApiServer {
         }
     }
 
+    private static final class LocationRoutes implements RouteModule {
+        private final Javalin app;
+        private final RestApiServer server;
+
+        private LocationRoutes(Javalin app, RestApiServer server) {
+            this.app = app;
+            this.server = server;
+        }
+
+        @Override
+        public void register() {
+            app.get("/api/location/countries", server::listLocationCountries);
+            app.get("/api/location/cities", server::listLocationCities);
+            app.post("/api/location/resolve", server::resolveLocationSelection);
+        }
+    }
+
     private static final class MatchingRoutes implements RouteModule {
         private final Javalin app;
         private final RestApiServer server;
@@ -1361,4 +1462,6 @@ public class RestApiServer {
             ApplicationStartup.shutdown();
         }));
     }
+
+    private record ResolvedProfileLocation(Double latitude, Double longitude) {}
 }

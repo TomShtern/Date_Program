@@ -83,7 +83,9 @@ class RestApiReadRoutesTest {
         UUID aliceId = UUID.randomUUID();
         UUID bobId = UUID.randomUUID();
         User alice = activeUser(aliceId, "Alice", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        alice.setLocation(32.0853, 34.7818);
         User bob = activeUser(bobId, "Bob", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        bob.setLocation(32.0870, 34.8877);
         userStorage.save(alice);
         userStorage.save(bob);
         interactionStorage.save(Match.create(aliceId, bobId));
@@ -109,6 +111,9 @@ class RestApiReadRoutesTest {
         assertEquals(200, userResponse.statusCode());
         JsonNode userJson = MAPPER.readTree(userResponse.body());
         assertEquals("Alice", userJson.get("name").asText());
+        assertEquals(
+                "Tel Aviv, Tel Aviv District",
+                userJson.get("approximateLocation").asText());
 
         HttpResponse<String> candidatesResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/candidates"))

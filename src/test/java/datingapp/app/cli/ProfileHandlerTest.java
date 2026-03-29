@@ -15,6 +15,7 @@ import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
@@ -26,6 +27,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Optional;
 import java.util.Scanner;
 import java.util.TimeZone;
 import java.util.UUID;
@@ -252,6 +254,21 @@ class ProfileHandlerTest {
             handlerLogger.setLevel(previousLevel);
             appender.stop();
         }
+    }
+
+    @Test
+    @DisplayName("promptZipSelection offers approximate fallback for valid unsupported ZIP codes")
+    void promptZipSelectionOffersApproximateFallbackForValidUnsupportedZipCodes() throws Exception {
+        ProfileHandler handler = createHandler("9999999\ny\n");
+
+        Method method = ProfileHandler.class.getDeclaredMethod("promptZipSelection", String.class);
+        method.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Optional<ResolvedLocation> resolvedLocation = (Optional<ResolvedLocation>) method.invoke(handler, "IL");
+
+        assertTrue(resolvedLocation.isPresent());
+        assertTrue(resolvedLocation.orElseThrow().label().contains("Approximate"));
     }
 
     private ProfileHandler createHandler(String input) {

@@ -11,6 +11,9 @@ import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.Standout;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
+import datingapp.core.model.LocationModels.City;
+import datingapp.core.model.LocationModels.Country;
+import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.Match;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
@@ -21,7 +24,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -35,8 +37,6 @@ import java.util.UUID;
  */
 final class RestApiDtos {
     private static final String UNKNOWN_USER = "Unknown";
-    private static final double APPROXIMATE_COORDINATE_SCALE = 10.0;
-    private static final String APPROXIMATE_COORDINATE_FORMAT = "%.1f, %.1f";
 
     private RestApiDtos() {}
 
@@ -77,7 +77,7 @@ final class RestApiDtos {
          * Creates a UserDetail from a User entity.
          * Uses the provided timezone for age calculation.
          */
-        static UserDetail from(User user, ZoneId userTimeZone) {
+        static UserDetail from(User user, ZoneId userTimeZone, String approximateLocation) {
             return new UserDetail(
                     user.getId(),
                     user.getName(),
@@ -85,12 +85,54 @@ final class RestApiDtos {
                     user.getBio(),
                     user.getGender() != null ? user.getGender().name() : null,
                     user.getInterestedIn().stream().map(Enum::name).toList(),
-                    toApproximateLocation(user),
+                    approximateLocation,
                     user.getMaxDistanceKm(),
                     user.getPhotoUrls(),
                     user.getState().name());
         }
     }
+
+    /** Country DTO for location metadata responses. */
+    static record LocationCountryDto(
+            String code, String name, String flagEmoji, boolean available, boolean defaultSelection) {
+        static LocationCountryDto from(Country country) {
+            return new LocationCountryDto(
+                    country.code(),
+                    country.name(),
+                    country.flagEmoji(),
+                    country.available(),
+                    country.defaultSelection());
+        }
+    }
+
+    /** City DTO for location metadata responses. */
+    static record LocationCityDto(String name, String district, String countryCode, int priority) {
+        static LocationCityDto from(City city) {
+            return new LocationCityDto(city.name(), city.district(), city.countryCode(), city.priority());
+        }
+    }
+
+    /** Request body for resolving a location selection. */
+    static record LocationResolveRequest(
+            String countryCode, String cityName, String zipCode, Boolean allowApproximate) {}
+
+    /** Response body for resolving a location selection. */
+    static record LocationResolveResponse(
+            String label, double latitude, double longitude, String precision, boolean approximate, String message) {
+        static LocationResolveResponse from(ResolvedLocation location, boolean approximate, String message) {
+            return new LocationResolveResponse(
+                    location.label(),
+                    location.latitude(),
+                    location.longitude(),
+                    location.precision().name(),
+                    approximate,
+                    message == null ? "" : message);
+        }
+    }
+
+    /** Nested location input for selection-based profile updates. */
+    static record ProfileLocationRequest(
+            String countryCode, String cityName, String zipCode, Boolean allowApproximate) {}
 
     /** Candidate browsing response. */
     static record BrowseCandidatesResponse(
@@ -289,7 +331,8 @@ final class RestApiDtos {
             Lifestyle.LookingFor lookingFor,
             Lifestyle.Education education,
             Set<Interest> interests,
-            Dealbreakers dealbreakers) {}
+            Dealbreakers dealbreakers,
+            ProfileLocationRequest location) {}
 
     /** Response body for profile updates. */
     static record ProfileUpdateResponse(
@@ -303,7 +346,8 @@ final class RestApiDtos {
             int maxDistanceKm,
             String state,
             boolean activated) {
-        static ProfileUpdateResponse from(User user, boolean activated, ZoneId userTimeZone) {
+        static ProfileUpdateResponse from(
+                User user, boolean activated, ZoneId userTimeZone, String approximateLocation) {
             return new ProfileUpdateResponse(
                     user.getId(),
                     user.getName(),
@@ -311,7 +355,7 @@ final class RestApiDtos {
                     user.getBio(),
                     user.getGender() != null ? user.getGender().name() : null,
                     user.getInterestedIn().stream().map(Enum::name).toList(),
-                    toApproximateLocation(user),
+                    approximateLocation,
                     user.getMaxDistanceKm(),
                     user.getState().name(),
                     activated);
@@ -405,19 +449,6 @@ final class RestApiDtos {
                     stats.selectivenessScore(),
                     stats.attractivenessScore());
         }
-    }
-
-    private static String toApproximateLocation(User user) {
-        if (user == null || !user.hasLocationSet()) {
-            return null;
-        }
-        double coarseLat = coarsenCoordinate(user.getLat());
-        double coarseLon = coarsenCoordinate(user.getLon());
-        return String.format(Locale.ENGLISH, APPROXIMATE_COORDINATE_FORMAT, coarseLat, coarseLon);
-    }
-
-    private static double coarsenCoordinate(double value) {
-        return Math.round(value * APPROXIMATE_COORDINATE_SCALE) / APPROXIMATE_COORDINATE_SCALE;
     }
 
     /** Achievement unlocked DTO. */
