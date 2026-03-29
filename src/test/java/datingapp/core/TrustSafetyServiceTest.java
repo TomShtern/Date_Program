@@ -24,6 +24,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -34,7 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
@@ -382,7 +382,7 @@ class TrustSafetyServiceTest {
             var us = new TestStorages.Users();
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(tss, iss, us, AppConfig.defaults())
                     .verificationTtl(Duration.ofMinutes(15))
-                    .random(new Random(123))
+                    .random(new SecureRandom(new byte[] {1, 2, 3, 4}))
                     .build();
 
             User user = createActiveUser("ExpiredVerify");

@@ -28,6 +28,7 @@ import datingapp.core.testutil.TestUserFactory;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +38,7 @@ import org.junit.jupiter.api.Test;
 class SocialUseCasesTest {
 
     private TestStorages.Interactions interactionStorage;
-    private TestStorages.Communications communicationStorage;
+    private TrackingCommunications communicationStorage;
     private ConnectionService connectionService;
     private TrustSafetyService trustSafetyService;
     private SocialUseCases useCases;
@@ -49,7 +50,7 @@ class SocialUseCasesTest {
     void setUp() {
         var config = AppConfig.defaults();
         var userStorage = new TestStorages.Users();
-        communicationStorage = new TestStorages.Communications();
+        communicationStorage = new TrackingCommunications();
         interactionStorage = new TestStorages.Interactions(communicationStorage);
         var trustSafetyStorage = new TestStorages.TrustSafety();
         eventBus = new InProcessAppEventBus();
@@ -210,6 +211,36 @@ class SocialUseCasesTest {
     }
 
     @Test
+    @DisplayName("mark all notifications read uses one bulk storage call")
+    void markAllNotificationsReadUsesOneBulkStorageCall() {
+        Notification first =
+                Notification.create(userA.getId(), Notification.Type.NEW_MESSAGE, "First", "One", Map.of());
+        Notification second =
+                Notification.create(userA.getId(), Notification.Type.MATCH_FOUND, "Second", "Two", Map.of());
+        Notification otherUser =
+                Notification.create(userB.getId(), Notification.Type.MATCH_FOUND, "Other", "Three", Map.of());
+        communicationStorage.saveNotification(first);
+        communicationStorage.saveNotification(second);
+        communicationStorage.saveNotification(otherUser);
+
+        var result = useCases.markAllNotificationsRead(
+                new SocialUseCases.MarkAllNotificationsReadCommand(UserContext.cli(userA.getId())));
+
+        assertTrue(result.success());
+        assertEquals(2, result.data());
+        assertEquals(1, communicationStorage.markAllNotificationsAsReadCalls.get());
+        assertEquals(0, communicationStorage.markNotificationAsReadCalls.get());
+        assertTrue(
+                communicationStorage.getNotification(first.id()).orElseThrow().isRead());
+        assertTrue(
+                communicationStorage.getNotification(second.id()).orElseThrow().isRead());
+        assertFalse(communicationStorage
+                .getNotification(otherUser.id())
+                .orElseThrow()
+                .isRead());
+    }
+
+    @Test
     @DisplayName("block user succeeds")
     void blockUserSucceeds() {
         var result = useCases.blockUser(new RelationshipCommand(UserContext.cli(userA.getId()), userB.getId()));
@@ -267,6 +298,25 @@ class SocialUseCasesTest {
         assertEquals(fromState, event.fromState());
         assertEquals(toState, event.toState());
         assertNotNull(event.occurredAt());
+    }
+
+    private static final class TrackingCommunications extends TestStorages.Communications {
+        private final AtomicInteger markAllNotificationsAsReadCalls = new AtomicInteger();
+        private final AtomicInteger markNotificationAsReadCalls = new AtomicInteger();
+
+        @Override
+        public int markAllNotificationsAsRead(UUID userId) {
+            markAllNotificationsAsReadCalls.incrementAndGet();
+            int updated = super.markAllNotificationsAsRead(userId);
+            markNotificationAsReadCalls.set(0);
+            return updated;
+        }
+
+        @Override
+        public void markNotificationAsRead(UUID userId, UUID id) {
+            markNotificationAsReadCalls.incrementAndGet();
+            super.markNotificationAsRead(userId, id);
+        }
     }
 
     private static final class ThrowingEventBus implements AppEventBus {

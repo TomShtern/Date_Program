@@ -4,6 +4,7 @@ import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
@@ -18,6 +19,8 @@ import java.util.UUID;
  * Defined in core, implemented in storage layer.
  */
 public interface UserStorage {
+
+    ZoneId CANONICAL_AGE_ZONE = ZoneOffset.UTC;
 
     /** Saves a user (insert or update). */
     void save(User user);
@@ -93,7 +96,7 @@ public interface UserStorage {
         return findActive().stream()
                 .filter(u -> !u.getId().equals(excludeId))
                 .filter(u -> genders.contains(u.getGender()))
-                .filter(u -> u.getAge(ZoneOffset.UTC)
+                .filter(u -> u.getAge(CANONICAL_AGE_ZONE)
                         .map(age -> age >= minAge && age <= maxAge)
                         .orElse(false))
                 .filter(u -> !applyDistanceFilter || isWithinDistance(seekerLat, seekerLon, u, maxDistanceKm))

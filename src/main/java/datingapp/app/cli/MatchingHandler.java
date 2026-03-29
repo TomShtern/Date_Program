@@ -229,6 +229,9 @@ public class MatchingHandler implements LoggingSupport {
 
         String action = readValidatedChoice(
                 CliTextAndInput.PROMPT_LIKE_PASS_QUIT, presenter.invalidLikePassQuitChoice(), "l", "p", "q");
+        if (action == null) {
+            return false;
+        }
         if ("q".equals(action)) {
             logInfo(CliTextAndInput.MSG_STOPPING_BROWSE);
             return false;
@@ -265,10 +268,9 @@ public class MatchingHandler implements LoggingSupport {
     private String readValidatedChoice(String prompt, String errorMsg, String... valid) {
         while (true) {
             String input = inputReader.readLine(prompt);
-            if (input == null) {
-                String message = "Input stream closed while waiting for choice: " + prompt;
-                logInfo("❌ {}", message);
-                throw new IllegalStateException(message);
+            if (inputReader.wasInputExhausted()) {
+                logInfo("❌ Input stream closed while waiting for choice: {}", prompt);
+                return null;
             }
             Optional<String> validated = CliTextAndInput.validateChoice(input, valid);
             if (validated.isPresent()) {
@@ -552,6 +554,9 @@ public class MatchingHandler implements LoggingSupport {
 
         String action = readValidatedChoice(
                 CliTextAndInput.PROMPT_LIKE_PASS_SKIP, presenter.invalidLikePassSkipChoice(), "l", "p", "s");
+        if (action == null) {
+            return;
+        }
         if ("s".equals(action)) {
             logInfo(presenter.dailyPickDeferred());
             logInfo("");

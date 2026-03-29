@@ -28,6 +28,8 @@ import javafx.scene.layout.VBox;
 /** Controller for the notes browser screen. */
 public final class NotesController extends BaseController implements Initializable {
 
+    private static final int NOTE_PREVIEW_MAX_CODE_POINTS = 120;
+
     @FXML
     private BorderPane rootPane;
 
@@ -187,6 +189,20 @@ public final class NotesController extends BaseController implements Initializab
         }
     }
 
+    static String previewText(String content) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+        int codePointCount = content.codePointCount(0, content.length());
+        if (codePointCount <= NOTE_PREVIEW_MAX_CODE_POINTS) {
+            return content;
+        }
+
+        int previewCodePoints = NOTE_PREVIEW_MAX_CODE_POINTS - 3;
+        int endIndex = content.offsetByCodePoints(0, previewCodePoints);
+        return content.substring(0, endIndex) + "...";
+    }
+
     private static final class NoteEntryCell extends ListCell<NotesViewModel.NoteEntry> {
         @Override
         protected void updateItem(NotesViewModel.NoteEntry item, boolean empty) {
@@ -213,17 +229,6 @@ public final class NotesController extends BaseController implements Initializab
             HBox row = new HBox(12, textBox, spacer, updatedAtLabel);
             row.getStyleClass().add("achievement-card");
             setGraphic(row);
-        }
-
-        private static String previewText(String content) {
-            if (content == null || content.isBlank()) {
-                return "";
-            }
-            int maxLength = 120;
-            if (content.length() <= maxLength) {
-                return content;
-            }
-            return content.substring(0, maxLength - 3) + "...";
         }
     }
 }

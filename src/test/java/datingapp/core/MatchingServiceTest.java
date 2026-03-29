@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.DailyLimitService;
@@ -109,6 +110,9 @@ class MatchingServiceTest {
             UUID alice = UUID.randomUUID();
             UUID bob = UUID.randomUUID();
 
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
+
             Like like = Like.create(alice, bob, Like.Direction.LIKE);
             Optional<Match> result = matchingService.recordLike(like);
 
@@ -121,6 +125,9 @@ class MatchingServiceTest {
         void recordLikeTracksMetricsAndInvalidatesCaches() {
             UUID alice = UUID.randomUUID();
             UUID bob = UUID.randomUUID();
+
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
 
             TrackingCandidateFinder trackingCandidateFinder =
                     new TrackingCandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
@@ -145,10 +152,29 @@ class MatchingServiceTest {
         }
 
         @Test
+        @DisplayName("recordLike rejects blocked users without persisting")
+        void recordLikeRejectsBlockedUsersWithoutPersisting() {
+            UUID alice = UUID.randomUUID();
+            UUID bob = UUID.randomUUID();
+
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
+            trustSafetyStorage.save(Block.create(alice, bob));
+
+            Optional<Match> result = matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
+
+            assertTrue(result.isEmpty(), "Blocked likes should be rejected");
+            assertFalse(interactionStorage.exists(alice, bob), "Blocked like should not be saved");
+        }
+
+        @Test
         @DisplayName("Pass does not create match")
         void passDoesNotCreateMatch() {
             UUID alice = UUID.randomUUID();
             UUID bob = UUID.randomUUID();
+
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
 
             // Bob likes Alice first
             interactionStorage.save(Like.create(bob, alice, Like.Direction.LIKE));
@@ -165,6 +191,9 @@ class MatchingServiceTest {
         void mutualLikesCreateMatch() {
             UUID alice = UUID.randomUUID();
             UUID bob = UUID.randomUUID();
+
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
 
             // Alice likes Bob
             Like aliceLikesBob = Like.create(alice, bob, Like.Direction.LIKE);
@@ -187,6 +216,9 @@ class MatchingServiceTest {
             UUID alice = UUID.randomUUID();
             UUID bob = UUID.randomUUID();
 
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
+
             Like like1 = Like.create(alice, bob, Like.Direction.LIKE);
             Like like2 = Like.create(alice, bob, Like.Direction.LIKE);
 
@@ -201,6 +233,9 @@ class MatchingServiceTest {
         void matchNotDuplicated() {
             UUID alice = UUID.randomUUID();
             UUID bob = UUID.randomUUID();
+
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
 
             // First mutual like
             matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
@@ -223,6 +258,9 @@ class MatchingServiceTest {
             UUID alice = UUID.randomUUID();
             UUID bob = UUID.randomUUID();
 
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
+
             // Alice likes Bob
             matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
 
@@ -239,6 +277,9 @@ class MatchingServiceTest {
         void orderDoesNotMatter() {
             UUID alice = UUID.randomUUID();
             UUID bob = UUID.randomUUID();
+
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
 
             // Bob likes Alice first
             matchingService.recordLike(Like.create(bob, alice, Like.Direction.LIKE));
@@ -310,6 +351,24 @@ class MatchingServiceTest {
 
             assertFalse(result.success());
             assertEquals("Candidate must be ACTIVE to receive swipes.", result.message());
+        }
+
+        @Test
+        @DisplayName("processSwipe rejects blocked candidates")
+        void processSwipeRejectsBlockedCandidates() {
+            User activeUser = User.StorageBuilder.create(UUID.randomUUID(), "Alice", AppClock.now())
+                    .state(UserState.ACTIVE)
+                    .build();
+            User blockedCandidate = User.StorageBuilder.create(UUID.randomUUID(), "BlockedBob", AppClock.now())
+                    .state(UserState.ACTIVE)
+                    .build();
+            trustSafetyStorage.save(Block.create(activeUser.getId(), blockedCandidate.getId()));
+
+            MatchingService.SwipeResult result = matchingService.processSwipe(activeUser, blockedCandidate, true);
+
+            assertFalse(result.success());
+            assertEquals("Cannot swipe on a blocked user.", result.message());
+            assertFalse(interactionStorage.exists(activeUser.getId(), blockedCandidate.getId()));
         }
 
         @Test
@@ -437,6 +496,64 @@ class MatchingServiceTest {
                 executor.awaitTermination(2, TimeUnit.SECONDS);
             }
         }
+
+        @Test
+        @DisplayName("concurrent likes to different candidates still honor the daily limit")
+        void concurrentLikesToDifferentCandidatesStillHonorTheDailyLimit() throws Exception {
+            SlowInteractions slowInteractions = new SlowInteractions();
+            TestStorages.Undos undos = new TestStorages.Undos();
+            RecommendationService recommendationService = new RecommendationService(
+                    oneLikePerDayLimitService(slowInteractions), noDailyPickService(), noStandoutService());
+            MatchingService guardedService = MatchingService.builder()
+                    .interactionStorage(slowInteractions)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(userStorage)
+                    .undoService(new UndoService(slowInteractions, undos, AppConfig.defaults()))
+                    .dailyService(recommendationService)
+                    .candidateFinder(candidateFinder)
+                    .build();
+
+            User alice = activeUser(UUID.randomUUID(), "Alice");
+            User bob = activeUser(UUID.randomUUID(), "Bob");
+            User carol = activeUser(UUID.randomUUID(), "Carol");
+
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch start = new CountDownLatch(1);
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            try {
+                Future<MatchingService.SwipeResult> first = executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return guardedService.processSwipe(alice, bob, true);
+                });
+                Future<MatchingService.SwipeResult> second = executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return guardedService.processSwipe(alice, carol, true);
+                });
+
+                assertTrue(ready.await(2, TimeUnit.SECONDS));
+                start.countDown();
+
+                List<MatchingService.SwipeResult> results =
+                        List.of(first.get(5, TimeUnit.SECONDS), second.get(5, TimeUnit.SECONDS));
+
+                assertEquals(
+                        1,
+                        results.stream()
+                                .filter(MatchingService.SwipeResult::success)
+                                .count());
+                assertEquals(1, slowInteractions.countByDirection(alice.getId(), Like.Direction.LIKE));
+                assertTrue(
+                        results.stream()
+                                .anyMatch(result ->
+                                        !result.success() && result.message().contains("limit")),
+                        "One swipe should be rejected by the daily limit guard");
+            } finally {
+                executor.shutdownNow();
+                executor.awaitTermination(2, TimeUnit.SECONDS);
+            }
+        }
     }
 
     @Nested
@@ -499,6 +616,40 @@ class MatchingServiceTest {
             @Override
             public DailyStatus getStatus(UUID userId) {
                 return new DailyStatus(0, 999, 0, 999, 0, 999, AppClock.today(), AppClock.now());
+            }
+
+            @Override
+            public Duration getTimeUntilReset() {
+                return Duration.ZERO;
+            }
+
+            @Override
+            public String formatDuration(Duration duration) {
+                return "00:00:00";
+            }
+        };
+    }
+
+    private static DailyLimitService oneLikePerDayLimitService(TestStorages.Interactions interactionStorage) {
+        return new DailyLimitService() {
+            @Override
+            public boolean canLike(UUID userId) {
+                return interactionStorage.countByDirection(userId, Like.Direction.LIKE) < 1;
+            }
+
+            @Override
+            public boolean canSuperLike(UUID userId) {
+                return true;
+            }
+
+            @Override
+            public boolean canPass(UUID userId) {
+                return true;
+            }
+
+            @Override
+            public DailyStatus getStatus(UUID userId) {
+                return new DailyStatus(0, 1, 0, 999, 0, 999, AppClock.today(), AppClock.now());
             }
 
             @Override
@@ -604,6 +755,14 @@ class MatchingServiceTest {
     }
 
     private static final class SlowInteractions extends TestStorages.Interactions {
+        @Override
+        public int countByDirection(UUID userId, Like.Direction direction) {
+            if (direction == Like.Direction.LIKE) {
+                pause();
+            }
+            return super.countByDirection(userId, direction);
+        }
+
         @Override
         public boolean exists(UUID whoLikes, UUID whoGotLiked) {
             pause();

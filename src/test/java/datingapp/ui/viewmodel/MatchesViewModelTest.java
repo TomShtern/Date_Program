@@ -215,6 +215,73 @@ class MatchesViewModelTest {
         assertEquals(1, viewModel.getMatches().size());
         assertEquals(otherUser.getName(), viewModel.getMatches().get(0).userName());
         assertEquals(1, viewModel.matchCountProperty().get());
+        assertFalse(viewModel.loadFailedProperty().get());
+    }
+
+    @Test
+    @DisplayName("empty refresh remains a successful empty state")
+    void refreshEmptyStateIsNotAFailure() {
+        viewModel.initialize();
+
+        assertTrue(viewModel.getMatches().isEmpty());
+        assertTrue(viewModel.getLikesReceived().isEmpty());
+        assertTrue(viewModel.getLikesSent().isEmpty());
+        assertFalse(viewModel.loadFailedProperty().get());
+    }
+
+    @Test
+    @DisplayName("refresh failures are surfaced instead of collapsing to empty data")
+    void refreshFailuresAreSurfaced() {
+        UiMatchDataAccess failingMatchData = new UiMatchDataAccess() {
+            @Override
+            public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public List<Match> getActiveMatchesFor(UUID userId) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public List<Match> getAllMatchesFor(UUID userId) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public java.util.Optional<Like> getLike(UUID from, UUID to) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public java.util.Set<UUID> getBlockedUserIds(UUID userId) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public java.util.Set<UUID> getLikedOrPassedUserIds(UUID userId) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public void deleteLike(UUID likeId) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public int countActiveMatchesFor(UUID userId) {
+                throw new IllegalStateException("match load failed");
+            }
+        };
+
+        MatchesViewModel failingViewModel = new MatchesViewModel(
+                failingMatchData, userStore, matchingService, dailyService, config, AppSession.getInstance());
+
+        failingViewModel.initialize();
+
+        assertTrue(failingViewModel.loadFailedProperty().get());
+        assertTrue(failingViewModel.loadFailureMessageProperty().get().contains("match load failed"));
+        assertTrue(failingViewModel.getMatches().isEmpty());
     }
 
     @Test

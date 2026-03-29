@@ -103,6 +103,17 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     }
 
     @Override
+    public void saveMessageAndUpdateConversationLastMessageAt(Message message) {
+        Objects.requireNonNull(message, "message cannot be null");
+
+        jdbi.useTransaction(handle -> {
+            MessagingDao transactionalDao = handle.attach(MessagingDao.class);
+            transactionalDao.saveMessage(message);
+            transactionalDao.updateConversationLastMessageAt(message.conversationId(), message.createdAt());
+        });
+    }
+
+    @Override
     public List<Message> getMessages(String conversationId, int limit, int offset) {
         return messagingDao.getMessages(conversationId, limit, offset);
     }
@@ -115,6 +126,43 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     @Override
     public Optional<Message> getLatestMessage(String conversationId) {
         return messagingDao.getLatestMessage(conversationId);
+    }
+
+    @Override
+    public Map<String, Optional<Message>> getLatestMessagesByConversationIds(Set<String> conversationIds) {
+        Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+        if (conversationIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return jdbi.withHandle(handle -> {
+            Map<String, Optional<Message>> latestMessages = new java.util.HashMap<>();
+            conversationIds.forEach(id -> latestMessages.put(id, Optional.empty()));
+
+            handle.createQuery("""
+                    SELECT ranked.id, ranked.conversation_id, ranked.sender_id, ranked.content, ranked.created_at
+                    FROM (
+                        SELECT m.id, m.conversation_id, m.sender_id, m.content, m.created_at,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY m.conversation_id
+                                   ORDER BY m.created_at DESC, m.id DESC
+                               ) AS rn
+                        FROM messages m
+                        JOIN conversations c ON c.id = m.conversation_id
+                        WHERE m.conversation_id IN (<conversationIds>)
+                          AND m.deleted_at IS NULL
+                          AND c.deleted_at IS NULL
+                          AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE)
+                    ) ranked
+                    WHERE ranked.rn = 1
+                    """)
+                    .bindList("conversationIds", conversationIds)
+                    .map(new MessageMapper())
+                    .list()
+                    .forEach(message -> latestMessages.put(message.conversationId(), Optional.of(message)));
+
+            return Map.copyOf(latestMessages);
+        });
     }
 
     @Override
@@ -131,9 +179,13 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
 
         return jdbi.withHandle(handle -> {
             Map<String, Integer> counts = new java.util.HashMap<>();
-            handle.createQuery(
-                            "SELECT conversation_id, COUNT(*) AS message_count FROM messages "
-                                    + "WHERE deleted_at IS NULL AND conversation_id IN (<conversationIds>) GROUP BY conversation_id")
+            handle.createQuery("SELECT m.conversation_id, COUNT(*) AS message_count FROM messages m "
+                            + "JOIN conversations c ON c.id = m.conversation_id "
+                            + "WHERE m.conversation_id IN (<conversationIds>) "
+                            + "AND m.deleted_at IS NULL "
+                            + "AND c.deleted_at IS NULL "
+                            + "AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE) "
+                            + "GROUP BY m.conversation_id")
                     .bindList("conversationIds", conversationIds)
                     .map((rs, ctx) -> Map.entry(rs.getString("conversation_id"), rs.getInt("message_count")))
                     .list()
@@ -160,6 +212,55 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     }
 
     @Override
+    public Map<String, Integer> countUnreadMessagesByConversationIds(UUID userId, Set<String> conversationIds) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+        if (conversationIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return jdbi.withHandle(handle -> {
+            Map<String, Integer> unreadCounts = new java.util.HashMap<>();
+            conversationIds.forEach(id -> unreadCounts.put(id, 0));
+
+            handle.createQuery("""
+                    SELECT c.id AS conversation_id, COUNT(m.id) AS unread_count
+                    FROM conversations c
+                    LEFT JOIN messages m
+                      ON m.conversation_id = c.id
+                     AND m.deleted_at IS NULL
+                     AND m.sender_id <> :userId
+                     AND (
+                         CASE
+                             WHEN c.user_a = :userId THEN c.user_a_last_read_at
+                             WHEN c.user_b = :userId THEN c.user_b_last_read_at
+                             ELSE NULL
+                         END IS NULL
+                         OR m.created_at > CASE
+                             WHEN c.user_a = :userId THEN c.user_a_last_read_at
+                             WHEN c.user_b = :userId THEN c.user_b_last_read_at
+                             ELSE NULL
+                         END
+                     )
+                    WHERE c.id IN (<conversationIds>)
+                      AND c.deleted_at IS NULL
+                      AND (
+                        (c.user_a = :userId AND c.visible_to_user_a = TRUE) OR
+                        (c.user_b = :userId AND c.visible_to_user_b = TRUE)
+                      )
+                    GROUP BY c.id
+                    """)
+                    .bind("userId", userId)
+                    .bindList("conversationIds", conversationIds)
+                    .map((rs, ctx) -> Map.entry(rs.getString("conversation_id"), rs.getInt("unread_count")))
+                    .list()
+                    .forEach(entry -> unreadCounts.put(entry.getKey(), entry.getValue()));
+
+            return Map.copyOf(unreadCounts);
+        });
+    }
+
+    @Override
     public void deleteMessage(UUID messageId) {
         messagingDao.deleteMessage(messageId, AppClock.now());
     }
@@ -167,6 +268,17 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     @Override
     public void deleteMessagesByConversation(String conversationId) {
         messagingDao.deleteMessagesByConversation(conversationId, AppClock.now());
+    }
+
+    @Override
+    public void deleteConversationWithMessages(String conversationId) {
+        Objects.requireNonNull(conversationId, "conversationId cannot be null");
+
+        jdbi.useTransaction(handle -> {
+            MessagingDao transactionalDao = handle.attach(MessagingDao.class);
+            transactionalDao.deleteConversation(conversationId);
+            transactionalDao.deleteMessagesByConversation(conversationId, AppClock.now());
+        });
     }
 
     @Override
@@ -222,8 +334,17 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     }
 
     @Override
-    public void markNotificationAsRead(UUID id) {
-        socialDao.markNotificationAsRead(id);
+    public int markAllNotificationsAsRead(UUID userId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+
+        return jdbi.inTransaction(handle -> handle.attach(SocialDao.class).markAllNotificationsAsRead(userId));
+    }
+
+    @Override
+    public void markNotificationAsRead(UUID userId, UUID id) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(id, "id cannot be null");
+        socialDao.markNotificationAsRead(userId, id);
     }
 
     @Override
@@ -237,8 +358,17 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     }
 
     @Override
-    public void deleteNotification(UUID id) {
-        socialDao.deleteNotification(id);
+    public int deleteNotificationsForUser(UUID userId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+
+        return jdbi.inTransaction(handle -> handle.attach(SocialDao.class).deleteNotificationsForUser(userId));
+    }
+
+    @Override
+    public void deleteNotification(UUID userId, UUID id) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(id, "id cannot be null");
+        socialDao.deleteNotification(userId, id);
     }
 
     @Override
@@ -291,7 +421,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                     (user_a = :userId AND visible_to_user_a = TRUE) OR
                     (user_b = :userId AND visible_to_user_b = TRUE)
                   )
-                ORDER BY COALESCE(last_message_at, created_at) DESC
+                                ORDER BY COALESCE(last_message_at, created_at) DESC, id DESC
                 LIMIT :limit OFFSET :offset
                 """)
         List<Conversation> getConversationsFor(
@@ -310,7 +440,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                     (user_a = :userId AND visible_to_user_a = TRUE) OR
                     (user_b = :userId AND visible_to_user_b = TRUE)
                   )
-                ORDER BY COALESCE(last_message_at, created_at) DESC
+                                ORDER BY COALESCE(last_message_at, created_at) DESC, id DESC
                 """)
         List<Conversation> getAllConversationsFor(@Bind("userId") UUID userId);
 
@@ -373,56 +503,84 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         void saveMessage(@org.jdbi.v3.sqlobject.customizer.BindMethods Message message);
 
         @SqlQuery("""
-                SELECT id, conversation_id, sender_id, content, created_at
-                FROM messages
-            WHERE conversation_id = :conversationId AND deleted_at IS NULL
-                ORDER BY created_at ASC
+                                SELECT m.id, m.conversation_id, m.sender_id, m.content, m.created_at
+                                FROM messages m
+                                JOIN conversations c ON c.id = m.conversation_id
+                        WHERE m.conversation_id = :conversationId
+                                AND m.deleted_at IS NULL
+                                AND c.deleted_at IS NULL
+                                AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE)
+                                ORDER BY m.created_at ASC, m.id ASC
                 LIMIT :limit OFFSET :offset
                 """)
         List<Message> getMessages(
                 @Bind("conversationId") String conversationId, @Bind("limit") int limit, @Bind("offset") int offset);
 
         @SqlQuery("""
-            SELECT id, conversation_id, sender_id, content, created_at
-            FROM messages
-            WHERE id = :messageId AND deleted_at IS NULL
+                        SELECT m.id, m.conversation_id, m.sender_id, m.content, m.created_at
+                        FROM messages m
+                        JOIN conversations c ON c.id = m.conversation_id
+                        WHERE m.id = :messageId
+                            AND m.deleted_at IS NULL
+                            AND c.deleted_at IS NULL
+                            AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE)
             """)
         Optional<Message> getMessage(@Bind("messageId") UUID messageId);
 
         @SqlQuery("""
-                SELECT id, conversation_id, sender_id, content, created_at
-                FROM messages
-            WHERE conversation_id = :conversationId AND deleted_at IS NULL
-                ORDER BY created_at DESC
+                                SELECT m.id, m.conversation_id, m.sender_id, m.content, m.created_at
+                                FROM messages m
+                                JOIN conversations c ON c.id = m.conversation_id
+                        WHERE m.conversation_id = :conversationId
+                                AND m.deleted_at IS NULL
+                                AND c.deleted_at IS NULL
+                                AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE)
+                                ORDER BY m.created_at DESC, m.id DESC
                 LIMIT 1
                 """)
         Optional<Message> getLatestMessage(@Bind("conversationId") String conversationId);
 
-        @SqlQuery("SELECT COUNT(*) FROM messages WHERE conversation_id = :conversationId AND deleted_at IS NULL")
+        @SqlQuery("""
+                                SELECT COUNT(*) FROM messages m
+                                JOIN conversations c ON c.id = m.conversation_id
+                                WHERE m.conversation_id = :conversationId
+                                    AND m.deleted_at IS NULL
+                                    AND c.deleted_at IS NULL
+                                    AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE)
+                                """)
         int countMessages(@Bind("conversationId") String conversationId);
 
         @SqlQuery("""
-                SELECT COUNT(*) FROM messages
-                WHERE conversation_id = :conversationId
-            AND deleted_at IS NULL
-                AND created_at > :after
+                                SELECT COUNT(*) FROM messages m
+                                JOIN conversations c ON c.id = m.conversation_id
+                                WHERE m.conversation_id = :conversationId
+                                    AND m.deleted_at IS NULL
+                                    AND c.deleted_at IS NULL
+                                    AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE)
+                                    AND m.created_at > :after
                 """)
         int countMessagesAfter(@Bind("conversationId") String conversationId, @Bind("after") Instant after);
 
         @SqlQuery("""
-                SELECT COUNT(*) FROM messages
-                WHERE conversation_id = :conversationId
-            AND deleted_at IS NULL
-                AND sender_id != :senderId
+                                SELECT COUNT(*) FROM messages m
+                                JOIN conversations c ON c.id = m.conversation_id
+                                WHERE m.conversation_id = :conversationId
+                                    AND m.deleted_at IS NULL
+                                    AND c.deleted_at IS NULL
+                                    AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE)
+                                    AND m.sender_id != :senderId
                 """)
         int countMessagesNotFromSender(@Bind("conversationId") String conversationId, @Bind("senderId") UUID senderId);
 
         @SqlQuery("""
-                SELECT COUNT(*) FROM messages
-                WHERE conversation_id = :conversationId
-            AND deleted_at IS NULL
-                AND created_at > :after
-                AND sender_id != :excludeSenderId
+                                SELECT COUNT(*) FROM messages m
+                                JOIN conversations c ON c.id = m.conversation_id
+                                WHERE m.conversation_id = :conversationId
+                                    AND m.deleted_at IS NULL
+                                    AND c.deleted_at IS NULL
+                                    AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE)
+                                    AND m.created_at > :after
+                                    AND m.sender_id != :excludeSenderId
                 """)
         int countMessagesAfterNotFrom(
                 @Bind("conversationId") String conversationId,
@@ -444,13 +602,26 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
         @SqlUpdate("""
-                INSERT INTO friend_requests (id, from_user_id, to_user_id, created_at, status, responded_at)
-                VALUES (:id, :fromUserId, :toUserId, :createdAt, :status, :respondedAt)
+                INSERT INTO friend_requests (
+                    id, from_user_id, to_user_id, created_at, status, responded_at, pair_key, pending_marker
+                )
+                VALUES (
+                    :id, :fromUserId, :toUserId, :createdAt, :status, :respondedAt,
+                    CASE
+                        WHEN CAST(:fromUserId AS VARCHAR) <= CAST(:toUserId AS VARCHAR)
+                            THEN CONCAT(CAST(:fromUserId AS VARCHAR), '|', CAST(:toUserId AS VARCHAR))
+                        ELSE CONCAT(CAST(:toUserId AS VARCHAR), '|', CAST(:fromUserId AS VARCHAR))
+                    END,
+                    CASE WHEN :status = 'PENDING' THEN 'PENDING' ELSE NULL END
+                )
                 """)
         void saveFriendRequest(@org.jdbi.v3.sqlobject.customizer.BindMethods FriendRequest request);
 
         @SqlUpdate("""
-                UPDATE friend_requests SET status = :status, responded_at = :respondedAt
+                UPDATE friend_requests
+                SET status = :status,
+                    responded_at = :respondedAt,
+                    pending_marker = CASE WHEN :status = 'PENDING' THEN 'PENDING' ELSE NULL END
                 WHERE id = :id
                 """)
         void updateFriendRequest(@org.jdbi.v3.sqlobject.customizer.BindMethods FriendRequest request);
@@ -461,13 +632,18 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 """)
         Optional<FriendRequest> getFriendRequest(@Bind("id") UUID id);
 
+        default Optional<FriendRequest> getPendingFriendRequestBetween(UUID user1, UUID user2) {
+            return getPendingFriendRequestByPairKey(friendRequestPairKey(user1, user2));
+        }
+
         @SqlQuery("""
-                SELECT id, from_user_id, to_user_id, created_at, status, responded_at
-                FROM friend_requests
-                WHERE ((from_user_id = :user1 AND to_user_id = :user2) OR (from_user_id = :user2 AND to_user_id = :user1))
-                AND status = 'PENDING'
-                """)
-        Optional<FriendRequest> getPendingFriendRequestBetween(@Bind("user1") UUID user1, @Bind("user2") UUID user2);
+            SELECT id, from_user_id, to_user_id, created_at, status, responded_at
+            FROM friend_requests
+            WHERE pair_key = :pairKey AND pending_marker = 'PENDING'
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """)
+        Optional<FriendRequest> getPendingFriendRequestByPairKey(@Bind("pairKey") String pairKey);
 
         @SqlQuery("""
                 SELECT id, from_user_id, to_user_id, created_at, status, responded_at
@@ -498,8 +674,11 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
             saveNotificationInternal(notification, dataJson);
         }
 
-        @SqlUpdate("UPDATE notifications SET is_read = TRUE WHERE id = :id")
-        void markNotificationAsRead(@Bind("id") UUID id);
+        @SqlUpdate("UPDATE notifications SET is_read = TRUE WHERE id = :id AND user_id = :userId")
+        void markNotificationAsRead(@Bind("userId") UUID userId, @Bind("id") UUID id);
+
+        @SqlUpdate("UPDATE notifications SET is_read = TRUE WHERE user_id = :userId AND is_read = FALSE")
+        int markAllNotificationsAsRead(@Bind("userId") UUID userId);
 
         @SqlQuery("""
                 SELECT id, user_id, type, title, message, created_at, is_read, data_json
@@ -525,11 +704,20 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
                 """)
         Optional<Notification> getNotification(@Bind("id") UUID id);
 
-        @SqlUpdate("DELETE FROM notifications WHERE id = :id")
-        void deleteNotification(@Bind("id") UUID id);
+        @SqlUpdate("DELETE FROM notifications WHERE user_id = :userId")
+        int deleteNotificationsForUser(@Bind("userId") UUID userId);
+
+        @SqlUpdate("DELETE FROM notifications WHERE id = :id AND user_id = :userId")
+        void deleteNotification(@Bind("userId") UUID userId, @Bind("id") UUID id);
 
         @SqlUpdate("DELETE FROM notifications WHERE created_at < :before")
         void deleteOldNotifications(@Bind("before") Instant before);
+
+        private static String friendRequestPairKey(UUID user1, UUID user2) {
+            String first = user1.toString();
+            String second = user2.toString();
+            return first.compareTo(second) <= 0 ? first + "|" + second : second + "|" + first;
+        }
 
         static String toJson(Map<String, String> data) {
             if (data == null) {

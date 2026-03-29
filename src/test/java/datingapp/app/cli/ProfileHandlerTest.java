@@ -4,19 +4,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.lang.reflect.Method;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Scanner;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
@@ -145,6 +156,102 @@ class ProfileHandlerTest {
 
         assertEquals("original-bio", session.getCurrentUser().getBio());
         assertEquals(original.getId(), session.getCurrentUser().getId());
+    }
+
+    @Test
+    @DisplayName("previewProfile uses the configured zone for age display")
+    void previewProfileUsesConfiguredZoneForAgeDisplay() throws Exception {
+        AppConfig config =
+                AppConfig.builder().userTimeZone(ZoneId.of("Pacific/Honolulu")).build();
+        TestStorages.Users previewUsers = new TestStorages.Users();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, previewUsers);
+        ProfileUseCases previewUseCases = new ProfileUseCases(
+                previewUsers,
+                profileService,
+                validationService,
+                null,
+                null,
+                config,
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                null);
+
+        User user = createEditableUser();
+        user.setBio("Preview bio");
+        user.setBirthDate(LocalDate.of(2000, 3, 29));
+        user.setLocation(32.0853, 34.7818);
+        previewUsers.save(user);
+        session.setCurrentUser(user);
+
+        TimeZone originalZone = TimeZone.getDefault();
+        AppClock.setClock(Clock.fixed(Instant.parse("2026-03-29T00:30:00Z"), ZoneId.of("UTC")));
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+
+        Logger handlerLogger = (Logger) org.slf4j.LoggerFactory.getLogger(ProfileHandler.class);
+        Level previousLevel = handlerLogger.getLevel();
+        handlerLogger.setLevel(Level.INFO);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        handlerLogger.addAppender(appender);
+
+        try {
+            ProfileHandler handler = new ProfileHandler(
+                    previewUsers,
+                    validationService,
+                    previewUseCases,
+                    config,
+                    session,
+                    new InputReader(new Scanner(new StringReader("\n"))));
+
+            handler.previewProfile();
+
+            assertTrue(appender.list.stream()
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("25 years old")));
+        } finally {
+            handlerLogger.detachAppender(appender);
+            handlerLogger.setLevel(previousLevel);
+            appender.stop();
+            TimeZone.setDefault(originalZone);
+            AppClock.reset();
+        }
+    }
+
+    @Test
+    @DisplayName("invalid preference input keeps current values instead of claiming defaults")
+    void invalidPreferenceInputKeepsCurrentValuesInsteadOfClaimingDefaults() throws Exception {
+        User user = createEditableUser();
+        user.setMaxDistanceKm(80, AppConfig.defaults().matching().maxDistanceKm());
+        user.setAgeRange(
+                21,
+                40,
+                AppConfig.defaults().validation().minAge(),
+                AppConfig.defaults().validation().maxAge());
+
+        Logger handlerLogger = (Logger) org.slf4j.LoggerFactory.getLogger(ProfileHandler.class);
+        Level previousLevel = handlerLogger.getLevel();
+        handlerLogger.setLevel(Level.INFO);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        handlerLogger.addAppender(appender);
+
+        try {
+            ProfileHandler handler = createHandler("999\n50\n20\n");
+            invokePrompt(handler, "promptPreferences", user);
+
+            assertEquals(80, user.getMaxDistanceKm());
+            assertEquals(21, user.getMinAge());
+            assertEquals(40, user.getMaxAge());
+            assertTrue(appender.list.stream()
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("Keeping current value")));
+        } finally {
+            handlerLogger.detachAppender(appender);
+            handlerLogger.setLevel(previousLevel);
+            appender.stop();
+        }
     }
 
     private ProfileHandler createHandler(String input) {

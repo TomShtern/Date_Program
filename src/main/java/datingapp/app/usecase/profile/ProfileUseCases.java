@@ -23,6 +23,7 @@ import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -412,16 +413,15 @@ public class ProfileUseCases {
 
         try {
             var deletedAt = AppClock.now();
-            user.markDeleted(deletedAt);
-            if (user.getState() == User.UserState.ACTIVE) {
-                user.pause();
-            }
+            User deletedUser = user.copy();
+            applyDeletionState(deletedUser, deletedAt);
             AppEvent.DeletionReason deletionReason = sanitizeDeletionReason(command.reason());
             if (accountCleanupStorage != null) {
-                accountCleanupStorage.softDeleteAccount(user, deletedAt);
+                accountCleanupStorage.softDeleteAccount(deletedUser, deletedAt);
             } else {
-                userStorage.save(user);
+                userStorage.save(deletedUser);
             }
+            applyDeletionState(user, deletedAt);
             if (logger.isInfoEnabled()) {
                 logger.info("Account soft-deleted for user {} (reasonCode={})", user.getId(), deletionReason);
             }
@@ -588,6 +588,13 @@ public class ProfileUseCases {
     private static void sanitizeProfileText(User user) {
         user.setName(SanitizerUtils.sanitize(user.getName()));
         user.setBio(SanitizerUtils.sanitize(user.getBio()));
+    }
+
+    private static void applyDeletionState(User user, Instant deletedAt) {
+        user.markDeleted(deletedAt);
+        if (user.getState() == User.UserState.ACTIVE) {
+            user.pause();
+        }
     }
 
     private void publishEvent(AppEvent event, String failureMessage) {

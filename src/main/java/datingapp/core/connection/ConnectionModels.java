@@ -434,8 +434,12 @@ public final class ConnectionModels {
             if (fromUserId.equals(toUserId)) {
                 throw new IllegalArgumentException("fromUserId cannot equal toUserId");
             }
-            if (status == Status.PENDING && respondedAt != null) {
-                throw new IllegalArgumentException("respondedAt must be null for pending requests");
+            if (status == Status.PENDING) {
+                if (respondedAt != null) {
+                    throw new IllegalArgumentException("respondedAt must be null for pending requests");
+                }
+            } else if (respondedAt == null) {
+                throw new IllegalArgumentException("respondedAt must be set for non-pending requests");
             }
         }
 

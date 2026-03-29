@@ -195,6 +195,7 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> deleteResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userId))
+                        .header("X-User-Id", userId.toString())
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());

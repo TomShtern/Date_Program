@@ -1,6 +1,9 @@
 package datingapp.storage;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zaxxer.hikari.HikariDataSource;
 import java.lang.reflect.Field;
@@ -10,6 +13,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.IntStream;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,9 +27,19 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(10)
 class DatabaseManagerThreadSafetyTest {
 
+    private static final String PROFILE_PROPERTY = "datingapp.db.profile";
+
     @BeforeEach
     void setup() {
+        System.clearProperty(PROFILE_PROPERTY);
+        System.setProperty(PROFILE_PROPERTY, "test");
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:thread_safety_test_" + UUID.randomUUID());
+        DatabaseManager.resetInstance();
+    }
+
+    @AfterEach
+    void tearDown() {
+        System.clearProperty(PROFILE_PROPERTY);
         DatabaseManager.resetInstance();
     }
 

@@ -37,6 +37,9 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("ProfileViewModel photo lifecycle")
 class ProfileViewModelTest {
 
+    private static final String FILE_URLS_ENABLED_PROPERTY = "datingapp.allowFileUrls";
+    private static final String FILE_URL_ROOT_PROPERTY = "datingapp.allowedFileUrlRoot";
+
     private static final UiThreadDispatcher TEST_DISPATCHER = new UiThreadDispatcher() {
         @Override
         public boolean isUiThread() {
@@ -70,6 +73,8 @@ class ProfileViewModelTest {
         if (originalUserHome != null) {
             System.setProperty("user.home", originalUserHome);
         }
+        System.clearProperty(FILE_URLS_ENABLED_PROPERTY);
+        System.clearProperty(FILE_URL_ROOT_PROPERTY);
     }
 
     @Test
@@ -78,6 +83,8 @@ class ProfileViewModelTest {
         originalUserHome = System.getProperty("user.home");
         Path tempHome = Files.createTempDirectory("datingapp-profile-home");
         System.setProperty("user.home", tempHome.toString());
+        System.setProperty(FILE_URLS_ENABLED_PROPERTY, "true");
+        System.setProperty(FILE_URL_ROOT_PROPERTY, tempHome.toString());
 
         TestStorages.Users users = new TestStorages.Users();
         TestStorages.Interactions interactions = new TestStorages.Interactions();
@@ -140,6 +147,8 @@ class ProfileViewModelTest {
         originalUserHome = System.getProperty("user.home");
         Path tempHome = Files.createTempDirectory("datingapp-profile-home");
         System.setProperty("user.home", tempHome.toString());
+        System.setProperty(FILE_URLS_ENABLED_PROPERTY, "true");
+        System.setProperty(FILE_URL_ROOT_PROPERTY, tempHome.toString());
 
         TestStorages.Users users = new TestStorages.Users();
         TestStorages.Interactions interactions = new TestStorages.Interactions();

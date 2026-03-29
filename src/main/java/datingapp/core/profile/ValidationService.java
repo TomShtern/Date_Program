@@ -28,6 +28,7 @@ public class ValidationService {
     private static final String HEIGHT_TOO_TALL = "Height too tall (max %dcm)";
     private static final String DISTANCE_TOO_SHORT = "Distance must be at least %dkm";
     private static final String DISTANCE_TOO_FAR = "Distance too far (max %dkm)";
+    private static final String BIO_EMPTY = "Bio cannot be blank";
     private static final String BIO_TOO_LONG = "Bio too long (max %d chars)";
     private static final String INVALID_EMAIL = "Invalid email format";
     private static final String INVALID_PHONE = "Invalid phone format";
@@ -216,8 +217,8 @@ public class ValidationService {
      * @return validation result
      */
     public ValidationResult validateBio(String bio) {
-        if (bio == null) {
-            return ValidationResult.success();
+        if (bio == null || bio.isBlank()) {
+            return ValidationResult.failure(BIO_EMPTY);
         }
         if (bio.length() > config.validation().maxBioLength()) {
             return ValidationResult.failure(
@@ -273,10 +274,14 @@ public class ValidationService {
     public ValidationResult validateLocation(double latitude, double longitude) {
         List<String> errors = new ArrayList<>();
 
-        if (latitude < -90 || latitude > 90) {
+        if (!Double.isFinite(latitude)) {
+            errors.add("Invalid latitude (must be finite and -90 to 90)");
+        } else if (latitude < -90 || latitude > 90) {
             errors.add("Invalid latitude (must be -90 to 90)");
         }
-        if (longitude < -180 || longitude > 180) {
+        if (!Double.isFinite(longitude)) {
+            errors.add("Invalid longitude (must be finite and -180 to 180)");
+        } else if (longitude < -180 || longitude > 180) {
             errors.add("Invalid longitude (must be -180 to 180)");
         }
 
@@ -339,6 +344,10 @@ public class ValidationService {
         }
         String normalized = phone.trim();
         if (!PHONE_ALLOWED_PATTERN.matcher(normalized).matches()) {
+            throw new IllegalArgumentException(INVALID_PHONE);
+        }
+        long plusCount = normalized.chars().filter(ch -> ch == '+').count();
+        if (plusCount > 1 || (plusCount == 1 && !normalized.startsWith("+"))) {
             throw new IllegalArgumentException(INVALID_PHONE);
         }
         String digitsOnly = normalized.replaceAll("\\D", "");

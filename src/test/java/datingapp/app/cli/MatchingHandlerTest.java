@@ -2,6 +2,7 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
@@ -25,6 +26,9 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import java.io.StringReader;
+import java.lang.reflect.Method;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -153,6 +157,34 @@ class MatchingHandlerTest {
             MatchingHandler handler = createHandler("q\n");
             assertDoesNotThrow(handler::browseCandidates);
             assertEquals(0, interactionStorage.countByDirection(testUser.getId(), Like.Direction.LIKE));
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @Nested
+    @DisplayName("EOF handling")
+    class EofHandlingTests {
+
+        @Test
+        @DisplayName("readValidatedChoice returns null on EOF instead of looping")
+        void readValidatedChoiceReturnsNullOnEofInsteadOfLooping() throws Exception {
+            User candidate = TestUserFactory.createActiveUser("EOFCandidate");
+            candidate.setBirthDate(LocalDate.of(1990, 1, 1));
+            candidate.setLocation(32.0853, 34.7818);
+            userStorage.save(candidate);
+            testUser.setLocation(32.0853, 34.7818);
+            userStorage.save(testUser);
+
+            MatchingHandler handler = createHandler("");
+
+            assertTimeoutPreemptively(Duration.ofSeconds(1), () -> {
+                Method method = MatchingHandler.class.getDeclaredMethod(
+                        "readValidatedChoice", String.class, String.class, String[].class);
+                method.setAccessible(true);
+                Object result = method.invoke(
+                        handler, CliTextAndInput.PROMPT_LIKE_PASS_QUIT, "error", (Object) new String[] {"l", "p", "q"});
+                assertEquals(null, result);
+            });
         }
     }
 

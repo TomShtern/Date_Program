@@ -99,14 +99,22 @@ public class ConnectionService {
         }
 
         String conversationId = Conversation.generateId(senderId, recipientId);
+        boolean createdConversation = false;
         if (communicationStorage.getConversation(conversationId).isEmpty()) {
             Conversation newConvo = Conversation.create(senderId, recipientId);
             communicationStorage.saveConversation(newConvo);
+            createdConversation = true;
         }
 
         Message message = Message.create(conversationId, senderId, content);
-        communicationStorage.saveMessage(message);
-        communicationStorage.updateConversationLastMessageAt(conversationId, message.createdAt());
+        try {
+            communicationStorage.saveMessageAndUpdateConversationLastMessageAt(message);
+        } catch (RuntimeException e) {
+            if (createdConversation) {
+                communicationStorage.deleteConversationWithMessages(conversationId);
+            }
+            throw e;
+        }
 
         return SendResult.success(message);
     }
@@ -159,6 +167,22 @@ public class ConnectionService {
         return communicationStorage.countMessagesByConversationIds(conversationIds);
     }
 
+    public int getTotalMessagesExchanged(UUID userId) {
+        List<Conversation> conversations = communicationStorage.getAllConversationsFor(userId);
+        if (conversations.isEmpty()) {
+            return 0;
+        }
+
+        Set<String> conversationIds = new HashSet<>();
+        for (Conversation conversation : conversations) {
+            conversationIds.add(conversation.getId());
+        }
+
+        return countMessagesByConversationIds(conversationIds).values().stream()
+                .mapToInt(Integer::intValue)
+                .sum();
+    }
+
     public List<ConversationPreview> getConversations(UUID userId, int limit, int offset) {
         if (limit < 1 || limit > config.validation().messageMaxPageSize()) {
             return List.of();
@@ -167,10 +191,19 @@ public class ConnectionService {
             return List.of();
         }
         List<Conversation> conversations = communicationStorage.getConversationsFor(userId, limit, offset);
+        if (conversations.isEmpty()) {
+            return List.of();
+        }
 
         List<UUID> otherUserIds =
                 conversations.stream().map(c -> c.getOtherUser(userId)).toList();
         Map<UUID, User> otherUsers = userStorage.findByIds(new HashSet<>(otherUserIds));
+        Set<String> conversationIds =
+                conversations.stream().map(Conversation::getId).collect(java.util.stream.Collectors.toSet());
+        Map<String, Optional<Message>> latestMessages =
+                communicationStorage.getLatestMessagesByConversationIds(conversationIds);
+        Map<String, Integer> unreadCounts =
+                communicationStorage.countUnreadMessagesByConversationIds(userId, conversationIds);
 
         List<ConversationPreview> previews = new ArrayList<>();
         for (Conversation convo : conversations) {
@@ -181,8 +214,8 @@ public class ConnectionService {
                 continue;
             }
 
-            Optional<Message> lastMessage = communicationStorage.getLatestMessage(convo.getId());
-            int unreadCount = calculateUnreadCount(userId, convo);
+            Optional<Message> lastMessage = latestMessages.getOrDefault(convo.getId(), Optional.empty());
+            int unreadCount = unreadCounts.getOrDefault(convo.getId(), 0);
             previews.add(new ConversationPreview(convo, otherUser, lastMessage, unreadCount));
         }
 
@@ -244,6 +277,15 @@ public class ConnectionService {
 
     public Conversation getOrCreateConversation(UUID userA, UUID userB) {
         String conversationId = Conversation.generateId(userA, userB);
+        Optional<Conversation> existing = communicationStorage.getConversation(conversationId);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        if (!canMessage(userA, userB)) {
+            throw new IllegalArgumentException(NO_ACTIVE_MATCH);
+        }
+
         return communicationStorage.getConversation(conversationId).orElseGet(() -> {
             Conversation newConvo = Conversation.create(userA, userB);
             communicationStorage.saveConversation(newConvo);
@@ -275,8 +317,7 @@ public class ConnectionService {
         if (!conversation.involves(userId)) {
             throw new IllegalArgumentException("Conversation not found or unauthorized");
         }
-        communicationStorage.deleteMessagesByConversation(conversationId);
-        communicationStorage.deleteConversation(conversationId);
+        communicationStorage.deleteConversationWithMessages(conversationId);
     }
 
     public void deleteMessage(UUID userId, String conversationId, UUID messageId) {

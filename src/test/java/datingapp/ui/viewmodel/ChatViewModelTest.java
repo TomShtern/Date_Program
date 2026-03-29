@@ -374,6 +374,7 @@ class ChatViewModelTest {
 
         assertTrue(waitUntil(() -> viewModel.getActiveMessages().size() == 1, 5000));
 
+        TestClock.setFixed(FIXED_INSTANT.plusSeconds(1));
         connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Polled follow-up");
 
         assertTrue(waitUntil(() -> viewModel.getActiveMessages().size() == 2, 5000));
@@ -614,6 +615,15 @@ class ChatViewModelTest {
         } finally {
             flakyViewModel.dispose();
         }
+    }
+
+    @Test
+    @DisplayName("explicit no-op presence dependencies report unsupported state")
+    void noOpPresenceDependenciesReportUnsupportedState() {
+        ChatViewModel.ChatUiDependencies dependencies = ChatViewModel.ChatUiDependencies.noOp();
+
+        assertFalse(dependencies.presenceDataAccess().isSupported());
+        assertFalse(dependencies.presenceDataAccess().unsupportedReason().isBlank());
     }
 
     private static User createActiveUser(String name) {

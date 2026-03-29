@@ -464,7 +464,12 @@ class StorageContractTest {
         }
 
         @Override
-        public void markNotificationAsRead(UUID id) {
+        public int markAllNotificationsAsRead(UUID userId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public void markNotificationAsRead(UUID userId, UUID id) {
             throw new UnsupportedOperationException("stub");
         }
 
@@ -479,7 +484,12 @@ class StorageContractTest {
         }
 
         @Override
-        public void deleteNotification(UUID id) {
+        public int deleteNotificationsForUser(UUID userId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public void deleteNotification(UUID userId, UUID id) {
             throw new UnsupportedOperationException("stub");
         }
 

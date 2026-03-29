@@ -634,12 +634,21 @@ public final class TestStorages {
         }
 
         @Override
+        public void saveMessageAndUpdateConversationLastMessageAt(Message message) {
+            saveMessage(message);
+            updateConversationLastMessageAt(message.conversationId(), message.createdAt());
+        }
+
+        @Override
         public List<Message> getMessages(String conversationId, int limit, int offset) {
             if (limit <= 0 || offset < 0) {
                 return List.of();
             }
+            if (!isConversationVisibleForMessages(conversationId)) {
+                return List.of();
+            }
             List<Message> all = messagesByConversation.getOrDefault(conversationId, List.of()).stream()
-                    .sorted(Comparator.comparing(Message::createdAt))
+                    .sorted(Comparator.comparing(Message::createdAt).thenComparing(Message::id))
                     .toList();
             if (offset >= all.size()) {
                 return List.of();
@@ -658,15 +667,23 @@ public final class TestStorages {
 
         @Override
         public Optional<Message> getLatestMessage(String conversationId) {
+            if (!isConversationVisibleForMessages(conversationId)) {
+                return Optional.empty();
+            }
             return messagesByConversation.getOrDefault(conversationId, List.of()).stream()
-                    .max(Comparator.comparing(Message::createdAt));
+                    .max(Comparator.comparing(Message::createdAt).thenComparing(Message::id));
+        }
+
+        @Override
+        public Map<String, Optional<Message>> getLatestMessagesByConversationIds(Set<String> conversationIds) {
+            Map<String, Optional<Message>> latestMessages = new HashMap<>();
+            conversationIds.forEach(id -> latestMessages.put(id, getLatestMessage(id)));
+            return Map.copyOf(latestMessages);
         }
 
         @Override
         public int countMessages(String conversationId) {
-            return messagesByConversation
-                    .getOrDefault(conversationId, List.of())
-                    .size();
+            return visibleMessages(conversationId).size();
         }
 
         @Override
@@ -682,24 +699,55 @@ public final class TestStorages {
 
         @Override
         public int countMessagesAfter(String conversationId, Instant after) {
-            return (int) messagesByConversation.getOrDefault(conversationId, List.of()).stream()
+            return (int) visibleMessages(conversationId).stream()
                     .filter(message -> message.createdAt().isAfter(after))
                     .count();
         }
 
         @Override
         public int countMessagesNotFromSender(String conversationId, UUID senderId) {
-            return (int) messagesByConversation.getOrDefault(conversationId, List.of()).stream()
+            return (int) visibleMessages(conversationId).stream()
                     .filter(message -> !message.senderId().equals(senderId))
                     .count();
         }
 
         @Override
         public int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId) {
-            return (int) messagesByConversation.getOrDefault(conversationId, List.of()).stream()
+            return (int) visibleMessages(conversationId).stream()
                     .filter(message -> message.createdAt().isAfter(after))
                     .filter(message -> !message.senderId().equals(excludeSenderId))
                     .count();
+        }
+
+        @Override
+        public Map<String, Integer> countUnreadMessagesByConversationIds(UUID userId, Set<String> conversationIds) {
+            Map<String, Integer> unreadCounts = new HashMap<>();
+            for (String conversationId : conversationIds) {
+                Conversation conversation = conversations.get(conversationId);
+                if (conversation == null || !conversation.involves(userId)) {
+                    unreadCounts.put(conversationId, 0);
+                    continue;
+                }
+
+                Instant lastReadAt = conversation.getLastReadAt(userId);
+                int unread = lastReadAt == null
+                        ? countMessagesNotFromSender(conversationId, userId)
+                        : countMessagesAfterNotFrom(conversationId, lastReadAt, userId);
+                unreadCounts.put(conversationId, unread);
+            }
+            return Map.copyOf(unreadCounts);
+        }
+
+        private List<Message> visibleMessages(String conversationId) {
+            if (!isConversationVisibleForMessages(conversationId)) {
+                return List.of();
+            }
+            return messagesByConversation.getOrDefault(conversationId, List.of());
+        }
+
+        private boolean isConversationVisibleForMessages(String conversationId) {
+            Conversation conversation = conversations.get(conversationId);
+            return conversation != null && (conversation.isVisibleToUserA() || conversation.isVisibleToUserB());
         }
 
         @Override
@@ -713,6 +761,12 @@ public final class TestStorages {
         @Override
         public void deleteMessagesByConversation(String conversationId) {
             messagesByConversation.remove(conversationId);
+        }
+
+        @Override
+        public void deleteConversationWithMessages(String conversationId) {
+            deleteConversation(conversationId);
+            deleteMessagesByConversation(conversationId);
         }
 
         @Override
@@ -769,9 +823,20 @@ public final class TestStorages {
         }
 
         @Override
-        public void markNotificationAsRead(UUID id) {
+        public int markAllNotificationsAsRead(UUID userId) {
+            List<UUID> unreadNotificationIds = notifications.values().stream()
+                    .filter(notification -> notification.userId().equals(userId))
+                    .filter(notification -> !notification.isRead())
+                    .map(Notification::id)
+                    .toList();
+            unreadNotificationIds.forEach(notificationId -> markNotificationAsRead(userId, notificationId));
+            return unreadNotificationIds.size();
+        }
+
+        @Override
+        public void markNotificationAsRead(UUID userId, UUID id) {
             Notification existing = notifications.get(id);
-            if (existing == null || existing.isRead()) {
+            if (existing == null || existing.isRead() || !existing.userId().equals(userId)) {
                 return;
             }
             Notification updated = new Notification(
@@ -801,8 +866,21 @@ public final class TestStorages {
         }
 
         @Override
-        public void deleteNotification(UUID id) {
-            notifications.remove(id);
+        public int deleteNotificationsForUser(UUID userId) {
+            List<UUID> notificationIds = notifications.values().stream()
+                    .filter(notification -> notification.userId().equals(userId))
+                    .map(Notification::id)
+                    .toList();
+            notificationIds.forEach(notifications::remove);
+            return notificationIds.size();
+        }
+
+        @Override
+        public void deleteNotification(UUID userId, UUID id) {
+            Notification existing = notifications.get(id);
+            if (existing != null && existing.userId().equals(userId)) {
+                notifications.remove(id);
+            }
         }
 
         @Override
@@ -1176,6 +1254,9 @@ public final class TestStorages {
 
         @Override
         public void save(Report report) {
+            if (hasReported(report.reporterId(), report.reportedUserId())) {
+                throw new RuntimeException("UNIQUE constraint violation on reports");
+            }
             reports.put(report.id(), report);
         }
 

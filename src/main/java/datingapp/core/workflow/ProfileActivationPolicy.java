@@ -23,10 +23,7 @@ public final class ProfileActivationPolicy {
         if (state == UserState.ACTIVE) {
             return WorkflowDecision.deny("ALREADY_ACTIVE", "User is already active");
         }
-        if (state == UserState.PAUSED) {
-            return WorkflowDecision.deny("PAUSED", "Paused users reactivate differently");
-        }
-        if (state != UserState.INCOMPLETE) {
+        if (state != UserState.INCOMPLETE && state != UserState.PAUSED) {
             return WorkflowDecision.deny("WRONG_STATE", "Unexpected state: " + state);
         }
         List<String> missing = missingFields(user);

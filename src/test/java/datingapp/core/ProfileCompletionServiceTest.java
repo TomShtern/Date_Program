@@ -290,6 +290,17 @@ class ProfileCompletionServiceTest {
             assertTrue(result.missingFields().contains("Location"));
             assertFalse(result.filledFields().contains("Location"));
         }
+
+        @Test
+        @DisplayName("placeholder avatar does not satisfy photo completeness")
+        void placeholderAvatarDoesNotSatisfyPhotoCompleteness() {
+            user.setPhotoUrls(List.of("placeholder://default-avatar"));
+
+            ProfileService.ProfileCompleteness result = service.calculateCompleteness(user);
+
+            assertTrue(result.missingFields().contains("Photo"));
+            assertFalse(result.filledFields().contains("Photo"));
+        }
     }
 
     @Nested

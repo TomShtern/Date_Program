@@ -1019,8 +1019,10 @@ class SqlRowReadersTest {
         MockResultSet rs = new MockResultSet();
         rs.setValue("INVALID");
 
-        TestEnum result = SqlRowReaders.readEnum(rs, "col", TestEnum.class);
-        assertNull(result);
+        SQLException error = assertThrows(SQLException.class, () -> SqlRowReaders.readEnum(rs, "col", TestEnum.class));
+        assertTrue(error.getMessage().contains("TestEnum"));
+        assertTrue(error.getMessage().contains("INVALID"));
+        assertTrue(error.getMessage().contains("col"));
     }
 
     @Test
@@ -1103,13 +1105,16 @@ class SqlRowReadersTest {
         }
 
         @Test
-        @DisplayName("returns null for invalid enum value (logs warning)")
-        void returnsNullForInvalidValue() throws SQLException {
+        @DisplayName("throws SQLException for invalid enum value with column context")
+        void throwsForInvalidValue() {
             MockResultSet rs = new MockResultSet();
             rs.setValue("NONEXISTENT");
 
-            TestEnum result = SqlRowReaders.readEnum(rs, "col", TestEnum.class);
-            assertNull(result, "Invalid enum values should return null");
+            SQLException error =
+                    assertThrows(SQLException.class, () -> SqlRowReaders.readEnum(rs, "col", TestEnum.class));
+            assertTrue(error.getMessage().contains("TestEnum"));
+            assertTrue(error.getMessage().contains("NONEXISTENT"));
+            assertTrue(error.getMessage().contains("col"));
         }
     }
 }

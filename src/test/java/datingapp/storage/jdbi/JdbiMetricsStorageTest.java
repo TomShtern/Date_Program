@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
 import datingapp.core.matching.Standout;
+import datingapp.core.metrics.EngagementDomain.UserStats;
+import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.model.User;
 import datingapp.storage.DatabaseManager;
 import java.sql.Timestamp;
@@ -28,11 +30,14 @@ class JdbiMetricsStorageTest {
 
     private DatabaseManager dbManager;
     private JdbiMetricsStorage storage;
+    private JdbiUserStorage userStorage;
     private User viewer;
     private User viewed;
+    private static final String DB_PROFILE_PROPERTY = "datingapp.db.profile";
 
     @BeforeEach
     void setUp() {
+        System.setProperty(DB_PROFILE_PROPERTY, "test");
         String dbName = "testdb_" + UUID.randomUUID().toString().replace("-", "");
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1");
         dbManager = DatabaseManager.getInstance();
@@ -54,7 +59,7 @@ class JdbiMetricsStorageTest {
         });
 
         storage = new JdbiMetricsStorage(jdbi);
-        JdbiUserStorage userStorage = new JdbiUserStorage(jdbi);
+        userStorage = new JdbiUserStorage(jdbi);
 
         viewer = new User(UUID.randomUUID(), "Viewer");
         viewed = new User(UUID.randomUUID(), "Viewed");
@@ -66,6 +71,7 @@ class JdbiMetricsStorageTest {
 
     @AfterEach
     void tearDown() {
+        System.clearProperty(DB_PROFILE_PROPERTY);
         AppClock.reset();
         if (dbManager != null) {
             dbManager.shutdown();
@@ -129,5 +135,113 @@ class JdbiMetricsStorageTest {
         UUID nonExistentId = UUID.randomUUID();
         boolean result = storage.markStandoutInteracted(nonExistentId, AppClock.now());
         assertFalse(result, "Should return false for non-existent standout");
+    }
+
+    @Test
+    @DisplayName("deleteExpiredSessions preserves active sessions even when they are older than the cutoff")
+    void deleteExpiredSessionsPreservesActiveSessions() {
+        AppClock.setFixed(Instant.parse("2026-03-25T12:00:00Z"));
+
+        UUID activeUserId = UUID.randomUUID();
+        UUID completedUserId = UUID.randomUUID();
+
+        userStorage.save(new User(activeUserId, "Active Session User"));
+        userStorage.save(new User(completedUserId, "Completed Session User"));
+
+        Session activeSession = new Session(
+                UUID.randomUUID(),
+                activeUserId,
+                Instant.parse("2026-01-01T00:00:00Z"),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                null,
+                Session.MatchState.ACTIVE,
+                0,
+                0,
+                0,
+                0);
+        Session completedSession = new Session(
+                UUID.randomUUID(),
+                completedUserId,
+                Instant.parse("2026-01-01T00:00:00Z"),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                Instant.parse("2026-01-01T01:00:00Z"),
+                Session.MatchState.COMPLETED,
+                0,
+                0,
+                0,
+                0);
+
+        storage.saveSession(activeSession);
+        storage.saveSession(completedSession);
+
+        int deleted = storage.deleteExpiredSessions(Instant.parse("2026-03-01T00:00:00Z"));
+
+        assertEquals(1, deleted);
+        assertTrue(storage.getActiveSession(activeUserId).isPresent());
+        assertTrue(storage.getSession(completedSession.getId()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("getAllLatestUserStats returns a single latest row per user when timestamps tie")
+    void getAllLatestUserStatsReturnsOneLatestRowPerUserOnTimestampTie() {
+        AppClock.setFixed(Instant.parse("2026-03-25T12:00:00Z"));
+
+        UUID userId = UUID.randomUUID();
+        userStorage.save(new User(userId, "Stats User"));
+        UserStats first = new UserStats(
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                userId,
+                Instant.parse("2026-03-25T12:00:00Z"),
+                0,
+                0,
+                0,
+                0.0,
+                0,
+                0,
+                0,
+                0.0,
+                0,
+                0,
+                0.0,
+                0,
+                0,
+                0,
+                0,
+                0.5,
+                0.5,
+                0.5);
+        UserStats second = new UserStats(
+                UUID.fromString("22222222-2222-2222-2222-222222222222"),
+                userId,
+                Instant.parse("2026-03-25T12:00:00Z"),
+                0,
+                0,
+                0,
+                0.0,
+                0,
+                0,
+                0,
+                0.0,
+                0,
+                0,
+                0.0,
+                0,
+                0,
+                0,
+                0,
+                0.5,
+                0.5,
+                0.5);
+
+        storage.saveUserStats(first);
+        storage.saveUserStats(second);
+
+        List<UserStats> latest = storage.getAllLatestUserStats();
+
+        assertEquals(1, latest.size());
+        assertEquals(userId, latest.get(0).userId());
+        assertEquals(
+                UUID.fromString("22222222-2222-2222-2222-222222222222"),
+                latest.get(0).id());
     }
 }

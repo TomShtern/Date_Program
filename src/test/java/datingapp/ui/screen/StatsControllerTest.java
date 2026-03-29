@@ -1,6 +1,7 @@
 package datingapp.ui.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -82,12 +83,13 @@ class StatsControllerTest {
                         return JavaFxTestSupport.callOnFxAndWait(
                                         () -> achievementListView.getItems().size())
                                 == 1;
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException interrupted) {
+                        throw new IllegalStateException(interrupted);
                     }
                 },
                 5000));
         assertEquals("0", JavaFxTestSupport.callOnFxAndWait(totalLikesLabel::getText));
+        assertNull(JavaFxTestSupport.callOnFxAndWait(() -> root.lookup("#staticAchievementsContainer")));
 
         viewModel.dispose();
     }

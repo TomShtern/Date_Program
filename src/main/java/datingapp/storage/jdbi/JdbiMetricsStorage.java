@@ -289,7 +289,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                     reciprocity_score, selectiveness_score, attractiveness_score
                 FROM user_stats
                 WHERE user_id = :userId
-                ORDER BY computed_at DESC
+                ORDER BY computed_at DESC, id DESC
                 LIMIT 1
                 """)
         @RegisterRowMapper(UserStatsMapper.class)
@@ -304,24 +304,28 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                     reciprocity_score, selectiveness_score, attractiveness_score
                 FROM user_stats
                 WHERE user_id = :userId
-                ORDER BY computed_at DESC
+                ORDER BY computed_at DESC, id DESC
                 LIMIT :limit
                 """)
         @RegisterRowMapper(UserStatsMapper.class)
         List<UserStats> getUserStatsHistory(@Bind("userId") UUID userId, @Bind("limit") int limit);
 
         @SqlQuery("""
-                SELECT s.id, s.user_id, s.computed_at,
-                    s.total_swipes_given, s.likes_given, s.passes_given, s.like_ratio,
-                    s.total_swipes_received, s.likes_received, s.passes_received, s.incoming_like_ratio,
-                    s.total_matches, s.active_matches, s.match_rate,
-                    s.blocks_given, s.blocks_received, s.reports_given, s.reports_received,
-                    s.reciprocity_score, s.selectiveness_score, s.attractiveness_score
-                FROM user_stats s
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM user_stats s2
-                    WHERE s2.user_id = s.user_id AND s2.computed_at > s.computed_at
-                )
+                SELECT id, user_id, computed_at,
+                    total_swipes_given, likes_given, passes_given, like_ratio,
+                    total_swipes_received, likes_received, passes_received, incoming_like_ratio,
+                    total_matches, active_matches, match_rate,
+                    blocks_given, blocks_received, reports_given, reports_received,
+                    reciprocity_score, selectiveness_score, attractiveness_score
+                FROM (
+                    SELECT s.*,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY s.user_id
+                            ORDER BY s.computed_at DESC, s.id DESC
+                        ) AS rn
+                    FROM user_stats s
+                ) ranked
+                WHERE rn = 1
                 """)
         @RegisterRowMapper(UserStatsMapper.class)
         List<UserStats> getAllLatestUserStats();
@@ -341,7 +345,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                 SELECT id, computed_at, total_active_users,
                     avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio
                 FROM platform_stats
-                ORDER BY computed_at DESC
+                ORDER BY computed_at DESC, id DESC
                 LIMIT 1
                 """)
         @RegisterRowMapper(PlatformStatsMapper.class)
@@ -351,7 +355,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                 SELECT id, computed_at, total_active_users,
                     avg_likes_received, avg_likes_given, avg_match_rate, avg_like_ratio
                 FROM platform_stats
-                ORDER BY computed_at DESC
+                ORDER BY computed_at DESC, id DESC
                 LIMIT :limit
                 """)
         @RegisterRowMapper(PlatformStatsMapper.class)
@@ -477,6 +481,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                 SELECT id, user_id, started_at, last_activity_at, ended_at,
                        state, swipe_count, like_count, pass_count, match_count
                 FROM swipe_sessions WHERE user_id = :userId AND state = 'ACTIVE'
+                  ORDER BY last_activity_at DESC, started_at DESC, id DESC
                 LIMIT 1
                 """)
         Optional<Session> getActiveSession(@Bind("userId") UUID userId);
@@ -548,7 +553,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
             return endStaleSessions(now, cutoff);
         }
 
-        @SqlUpdate("DELETE FROM swipe_sessions WHERE started_at < :cutoff")
+        @SqlUpdate("DELETE FROM swipe_sessions WHERE state <> 'ACTIVE' AND started_at < :cutoff")
         int deleteExpiredSessions(@Bind("cutoff") Instant cutoff);
     }
 

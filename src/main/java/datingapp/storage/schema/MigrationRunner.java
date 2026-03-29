@@ -100,9 +100,11 @@ public final class MigrationRunner {
                     "Repair matches.updated_at for legacy databases with already-recorded earlier versions",
                     MigrationRunner::applyV9),
             new VersionedMigration(
-                    10,
-                    "Add named foreign keys for daily_pick_views and user_achievements",
-                    MigrationRunner::applyV10));
+                    10, "Add named foreign keys for daily_pick_views and user_achievements", MigrationRunner::applyV10),
+            new VersionedMigration(
+                    11,
+                    "Add pending friend-request uniqueness helpers and deterministic pair lookup columns",
+                    MigrationRunner::applyV11));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -322,6 +324,46 @@ public final class MigrationRunner {
         }
     }
 
+    /**
+     * V11 migration: adds helper columns and a uniqueness invariant so only one
+     * pending friend request can exist per user pair while preserving accepted/rejected
+     * history rows.
+     */
+    private static void applyV11(Statement stmt) throws SQLException {
+        if (!hasTable(stmt, "FRIEND_REQUESTS")) {
+            return;
+        }
+
+        stmt.execute("ALTER TABLE friend_requests ADD COLUMN IF NOT EXISTS pair_key VARCHAR(73)");
+        stmt.execute("ALTER TABLE friend_requests ADD COLUMN IF NOT EXISTS pending_marker VARCHAR(10)");
+
+        stmt.execute("""
+                UPDATE friend_requests
+                SET pair_key = CASE
+                    WHEN CAST(from_user_id AS VARCHAR) <= CAST(to_user_id AS VARCHAR)
+                        THEN CONCAT(CAST(from_user_id AS VARCHAR), '|', CAST(to_user_id AS VARCHAR))
+                    ELSE CONCAT(CAST(to_user_id AS VARCHAR), '|', CAST(from_user_id AS VARCHAR))
+                END
+                WHERE pair_key IS NULL
+                """);
+
+        stmt.execute("""
+                UPDATE friend_requests
+                SET pending_marker = CASE WHEN status = 'PENDING' THEN 'PENDING' ELSE NULL END
+                WHERE pending_marker IS DISTINCT FROM CASE WHEN status = 'PENDING' THEN 'PENDING' ELSE NULL END
+                """);
+
+        long duplicatePendingPairs = countDuplicatePendingFriendRequestPairs(stmt);
+        if (duplicatePendingPairs > 0) {
+            throw new SQLException("Cannot enforce pending friend-request uniqueness: "
+                    + duplicatePendingPairs
+                    + " duplicate pending pair(s) exist in friend_requests");
+        }
+
+        stmt.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uk_friend_requests_pending_pair ON friend_requests(pair_key, pending_marker)");
+    }
+
     private static void repairMatchesUpdatedAtColumn(Statement stmt) throws SQLException {
         if (!hasTable(stmt, TABLE_MATCHES)) {
             return;
@@ -415,6 +457,22 @@ public final class MigrationRunner {
                 + " = t."
                 + columnName
                 + ")";
+        try (ResultSet rs = stmt.executeQuery(sql)) {
+            return rs.next() ? rs.getLong(1) : 0L;
+        }
+    }
+
+    private static long countDuplicatePendingFriendRequestPairs(Statement stmt) throws SQLException {
+        String sql = """
+                SELECT COUNT(*)
+                FROM (
+                    SELECT pair_key
+                    FROM friend_requests
+                    WHERE pending_marker = 'PENDING'
+                    GROUP BY pair_key
+                    HAVING COUNT(*) > 1
+                ) duplicate_pairs
+                """;
         try (ResultSet rs = stmt.executeQuery(sql)) {
             return rs.next() ? rs.getLong(1) : 0L;
         }

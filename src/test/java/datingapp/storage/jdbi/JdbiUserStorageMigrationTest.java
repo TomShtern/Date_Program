@@ -12,6 +12,7 @@ import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.storage.DatabaseManager;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -31,9 +32,11 @@ class JdbiUserStorageMigrationTest {
     private JdbiUserStorage storage;
     private Jdbi jdbi;
     private UUID userId;
+    private static final String DB_PROFILE_PROPERTY = "datingapp.db.profile";
 
     @BeforeEach
     void setUp() {
+        System.setProperty(DB_PROFILE_PROPERTY, "test");
         String dbName = "migrationdb_" + UUID.randomUUID().toString().replace("-", "");
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1");
         DatabaseManager dbManager = DatabaseManager.getInstance();
@@ -60,6 +63,8 @@ class JdbiUserStorageMigrationTest {
 
     @AfterEach
     void tearDown() {
+        System.clearProperty(DB_PROFILE_PROPERTY);
+        AppClock.reset();
         DatabaseManager.resetInstance();
     }
 
@@ -112,6 +117,24 @@ class JdbiUserStorageMigrationTest {
 
         assertEquals(1, results.size());
         assertEquals(femaleCandidate.getId(), results.getFirst().getId());
+    }
+
+    @Test
+    @DisplayName("findCandidates uses exact UTC age boundaries rather than year-difference shortcuts")
+    void findCandidatesUsesExactUtcAgeBoundaries() {
+        AppClock.setFixed(Instant.parse("2026-03-25T12:00:00Z"));
+
+        User seeker = createUser();
+        seeker.setAgeRange(26, 26, 18, 120);
+        storage.save(seeker);
+
+        User borderlineCandidate = createCandidate("BorderlineCandidate", Gender.FEMALE, 40.7228, -74.0060);
+        borderlineCandidate.setBirthDate(LocalDate.of(2000, 3, 26));
+        storage.save(borderlineCandidate);
+
+        List<User> results = storage.findCandidates(userId, EnumSet.of(Gender.FEMALE), 26, 26, 40.7128, -74.0060, 25);
+
+        assertEquals(0, results.size());
     }
 
     private User createUser() {

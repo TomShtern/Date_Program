@@ -5,9 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.connection.*;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
+import datingapp.core.connection.ConnectionService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.ProfileNote;
@@ -36,6 +36,58 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("ConnectionService Tests")
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class MessagingServiceTest {
+
+    private static final class TrackingCommunications extends TestStorages.Communications {
+        private int latestMessageBatchCalls;
+        private int unreadBatchCalls;
+        private int directLatestMessageCalls;
+        private int directUnreadCountCalls;
+
+        @Override
+        public Map<String, Optional<Message>> getLatestMessagesByConversationIds(Set<String> conversationIds) {
+            latestMessageBatchCalls++;
+            Map<String, Optional<Message>> latestMessages = new HashMap<>();
+            conversationIds.forEach(id -> latestMessages.put(id, super.getLatestMessage(id)));
+            return Map.copyOf(latestMessages);
+        }
+
+        @Override
+        public Map<String, Integer> countUnreadMessagesByConversationIds(UUID userId, Set<String> conversationIds) {
+            unreadBatchCalls++;
+            Map<String, Integer> unreadCounts = new HashMap<>();
+            for (String conversationId : conversationIds) {
+                Conversation conversation = getConversation(conversationId).orElse(null);
+                if (conversation == null || !conversation.involves(userId)) {
+                    unreadCounts.put(conversationId, 0);
+                    continue;
+                }
+                Instant lastReadAt = conversation.getLastReadAt(userId);
+                int unread = lastReadAt == null
+                        ? super.countMessagesNotFromSender(conversationId, userId)
+                        : super.countMessagesAfterNotFrom(conversationId, lastReadAt, userId);
+                unreadCounts.put(conversationId, unread);
+            }
+            return Map.copyOf(unreadCounts);
+        }
+
+        @Override
+        public Optional<Message> getLatestMessage(String conversationId) {
+            directLatestMessageCalls++;
+            return super.getLatestMessage(conversationId);
+        }
+
+        @Override
+        public int countMessagesNotFromSender(String conversationId, UUID senderId) {
+            directUnreadCountCalls++;
+            return super.countMessagesNotFromSender(conversationId, senderId);
+        }
+
+        @Override
+        public int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId) {
+            directUnreadCountCalls++;
+            return super.countMessagesAfterNotFrom(conversationId, after, excludeSenderId);
+        }
+    }
 
     private CommunicationStorage messagingStorage;
     private InteractionStorage matchStorage;
@@ -231,6 +283,7 @@ class MessagingServiceTest {
             matchStorage.save(match);
 
             messagingService.sendMessage(userA, userB, "First");
+            TestClock.setFixed(FIXED_INSTANT.plusSeconds(1));
             messagingService.sendMessage(userB, userA, "Second");
 
             var result = messagingService.getMessages(userA, userB, 10, 0);
@@ -527,6 +580,30 @@ class MessagingServiceTest {
 
             assertTrue(previews.isEmpty());
         }
+
+        @Test
+        @DisplayName("uses batched preview queries instead of per-conversation lookups")
+        void usesBatchedPreviewQueries() {
+            TrackingCommunications trackingStorage = new TrackingCommunications();
+            ConnectionService batchedService =
+                    new ConnectionService(AppConfig.defaults(), trackingStorage, matchStorage, userStorage);
+
+            Match matchAB = Match.create(userA, userB);
+            Match matchAC = Match.create(userA, userC);
+            matchStorage.save(matchAB);
+            matchStorage.save(matchAC);
+
+            batchedService.sendMessage(userB, userA, "From B");
+            batchedService.sendMessage(userC, userA, "From C");
+
+            List<ConnectionService.ConversationPreview> previews = batchedService.getConversations(userA, 50, 0);
+
+            assertEquals(2, previews.size());
+            assertEquals(1, trackingStorage.latestMessageBatchCalls);
+            assertEquals(1, trackingStorage.unreadBatchCalls);
+            assertEquals(0, trackingStorage.directLatestMessageCalls);
+            assertEquals(0, trackingStorage.directUnreadCountCalls);
+        }
     }
 
     @SuppressWarnings("unused") // JUnit 5 discovers via reflection
@@ -559,6 +636,9 @@ class MessagingServiceTest {
         @Test
         @DisplayName("includes zero counts for conversations without messages")
         void includesZeroForConversationsWithoutMessages() {
+            Match match = Match.create(userA, userB);
+            matchStorage.save(match);
+
             Conversation emptyConversation = messagingService.getOrCreateConversation(userA, userB);
 
             Map<String, Integer> counts =
@@ -582,6 +662,9 @@ class MessagingServiceTest {
         @Test
         @DisplayName("should create if not exists")
         void createIfNotExists() {
+            Match match = Match.create(userA, userB);
+            matchStorage.save(match);
+
             String conversationId = Conversation.generateId(userA, userB);
             assertTrue(messagingStorage.getConversation(conversationId).isEmpty());
 

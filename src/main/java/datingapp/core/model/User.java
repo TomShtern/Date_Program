@@ -399,6 +399,22 @@ public class User {
         return Collections.unmodifiableList(photoUrls);
     }
 
+    public int getRealPhotoCount() {
+        return (int) photoUrls.stream().filter(User::isRealPhotoUrl).count();
+    }
+
+    public boolean hasRealPhoto() {
+        return getRealPhotoCount() > 0;
+    }
+
+    public static boolean isPlaceholderPhotoUrl(String photoUrl) {
+        return PLACEHOLDER_PHOTO_URL.equals(photoUrl);
+    }
+
+    public static boolean isRealPhotoUrl(String photoUrl) {
+        return photoUrl != null && !photoUrl.isBlank() && !isPlaceholderPhotoUrl(photoUrl);
+    }
+
     public UserState getState() {
         return state;
     }

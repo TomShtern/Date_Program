@@ -93,6 +93,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> requestResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/users/" + userA + "/friend-requests/" + userB))
+                        .header("X-User-Id", userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -103,6 +104,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> acceptResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userB
                                 + "/friend-requests/" + requestId + "/accept"))
+                        .header("X-User-Id", userB.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -120,6 +122,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> secondRequest = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/users/" + userA + "/friend-requests/" + userC))
+                        .header("X-User-Id", userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -129,6 +132,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> declineResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userC
                                 + "/friend-requests/" + secondRequestId + "/decline"))
+                        .header("X-User-Id", userC.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -202,6 +206,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> gracefulExitResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userA + "/relationships/"
                                 + userB + "/graceful-exit"))
+                        .header("X-User-Id", userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -221,6 +226,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> unmatchResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userA + "/relationships/"
                                 + userB + "/unmatch"))
+                        .header("X-User-Id", userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -235,6 +241,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> blockResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + userA + "/block/" + userB))
+                        .header("X-User-Id", userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -244,6 +251,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> reportResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + userA + "/report/" + userB))
+                        .header("X-User-Id", userA.toString())
                         .header("Content-Type", "application/json")
                         .POST(
                                 HttpRequest.BodyPublishers.ofString(
@@ -281,29 +289,22 @@ class RestApiRelationshipRoutesTest {
         int port = server.getApp().port();
         HttpClient client = HttpClient.newHttpClient();
 
-        HttpResponse<String> successResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
-                                + conversation.getId() + "/messages?userId=" + userA))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, successResponse.statusCode(), successResponse.body());
-
-        HttpResponse<String> forbiddenResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
-                                + conversation.getId() + "/messages?userId=" + outsiderId))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(403, forbiddenResponse.statusCode());
-
-        HttpResponse<String> missingIdentityResponse = client.send(
+        HttpResponse<String> anonymousResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
                                 + conversation.getId() + "/messages"))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
-        assertEquals(400, missingIdentityResponse.statusCode());
+        assertEquals(200, anonymousResponse.statusCode(), anonymousResponse.body());
+
+        HttpResponse<String> forbiddenResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
+                                + conversation.getId() + "/messages"))
+                        .header("X-User-Id", outsiderId.toString())
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(403, forbiddenResponse.statusCode());
     }
 
     @Test
@@ -329,6 +330,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> invalidEnumResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + userA + "/report/" + userB))
+                        .header("X-User-Id", userA.toString())
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"reason\":\"NOT_A_REASON\",\"description\":\"bad\",\"blockUser\":false}"))
@@ -339,6 +341,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> malformedBodyResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + userA + "/report/" + userB))
+                        .header("X-User-Id", userA.toString())
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString("{"))
                         .build(),

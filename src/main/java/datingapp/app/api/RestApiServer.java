@@ -143,8 +143,8 @@ public class RestApiServer {
     private static final String PATH_TARGET_ID = "targetId";
     private static final String NOTES_COLLECTION_ROUTE = "/api/users/{authorId}/notes";
     private static final String NOTE_ITEM_ROUTE = "/api/users/{authorId}/notes/{subjectId}";
+    private static final String HEALTH_ROUTE = "/api/health";
     private static final String HEADER_ACTING_USER_ID = "X-User-Id";
-    private static final String QUERY_ACTING_USER_ID = "userId";
     private static final Duration DEFAULT_RATE_LIMIT_WINDOW = Duration.ofMinutes(1);
     private static final int DEFAULT_RATE_LIMIT_REQUESTS = 240;
     /**
@@ -224,7 +224,7 @@ public class RestApiServer {
         // It is designed for local IPC use only (CLI tools, local admin scripts).
         // Do NOT expose these endpoints over a public network without adding
         // authentication middleware (e.g., app.before() with a shared secret).
-        // All routes below operate without any identity verification.
+        // Mutating routes require X-User-Id; selected read routes may remain anonymous.
         // ────────────────────────────────────────────────────────────────────
 
         new HealthRoutes(app).register();
@@ -242,6 +242,7 @@ public class RestApiServer {
             }
             enforceLocalhostOnly(ctx);
             enforceRateLimit(ctx);
+            enforceMutatingRouteIdentity(ctx);
             enforceScopedIdentity(ctx);
         });
     }
@@ -405,8 +406,7 @@ public class RestApiServer {
                 datingapp.core.connection.ConnectionModels.Like.Direction.LIKE,
                 true));
         if (!result.success()) {
-            ctx.status(409);
-            ctx.json(new ErrorResponse(CONFLICT, result.error().message()));
+            handleUseCaseFailure(ctx, result.error());
             return;
         }
 
@@ -437,8 +437,7 @@ public class RestApiServer {
                 datingapp.core.connection.ConnectionModels.Like.Direction.PASS,
                 true));
         if (!result.success()) {
-            ctx.status(409);
-            ctx.json(new ErrorResponse(CONFLICT, result.error().message()));
+            handleUseCaseFailure(ctx, result.error());
             return;
         }
         ctx.status(200);
@@ -733,8 +732,7 @@ public class RestApiServer {
         var listResult =
                 messagingUseCases.listConversations(new ListConversationsQuery(UserContext.api(userId), limit, offset));
         if (!listResult.success()) {
-            ctx.status(409);
-            ctx.json(new ErrorResponse(CONFLICT, listResult.error().message()));
+            handleUseCaseFailure(ctx, listResult.error());
             return;
         }
         List<ConnectionService.ConversationPreview> previews = listResult.data().conversations();
@@ -796,7 +794,6 @@ public class RestApiServer {
 
     private void getMessages(Context ctx) {
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
-        UUID actingUserId = requireActingUserId(ctx);
         int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
         int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
         if (limit <= 0) {
@@ -807,10 +804,13 @@ public class RestApiServer {
         }
 
         ConversationParticipants participants = parseConversationParticipants(conversationId);
-        participants.requireParticipant(actingUserId);
+        Optional<UUID> actingUserId = resolveActingUserId(ctx);
+        actingUserId.ifPresent(participants::requireParticipant);
+        UUID requestUserId = actingUserId.orElse(participants.firstUserId());
+        UUID otherUserId = actingUserId.map(participants::otherParticipant).orElse(participants.secondUserId());
 
         var result = messagingUseCases.loadConversation(new LoadConversationQuery(
-                UserContext.api(actingUserId), participants.otherParticipant(actingUserId), limit, offset, true));
+                UserContext.api(requestUserId), otherUserId, limit, offset, actingUserId.isPresent()));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -855,8 +855,7 @@ public class RestApiServer {
             ctx.status(201);
             ctx.json(MessageDto.from(result.data().message()));
         } else {
-            ctx.status(409);
-            ctx.json(new ErrorResponse(CONFLICT, result.error().message()));
+            handleUseCaseFailure(ctx, result.error());
         }
     }
 
@@ -977,7 +976,7 @@ public class RestApiServer {
     }
 
     private void enforceRateLimit(Context ctx) {
-        if ("/api/health".equals(ctx.path())) {
+        if (HEALTH_ROUTE.equals(ctx.path())) {
             return;
         }
         String key = ctx.ip() + '|' + ctx.method();
@@ -999,9 +998,24 @@ public class RestApiServer {
         validateActingUserMatchesPathParam(ctx, PATH_AUTHOR_ID);
 
         if (ctx.path().startsWith("/api/conversations/")) {
-            UUID actingUserId = requireActingUserId(ctx);
-            parseConversationParticipants(ctx.pathParam(PATH_CONVERSATION_ID)).requireParticipant(actingUserId);
+            resolveActingUserId(ctx)
+                    .ifPresent(actingUserId -> parseConversationParticipants(ctx.pathParam(PATH_CONVERSATION_ID))
+                            .requireParticipant(actingUserId));
         }
+    }
+
+    private void enforceMutatingRouteIdentity(Context ctx) {
+        if (!requiresActingUserIdentity(ctx)) {
+            return;
+        }
+        requireActingUserId(ctx);
+    }
+
+    private boolean requiresActingUserIdentity(Context ctx) {
+        return switch (ctx.method()) {
+            case POST, PUT, DELETE -> !HEALTH_ROUTE.equals(ctx.path());
+            default -> false;
+        };
     }
 
     private void validateActingUserMatchesPathParam(Context ctx, String paramName) {
@@ -1021,9 +1035,7 @@ public class RestApiServer {
     private Optional<UUID> resolveActingUserId(Context ctx) {
         String rawUserId = Optional.ofNullable(ctx.header(HEADER_ACTING_USER_ID))
                 .filter(value -> !value.isBlank())
-                .orElseGet(() -> Optional.ofNullable(ctx.queryParam(QUERY_ACTING_USER_ID))
-                        .filter(value -> !value.isBlank())
-                        .orElse(null));
+                .orElse(null);
         if (rawUserId == null) {
             return Optional.empty();
         }
@@ -1032,8 +1044,8 @@ public class RestApiServer {
 
     private UUID requireActingUserId(Context ctx) {
         return resolveActingUserId(ctx)
-                .orElseThrow(() -> new IllegalArgumentException(HEADER_ACTING_USER_ID + " header or "
-                        + QUERY_ACTING_USER_ID + " query parameter is required for conversation routes"));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        HEADER_ACTING_USER_ID + " header is required for mutating API routes"));
     }
 
     private boolean isLoopbackAddress(String host) {
@@ -1226,7 +1238,7 @@ public class RestApiServer {
 
         @Override
         public void register() {
-            app.get("/api/health", ctx -> ctx.json(new HealthResponse("ok", System.currentTimeMillis())));
+            app.get(HEALTH_ROUTE, ctx -> ctx.json(new HealthResponse("ok", System.currentTimeMillis())));
         }
     }
 

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
+import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.messaging.MessagingUseCases.ArchiveConversationCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.CountMessagesByConversationIdsQuery;
@@ -105,6 +106,55 @@ class MessagingUseCasesTest {
         assertTrue(result.success());
         assertFalse(result.data().conversations().isEmpty());
         assertEquals(1, result.data().totalUnreadCount());
+    }
+
+    @Test
+    @DisplayName("openConversation resolves the target conversation even when it is outside the requested preview page")
+    void openConversationResolvesTargetConversationOutsideRequestedPreviewPage() {
+        var targetSend = useCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(sender.getId()), recipient.getId(), "Target conversation"));
+        assertTrue(targetSend.success());
+
+        User otherRecipient = TestUserFactory.createActiveUser(UUID.randomUUID(), "Other Recipient");
+        otherRecipient.setGender(User.Gender.FEMALE);
+        otherRecipient.setInterestedIn(java.util.Set.of(User.Gender.MALE));
+        userStorage.save(otherRecipient);
+        interactionStorage.save(Match.create(sender.getId(), otherRecipient.getId()));
+
+        var otherSend = useCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(sender.getId()), otherRecipient.getId(), "More recent"));
+        assertTrue(otherSend.success());
+
+        var result = useCases.openConversation(new MessagingUseCases.OpenConversationCommand(
+                UserContext.cli(sender.getId()), recipient.getId(), 1, 0));
+
+        assertTrue(result.success());
+        assertEquals(
+                targetSend.data().message().conversationId(),
+                result.data().conversation().getId());
+        assertEquals(
+                targetSend.data().message().conversationId(),
+                result.data().preview().conversation().getId());
+    }
+
+    @Test
+    @DisplayName("loadConversation maps a missing conversation to NOT_FOUND")
+    void loadConversationMapsMissingConversationToNotFound() {
+        var result = useCases.loadConversation(
+                new LoadConversationQuery(UserContext.cli(sender.getId()), recipient.getId(), 50, 0, false));
+
+        assertFalse(result.success());
+        assertEquals(UseCaseError.Code.NOT_FOUND, result.error().code());
+    }
+
+    @Test
+    @DisplayName("loadConversation maps oversized page requests to VALIDATION")
+    void loadConversationMapsOversizedPageRequestsToValidation() {
+        var result = useCases.loadConversation(new LoadConversationQuery(
+                UserContext.cli(sender.getId()), recipient.getId(), Integer.MAX_VALUE, 0, false));
+
+        assertFalse(result.success());
+        assertEquals(UseCaseError.Code.VALIDATION, result.error().code());
     }
 
     @Test

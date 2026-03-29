@@ -4,12 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,33 +31,15 @@ class AdapterBoundaryArchitectureTest {
     @Test
     void viewModelsDoNotImportCoreStorage() throws IOException {
         Path vmRoot = SOURCE_ROOT.resolve("datingapp/ui/viewmodel");
-        List<String> violations = new ArrayList<>();
-        if (!Files.isDirectory(vmRoot)) {
+        if (!java.nio.file.Files.isDirectory(vmRoot)) {
             fail("Expected ViewModel directory does not exist: " + vmRoot
                     + ". If the directory was renamed/moved or SOURCE_ROOT is incorrect, update this test.");
         }
-        try (Stream<Path> paths = Files.walk(vmRoot)) {
-            paths.filter(p -> p.toString().endsWith(".java")).forEach(path -> {
-                String fileName = path.getFileName().toString();
-                if (VIEWMODEL_STORAGE_ALLOWLIST.contains(fileName)) {
-                    return;
-                }
-                try {
-                    List<String> lines = Files.readAllLines(path);
-                    for (int i = 0; i < lines.size(); i++) {
-                        String line = lines.get(i).strip();
-                        if (line.contains("import datingapp.core.storage.")
-                                && !VIEWMODEL_STORAGE_TYPE_ALLOWLIST.contains(line)) {
-                            String normalizedPath = path.toString().replace('\\', '/');
-                            violations.add(normalizedPath + ":" + (i + 1) + "  "
-                                    + lines.get(i).strip());
-                        }
-                    }
-                } catch (IOException e) {
-                    throw new java.io.UncheckedIOException(e);
-                }
-            });
-        }
+        List<String> violations = ArchitectureTestSupport.collectImportViolations(
+                vmRoot,
+                path -> VIEWMODEL_STORAGE_ALLOWLIST.contains(path.getFileName().toString()),
+                VIEWMODEL_STORAGE_TYPE_ALLOWLIST::contains,
+                importText -> importText.startsWith("import datingapp.core.storage."));
         assertTrue(
                 violations.isEmpty(),
                 "ViewModels import core.storage directly (should use UiDataAdapters):\n"
@@ -70,29 +49,13 @@ class AdapterBoundaryArchitectureTest {
     @Test
     void corePackageDoesNotImportFrameworks() throws IOException {
         Path coreRoot = SOURCE_ROOT.resolve("datingapp/core");
-        List<String> violations = new ArrayList<>();
         assertTrue(
-                Files.isDirectory(coreRoot),
+                java.nio.file.Files.isDirectory(coreRoot),
                 "Expected core directory does not exist: " + coreRoot
                         + ". If the package was intentionally removed/renamed, update this test.");
-        try (Stream<Path> paths = Files.walk(coreRoot)) {
-            paths.filter(p -> p.toString().endsWith(".java")).forEach(path -> {
-                try {
-                    List<String> lines = Files.readAllLines(path);
-                    for (int i = 0; i < lines.size(); i++) {
-                        String line = lines.get(i);
-                        for (String forbidden : FORBIDDEN_CORE_IMPORTS) {
-                            if (line.contains(forbidden)) {
-                                String normalizedPath = path.toString().replace('\\', '/');
-                                violations.add(normalizedPath + ":" + (i + 1) + "  " + line.strip());
-                            }
-                        }
-                    }
-                } catch (IOException e) {
-                    throw new java.io.UncheckedIOException(e);
-                }
-            });
-        }
+        List<String> violations = ArchitectureTestSupport.collectImportViolations(
+                coreRoot, path -> false, line -> false, line -> FORBIDDEN_CORE_IMPORTS.stream()
+                        .anyMatch(line::startsWith));
         assertTrue(violations.isEmpty(), "Core package imports framework libraries:\n" + String.join("\n", violations));
     }
 }

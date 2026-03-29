@@ -15,6 +15,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Unit tests for ValidationService. */
 class ValidationServiceTest {
@@ -131,10 +133,12 @@ class ValidationServiceTest {
             assertEquals("+15551234567", ValidationService.normalizePhone("+1 (555) 123-4567"));
         }
 
-        @Test
-        @DisplayName("Invalid phone fails validation")
-        void invalidPhone() {
-            ValidationResult result = validator.validatePhone("bad-phone");
+        @ParameterizedTest(name = "\"{0}\" fails phone validation")
+        @ValueSource(strings = {"bad-phone", "123+4567890", "++15551234567"})
+        @DisplayName("Invalid phone formats fail validation")
+        void invalidPhone(String phone) {
+            ValidationResult result = validator.validatePhone(phone);
+
             assertFalse(result.valid());
             assertEquals("Invalid phone format", result.errors().getFirst());
         }
@@ -343,17 +347,21 @@ class ValidationServiceTest {
         }
 
         @Test
-        @DisplayName("Null bio passes validation")
+        @DisplayName("Null bio fails validation")
         void nullBio() {
             ValidationResult result = validator.validateBio(null);
-            assertTrue(result.valid());
+
+            assertFalse(result.valid());
+            assertEquals("Bio cannot be blank", result.errors().getFirst());
         }
 
         @Test
-        @DisplayName("Empty bio passes validation")
+        @DisplayName("Empty bio fails validation")
         void emptyBio() {
             ValidationResult result = validator.validateBio("");
-            assertTrue(result.valid());
+
+            assertFalse(result.valid());
+            assertEquals("Bio cannot be blank", result.errors().getFirst());
         }
 
         @Test
@@ -546,6 +554,24 @@ class ValidationServiceTest {
             assertEquals(2, result.errors().size());
             assertTrue(result.errors().contains("Invalid latitude (must be -90 to 90)"));
             assertTrue(result.errors().contains("Invalid longitude (must be -180 to 180)"));
+        }
+
+        @Test
+        @DisplayName("Latitude NaN fails validation")
+        void latitudeNaNFailsValidation() {
+            ValidationResult result = validator.validateLocation(Double.NaN, 34.7818);
+
+            assertFalse(result.valid());
+            assertTrue(result.errors().contains("Invalid latitude (must be finite and -90 to 90)"));
+        }
+
+        @Test
+        @DisplayName("Longitude NaN fails validation")
+        void longitudeNaNFailsValidation() {
+            ValidationResult result = validator.validateLocation(32.0853, Double.NaN);
+
+            assertFalse(result.valid());
+            assertTrue(result.errors().contains("Invalid longitude (must be finite and -180 to 180)"));
         }
     }
 

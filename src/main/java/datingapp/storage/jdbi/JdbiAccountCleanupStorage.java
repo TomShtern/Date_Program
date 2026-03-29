@@ -44,6 +44,7 @@ public final class JdbiAccountCleanupStorage implements AccountCleanupStorage {
                 deleteUserStats(handle, user.getId());
                 deleteUserAchievements(handle, user.getId());
                 deleteDailyPickViews(handle, user.getId());
+                deleteDailyPicks(handle, user.getId());
                 deleteSwipeSessions(handle, user.getId());
 
                 // ── Social graph ──
@@ -171,6 +172,11 @@ public final class JdbiAccountCleanupStorage implements AccountCleanupStorage {
 
     private static void deleteDailyPickViews(Handle handle, UUID userId) {
         executeHardDelete(handle, "DELETE FROM daily_pick_views WHERE user_id = :userId", userId);
+    }
+
+    private static void deleteDailyPicks(Handle handle, UUID userId) {
+        executeHardDelete(
+                handle, "DELETE FROM daily_picks WHERE user_id = :userId OR picked_user_id = :userId", userId);
     }
 
     private static void deleteSwipeSessions(Handle handle, UUID userId) {

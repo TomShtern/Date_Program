@@ -23,11 +23,13 @@ class NotificationEventHandlerTest {
 
     private InProcessAppEventBus bus;
     private final List<Notification> savedNotifications = new ArrayList<>();
+    private final List<UUID> deletedNotificationUserIds = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
         bus = new InProcessAppEventBus();
         savedNotifications.clear();
+        deletedNotificationUserIds.clear();
 
         NotificationEventHandler handler = new NotificationEventHandler(new CapturingStorage());
         handler.register(bus);
@@ -55,7 +57,7 @@ class NotificationEventHandlerTest {
         UUID targetId = UUID.randomUUID();
 
         bus.publish(new AppEvent.RelationshipTransitioned(
-                "match-" + UUID.randomUUID(), initiatorId, targetId, "ACTIVE", "FRIENDS", Instant.now()));
+                "match-" + UUID.randomUUID(), initiatorId, targetId, "ACTIVE", "FRIEND_ZONE_REQUESTED", Instant.now()));
 
         assertEquals(1, savedNotifications.size());
         Notification n = savedNotifications.getFirst();
@@ -158,9 +160,8 @@ class NotificationEventHandlerTest {
 
         bus.publish(new AppEvent.AccountDeleted(userId, AppEvent.DeletionReason.USER_REQUEST, Instant.now()));
 
-        // No exception should be thrown in BEST_EFFORT mode
-        // The handler logs but doesn't fail if no cleanup method exists
         assertEquals(0, savedNotifications.size());
+        assertEquals(List.of(userId), deletedNotificationUserIds);
     }
 
     /** Minimal stub that only captures saveNotification calls. */
@@ -169,6 +170,11 @@ class NotificationEventHandlerTest {
         @Override
         public void saveNotification(Notification notification) {
             savedNotifications.add(notification);
+        }
+
+        @Override
+        public int markAllNotificationsAsRead(UUID userId) {
+            throw new UnsupportedOperationException("stub");
         }
 
         // --- Unused stubs below ---
@@ -304,7 +310,7 @@ class NotificationEventHandlerTest {
         }
 
         @Override
-        public void markNotificationAsRead(UUID id) {
+        public void markNotificationAsRead(UUID userId, UUID id) {
             throw new UnsupportedOperationException("stub");
         }
 
@@ -319,7 +325,13 @@ class NotificationEventHandlerTest {
         }
 
         @Override
-        public void deleteNotification(UUID id) {
+        public int deleteNotificationsForUser(UUID userId) {
+            deletedNotificationUserIds.add(userId);
+            return 0;
+        }
+
+        @Override
+        public void deleteNotification(UUID userId, UUID id) {
             throw new UnsupportedOperationException("stub");
         }
 

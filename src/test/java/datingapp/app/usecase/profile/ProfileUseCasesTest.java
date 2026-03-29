@@ -1,6 +1,7 @@
 package datingapp.app.usecase.profile;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -403,6 +404,36 @@ class ProfileUseCasesTest {
     }
 
     @Test
+    @DisplayName("deleteAccount should not mutate caller-visible user state when persistence fails")
+    void deleteAccountLeavesUserUnchangedWhenPersistenceFails() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Failing Delete User");
+        userStorage.save(user);
+
+        AtomicBoolean eventPublished = new AtomicBoolean(false);
+        ProfileUseCases failingUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                null,
+                config,
+                new ProfileActivationPolicy(),
+                recordingEventBus(eventPublished),
+                new ThrowingAccountCleanupStorage());
+
+        var result = failingUseCases.deleteAccount(new DeleteAccountCommand(UserContext.cli(user.getId()), "privacy"));
+
+        assertFalse(result.success());
+        assertEquals(User.UserState.ACTIVE, user.getState());
+        assertFalse(user.isDeleted());
+        assertEquals(
+                User.UserState.ACTIVE,
+                userStorage.get(user.getId()).orElseThrow().getState());
+        assertFalse(userStorage.get(user.getId()).orElseThrow().isDeleted());
+        assertFalse(eventPublished.get());
+    }
+
+    @Test
     @DisplayName("updateProfile should publish LocationUpdated when coordinates change")
     void updateProfilePublishesLocationUpdatedEvent() {
         User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Location User");
@@ -659,6 +690,13 @@ class ProfileUseCasesTest {
             userId.set(user.getId());
             this.deletedAt.set(deletedAt);
             userSnapshot.set(user);
+        }
+    }
+
+    private static final class ThrowingAccountCleanupStorage implements AccountCleanupStorage {
+        @Override
+        public void softDeleteAccount(User user, Instant deletedAt) {
+            throw new IllegalStateException("cleanup failed");
         }
     }
 }

@@ -19,7 +19,7 @@ import datingapp.ui.screen.SafetyController;
 import datingapp.ui.screen.SocialController;
 import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
-import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.MetricsUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
@@ -238,7 +238,7 @@ public class ViewModelFactory {
                         java.time.Duration.ofSeconds(
                                 services.getConfig().validation().chatActivePollSeconds()),
                         new ChatViewModel.ChatUiDependencies(
-                                createUiProfileNoteDataAccess(), new NoOpUiPresenceDataAccess())));
+                                createUiProfileNoteDataAccess(), createUiPresenceDataAccess())));
     }
 
     public StatsViewModel getStatsViewModel() {
@@ -250,6 +250,7 @@ public class ViewModelFactory {
                         services.getConnectionService(),
                         services.getProfileUseCases(),
                         session,
+                        datingapp.core.AppClock.clock(),
                         uiDispatcher));
     }
 
@@ -356,6 +357,10 @@ public class ViewModelFactory {
 
     private UiProfileNoteDataAccess createUiProfileNoteDataAccess() {
         return new UseCaseUiProfileNoteDataAccess(services.getProfileUseCases());
+    }
+
+    private UiDataAdapters.UiPresenceDataAccess createUiPresenceDataAccess() {
+        return new MetricsUiPresenceDataAccess(services.getActivityMetricsService(), services.getConfig());
     }
 
     private void logDebug(String message, Object... args) {

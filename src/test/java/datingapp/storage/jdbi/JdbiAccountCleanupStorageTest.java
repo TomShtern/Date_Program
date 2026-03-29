@@ -20,9 +20,10 @@ import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.storage.DatabaseManager;
-import datingapp.storage.schema.SchemaInitializer;
+import datingapp.storage.schema.MigrationRunner;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
@@ -76,7 +77,7 @@ class JdbiAccountCleanupStorageTest {
 
         jdbi.useHandle(handle -> {
             try (var stmt = handle.getConnection().createStatement()) {
-                SchemaInitializer.createAllTables(stmt);
+                MigrationRunner.runAllPending(stmt);
             } catch (java.sql.SQLException _) {
                 throw new DatabaseManager.StorageException("Failed to initialize schema");
             }
@@ -166,6 +167,26 @@ class JdbiAccountCleanupStorageTest {
                 .bind("userId", survivingUser.getId())
                 .bind("computedAt", Timestamp.from(AppClock.now()))
                 .execute());
+
+        jdbi.useHandle(handle -> handle.createUpdate("""
+            INSERT INTO daily_picks (user_id, pick_date, picked_user_id, created_at)
+            VALUES (:userId, :pickDate, :pickedUserId, :createdAt)
+            """)
+                .bind("userId", deletedUser.getId())
+                .bind("pickDate", LocalDate.now())
+                .bind("pickedUserId", survivingUser.getId())
+                .bind("createdAt", Timestamp.from(AppClock.now()))
+                .execute());
+
+        jdbi.useHandle(handle -> handle.createUpdate("""
+            INSERT INTO daily_picks (user_id, pick_date, picked_user_id, created_at)
+            VALUES (:userId, :pickDate, :pickedUserId, :createdAt)
+            """)
+                .bind("userId", survivingUser.getId())
+                .bind("pickDate", LocalDate.now())
+                .bind("pickedUserId", deletedUser.getId())
+                .bind("createdAt", Timestamp.from(AppClock.now()))
+                .execute());
     }
 
     @AfterEach
@@ -179,6 +200,8 @@ class JdbiAccountCleanupStorageTest {
     @Test
     @DisplayName("softDeleteAccount soft-deletes the user graph and hides related rows")
     void softDeleteAccountSoftDeletesTheUserGraph() {
+        assertDailyPickPreconditions();
+
         Instant deletedAt = AppClock.now();
         accountCleanupStorage.softDeleteAccount(deletedUser, deletedAt);
 
@@ -200,6 +223,7 @@ class JdbiAccountCleanupStorageTest {
         assertEquals(0, trustSafetyStorage.countReportsAgainst(survivingUser.getId()));
         assertEquals(0, countUserStatsRows(deletedUser.getId()));
         assertEquals(1, countUserStatsRows(survivingUser.getId()));
+        assertDailyPicksRemovedForDeletedUserGraph();
 
         assertNotNull(rawDeletedAt("SELECT deleted_at FROM users WHERE id = :id", deletedUser.getId()));
         assertNotNull(rawDeletedAtForLike(
@@ -257,6 +281,23 @@ class JdbiAccountCleanupStorageTest {
                 .bind("userId", userId)
                 .mapTo(int.class)
                 .one());
+    }
+
+    private int countDailyPicksRows(UUID userId) {
+        return jdbi.withHandle(handle -> handle.createQuery("SELECT COUNT(*) FROM daily_picks WHERE user_id = :userId")
+                .bind("userId", userId)
+                .mapTo(int.class)
+                .one());
+    }
+
+    private void assertDailyPickPreconditions() {
+        assertEquals(1, countDailyPicksRows(deletedUser.getId()));
+        assertEquals(1, countDailyPicksRows(survivingUser.getId()));
+    }
+
+    private void assertDailyPicksRemovedForDeletedUserGraph() {
+        assertEquals(0, countDailyPicksRows(deletedUser.getId()));
+        assertEquals(0, countDailyPicksRows(survivingUser.getId()));
     }
 
     private Instant rawDeletedAtForLike(String sql, UUID whoLikes, UUID whoGotLiked) {

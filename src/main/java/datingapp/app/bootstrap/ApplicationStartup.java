@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,8 +53,10 @@ import org.slf4j.LoggerFactory;
 public final class ApplicationStartup {
     private static final Logger logger = LoggerFactory.getLogger(ApplicationStartup.class);
 
-    private static final String CONFIG_FILE = "./config/app-config.json";
+    private static final String CONFIG_FILE = "config/app-config.json";
     private static final String ENV_PREFIX = "DATING_APP_";
+    private static final String CONFIG_OVERRIDE_PROPERTY = "datingapp.config";
+    private static final String CONFIG_OVERRIDE_ENV = ENV_PREFIX + "CONFIG";
     private static final String SEED_DATA_ENV_VAR = ENV_PREFIX + "SEED_DATA";
     private static final Set<String> KNOWN_CONFIG_KEYS = knownConfigKeys();
 
@@ -80,6 +83,7 @@ public final class ApplicationStartup {
     private static volatile ServiceRegistry services;
     private static volatile DatabaseManager dbManager;
     private static final AtomicReference<CleanupScheduler> CLEANUP_SCHEDULER_REF = new AtomicReference<>();
+    private static final AtomicReference<Thread> SHUTDOWN_HOOK_REF = new AtomicReference<>();
     private static volatile boolean initialized = false;
 
     private ApplicationStartup() {}
@@ -94,6 +98,7 @@ public final class ApplicationStartup {
 
     public static synchronized ServiceRegistry initialize(AppConfig config) {
         Objects.requireNonNull(config, "config cannot be null");
+        installShutdownHook();
         if (!initialized) {
             dbManager = DatabaseManager.getInstance();
             services = StorageFactory.buildH2(dbManager, config);
@@ -148,7 +153,7 @@ public final class ApplicationStartup {
     // ========================================================================
 
     public static AppConfig load() {
-        return load(Path.of(CONFIG_FILE));
+        return load(resolveConfigPath());
     }
 
     public static AppConfig load(Path configPath) {
@@ -250,25 +255,30 @@ public final class ApplicationStartup {
      * level are exposed.
      */
     private static void applyEnvironmentOverrides(AppConfig.Builder builder) {
-        applyEnvInt("DAILY_LIKE_LIMIT", builder::dailyLikeLimit);
-        applyEnvInt("DAILY_SUPER_LIKE_LIMIT", builder::dailySuperLikeLimit);
-        applyEnvInt("DAILY_PASS_LIMIT", builder::dailyPassLimit);
-        applyEnvInt("AUTO_BAN_THRESHOLD", builder::autoBanThreshold);
-        applyEnvInt("MAX_DISTANCE_KM", builder::maxDistanceKm);
-        applyEnvInt("MAX_SWIPES_PER_SESSION", builder::maxSwipesPerSession);
-        applyEnvInt("UNDO_WINDOW_SECONDS", builder::undoWindowSeconds);
-        applyEnvInt("SESSION_TIMEOUT_MINUTES", builder::sessionTimeoutMinutes);
-        applyEnvInt("QUERY_TIMEOUT_SECONDS", builder::queryTimeoutSeconds);
-        applyEnvInt("CLEANUP_RETENTION_DAYS", builder::cleanupRetentionDays);
-        applyEnvInt("MIN_AGE", builder::minAge);
-        applyEnvInt("MAX_AGE", builder::maxAge);
+        applyEnvironmentOverrides(builder, System::getenv);
+    }
 
-        String tz = System.getenv(ENV_PREFIX + "USER_TIME_ZONE");
+    static void applyEnvironmentOverrides(AppConfig.Builder builder, Function<String, String> envLookup) {
+        applyEnvInt(envLookup, "DAILY_LIKE_LIMIT", builder::dailyLikeLimit);
+        applyEnvInt(envLookup, "DAILY_SUPER_LIKE_LIMIT", builder::dailySuperLikeLimit);
+        applyEnvInt(envLookup, "DAILY_PASS_LIMIT", builder::dailyPassLimit);
+        applyEnvInt(envLookup, "AUTO_BAN_THRESHOLD", builder::autoBanThreshold);
+        applyEnvInt(envLookup, "MAX_DISTANCE_KM", builder::maxDistanceKm);
+        applyEnvInt(envLookup, "MAX_SWIPES_PER_SESSION", builder::maxSwipesPerSession);
+        applyEnvInt(envLookup, "UNDO_WINDOW_SECONDS", builder::undoWindowSeconds);
+        applyEnvInt(envLookup, "SESSION_TIMEOUT_MINUTES", builder::sessionTimeoutMinutes);
+        applyEnvInt(envLookup, "QUERY_TIMEOUT_SECONDS", builder::queryTimeoutSeconds);
+        applyEnvInt(envLookup, "CLEANUP_RETENTION_DAYS", builder::cleanupRetentionDays);
+        applyEnvInt(envLookup, "MIN_AGE", builder::minAge);
+        applyEnvInt(envLookup, "MAX_AGE", builder::maxAge);
+
+        String tz = envLookup.apply(ENV_PREFIX + "USER_TIME_ZONE");
         if (tz != null && !tz.isBlank()) {
             try {
                 builder.userTimeZone(ZoneId.of(tz));
             } catch (Exception ex) {
-                logWarn("Invalid timezone in env var {}{}: {}", ENV_PREFIX, "USER_TIME_ZONE", tz);
+                throw new IllegalStateException(
+                        "Invalid timezone in env var " + ENV_PREFIX + "USER_TIME_ZONE: " + tz, ex);
             }
         }
     }
@@ -277,14 +287,65 @@ public final class ApplicationStartup {
         return "true".equalsIgnoreCase(System.getenv(SEED_DATA_ENV_VAR));
     }
 
-    private static void applyEnvInt(String suffix, java.util.function.IntConsumer setter) {
-        String value = System.getenv(ENV_PREFIX + suffix);
+    private static void applyEnvInt(
+            Function<String, String> envLookup, String suffix, java.util.function.IntConsumer setter) {
+        String value = envLookup.apply(ENV_PREFIX + suffix);
         if (value != null && !value.isBlank()) {
             try {
                 setter.accept(Integer.parseInt(value));
             } catch (NumberFormatException ex) {
-                logWarn("Invalid integer in env var {}: {}", ENV_PREFIX + suffix, value);
+                throw new IllegalStateException("Invalid integer in env var " + ENV_PREFIX + suffix + ": " + value, ex);
             }
+        }
+    }
+
+    private static Path resolveConfigPath() {
+        Path propertyOverride = pathOrNull(System.getProperty(CONFIG_OVERRIDE_PROPERTY));
+        Path envOverride = pathOrNull(System.getenv(CONFIG_OVERRIDE_ENV));
+        Path appRelative = Path.of(CONFIG_FILE);
+        Path fallback = Path.of("app-config.json");
+
+        return firstExistingPath(propertyOverride, envOverride, appRelative, fallback)
+                .orElse(appRelative);
+    }
+
+    private static Path pathOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return Path.of(value);
+    }
+
+    private static java.util.Optional<Path> firstExistingPath(Path... candidates) {
+        for (Path candidate : candidates) {
+            if (candidate != null && Files.exists(candidate)) {
+                return java.util.Optional.of(candidate);
+            }
+        }
+        for (Path candidate : candidates) {
+            if (candidate != null) {
+                return java.util.Optional.of(candidate);
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    private static void installShutdownHook() {
+        Thread existingHook = SHUTDOWN_HOOK_REF.get();
+        if (existingHook != null) {
+            return;
+        }
+
+        Thread hook = new Thread(ApplicationStartup::shutdown, "datingapp-shutdown-hook");
+        if (!SHUTDOWN_HOOK_REF.compareAndSet(null, hook)) {
+            return;
+        }
+
+        try {
+            Runtime.getRuntime().addShutdownHook(hook);
+        } catch (IllegalStateException | SecurityException ex) {
+            SHUTDOWN_HOOK_REF.compareAndSet(hook, null);
+            logWarn("Unable to register application shutdown hook", ex);
         }
     }
 

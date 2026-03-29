@@ -287,7 +287,7 @@ public class SocialUseCases {
             if (!notification.userId().equals(command.context().userId())) {
                 return UseCaseResult.failure(UseCaseError.forbidden("Notification does not belong to current user"));
             }
-            communicationStorage.markNotificationAsRead(command.notificationId());
+            communicationStorage.markNotificationAsRead(command.context().userId(), command.notificationId());
             return UseCaseResult.success(null);
         } catch (Exception e) {
             return UseCaseResult.failure(
@@ -303,10 +303,8 @@ public class SocialUseCases {
             return UseCaseResult.failure(UseCaseError.dependency(COMMUNICATION_STORAGE_NOT_CONFIGURED));
         }
         try {
-            List<Notification> unreadNotifications = communicationStorage.getNotificationsForUser(
-                    command.context().userId(), true);
-            unreadNotifications.stream().map(Notification::id).forEach(communicationStorage::markNotificationAsRead);
-            return UseCaseResult.success(unreadNotifications.size());
+            return UseCaseResult.success(communicationStorage.markAllNotificationsAsRead(
+                    command.context().userId()));
         } catch (Exception e) {
             return UseCaseResult.failure(
                     UseCaseError.internal("Failed to mark notifications as read: " + e.getMessage()));

@@ -53,6 +53,13 @@ class ProfileActivationPolicyTest {
                 .build();
     }
 
+    /** Creates a user with all fields filled and state = ACTIVE. */
+    private User completeActiveUser() {
+        User user = completeIncompleteUser();
+        user.activate();
+        return user;
+    }
+
     @Nested
     @DisplayName("canActivate")
     class CanActivate {
@@ -91,13 +98,23 @@ class ProfileActivationPolicyTest {
         }
 
         @Test
-        @DisplayName("denies paused user")
-        void cannotActivatePausedUser() {
-            User u = TestUserFactory.createActiveUser("Paused");
+        @DisplayName("allows paused user with a complete profile")
+        void canActivatePausedUserWithCompleteProfile() {
+            User u = completeActiveUser();
             u.pause();
             WorkflowDecision d = policy.canActivate(u);
+            assertTrue(d.isAllowed());
+        }
+
+        @Test
+        @DisplayName("denies paused user with an incomplete profile")
+        void cannotActivatePausedUserWithIncompleteProfile() {
+            User u = TestUserFactory.createActiveUser("Paused");
+            u.pause();
+            u.setBio("");
+            WorkflowDecision d = policy.canActivate(u);
             assertTrue(d.isDenied());
-            assertEquals("PAUSED", ((WorkflowDecision.Denied) d).reasonCode());
+            assertEquals("INCOMPLETE_PROFILE", ((WorkflowDecision.Denied) d).reasonCode());
         }
 
         @Test
@@ -155,7 +172,19 @@ class ProfileActivationPolicyTest {
     class TryActivate {
 
         @Test
-        @DisplayName("succeeds for eligible user")
+        @DisplayName("succeeds for paused user with a complete profile")
+        void tryActivateSucceedsForPausedCompleteUser() {
+            User u = completeActiveUser();
+            u.pause();
+            ProfileActivationPolicy.ActivationResult result = policy.tryActivate(u);
+            assertTrue(result.activated());
+            assertNotNull(result.user());
+            assertEquals(UserState.ACTIVE, result.user().getState());
+            assertTrue(result.decision().isAllowed());
+        }
+
+        @Test
+        @DisplayName("succeeds for eligible INCOMPLETE user")
         void tryActivateSucceedsForEligibleUser() {
             User u = completeIncompleteUser();
             ProfileActivationPolicy.ActivationResult result = policy.tryActivate(u);

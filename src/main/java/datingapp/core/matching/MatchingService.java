@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class MatchingService {
 
     private static final String LIKE_REQUIRED = "like cannot be null";
+    private static final String BLOCKED_SWIPE_MESSAGE = "Cannot swipe on a blocked user.";
     private static final Object IN_FLIGHT_SENTINEL = new Object();
 
     private final InteractionStorage interactionStorage;
@@ -141,8 +142,17 @@ public final class MatchingService {
      */
     public Optional<Match> recordLike(Like like) {
         Objects.requireNonNull(like, LIKE_REQUIRED);
-        InteractionStorage.LikeMatchWriteResult writeResult = persistLikeAndMaybeCreateMatch(like);
-        return writeResult.createdMatch();
+        final InteractionStorage.LikeMatchWriteResult[] resultHolder = new InteractionStorage.LikeMatchWriteResult[1];
+        userStorage.executeWithUserLock(
+                like.whoLikes(), () -> storeWriteResult(resultHolder, recordLikeWithinLock(like)));
+        return resultHolder[0].createdMatch();
+    }
+
+    private InteractionStorage.LikeMatchWriteResult recordLikeWithinLock(Like like) {
+        if (!isDirectLikeAllowed(like)) {
+            return InteractionStorage.LikeMatchWriteResult.duplicateLike();
+        }
+        return persistLikeAndMaybeCreateMatch(like);
     }
 
     private InteractionStorage.LikeMatchWriteResult persistLikeAndMaybeCreateMatch(Like like) {
@@ -153,6 +163,30 @@ public final class MatchingService {
             invalidateCandidateCaches(like.whoLikes(), like.whoGotLiked());
         }
         return writeResult;
+    }
+
+    private boolean isDirectLikeAllowed(Like like) {
+        if (like.whoLikes().equals(like.whoGotLiked())) {
+            return false;
+        }
+        if (trustSafetyStorage.isBlocked(like.whoLikes(), like.whoGotLiked())) {
+            return false;
+        }
+        if (!isActiveUser(like.whoLikes()) || !isActiveUser(like.whoGotLiked())) {
+            return false;
+        }
+        return switch (like.direction()) {
+            case LIKE -> dailyService.canLike(like.whoLikes());
+            case SUPER_LIKE -> dailyService.canSuperLike(like.whoLikes());
+            case PASS -> dailyService.canPass(like.whoLikes());
+        };
+    }
+
+    private boolean isActiveUser(UUID userId) {
+        return userStorage
+                .get(userId)
+                .map(user -> user.getState() == UserState.ACTIVE)
+                .orElse(false);
     }
 
     public List<Match> getMatchesForUser(UUID userId) {
@@ -216,8 +250,42 @@ public final class MatchingService {
             return SwipeResult.configError("Cannot swipe on yourself.");
         }
 
+        if (trustSafetyStorage.isBlocked(currentUser.getId(), candidate.getId())) {
+            return SwipeResult.configError(BLOCKED_SWIPE_MESSAGE);
+        }
+
         if (superLike && !liked) {
             return SwipeResult.configError("Super like requires liked=true");
+        }
+
+        String inFlightKey = currentUser.getId() + ">" + candidate.getId();
+        if (swipeInFlight.putIfAbsent(inFlightKey, IN_FLIGHT_SENTINEL) != null) {
+            return SwipeResult.configError("A swipe for this candidate is already in progress");
+        }
+        try {
+            final SwipeResult[] resultHolder = new SwipeResult[1];
+            userStorage.executeWithUserLock(
+                    currentUser.getId(),
+                    () -> storeSwipeResult(
+                            resultHolder, processSwipeWithinLock(currentUser, candidate, liked, superLike)));
+            return resultHolder[0];
+        } finally {
+            swipeInFlight.remove(inFlightKey);
+        }
+    }
+
+    private static void storeWriteResult(
+            InteractionStorage.LikeMatchWriteResult[] resultHolder, InteractionStorage.LikeMatchWriteResult result) {
+        resultHolder[0] = result;
+    }
+
+    private static void storeSwipeResult(SwipeResult[] resultHolder, SwipeResult result) {
+        resultHolder[0] = result;
+    }
+
+    private SwipeResult processSwipeWithinLock(User currentUser, User candidate, boolean liked, boolean superLike) {
+        if (trustSafetyStorage.isBlocked(currentUser.getId(), candidate.getId())) {
+            return SwipeResult.configError(BLOCKED_SWIPE_MESSAGE);
         }
 
         if (superLike && !dailyService.canSuperLike(currentUser.getId())) {
@@ -232,28 +300,20 @@ public final class MatchingService {
             return SwipeResult.passLimitReached();
         }
 
-        String inFlightKey = currentUser.getId() + ">" + candidate.getId();
-        if (swipeInFlight.putIfAbsent(inFlightKey, IN_FLIGHT_SENTINEL) != null) {
-            return SwipeResult.configError("A swipe for this candidate is already in progress");
+        Like.Direction direction = resolveDirection(liked, superLike);
+        Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
+        InteractionStorage.LikeMatchWriteResult writeResult = persistLikeAndMaybeCreateMatch(like);
+        if (!writeResult.likePersisted()) {
+            return SwipeResult.alreadySwiped();
         }
-        try {
-            Like.Direction direction = resolveDirection(liked, superLike);
-            Like like = Like.create(currentUser.getId(), candidate.getId(), direction);
-            InteractionStorage.LikeMatchWriteResult writeResult = persistLikeAndMaybeCreateMatch(like);
-            if (!writeResult.likePersisted()) {
-                return SwipeResult.alreadySwiped();
-            }
 
-            Optional<Match> match = writeResult.createdMatch();
-            undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
+        Optional<Match> match = writeResult.createdMatch();
+        undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
 
-            if (match.isPresent()) {
-                return SwipeResult.matched(match.get(), like);
-            }
-            return liked ? SwipeResult.liked(like) : SwipeResult.passed(like);
-        } finally {
-            swipeInFlight.remove(inFlightKey);
+        if (match.isPresent()) {
+            return SwipeResult.matched(match.get(), like);
         }
+        return liked ? SwipeResult.liked(like) : SwipeResult.passed(like);
     }
 
     private static Like.Direction resolveDirection(boolean liked, boolean superLike) {

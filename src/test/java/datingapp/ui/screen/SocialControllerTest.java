@@ -1,5 +1,7 @@
 package datingapp.ui.screen;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppConfig;
@@ -13,6 +15,7 @@ import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.viewmodel.SocialViewModel;
+import datingapp.ui.viewmodel.SocialViewModel.FriendRequestEntry;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.time.Instant;
@@ -56,11 +59,24 @@ class SocialControllerTest {
                 JavaFxTestSupport.loadFxml("/fxml/social.fxml", () -> new SocialController(fixture.viewModel));
         Parent root = loaded.root();
 
-        ListView<?> notifications = JavaFxTestSupport.lookup(root, "#notificationsListView", ListView.class);
-        ListView<?> requests = JavaFxTestSupport.lookup(root, "#requestsListView", ListView.class);
+        @SuppressWarnings("unchecked")
+        ListView<Notification> notifications = JavaFxTestSupport.lookup(root, "#notificationsListView", ListView.class);
+        @SuppressWarnings("unchecked")
+        ListView<FriendRequestEntry> requests = JavaFxTestSupport.lookup(root, "#requestsListView", ListView.class);
 
-        assertTrue(JavaFxTestSupport.waitUntil(() -> !notifications.getItems().isEmpty(), 5000));
-        assertTrue(JavaFxTestSupport.waitUntil(() -> !requests.getItems().isEmpty(), 5000));
+        assertTrue(JavaFxTestSupport.waitUntil(() -> notifications.getItems().size() == 1, 5000));
+        assertTrue(JavaFxTestSupport.waitUntil(() -> requests.getItems().size() == 1, 5000));
+
+        Notification notification =
+                JavaFxTestSupport.callOnFxAndWait(() -> notifications.getItems().get(0));
+        FriendRequestEntry request =
+                JavaFxTestSupport.callOnFxAndWait(() -> requests.getItems().get(0));
+
+        assertEquals(Notification.Type.MATCH_FOUND, notification.type());
+        assertEquals("New Match", notification.title());
+        assertEquals("You matched with someone.", notification.message());
+        assertFalse(notification.isRead());
+        assertEquals(fixture.sender.getName(), request.fromUserName());
 
         fixture.dispose();
     }
@@ -127,12 +143,21 @@ class SocialControllerTest {
             notificationsListView.fireEvent(enterEvent);
         });
 
-        // Verify notification is marked as read
         assertTrue(JavaFxTestSupport.waitUntil(
                 () -> fixture.communications
                         .getNotification(selectedNotification.id())
                         .map(Notification::isRead)
                         .orElse(false),
+                5000));
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return JavaFxTestSupport.callOnFxAndWait(
+                                () -> notificationsListView.getItems().get(0).isRead());
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
                 5000));
 
         fixture.dispose();

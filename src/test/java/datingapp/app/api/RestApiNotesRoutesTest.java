@@ -91,6 +91,7 @@ class RestApiNotesRoutesTest {
 
         HttpResponse<String> putResponse = client.send(
                 HttpRequest.newBuilder(URI.create(baseUri))
+                        .header("X-User-Id", authorId.toString())
                         .PUT(HttpRequest.BodyPublishers.ofString("{\"content\":\"Met at coffee shop\"}"))
                         .header("Content-Type", "application/json")
                         .build(),
@@ -116,7 +117,11 @@ class RestApiNotesRoutesTest {
         assertTrue(listJson.get(0).get("content").asText().contains("coffee shop"));
 
         HttpResponse<String> deleteResponse = client.send(
-                HttpRequest.newBuilder(URI.create(baseUri)).DELETE().build(), HttpResponse.BodyHandlers.ofString());
+                HttpRequest.newBuilder(URI.create(baseUri))
+                        .header("X-User-Id", authorId.toString())
+                        .DELETE()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
         assertEquals(204, deleteResponse.statusCode());
 
         HttpResponse<String> missingResponse = client.send(

@@ -2,6 +2,7 @@ package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -17,16 +18,19 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import datingapp.ui.JavaFxTestSupport;
+import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BooleanSupplier;
-import javafx.application.Platform;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +48,7 @@ class DashboardViewModelTest {
     private TestStorages.Analytics analyticsStorage;
     private TestStorages.Communications communications;
     private RecommendationService dailyService;
+    private TestUiThreadDispatcher uiDispatcher;
 
     private DashboardViewModel viewModel;
     private User currentUser;
@@ -51,12 +56,8 @@ class DashboardViewModelTest {
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @BeforeAll
-    static void initJfx() {
-        try {
-            Platform.startup(() -> {});
-        } catch (IllegalStateException _) {
-            // Toolkit already initialized
-        }
+    static void initJfx() throws InterruptedException {
+        JavaFxTestSupport.initJfx();
     }
 
     @BeforeEach
@@ -90,15 +91,19 @@ class DashboardViewModelTest {
         UiMatchDataAccess matchData = new StorageUiMatchDataAccess(interactions, trustSafetyStorage);
 
         ConnectionService messagingService = new ConnectionService(config, communications, interactions, users);
+        uiDispatcher = new TestUiThreadDispatcher();
 
         viewModel = new DashboardViewModel(
                 new DashboardViewModel.Dependencies(
                         dailyService, matchData, profileService, messagingService, profileService, config),
-                AppSession.getInstance());
+                AppSession.getInstance(),
+                uiDispatcher);
 
         currentUser = createActiveUser("DashboardUser");
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
+
+        uiDispatcher.drainAll();
     }
 
     @AfterEach
@@ -110,32 +115,10 @@ class DashboardViewModelTest {
         AppSession.getInstance().reset();
     }
 
-    private void waitForFxEvents() throws InterruptedException {
-        CountDownLatch latch = new CountDownLatch(1);
-        Platform.runLater(latch::countDown);
-        if (!latch.await(5, TimeUnit.SECONDS)) {
-            throw new RuntimeException("Timeout waiting for FX thread");
-        }
-    }
-
-    private boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
-        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
-        while (System.nanoTime() < deadlineNanos) {
-            waitForFxEvents();
-            if (condition.getAsBoolean()) {
-                return true;
-            }
-        }
-        waitForFxEvents();
-        return condition.getAsBoolean();
-    }
-
     @Test
     @DisplayName("refresh() fetches dashboard data and updates properties on FX thread")
     void shouldRefreshDashboardData() throws InterruptedException {
-        viewModel.performRefresh();
-
-        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
+        performRefreshAndDrainUntilIdle();
 
         assertEquals(currentUser.getName(), viewModel.userNameProperty().get());
         assertTrue(viewModel.dailyLikesStatusProperty().get().contains("Likes:"));
@@ -153,9 +136,9 @@ class DashboardViewModelTest {
         candidate.setInterestedIn(EnumSet.of(Gender.MALE));
         users.save(candidate);
 
-        viewModel.performRefresh();
+        performRefreshAndDrainUntilIdle();
 
-        assertTrue(waitUntil(viewModel.dailyPickAvailableProperty()::get, 5000));
+        assertTrue(viewModel.dailyPickAvailableProperty().get());
         assertEquals(candidate.getId(), viewModel.dailyPickUserIdProperty().get());
         assertTrue(viewModel.dailyPickReasonProperty().get() != null
                 && !viewModel.dailyPickReasonProperty().get().isBlank());
@@ -163,42 +146,54 @@ class DashboardViewModelTest {
         assertEquals("", viewModel.dailyPickEmptyMessageProperty().get());
 
         dailyService.markDailyPickViewed(currentUser.getId());
-        viewModel.performRefresh();
+        performRefreshAndDrainUntilIdle();
 
-        assertTrue(waitUntil(viewModel.dailyPickSeenProperty()::get, 5000));
+        assertTrue(viewModel.dailyPickSeenProperty().get());
     }
 
     @Test
     @DisplayName("performRefresh remains re-callable without getting stuck")
     void performRefreshRemainsRecallable() throws InterruptedException {
-        viewModel.performRefresh();
-        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
+        performRefreshAndDrainUntilIdle();
 
-        viewModel.performRefresh();
-
-        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
+        performRefreshAndDrainUntilIdle();
         assertEquals(currentUser.getName(), viewModel.userNameProperty().get());
     }
 
     @Test
     @DisplayName("concurrent refreshes are safe and last one wins")
     void shouldHandleConcurrentRefreshes() throws InterruptedException {
-        // Trigger multiple refreshes simultaneously
+        CountDownLatch ready = new CountDownLatch(20);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(20);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
         for (int i = 0; i < 20; i++) {
-            Thread.ofVirtual().start(() -> viewModel.refresh());
+            Thread.ofVirtual().start(() -> {
+                ready.countDown();
+                try {
+                    if (!start.await(5, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Timed out waiting to start dashboard refresh");
+                    }
+                    viewModel.refresh();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    failure.compareAndSet(
+                            null, new IllegalStateException("Interrupted while coordinating dashboard refresh", e));
+                } catch (Throwable t) {
+                    failure.compareAndSet(null, t);
+                } finally {
+                    done.countDown();
+                }
+            });
         }
 
-        assertTrue(
-                waitUntil(
-                        () -> !viewModel.loadingProperty().get()
-                                && currentUser
-                                        .getName()
-                                        .equals(viewModel.userNameProperty().get()),
-                        5000),
-                "Dashboard refresh did not converge to expected latest state in time");
+        assertTrue(ready.await(5, TimeUnit.SECONDS), "Timed out waiting for dashboard refresh workers");
+        start.countDown();
+        assertTrue(done.await(5, TimeUnit.SECONDS), "Timed out waiting for dashboard refresh workers to complete");
+        assertNull(failure.get(), "Concurrent dashboard refresh worker failed: " + failure.get());
 
-        // Even with multiple refreshes, the UI state shouldn't be broken or stuck
-        // loading forever
+        awaitAndDrainUntilLoadingClears();
+
         assertFalse(viewModel.loadingProperty().get());
         assertEquals(currentUser.getName(), viewModel.userNameProperty().get());
     }
@@ -209,12 +204,27 @@ class DashboardViewModelTest {
         viewModel.refresh();
         viewModel.dispose();
 
-        assertTrue(waitUntil(() -> !viewModel.loadingProperty().get(), 5000));
+        awaitAndDrainUntilLoadingClears();
 
-        // If disposed properly, the user name should be what it initially was,
-        // because the FX update is aborted if 'disposed' is true.
         assertEquals("Not Logged In", viewModel.userNameProperty().get());
         assertFalse(viewModel.loadingProperty().get());
+    }
+
+    private void performRefreshAndDrainUntilIdle() throws InterruptedException {
+        viewModel.performRefresh();
+        awaitAndDrainUntilLoadingClears();
+    }
+
+    private void awaitAndDrainUntilLoadingClears() throws InterruptedException {
+        for (int attempts = 0; attempts < 10; attempts++) {
+            uiDispatcher.drainAll();
+            if (!viewModel.loadingProperty().get()) {
+                return;
+            }
+            int observedQueueCount = uiDispatcher.queuedActionCount();
+            assertTrue(uiDispatcher.awaitQueuedActionCountAtLeast(observedQueueCount + 1, 5000));
+        }
+        uiDispatcher.drainAll();
     }
 
     private static User createActiveUser(String name) {
@@ -237,5 +247,59 @@ class DashboardViewModelTest {
             throw new IllegalStateException("User should be active for test");
         }
         return user;
+    }
+
+    private static final class TestUiThreadDispatcher implements UiThreadDispatcher {
+        private final ConcurrentLinkedQueue<Runnable> queuedActions = new ConcurrentLinkedQueue<>();
+        private final AtomicInteger queuedActionCount = new AtomicInteger();
+        private final Object monitor = new Object();
+        private final ThreadLocal<Boolean> uiThread = ThreadLocal.withInitial(() -> false);
+
+        @Override
+        public boolean isUiThread() {
+            return uiThread.get();
+        }
+
+        @Override
+        public void dispatch(Runnable action) {
+            queuedActions.add(action);
+            synchronized (monitor) {
+                queuedActionCount.incrementAndGet();
+                monitor.notifyAll();
+            }
+        }
+
+        int queuedActionCount() {
+            return queuedActionCount.get();
+        }
+
+        boolean awaitQueuedActionCountAtLeast(int expectedCount, long timeoutMillis) throws InterruptedException {
+            long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+            synchronized (monitor) {
+                while (queuedActionCount.get() < expectedCount) {
+                    long remainingNanos = deadlineNanos - System.nanoTime();
+                    if (remainingNanos <= 0) {
+                        return false;
+                    }
+                    long waitMillis = TimeUnit.NANOSECONDS.toMillis(remainingNanos);
+                    int waitNanos = (int) (remainingNanos - TimeUnit.MILLISECONDS.toNanos(waitMillis));
+                    monitor.wait(waitMillis, waitNanos);
+                }
+                return true;
+            }
+        }
+
+        void drainAll() {
+            Runnable action;
+            while ((action = queuedActions.poll()) != null) {
+                boolean previous = uiThread.get();
+                uiThread.set(true);
+                try {
+                    action.run();
+                } finally {
+                    uiThread.set(previous);
+                }
+            }
+        }
     }
 }

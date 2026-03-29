@@ -21,6 +21,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.OptionalInt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +31,7 @@ public class MessagingHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(MessagingHandler.class);
     private static final String ERROR_TEMPLATE = "\n❌ {}";
     private static final int MESSAGES_PER_PAGE = 20;
+    private static final int CONVERSATIONS_PER_PAGE = 50;
     private static final int PREVIEW_MAX_LENGTH = 28;
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
@@ -63,33 +65,69 @@ public class MessagingHandler implements LoggingSupport {
     }
 
     private void showConversationsForCurrentUser(User currentUser) {
-
-        List<ConversationPreview> previews = loadConversationPreviews(currentUser);
+        int offset = 0;
 
         while (true) {
-            printConversationListHeader();
-
-            if (previews.isEmpty()) {
-                printEmptyConversations();
+            var previewsResult = loadConversationPreviews(currentUser, offset);
+            if (previewsResult.isEmpty()) {
                 return;
             }
 
-            displayConversationPreviews(previews);
-            String choice = input.readLine("> ").trim();
-
-            if ("b".equalsIgnoreCase(choice) || choice.isEmpty()) {
+            List<ConversationPreview> previews = previewsResult.orElseThrow();
+            OptionalInt nextOffset = handleConversationListPage(currentUser, previews, offset);
+            if (nextOffset.isEmpty()) {
                 return;
             }
-
-            previews = handleConversationSelection(choice, previews, currentUser);
+            offset = nextOffset.getAsInt();
         }
     }
 
+    private OptionalInt handleConversationListPage(User currentUser, List<ConversationPreview> previews, int offset) {
+        printConversationListHeader(offset);
+
+        if (previews.isEmpty()) {
+            if (offset == 0) {
+                printEmptyConversations();
+                return OptionalInt.empty();
+            }
+            return OptionalInt.of(Math.max(0, offset - CONVERSATIONS_PER_PAGE));
+        }
+
+        boolean hasPrevious = offset > 0;
+        boolean hasNext = previews.size() == CONVERSATIONS_PER_PAGE;
+        displayConversationPreviews(previews, hasPrevious, hasNext);
+        String choice = input.readLine("> ").trim();
+
+        if (input.wasInputExhausted() || "b".equalsIgnoreCase(choice) || choice.isEmpty()) {
+            return OptionalInt.empty();
+        }
+
+        if ("n".equalsIgnoreCase(choice)) {
+            if (hasNext) {
+                return OptionalInt.of(offset + CONVERSATIONS_PER_PAGE);
+            }
+            logInfo(CliTextAndInput.INVALID_SELECTION);
+            return OptionalInt.of(offset);
+        }
+
+        if ("p".equalsIgnoreCase(choice)) {
+            if (hasPrevious) {
+                return OptionalInt.of(Math.max(0, offset - CONVERSATIONS_PER_PAGE));
+            }
+            logInfo(CliTextAndInput.INVALID_SELECTION);
+            return OptionalInt.of(offset);
+        }
+
+        handleConversationSelection(choice, previews, currentUser);
+        return OptionalInt.of(offset);
+    }
+
     /** Prints the header for the conversation list. */
-    private void printConversationListHeader() {
+    private void printConversationListHeader(int offset) {
         logInfo("\n{}", CliTextAndInput.SEPARATOR_LINE);
         logInfo("       💬 YOUR CONVERSATIONS");
         logInfo("{}", CliTextAndInput.SEPARATOR_LINE);
+        logInfo("Page {}", offset / CONVERSATIONS_PER_PAGE + 1);
     }
 
     /** Prints a message when there are no conversations. */
@@ -106,7 +144,7 @@ public class MessagingHandler implements LoggingSupport {
      *
      * @param previews The list of conversation previews to display
      */
-    private void displayConversationPreviews(List<ConversationPreview> previews) {
+    private void displayConversationPreviews(List<ConversationPreview> previews, boolean hasPrevious, boolean hasNext) {
         for (int i = 0; i < previews.size(); i++) {
             displayConversationPreview(i + 1, previews.get(i));
         }
@@ -118,7 +156,15 @@ public class MessagingHandler implements LoggingSupport {
         }
 
         logInfo("{}", CliTextAndInput.MENU_DIVIDER);
-        logInfo("[#] Select conversation  [B] Back");
+        StringBuilder prompt = new StringBuilder("[#] Select conversation");
+        if (hasNext) {
+            prompt.append("  [N] Next page");
+        }
+        if (hasPrevious) {
+            prompt.append("  [P] Previous page");
+        }
+        prompt.append("  [B] Back");
+        logInfo(prompt.toString());
     }
 
     /**
@@ -129,20 +175,17 @@ public class MessagingHandler implements LoggingSupport {
      * @param currentUser The current user
      * @return Updated list of conversation previews
      */
-    private List<ConversationPreview> handleConversationSelection(
-            String choice, List<ConversationPreview> previews, User currentUser) {
+    private void handleConversationSelection(String choice, List<ConversationPreview> previews, User currentUser) {
         try {
             int idx = Integer.parseInt(choice) - 1;
             if (idx >= 0 && idx < previews.size()) {
                 showConversation(currentUser, previews.get(idx));
-                return loadConversationPreviews(currentUser);
             } else {
                 logInfo(CliTextAndInput.INVALID_SELECTION);
             }
         } catch (NumberFormatException _) {
             logInfo(CliTextAndInput.INVALID_INPUT);
         }
-        return previews;
     }
 
     /** Displays a single conversation preview in the list. */
@@ -165,8 +208,14 @@ public class MessagingHandler implements LoggingSupport {
         Conversation conversation = preview.conversation();
         User otherUser = preview.otherUser();
 
-        messagingUseCases.markConversationRead(
+        var markReadResult = messagingUseCases.markConversationRead(
                 new MarkConversationReadCommand(UserContext.cli(currentUser.getId()), conversation.getId()));
+        if (!markReadResult.success()) {
+            logInfo(
+                    ERROR_TEMPLATE,
+                    "Failed to mark conversation as read: "
+                            + markReadResult.error().message());
+        }
 
         int offset = 0;
         boolean showOlder = false;
@@ -437,13 +486,13 @@ public class MessagingHandler implements LoggingSupport {
         return result.data();
     }
 
-    private List<ConversationPreview> loadConversationPreviews(User currentUser) {
-        var result = messagingUseCases.listConversations(
-                new MessagingUseCases.ListConversationsQuery(UserContext.cli(currentUser.getId()), 50, 0));
+    private java.util.Optional<List<ConversationPreview>> loadConversationPreviews(User currentUser, int offset) {
+        var result = messagingUseCases.listConversations(new MessagingUseCases.ListConversationsQuery(
+                UserContext.cli(currentUser.getId()), CONVERSATIONS_PER_PAGE, offset));
         if (!result.success()) {
             logWarn("Failed to load conversations: {}", result.error().message());
-            return List.of();
+            return java.util.Optional.empty();
         }
-        return result.data().conversations();
+        return java.util.Optional.of(result.data().conversations());
     }
 }

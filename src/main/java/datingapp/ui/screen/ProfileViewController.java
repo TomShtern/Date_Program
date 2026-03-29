@@ -66,10 +66,6 @@ public final class ProfileViewController extends BaseController implements Initi
     }
 
     private void updatePhoto(String photoUrl) {
-        if (photoUrl == null || photoUrl.isBlank()) {
-            profileImageView.setImage(null);
-            return;
-        }
         profileImageView.setImage(ImageCache.getImage(photoUrl, 360, 240));
     }
 

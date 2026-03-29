@@ -10,6 +10,8 @@ import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.model.Match;
+import datingapp.core.model.User;
+import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
@@ -67,6 +69,13 @@ class EdgeCaseRegressionTest {
 
         UUID userA = UUID.randomUUID();
         UUID userB = UUID.randomUUID();
+
+        userStorage.save(User.StorageBuilder.create(userA, "UserA", AppClock.now())
+                .state(UserState.ACTIVE)
+                .build());
+        userStorage.save(User.StorageBuilder.create(userB, "UserB", AppClock.now())
+                .state(UserState.ACTIVE)
+                .build());
 
         service.recordLike(Like.create(userA, userB, Like.Direction.LIKE));
         service.recordLike(Like.create(userB, userA, Like.Direction.LIKE));

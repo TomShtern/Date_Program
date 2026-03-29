@@ -74,42 +74,62 @@ public final class Main {
 
     public static void main(String[] args) {
         try (Scanner scanner = new Scanner(System.in)) {
-            ServiceRegistry services = ApplicationStartup.initialize();
-            InputReader inputReader = new InputReader(scanner);
-            AppSession session = AppSession.getInstance();
+            runWithShutdown(
+                    () -> {
+                        ServiceRegistry services = ApplicationStartup.initialize();
+                        InputReader inputReader = new InputReader(scanner);
+                        AppSession session = AppSession.getInstance();
 
-            ProfileHandler profileHandler = ProfileHandler.fromServices(services, session, inputReader);
-            MatchingHandler matchingHandler = new MatchingHandler(MatchingHandler.Dependencies.fromServices(
-                    services, session, inputReader, profileHandler::completeProfile));
-            SafetyHandler safetyHandler = SafetyHandler.fromServices(services, session, inputReader);
-            StatsHandler statsHandler = StatsHandler.fromServices(services, session, inputReader);
-            MessagingHandler messagingHandler = MessagingHandler.fromServices(services, session, inputReader);
-            MainMenuRegistry menuRegistry = createMainMenuRegistry(
-                    matchingHandler, profileHandler, safetyHandler, statsHandler, messagingHandler);
+                        ProfileHandler profileHandler = ProfileHandler.fromServices(services, session, inputReader);
+                        MatchingHandler matchingHandler = new MatchingHandler(MatchingHandler.Dependencies.fromServices(
+                                services, session, inputReader, profileHandler::completeProfile));
+                        SafetyHandler safetyHandler = SafetyHandler.fromServices(services, session, inputReader);
+                        StatsHandler statsHandler = StatsHandler.fromServices(services, session, inputReader);
+                        MessagingHandler messagingHandler =
+                                MessagingHandler.fromServices(services, session, inputReader);
+                        MainMenuRegistry menuRegistry = createMainMenuRegistry(
+                                matchingHandler, profileHandler, safetyHandler, statsHandler, messagingHandler);
 
-            logInfo("\n🌹 Welcome to Dating App 🌹\n");
+                        logInfo("\n🌹 Welcome to Dating App 🌹\n");
 
-            boolean running = true;
-            while (running) {
-                MainMenuRegistry.MenuRenderContext menuRenderContext =
-                        new MainMenuRegistry.MenuRenderContext(messagingHandler.getTotalUnreadCount());
-                printMenu(services, session, menuRegistry, menuRenderContext);
-                String choice = inputReader.readLine("Choose an option: ");
+                        boolean running = true;
+                        while (running) {
+                            MainMenuRegistry.MenuRenderContext menuRenderContext =
+                                    new MainMenuRegistry.MenuRenderContext(messagingHandler.getTotalUnreadCount());
+                            printMenu(services, session, menuRegistry, menuRenderContext);
+                            String choice = inputReader.readLine("Choose an option: ");
 
-                var option = menuRegistry.findOption(choice);
-                if (option.isEmpty()) {
-                    logInfo(CliTextAndInput.INVALID_SELECTION);
-                } else if (option.orElseThrow().requiresLogin() && !session.isLoggedIn()) {
-                    logInfo(CliTextAndInput.PLEASE_SELECT_USER);
-                } else {
-                    MainMenuRegistry.DispatchResult dispatchResult =
-                            option.orElseThrow().action().execute();
-                    running = dispatchResult != MainMenuRegistry.DispatchResult.EXIT;
-                }
-            }
+                            if (shouldExitMainMenu(inputReader)) {
+                                logInfo("\n👋 Goodbye!\n");
+                                break;
+                            }
 
-            ApplicationStartup.shutdown();
+                            var option = menuRegistry.findOption(choice);
+                            if (option.isEmpty()) {
+                                logInfo(CliTextAndInput.INVALID_SELECTION);
+                            } else if (option.orElseThrow().requiresLogin() && !session.isLoggedIn()) {
+                                logInfo(CliTextAndInput.PLEASE_SELECT_USER);
+                            } else {
+                                MainMenuRegistry.DispatchResult dispatchResult =
+                                        option.orElseThrow().action().execute();
+                                running = dispatchResult != MainMenuRegistry.DispatchResult.EXIT;
+                            }
+                        }
+                    },
+                    ApplicationStartup::shutdown);
         }
+    }
+
+    static void runWithShutdown(Runnable action, Runnable shutdownAction) {
+        try {
+            action.run();
+        } finally {
+            shutdownAction.run();
+        }
+    }
+
+    static boolean shouldExitMainMenu(InputReader inputReader) {
+        return inputReader.wasInputExhausted();
     }
 
     private static void logInfo(String message, Object... args) {

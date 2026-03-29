@@ -7,10 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
+import datingapp.app.usecase.messaging.MessagingUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
@@ -141,6 +143,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> readSingleResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/notifications/" + firstNotification.id() + "/read"))
+                        .header("X-User-Id", aliceId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -149,6 +152,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> forbiddenReadResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + bobId + "/notifications/"
                                 + secondNotification.id() + "/read"))
+                        .header("X-User-Id", bobId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -157,6 +161,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> readAllResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/users/" + aliceId + "/notifications/read-all"))
+                        .header("X-User-Id", aliceId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -265,6 +270,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> undoResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/undo"))
+                        .header("X-User-Id", aliceId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -299,6 +305,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> updateProfileResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/profile"))
+                        .header("X-User-Id", aliceId.toString())
                         .header("Content-Type", "application/json")
                         .PUT(HttpRequest.BodyPublishers.ofString("""
                                 {
@@ -330,7 +337,8 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> sendMessageResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
                                 + datingapp.core.connection.ConnectionModels.Conversation.generateId(aliceId, bobId)
-                                + "/messages?userId=" + aliceId))
+                                + "/messages"))
+                        .header("X-User-Id", aliceId.toString())
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"senderId\":\"" + aliceId + "\",\"content\":\"Hello Bob\"}"))
@@ -343,7 +351,8 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> deleteMessageResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/" + conversationId
-                                + "/messages/" + messageId + "?userId=" + aliceId))
+                                + "/messages/" + messageId))
+                        .header("X-User-Id", aliceId.toString())
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -352,6 +361,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> archiveConversationResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/conversations/" + conversationId + "/archive"))
+                        .header("X-User-Id", aliceId.toString())
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString("{\"reason\":\"UNMATCH\"}"))
                         .build(),
@@ -367,6 +377,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> deleteConversationResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/conversations/" + conversationId))
+                        .header("X-User-Id", aliceId.toString())
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -376,11 +387,107 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> archiveMatchResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/matches/"
                                 + Match.generateId(aliceId, bobId) + "/archive"))
+                        .header("X-User-Id", aliceId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(204, archiveMatchResponse.statusCode());
         assertTrue(interactionStorage.get(Match.generateId(aliceId, bobId)).isEmpty());
+    }
+
+    @Test
+    @DisplayName("mutating conversation routes require X-User-Id and do not accept query fallback")
+    void mutatingConversationRoutesRequireHeaderAndDoNotAcceptQueryFallback() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        SeededStandoutStorage standoutStorage = new SeededStandoutStorage();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, standoutStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        userStorage.save(activeUser(aliceId, "Alice"));
+        userStorage.save(activeUser(bobId, "Bob"));
+        interactionStorage.save(Match.create(aliceId, bobId));
+
+        String conversationId = datingapp.core.connection.ConnectionModels.Conversation.generateId(aliceId, bobId);
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> missingHeaderResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/" + conversationId
+                                + "/messages?userId=" + aliceId))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "{\"senderId\":\"" + aliceId + "\",\"content\":\"Hello Bob\"}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, missingHeaderResponse.statusCode(), missingHeaderResponse.body());
+    }
+
+    @Test
+    @DisplayName("like, pass, conversations, and send message failures use the shared use-case failure mapper")
+    void affectedRoutesUseTheSharedUseCaseFailureMapper() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        SeededStandoutStorage standoutStorage = new SeededStandoutStorage();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, standoutStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        userStorage.save(activeUser(aliceId, "Alice"));
+        userStorage.save(activeUser(bobId, "Bob"));
+        interactionStorage.save(Match.create(aliceId, bobId));
+
+        String conversationId = datingapp.core.connection.ConnectionModels.Conversation.generateId(aliceId, bobId);
+        server = new RestApiServer(services, 0);
+        replaceMatchingUseCases(server, new FailingMatchingUseCases(services));
+        replaceMessagingUseCases(server, new FailingMessagingUseCases(services));
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> likeResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/like/" + bobId))
+                        .header("X-User-Id", aliceId.toString())
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, likeResponse.statusCode(), likeResponse.body());
+
+        HttpResponse<String> passResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/pass/" + bobId))
+                        .header("X-User-Id", aliceId.toString())
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, passResponse.statusCode(), passResponse.body());
+
+        HttpResponse<String> conversationsResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/conversations"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, conversationsResponse.statusCode(), conversationsResponse.body());
+
+        HttpResponse<String> sendMessageResponse = client.send(
+                HttpRequest.newBuilder(URI.create(
+                                "http://localhost:" + port + "/api/conversations/" + conversationId + "/messages"))
+                        .header("X-User-Id", aliceId.toString())
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "{\"senderId\":\"" + aliceId + "\",\"content\":\"Hello Bob\"}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, sendMessageResponse.statusCode(), sendMessageResponse.body());
     }
 
     @Test
@@ -408,6 +515,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> updateProfileResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/profile"))
+                        .header("X-User-Id", aliceId.toString())
                         .header("Content-Type", "application/json")
                         .PUT(HttpRequest.BodyPublishers.ofString("""
                                 {
@@ -433,6 +541,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> firstLikeResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/like/" + bobId))
+                        .header("X-User-Id", aliceId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -441,6 +550,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> secondLikeResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + bobId + "/like/" + aliceId))
+                        .header("X-User-Id", bobId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -450,8 +560,9 @@ class RestApiPhaseTwoRoutesTest {
 
         String conversationId = datingapp.core.connection.ConnectionModels.Conversation.generateId(aliceId, bobId);
         HttpResponse<String> sendMessageResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/" + conversationId
-                                + "/messages?userId=" + aliceId))
+                HttpRequest.newBuilder(URI.create(
+                                "http://localhost:" + port + "/api/conversations/" + conversationId + "/messages"))
+                        .header("X-User-Id", aliceId.toString())
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"senderId\":\"" + aliceId + "\",\"content\":\"Hello from the happy path\"}"))
@@ -462,6 +573,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> gracefulExitResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/relationships/" + bobId + "/graceful-exit"))
+                        .header("X-User-Id", aliceId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -500,6 +612,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> passResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/pass/" + bobId))
+                        .header("X-User-Id", aliceId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -537,8 +650,9 @@ class RestApiPhaseTwoRoutesTest {
 
         String conversationId = datingapp.core.connection.ConnectionModels.Conversation.generateId(aliceId, bobId);
         HttpResponse<String> sendMessageResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/" + conversationId
-                                + "/messages?userId=" + aliceId))
+                HttpRequest.newBuilder(URI.create(
+                                "http://localhost:" + port + "/api/conversations/" + conversationId + "/messages"))
+                        .header("X-User-Id", aliceId.toString())
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"senderId\":\"" + aliceId + "\",\"content\":\"Before block\"}"))
@@ -549,6 +663,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> reportResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/report/" + bobId))
+                        .header("X-User-Id", aliceId.toString())
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"reason\":\"HARASSMENT\",\"description\":\"Unsafe behavior\",\"blockUser\":true}"))
@@ -560,8 +675,9 @@ class RestApiPhaseTwoRoutesTest {
         assertTrue(reportJson.get("blockedByReporter").asBoolean());
 
         HttpResponse<String> blockedMessageResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/" + conversationId
-                                + "/messages?userId=" + aliceId))
+                HttpRequest.newBuilder(URI.create(
+                                "http://localhost:" + port + "/api/conversations/" + conversationId + "/messages"))
+                        .header("X-User-Id", aliceId.toString())
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"senderId\":\"" + aliceId + "\",\"content\":\"This should fail\"}"))
@@ -658,6 +774,16 @@ class RestApiPhaseTwoRoutesTest {
         }
     }
 
+    private static void replaceMessagingUseCases(RestApiServer server, MessagingUseCases messagingUseCases) {
+        try {
+            java.lang.reflect.Field field = RestApiServer.class.getDeclaredField("messagingUseCases");
+            field.setAccessible(true);
+            field.set(server, messagingUseCases);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to replace messaging use cases in RestApiServer", e);
+        }
+    }
+
     private static final class CapturingMatchingUseCases extends MatchingUseCases {
         private datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand lastCommand;
 
@@ -682,6 +808,45 @@ class RestApiPhaseTwoRoutesTest {
             Like like = Like.create(command.context().userId(), command.targetUserId(), command.direction());
             return UseCaseResult.success(
                     new datingapp.app.usecase.matching.MatchingUseCases.RecordLikeResult(like, Optional.empty()));
+        }
+    }
+
+    private static final class FailingMatchingUseCases extends MatchingUseCases {
+        private FailingMatchingUseCases(ServiceRegistry services) {
+            super(
+                    services.getCandidateFinder(),
+                    services.getMatchingService(),
+                    services.getDailyLimitService(),
+                    services.getDailyPickService(),
+                    services.getStandoutService(),
+                    services.getUndoService(),
+                    services.getInteractionStorage(),
+                    services.getUserStorage(),
+                    services.getMatchQualityService(),
+                    services.getEventBus());
+        }
+
+        @Override
+        public UseCaseResult<datingapp.app.usecase.matching.MatchingUseCases.RecordLikeResult> recordLike(
+                datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand command) {
+            return UseCaseResult.failure(UseCaseError.validation("Simulated matching failure"));
+        }
+    }
+
+    private static final class FailingMessagingUseCases extends MessagingUseCases {
+        private FailingMessagingUseCases(ServiceRegistry services) {
+            super(services.getConnectionService(), services.getEventBus());
+        }
+
+        @Override
+        public UseCaseResult<MessagingUseCases.ConversationListResult> listConversations(ListConversationsQuery query) {
+            return UseCaseResult.failure(UseCaseError.validation("Simulated conversation failure"));
+        }
+
+        @Override
+        public UseCaseResult<datingapp.core.connection.ConnectionService.SendResult> sendMessage(
+                SendMessageCommand command) {
+            return UseCaseResult.failure(UseCaseError.validation("Simulated message failure"));
         }
     }
 

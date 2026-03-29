@@ -56,16 +56,11 @@ public class MessagingUseCases {
             return UseCaseResult.failure(UseCaseError.validation("Context and target user are required"));
         }
         int limit = command.listLimit() > 0 ? command.listLimit() : DEFAULT_LIMIT;
-        int offset = Math.max(0, command.listOffset());
         try {
             Conversation conversation =
                     connectionService.getOrCreateConversation(command.context().userId(), command.otherUserId());
-            List<ConversationPreview> previews =
-                    connectionService.getConversations(command.context().userId(), limit, offset);
-            ConversationPreview preview = previews.stream()
-                    .filter(item -> item.conversation().getId().equals(conversation.getId()))
-                    .findFirst()
-                    .orElse(null);
+            ConversationPreview preview = findConversationPreview(
+                    command.context().userId(), conversation.getId(), Math.min(limit, DEFAULT_LIMIT));
             if (preview == null) {
                 return UseCaseResult.failure(UseCaseError.notFound("Conversation preview not found"));
             }
@@ -84,7 +79,7 @@ public class MessagingUseCases {
         try {
             var result = connectionService.getMessages(query.context().userId(), query.otherUserId(), limit, offset);
             if (!result.success()) {
-                return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+                return UseCaseResult.failure(mapConversationLoadFailure(result.errorMessage()));
             }
 
             String conversationId = Conversation.generateId(query.context().userId(), query.otherUserId());
@@ -111,6 +106,42 @@ public class MessagingUseCases {
                         markReadError.getMessage());
             }
         }
+    }
+
+    private ConversationPreview findConversationPreview(UUID userId, String conversationId, int pageSize) {
+        int safePageSize = pageSize > 0 ? pageSize : DEFAULT_LIMIT;
+        int offset = 0;
+
+        while (true) {
+            List<ConversationPreview> previews = connectionService.getConversations(userId, safePageSize, offset);
+            if (previews.isEmpty()) {
+                return null;
+            }
+
+            for (ConversationPreview preview : previews) {
+                if (preview.conversation().getId().equals(conversationId)) {
+                    return preview;
+                }
+            }
+
+            if (previews.size() < safePageSize) {
+                return null;
+            }
+
+            offset += safePageSize;
+        }
+    }
+
+    private UseCaseError mapConversationLoadFailure(String errorMessage) {
+        if (errorMessage == null || errorMessage.isBlank()) {
+            return UseCaseError.internal("Failed to load conversation");
+        }
+
+        return switch (errorMessage) {
+            case "Invalid limit", "Invalid offset" -> UseCaseError.validation(errorMessage);
+            case "Conversation not found or unauthorized" -> UseCaseError.notFound(errorMessage);
+            default -> UseCaseError.conflict(errorMessage);
+        };
     }
 
     public UseCaseResult<ConnectionService.SendResult> sendMessage(SendMessageCommand command) {

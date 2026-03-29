@@ -1,13 +1,17 @@
 package datingapp.app.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.usecase.social.SocialUseCases;
-import datingapp.core.*;
+import datingapp.core.AppConfig;
+import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.core.matching.*;
+import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User;
@@ -16,10 +20,18 @@ import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
+import java.security.SecureRandom;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.EnumSet;
+import java.util.Optional;
+import java.util.Scanner;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Unit tests for SafetyHandler CLI commands: blockUser(), reportUser(),
@@ -53,12 +65,20 @@ class SafetyHandlerTest {
     }
 
     private SafetyHandler createHandler(String input, AppConfig config) {
+        return createHandler(input, config, new SecureRandom());
+    }
+
+    private SafetyHandler createHandler(String input, AppConfig config, SecureRandom random) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
-                        trustSafetyStorage, interactionStorage, userStorage, config)
-                .build();
+        TrustSafetyService trustSafetyService = createTrustSafetyService(config, random);
         return new SafetyHandler(
                 userStorage, trustSafetyService, new SocialUseCases(trustSafetyService), session, inputReader, config);
+    }
+
+    private TrustSafetyService createTrustSafetyService(AppConfig config, SecureRandom random) {
+        return TrustSafetyService.builder(trustSafetyStorage, interactionStorage, userStorage, config)
+                .random(random)
+                .build();
     }
 
     @SuppressWarnings("unused")
@@ -358,20 +378,33 @@ class SafetyHandlerTest {
         @Test
         @DisplayName("Verifies by email with correct code")
         void verifiesByEmailWithCorrectCode() {
-            // Select email verification, enter email, then code
-            SafetyHandler handler = createHandler("1\ntest@example.com\n123456\n");
+            AppConfig config = AppConfig.defaults();
+            TrustSafetyService trustSafetyService = createTrustSafetyService(config, fixedVerificationRandom());
+            assertEquals("123456", trustSafetyService.generateVerificationCode());
+            SafetyHandler handler = new SafetyHandler(
+                    userStorage,
+                    trustSafetyService,
+                    new SocialUseCases(trustSafetyService),
+                    session,
+                    new InputReader(new Scanner(new StringReader("1\ntest@example.com\n123456\n"))),
+                    config);
 
-            // The handler generates a random code, but we can't match it
-            // We just verify it doesn't throw
-            assertDoesNotThrow(handler::verifyProfile);
+            handler.verifyProfile();
+
+            User stored = userStorage.get(testUser.getId()).orElseThrow();
+            assertTrue(stored.isVerified());
+            assertEquals(VerificationMethod.EMAIL, stored.getVerificationMethod());
+            assertEquals("test@example.com", stored.getEmail());
         }
 
         @Test
         @DisplayName("Shows error for incorrect code")
         void showsErrorForIncorrectCode() {
-            SafetyHandler handler = createHandler("1\ntest@example.com\nwrongcode\n");
+            AppConfig config = AppConfig.defaults();
+            SafetyHandler handler =
+                    createHandler("1\ntest@example.com\nwrongcode\n", config, fixedVerificationRandom());
 
-            assertDoesNotThrow(handler::verifyProfile);
+            handler.verifyProfile();
             assertFalse(testUser.isVerified());
         }
 
@@ -431,5 +464,14 @@ class SafetyHandlerTest {
                 PacePreferences.DepthPreference.SMALL_TALK));
         user.activate();
         return user;
+    }
+
+    private static SecureRandom fixedVerificationRandom() {
+        return new SecureRandom() {
+            @Override
+            public int nextInt(int bound) {
+                return 123_456;
+            }
+        };
     }
 }

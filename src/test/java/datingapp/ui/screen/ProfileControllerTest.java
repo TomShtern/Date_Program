@@ -34,6 +34,9 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("ProfileController wiring and binding tests")
 class ProfileControllerTest {
 
+    private static final String FILE_URLS_ENABLED_PROPERTY = "datingapp.allowFileUrls";
+    private static final String FILE_URL_ROOT_PROPERTY = "datingapp.allowedFileUrlRoot";
+
     private static final datingapp.ui.async.UiThreadDispatcher TEST_DISPATCHER =
             new datingapp.ui.async.UiThreadDispatcher() {
                 @Override
@@ -59,6 +62,8 @@ class ProfileControllerTest {
         Path tempHome = Files.createTempDirectory("datingapp-profile-controller-home");
         try {
             System.setProperty("user.home", tempHome.toString());
+            System.setProperty(FILE_URLS_ENABLED_PROPERTY, "true");
+            System.setProperty(FILE_URL_ROOT_PROPERTY, tempHome.toString());
 
             TestStorages.Users users = new TestStorages.Users();
             TestStorages.Interactions interactions = new TestStorages.Interactions();
@@ -120,6 +125,8 @@ class ProfileControllerTest {
             NavigationService.getInstance().clearHistory();
             AppSession.getInstance().reset();
         } finally {
+            System.clearProperty(FILE_URLS_ENABLED_PROPERTY);
+            System.clearProperty(FILE_URL_ROOT_PROPERTY);
             System.setProperty("user.home", originalUserHome);
         }
     }
@@ -131,6 +138,8 @@ class ProfileControllerTest {
         Path tempHome = Files.createTempDirectory("datingapp-profile-buttons-home");
         try {
             System.setProperty("user.home", tempHome.toString());
+            System.setProperty(FILE_URLS_ENABLED_PROPERTY, "true");
+            System.setProperty(FILE_URL_ROOT_PROPERTY, tempHome.toString());
 
             TestStorages.Users users = new TestStorages.Users();
             TestStorages.Interactions interactions = new TestStorages.Interactions();
@@ -176,6 +185,8 @@ class ProfileControllerTest {
             NavigationService.getInstance().clearHistory();
             AppSession.getInstance().reset();
         } finally {
+            System.clearProperty(FILE_URLS_ENABLED_PROPERTY);
+            System.clearProperty(FILE_URL_ROOT_PROPERTY);
             System.setProperty("user.home", originalUserHome);
         }
     }

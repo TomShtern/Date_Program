@@ -12,13 +12,14 @@ import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +47,7 @@ public final class TrustSafetyService {
     private final AppConfig config;
     private final CommunicationStorage communicationStorage; // nullable
     private final Duration verificationTtl;
-    private final Random random;
+    private final SecureRandom random;
     private final RelationshipWorkflowPolicy workflowPolicy;
     private final ModerationAuditLogger moderationAuditLogger = new ModerationAuditLogger();
     private CandidateFinder candidateFinder;
@@ -103,7 +104,7 @@ public final class TrustSafetyService {
         private AppConfig config;
         private CommunicationStorage communicationStorage;
         private Duration verificationTtl = DEFAULT_VERIFICATION_TTL;
-        private Random random = new Random();
+        private SecureRandom random = new SecureRandom();
         private RelationshipWorkflowPolicy workflowPolicy = new RelationshipWorkflowPolicy();
 
         private Builder() {}
@@ -138,7 +139,7 @@ public final class TrustSafetyService {
             return this;
         }
 
-        public Builder random(Random random) {
+        public Builder random(SecureRandom random) {
             this.random = random;
             return this;
         }
@@ -269,18 +270,21 @@ public final class TrustSafetyService {
             return new ReportResult(false, false, "Reported user not found");
         }
 
-        if (trustSafetyStorage.hasReported(reporterId, reportedUserId)) {
-            auditModeration(
-                    ModerationAuditEvent.Action.REPORT,
-                    ModerationAuditEvent.Outcome.FAILURE,
-                    reporterId,
-                    reportedUserId,
-                    contextOf(AUDIT_KEY_ERROR_CODE, "duplicate_report", AUDIT_KEY_BLOCK_REQUESTED, blockUser));
-            return new ReportResult(false, false, "Already reported this user");
-        }
-
         Report report = Report.create(reporterId, reportedUserId, reason, description);
-        trustSafetyStorage.save(report);
+        try {
+            trustSafetyStorage.save(report);
+        } catch (RuntimeException exception) {
+            if (isDuplicateKeyViolation(exception)) {
+                auditModeration(
+                        ModerationAuditEvent.Action.REPORT,
+                        ModerationAuditEvent.Outcome.FAILURE,
+                        reporterId,
+                        reportedUserId,
+                        contextOf(AUDIT_KEY_ERROR_CODE, "duplicate_report", AUDIT_KEY_BLOCK_REQUESTED, blockUser));
+                return new ReportResult(false, false, "Already reported this user");
+            }
+            throw exception;
+        }
 
         auditModeration(
                 ModerationAuditEvent.Action.REPORT,
@@ -398,6 +402,21 @@ public final class TrustSafetyService {
             }
         });
         return result[0];
+    }
+
+    private static boolean isDuplicateKeyViolation(RuntimeException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            String message = cause.getMessage();
+            if (message != null) {
+                String upper = message.toUpperCase(Locale.ROOT);
+                if (upper.contains("UNIQUE") || upper.contains("DUPLICATE") || upper.contains("CONSTRAINT")) {
+                    return true;
+                }
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private static User copyUser(User user) {
@@ -520,9 +539,9 @@ public final class TrustSafetyService {
             return new BlockResult(false, "User is already blocked");
         }
 
+        updateMatchStateForBlock(blockerId, blockedId);
         Block block = Block.create(blockerId, blockedId);
         trustSafetyStorage.save(block);
-        updateMatchStateForBlock(blockerId, blockedId);
 
         auditModeration(
                 ModerationAuditEvent.Action.BLOCK,

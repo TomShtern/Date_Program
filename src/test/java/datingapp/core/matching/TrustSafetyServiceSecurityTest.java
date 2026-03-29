@@ -1,0 +1,149 @@
+package datingapp.core.matching;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import datingapp.core.AppClock;
+import datingapp.core.AppConfig;
+import datingapp.core.connection.ConnectionModels.Report;
+import datingapp.core.model.Match;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
+import datingapp.core.testutil.TestStorages;
+import java.lang.reflect.Field;
+import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+class TrustSafetyServiceSecurityTest {
+
+    private AppConfig config;
+    private TestStorages.Users userStorage;
+
+    @BeforeEach
+    void setUp() {
+        config = AppConfig.defaults();
+        userStorage = new TestStorages.Users();
+    }
+
+    @Test
+    void builder_usesSecureRandomByDefaultAndExposesSecureRandomSetter() throws Exception {
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TrustSafetyService service = TrustSafetyService.builder(
+                        trustSafetyStorage, new TestStorages.Interactions(), userStorage, config)
+                .build();
+
+        Field randomField = TrustSafetyService.class.getDeclaredField("random");
+        randomField.setAccessible(true);
+
+        Object random = randomField.get(service);
+        assertInstanceOf(SecureRandom.class, random);
+        assertNotNull(TrustSafetyService.Builder.class.getDeclaredMethod("random", SecureRandom.class));
+    }
+
+    @Test
+    void generateVerificationCode_producesValidSixDigitCode() {
+        TrustSafetyService service = TrustSafetyService.builder(
+                        new TestStorages.TrustSafety(), new TestStorages.Interactions(), userStorage, config)
+                .random(new SecureRandom(new byte[] {1, 2, 3, 4}))
+                .build();
+
+        for (int i = 0; i < 100; i++) {
+            String code = service.generateVerificationCode();
+            assertNotNull(code);
+            assertEquals(6, code.length(), "Code must be 6 digits");
+            assertTrue(code.matches("\\d{6}"), "Code must contain only digits: " + code);
+        }
+    }
+
+    @Test
+    void report_duplicateUsesSaveTimeConstraintViolation() {
+        DuplicateRejectingTrustSafetyStorage trustSafetyStorage = new DuplicateRejectingTrustSafetyStorage();
+        TrustSafetyService service = TrustSafetyService.builder(
+                        trustSafetyStorage, new TestStorages.Interactions(), userStorage, config)
+                .build();
+
+        User reporter = createActiveUser("Reporter");
+        User reported = createActiveUser("Reported");
+        userStorage.save(reporter);
+        userStorage.save(reported);
+
+        TrustSafetyService.ReportResult first =
+                service.report(reporter.getId(), reported.getId(), Report.Reason.HARASSMENT, "desc", false);
+        assertTrue(first.success());
+
+        TrustSafetyService.ReportResult duplicate =
+                service.report(reporter.getId(), reported.getId(), Report.Reason.HARASSMENT, "desc", false);
+        assertFalse(duplicate.success());
+        assertFalse(duplicate.userWasBanned());
+        assertEquals("Already reported this user", duplicate.errorMessage());
+        assertEquals(1, trustSafetyStorage.countReportsAgainst(reported.getId()));
+    }
+
+    @Test
+    void block_doesNotPersistBlockWhenMatchUpdateFails() {
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        FailingInteractions interactions = new FailingInteractions();
+        TrustSafetyService service = TrustSafetyService.builder(trustSafetyStorage, interactions, userStorage, config)
+                .build();
+
+        User blocker = createActiveUser("Blocker");
+        User blocked = createActiveUser("Blocked");
+        userStorage.save(blocker);
+        userStorage.save(blocked);
+        interactions.save(Match.create(blocker.getId(), blocked.getId()));
+
+        UUID blockerId = blocker.getId();
+        UUID blockedId = blocked.getId();
+
+        assertThrows(RuntimeException.class, () -> service.block(blockerId, blockedId));
+        assertFalse(trustSafetyStorage.isBlocked(blockerId, blockedId));
+    }
+
+    private static User createActiveUser(String name) {
+        return User.StorageBuilder.create(UUID.randomUUID(), name, AppClock.now())
+                .bio("Test user")
+                .birthDate(LocalDate.of(1990, 1, 1))
+                .gender(Gender.MALE)
+                .interestedIn(Set.of(Gender.FEMALE))
+                .photoUrls(List.of("https://example.com/photo.jpg"))
+                .state(UserState.ACTIVE)
+                .build();
+    }
+
+    private static final class DuplicateRejectingTrustSafetyStorage extends TestStorages.TrustSafety {
+        private final Set<String> reportKeys = new HashSet<>();
+
+        @Override
+        public void save(Report report) {
+            String key = report.reporterId() + "->" + report.reportedUserId();
+            if (!reportKeys.add(key)) {
+                throw new RuntimeException("UNIQUE constraint violation on reports");
+            }
+            super.save(report);
+        }
+
+        @Override
+        public boolean hasReported(UUID reporterId, UUID reportedUserId) {
+            return false;
+        }
+    }
+
+    private static final class FailingInteractions extends TestStorages.Interactions {
+        @Override
+        public void update(Match match) {
+            super.update(match);
+            throw new RuntimeException("match update failed");
+        }
+    }
+}

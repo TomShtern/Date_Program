@@ -1,8 +1,12 @@
 package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.usecase.common.UseCaseError;
+import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -15,17 +19,20 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;
+import datingapp.ui.JavaFxTestSupport;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
-import java.util.function.BooleanSupplier;
-import javafx.application.Platform;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -34,17 +41,22 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("StatsViewModel behavior")
 class StatsViewModelTest {
 
+    private TimeZone originalTimeZone;
+
     @BeforeAll
-    static void initJfx() {
-        try {
-            Platform.startup(() -> {});
-        } catch (IllegalStateException _) {
-            // Toolkit already initialized
-        }
+    static void initJfx() throws InterruptedException {
+        JavaFxTestSupport.initJfx();
+    }
+
+    @BeforeEach
+    void captureTimeZone() {
+        originalTimeZone = TimeZone.getDefault();
     }
 
     @AfterEach
     void tearDown() {
+        TimeZone.setDefault(originalTimeZone);
+        AppClock.reset();
         AppSession.getInstance().reset();
     }
 
@@ -70,11 +82,60 @@ class StatsViewModelTest {
 
         viewModel.initialize();
 
-        assertTrue(waitUntil(() -> viewModel.getAchievements().size() == 1, 5000));
+        assertTrue(JavaFxTestSupport.waitUntil(() -> viewModel.getAchievements().size() == 1, 5000));
+        assertEquals(Achievement.FIRST_SPARK, viewModel.getAchievements().get(0));
         assertEquals(0, viewModel.totalLikesGivenProperty().get());
         assertEquals(0, viewModel.totalLikesReceivedProperty().get());
         assertEquals(0, viewModel.totalMatchesProperty().get());
         assertEquals("--", viewModel.responseRateProperty().get());
+        assertFalse(viewModel.loadFailedProperty().get());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("achievement load failures are surfaced instead of collapsing to empty state")
+    void achievementLoadFailuresAreSurfaced() throws InterruptedException {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createActiveUser("Stats User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileUseCases failingProfileUseCases =
+                new ProfileUseCases(
+                        users,
+                        null,
+                        null,
+                        new ActivityMetricsService(interactions, trustSafety, analytics, config),
+                        null,
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        null) {
+                    @Override
+                    public UseCaseResult<ProfileUseCases.AchievementSnapshot> getAchievements(AchievementsQuery query) {
+                        return UseCaseResult.failure(UseCaseError.internal("achievement load failed"));
+                    }
+                };
+
+        StatsViewModel viewModel = new StatsViewModel(
+                new SingleAchievementService(currentUser.getId()),
+                new ActivityMetricsService(interactions, trustSafety, analytics, config),
+                new ConnectionService(config, communications, interactions, users),
+                failingProfileUseCases,
+                AppSession.getInstance());
+
+        viewModel.initialize();
+
+        assertTrue(
+                JavaFxTestSupport.waitUntil(() -> viewModel.loadFailedProperty().get(), 5000));
+        assertFalse(viewModel.loadFailureMessageProperty().get().isBlank());
+        assertEquals(0, viewModel.getAchievements().size());
 
         viewModel.dispose();
     }
@@ -105,6 +166,60 @@ class StatsViewModelTest {
         }
     }
 
+    @Test
+    @DisplayName("login streak uses UTC clock semantics instead of host default timezone")
+    void loginStreakUsesUtcClockSemantics() throws InterruptedException {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of("Pacific/Kiritimati")));
+        AppClock.setClock(Clock.fixed(Instant.parse("2026-03-25T00:30:00Z"), ZoneOffset.UTC));
+
+        User currentUser = createActiveUser("Stats User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        analytics.saveSession(new datingapp.core.metrics.SwipeState.Session(
+                UUID.randomUUID(),
+                currentUser.getId(),
+                Instant.parse("2026-03-24T23:30:00Z"),
+                Instant.parse("2026-03-24T23:30:00Z"),
+                null,
+                datingapp.core.metrics.SwipeState.Session.MatchState.ACTIVE,
+                0,
+                0,
+                0,
+                0));
+        analytics.saveSession(new datingapp.core.metrics.SwipeState.Session(
+                UUID.randomUUID(),
+                currentUser.getId(),
+                Instant.parse("2026-03-25T00:30:00Z"),
+                Instant.parse("2026-03-25T00:30:00Z"),
+                null,
+                datingapp.core.metrics.SwipeState.Session.MatchState.ACTIVE,
+                0,
+                0,
+                0,
+                0));
+
+        StatsViewModel viewModel = new StatsViewModel(
+                new SingleAchievementService(currentUser.getId()),
+                new ActivityMetricsService(interactions, trustSafety, analytics, config),
+                new ConnectionService(config, communications, interactions, users),
+                AppSession.getInstance());
+
+        viewModel.initialize();
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> viewModel.loginStreakProperty().get() == 2, 5000));
+
+        viewModel.dispose();
+    }
+
     private static User createActiveUser(String name) {
         User user = new User(UUID.randomUUID(), name);
         user.setBirthDate(AppClock.today().minusYears(25));
@@ -122,27 +237,6 @@ class StatsViewModelTest {
                 PacePreferences.DepthPreference.DEEP_CHAT));
         user.activate();
         return user;
-    }
-
-    private static boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
-        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
-        while (System.nanoTime() < deadlineNanos) {
-            waitForFxEvents();
-            if (condition.getAsBoolean()) {
-                return true;
-            }
-            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(25));
-        }
-        waitForFxEvents();
-        return condition.getAsBoolean();
-    }
-
-    private static void waitForFxEvents() throws InterruptedException {
-        CountDownLatch latch = new CountDownLatch(1);
-        Platform.runLater(latch::countDown);
-        if (!latch.await(5, TimeUnit.SECONDS)) {
-            throw new IllegalStateException("Timeout waiting for FX thread");
-        }
     }
 
     private static final class SingleAchievementService implements AchievementService {

@@ -76,11 +76,7 @@ final class ProfileCompletionSupport {
                     BASIC_INTERESTED_POINTS,
                     user -> user.getInterestedIn() != null
                             && !user.getInterestedIn().isEmpty()),
-            new FieldCheck(
-                    "Photo",
-                    BASIC_PHOTO_POINTS,
-                    user -> user.getPhotoUrls() != null && !user.getPhotoUrls().isEmpty(),
-                    "📸 Add a photo"));
+            new FieldCheck("Photo", BASIC_PHOTO_POINTS, User::hasRealPhoto, "📸 Add a photo"));
 
     private static final List<FieldCheck> LIFESTYLE_FIELDS = List.of(
             new FieldCheck("Height", LIFESTYLE_FIELD_POINTS, user -> user.getHeightCm() != null),
@@ -136,7 +132,6 @@ final class ProfileCompletionSupport {
     ProfileService.ProfileCompleteness calculateCompleteness(User user) {
         List<String> filled = new ArrayList<>();
         List<String> missing = new ArrayList<>();
-        List<String> photoUrls = user.getPhotoUrls() != null ? user.getPhotoUrls() : List.of();
         Set<Interest> interests = user.getInterests() != null ? user.getInterests() : Set.of();
 
         checkField("Name", user.getName() != null && !user.getName().isBlank(), filled, missing);
@@ -149,7 +144,7 @@ final class ProfileCompletionSupport {
                 filled,
                 missing);
         checkField(FIELD_LOCATION, user.hasLocation(), filled, missing);
-        checkField("Photo", !photoUrls.isEmpty(), filled, missing);
+        checkField("Photo", user.hasRealPhoto(), filled, missing);
 
         checkField("Height", user.getHeightCm() != null, filled, missing);
         checkField("Smoking", user.getSmoking() != null, filled, missing);
@@ -166,8 +161,8 @@ final class ProfileCompletionSupport {
 
     List<String> generateTips(User user) {
         List<String> tips = new ArrayList<>();
-        List<String> photoUrls = user.getPhotoUrls() != null ? user.getPhotoUrls() : List.of();
         Set<Interest> interests = user.getInterests() != null ? user.getInterests() : Set.of();
+        int realPhotoCount = user.getRealPhotoCount();
 
         if (user.getBio() == null || user.getBio().isBlank()) {
             tips.add("📝 Add a bio to tell others about yourself");
@@ -175,9 +170,9 @@ final class ProfileCompletionSupport {
             tips.add("💡 Expand your bio");
         }
 
-        if (photoUrls.isEmpty()) {
+        if (realPhotoCount == 0) {
             tips.add("📸 Add a photo");
-        } else if (photoUrls.size() < PHOTO_TIP_MIN_COUNT) {
+        } else if (realPhotoCount < PHOTO_TIP_MIN_COUNT) {
             tips.add("📸 Add a second photo");
         }
 

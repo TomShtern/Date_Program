@@ -105,65 +105,6 @@
           </HBox>
           <!-- Achievement List -->
           <ListView fx:id="achievementListView" styleClass="achievement-list-view" maxHeight="Infinity" minHeight="400"/>
-          <!-- Alternative static content if ListView is not populated -->
-          <VBox fx:id="staticAchievementsContainer" spacing="12" styleClass="achievements-container" visible="false">
-            <!-- First Match Achievement -->
-            <HBox styleClass="achievement-card" spacing="16" alignment="CENTER_LEFT">
-              <StackPane styleClass="achievement-badge-icon">
-                <FontIcon iconLiteral="mdi2h-heart-flash" iconSize="24" iconColor="#f59e0b"/>
-              </StackPane>
-              <VBox spacing="4" HBox.hgrow="ALWAYS">
-                <Label text="First Match" styleClass="stat-label-primary"/>
-                <Label text="Make your first match" styleClass="text-secondary, stat-label-secondary"/>
-              </VBox>
-              <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
-            </HBox>
-            <!-- Super Liker Achievement -->
-            <HBox styleClass="achievement-card" spacing="16" alignment="CENTER_LEFT">
-              <StackPane styleClass="achievement-icon-locked">
-                <FontIcon iconLiteral="mdi2s-star" iconSize="24" iconColor="#64748b"/>
-              </StackPane>
-              <VBox spacing="4" HBox.hgrow="ALWAYS">
-                <Label text="Super Liker" styleClass="stat-label-primary"/>
-                <Label text="Send 10 super likes" styleClass="text-secondary, stat-label-secondary"/>
-                <HBox spacing="8" alignment="CENTER_LEFT">
-                  <StackPane styleClass="achievement-progress" HBox.hgrow="ALWAYS">
-                    <StackPane styleClass="achievement-progress-fill" StackPane.alignment="CENTER_LEFT"/>
-                  </StackPane>
-                  <Label text="0/10" styleClass="text-secondary, stat-label-small"/>
-                </HBox>
-              </VBox>
-              <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
-            </HBox>
-            <!-- Conversation Starter Achievement -->
-            <HBox styleClass="achievement-card" spacing="16" alignment="CENTER_LEFT">
-              <StackPane styleClass="achievement-icon-locked">
-                <FontIcon iconLiteral="mdi2m-message-text" iconSize="24" iconColor="#64748b"/>
-              </StackPane>
-              <VBox spacing="4" HBox.hgrow="ALWAYS">
-                <Label text="Conversation Starter" styleClass="stat-label-primary"/>
-                <Label text="Start 5 conversations" styleClass="text-secondary, stat-label-secondary"/>
-                <HBox spacing="8" alignment="CENTER_LEFT">
-                  <StackPane styleClass="achievement-progress" HBox.hgrow="ALWAYS">
-                    <StackPane styleClass="achievement-progress-fill" StackPane.alignment="CENTER_LEFT"/>
-                  </StackPane>
-                  <Label text="0/5" styleClass="text-secondary, stat-label-small"/>
-                </HBox>
-              </VBox>
-              <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
-            </HBox>
-            <!-- Profile Pro Achievement -->
-            <HBox styleClass="achievement-card" spacing="16" alignment="CENTER_LEFT">
-              <StackPane styleClass="achievement-icon-locked">
-                <FontIcon iconLiteral="mdi2a-account-check" iconSize="24" iconColor="#64748b"/>
-              </StackPane>
-              <VBox spacing="4" HBox.hgrow="ALWAYS">
-                <Label text="Profile Pro" styleClass="stat-label-primary"/>
-                <Label text="Complete your profile 100%" styleClass="text-secondary, stat-label-secondary"/>
-              </VBox>
-              <FontIcon iconLiteral="mdi2l-lock" iconSize="20" iconColor="#64748b"/>
-            </HBox>
-          </VBox>
         </VBox>
       </VBox>
     </ScrollPane>

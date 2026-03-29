@@ -17,6 +17,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -130,6 +131,9 @@ public final class JdbiUserStorage implements UserStorage {
             return List.of();
         }
         List<String> genderNames = genders.stream().map(Enum::name).toList();
+        LocalDate today = AppClock.today(ZoneOffset.UTC);
+        LocalDate oldestBirthDate = today.minusYears(maxAge);
+        LocalDate youngestBirthDate = today.minusYears(minAge);
 
         return jdbi.withHandle(handle -> {
             int effectiveDistanceKm = Math.clamp(maxDistanceKm, 0, 20_000);
@@ -141,7 +145,7 @@ public final class JdbiUserStorage implements UserStorage {
                     .append(" AND state = 'ACTIVE'")
                     .append(" AND deleted_at IS NULL")
                     .append(" AND gender IN (<genders>)")
-                    .append(" AND DATEDIFF('YEAR', birth_date, CURRENT_DATE) BETWEEN :minAge AND :maxAge")
+                    .append(" AND birth_date BETWEEN :oldestBirthDate AND :youngestBirthDate")
                     .append(" AND has_location_set = TRUE")
                     .append(" AND lat BETWEEN :latMin AND :latMax")
                     .append(" AND lon BETWEEN :lonMin AND :lonMax");
@@ -151,8 +155,8 @@ public final class JdbiUserStorage implements UserStorage {
                     handle.createQuery(sql.toString())
                             .bindList("genders", genderNames)
                             .bind("excludeId", excludeId)
-                            .bind("minAge", minAge)
-                            .bind("maxAge", maxAge)
+                            .bind("oldestBirthDate", oldestBirthDate)
+                            .bind("youngestBirthDate", youngestBirthDate)
                             .bind("latMin", seekerLat - latDelta)
                             .bind("latMax", seekerLat + latDelta)
                             .bind("lonMin", seekerLon - lonDelta)

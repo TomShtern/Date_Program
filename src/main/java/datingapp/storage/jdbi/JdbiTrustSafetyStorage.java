@@ -15,7 +15,7 @@ import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
-import org.jdbi.v3.sqlobject.customizer.BindBean;
+import org.jdbi.v3.sqlobject.customizer.BindMethods;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
@@ -34,7 +34,7 @@ public interface JdbiTrustSafetyStorage extends TrustSafetyStorage {
             VALUES (:id, :blockerId, :blockedId, :createdAt)
             """)
     @Override
-    void save(@BindBean Block block);
+    void save(@BindMethods Block block);
 
     @SqlQuery("""
             SELECT EXISTS (
@@ -93,7 +93,7 @@ public interface JdbiTrustSafetyStorage extends TrustSafetyStorage {
             VALUES (:id, :reporterId, :reportedUserId, :reason, :description, :createdAt)
             """)
     @Override
-    void save(@BindBean Report report);
+    void save(@BindMethods Report report);
 
     @SqlQuery("SELECT COUNT(*) FROM reports WHERE reported_user_id = :userId AND deleted_at IS NULL")
     @Override

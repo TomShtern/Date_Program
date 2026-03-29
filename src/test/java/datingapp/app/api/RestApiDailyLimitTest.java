@@ -109,6 +109,7 @@ class RestApiDailyLimitTest {
         HttpResponse<String> response = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/users/" + aliceId + "/like/" + otherUserId))
+                        .header("X-User-Id", aliceId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -166,6 +167,7 @@ class RestApiDailyLimitTest {
         HttpResponse<String> response = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/users/" + aliceId + "/pass/" + otherUserId))
+                        .header("X-User-Id", aliceId.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -213,6 +215,7 @@ class RestApiDailyLimitTest {
             HttpResponse<String> response = client.send(
                     HttpRequest.newBuilder(URI.create(
                                     "http://localhost:" + port + "/api/users/" + aliceId + "/like/" + targetId))
+                            .header("X-User-Id", aliceId.toString())
                             .POST(HttpRequest.BodyPublishers.noBody())
                             .build(),
                     HttpResponse.BodyHandlers.ofString());

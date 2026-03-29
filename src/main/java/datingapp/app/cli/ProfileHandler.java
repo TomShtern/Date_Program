@@ -226,7 +226,7 @@ public class ProfileHandler implements LoggingSupport {
             // Card display
             logInfo(CliTextAndInput.BOX_TOP);
             String verifiedBadge = currentUser.isVerified() ? " ✅ Verified" : "";
-            int age = currentUser.getAge(java.time.ZoneId.systemDefault()).orElse(0);
+            int age = currentUser.getAge(config.safety().userTimeZone()).orElse(0);
             logInfo("│ 💝 {}, {} years old{}", currentUser.getName(), age, verifiedBadge);
             logInfo("│ 📍 Location: {}", locationService.formatForDisplay(currentUser.getLat(), currentUser.getLon()));
             String bio = preview.displayBio();
@@ -647,13 +647,12 @@ public class ProfileHandler implements LoggingSupport {
                 if (!result.valid()) {
                     logInfo("⚠️  Invalid distance:");
                     result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
-                    logInfo("    Using default (50km)");
+                    logInfo("    Keeping current value.");
                 } else {
                     currentUser.setMaxDistanceKm(dist, config.matching().maxDistanceKm());
                 }
             } catch (NumberFormatException e) {
-                logTrace("Using default distance, input was: {}", e.getMessage());
-                // Keep default - user entered non-numeric or empty input
+                logTrace("Keeping current distance value, input was: {}", e.getMessage());
             }
         }
 
@@ -666,7 +665,7 @@ public class ProfileHandler implements LoggingSupport {
             if (!result.valid()) {
                 logInfo("⚠️  Invalid age range:");
                 result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
-                logInfo("    Using defaults (18-99)");
+                logInfo("    Keeping current value.");
             } else {
                 currentUser.setAgeRange(
                         minAge,
@@ -675,7 +674,7 @@ public class ProfileHandler implements LoggingSupport {
                         config.validation().maxAge());
             }
         } catch (NumberFormatException _) {
-            logInfo("⚠️  Invalid age range, using defaults.");
+            logInfo("⚠️  Invalid age range, keeping current value.");
         }
     }
 

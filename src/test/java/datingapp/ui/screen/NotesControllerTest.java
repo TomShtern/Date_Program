@@ -152,6 +152,26 @@ class NotesControllerTest {
     }
 
     @Test
+    @DisplayName("previewText truncates by code point without splitting surrogate pairs")
+    void previewTextTruncatesByCodePoint() {
+        String content = "😀".repeat(119) + "ABCD";
+
+        String preview = NotesController.previewText(content);
+
+        assertTrue(preview.endsWith("..."));
+        assertEquals(120, preview.codePointCount(0, preview.length()));
+        assertFalse(preview.contains("\uFFFD"));
+    }
+
+    @Test
+    @DisplayName("previewText returns original content when within code point limit")
+    void previewTextReturnsOriginalContentWhenWithinLimit() {
+        String content = "😀".repeat(50) + " short tail";
+
+        assertEquals(content, NotesController.previewText(content));
+    }
+
+    @Test
     @DisplayName("FXML loads saved notes into the list and hides the empty state")
     void fxmlLoadsSavedNotesIntoListAndHidesEmptyState() throws Exception {
         TestStorages.Users users = new TestStorages.Users();

@@ -84,10 +84,10 @@ public final class JdbiTypeCodecs {
                 return Enum.valueOf(enumType, value);
             } catch (IllegalArgumentException _) {
                 if (logger.isWarnEnabled()) {
-                    logger.warn(
-                            "Skipping invalid {} value '{}' in column '{}'", enumType.getSimpleName(), value, column);
+                    logger.warn("Invalid {} value '{}' in column '{}'", enumType.getSimpleName(), value, column);
                 }
-                return null;
+                throw new SQLException(
+                        "Invalid %s value in column '%s': '%s'".formatted(enumType.getSimpleName(), column, value));
             }
         }
 

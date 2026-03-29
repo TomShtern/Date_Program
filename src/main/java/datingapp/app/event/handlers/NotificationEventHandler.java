@@ -6,12 +6,16 @@ import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.storage.CommunicationStorage;
 import java.util.Map;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Listens for relationship transition events and creates user-facing notifications.
  * Handles graceful-exit and friend-zone-acceptance notifications.
  */
 public final class NotificationEventHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(NotificationEventHandler.class);
 
     private static final String DATA_MATCH_ID = "matchId";
     private static final String DATA_OTHER_USER_ID = "otherUserId";
@@ -53,7 +57,7 @@ public final class NotificationEventHandler {
                         Map.of("initiatorId", event.initiatorId().toString()));
                 communicationStorage.saveNotification(notification);
             }
-            case "FRIENDS" -> {
+            case "FRIEND_ZONE_REQUESTED" -> {
                 Notification notification = Notification.create(
                         event.initiatorId(),
                         Notification.Type.FRIEND_REQUEST_ACCEPTED,
@@ -115,9 +119,11 @@ public final class NotificationEventHandler {
     }
 
     void onAccountDeleted(AppEvent.AccountDeleted event) {
-        if (org.slf4j.LoggerFactory.getLogger(getClass()).isInfoEnabled()) {
-            org.slf4j.LoggerFactory.getLogger(getClass())
-                    .info("Account deleted for userId={}, cleaning up notifications", event.userId());
+        if (communicationStorage != null) {
+            communicationStorage.deleteNotificationsForUser(event.userId());
+        }
+        if (logger.isInfoEnabled()) {
+            logger.info("Account deleted for userId={}, cleaning up notifications", event.userId());
         }
     }
 

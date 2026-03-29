@@ -3,8 +3,12 @@ package datingapp.ui.viewmodel;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.core.AppClock;
+import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
+import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.model.Match;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
@@ -186,7 +190,10 @@ public final class UiDataAdapters {
 
         @Override
         public void markNotificationRead(UUID notificationId) {
-            communicationStorage.markNotificationAsRead(notificationId);
+            communicationStorage
+                    .getNotification(notificationId)
+                    .ifPresent(notification ->
+                            communicationStorage.markNotificationAsRead(notification.userId(), notificationId));
         }
     }
 
@@ -328,6 +335,53 @@ public final class UiDataAdapters {
         @Override
         public String unsupportedReason() {
             return "Presence indicators are currently unavailable.";
+        }
+    }
+
+    /** Presence adapter backed by the active-session tracking service. */
+    public static final class MetricsUiPresenceDataAccess implements UiPresenceDataAccess {
+
+        private static final java.time.Duration DEFAULT_ONLINE_THRESHOLD = java.time.Duration.ofMinutes(2);
+
+        private final ActivityMetricsService activityMetricsService;
+        private final java.time.Duration onlineThreshold;
+
+        public MetricsUiPresenceDataAccess(ActivityMetricsService activityMetricsService, AppConfig config) {
+            this(activityMetricsService, resolveOnlineThreshold(config));
+        }
+
+        MetricsUiPresenceDataAccess(ActivityMetricsService activityMetricsService, java.time.Duration onlineThreshold) {
+            this.activityMetricsService =
+                    Objects.requireNonNull(activityMetricsService, "activityMetricsService cannot be null");
+            this.onlineThreshold = Objects.requireNonNull(onlineThreshold, "onlineThreshold cannot be null");
+        }
+
+        @Override
+        public PresenceStatus getPresence(UUID userId) {
+            Optional<Session> activeSession = activityMetricsService.getCurrentSession(userId);
+            if (activeSession.isEmpty()) {
+                return PresenceStatus.OFFLINE;
+            }
+
+            java.time.Duration inactivity =
+                    java.time.Duration.between(activeSession.get().getLastActivityAt(), AppClock.now());
+            if (inactivity.isNegative() || inactivity.compareTo(onlineThreshold) <= 0) {
+                return PresenceStatus.ONLINE;
+            }
+            return PresenceStatus.AWAY;
+        }
+
+        @Override
+        public boolean isTyping(UUID userId) {
+            return false;
+        }
+
+        private static java.time.Duration resolveOnlineThreshold(AppConfig config) {
+            java.time.Duration sessionTimeout = config.getSessionTimeout();
+            if (sessionTimeout.isZero() || sessionTimeout.isNegative()) {
+                return DEFAULT_ONLINE_THRESHOLD;
+            }
+            return sessionTimeout.compareTo(DEFAULT_ONLINE_THRESHOLD) < 0 ? sessionTimeout : DEFAULT_ONLINE_THRESHOLD;
         }
     }
 }

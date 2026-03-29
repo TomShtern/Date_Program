@@ -29,6 +29,7 @@ import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
+import org.jdbi.v3.sqlobject.customizer.BindMethods;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
@@ -109,7 +110,8 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     private static final String SQL_ACCEPT_FRIEND_REQUEST = """
             UPDATE friend_requests
             SET status = :status,
-            responded_at = :respondedAt
+            responded_at = :respondedAt,
+            pending_marker = NULL
             WHERE id = :id AND status = 'PENDING'
             """;
 
@@ -705,7 +707,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 KEY (who_likes, who_got_liked)
                 VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt, NULL)
                 """)
-        void save(@BindBean Like like);
+        void save(@BindMethods Like like);
 
         @SqlQuery("""
                 SELECT EXISTS (

@@ -64,11 +64,46 @@ public interface CommunicationStorage {
 
     void saveMessage(Message message);
 
+    /**
+     * Persists a message and updates the owning conversation's last-message timestamp as one logical write.
+     *
+     * <p>
+     * The default implementation preserves backward compatibility by calling the two existing methods
+     * sequentially. Transactional implementations should override this method so a failure in either step
+     * leaves no partial observable state.
+     */
+    default void saveMessageAndUpdateConversationLastMessageAt(Message message) {
+        saveMessage(message);
+        updateConversationLastMessageAt(message.conversationId(), message.createdAt());
+    }
+
     List<Message> getMessages(String conversationId, int limit, int offset);
 
     Optional<Message> getMessage(UUID messageId);
 
     Optional<Message> getLatestMessage(String conversationId);
+
+    /**
+     * Returns the latest message for each requested conversation ID.
+     *
+     * <p>Default implementation preserves compatibility by delegating to
+     * {@link #getLatestMessage(String)} for each conversation.
+     */
+    default Map<String, Optional<Message>> getLatestMessagesByConversationIds(Set<String> conversationIds) {
+        Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+        if (conversationIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, Optional<Message>> latestMessages = new HashMap<>();
+        for (String conversationId : conversationIds) {
+            if (conversationId == null || conversationId.isBlank()) {
+                continue;
+            }
+            latestMessages.put(conversationId, getLatestMessage(conversationId));
+        }
+        return Map.copyOf(latestMessages);
+    }
 
     int countMessages(String conversationId);
 
@@ -102,9 +137,57 @@ public interface CommunicationStorage {
 
     int countMessagesAfterNotFrom(String conversationId, Instant after, UUID excludeSenderId);
 
+    /**
+     * Returns unread counts for each requested conversation ID from the
+     * perspective of {@code userId}.
+     *
+     * <p>Default implementation preserves compatibility by delegating to the
+     * existing per-conversation unread counting flow.
+     */
+    default Map<String, Integer> countUnreadMessagesByConversationIds(UUID userId, Set<String> conversationIds) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+        if (conversationIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, Integer> unreadCounts = new HashMap<>();
+        for (String conversationId : conversationIds) {
+            if (conversationId == null || conversationId.isBlank()) {
+                continue;
+            }
+
+            Optional<Conversation> conversation = getConversation(conversationId);
+            if (conversation.isEmpty() || !conversation.get().involves(userId)) {
+                unreadCounts.put(conversationId, 0);
+                continue;
+            }
+
+            Instant lastReadAt = conversation.get().getLastReadAt(userId);
+            int unread = lastReadAt == null
+                    ? countMessagesNotFromSender(conversationId, userId)
+                    : countMessagesAfterNotFrom(conversationId, lastReadAt, userId);
+            unreadCounts.put(conversationId, unread);
+        }
+        return Map.copyOf(unreadCounts);
+    }
+
     void deleteMessage(UUID messageId);
 
     void deleteMessagesByConversation(String conversationId);
+
+    /**
+     * Soft-deletes all messages in a conversation and the conversation row itself as one logical write.
+     *
+     * <p>
+     * The default implementation preserves backward compatibility by calling the two existing methods
+     * sequentially. Transactional implementations should override this method so a failure in either step
+     * leaves no partial observable state.
+     */
+    default void deleteConversationWithMessages(String conversationId) {
+        deleteConversation(conversationId);
+        deleteMessagesByConversation(conversationId);
+    }
 
     // ═══ Friend Request Operations ═══
 
@@ -150,13 +233,17 @@ public interface CommunicationStorage {
 
     void saveNotification(Notification notification);
 
-    void markNotificationAsRead(UUID id);
+    int markAllNotificationsAsRead(UUID userId);
+
+    void markNotificationAsRead(UUID userId, UUID id);
 
     List<Notification> getNotificationsForUser(UUID userId, boolean unreadOnly);
 
     Optional<Notification> getNotification(UUID id);
 
-    void deleteNotification(UUID id);
+    int deleteNotificationsForUser(UUID userId);
+
+    void deleteNotification(UUID userId, UUID id);
 
     void deleteOldNotifications(Instant before);
 }

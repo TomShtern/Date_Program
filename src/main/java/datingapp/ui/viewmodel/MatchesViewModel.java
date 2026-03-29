@@ -44,6 +44,8 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.slf4j.Logger;
@@ -65,6 +67,8 @@ public class MatchesViewModel {
     private static final Logger logger = LoggerFactory.getLogger(MatchesViewModel.class);
     private static final String LIKE_REQUIRED = "like cannot be null";
     private static final String MATCH_REQUIRED = "match cannot be null";
+    private static final String REFRESH_FAILURE_MESSAGE = "Failed to refresh matches";
+    private static final String LOAD_MORE_FAILURE_MESSAGE = "Failed to load more matches";
 
     /** Number of matches returned per page from storage. */
     private static final int PAGE_SIZE = 20;
@@ -85,6 +89,8 @@ public class MatchesViewModel {
     private final IntegerProperty matchCount = new SimpleIntegerProperty(0);
     private final IntegerProperty likesReceivedCount = new SimpleIntegerProperty(0);
     private final IntegerProperty likesSentCount = new SimpleIntegerProperty(0);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
+    private final StringProperty loadFailureMessage = new SimpleStringProperty("");
 
     /**
      * Total number of active matches in storage for the current user (across all
@@ -248,6 +254,7 @@ public class MatchesViewModel {
      */
     private void updateObservableLists(
             MatchFetchResult matchResult, List<LikeCardData> received, List<LikeCardData> sent, String userName) {
+        clearLoadFailure();
         matches.setAll(matchResult.cards());
         matchCount.set(matches.size());
         totalMatchCount.set(matchResult.totalCount());
@@ -336,7 +343,11 @@ public class MatchesViewModel {
         List<PendingLiker> pendingLikers;
         if (matchingUseCases != null) {
             var result = matchingUseCases.pendingLikers(new PendingLikersQuery(UserContext.ui(userId)));
-            pendingLikers = result.success() ? result.data() : List.of();
+            if (!result.success()) {
+                throw new IllegalStateException(
+                        result.error() != null ? result.error().message() : "Failed to load likes received");
+            }
+            pendingLikers = result.data();
         } else {
             pendingLikers = matchingService.findPendingLikersWithTimes(userId);
         }
@@ -450,6 +461,7 @@ public class MatchesViewModel {
         if (capturedEpoch != refreshEpoch.get()) {
             return;
         }
+        clearLoadFailure();
         matches.addAll(result.cards());
         matchCount.set(matches.size());
         totalMatchCount.set(result.totalCount());
@@ -461,7 +473,8 @@ public class MatchesViewModel {
             return;
         }
         logWarn("Failed to load next match page: {}", e.getMessage(), e);
-        notifyError("Failed to load more matches", e);
+        markLoadFailure(e.getMessage());
+        notifyError(LOAD_MORE_FAILURE_MESSAGE, e);
     }
 
     /**
@@ -576,24 +589,18 @@ public class MatchesViewModel {
                 "matches-refresh",
                 "refresh matches",
                 () -> fetchRefreshPayload(userId, userName, capturedEpoch),
-                payload -> {
-                    if (refreshEpoch.get() == payload.epoch()) {
-                        updateObservableLists(
-                                payload.matchResult(), payload.received(), payload.sent(), payload.userName());
-                    }
-                });
+                payload -> applyRefreshPayload(payload, capturedEpoch));
     }
 
     private void refreshAllSync(UUID userId, String userName, long capturedEpoch) {
         setLoadingState(true);
         try {
             RefreshPayload payload = fetchRefreshPayload(userId, userName, capturedEpoch);
-            if (refreshEpoch.get() == payload.epoch()) {
-                updateObservableLists(payload.matchResult(), payload.received(), payload.sent(), payload.userName());
-            }
+            applyRefreshPayload(payload, capturedEpoch);
         } catch (Exception e) {
             logWarn("Failed to refresh matches: {}", e.getMessage(), e);
-            notifyError("Failed to refresh matches", e);
+            markLoadFailure(e.getMessage());
+            notifyError(REFRESH_FAILURE_MESSAGE, e);
         } finally {
             if (refreshEpoch.get() == capturedEpoch) {
                 setLoadingState(false);
@@ -602,10 +609,27 @@ public class MatchesViewModel {
     }
 
     private RefreshPayload fetchRefreshPayload(UUID userId, String userName, long capturedEpoch) {
-        MatchFetchResult matchResult = fetchMatchesFromStorage(userId, capturedEpoch);
-        List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
-        List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
-        return new RefreshPayload(capturedEpoch, matchResult, received, sent, userName);
+        try {
+            MatchFetchResult matchResult = fetchMatchesFromStorage(userId, capturedEpoch);
+            List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
+            List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
+            return RefreshPayload.success(capturedEpoch, matchResult, received, sent, userName);
+        } catch (Exception e) {
+            return RefreshPayload.failure(capturedEpoch, userName, e);
+        }
+    }
+
+    private void applyRefreshPayload(RefreshPayload payload, long capturedEpoch) {
+        if (capturedEpoch != refreshEpoch.get()) {
+            return;
+        }
+        if (payload.success()) {
+            updateObservableLists(payload.matchResult(), payload.received(), payload.sent(), payload.userName());
+            return;
+        }
+
+        markLoadFailure(payload.failureMessage());
+        notifyError(REFRESH_FAILURE_MESSAGE, payload.failureException());
     }
 
     private LoadMorePayload fetchNextPagePayload(UUID userId, long capturedEpoch) {
@@ -735,6 +759,24 @@ public class MatchesViewModel {
         }
     }
 
+    public BooleanProperty loadFailedProperty() {
+        return loadFailed;
+    }
+
+    public StringProperty loadFailureMessageProperty() {
+        return loadFailureMessage;
+    }
+
+    private void clearLoadFailure() {
+        loadFailed.set(false);
+        loadFailureMessage.set("");
+    }
+
+    private void markLoadFailure(String message) {
+        loadFailed.set(true);
+        loadFailureMessage.set(message == null ? "" : message);
+    }
+
     private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
         UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
         ViewModelAsyncScope scope = new ViewModelAsyncScope(
@@ -748,7 +790,26 @@ public class MatchesViewModel {
             MatchFetchResult matchResult,
             List<LikeCardData> received,
             List<LikeCardData> sent,
-            String userName) {}
+            String userName,
+            boolean success,
+            String failureMessage,
+            Exception failureException) {
+
+        private static RefreshPayload success(
+                long epoch,
+                MatchFetchResult matchResult,
+                List<LikeCardData> received,
+                List<LikeCardData> sent,
+                String userName) {
+            return new RefreshPayload(
+                    epoch, matchResult, List.copyOf(received), List.copyOf(sent), userName, true, "", null);
+        }
+
+        private static RefreshPayload failure(long epoch, String userName, Exception error) {
+            String message = error != null ? error.getMessage() : REFRESH_FAILURE_MESSAGE;
+            return new RefreshPayload(epoch, null, List.of(), List.of(), userName, false, message, error);
+        }
+    }
 
     private record LoadMorePayload(long epoch, MatchFetchResult result) {}
 
