@@ -413,7 +413,7 @@ public class MatchingViewModel extends BaseViewModel {
             swipeInProgress.set(false);
             return;
         }
-        MatchingService.SwipeResult swipeResult = result.data();
+        MatchingUseCases.SwipeOutcome swipeResult = result.data();
 
         lastSwipedCandidate = candidate;
         startUndoCountdown();

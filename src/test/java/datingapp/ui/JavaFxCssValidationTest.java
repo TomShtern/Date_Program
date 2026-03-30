@@ -9,14 +9,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.layout.Pane;
 import org.junit.jupiter.api.BeforeAll;
@@ -38,32 +35,11 @@ class JavaFxCssValidationTest {
 
     private static final String[] CSS_FILES = {"/css/theme.css", "/css/light-theme.css"};
 
-    private static boolean javafxInitialized = false;
-
     @BeforeAll
     static void initJavaFx() throws InterruptedException {
-        if (javafxInitialized) {
-            return;
-        }
-
-        CountDownLatch latch = new CountDownLatch(1);
-
         Logger.getLogger("com.sun.javafx.application.PlatformImpl").setLevel(Level.SEVERE);
         Logger.getLogger("javafx").setLevel(Level.SEVERE);
-
-        // Initialize JavaFX toolkit
-        try {
-            Platform.startup(() -> {
-                javafxInitialized = true;
-                latch.countDown();
-            });
-        } catch (IllegalStateException e) {
-            // Already initialized
-            javafxInitialized = true;
-            latch.countDown();
-        }
-
-        assertTrue(latch.await(10, TimeUnit.SECONDS), "JavaFX initialization timed out");
+        JavaFxTestSupport.initJfx();
     }
 
     @Test
@@ -114,10 +90,7 @@ class JavaFxCssValidationTest {
         URL cssUrl = getClass().getResource(cssPath);
         assertNotNull(cssUrl, "CSS file not found: " + cssPath);
 
-        AtomicReference<List<String>> errors = new AtomicReference<>(new ArrayList<>());
-        CountDownLatch latch = new CountDownLatch(1);
-
-        Platform.runLater(() -> {
+        List<String> foundErrors = JavaFxTestSupport.callOnFxAndWait(() -> {
             // Capture stderr to catch JavaFX CSS parser errors
             PrintStream originalErr = System.err;
             ByteArrayOutputStream errCapture = new ByteArrayOutputStream();
@@ -134,28 +107,22 @@ class JavaFxCssValidationTest {
                 // Force CSS to be parsed by requesting a layout pass
                 root.applyCss();
 
-                // Restore stderr and check for errors
-                System.setErr(originalErr);
                 captureStream.flush();
 
                 String errorOutput = errCapture.toString();
                 if (!errorOutput.isEmpty()) {
                     // Parse the error output for CSS-related errors
-                    List<String> cssErrors = parseCssErrors(errorOutput);
-                    errors.set(cssErrors);
+                    return parseCssErrors(errorOutput);
                 }
-
+                return new ArrayList<>();
             } catch (Exception e) {
-                errors.get().add("Exception during CSS validation: " + e.getMessage());
+                List<String> errors = new ArrayList<>();
+                errors.add("Exception during CSS validation: " + e.getMessage());
+                return errors;
             } finally {
                 System.setErr(originalErr);
-                latch.countDown();
             }
         });
-
-        assertTrue(latch.await(30, TimeUnit.SECONDS), "CSS validation timed out");
-
-        List<String> foundErrors = errors.get();
         if (!foundErrors.isEmpty()) {
             fail("JavaFX CSS parser errors in " + cssPath + ":\n" + String.join("\n", foundErrors));
         }

@@ -14,7 +14,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.LockSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -26,7 +25,7 @@ class ViewModelAsyncScopeTest {
     @Test
     @DisplayName("runLatest delivers only the newest callback for a key")
     void runLatestDeliversOnlyNewestCallbackForKey() throws InterruptedException {
-        TestUiThreadDispatcher dispatcher = new TestUiThreadDispatcher();
+        UiAsyncTestSupport.TestUiThreadDispatcher dispatcher = new UiAsyncTestSupport.TestUiThreadDispatcher();
         ViewModelAsyncScope scope = createScope(dispatcher, message -> {
             throw new AssertionError("Unexpected error: " + message);
         });
@@ -39,7 +38,7 @@ class ViewModelAsyncScopeTest {
                 "refresh",
                 "first refresh",
                 () -> {
-                    sleepQuietly(150);
+                    UiAsyncTestSupport.sleepQuietly(150);
                     return "first";
                 },
                 value -> {
@@ -55,7 +54,7 @@ class ViewModelAsyncScopeTest {
         });
 
         assertTrue(latch.await(2, TimeUnit.SECONDS));
-        assertTrue(waitUntil(
+        assertTrue(UiAsyncTestSupport.waitUntil(
                 () -> scope.diagnosticsSnapshot().cancelledBeforeDeliveryCount() == 1L, Duration.ofSeconds(2)));
         assertEquals("second", delivered.get());
         assertEquals(1, callbackCount.get());
@@ -72,7 +71,7 @@ class ViewModelAsyncScopeTest {
     @Test
     @DisplayName("runLatest releases loading when an older keyed task is superseded")
     void runLatestReleasesLoadingWhenOlderKeyedTaskIsSuperseded() throws InterruptedException {
-        TestUiThreadDispatcher dispatcher = new TestUiThreadDispatcher();
+        UiAsyncTestSupport.TestUiThreadDispatcher dispatcher = new UiAsyncTestSupport.TestUiThreadDispatcher();
         ViewModelAsyncScope scope = createScope(dispatcher, message -> {
             throw new AssertionError("Unexpected error: " + message);
         });
@@ -93,7 +92,7 @@ class ViewModelAsyncScopeTest {
                     firstStarted.countDown();
                     try {
                         while (!releaseFirst.get()) {
-                            pauseMillis(10);
+                            UiAsyncTestSupport.pauseMillis(10);
                             if (Thread.currentThread().isInterrupted()) {
                                 Thread.interrupted();
                             }
@@ -108,7 +107,7 @@ class ViewModelAsyncScopeTest {
                 });
 
         assertTrue(firstStarted.await(2, TimeUnit.SECONDS));
-        assertTrue(waitUntil(() -> loadingStates.contains(Boolean.TRUE), Duration.ofSeconds(2)));
+        assertTrue(UiAsyncTestSupport.waitUntil(() -> loadingStates.contains(Boolean.TRUE), Duration.ofSeconds(2)));
 
         scope.runLatest("refresh", "second refresh", () -> "fresh", value -> {
             delivered.set(value);
@@ -116,7 +115,7 @@ class ViewModelAsyncScopeTest {
         });
 
         assertTrue(secondDelivered.await(2, TimeUnit.SECONDS));
-        assertTrue(waitUntil(
+        assertTrue(UiAsyncTestSupport.waitUntil(
                 () -> !loadingStates.isEmpty() && Boolean.FALSE.equals(loadingStates.get(loadingStates.size() - 1)),
                 Duration.ofSeconds(2)));
         assertEquals("fresh", delivered.get());
@@ -138,7 +137,7 @@ class ViewModelAsyncScopeTest {
     @Test
     @DisplayName("callback suppression is recorded when latest delivery is overtaken before UI dispatch")
     void callbackSuppressionIsRecordedWhenLatestDeliveryIsOvertakenBeforeUiDispatch() throws InterruptedException {
-        QueuedUiThreadDispatcher dispatcher = new QueuedUiThreadDispatcher();
+        UiAsyncTestSupport.QueuedUiThreadDispatcher dispatcher = new UiAsyncTestSupport.QueuedUiThreadDispatcher();
         ViewModelAsyncScope scope = createScope(dispatcher, message -> {
             throw new AssertionError("Unexpected error: " + message);
         });
@@ -152,7 +151,8 @@ class ViewModelAsyncScopeTest {
         scope.dispose();
         dispatcher.drainAll();
 
-        assertTrue(waitUntil(() -> scope.diagnosticsSnapshot().callbackSuppressedCount() == 1L, Duration.ofSeconds(2)));
+        assertTrue(UiAsyncTestSupport.waitUntil(
+                () -> scope.diagnosticsSnapshot().callbackSuppressedCount() == 1L, Duration.ofSeconds(2)));
         assertEquals(0, callbackCount.get());
 
         ViewModelAsyncScope.DiagnosticsSnapshot diagnostics = scope.diagnosticsSnapshot();
@@ -167,7 +167,7 @@ class ViewModelAsyncScopeTest {
     @Test
     @DisplayName("dispose cancels in-flight tasks and suppresses callbacks")
     void disposeCancelsInflightTasksAndSuppressesCallbacks() throws InterruptedException {
-        TestUiThreadDispatcher dispatcher = new TestUiThreadDispatcher();
+        UiAsyncTestSupport.TestUiThreadDispatcher dispatcher = new UiAsyncTestSupport.TestUiThreadDispatcher();
         ViewModelAsyncScope scope = createScope(dispatcher, message -> {
             throw new AssertionError("Unexpected error: " + message);
         });
@@ -179,7 +179,7 @@ class ViewModelAsyncScopeTest {
                 "long task",
                 () -> {
                     started.countDown();
-                    sleepQuietly(800);
+                    UiAsyncTestSupport.sleepQuietly(800);
                     return 42;
                 },
                 value -> callbackInvoked.set(true));
@@ -187,7 +187,7 @@ class ViewModelAsyncScopeTest {
         assertTrue(started.await(1, TimeUnit.SECONDS));
         scope.dispose();
 
-        sleepQuietly(200);
+        UiAsyncTestSupport.sleepQuietly(200);
 
         assertTrue(handle.isCancelled());
         assertFalse(callbackInvoked.get());
@@ -196,7 +196,7 @@ class ViewModelAsyncScopeTest {
     @Test
     @DisplayName("success callbacks execute on the UI dispatcher")
     void successCallbacksExecuteOnUiDispatcher() throws InterruptedException {
-        TestUiThreadDispatcher dispatcher = new TestUiThreadDispatcher();
+        UiAsyncTestSupport.TestUiThreadDispatcher dispatcher = new UiAsyncTestSupport.TestUiThreadDispatcher();
         ViewModelAsyncScope scope = createScope(dispatcher, message -> {
             throw new AssertionError("Unexpected error: " + message);
         });
@@ -218,7 +218,7 @@ class ViewModelAsyncScopeTest {
     @Test
     @DisplayName("errors are routed exactly once through AsyncErrorRouter")
     void errorsAreRoutedExactlyOnceThroughAsyncErrorRouter() throws InterruptedException {
-        TestUiThreadDispatcher dispatcher = new TestUiThreadDispatcher();
+        UiAsyncTestSupport.TestUiThreadDispatcher dispatcher = new UiAsyncTestSupport.TestUiThreadDispatcher();
         AtomicInteger errorCount = new AtomicInteger(0);
         AtomicReference<String> errorMessage = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
@@ -256,7 +256,7 @@ class ViewModelAsyncScopeTest {
     @Test
     @DisplayName("loading state tracks overlapping tasks and returns to false")
     void loadingStateTracksOverlappingTasksAndReturnsToFalse() throws InterruptedException {
-        TestUiThreadDispatcher dispatcher = new TestUiThreadDispatcher();
+        UiAsyncTestSupport.TestUiThreadDispatcher dispatcher = new UiAsyncTestSupport.TestUiThreadDispatcher();
         ViewModelAsyncScope scope = createScope(dispatcher, message -> {
             throw new AssertionError("Unexpected error: " + message);
         });
@@ -270,7 +270,7 @@ class ViewModelAsyncScopeTest {
         scope.run(
                 "task-a",
                 () -> {
-                    awaitQuietly(release);
+                    UiAsyncTestSupport.awaitQuietly(release);
                     return 1;
                 },
                 value -> done.countDown());
@@ -278,16 +278,16 @@ class ViewModelAsyncScopeTest {
         scope.run(
                 "task-b",
                 () -> {
-                    awaitQuietly(release);
+                    UiAsyncTestSupport.awaitQuietly(release);
                     return 2;
                 },
                 value -> done.countDown());
 
-        assertTrue(waitUntil(() -> loadingStates.contains(Boolean.TRUE), Duration.ofSeconds(2)));
+        assertTrue(UiAsyncTestSupport.waitUntil(() -> loadingStates.contains(Boolean.TRUE), Duration.ofSeconds(2)));
 
         release.countDown();
         assertTrue(done.await(2, TimeUnit.SECONDS));
-        assertTrue(waitUntil(
+        assertTrue(UiAsyncTestSupport.waitUntil(
                 () -> !loadingStates.isEmpty() && Boolean.FALSE.equals(loadingStates.get(loadingStates.size() - 1)),
                 Duration.ofSeconds(2)));
 
@@ -297,7 +297,7 @@ class ViewModelAsyncScopeTest {
     @Test
     @DisplayName("fire-and-forget tasks do not toggle loading state")
     void fireAndForgetTasksDoNotToggleLoadingState() throws InterruptedException {
-        TestUiThreadDispatcher dispatcher = new TestUiThreadDispatcher();
+        UiAsyncTestSupport.TestUiThreadDispatcher dispatcher = new UiAsyncTestSupport.TestUiThreadDispatcher();
         ViewModelAsyncScope scope = createScope(dispatcher, message -> {
             throw new AssertionError("Unexpected error: " + message);
         });
@@ -317,101 +317,5 @@ class ViewModelAsyncScopeTest {
     private static ViewModelAsyncScope createScope(UiThreadDispatcher dispatcher, ViewModelErrorSink sink) {
         AsyncErrorRouter router = new AsyncErrorRouter(dispatcher, () -> sink, (_, _) -> {});
         return new ViewModelAsyncScope("test", dispatcher, router);
-    }
-
-    private static boolean waitUntil(java.util.function.BooleanSupplier condition, Duration timeout)
-            throws InterruptedException {
-        // Use System.nanoTime() instead of Instant.now() for more precise timing
-        // and to avoid system clock adjustments affecting test reliability
-        long deadlineNanos = System.nanoTime() + timeout.toNanos();
-        while (System.nanoTime() < deadlineNanos) {
-            if (condition.getAsBoolean()) {
-                return true;
-            }
-            pauseMillis(20);
-            if (Thread.currentThread().isInterrupted()) {
-                throw new InterruptedException("Interrupted while waiting for async condition");
-            }
-        }
-        return condition.getAsBoolean();
-    }
-
-    private static void sleepQuietly(long millis) {
-        pauseMillis(millis);
-        if (Thread.currentThread().isInterrupted()) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private static void awaitQuietly(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private static void pauseMillis(long millis) {
-        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(millis));
-    }
-
-    private static final class TestUiThreadDispatcher implements UiThreadDispatcher {
-        private final ThreadLocal<Boolean> uiThread = ThreadLocal.withInitial(() -> false);
-
-        @Override
-        public boolean isUiThread() {
-            return uiThread.get();
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            boolean previous = uiThread.get();
-            uiThread.set(true);
-            try {
-                action.run();
-            } finally {
-                uiThread.set(previous);
-            }
-        }
-    }
-
-    private static final class QueuedUiThreadDispatcher implements UiThreadDispatcher {
-        private final java.util.concurrent.ConcurrentLinkedQueue<Runnable> queuedActions =
-                new java.util.concurrent.ConcurrentLinkedQueue<>();
-        private final ThreadLocal<Boolean> uiThread = ThreadLocal.withInitial(() -> false);
-        private final CountDownLatch firstDispatchQueued = new CountDownLatch(1);
-
-        @Override
-        public boolean isUiThread() {
-            return uiThread.get();
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            queuedActions.add(action);
-            firstDispatchQueued.countDown();
-        }
-
-        private boolean awaitFirstDispatchQueued() {
-            try {
-                return firstDispatchQueued.await(2, TimeUnit.SECONDS);
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        }
-
-        private void drainAll() {
-            Runnable action;
-            while ((action = queuedActions.poll()) != null) {
-                boolean previous = uiThread.get();
-                uiThread.set(true);
-                try {
-                    action.run();
-                } finally {
-                    uiThread.set(previous);
-                }
-            }
-        }
     }
 }

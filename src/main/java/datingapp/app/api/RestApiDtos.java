@@ -1,12 +1,13 @@
 package datingapp.app.api;
 
+import datingapp.app.usecase.matching.MatchingUseCases.MatchQualitySnapshot;
+import datingapp.app.usecase.matching.MatchingUseCases.UndoOutcome;
+import datingapp.app.usecase.social.SocialUseCases.RelationshipTransitionOutcome;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.DailyPickService.DailyPick;
-import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.Standout;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
@@ -188,8 +189,8 @@ final class RestApiDtos {
 
     /** Response for undo action. */
     static record UndoResponse(boolean success, String message, boolean matchDeleted) {
-        static UndoResponse from(datingapp.core.matching.UndoService.UndoResult result) {
-            return new UndoResponse(result.success(), result.message(), result.matchDeleted());
+        static UndoResponse from(UndoOutcome outcome) {
+            return new UndoResponse(true, outcome.message(), outcome.matchDeleted());
         }
     }
 
@@ -374,7 +375,7 @@ final class RestApiDtos {
             double distanceKm,
             int ageDifference,
             List<String> highlights) {
-        static MatchQualityDto from(MatchQualityService.MatchQuality quality) {
+        static MatchQualityDto from(MatchQualitySnapshot quality) {
             return new MatchQualityDto(
                     quality.matchId(),
                     quality.perspectiveUserId(),
@@ -391,10 +392,9 @@ final class RestApiDtos {
 
     /** Response for relationship transitions. */
     static record TransitionResponse(boolean success, UUID friendRequestId, String errorMessage) {
-        static TransitionResponse from(ConnectionService.TransitionResult result) {
-            FriendRequest request = result.friendRequest();
-            return new TransitionResponse(
-                    result.success(), request != null ? request.id() : null, result.errorMessage());
+        static TransitionResponse from(RelationshipTransitionOutcome outcome) {
+            FriendRequest request = outcome.friendRequest();
+            return new TransitionResponse(true, request != null ? request.id() : null, null);
         }
     }
 

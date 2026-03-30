@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -16,6 +17,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
@@ -364,8 +366,16 @@ class ChatControllerTest {
         private Fixture() {
             ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
             var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
-                    users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
-            var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService, null);
+                    users,
+                    profileService,
+                    null,
+                    null,
+                    TestAchievementService.empty(),
+                    config,
+                    new ProfileActivationPolicy(),
+                    new InProcessAppEventBus());
+            var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(
+                    connectionService, new InProcessAppEventBus());
             var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, trustSafetyService);
             this.viewModel = new ChatViewModel(
                     messagingUseCases,

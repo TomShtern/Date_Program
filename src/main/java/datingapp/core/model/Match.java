@@ -113,20 +113,9 @@ public class Match {
             throw new IllegalArgumentException("Cannot match with yourself");
         }
 
-        String firstUserId = a.toString();
-        String secondUserId = b.toString();
-
-        UUID userA;
-        UUID userB;
-        if (firstUserId.compareTo(secondUserId) < 0) {
-            userA = a;
-            userB = b;
-        } else {
-            userA = b;
-            userB = a;
-        }
-
-        String id = userA + "_" + userB;
+        UUID userA = a.toString().compareTo(b.toString()) < 0 ? a : b;
+        UUID userB = userA.equals(a) ? b : a;
+        String id = generateId(a, b);
         Instant now = AppClock.now();
         return new Match(id, userA, userB, now, now, MatchState.ACTIVE, null, null, null, null);
     }

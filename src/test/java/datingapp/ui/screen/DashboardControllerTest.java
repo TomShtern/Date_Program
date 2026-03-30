@@ -10,10 +10,12 @@ import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.RecommendationService;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
@@ -81,6 +83,7 @@ class DashboardControllerTest {
                 .build();
 
         ConnectionService messagingService = new ConnectionService(config, communications, interactions, users);
+        AchievementService achievementService = TestAchievementService.empty();
 
         User currentUser = createActiveUser("DashboardUser", Gender.MALE, EnumSet.of(Gender.FEMALE));
         User candidate = createActiveUser("Daily Pick", Gender.FEMALE, EnumSet.of(Gender.MALE));
@@ -92,7 +95,7 @@ class DashboardControllerTest {
                 new DashboardViewModel.Dependencies(
                         dailyService,
                         new StorageUiMatchDataAccess(interactions, trustSafetyStorage),
-                        profileService,
+                        achievementService,
                         messagingService,
                         profileService,
                         config),
@@ -162,6 +165,7 @@ class DashboardControllerTest {
                 .build();
 
         ConnectionService messagingService = new ConnectionService(config, communications, interactions, users);
+        AchievementService achievementService = TestAchievementService.empty();
 
         User currentUser = createActiveUser("DashboardUser", Gender.MALE, EnumSet.of(Gender.FEMALE));
         users.save(currentUser);
@@ -171,7 +175,7 @@ class DashboardControllerTest {
                 new DashboardViewModel.Dependencies(
                         dailyService,
                         new StorageUiMatchDataAccess(interactions, trustSafetyStorage),
-                        profileService,
+                        achievementService,
                         messagingService,
                         profileService,
                         config),
@@ -247,6 +251,7 @@ class DashboardControllerTest {
                 .build();
 
         ConnectionService messagingService = new ConnectionService(config, communications, interactions, users);
+        AchievementService achievementService = TestAchievementService.empty();
 
         User currentUser = createActiveUser("DashboardUser", Gender.MALE, EnumSet.of(Gender.FEMALE));
         users.save(currentUser);
@@ -256,7 +261,7 @@ class DashboardControllerTest {
                 new DashboardViewModel.Dependencies(
                         dailyService,
                         new StorageUiMatchDataAccess(interactions, trustSafetyStorage),
-                        profileService,
+                        achievementService,
                         messagingService,
                         profileService,
                         config),

@@ -1,22 +1,35 @@
 package datingapp.app.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.profile.ProfileUseCases;
-import datingapp.core.*;
+import datingapp.core.AppConfig;
+import datingapp.core.AppSession;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.profile.*;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ValidationService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import java.io.StringReader;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.EnumSet;
+import java.util.Optional;
+import java.util.Scanner;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Unit tests for profile notes CLI commands: manageNoteFor(), viewAllNotes().
@@ -43,7 +56,14 @@ class ProfileNotesHandlerTest {
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         ProfileUseCases profileUseCases = new ProfileUseCases(
-                userStorage, null, null, null, null, AppConfig.defaults(), new ProfileActivationPolicy(), null);
+                userStorage,
+                null,
+                null,
+                null,
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new ProfileActivationPolicy(),
+                new TestEventBus());
         return new ProfileHandler(
                 userStorage,
                 new ValidationService(AppConfig.defaults()),

@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Like;
@@ -18,14 +17,14 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
-import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
-import datingapp.core.storage.PageData;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.UiPage;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.lang.reflect.Field;
 import java.time.Instant;
@@ -33,6 +32,7 @@ import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -113,7 +113,8 @@ class MatchesViewModelTest {
                 interactions,
                 users,
                 matchQualityService,
-                new datingapp.app.event.InProcessAppEventBus());
+                new datingapp.app.event.InProcessAppEventBus(),
+                dailyService);
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactions, users, config, communications)
                 .build();
@@ -179,7 +180,8 @@ class MatchesViewModelTest {
                         interactions,
                         users,
                         new MatchQualityService(users, interactions, zeroLimitConfig),
-                        new datingapp.app.event.InProcessAppEventBus()),
+                        new datingapp.app.event.InProcessAppEventBus(),
+                        zeroLimitRecommendationService),
                 zeroLimitConfig,
                 AppSession.getInstance());
 
@@ -234,7 +236,7 @@ class MatchesViewModelTest {
     void refreshFailuresAreSurfaced() {
         UiMatchDataAccess failingMatchData = new UiMatchDataAccess() {
             @Override
-            public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+            public UiPage<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
                 throw new IllegalStateException("match load failed");
             }
 
@@ -282,6 +284,69 @@ class MatchesViewModelTest {
         assertTrue(failingViewModel.loadFailedProperty().get());
         assertTrue(failingViewModel.loadFailureMessageProperty().get().contains("match load failed"));
         assertTrue(failingViewModel.getMatches().isEmpty());
+    }
+
+    @Test
+    @DisplayName("late-bound error handler receives refresh failures")
+    void lateBoundErrorHandlerReceivesRefreshFailures() throws InterruptedException {
+        UiMatchDataAccess failingMatchData = new UiMatchDataAccess() {
+            @Override
+            public UiPage<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public List<Match> getActiveMatchesFor(UUID userId) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public List<Match> getAllMatchesFor(UUID userId) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public java.util.Optional<Like> getLike(UUID from, UUID to) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public java.util.Set<UUID> getBlockedUserIds(UUID userId) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public java.util.Set<UUID> getLikedOrPassedUserIds(UUID userId) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public void deleteLike(UUID likeId) {
+                throw new IllegalStateException("match load failed");
+            }
+
+            @Override
+            public int countActiveMatchesFor(UUID userId) {
+                throw new IllegalStateException("match load failed");
+            }
+        };
+
+        MatchesViewModel failingViewModel = new MatchesViewModel(
+                failingMatchData, userStore, matchingService, dailyService, config, AppSession.getInstance());
+
+        AtomicReference<String> routedMessage = new AtomicReference<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        failingViewModel.setErrorHandler(message -> {
+            routedMessage.set(message);
+            latch.countDown();
+        });
+
+        failingViewModel.initialize();
+
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertTrue(failingViewModel.loadFailedProperty().get());
+        assertTrue(routedMessage.get().contains("Failed to refresh matches"));
+        assertTrue(routedMessage.get().contains("match load failed"));
     }
 
     @Test
@@ -444,7 +509,7 @@ class MatchesViewModelTest {
         // fetchMatchesFromStorage
         UiMatchDataAccess raceMatchData = new UiMatchDataAccess() {
             @Override
-            public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+            public UiPage<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
                 if (raceTriggered.compareAndSet(false, true)) {
                     // Simulate refreshAll() happening after offset reservation
                     // but before the downward adjustment in fetchMatchesFromStorage.
@@ -513,21 +578,9 @@ class MatchesViewModelTest {
     }
 
     private static User createActiveUser(String name) {
-        User user = new User(UUID.randomUUID(), name);
-        user.setBirthDate(AppClock.today().minusYears(25));
+        User user = TestUserFactory.createActiveUser(name);
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.of(Gender.OTHER));
-        user.setAgeRange(18, 60, 18, 120);
-        user.setMaxDistanceKm(50, 500);
-        user.setLocation(40.7128, -74.0060);
-        user.addPhotoUrl("http://example.com/" + name + ".jpg");
-        user.setBio("Bio");
-        user.setPacePreferences(new PacePreferences(
-                PacePreferences.MessagingFrequency.OFTEN,
-                PacePreferences.TimeToFirstDate.FEW_DAYS,
-                PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
-                PacePreferences.DepthPreference.DEEP_CHAT));
-        user.activate();
         if (user.getState() != UserState.ACTIVE) {
             throw new IllegalStateException("User should be active for test");
         }

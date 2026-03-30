@@ -1,13 +1,12 @@
 package datingapp.app.cli;
 
+import datingapp.app.usecase.matching.MatchingUseCases.MatchQualitySnapshot;
+import datingapp.app.usecase.matching.MatchingUseCases.SwipeOutcome;
 import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.i18n.I18n;
 import datingapp.core.matching.InterestMatcher;
-import datingapp.core.matching.MatchQualityService.MatchQuality;
-import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.MatchingService.PendingLiker;
-import datingapp.core.matching.RecommendationService;
 import datingapp.core.model.User;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -45,7 +44,7 @@ final class MatchingCliPresenter {
         return I18n.text("cli.common.press_enter_menu");
     }
 
-    List<String> swipeResultLines(MatchingService.SwipeResult result, String candidateName) {
+    List<String> swipeResultLines(SwipeOutcome result, String candidateName) {
         if (result.matched()) {
             return List.of(
                     "",
@@ -59,14 +58,14 @@ final class MatchingCliPresenter {
         return List.of(I18n.text("cli.matching.pass_saved"), "");
     }
 
-    List<String> dailyLimitReachedLines(RecommendationService.DailyStatus status, String timeUntilReset) {
+    List<String> dailyLimitReachedLines(int likesUsed, String timeUntilReset) {
         return List.of(
                 "",
                 CliTextAndInput.SEPARATOR_LINE,
                 I18n.text("cli.matching.daily_limit.title"),
                 CliTextAndInput.SEPARATOR_LINE,
                 "",
-                I18n.text("cli.matching.daily_limit.used", status.likesUsed()),
+                I18n.text("cli.matching.daily_limit.used", likesUsed),
                 "",
                 I18n.text("cli.matching.daily_limit.reset", timeUntilReset),
                 "",
@@ -77,7 +76,7 @@ final class MatchingCliPresenter {
                 "");
     }
 
-    List<String> dailyPickSwipeResultLines(MatchingService.SwipeResult result) {
+    List<String> dailyPickSwipeResultLines(SwipeOutcome result) {
         if (result.matched()) {
             return List.of("", I18n.text("cli.matching.daily_pick.match.banner"), "");
         }
@@ -121,7 +120,7 @@ final class MatchingCliPresenter {
         return List.copyOf(lines);
     }
 
-    List<String> matchQualityLines(User otherUser, MatchQuality quality, ZoneId userTimeZone) {
+    List<String> matchQualityLines(User otherUser, MatchQualitySnapshot quality, ZoneId userTimeZone) {
         List<String> lines = new ArrayList<>();
         String nameUpper = otherUser.getName().toUpperCase(Locale.ROOT);
         lines.add("");
@@ -180,7 +179,7 @@ final class MatchingCliPresenter {
                 "");
     }
 
-    private List<String> scoreBreakdownLines(MatchQuality quality) {
+    private List<String> scoreBreakdownLines(MatchQualitySnapshot quality) {
         String distanceBar = TextUtil.renderProgressBar(quality.distanceScore(), 12);
         String ageBar = TextUtil.renderProgressBar(quality.ageScore(), 12);
         String interestBar = TextUtil.renderProgressBar(quality.interestScore(), 12);

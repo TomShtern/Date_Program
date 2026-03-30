@@ -10,8 +10,10 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;
+import datingapp.ui.NavigationService;
 import datingapp.ui.UiPreferencesStore;
 import datingapp.ui.UiPreferencesStore.ThemeMode;
+import datingapp.ui.UiThemeService;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.util.EnumSet;
@@ -68,9 +70,10 @@ class PreferencesViewModelTest {
 
         UiPreferencesStore store = new UiPreferencesStore("/datingapp/tests/preferences-" + UUID.randomUUID());
         store.saveThemeMode(ThemeMode.LIGHT);
+        UiThemeService themeService = new UiThemeService(store, NavigationService.getInstance());
 
         PreferencesViewModel viewModel = new PreferencesViewModel(
-                new StorageUiUserStore(users), null, store, AppConfig.defaults(), session, TEST_DISPATCHER);
+                new StorageUiUserStore(users), null, themeService, AppConfig.defaults(), session, TEST_DISPATCHER);
 
         viewModel.initialize();
         waitForAsyncWork();
@@ -90,8 +93,9 @@ class PreferencesViewModelTest {
         session.setCurrentUser(currentUser);
 
         UiPreferencesStore store = new UiPreferencesStore("/datingapp/tests/preferences-" + UUID.randomUUID());
+        UiThemeService themeService = new UiThemeService(store, NavigationService.getInstance());
         PreferencesViewModel viewModel = new PreferencesViewModel(
-                new StorageUiUserStore(users), null, store, AppConfig.defaults(), session, TEST_DISPATCHER);
+                new StorageUiUserStore(users), null, themeService, AppConfig.defaults(), session, TEST_DISPATCHER);
 
         viewModel.initialize();
         waitForAsyncWork();
@@ -112,6 +116,32 @@ class PreferencesViewModelTest {
         assertEquals(77, savedUser.getMaxDistanceKm());
         assertTrue(savedUser.getInterestedIn().contains(Gender.MALE));
         assertEquals(ThemeMode.LIGHT, store.loadThemeMode());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("updateThemeMode routes theme changes through an injected theme service")
+    void updateThemeModeRoutesThroughInjectedThemeService() throws InterruptedException {
+        TestStorages.Users users = new TestStorages.Users();
+        User currentUser = createUser("Morgan");
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        RecordingThemeService themeService = new RecordingThemeService(ThemeMode.DARK);
+        PreferencesViewModel viewModel = new PreferencesViewModel(
+                new StorageUiUserStore(users), null, themeService, AppConfig.defaults(), session, TEST_DISPATCHER);
+
+        viewModel.initialize();
+        waitForAsyncWork();
+        themeService.resetCalls();
+
+        viewModel.updateThemeMode(ThemeMode.LIGHT);
+        waitForAsyncWork();
+
+        assertEquals(ThemeMode.LIGHT, viewModel.themeModeProperty().get());
+        assertEquals(ThemeMode.LIGHT, themeService.lastAppliedTheme());
+        assertEquals(1, themeService.setCalls());
 
         viewModel.dispose();
     }
@@ -144,5 +174,40 @@ class PreferencesViewModelTest {
                 PacePreferences.DepthPreference.DEEP_CHAT));
         user.activate();
         return user;
+    }
+
+    private static final class RecordingThemeService extends UiThemeService {
+        private ThemeMode currentThemeMode;
+        private ThemeMode lastAppliedTheme;
+        private int setCalls;
+
+        private RecordingThemeService(ThemeMode initialThemeMode) {
+            this.currentThemeMode = initialThemeMode;
+        }
+
+        @Override
+        public ThemeMode loadThemeMode() {
+            return currentThemeMode;
+        }
+
+        @Override
+        public void setThemeMode(ThemeMode themeMode) {
+            this.currentThemeMode = themeMode;
+            this.lastAppliedTheme = themeMode;
+            this.setCalls++;
+        }
+
+        private ThemeMode lastAppliedTheme() {
+            return lastAppliedTheme;
+        }
+
+        private int setCalls() {
+            return setCalls;
+        }
+
+        private void resetCalls() {
+            this.lastAppliedTheme = null;
+            this.setCalls = 0;
+        }
     }
 }

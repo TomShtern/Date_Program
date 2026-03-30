@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -14,6 +15,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
@@ -181,7 +183,14 @@ class NotesControllerTest {
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
-                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
+                users,
+                profileService,
+                null,
+                null,
+                TestAchievementService.empty(),
+                config,
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
 
         User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         User subject = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));
@@ -217,7 +226,14 @@ class NotesControllerTest {
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
-                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
+                users,
+                profileService,
+                null,
+                null,
+                TestAchievementService.empty(),
+                config,
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
 
         User author = createUser("Alex", Gender.MALE, EnumSet.of(Gender.FEMALE));
         User subject = createUser("Jordan", Gender.FEMALE, EnumSet.of(Gender.MALE));
@@ -328,7 +344,14 @@ class NotesControllerTest {
         private final ProfileService profileService =
                 new ProfileService(config, analytics, interactions, trustSafety, users);
         private final ProfileUseCases profileUseCases = new ProfileUseCases(
-                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
+                users,
+                profileService,
+                null,
+                null,
+                TestAchievementService.empty(),
+                config,
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
         private final User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         private final User subject = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));
 

@@ -13,6 +13,7 @@ import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiPreferencesStore;
 import datingapp.ui.UiPreferencesStore.ThemeMode;
+import datingapp.ui.UiThemeService;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.PreferencesViewModel;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
@@ -79,9 +80,15 @@ class PreferencesControllerTest {
         UiPreferencesStore store =
                 new UiPreferencesStore("/datingapp/tests/preferences-controller-" + UUID.randomUUID());
         store.saveThemeMode(ThemeMode.LIGHT);
+        UiThemeService themeService = new UiThemeService(store, NavigationService.getInstance());
 
         viewModel = new PreferencesViewModel(
-                new StorageUiUserStore(userStorage), null, store, AppConfig.defaults(), session, TEST_DISPATCHER);
+                new StorageUiUserStore(userStorage),
+                null,
+                themeService,
+                AppConfig.defaults(),
+                session,
+                TEST_DISPATCHER);
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/preferences.fxml", () -> new PreferencesController(viewModel));
@@ -115,9 +122,15 @@ class PreferencesControllerTest {
         UiPreferencesStore store =
                 new UiPreferencesStore("/datingapp/tests/preferences-controller-" + UUID.randomUUID());
         store.saveThemeMode(ThemeMode.DARK);
+        UiThemeService themeService = new UiThemeService(store, NavigationService.getInstance());
 
         viewModel = new PreferencesViewModel(
-                new StorageUiUserStore(userStorage), null, store, AppConfig.defaults(), session, TEST_DISPATCHER);
+                new StorageUiUserStore(userStorage),
+                null,
+                themeService,
+                AppConfig.defaults(),
+                session,
+                TEST_DISPATCHER);
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/preferences.fxml", () -> new PreferencesController(viewModel));

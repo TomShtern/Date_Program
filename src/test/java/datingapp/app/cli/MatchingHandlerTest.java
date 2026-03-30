@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.AppClock;
@@ -125,7 +126,8 @@ class MatchingHandlerTest {
                 interactionStorage,
                 userStorage,
                 matchQualityService,
-                null);
+                new InProcessAppEventBus(),
+                dailyService);
         SocialUseCases socialUseCases = new SocialUseCases(connectionService, trustSafetyService, communicationStorage);
 
         MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(

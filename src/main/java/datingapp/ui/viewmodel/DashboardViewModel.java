@@ -6,6 +6,7 @@ import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.RecommendationService.DailyPick;
 import datingapp.core.matching.RecommendationService.DailyStatus;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
@@ -45,7 +46,7 @@ public class DashboardViewModel extends BaseViewModel {
 
     private final RecommendationService dailyService;
     private final UiMatchDataAccess matchData;
-    private final ProfileService achievementService;
+    private final AchievementService achievementService;
     private final ConnectionService messagingService;
     private final ProfileService profileCompletionService;
     private final AppConfig config;
@@ -77,21 +78,10 @@ public class DashboardViewModel extends BaseViewModel {
     public record Dependencies(
             RecommendationService dailyService,
             UiMatchDataAccess matchData,
-            ProfileService achievementService,
+            AchievementService achievementService,
             ConnectionService messagingService,
             ProfileService profileCompletionService,
-            AppConfig config) {
-        public static Dependencies fromServices(datingapp.core.ServiceRegistry services) {
-            return new Dependencies(
-                    services.getRecommendationService(),
-                    new UiDataAdapters.StorageUiMatchDataAccess(
-                            services.getInteractionStorage(), services.getTrustSafetyStorage()),
-                    services.getProfileService(),
-                    services.getConnectionService(),
-                    services.getProfileService(),
-                    services.getConfig());
-        }
-    }
+            AppConfig config) {}
 
     public DashboardViewModel(Dependencies dependencies, AppSession session) {
         this(dependencies, session, new JavaFxUiThreadDispatcher(), new UiPreferencesStore());

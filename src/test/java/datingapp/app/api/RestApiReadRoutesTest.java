@@ -5,36 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import datingapp.app.event.InProcessAppEventBus;
 import datingapp.core.AppClock;
-import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.connection.ConnectionService;
-import datingapp.core.matching.CandidateFinder;
-import datingapp.core.matching.CompatibilityCalculator;
-import datingapp.core.matching.DailyLimitService;
-import datingapp.core.matching.DailyPickService;
-import datingapp.core.matching.DefaultCompatibilityCalculator;
-import datingapp.core.matching.DefaultDailyLimitService;
-import datingapp.core.matching.DefaultDailyPickService;
-import datingapp.core.matching.DefaultStandoutService;
-import datingapp.core.matching.MatchQualityService;
-import datingapp.core.matching.MatchingService;
-import datingapp.core.matching.RecommendationService;
-import datingapp.core.matching.Standout;
-import datingapp.core.matching.StandoutService;
-import datingapp.core.matching.TrustSafetyService;
-import datingapp.core.matching.UndoService;
-import datingapp.core.metrics.AchievementService;
-import datingapp.core.metrics.ActivityMetricsService;
-import datingapp.core.metrics.DefaultAchievementService;
-import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
-import datingapp.core.profile.ProfileService;
-import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
@@ -43,15 +19,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -183,6 +153,50 @@ class RestApiReadRoutesTest {
     }
 
     @Test
+    @DisplayName("candidates route remains the deliberate direct-read exception")
+    void candidatesRouteRemainsTheDeliberateDirectReadException() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID activeId = UUID.randomUUID();
+        UUID candidateId = UUID.randomUUID();
+        User active = activeUser(activeId, "Active", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        User candidate = activeUser(candidateId, "Candidate", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        userStorage.save(active);
+        userStorage.save(candidate);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> browseResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + activeId + "/browse"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> candidatesResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + activeId + "/candidates"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, browseResponse.statusCode());
+        assertEquals(200, candidatesResponse.statusCode());
+
+        JsonNode browseJson = MAPPER.readTree(browseResponse.body());
+        JsonNode candidatesJson = MAPPER.readTree(candidatesResponse.body());
+
+        assertTrue(browseJson.has("candidates"));
+        assertTrue(browseJson.has("locationMissing"));
+        assertTrue(candidatesJson.isArray());
+        assertEquals(candidateId.toString(), candidatesJson.get(0).get("id").asText());
+    }
+
+    @Test
     @DisplayName("delete user route returns no content and soft deletes the account")
     void deleteUserRouteReturnsNoContentAndSoftDeletesTheAccount() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
@@ -210,73 +224,7 @@ class RestApiReadRoutesTest {
 
     private static ServiceRegistry createServices(
             UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
-        AppConfig config = AppConfig.defaults();
-        TestStorages.Analytics analyticsStorage = new TestStorages.Analytics();
-        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
-
-        CandidateFinder candidateFinder =
-                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
-        ActivityMetricsService activityMetricsService =
-                new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
-        ProfileService profileService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
-        CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
-        DailyLimitService dailyLimitService = new DefaultDailyLimitService(interactionStorage, config);
-        DailyPickService dailyPickService =
-                new DefaultDailyPickService(userStorage, interactionStorage, analyticsStorage, candidateFinder, config);
-        StandoutService standoutService = new DefaultStandoutService(
-                compatibilityCalculator,
-                userStorage,
-                candidateFinder,
-                new InMemoryStandoutStorage(),
-                profileService,
-                config);
-        RecommendationService recommendationService =
-                new RecommendationService(dailyLimitService, dailyPickService, standoutService);
-        UndoService undoService = new UndoService(interactionStorage, new InMemoryUndoStorage(), config);
-        MatchingService matchingService = MatchingService.builder()
-                .interactionStorage(interactionStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .userStorage(userStorage)
-                .activityMetricsService(activityMetricsService)
-                .dailyService(recommendationService)
-                .undoService(undoService)
-                .candidateFinder(candidateFinder)
-                .build();
-        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
-                        trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)
-                .build();
-        ConnectionService connectionService =
-                new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
-        MatchQualityService matchQualityService =
-                new MatchQualityService(userStorage, interactionStorage, config, compatibilityCalculator);
-        ValidationService validationService = new ValidationService(config);
-        AchievementService achievementService = new DefaultAchievementService(
-                config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
-
-        return ServiceRegistry.builder()
-                .config(config)
-                .userStorage(userStorage)
-                .interactionStorage(interactionStorage)
-                .communicationStorage(communicationStorage)
-                .analyticsStorage(analyticsStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .candidateFinder(candidateFinder)
-                .matchingService(matchingService)
-                .trustSafetyService(trustSafetyService)
-                .activityMetricsService(activityMetricsService)
-                .matchQualityService(matchQualityService)
-                .profileService(profileService)
-                .recommendationService(recommendationService)
-                .dailyLimitService(dailyLimitService)
-                .dailyPickService(dailyPickService)
-                .standoutService(standoutService)
-                .undoService(undoService)
-                .compatibilityCalculator(compatibilityCalculator)
-                .achievementService(achievementService)
-                .connectionService(connectionService)
-                .validationService(validationService)
-                .eventBus(new InProcessAppEventBus())
+        return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
                 .build();
     }
 
@@ -291,63 +239,5 @@ class RestApiReadRoutesTest {
                 .maxDistanceKm(100)
                 .photoUrls(List.of("https://example.com/" + name.toLowerCase() + ".jpg"))
                 .build();
-    }
-
-    private static final class InMemoryUndoStorage implements Undo.Storage {
-        private final Map<UUID, Undo> byUserId = new HashMap<>();
-
-        @Override
-        public void save(Undo state) {
-            byUserId.put(state.userId(), state);
-        }
-
-        @Override
-        public Optional<Undo> findByUserId(UUID userId) {
-            return Optional.ofNullable(byUserId.get(userId));
-        }
-
-        @Override
-        public boolean delete(UUID userId) {
-            return byUserId.remove(userId) != null;
-        }
-
-        @Override
-        public int deleteExpired(Instant now) {
-            List<UUID> toDelete = new ArrayList<>();
-            for (Undo undo : byUserId.values()) {
-                if (undo.isExpired(now)) {
-                    toDelete.add(undo.userId());
-                }
-            }
-            toDelete.forEach(byUserId::remove);
-            return toDelete.size();
-        }
-
-        @Override
-        public List<Undo> findAll() {
-            return List.copyOf(byUserId.values());
-        }
-    }
-
-    private static final class InMemoryStandoutStorage implements Standout.Storage {
-        @Override
-        public void saveStandouts(UUID seekerId, List<Standout> standouts, LocalDate date) {
-            // no-op
-        }
-
-        @Override
-        public List<Standout> getStandouts(UUID seekerId, LocalDate date) {
-            return List.of();
-        }
-
-        @Override
-        public void markInteracted(UUID seekerId, UUID standoutUserId, LocalDate date) {
-            // no-op
-        }
-
-        @Override
-        public int cleanup(LocalDate before) {
-            return 0;
-        }
     }
 }

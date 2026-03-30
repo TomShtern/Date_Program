@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.event.AppEvent;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
@@ -229,7 +230,7 @@ public final class SafetyViewModel extends BaseViewModel {
         }
 
         var result = profileUseCases.deleteAccount(
-                new DeleteAccountCommand(UserContext.ui(currentUser.getId()), "User-initiated safety screen deletion"));
+                new DeleteAccountCommand(UserContext.ui(currentUser.getId()), AppEvent.DeletionReason.USER_REQUEST));
         if (!result.success()) {
             reportError(result.error().message());
             return;

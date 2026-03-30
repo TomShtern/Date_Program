@@ -3,6 +3,7 @@ package datingapp.app.usecase.social;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.AppEvent;
@@ -87,6 +88,7 @@ class SocialUseCasesTest {
                 new RespondFriendRequestCommand(UserContext.cli(userB.getId()), requestId, FriendRequestAction.ACCEPT));
 
         assertTrue(accepted.success());
+        assertEquals(requestId, accepted.data().friendRequestId());
         Match updated = interactionStorage
                 .get(Match.generateId(userA.getId(), userB.getId()))
                 .orElseThrow();
@@ -273,11 +275,25 @@ class SocialUseCasesTest {
                 UserContext.cli(userA.getId()), userB.getId(), Report.Reason.HARASSMENT, "Repeated harassment", true));
 
         assertTrue(result.success());
+        assertTrue(result.data().blockedByReporter());
         assertEquals(userA.getId(), published.get().reporterId());
         assertEquals(userB.getId(), published.get().reportedUserId());
         assertEquals(Report.Reason.HARASSMENT.name(), published.get().reason());
         assertTrue(published.get().blockedUser());
         assertFalse(published.get().validated());
+    }
+
+    @Test
+    @DisplayName("full constructor rejects missing event bus for production wiring")
+    void fullConstructorRejectsMissingEventBusForProductionWiring() {
+        NullPointerException exception =
+                assertThrows(NullPointerException.class, this::newSocialUseCasesWithoutEventBus);
+
+        assertEquals("eventBus cannot be null", exception.getMessage());
+    }
+
+    private SocialUseCases newSocialUseCasesWithoutEventBus() {
+        return new SocialUseCases(connectionService, trustSafetyService, communicationStorage, null);
     }
 
     private SocialUseCases createUseCases(AppEventBus appEventBus) {

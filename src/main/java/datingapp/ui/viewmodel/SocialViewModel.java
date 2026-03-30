@@ -12,10 +12,8 @@ import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.model.User;
-import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.util.List;
@@ -24,12 +22,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Social screen.
@@ -37,9 +31,7 @@ import org.slf4j.LoggerFactory;
  * Friend request accept/decline is handled via {@link ConnectionService}.
  * Notifications are fetched via the {@link UiSocialDataAccess} adapter.
  */
-public class SocialViewModel {
-
-    private static final Logger logger = LoggerFactory.getLogger(SocialViewModel.class);
+public class SocialViewModel extends BaseViewModel {
 
     /**
      * Combines a {@link FriendRequest} with the resolved display name of the sender
@@ -57,14 +49,12 @@ public class SocialViewModel {
     private final UiUserStore userStore;
     private final SocialUseCases socialUseCases;
     private final AppSession session;
-    private final ViewModelAsyncScope asyncScope;
 
     private final ObservableList<Notification> notifications = FXCollections.observableArrayList();
     private final ObservableList<FriendRequestEntry> pendingRequests = FXCollections.observableArrayList();
-    private final BooleanProperty loading = new SimpleBooleanProperty(false);
 
     private User currentUser;
-    private ViewModelErrorSink errorHandler;
+    private ViewModelErrorSink errorSink;
 
     public SocialViewModel(
             ConnectionService connectionService,
@@ -82,16 +72,17 @@ public class SocialViewModel {
             SocialUseCases socialUseCases,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
+        super("social", uiDispatcher);
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
         this.socialDataAccess = Objects.requireNonNull(socialDataAccess, "socialDataAccess cannot be null");
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
-        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
-    public void setErrorHandler(ViewModelErrorSink handler) {
-        this.errorHandler = handler;
+    public final void setErrorHandler(ViewModelErrorSink handler) {
+        this.errorSink = handler;
+        setErrorSink(handler);
     }
 
     /** Initializes the ViewModel by loading the current user and fetching social data. */
@@ -129,8 +120,8 @@ public class SocialViewModel {
                     : connectionService.getPendingRequestsFor(user.getId());
             List<FriendRequestEntry> entries = resolveRequestEntries(requests);
             return new SocialData(notifs, entries);
-        } catch (Exception e) {
-            logError("Failed to load social data", e);
+        } catch (Exception _) {
+            logger.error("Failed to load social data");
             notifyError("Could not load social data. Please try again.");
             return new SocialData(List.of(), List.of());
         }
@@ -165,8 +156,8 @@ public class SocialViewModel {
                 if (!result.success()) {
                     notifyError("Could not accept request: " + result.error().message());
                 }
-            } catch (Exception e) {
-                logError("Failed to accept friend request", e);
+            } catch (Exception _) {
+                logger.error("Failed to accept friend request");
                 notifyError("Failed to accept request.");
             }
             asyncScope.dispatchToUi(this::refresh);
@@ -186,8 +177,8 @@ public class SocialViewModel {
                 if (!result.success()) {
                     notifyError("Could not decline request: " + result.error().message());
                 }
-            } catch (Exception e) {
-                logError("Failed to decline friend request", e);
+            } catch (Exception _) {
+                logger.error("Failed to decline friend request");
                 notifyError("Failed to decline request.");
             }
             asyncScope.dispatchToUi(this::refresh);
@@ -205,18 +196,16 @@ public class SocialViewModel {
                 socialUseCases.markNotificationRead(
                         new MarkNotificationReadCommand(UserContext.ui(user.getId()), notification.id()));
                 asyncScope.dispatchToUi(this::refresh);
-            } catch (Exception e) {
-                logWarn("Failed to mark notification as read", e);
+            } catch (Exception _) {
+                logger.warn("Failed to mark notification as read");
             }
         });
     }
 
-    /** Disposes resources. Should be called when the ViewModel is no longer needed. */
-    public void dispose() {
-        asyncScope.dispose();
+    @Override
+    protected void onDispose() {
         notifications.clear();
         pendingRequests.clear();
-        setLoadingState(false);
     }
 
     private User ensureCurrentUser() {
@@ -227,34 +216,8 @@ public class SocialViewModel {
     }
 
     private void notifyError(String message) {
-        if (errorHandler != null) {
-            asyncScope.dispatchToUi(() -> errorHandler.onError(message));
-        }
-    }
-
-    private void setLoadingState(boolean isLoading) {
-        if (loading.get() != isLoading) {
-            loading.set(isLoading);
-        }
-    }
-
-    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
-        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
-        ViewModelAsyncScope scope = new ViewModelAsyncScope(
-                "social", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
-        scope.setLoadingStateConsumer(this::setLoadingState);
-        return scope;
-    }
-
-    private void logError(String message, Throwable error) {
-        if (logger.isErrorEnabled()) {
-            logger.error(message, error);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
+        if (errorSink != null) {
+            asyncScope.dispatchToUi(() -> errorSink.onError(message));
         }
     }
 
@@ -266,10 +229,6 @@ public class SocialViewModel {
 
     public ObservableList<FriendRequestEntry> getPendingRequests() {
         return pendingRequests;
-    }
-
-    public BooleanProperty loadingProperty() {
-        return loading;
     }
 
     private record SocialData(List<Notification> notifications, List<FriendRequestEntry> pendingRequests) {}

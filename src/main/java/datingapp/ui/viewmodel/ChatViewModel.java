@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.messaging.MessagingUseCases;
 import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
@@ -8,21 +9,19 @@ import datingapp.app.usecase.messaging.MessagingUseCases.OpenConversationCommand
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
+import datingapp.app.usecase.social.SocialUseCases.RelationshipTransitionOutcome;
 import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.connection.ConnectionService.SendResult;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.TaskHandle;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.PresenceStatus;
@@ -47,15 +46,12 @@ import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Messaging screen.
  * Handles the conversation list and the active message thread.
  */
-public class ChatViewModel {
-    private static final Logger logger = LoggerFactory.getLogger(ChatViewModel.class);
+public class ChatViewModel extends BaseViewModel {
     private static final Duration DEFAULT_CONVERSATION_POLL_INTERVAL = Duration.ofSeconds(15);
     private static final Duration DEFAULT_ACTIVE_CONVERSATION_POLL_INTERVAL = Duration.ofSeconds(5);
     private static final String TASK_LOAD_MESSAGES = "load messages";
@@ -77,14 +73,12 @@ public class ChatViewModel {
     private final UiProfileNoteDataAccess noteDataAccess;
     private final UiPresenceDataAccess presenceDataAccess;
     private final AppSession session;
-    private final ViewModelAsyncScope asyncScope;
     private final Duration conversationPollInterval;
     private final Duration activeConversationPollInterval;
     private final ObservableList<ConversationPreview> conversations = FXCollections.observableArrayList();
     private final ObservableList<Message> activeMessages = FXCollections.observableArrayList();
 
     private final ObjectProperty<ConversationPreview> selectedConversation = new SimpleObjectProperty<>();
-    private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty sending = new SimpleBooleanProperty(false);
     private final IntegerProperty totalUnreadCount = new SimpleIntegerProperty(0);
     private final StringProperty profileNoteContent = new SimpleStringProperty("");
@@ -101,11 +95,9 @@ public class ChatViewModel {
     private final AtomicInteger noteLoadToken = new AtomicInteger();
     private PauseTransition profileNoteStatusDismissTransition;
 
-    private ViewModelErrorSink errorHandler;
-
     /** Set the error handler for send failures. */
     public void setErrorHandler(ViewModelErrorSink handler) {
-        this.errorHandler = handler;
+        setErrorSink(handler);
     }
 
     /** Keep reference to listener for cleanup. */
@@ -155,10 +147,10 @@ public class ChatViewModel {
             Duration conversationPollInterval,
             Duration activeConversationPollInterval,
             ChatUiDependencies uiDependencies) {
+        super("chat", uiDispatcher);
         this.messagingUseCases = Objects.requireNonNull(messagingUseCases, "messagingUseCases cannot be null");
         this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
-        this.asyncScope = createAsyncScope(uiDispatcher);
         this.conversationPollInterval =
                 Objects.requireNonNull(conversationPollInterval, "conversationPollInterval cannot be null");
         this.activeConversationPollInterval =
@@ -211,8 +203,8 @@ public class ChatViewModel {
      * Disposes resources held by this ViewModel.
      * Should be called when the ViewModel is no longer needed.
      */
-    public void dispose() {
-        asyncScope.dispose();
+    @Override
+    protected void onDispose() {
         stopConversationsPolling();
         stopMessagesPolling();
         clearProfileNoteState();
@@ -700,8 +692,8 @@ public class ChatViewModel {
 
     private void reportSendFailure(String message, Exception error) {
         sending.set(false);
-        if (errorHandler != null) {
-            errorHandler.onError(message);
+        if (hasErrorSink()) {
+            notifyError(message, error);
             return;
         }
         if (error != null) {
@@ -857,24 +849,6 @@ public class ChatViewModel {
         return previews.stream().mapToInt(ConversationPreview::unreadCount).sum();
     }
 
-    private void setLoadingState(boolean isLoading) {
-        if (loading.get() != isLoading) {
-            loading.set(isLoading);
-        }
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logError(String message, Throwable error) {
-        if (logger.isErrorEnabled()) {
-            logger.error(message, error);
-        }
-    }
-
     public void blockUser(UUID targetId) {
         User user = ensureCurrentUser();
         if (user == null || targetId == null) {
@@ -930,10 +904,7 @@ public class ChatViewModel {
     }
 
     private void runRelationshipActionForSelectedConversation(
-            String actionName,
-            java.util.function.Function<
-                            UUID, datingapp.app.usecase.common.UseCaseResult<ConnectionService.TransitionResult>>
-                    action) {
+            String actionName, java.util.function.Function<UUID, UseCaseResult<RelationshipTransitionOutcome>> action) {
         User user = ensureCurrentUser();
         ConversationPreview selected = selectedConversation.get();
         if (user == null || selected == null) {
@@ -959,8 +930,8 @@ public class ChatViewModel {
     }
 
     private void reportActionError(String message, Exception error) {
-        if (errorHandler != null) {
-            asyncScope.dispatchToUi(() -> errorHandler.onError(message));
+        if (hasErrorSink()) {
+            notifyError(message, error);
             return;
         }
         if (error != null) {
@@ -981,10 +952,6 @@ public class ChatViewModel {
 
     public ObjectProperty<ConversationPreview> selectedConversationProperty() {
         return selectedConversation;
-    }
-
-    public BooleanProperty loadingProperty() {
-        return loading;
     }
 
     public ReadOnlyBooleanProperty sendingProperty() {
@@ -1021,14 +988,6 @@ public class ChatViewModel {
 
     public StringProperty presenceUnavailableMessageProperty() {
         return presenceUnavailableMessage;
-    }
-
-    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
-        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
-        ViewModelAsyncScope scope = new ViewModelAsyncScope(
-                "chat", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
-        scope.setLoadingStateConsumer(this::setLoadingState);
-        return scope;
     }
 
     private record ConversationRefreshData(@Nullable List<ConversationPreview> previews, int unreadCount) {}

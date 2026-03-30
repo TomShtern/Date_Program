@@ -19,11 +19,8 @@ import datingapp.core.matching.RecommendationService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
-import datingapp.core.storage.PageData;
-import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.Instant;
@@ -48,8 +45,6 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Matches screen.
@@ -63,8 +58,7 @@ import org.slf4j.LoggerFactory;
  * {@link #resetMatchPage()} to
  * start over from the beginning.
  */
-public class MatchesViewModel {
-    private static final Logger logger = LoggerFactory.getLogger(MatchesViewModel.class);
+public class MatchesViewModel extends BaseViewModel {
     private static final String LIKE_REQUIRED = "like cannot be null";
     private static final String MATCH_REQUIRED = "match cannot be null";
     private static final String REFRESH_FAILURE_MESSAGE = "Failed to refresh matches";
@@ -81,11 +75,9 @@ public class MatchesViewModel {
     private final SocialUseCases socialUseCases;
     private final AppConfig config;
     private final AppSession session;
-    private final ViewModelAsyncScope asyncScope;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesReceived = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesSent = FXCollections.observableArrayList();
-    private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final IntegerProperty matchCount = new SimpleIntegerProperty(0);
     private final IntegerProperty likesReceivedCount = new SimpleIntegerProperty(0);
     private final IntegerProperty likesSentCount = new SimpleIntegerProperty(0);
@@ -112,8 +104,6 @@ public class MatchesViewModel {
 
     private final AtomicLong refreshEpoch = new AtomicLong(0);
     private final AtomicBoolean isFetchingNextPage = new AtomicBoolean(false);
-
-    private ViewModelErrorSink errorHandler;
 
     private final AtomicReference<User> currentUser = new AtomicReference<>();
 
@@ -163,6 +153,7 @@ public class MatchesViewModel {
     }
 
     public MatchesViewModel(Dependencies dependencies, AppSession session, UiThreadDispatcher uiDispatcher) {
+        super("matches", Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null"));
         Dependencies resolvedDependencies = Objects.requireNonNull(dependencies, "dependencies cannot be null");
         this.matchData = resolvedDependencies.matchData();
         this.userStore = resolvedDependencies.userStore();
@@ -172,7 +163,6 @@ public class MatchesViewModel {
         this.socialUseCases = resolvedDependencies.socialUseCases();
         this.config = resolvedDependencies.config();
         this.session = Objects.requireNonNull(session, "session cannot be null");
-        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
     /** Initialize and load matches for current user. */
@@ -198,15 +188,15 @@ public class MatchesViewModel {
      * Disposes resources held by this ViewModel.
      * Should be called when the ViewModel is no longer needed.
      */
-    public void dispose() {
-        asyncScope.dispose();
+    public void setErrorHandler(ViewModelErrorSink handler) {
+        setErrorSink(handler);
+    }
+
+    @Override
+    protected void onDispose() {
         matches.clear();
         likesReceived.clear();
         likesSent.clear();
-    }
-
-    public void setErrorHandler(ViewModelErrorSink handler) {
-        this.errorHandler = handler;
     }
 
     /** Refresh all sections for the current user. */
@@ -266,9 +256,7 @@ public class MatchesViewModel {
         likesSent.setAll(sent);
         likesSentCount.set(likesSent.size());
 
-        if (logger.isInfoEnabled()) {
-            logger.info("Refreshed all matches and likes for {}", userName);
-        }
+        logInfo("Refreshed all matches and likes for {}", userName);
     }
 
     /**
@@ -288,7 +276,7 @@ public class MatchesViewModel {
         int offset = currentMatchOffset.getAndAdd(PAGE_SIZE);
 
         // Call matchData.getPageOfActiveMatchesFor using the reserved offset.
-        PageData<Match> page = matchData.getPageOfActiveMatchesFor(userId, offset, PAGE_SIZE);
+        UiDataAdapters.UiPage<Match> page = matchData.getPageOfActiveMatchesFor(userId, offset, PAGE_SIZE);
 
         // If the returned page items size is less than PAGE_SIZE (last page),
         // adjust currentMatchOffset downward so the counter accurately reflects
@@ -735,8 +723,7 @@ public class MatchesViewModel {
         void run(UUID targetUserId);
     }
 
-    private void executeActionSync(
-            String userMessage, ViewModelAsyncScope.ThrowingRunnable action, Runnable onSuccess) {
+    private void executeActionSync(String userMessage, Runnable action, Runnable onSuccess) {
         setLoadingState(true);
         try {
             action.run();
@@ -751,12 +738,6 @@ public class MatchesViewModel {
 
     private boolean shouldRunAsync() {
         return isFxToolkitAvailable() && Platform.isFxApplicationThread();
-    }
-
-    private void setLoadingState(boolean isLoading) {
-        if (loading.get() != isLoading) {
-            loading.set(isLoading);
-        }
     }
 
     public BooleanProperty loadFailedProperty() {
@@ -775,14 +756,6 @@ public class MatchesViewModel {
     private void markLoadFailure(String message) {
         loadFailed.set(true);
         loadFailureMessage.set(message == null ? "" : message);
-    }
-
-    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
-        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
-        ViewModelAsyncScope scope = new ViewModelAsyncScope(
-                "matches", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
-        scope.setLoadingStateConsumer(this::setLoadingState);
-        return scope;
     }
 
     private record RefreshPayload(
@@ -817,21 +790,6 @@ public class MatchesViewModel {
         private static MatchQualitySummary empty() {
             return new MatchQualitySummary(null, null);
         }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
-        }
-    }
-
-    private void notifyError(String userMessage, Exception e) {
-        if (errorHandler == null) {
-            return;
-        }
-        String detail = e != null ? e.getMessage() : null;
-        String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
-        errorHandler.onError(message);
     }
 
     private static String summarizeBio(User user) {
@@ -884,10 +842,6 @@ public class MatchesViewModel {
 
     public ObservableList<LikeCardData> getLikesSent() {
         return likesSent;
-    }
-
-    public BooleanProperty loadingProperty() {
-        return loading;
     }
 
     public IntegerProperty matchCountProperty() {

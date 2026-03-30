@@ -2,6 +2,7 @@ package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -11,17 +12,15 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
+import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.util.EnumSet;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
-import java.util.function.BooleanSupplier;
-import javafx.application.Platform;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -47,9 +46,10 @@ class NotesViewModelTest {
     @BeforeAll
     static void initJfx() {
         try {
-            Platform.startup(() -> {});
-        } catch (IllegalStateException _) {
-            // already initialized
+            JavaFxTestSupport.initJfx();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Failed to initialize JavaFX toolkit", e);
         }
     }
 
@@ -68,7 +68,14 @@ class NotesViewModelTest {
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
-                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
+                users,
+                profileService,
+                null,
+                null,
+                TestAchievementService.empty(),
+                config,
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
 
         User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         User subjectOne = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));
@@ -84,7 +91,7 @@ class NotesViewModelTest {
                 profileUseCases, new StorageUiUserStore(users), AppSession.getInstance(), TEST_DISPATCHER);
         viewModel.initialize();
 
-        assertTrue(waitUntil(() -> viewModel.getNotes().size() == 2, 5000));
+        assertTrue(JavaFxTestSupport.waitUntil(() -> viewModel.getNotes().size() == 2, 5000));
         assertTrue(
                 viewModel.getNotes().stream().anyMatch(note -> note.userName().equals("Riley")));
         assertTrue(
@@ -104,7 +111,14 @@ class NotesViewModelTest {
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
-                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
+                users,
+                profileService,
+                null,
+                null,
+                TestAchievementService.empty(),
+                config,
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
 
         User author = createUser("Jordan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         users.save(author);
@@ -114,7 +128,7 @@ class NotesViewModelTest {
                 profileUseCases, new StorageUiUserStore(users), AppSession.getInstance(), TEST_DISPATCHER);
         viewModel.initialize();
 
-        assertTrue(waitUntil(viewModel.getNotes()::isEmpty, 5000));
+        assertTrue(JavaFxTestSupport.waitUntil(viewModel.getNotes()::isEmpty, 5000));
         viewModel.dispose();
     }
 
@@ -128,7 +142,14 @@ class NotesViewModelTest {
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
-                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
+                users,
+                profileService,
+                null,
+                null,
+                TestAchievementService.empty(),
+                config,
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
 
         User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         User subject = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));
@@ -141,16 +162,16 @@ class NotesViewModelTest {
                 profileUseCases, new StorageUiUserStore(users), AppSession.getInstance(), TEST_DISPATCHER);
         viewModel.initialize();
 
-        assertTrue(waitUntil(() -> viewModel.getNotes().size() == 1, 5000));
+        assertTrue(JavaFxTestSupport.waitUntil(() -> viewModel.getNotes().size() == 1, 5000));
         viewModel.selectNote(viewModel.getNotes().get(0));
         viewModel.selectedNoteContentProperty().set("Updated note content for Riley");
         viewModel.saveSelectedNote();
 
-        assertTrue(waitUntil(
+        assertTrue(JavaFxTestSupport.waitUntil(
                 () -> "Updated note content for Riley"
                         .equals(viewModel.getNotes().get(0).content()),
                 5000));
-        assertTrue(waitUntil(
+        assertTrue(JavaFxTestSupport.waitUntil(
                 () -> fixtureNoteContent(users, author.getId(), subject.getId())
                         .filter("Updated note content for Riley"::equals)
                         .isPresent(),
@@ -169,7 +190,14 @@ class NotesViewModelTest {
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
-                users, profileService, null, null, null, config, new ProfileActivationPolicy(), null);
+                users,
+                profileService,
+                null,
+                null,
+                TestAchievementService.empty(),
+                config,
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
 
         User author = createUser("Jordan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         User subject = createUser("Taylor", Gender.MALE, EnumSet.of(Gender.FEMALE));
@@ -182,36 +210,15 @@ class NotesViewModelTest {
                 profileUseCases, new StorageUiUserStore(users), AppSession.getInstance(), TEST_DISPATCHER);
         viewModel.initialize();
 
-        assertTrue(waitUntil(() -> viewModel.getNotes().size() == 1, 5000));
+        assertTrue(JavaFxTestSupport.waitUntil(() -> viewModel.getNotes().size() == 1, 5000));
         viewModel.selectNote(viewModel.getNotes().get(0));
         viewModel.deleteSelectedNote();
 
-        assertTrue(waitUntil(viewModel.getNotes()::isEmpty, 5000));
-        assertTrue(waitUntil(
+        assertTrue(JavaFxTestSupport.waitUntil(viewModel.getNotes()::isEmpty, 5000));
+        assertTrue(JavaFxTestSupport.waitUntil(
                 () -> fixtureNoteContent(users, author.getId(), subject.getId()).isEmpty(), 5000));
 
         viewModel.dispose();
-    }
-
-    private static boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
-        while (System.nanoTime() < deadline) {
-            waitForFxEvents();
-            if (condition.getAsBoolean()) {
-                return true;
-            }
-            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(25));
-        }
-        waitForFxEvents();
-        return condition.getAsBoolean();
-    }
-
-    private static void waitForFxEvents() throws InterruptedException {
-        CountDownLatch latch = new CountDownLatch(1);
-        Platform.runLater(latch::countDown);
-        if (!latch.await(5, TimeUnit.SECONDS)) {
-            throw new IllegalStateException("Timed out waiting for FX events");
-        }
     }
 
     private static User createUser(String name, Gender gender, EnumSet<Gender> interestedIn) {

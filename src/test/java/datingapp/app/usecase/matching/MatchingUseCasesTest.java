@@ -3,8 +3,10 @@ package datingapp.app.usecase.matching;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.ListActiveMatchesQuery;
@@ -13,6 +15,7 @@ import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoSwipeCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.DailyPickService;
@@ -42,6 +45,13 @@ class MatchingUseCasesTest {
 
     private TestStorages.Users userStorage;
     private TestStorages.Interactions interactionStorage;
+    private CandidateFinder candidateFinder;
+    private DailyLimitService dailyLimitService;
+    private DailyPickService dailyPickService;
+    private StandoutService standoutService;
+    private UndoService undoService;
+    private MatchingService matchingService;
+    private MatchQualityService matchQualityService;
     private MatchingUseCases useCases;
     private User currentUser;
     private User candidate;
@@ -53,9 +63,9 @@ class MatchingUseCasesTest {
         interactionStorage = new TestStorages.Interactions();
         var trustSafetyStorage = new TestStorages.TrustSafety();
         var undoStorage = new TestStorages.Undos();
-        DailyLimitService dailyLimitService = alwaysAllowDailyLimitService();
-        DailyPickService dailyPickService = noDailyPickService();
-        StandoutService standoutService = noStandoutService();
+        dailyLimitService = alwaysAllowDailyLimitService();
+        dailyPickService = noDailyPickService();
+        standoutService = noStandoutService();
         var recommendationService = new RecommendationService(dailyLimitService, dailyPickService, standoutService);
 
         currentUser = TestUserFactory.createActiveUser(UUID.randomUUID(), "Current");
@@ -66,14 +76,14 @@ class MatchingUseCasesTest {
         userStorage.save(currentUser);
         userStorage.save(candidate);
 
-        var candidateFinder = new CandidateFinder(
+        candidateFinder = new CandidateFinder(
                 userStorage,
                 interactionStorage,
                 trustSafetyStorage,
                 config.safety().userTimeZone());
-        var matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
-        var undoService = new UndoService(interactionStorage, undoStorage, config);
-        var matchingService = MatchingService.builder()
+        matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
+        undoService = new UndoService(interactionStorage, undoStorage, config);
+        matchingService = MatchingService.builder()
                 .interactionStorage(interactionStorage)
                 .trustSafetyStorage(trustSafetyStorage)
                 .userStorage(userStorage)
@@ -92,7 +102,8 @@ class MatchingUseCasesTest {
                 interactionStorage,
                 userStorage,
                 matchQualityService,
-                null);
+                new TestEventBus(),
+                recommendationService);
     }
 
     @Test
@@ -135,11 +146,12 @@ class MatchingUseCasesTest {
                 UserContext.cli(currentUser.getId()), currentUser, candidate, true, false, false));
 
         assertTrue(swipeResult.success());
-        assertTrue(swipeResult.data().success());
+        assertNotNull(swipeResult.data().like());
+        assertEquals(Like.Direction.LIKE, swipeResult.data().like().direction());
 
         var undoResult = useCases.undoSwipe(new UndoSwipeCommand(UserContext.cli(currentUser.getId())));
         assertTrue(undoResult.success());
-        assertTrue(undoResult.data().success());
+        assertNotNull(undoResult.data().undoneSwipe());
     }
 
     @Test
@@ -157,10 +169,25 @@ class MatchingUseCasesTest {
 
         var undoResult = useCases.undoSwipe(new UndoSwipeCommand(UserContext.cli(currentUser.getId())));
         assertTrue(undoResult.success());
-        assertTrue(undoResult.data().success());
+        assertNotNull(undoResult.data().undoneSwipe());
         assertTrue(interactionStorage
                 .getLike(currentUser.getId(), candidate.getId())
                 .isEmpty());
+    }
+
+    @Test
+    @DisplayName("matchQuality returns an app-owned snapshot")
+    void matchQualityReturnsAnAppOwnedSnapshot() {
+        Match match = Match.create(currentUser.getId(), candidate.getId());
+        interactionStorage.save(match);
+
+        var result = useCases.matchQuality(
+                new MatchingUseCases.MatchQualityQuery(UserContext.cli(currentUser.getId()), match));
+
+        assertTrue(result.success());
+        assertNotNull(result.data().compatibilityLabel());
+        assertNotNull(result.data().starDisplay());
+        assertNotNull(result.data().shortSummary());
     }
 
     @Test
@@ -209,10 +236,11 @@ class MatchingUseCasesTest {
         var config = AppConfig.defaults();
         var trustSafetyStorage = new TestStorages.TrustSafety();
         var undoStorage = new TestStorages.Undos();
-        DailyLimitService dailyLimitService = alwaysAllowDailyLimitService();
-        DailyPickService dailyPickService = noDailyPickService();
-        StandoutService standoutService = noStandoutService();
-        var recommendationService = new RecommendationService(dailyLimitService, dailyPickService, standoutService);
+        DailyLimitService failingDailyLimitService = alwaysAllowDailyLimitService();
+        DailyPickService failingDailyPickService = noDailyPickService();
+        StandoutService failingStandoutService = noStandoutService();
+        var recommendationService =
+                new RecommendationService(failingDailyLimitService, failingDailyPickService, failingStandoutService);
 
         InteractionStorage failingInteractionStorage = new TestStorages.Interactions() {
             @Override
@@ -222,32 +250,33 @@ class MatchingUseCasesTest {
             }
         };
 
-        var candidateFinder = new CandidateFinder(
+        var failingCandidateFinder = new CandidateFinder(
                 userStorage,
                 failingInteractionStorage,
                 trustSafetyStorage,
                 config.safety().userTimeZone());
-        var undoService = new UndoService(failingInteractionStorage, undoStorage, config);
-        var matchingService = MatchingService.builder()
+        var failingUndoService = new UndoService(failingInteractionStorage, undoStorage, config);
+        var failingMatchingService = MatchingService.builder()
                 .interactionStorage(failingInteractionStorage)
                 .trustSafetyStorage(trustSafetyStorage)
                 .userStorage(userStorage)
-                .undoService(undoService)
+                .undoService(failingUndoService)
                 .dailyService(recommendationService)
-                .candidateFinder(candidateFinder)
+                .candidateFinder(failingCandidateFinder)
                 .build();
 
         var failingUseCases = new MatchingUseCases(
-                candidateFinder,
-                matchingService,
-                dailyLimitService,
-                dailyPickService,
-                standoutService,
-                undoService,
+                failingCandidateFinder,
+                failingMatchingService,
+                failingDailyLimitService,
+                failingDailyPickService,
+                failingStandoutService,
+                failingUndoService,
                 failingInteractionStorage,
                 userStorage,
                 new MatchQualityService(userStorage, failingInteractionStorage, config),
-                null);
+                new TestEventBus(),
+                recommendationService);
 
         var result = failingUseCases.processSwipe(new ProcessSwipeCommand(
                 UserContext.cli(currentUser.getId()), currentUser, candidate, true, false, false));
@@ -312,6 +341,50 @@ class MatchingUseCasesTest {
         assertNotNull(wrappedService);
         assertEquals(0, wrappedService.getStandouts(currentUser).standouts().size());
         assertEquals(0, wrappedService.resolveUsers(List.of()).size());
+    }
+
+    @Test
+    @DisplayName("builder rejects missing event bus for production wiring")
+    void builderRejectsMissingEventBusForProductionWiring() {
+        NullPointerException exception =
+                assertThrows(NullPointerException.class, this::buildMatchingUseCasesWithoutEventBus);
+
+        assertEquals("eventBus cannot be null", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("constructor rejects missing event bus")
+    void constructorRejectsMissingEventBus() {
+        NullPointerException exception = assertThrows(
+                NullPointerException.class,
+                () -> new MatchingUseCases(
+                        candidateFinder,
+                        matchingService,
+                        dailyLimitService,
+                        dailyPickService,
+                        standoutService,
+                        undoService,
+                        interactionStorage,
+                        userStorage,
+                        matchQualityService,
+                        null,
+                        null));
+
+        assertEquals("eventBus cannot be null", exception.getMessage());
+    }
+
+    private MatchingUseCases buildMatchingUseCasesWithoutEventBus() {
+        return MatchingUseCases.builder()
+                .candidateFinder(candidateFinder)
+                .matchingService(matchingService)
+                .dailyLimitService(dailyLimitService)
+                .dailyPickService(dailyPickService)
+                .standoutService(standoutService)
+                .undoService(undoService)
+                .interactionStorage(interactionStorage)
+                .userStorage(userStorage)
+                .matchQualityService(matchQualityService)
+                .build();
     }
 
     private static DailyLimitService alwaysAllowDailyLimitService() {

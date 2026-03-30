@@ -11,6 +11,7 @@ import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.model.Match.MatchArchiveReason;
+import datingapp.core.profile.ValidationService;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,11 +28,18 @@ public class MessagingUseCases {
     private static final String CONTEXT_REQUIRED = "Context is required";
 
     private final ConnectionService connectionService;
+    private final ValidationService validationService;
     private final AppEventBus eventBus;
 
     public MessagingUseCases(ConnectionService connectionService, AppEventBus eventBus) {
+        this(connectionService, null, eventBus);
+    }
+
+    public MessagingUseCases(
+            ConnectionService connectionService, ValidationService validationService, AppEventBus eventBus) {
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
-        this.eventBus = eventBus;
+        this.validationService = validationService;
+        this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
     }
 
     public UseCaseResult<ConversationListResult> listConversations(ListConversationsQuery query) {
@@ -148,7 +156,13 @@ public class MessagingUseCases {
         if (command == null || command.context() == null || command.recipientId() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and recipient are required"));
         }
-        if (command.content() == null || command.content().isBlank()) {
+        if (validationService != null) {
+            var validationResult = validationService.validateMessageContent(command.content());
+            if (!validationResult.valid()) {
+                return UseCaseResult.failure(
+                        UseCaseError.validation(validationResult.errors().getFirst()));
+            }
+        } else if (command.content() == null || command.content().isBlank()) {
             return UseCaseResult.failure(UseCaseError.validation("Message content cannot be empty"));
         }
         ConnectionService.SendResult result;
@@ -297,9 +311,6 @@ public class MessagingUseCases {
     public static record DeleteMessageCommand(UserContext context, String conversationId, UUID messageId) {}
 
     private void publishEvent(AppEvent event, String failureMessage) {
-        if (eventBus == null) {
-            return;
-        }
         try {
             eventBus.publish(event);
         } catch (Exception e) {

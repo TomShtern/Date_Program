@@ -4,9 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppConfig;
 import datingapp.core.model.User;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import java.util.List;
@@ -27,7 +29,14 @@ class ProfileUseCasesNotesTest {
         users.save(new User(subjectId, "Subject"));
 
         ProfileUseCases useCases = new ProfileUseCases(
-                users, null, null, null, null, AppConfig.defaults(), new ProfileActivationPolicy(), null);
+                users,
+                null,
+                null,
+                null,
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
 
         var createResult = useCases.upsertProfileNote(new ProfileUseCases.UpsertProfileNoteCommand(
                 UserContext.ui(authorId), subjectId, "Met at coffee shop"));
@@ -51,7 +60,6 @@ class ProfileUseCasesNotesTest {
         var deleteResult = useCases.deleteProfileNote(
                 new ProfileUseCases.DeleteProfileNoteCommand(UserContext.ui(authorId), subjectId));
         assertTrue(deleteResult.success());
-        assertTrue(deleteResult.data());
 
         var missingResult =
                 useCases.getProfileNote(new ProfileUseCases.ProfileNoteQuery(UserContext.ui(authorId), subjectId));
@@ -66,7 +74,14 @@ class ProfileUseCasesNotesTest {
         users.save(new User(authorId, "Author"));
 
         ProfileUseCases useCases = new ProfileUseCases(
-                users, null, null, null, null, AppConfig.defaults(), new ProfileActivationPolicy(), null);
+                users,
+                null,
+                null,
+                null,
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
         var result = useCases.upsertProfileNote(
                 new ProfileUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), UUID.randomUUID(), "Hello"));
 
@@ -84,8 +99,15 @@ class ProfileUseCasesNotesTest {
         users.save(new User(subjectId, "Subject"));
 
         AppConfig config = AppConfig.builder().maxProfileNoteLength(5).build();
-        ProfileUseCases useCases =
-                new ProfileUseCases(users, null, null, null, null, config, new ProfileActivationPolicy(), null);
+        ProfileUseCases useCases = new ProfileUseCases(
+                users,
+                null,
+                null,
+                null,
+                TestAchievementService.empty(),
+                config,
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
 
         var result = useCases.upsertProfileNote(
                 new ProfileUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), subjectId, "123456"));

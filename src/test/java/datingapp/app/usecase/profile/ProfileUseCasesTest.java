@@ -3,15 +3,18 @@ package datingapp.app.usecase.profile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
+import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.DeleteProfileNoteCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
+import datingapp.app.usecase.profile.ProfileUseCases.SessionSummaryQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.UpdateDiscoveryPreferencesCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.UpsertProfileNoteCommand;
@@ -21,7 +24,9 @@ import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
+import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle;
@@ -31,11 +36,13 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +64,8 @@ class ProfileUseCasesTest {
     private ProfileService profileService;
     private ValidationService validationService;
     private ActivityMetricsService metricsService;
+    private AchievementService achievementService;
+    private TestEventBus eventBus;
     private ProfileUseCases useCases;
 
     @BeforeEach
@@ -71,16 +80,18 @@ class ProfileUseCasesTest {
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
         validationService = new ValidationService(config);
         metricsService = new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
+        achievementService = TestAchievementService.empty();
+        eventBus = new TestEventBus();
 
         useCases = new ProfileUseCases(
                 userStorage,
                 profileService,
                 validationService,
                 metricsService,
-                null,
+                achievementService,
                 config,
                 new ProfileActivationPolicy(),
-                null);
+                eventBus);
     }
 
     @Test
@@ -138,7 +149,7 @@ class ProfileUseCasesTest {
                 profileService,
                 validationService,
                 metricsService,
-                null,
+                achievementService,
                 config,
                 new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents));
@@ -247,7 +258,7 @@ class ProfileUseCasesTest {
                 profileService,
                 validationService,
                 metricsService,
-                null,
+                achievementService,
                 config,
                 new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents));
@@ -279,7 +290,7 @@ class ProfileUseCasesTest {
                 profileService,
                 validationService,
                 metricsService,
-                null,
+                achievementService,
                 config,
                 new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents));
@@ -288,7 +299,6 @@ class ProfileUseCasesTest {
                 new DeleteProfileNoteCommand(UserContext.cli(author.getId()), subject.getId()));
 
         assertTrue(result.success());
-        assertTrue(result.data());
         assertEquals(1, publishedEvents.size());
         assertTrue(publishedEvents.getFirst() instanceof AppEvent.ProfileNoteDeleted);
         AppEvent.ProfileNoteDeleted event = (AppEvent.ProfileNoteDeleted) publishedEvents.getFirst();
@@ -346,6 +356,26 @@ class ProfileUseCasesTest {
     }
 
     @Test
+    @DisplayName("getSessionSummary returns the current swipe session snapshot")
+    void getSessionSummaryReturnsCurrentSwipeSessionSnapshot() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Session User");
+        userStorage.save(user);
+
+        metricsService.recordSwipe(user.getId(), datingapp.core.connection.ConnectionModels.Like.Direction.LIKE, false);
+        metricsService.recordSwipe(user.getId(), datingapp.core.connection.ConnectionModels.Like.Direction.PASS, false);
+
+        var result = useCases.getSessionSummary(new SessionSummaryQuery(UserContext.cli(user.getId())));
+
+        assertTrue(result.success());
+        assertTrue(result.data().currentSession().isPresent());
+        var snapshot = result.data().currentSession().orElseThrow();
+        assertEquals(2, snapshot.swipeCount());
+        assertEquals(1, snapshot.likeCount());
+        assertEquals(1, snapshot.passCount());
+        assertNotNull(snapshot.formattedDuration());
+    }
+
+    @Test
     @DisplayName("deleteAccount delegates cleanup to the account cleanup storage")
     void deleteAccountDelegatesCleanupToStorage() {
         User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Cleanup User");
@@ -357,13 +387,14 @@ class ProfileUseCasesTest {
                 profileService,
                 validationService,
                 metricsService,
-                null,
+                achievementService,
                 config,
                 new ProfileActivationPolicy(),
-                null,
+                eventBus,
                 cleanupStorage);
 
-        var result = cleanupUseCases.deleteAccount(new DeleteAccountCommand(UserContext.cli(user.getId()), "privacy"));
+        var result = cleanupUseCases.deleteAccount(
+                new DeleteAccountCommand(UserContext.cli(user.getId()), AppEvent.DeletionReason.PRIVACY_REQUEST));
 
         assertTrue(result.success());
         assertEquals(user.getId(), cleanupStorage.userId.get());
@@ -386,13 +417,14 @@ class ProfileUseCasesTest {
                 profileService,
                 validationService,
                 metricsService,
-                null,
+                achievementService,
                 config,
                 new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents),
                 cleanupStorage);
 
-        var result = eventUseCases.deleteAccount(new DeleteAccountCommand(UserContext.cli(user.getId()), "privacy"));
+        var result = eventUseCases.deleteAccount(
+                new DeleteAccountCommand(UserContext.cli(user.getId()), AppEvent.DeletionReason.PRIVACY_REQUEST));
 
         assertTrue(result.success());
         assertEquals(1, publishedEvents.size());
@@ -415,13 +447,14 @@ class ProfileUseCasesTest {
                 profileService,
                 validationService,
                 metricsService,
-                null,
+                achievementService,
                 config,
                 new ProfileActivationPolicy(),
                 recordingEventBus(eventPublished),
                 new ThrowingAccountCleanupStorage());
 
-        var result = failingUseCases.deleteAccount(new DeleteAccountCommand(UserContext.cli(user.getId()), "privacy"));
+        var result = failingUseCases.deleteAccount(
+                new DeleteAccountCommand(UserContext.cli(user.getId()), AppEvent.DeletionReason.PRIVACY_REQUEST));
 
         assertFalse(result.success());
         assertEquals(User.UserState.ACTIVE, user.getState());
@@ -446,7 +479,7 @@ class ProfileUseCasesTest {
                 profileService,
                 validationService,
                 metricsService,
-                null,
+                achievementService,
                 config,
                 new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents));
@@ -551,6 +584,122 @@ class ProfileUseCasesTest {
         assertEquals(160, persistedDealbreakers.minHeightCm(), "minHeightCm should match");
         assertEquals(200, persistedDealbreakers.maxHeightCm(), "maxHeightCm should match");
         assertEquals(8, persistedDealbreakers.maxAgeDifference(), "maxAgeDifference should match");
+    }
+
+    @Test
+    @DisplayName("updateProfile clears interestedIn and interests when empty sets are provided")
+    void updateProfileClearsInterestedInAndInterestsWhenEmptySetsAreProvided() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Clearable User");
+        user.setInterestedIn(EnumSet.of(Gender.MALE, Gender.FEMALE));
+        user.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE));
+        userStorage.save(user);
+
+        var result = useCases.updateProfile(new ProfileUseCases.UpdateProfileCommand(
+                UserContext.cli(user.getId()),
+                null,
+                null,
+                null,
+                EnumSet.noneOf(Gender.class),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                EnumSet.noneOf(Interest.class),
+                null));
+
+        assertTrue(result.success());
+        User persistedUser = userStorage.get(user.getId()).orElseThrow();
+        assertTrue(persistedUser.getInterestedIn().isEmpty());
+        assertTrue(persistedUser.getInterests().isEmpty());
+    }
+
+    @Test
+    @DisplayName("updateDiscoveryPreferences clears interestedIn when an empty set is provided")
+    void updateDiscoveryPreferencesClearsInterestedInWhenEmptySetProvided() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Discovery User");
+        user.setInterestedIn(EnumSet.of(Gender.OTHER));
+        userStorage.save(user);
+
+        var result = useCases.updateDiscoveryPreferences(new UpdateDiscoveryPreferencesCommand(
+                UserContext.cli(user.getId()), 22, 35, 40, EnumSet.noneOf(Gender.class)));
+
+        assertTrue(result.success());
+        assertTrue(userStorage.get(user.getId()).orElseThrow().getInterestedIn().isEmpty());
+    }
+
+    @Test
+    @DisplayName("builder rejects missing event bus for production wiring")
+    void builderRejectsMissingEventBusForProductionWiring() {
+        NullPointerException exception =
+                assertThrows(NullPointerException.class, this::buildProfileUseCasesWithoutEventBus);
+
+        assertEquals("eventBus cannot be null", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("constructor requires non-null event bus")
+    void constructorRequiresNonNullEventBus() {
+        NullPointerException exception =
+                assertThrows(NullPointerException.class, this::newProfileUseCasesWithoutEventBus);
+
+        assertEquals("eventBus cannot be null", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("getAchievements uses AchievementService without ProfileService fallback")
+    void getAchievementsUsesAchievementServiceWithoutProfileServiceFallback() {
+        UUID userId = UUID.randomUUID();
+        AchievementService unlockedService = TestAchievementService.unlocked(
+                datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement.create(
+                        userId, datingapp.core.metrics.EngagementDomain.Achievement.FIRST_SPARK));
+        ProfileUseCases achievementOnlyUseCases = new ProfileUseCases(
+                userStorage,
+                null,
+                validationService,
+                metricsService,
+                unlockedService,
+                config,
+                new ProfileActivationPolicy(),
+                new TestEventBus());
+
+        var result = achievementOnlyUseCases.getAchievements(new AchievementsQuery(UserContext.cli(userId), false));
+
+        assertTrue(result.success());
+        assertEquals(1, result.data().unlocked().size());
+        assertEquals(
+                datingapp.core.metrics.EngagementDomain.Achievement.FIRST_SPARK,
+                result.data().unlocked().getFirst().achievement());
+    }
+
+    private ProfileUseCases buildProfileUseCasesWithoutEventBus() {
+        return ProfileUseCases.builder()
+                .userStorage(userStorage)
+                .profileService(profileService)
+                .validationService(validationService)
+                .activityMetricsService(metricsService)
+                .achievementService(achievementService)
+                .config(config)
+                .activationPolicy(new ProfileActivationPolicy())
+                .build();
+    }
+
+    private ProfileUseCases newProfileUseCasesWithoutEventBus() {
+        return new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                achievementService,
+                config,
+                new ProfileActivationPolicy(),
+                null);
     }
 
     private static AchievementService noOpAchievementService() {

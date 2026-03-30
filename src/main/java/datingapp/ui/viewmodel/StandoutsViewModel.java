@@ -8,43 +8,33 @@ import datingapp.core.AppSession;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
 import datingapp.core.model.User;
-import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.async.ViewModelAsyncScope;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Standouts screen.
  * Loads today's top standout candidates from {@link RecommendationService} and
  * exposes them for display.
  */
-public class StandoutsViewModel {
-
-    private static final Logger logger = LoggerFactory.getLogger(StandoutsViewModel.class);
+public class StandoutsViewModel extends BaseViewModel {
 
     private final RecommendationService recommendationService;
     private final MatchingUseCases matchingUseCases;
     private final AppSession session;
-    private final ViewModelAsyncScope asyncScope;
 
     private final ObservableList<StandoutEntry> standouts = FXCollections.observableArrayList();
-    private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final StringProperty statusMessage = new SimpleStringProperty("");
 
     private User currentUser;
-    private ViewModelErrorSink errorHandler;
+    private ViewModelErrorSink errorSink;
 
     /** Combines a {@link Standout} with its resolved {@link User} for display. */
     public record StandoutEntry(Standout standout, User user) {
@@ -84,15 +74,16 @@ public class StandoutsViewModel {
             MatchingUseCases matchingUseCases,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
+        super("standouts", uiDispatcher);
         this.recommendationService =
                 Objects.requireNonNull(recommendationService, "recommendationService cannot be null");
         this.matchingUseCases = matchingUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
-        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
-    public void setErrorHandler(ViewModelErrorSink handler) {
-        this.errorHandler = handler;
+    public final void setErrorHandler(ViewModelErrorSink handler) {
+        this.errorSink = handler;
+        setErrorSink(handler);
     }
 
     /** Initializes the ViewModel by loading the current user and fetching standouts. */
@@ -153,8 +144,8 @@ public class StandoutsViewModel {
             } else {
                 message = resultMessage != null ? resultMessage : "No standouts today. Check back tomorrow!";
             }
-        } catch (Exception e) {
-            logWarn("Failed to load standouts", e);
+        } catch (Exception _) {
+            logger.warn("Failed to load standouts");
             message = "Could not load standouts. Please try again.";
             notifyError(message);
         }
@@ -179,17 +170,15 @@ public class StandoutsViewModel {
                 } else {
                     recommendationService.markInteracted(user.getId(), entry.userId());
                 }
-            } catch (Exception e) {
-                logWarn("Failed to mark standout as interacted", e);
+            } catch (Exception _) {
+                logger.warn("Failed to mark standout as interacted");
             }
         });
     }
 
-    /** Disposes resources. Should be called when the ViewModel is no longer needed. */
-    public void dispose() {
-        asyncScope.dispose();
+    @Override
+    protected void onDispose() {
         standouts.clear();
-        setLoadingState(false);
     }
 
     private User ensureCurrentUser() {
@@ -200,28 +189,8 @@ public class StandoutsViewModel {
     }
 
     private void notifyError(String message) {
-        if (errorHandler != null) {
-            asyncScope.dispatchToUi(() -> errorHandler.onError(message));
-        }
-    }
-
-    private void setLoadingState(boolean isLoading) {
-        if (loading.get() != isLoading) {
-            loading.set(isLoading);
-        }
-    }
-
-    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
-        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
-        ViewModelAsyncScope scope = new ViewModelAsyncScope(
-                "standouts", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
-        scope.setLoadingStateConsumer(this::setLoadingState);
-        return scope;
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
+        if (errorSink != null) {
+            asyncScope.dispatchToUi(() -> errorSink.onError(message));
         }
     }
 
@@ -229,10 +198,6 @@ public class StandoutsViewModel {
 
     public ObservableList<StandoutEntry> getStandouts() {
         return standouts;
-    }
-
-    public BooleanProperty loadingProperty() {
-        return loading;
     }
 
     public StringProperty statusMessageProperty() {

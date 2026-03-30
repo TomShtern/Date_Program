@@ -40,6 +40,7 @@ import datingapp.app.api.RestApiDtos.UserDetail;
 import datingapp.app.api.RestApiDtos.UserStatsDto;
 import datingapp.app.api.RestApiDtos.UserSummary;
 import datingapp.app.bootstrap.ApplicationStartup;
+import datingapp.app.event.AppEvent;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.ArchiveMatchCommand;
@@ -385,7 +386,8 @@ public class RestApiServer {
             return;
         }
 
-        var result = profileUseCases.deleteAccount(new DeleteAccountCommand(UserContext.api(userId), "user_request"));
+        var result = profileUseCases.deleteAccount(
+                new DeleteAccountCommand(UserContext.api(userId), AppEvent.DeletionReason.USER_REQUEST));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -792,10 +794,7 @@ public class RestApiServer {
             return;
         }
         ctx.json(new ReportResponse(
-                result.data().success(),
-                result.data().userWasBanned(),
-                result.data().errorMessage(),
-                request.blockUser()));
+                true, result.data().autoBanned(), null, result.data().blockedByReporter()));
     }
 
     // ── Messaging Handlers ──────────────────────────────────────────────

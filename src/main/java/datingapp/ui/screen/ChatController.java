@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -244,6 +245,7 @@ public class ChatController extends BaseController implements Initializable {
                 .getSelectionModel()
                 .selectedItemProperty()
                 .subscribe(this::handleConversationSelection));
+        addSubscription(viewModel.selectedConversationProperty().subscribe(this::applySelectedConversationState));
         addSubscription(viewModel.presenceStatusProperty().subscribe(this::updatePresenceIndicator));
         addSubscription(viewModel.remoteTypingProperty().subscribe(this::updateTypingIndicator));
         addSubscription(viewModel.presenceSupportedProperty().subscribe(_ -> refreshPresenceTooltip()));
@@ -273,7 +275,24 @@ public class ChatController extends BaseController implements Initializable {
 
     /** Handle conversation selection change. */
     private void handleConversationSelection(ConversationPreview selected) {
+        if (selected == null && viewModel.selectedConversationProperty().get() != null) {
+            return;
+        }
         viewModel.selectedConversationProperty().set(selected);
+    }
+
+    private void applySelectedConversationState(ConversationPreview selected) {
+        if (conversationListView != null) {
+            var selectionModel = conversationListView.getSelectionModel();
+            if (selected == null) {
+                if (selectionModel.getSelectedItem() != null) {
+                    selectionModel.clearSelection();
+                }
+            } else if (!Objects.equals(selectionModel.getSelectedItem(), selected)) {
+                selectionModel.select(selected);
+            }
+        }
+
         if (selected != null) {
             chatHeaderLabel.setText(selected.otherUser().getName());
             chatContainer.setVisible(true);

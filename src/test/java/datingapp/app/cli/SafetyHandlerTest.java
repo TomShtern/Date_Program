@@ -3,9 +3,15 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.testutil.TestEventBus;
+import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -18,11 +24,15 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.UUID;
@@ -71,8 +81,24 @@ class SafetyHandlerTest {
     private SafetyHandler createHandler(String input, AppConfig config, SecureRandom random) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         TrustSafetyService trustSafetyService = createTrustSafetyService(config, random);
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                userStorage,
+                new ProfileService(
+                        config, new TestStorages.Analytics(), interactionStorage, trustSafetyStorage, userStorage),
+                new ValidationService(config),
+                null,
+                TestAchievementService.empty(),
+                config,
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                new InProcessAppEventBus());
         return new SafetyHandler(
-                userStorage, trustSafetyService, new SocialUseCases(trustSafetyService), session, inputReader, config);
+                trustSafetyService,
+                new SocialUseCases(trustSafetyService),
+                profileUseCases,
+                new VerificationUseCases(userStorage, trustSafetyService),
+                session,
+                inputReader,
+                config);
     }
 
     private TrustSafetyService createTrustSafetyService(AppConfig config, SecureRandom random) {
@@ -174,6 +200,48 @@ class SafetyHandlerTest {
             handler.blockUser();
 
             assertEquals(0, trustSafetyStorage.countBlocksGiven(testUser.getId()));
+        }
+
+        @Test
+        @DisplayName("blockUser uses ProfileUseCases listUsers for selection reads")
+        void blockUserUsesProfileUseCasesListUsersForSelectionReads() {
+            User otherUser = createActiveUser("UseCaseUser");
+            userStorage.save(otherUser);
+
+            TrustSafetyService trustSafetyService = createTrustSafetyService(AppConfig.defaults(), new SecureRandom());
+            ProfileUseCases profileUseCases =
+                    new ProfileUseCases(
+                            userStorage,
+                            new ProfileService(
+                                    AppConfig.defaults(),
+                                    new TestStorages.Analytics(),
+                                    interactionStorage,
+                                    trustSafetyStorage,
+                                    userStorage),
+                            new ValidationService(AppConfig.defaults()),
+                            null,
+                            TestAchievementService.empty(),
+                            AppConfig.defaults(),
+                            new datingapp.core.workflow.ProfileActivationPolicy(),
+                            new InProcessAppEventBus()) {
+                        @Override
+                        public UseCaseResult<List<User>> listUsers() {
+                            return UseCaseResult.success(List.of(testUser, otherUser));
+                        }
+                    };
+
+            SafetyHandler handler = new SafetyHandler(
+                    trustSafetyService,
+                    new SocialUseCases(trustSafetyService),
+                    profileUseCases,
+                    new VerificationUseCases(userStorage, trustSafetyService),
+                    session,
+                    new InputReader(new Scanner(new StringReader("1\ny\n"))),
+                    AppConfig.defaults());
+
+            handler.blockUser();
+
+            assertTrue(trustSafetyStorage.isBlocked(testUser.getId(), otherUser.getId()));
         }
     }
 
@@ -381,10 +449,21 @@ class SafetyHandlerTest {
             AppConfig config = AppConfig.defaults();
             TrustSafetyService trustSafetyService = createTrustSafetyService(config, fixedVerificationRandom());
             assertEquals("123456", trustSafetyService.generateVerificationCode());
-            SafetyHandler handler = new SafetyHandler(
+            ProfileUseCases profileUseCases = new ProfileUseCases(
                     userStorage,
+                    new ProfileService(
+                            config, new TestStorages.Analytics(), interactionStorage, trustSafetyStorage, userStorage),
+                    new ValidationService(config),
+                    null,
+                    TestAchievementService.empty(),
+                    config,
+                    new datingapp.core.workflow.ProfileActivationPolicy(),
+                    new TestEventBus());
+            SafetyHandler handler = new SafetyHandler(
                     trustSafetyService,
                     new SocialUseCases(trustSafetyService),
+                    profileUseCases,
+                    new VerificationUseCases(userStorage, trustSafetyService),
                     session,
                     new InputReader(new Scanner(new StringReader("1\ntest@example.com\n123456\n"))),
                     config);
@@ -445,6 +524,65 @@ class SafetyHandlerTest {
             // Should not modify user
             User stored = userStorage.get(testUser.getId()).orElse(null);
             assertFalse(stored.isVerified());
+        }
+
+        @Test
+        @DisplayName("verifyProfile delegates start and confirm to VerificationUseCases")
+        void verifyProfileDelegatesStartAndConfirmToVerificationUseCases() {
+            TrustSafetyService trustSafetyService =
+                    createTrustSafetyService(AppConfig.defaults(), fixedVerificationRandom());
+            ProfileUseCases profileUseCases = new ProfileUseCases(
+                    userStorage,
+                    new ProfileService(
+                            AppConfig.defaults(),
+                            new TestStorages.Analytics(),
+                            interactionStorage,
+                            trustSafetyStorage,
+                            userStorage),
+                    new ValidationService(AppConfig.defaults()),
+                    null,
+                    TestAchievementService.empty(),
+                    AppConfig.defaults(),
+                    new datingapp.core.workflow.ProfileActivationPolicy(),
+                    new TestEventBus());
+            RecordingVerificationUseCases verificationUseCases =
+                    new RecordingVerificationUseCases(userStorage, trustSafetyService);
+
+            SafetyHandler handler = new SafetyHandler(
+                    trustSafetyService,
+                    new SocialUseCases(trustSafetyService),
+                    profileUseCases,
+                    verificationUseCases,
+                    session,
+                    new InputReader(new Scanner(new StringReader("1\nverified@example.com\n123456\n"))),
+                    AppConfig.defaults());
+
+            handler.verifyProfile();
+
+            assertTrue(verificationUseCases.startCalled);
+            assertTrue(verificationUseCases.confirmCalled);
+            assertNotNull(userStorage.get(testUser.getId()).orElseThrow().getVerifiedAt());
+        }
+    }
+
+    private static final class RecordingVerificationUseCases extends VerificationUseCases {
+        private boolean startCalled;
+        private boolean confirmCalled;
+
+        private RecordingVerificationUseCases(TestStorages.Users userStorage, TrustSafetyService trustSafetyService) {
+            super(userStorage, trustSafetyService);
+        }
+
+        @Override
+        public UseCaseResult<StartVerificationResult> startVerification(StartVerificationCommand command) {
+            startCalled = true;
+            return super.startVerification(command);
+        }
+
+        @Override
+        public UseCaseResult<ConfirmVerificationResult> confirmVerification(ConfirmVerificationCommand command) {
+            confirmCalled = true;
+            return super.confirmVerification(command);
         }
     }
 

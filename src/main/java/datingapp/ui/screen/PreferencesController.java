@@ -205,7 +205,7 @@ public class PreferencesController extends BaseController implements Initializab
     private void handleSave() {
         logInfo("Saving MatchPreferences...");
         viewModel.savePreferences();
-        datingapp.ui.NavigationService.getInstance().goBack();
+        handleBack();
     }
 
     @FXML

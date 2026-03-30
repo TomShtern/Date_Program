@@ -4,15 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.async.UiThreadDispatcher;
+import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -469,6 +470,64 @@ class ProfileViewModelTest {
         viewModel.dispose();
     }
 
+    @Test
+    @DisplayName("saveAsync clears interestedIn and interests when selections are emptied")
+    void saveAsyncClearsInterestedInAndInterestsWhenSelectionsAreEmptied() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+
+        User currentUser = createActiveUser("ClearSelectionsUser");
+        currentUser.setInterestedIn(EnumSet.of(Gender.MALE, Gender.FEMALE));
+        currentUser.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE));
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                (datingapp.app.usecase.profile.ProfileUseCases) null,
+                config,
+                session,
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy());
+        viewModel.loadCurrentUser();
+        viewModel.getInterestedInGenders().clear();
+        viewModel.getSelectedInterests().clear();
+
+        AtomicBoolean saveResult = new AtomicBoolean(false);
+        CountDownLatch latch = new CountDownLatch(1);
+        viewModel.saveAsync(success -> {
+            saveResult.set(success);
+            latch.countDown();
+        });
+
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertTrue(saveResult.get());
+        assertTrue(session.getCurrentUser().getInterestedIn().isEmpty());
+        assertTrue(session.getCurrentUser().getInterests().isEmpty());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("self composing convenience constructors are not public production API")
+    void selfComposingConvenienceConstructorsAreNotPublicProductionApi() {
+        long publicConvenienceConstructorCount = java.util.Arrays.stream(
+                        ProfileViewModel.class.getDeclaredConstructors())
+                .filter(constructor -> Modifier.isPublic(constructor.getModifiers()))
+                .filter(constructor -> {
+                    Class<?>[] parameterTypes = constructor.getParameterTypes();
+                    return parameterTypes.length != 1 || parameterTypes[0] != ProfileViewModel.Dependencies.class;
+                })
+                .count();
+
+        assertEquals(0, publicConvenienceConstructorCount);
+    }
+
     private static Path createTempImageFile(String prefix) throws Exception {
         Path file = Files.createTempFile(prefix, ".png");
         Files.write(file, java.util.Base64.getDecoder().decode(SAMPLE_PNG_BASE64));
@@ -487,19 +546,11 @@ class ProfileViewModelTest {
     }
 
     private static User createActiveUser(String name) {
-        User user = new User(UUID.randomUUID(), name);
-        user.setBirthDate(AppClock.today().minusYears(25));
+        User user = TestUserFactory.createActiveUser(name);
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.of(Gender.OTHER));
-        user.setAgeRange(18, 60, 18, 120);
-        user.setMaxDistanceKm(50, 500);
-        user.setLocation(40.7128, -74.0060);
+        user.setPhotoUrls(List.of());
         user.setBio("Photo test user");
-        user.setPacePreferences(new PacePreferences(
-                PacePreferences.MessagingFrequency.OFTEN,
-                PacePreferences.TimeToFirstDate.FEW_DAYS,
-                PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
-                PacePreferences.DepthPreference.DEEP_CHAT));
         return user;
     }
 }

@@ -21,10 +21,7 @@ import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.ProfileActivationPolicy.ActivationResult;
 import datingapp.ui.LocalPhotoStore;
 import datingapp.ui.UiFeedbackService;
-import datingapp.ui.async.AsyncErrorRouter;
-import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.io.File;
 import java.io.IOException;
@@ -34,7 +31,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
@@ -48,16 +44,13 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableSet;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Profile Editor screen.
  * Handles editing of user bio, location, interests, lifestyle, and profile
  * photo.
  */
-public class ProfileViewModel {
-    private static final Logger logger = LoggerFactory.getLogger(ProfileViewModel.class);
+public class ProfileViewModel extends BaseViewModel {
     private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
     private static final String NONE_SET_LABEL = "None set";
     private static final String SAVE_PHOTO_ERROR = "Failed to save profile photo";
@@ -76,7 +69,7 @@ public class ProfileViewModel {
     private final AppSession session;
     private final ProfileActivationPolicy activationPolicy;
     private final LocationService locationService;
-    private final ViewModelAsyncScope asyncScope;
+    private final ValidationService validationService;
     private final LocalPhotoStore photoStore;
 
     // Observable properties for form binding - Basic Info
@@ -127,64 +120,11 @@ public class ProfileViewModel {
     private final ObservableSet<Interest> selectedInterests =
             FXCollections.observableSet(EnumSet.noneOf(Interest.class));
 
-    /** Track disposed state to prevent operations after cleanup. */
-    private final AtomicBoolean disposed = new AtomicBoolean(false);
-
     private final Object photoMutationLock = new Object();
 
     private String lastSavedSnapshot = "";
 
-    private ViewModelErrorSink errorHandler;
-
-    public ProfileViewModel(
-            UiUserStore userStore, ProfileService profileCompletionService, AppConfig config, AppSession session) {
-        this(new Dependencies(
-                userStore,
-                profileCompletionService,
-                null,
-                config,
-                session,
-                new LocationService(new ValidationService(config)),
-                new JavaFxUiThreadDispatcher(),
-                new ProfileActivationPolicy()));
-    }
-
-    public ProfileViewModel(
-            UiUserStore userStore,
-            ProfileService profileCompletionService,
-            ProfileUseCases profileUseCases,
-            AppConfig config,
-            AppSession session) {
-        this(new Dependencies(
-                userStore,
-                profileCompletionService,
-                profileUseCases,
-                config,
-                session,
-                new LocationService(new ValidationService(config)),
-                new JavaFxUiThreadDispatcher(),
-                new ProfileActivationPolicy()));
-    }
-
-    public ProfileViewModel(
-            UiUserStore userStore,
-            ProfileService profileCompletionService,
-            ProfileUseCases profileUseCases,
-            AppConfig config,
-            AppSession session,
-            UiThreadDispatcher uiDispatcher) {
-        this(new Dependencies(
-                userStore,
-                profileCompletionService,
-                profileUseCases,
-                config,
-                session,
-                new LocationService(new ValidationService(config)),
-                uiDispatcher,
-                new ProfileActivationPolicy()));
-    }
-
-    public ProfileViewModel(
+    ProfileViewModel(
             UiUserStore userStore,
             ProfileService profileCompletionService,
             ProfileUseCases profileUseCases,
@@ -192,28 +132,23 @@ public class ProfileViewModel {
             AppSession session,
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {
-        this(new Dependencies(
-                userStore,
-                profileCompletionService,
-                profileUseCases,
-                config,
-                session,
-                new LocationService(new ValidationService(config)),
-                uiDispatcher,
-                activationPolicy));
+        this(createDependencies(
+                userStore, profileCompletionService, profileUseCases, config, session, uiDispatcher, activationPolicy));
     }
 
     public ProfileViewModel(Dependencies dependencies) {
+        super("profile", dependencies.uiDispatcher());
         this.userStore = Objects.requireNonNull(dependencies.userStore(), "userStore cannot be null");
         this.profileCompletionService = Objects.requireNonNull(
                 dependencies.profileCompletionService(), "profileCompletionService cannot be null");
         this.profileUseCases = dependencies.profileUseCases();
         this.config = Objects.requireNonNull(dependencies.config(), "config cannot be null");
         this.session = Objects.requireNonNull(dependencies.session(), "session cannot be null");
+        this.validationService =
+                Objects.requireNonNull(dependencies.validationService(), "validationService cannot be null");
         this.locationService = Objects.requireNonNull(dependencies.locationService(), "locationService cannot be null");
         this.activationPolicy =
                 Objects.requireNonNull(dependencies.activationPolicy(), "activationPolicy cannot be null");
-        this.asyncScope = createAsyncScope(dependencies.uiDispatcher());
         this.photoStore = new LocalPhotoStore();
     }
 
@@ -221,15 +156,14 @@ public class ProfileViewModel {
      * Disposes resources held by this ViewModel.
      * Should be called when the ViewModel is no longer needed.
      */
-    public void dispose() {
-        disposed.set(true);
-        asyncScope.dispose();
+    @Override
+    protected void onDispose() {
         selectedInterests.clear();
         photoUrls.clear();
     }
 
     public void setErrorHandler(ViewModelErrorSink handler) {
-        this.errorHandler = handler;
+        setErrorSink(handler);
     }
 
     /**
@@ -434,7 +368,7 @@ public class ProfileViewModel {
     }
 
     public void saveAsync(Consumer<Boolean> onComplete) {
-        if (disposed.get()) {
+        if (isDisposed()) {
             logWarn("ProfileViewModel is disposed; skipping save");
             completeSave(onComplete, false);
             return;
@@ -469,7 +403,7 @@ public class ProfileViewModel {
     private void persistProfileInBackground(User draftUser, Consumer<Boolean> onComplete) {
         SaveOperationResult result;
         try {
-            if (disposed.get()) {
+            if (isDisposed()) {
                 result = SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
             } else if (profileUseCases != null) {
                 result = persistProfileViaUseCase(draftUser);
@@ -477,7 +411,7 @@ public class ProfileViewModel {
                 result = persistProfileLegacy(draftUser);
             }
         } catch (Exception e) {
-            logError("Failed to save profile: {}", e.getMessage(), e);
+            logError("Failed to save profile", e);
             result = SaveOperationResult.failure(e);
         }
 
@@ -498,12 +432,12 @@ public class ProfileViewModel {
 
     private SaveOperationResult persistProfileLegacy(User user) {
         persistUser(user);
-        if (disposed.get()) {
+        if (isDisposed()) {
             return SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
         }
 
         attemptActivation(user);
-        if (disposed.get()) {
+        if (isDisposed()) {
             return SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
         }
 
@@ -512,7 +446,7 @@ public class ProfileViewModel {
 
     private void applySaveOperationResult(SaveOperationResult result, Consumer<Boolean> onComplete) {
         saving.set(false);
-        if (disposed.get()) {
+        if (isDisposed()) {
             completeSave(onComplete, false);
             return;
         }
@@ -540,9 +474,7 @@ public class ProfileViewModel {
         if (gender.get() != null) {
             user.setGender(gender.get());
         }
-        if (!interestedInGenders.isEmpty()) {
-            user.setInterestedIn(EnumSet.copyOf(interestedInGenders));
-        }
+        user.setInterestedIn(interestedInGenders);
         applyBirthDate(user, true);
     }
 
@@ -554,9 +486,7 @@ public class ProfileViewModel {
     }
 
     private void applyInterests(User user) {
-        if (!selectedInterests.isEmpty()) {
-            user.setInterests(EnumSet.copyOf(selectedInterests));
-        }
+        user.setInterests(selectedInterests);
     }
 
     private void applyLifestyleFields(User user) {
@@ -692,34 +622,7 @@ public class ProfileViewModel {
 
     /** Returns a ValidationService bound to this view model's runtime config. */
     public ValidationService getValidationService() {
-        return new ValidationService(config);
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
-        }
-    }
-
-    private void logError(String message, Object... args) {
-        if (logger.isErrorEnabled()) {
-            logger.error(message, args);
-        }
-    }
-
-    private void notifyError(String userMessage, Exception e) {
-        if (errorHandler == null) {
-            return;
-        }
-        String detail = e.getMessage();
-        String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
-        asyncScope.dispatchToUi(() -> errorHandler.onError(message));
+        return validationService;
     }
 
     // --- Properties for data binding ---
@@ -1041,7 +944,7 @@ public class ProfileViewModel {
     }
 
     private void savePhotoInternal(File photoFile, Integer replaceIndex) {
-        if (disposed.get()) {
+        if (isDisposed()) {
             return;
         }
         User user = session.getCurrentUser();
@@ -1069,7 +972,7 @@ public class ProfileViewModel {
     }
 
     public void deletePhoto(int index) {
-        if (disposed.get()) {
+        if (isDisposed()) {
             return;
         }
         User user = session.getCurrentUser();
@@ -1082,7 +985,7 @@ public class ProfileViewModel {
     }
 
     public void setPrimaryPhoto(int index) {
-        if (disposed.get()) {
+        if (isDisposed()) {
             return;
         }
         User user = session.getCurrentUser();
@@ -1097,7 +1000,7 @@ public class ProfileViewModel {
     private void processPhotoUpload(User user, File photoFile) {
         synchronized (photoMutationLock) {
             try {
-                if (disposed.get()) {
+                if (isDisposed()) {
                     return;
                 }
                 List<String> updatedPhotoUrls =
@@ -1117,7 +1020,7 @@ public class ProfileViewModel {
     private void processPhotoReplacement(User user, int index, File photoFile) {
         synchronized (photoMutationLock) {
             try {
-                if (disposed.get()) {
+                if (isDisposed()) {
                     return;
                 }
                 List<String> updatedPhotoUrls =
@@ -1136,7 +1039,7 @@ public class ProfileViewModel {
     private void processPhotoDeletion(User user, int index) {
         synchronized (photoMutationLock) {
             try {
-                if (disposed.get()) {
+                if (isDisposed()) {
                     return;
                 }
                 List<String> updatedPhotoUrls = photoStore.deletePhoto(user.getPhotoUrls(), index);
@@ -1155,7 +1058,7 @@ public class ProfileViewModel {
     private void processSetPrimaryPhoto(User user, int index) {
         synchronized (photoMutationLock) {
             try {
-                if (disposed.get()) {
+                if (isDisposed()) {
                     return;
                 }
                 List<String> updatedPhotoUrls = photoStore.setPrimaryPhoto(user.getPhotoUrls(), index);
@@ -1172,7 +1075,7 @@ public class ProfileViewModel {
         userStore.save(user);
 
         asyncScope.dispatchToUi(() -> {
-            if (disposed.get()) {
+            if (isDisposed()) {
                 return;
             }
             photoUrls.setAll(updatedPhotoUrls);
@@ -1396,14 +1299,30 @@ public class ProfileViewModel {
             ProfileUseCases profileUseCases,
             AppConfig config,
             AppSession session,
+            ValidationService validationService,
             LocationService locationService,
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {}
 
-    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
-        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
-        return new ViewModelAsyncScope(
-                "profile", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorHandler));
+    private static Dependencies createDependencies(
+            UiUserStore userStore,
+            ProfileService profileCompletionService,
+            ProfileUseCases profileUseCases,
+            AppConfig config,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher,
+            ProfileActivationPolicy activationPolicy) {
+        ValidationService validationService = new ValidationService(config);
+        return new Dependencies(
+                userStore,
+                profileCompletionService,
+                profileUseCases,
+                config,
+                session,
+                validationService,
+                new LocationService(validationService),
+                uiDispatcher,
+                activationPolicy);
     }
 
     private record SaveOperationResult(boolean success, User savedUser, Exception error) {

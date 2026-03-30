@@ -83,6 +83,32 @@ class ConnectionServiceAtomicityTest {
         assertEquals(1, communications.countMessages(conversationId));
     }
 
+    @Test
+    @DisplayName("match factory uses the canonical deterministic ID")
+    void matchFactoryUsesCanonicalDeterministicId() {
+        UUID first = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        UUID second = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+        Match match = Match.create(first, second);
+
+        assertEquals(Match.generateId(first, second), match.getId());
+        assertEquals(second, match.getUserA());
+        assertEquals(first, match.getUserB());
+    }
+
+    @Test
+    @DisplayName("conversation factory uses the canonical deterministic ID")
+    void conversationFactoryUsesCanonicalDeterministicId() {
+        UUID first = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        UUID second = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+        Conversation conversation = Conversation.create(first, second);
+
+        assertEquals(Conversation.generateId(first, second), conversation.getId());
+        assertEquals(second, conversation.getUserA());
+        assertEquals(first, conversation.getUserB());
+    }
+
     private static final class FailingMessageCommunications extends TestStorages.Communications {
         @Override
         public void saveMessageAndUpdateConversationLastMessageAt(

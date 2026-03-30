@@ -5,11 +5,17 @@ import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.DailyStatusQuery;
+import datingapp.app.usecase.matching.MatchingUseCases.MatchQualitySnapshot;
 import datingapp.app.usecase.matching.MatchingUseCases.PendingLikersQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.StandoutInteractionCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.StandoutsQuery;
+import datingapp.app.usecase.matching.MatchingUseCases.SwipeOutcome;
+import datingapp.app.usecase.matching.MatchingUseCases.UndoAvailabilityQuery;
+import datingapp.app.usecase.matching.MatchingUseCases.UndoOutcome;
+import datingapp.app.usecase.matching.MatchingUseCases.UndoSwipeCommand;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.FriendRequestAction;
 import datingapp.app.usecase.social.SocialUseCases.FriendRequestsQuery;
@@ -24,12 +30,10 @@ import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
-import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.matching.DailyPickService.DailyPick;
 import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchQualityService;
-import datingapp.core.matching.MatchQualityService.MatchQuality;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.MatchingService.PendingLiker;
 import datingapp.core.matching.RecommendationService;
@@ -60,11 +64,8 @@ public class MatchingHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(MatchingHandler.class);
     private static final String ERR_FAILED = "❌ Failed: {}\n";
 
-    private final RecommendationService dailyService;
-    private final UndoService undoService;
     private final UserStorage userStorage;
     private final AnalyticsStorage analyticsStorage;
-    private final RecommendationService standoutsService;
     private final AppConfig config;
     private final AppSession session;
     private final InputReader inputReader;
@@ -74,11 +75,8 @@ public class MatchingHandler implements LoggingSupport {
     private final MatchingCliPresenter presenter;
 
     public MatchingHandler(Dependencies dependencies) {
-        this.dailyService = dependencies.dailyService();
-        this.undoService = dependencies.undoService();
         this.userStorage = dependencies.userStorage();
         this.analyticsStorage = dependencies.analyticsStorage();
-        this.standoutsService = dependencies.standoutsService();
         this.config = dependencies.config();
         this.session = dependencies.userSession();
         this.inputReader = dependencies.inputReader();
@@ -257,7 +255,7 @@ public class MatchingHandler implements LoggingSupport {
                 config.matching().sharedInterestsPreviewCount()));
     }
 
-    private void displaySwipeResult(MatchingService.SwipeResult result, User candidate) {
+    private void displaySwipeResult(SwipeOutcome result, User candidate) {
         logLines(presenter.swipeResultLines(result, candidate.getName()));
     }
 
@@ -336,7 +334,7 @@ public class MatchingHandler implements LoggingSupport {
                 var qualityResult = matchingUseCases.matchQuality(
                         new MatchingUseCases.MatchQualityQuery(UserContext.cli(currentUser.getId()), match));
                 if (qualityResult.success()) {
-                    MatchQuality quality = qualityResult.data();
+                    MatchQualitySnapshot quality = qualityResult.data();
                     int displayIndex = i + 1;
                     String verifiedBadge = otherUser.isVerified() ? " ✅ Verified" : "";
                     int age = otherUser.getAge(config.safety().userTimeZone()).orElse(0);
@@ -388,7 +386,7 @@ public class MatchingHandler implements LoggingSupport {
                 logInfo("  Match quality unavailable — user may have been removed.");
                 return;
             }
-            MatchQuality quality = qualityResult.data();
+            MatchQualitySnapshot quality = qualityResult.data();
 
             displayMatchQuality(otherUser, quality);
 
@@ -403,7 +401,7 @@ public class MatchingHandler implements LoggingSupport {
         }
     }
 
-    private void displayMatchQuality(User otherUser, MatchQuality quality) {
+    private void displayMatchQuality(User otherUser, MatchQualitySnapshot quality) {
         logLines(presenter.matchQualityLines(otherUser, quality, config.safety().userTimeZone()));
     }
 
@@ -452,7 +450,8 @@ public class MatchingHandler implements LoggingSupport {
         }
     }
 
-    private void logTransitionResult(UseCaseResult<ConnectionService.TransitionResult> result, String successMessage) {
+    private void logTransitionResult(
+            UseCaseResult<SocialUseCases.RelationshipTransitionOutcome> result, String successMessage) {
         if (result.success()) {
             logInfo(successMessage);
         } else {
@@ -537,10 +536,13 @@ public class MatchingHandler implements LoggingSupport {
      * @param currentUser The user who reached the limit
      */
     private void showDailyLimitReached(User currentUser) {
-        RecommendationService.DailyStatus status = dailyService.getStatus(currentUser.getId());
-        String timeUntilReset = RecommendationService.formatDuration(dailyService.getTimeUntilReset());
-
-        logLines(presenter.dailyLimitReachedLines(status, timeUntilReset));
+        var statusResult = matchingUseCases.getDailyStatus(new DailyStatusQuery(UserContext.cli(currentUser.getId())));
+        if (!statusResult.success()) {
+            logInfo(ERR_FAILED, statusResult.error().message());
+            return;
+        }
+        var status = statusResult.data();
+        logLines(presenter.dailyLimitReachedLines(status.likesUsed(), status.timeUntilReset()));
         inputReader.readLine(presenter.pressEnterPrompt());
         logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
     }
@@ -607,18 +609,21 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private void promptUndo(String candidateName, User currentUser) {
-        if (!undoService.canUndo(currentUser.getId())) {
+        var availabilityResult =
+                matchingUseCases.getUndoAvailability(new UndoAvailabilityQuery(UserContext.cli(currentUser.getId())));
+        if (!availabilityResult.success() || !availabilityResult.data().canUndo()) {
             return;
         }
 
-        int secondsLeft = undoService.getSecondsRemaining(currentUser.getId());
+        int secondsLeft = availabilityResult.data().secondsRemaining();
         String prompt = String.format("⏪ Undo last swipe? (%ds remaining) (Y/N): ", secondsLeft);
         String response = inputReader.readLine(prompt).toLowerCase(Locale.ROOT);
 
         if ("y".equals(response)) {
-            UndoService.UndoResult result = undoService.undo(currentUser.getId());
+            var undoResult = matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.cli(currentUser.getId())));
 
-            if (result.success()) {
+            if (undoResult.success()) {
+                UndoOutcome result = undoResult.data();
                 String directionStr = result.undoneSwipe().direction() == Like.Direction.LIKE ? "like" : "pass";
                 logInfo("\n✅ Undone! Your {} on {} has been reversed.", directionStr, candidateName);
 
@@ -628,7 +633,7 @@ public class MatchingHandler implements LoggingSupport {
                     logInfo("");
                 }
             } else {
-                logInfo("\n❌ {}\n", result.message());
+                logInfo("\n❌ {}\n", undoResult.error().message());
             }
         }
     }
@@ -661,9 +666,6 @@ public class MatchingHandler implements LoggingSupport {
             }
             List<Standout> standouts = result.standouts();
             Map<UUID, User> users = standoutResult.data().usersById();
-            if (users.isEmpty()) {
-                users = standoutsService.resolveUsers(standouts);
-            }
             displayStandoutCandidates(standouts, users, result.totalCandidates());
             logInfo("\n[L] Like a standout  [P] Pass  [B] Back to menu");
             String input = inputReader.readLine("\nYour choice: ").toLowerCase(Locale.ROOT);

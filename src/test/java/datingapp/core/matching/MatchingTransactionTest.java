@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
@@ -106,7 +107,7 @@ class MatchingTransactionTest {
         var result = useCases.processSwipe(swipeCommand(alice, bob));
 
         assertTrue(result.success());
-        assertTrue(result.data().success());
+        assertEquals(Like.Direction.LIKE, result.data().like().direction());
         assertTrue(interactionStorage.getLike(alice.getId(), bob.getId()).isPresent());
         assertEquals(1, interactionStorage.likeSize());
         assertTrue(interactionStorage
@@ -151,7 +152,8 @@ class MatchingTransactionTest {
                 interactionStorage,
                 userStorage,
                 new MatchQualityService(userStorage, interactionStorage, config),
-                null);
+                new InProcessAppEventBus(),
+                permissiveRecommendationService());
     }
 
     private static ProcessSwipeCommand swipeCommand(User currentUser, User candidate) {

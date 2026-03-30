@@ -20,6 +20,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
@@ -407,7 +408,8 @@ class MatchingViewModelTest {
                                     interactions,
                                     users,
                                     new MatchQualityService(users, interactions, config),
-                                    new datingapp.app.event.InProcessAppEventBus()),
+                                    new datingapp.app.event.InProcessAppEventBus(),
+                                    recommendationService),
                             new datingapp.app.usecase.social.SocialUseCases(trustSafetyService),
                             noteDataAccess),
                     session,
@@ -422,7 +424,7 @@ class MatchingViewModelTest {
                     noteProfileService,
                     null,
                     null,
-                    null,
+                    TestAchievementService.empty(),
                     config,
                     new datingapp.core.workflow.ProfileActivationPolicy(),
                     new InProcessAppEventBus());

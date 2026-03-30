@@ -940,15 +940,7 @@ public class User {
                 .build();
 
         if (dealbreakers != null) {
-            copy.dealbreakers = new MatchPreferences.Dealbreakers(
-                    dealbreakers.acceptableSmoking(),
-                    dealbreakers.acceptableDrinking(),
-                    dealbreakers.acceptableKidsStance(),
-                    dealbreakers.acceptableLookingFor(),
-                    dealbreakers.acceptableEducation(),
-                    dealbreakers.minHeightCm(),
-                    dealbreakers.maxHeightCm(),
-                    dealbreakers.maxAgeDifference());
+            copy.dealbreakers = dealbreakers.toBuilder().build();
         }
         return copy;
     }

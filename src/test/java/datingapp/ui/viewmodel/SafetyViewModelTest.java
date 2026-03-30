@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -16,6 +17,7 @@ import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.async.UiThreadDispatcher;
@@ -144,10 +146,10 @@ class SafetyViewModelTest {
                 new ProfileService(config, analytics, interactions, trustSafetyStorage, users),
                 new ValidationService(config),
                 new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config),
-                null,
+                TestAchievementService.empty(),
                 config,
                 new ProfileActivationPolicy(),
-                null);
+                new InProcessAppEventBus());
 
         viewModel = new SafetyViewModel(trustSafetyService, profileUseCases, AppSession.getInstance(), TEST_DISPATCHER);
         viewModel.initialize();
@@ -186,10 +188,10 @@ class SafetyViewModelTest {
                 new ProfileService(config, analytics, interactions, trustSafetyStorage, users),
                 new ValidationService(config),
                 new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config),
-                null,
+                TestAchievementService.empty(),
                 config,
                 new ProfileActivationPolicy(),
-                null);
+                new InProcessAppEventBus());
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactions, users, config, new TestStorages.Communications())
                 .build();

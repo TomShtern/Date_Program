@@ -239,6 +239,33 @@ public class ValidationService {
     }
 
     /**
+     * Validates message content for send operations.
+     *
+     * @param content the message text to validate
+     * @return validation result
+     */
+    public ValidationResult validateMessageContent(String content) {
+        if (content == null || content.isBlank()) {
+            return ValidationResult.failure("Message content cannot be empty");
+        }
+        return ValidationResult.success();
+    }
+
+    /**
+     * Validates profile note content for upsert operations.
+     *
+     * @param content the note text to validate (after sanitization)
+     * @return validation result
+     */
+    public ValidationResult validateProfileNoteContent(String content) {
+        if (content != null && content.length() > config.validation().maxProfileNoteLength()) {
+            return ValidationResult.failure(
+                    "Note too long (max " + config.validation().maxProfileNoteLength() + " characters)");
+        }
+        return ValidationResult.success();
+    }
+
+    /**
      * Validates an age range preference.
      *
      * @param min the minimum age

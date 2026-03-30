@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.profile.ProfileUseCases;
@@ -16,15 +17,13 @@ import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
-import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.JavaFxTestSupport;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -113,10 +112,10 @@ class StatsViewModelTest {
                         null,
                         null,
                         new ActivityMetricsService(interactions, trustSafety, analytics, config),
-                        null,
+                        new SingleAchievementService(currentUser.getId()),
                         config,
                         new datingapp.core.workflow.ProfileActivationPolicy(),
-                        null) {
+                        new TestEventBus()) {
                     @Override
                     public UseCaseResult<ProfileUseCases.AchievementSnapshot> getAchievements(AchievementsQuery query) {
                         return UseCaseResult.failure(UseCaseError.internal("achievement load failed"));
@@ -221,22 +220,7 @@ class StatsViewModelTest {
     }
 
     private static User createActiveUser(String name) {
-        User user = new User(UUID.randomUUID(), name);
-        user.setBirthDate(AppClock.today().minusYears(25));
-        user.setGender(Gender.MALE);
-        user.setInterestedIn(EnumSet.of(Gender.FEMALE));
-        user.setAgeRange(18, 60, 18, 120);
-        user.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
-        user.setLocation(40.7128, -74.0060);
-        user.addPhotoUrl("http://example.com/" + name.replace(' ', '-') + ".jpg");
-        user.setBio("Stats user");
-        user.setPacePreferences(new PacePreferences(
-                PacePreferences.MessagingFrequency.OFTEN,
-                PacePreferences.TimeToFirstDate.FEW_DAYS,
-                PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
-                PacePreferences.DepthPreference.DEEP_CHAT));
-        user.activate();
-        return user;
+        return TestUserFactory.createActiveUser(name);
     }
 
     private static final class SingleAchievementService implements AchievementService {

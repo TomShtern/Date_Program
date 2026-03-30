@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
@@ -14,38 +13,16 @@ import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases;
 import datingapp.core.AppClock;
-import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
-import datingapp.core.connection.ConnectionService;
-import datingapp.core.matching.CandidateFinder;
-import datingapp.core.matching.CompatibilityCalculator;
-import datingapp.core.matching.DailyLimitService;
-import datingapp.core.matching.DailyPickService;
-import datingapp.core.matching.DefaultCompatibilityCalculator;
-import datingapp.core.matching.DefaultDailyLimitService;
-import datingapp.core.matching.DefaultDailyPickService;
-import datingapp.core.matching.DefaultStandoutService;
-import datingapp.core.matching.MatchQualityService;
-import datingapp.core.matching.MatchingService;
-import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
-import datingapp.core.matching.StandoutService;
-import datingapp.core.matching.TrustSafetyService;
-import datingapp.core.matching.UndoService;
-import datingapp.core.metrics.AchievementService;
-import datingapp.core.metrics.ActivityMetricsService;
-import datingapp.core.metrics.DefaultAchievementService;
-import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
-import datingapp.core.profile.ProfileService;
-import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
@@ -54,9 +31,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -772,69 +747,9 @@ class RestApiPhaseTwoRoutesTest {
             InteractionStorage interactionStorage,
             CommunicationStorage communicationStorage,
             Standout.Storage standoutStorage) {
-        AppConfig config = AppConfig.defaults();
-        TestStorages.Analytics analyticsStorage = new TestStorages.Analytics();
-        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
-
-        CandidateFinder candidateFinder =
-                new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
-        ActivityMetricsService activityMetricsService =
-                new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
-        ProfileService profileService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
-
-        CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
-        DailyLimitService dailyLimitService = new DefaultDailyLimitService(interactionStorage, config);
-        DailyPickService dailyPickService =
-                new DefaultDailyPickService(userStorage, interactionStorage, analyticsStorage, candidateFinder, config);
-        StandoutService standoutService = new DefaultStandoutService(
-                compatibilityCalculator, userStorage, candidateFinder, standoutStorage, profileService, config);
-        RecommendationService recommendationService =
-                new RecommendationService(dailyLimitService, dailyPickService, standoutService);
-        UndoService undoService = new UndoService(interactionStorage, new InMemoryUndoStorage(), config);
-        MatchingService matchingService = MatchingService.builder()
-                .interactionStorage(interactionStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .userStorage(userStorage)
-                .activityMetricsService(activityMetricsService)
-                .dailyService(recommendationService)
-                .undoService(undoService)
-                .candidateFinder(candidateFinder)
-                .build();
-        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
-                        trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)
-                .build();
-        ConnectionService connectionService =
-                new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
-        MatchQualityService matchQualityService =
-                new MatchQualityService(userStorage, interactionStorage, config, compatibilityCalculator);
-        ValidationService validationService = new ValidationService(config);
-        AchievementService achievementService = new DefaultAchievementService(
-                config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
-
-        return ServiceRegistry.builder()
-                .config(config)
-                .userStorage(userStorage)
-                .interactionStorage(interactionStorage)
-                .communicationStorage(communicationStorage)
-                .analyticsStorage(analyticsStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .candidateFinder(candidateFinder)
-                .matchingService(matchingService)
-                .trustSafetyService(trustSafetyService)
-                .activityMetricsService(activityMetricsService)
-                .matchQualityService(matchQualityService)
-                .profileService(profileService)
-                .recommendationService(recommendationService)
-                .dailyLimitService(dailyLimitService)
-                .dailyPickService(dailyPickService)
-                .standoutService(standoutService)
-                .undoService(undoService)
-                .compatibilityCalculator(compatibilityCalculator)
-                .achievementService(achievementService)
-                .connectionService(connectionService)
-                .validationService(validationService)
-                .eventBus(new InProcessAppEventBus())
+        return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .standoutStorage(standoutStorage)
+                .undoStorage(new RestApiTestFixture.InMemoryUndoStorage())
                 .build();
     }
 
@@ -879,7 +794,8 @@ class RestApiPhaseTwoRoutesTest {
                     services.getInteractionStorage(),
                     services.getUserStorage(),
                     services.getMatchQualityService(),
-                    services.getEventBus());
+                    services.getEventBus(),
+                    services.getRecommendationService());
         }
 
         @Override
@@ -904,7 +820,8 @@ class RestApiPhaseTwoRoutesTest {
                     services.getInteractionStorage(),
                     services.getUserStorage(),
                     services.getMatchQualityService(),
-                    services.getEventBus());
+                    services.getEventBus(),
+                    services.getRecommendationService());
         }
 
         @Override
@@ -928,42 +845,6 @@ class RestApiPhaseTwoRoutesTest {
         public UseCaseResult<datingapp.core.connection.ConnectionService.SendResult> sendMessage(
                 SendMessageCommand command) {
             return UseCaseResult.failure(UseCaseError.validation("Simulated message failure"));
-        }
-    }
-
-    private static final class InMemoryUndoStorage implements Undo.Storage {
-        private final Map<UUID, Undo> byUserId = new HashMap<>();
-
-        @Override
-        public void save(Undo state) {
-            byUserId.put(state.userId(), state);
-        }
-
-        @Override
-        public Optional<Undo> findByUserId(UUID userId) {
-            return Optional.ofNullable(byUserId.get(userId));
-        }
-
-        @Override
-        public boolean delete(UUID userId) {
-            return byUserId.remove(userId) != null;
-        }
-
-        @Override
-        public int deleteExpired(Instant now) {
-            List<UUID> toDelete = new ArrayList<>();
-            for (Undo undo : byUserId.values()) {
-                if (undo.isExpired(now)) {
-                    toDelete.add(undo.userId());
-                }
-            }
-            toDelete.forEach(byUserId::remove);
-            return toDelete.size();
-        }
-
-        @Override
-        public List<Undo> findAll() {
-            return List.copyOf(byUserId.values());
         }
     }
 

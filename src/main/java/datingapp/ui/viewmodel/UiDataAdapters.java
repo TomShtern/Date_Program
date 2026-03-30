@@ -69,7 +69,7 @@ public final class UiDataAdapters {
          * @param offset zero-based start index
          * @param limit  maximum number of items per page
          */
-        PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit);
+        UiPage<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit);
 
         /**
          * Returns the total number of ACTIVE matches for the user.
@@ -146,6 +146,30 @@ public final class UiDataAdapters {
         }
     }
 
+    /** UI-owned paged result wrapper that keeps storage paging types behind the adapter boundary. */
+    public static record UiPage<T>(List<T> items, int totalCount, int offset, int limit) {
+        public UiPage {
+            items = List.copyOf(Objects.requireNonNull(items, "items cannot be null"));
+            if (totalCount < 0) {
+                throw new IllegalArgumentException("totalCount cannot be negative");
+            }
+            if (offset < 0) {
+                throw new IllegalArgumentException("offset cannot be negative");
+            }
+            if (limit <= 0) {
+                throw new IllegalArgumentException("limit must be greater than zero");
+            }
+        }
+
+        public boolean hasMore() {
+            return offset + items.size() < totalCount;
+        }
+
+        static <T> UiPage<T> from(PageData<T> page) {
+            return new UiPage<>(page.items(), page.totalCount(), page.offset(), page.limit());
+        }
+    }
+
     // ── Implementations ─────────────────────────────────────────────────────
 
     /** Bridges the UI layer to the core {@link UserStorage} interface. */
@@ -219,8 +243,8 @@ public final class UiDataAdapters {
         }
 
         @Override
-        public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
-            return interactionStorage.getPageOfActiveMatchesFor(userId, offset, limit);
+        public UiPage<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+            return UiPage.from(interactionStorage.getPageOfActiveMatchesFor(userId, offset, limit));
         }
 
         @Override
@@ -286,7 +310,7 @@ public final class UiDataAdapters {
             var result = profileUseCases.deleteProfileNote(
                     new ProfileUseCases.DeleteProfileNoteCommand(UserContext.ui(authorId), subjectId));
             if (result.success()) {
-                return Boolean.TRUE.equals(result.data());
+                return true;
             }
             if (result.error().code() == UseCaseError.Code.NOT_FOUND) {
                 return false;

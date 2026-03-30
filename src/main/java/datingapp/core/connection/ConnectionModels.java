@@ -160,20 +160,9 @@ public final class ConnectionModels {
                 throw new IllegalArgumentException("Cannot have conversation with yourself");
             }
 
-            String userAString = a.toString();
-            String userBString = b.toString();
-
-            UUID normalizedA;
-            UUID normalizedB;
-            if (userAString.compareTo(userBString) < 0) {
-                normalizedA = a;
-                normalizedB = b;
-            } else {
-                normalizedA = b;
-                normalizedB = a;
-            }
-
-            String id = normalizedA + CONVERSATION_ID_SEPARATOR + normalizedB;
+            UUID normalizedA = a.toString().compareTo(b.toString()) < 0 ? a : b;
+            UUID normalizedB = normalizedA.equals(a) ? b : a;
+            String id = generateId(a, b);
             Instant now = AppClock.now();
             return new Conversation(
                     id, normalizedA, normalizedB, now, null, null, null, null, null, null, null, true, true);

@@ -14,10 +14,8 @@ import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.model.User;
-import datingapp.ui.async.AsyncErrorRouter;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.async.ViewModelAsyncScope;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -33,15 +31,12 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Stats and Achievements screen.
  * Displays user progress, match statistics, and earned achievements.
  */
-public class StatsViewModel {
-    private static final Logger logger = LoggerFactory.getLogger(StatsViewModel.class);
+public class StatsViewModel extends BaseViewModel {
 
     private final AchievementService achievementService;
     private final ActivityMetricsService statsService;
@@ -49,7 +44,6 @@ public class StatsViewModel {
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
     private final Clock clock;
-    private final ViewModelAsyncScope asyncScope;
 
     private final ObservableList<Achievement> achievements = FXCollections.observableArrayList();
 
@@ -60,17 +54,14 @@ public class StatsViewModel {
     private final IntegerProperty messagesExchanged = new SimpleIntegerProperty(0);
     private final IntegerProperty loginStreak = new SimpleIntegerProperty(0);
     private final StringProperty responseRate = new SimpleStringProperty("--");
-    private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final StringProperty loadFailureMessage = new SimpleStringProperty("");
 
     private final AtomicReference<User> currentUser = new AtomicReference<>();
 
-    /** Error handler for ViewModel→Controller error communication (M-22). */
-    private final AtomicReference<ViewModelErrorSink> errorHandler = new AtomicReference<>();
-
+    /** Error handler for late-bound error communication (M-22). */
     public void setErrorHandler(ViewModelErrorSink handler) {
-        this.errorHandler.set(handler);
+        this.setErrorSink(handler);
     }
 
     public StatsViewModel(
@@ -129,13 +120,13 @@ public class StatsViewModel {
             AppSession session,
             Clock clock,
             UiThreadDispatcher uiDispatcher) {
+        super("stats", uiDispatcher);
         this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
         this.statsService = Objects.requireNonNull(statsService, "statsService cannot be null");
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
         this.profileUseCases = profileUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.clock = Objects.requireNonNull(clock, "clock cannot be null");
-        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
     /**
@@ -186,9 +177,8 @@ public class StatsViewModel {
 
     private void applyStatsData(StatsRefreshData data) {
         if (!data.success()) {
-            loadFailed.set(true);
             loadFailureMessage.set(data.failureMessage());
-            notifyError(data.failureMessage());
+            loadFailed.set(true);
             return;
         }
 
@@ -201,16 +191,7 @@ public class StatsViewModel {
         messagesExchanged.set(data.stats().messagesExchanged());
         loginStreak.set(data.stats().loginStreak());
         responseRate.set(data.stats().rateText());
-        if (logger.isInfoEnabled()) {
-            logger.info("Refreshed stats for user: {}", maskUserIdentifier(data.user()));
-        }
-    }
-
-    private void notifyError(String message) {
-        ViewModelErrorSink handler = errorHandler.get();
-        if (handler != null) {
-            asyncScope.dispatchToUi(() -> handler.onError(message));
-        }
+        logInfo("Refreshed stats for user: {}", maskUserIdentifier(data.user()));
     }
 
     private List<Achievement> fetchAchievements(java.util.UUID userId) {
@@ -296,10 +277,6 @@ public class StatsViewModel {
         return Achievement.values().length;
     }
 
-    public BooleanProperty loadingProperty() {
-        return loading;
-    }
-
     public IntegerProperty totalLikesGivenProperty() {
         return totalLikesGiven;
     }
@@ -332,27 +309,10 @@ public class StatsViewModel {
         return loadFailureMessage;
     }
 
-    /**
-     * Disposes resources held by this ViewModel.
-     * Should be called when the ViewModel is no longer needed.
-     */
+    @Override
     public void dispose() {
-        asyncScope.dispose();
         asyncScope.dispatchToUi(achievements::clear);
-    }
-
-    private void setLoadingState(boolean isLoading) {
-        if (loading.get() != isLoading) {
-            loading.set(isLoading);
-        }
-    }
-
-    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
-        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
-        ViewModelAsyncScope scope = new ViewModelAsyncScope(
-                "stats", dispatcher, new AsyncErrorRouter(logger, dispatcher, errorHandler::get));
-        scope.setLoadingStateConsumer(this::setLoadingState);
-        return scope;
+        super.dispose();
     }
 
     private record StatsRefreshData(
@@ -372,11 +332,5 @@ public class StatsViewModel {
             return "unknown";
         }
         return Integer.toHexString(user.getId().toString().hashCode());
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
-        }
     }
 }

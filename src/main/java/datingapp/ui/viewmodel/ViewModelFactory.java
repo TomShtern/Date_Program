@@ -3,7 +3,9 @@ package datingapp.ui.viewmodel;
 import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.model.User;
+import datingapp.ui.NavigationService;
 import datingapp.ui.UiPreferencesStore;
+import datingapp.ui.UiThemeService;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.screen.ChatController;
@@ -167,7 +169,13 @@ public class ViewModelFactory {
         return getViewModel(
                 DashboardViewModel.class,
                 () -> new DashboardViewModel(
-                        DashboardViewModel.Dependencies.fromServices(services),
+                        new DashboardViewModel.Dependencies(
+                                services.getRecommendationService(),
+                                createUiMatchDataAccess(),
+                                services.getAchievementService(),
+                                services.getConnectionService(),
+                                services.getProfileService(),
+                                services.getConfig()),
                         session,
                         uiDispatcher,
                         uiPreferencesStore));
@@ -182,6 +190,7 @@ public class ViewModelFactory {
                         services.getProfileUseCases(),
                         services.getConfig(),
                         session,
+                        services.getValidationService(),
                         services.getLocationService(),
                         uiDispatcher,
                         services.getActivationPolicy())));
@@ -260,7 +269,7 @@ public class ViewModelFactory {
                 () -> new PreferencesViewModel(
                         createUiUserStore(),
                         services.getProfileUseCases(),
-                        uiPreferencesStore,
+                        new UiThemeService(uiPreferencesStore, NavigationService.getInstance()),
                         services.getConfig(),
                         session,
                         uiDispatcher));
@@ -330,18 +339,14 @@ public class ViewModelFactory {
     }
 
     private void disposeCachedViewModels() {
-        // Dispose all ViewModels that have a dispose() method
         viewModelCache.values().forEach(vm -> {
-            try {
-                if (vm instanceof BaseViewModel bvm) {
-                    bvm.dispose();
-                } else {
-                    // Fallback for ViewModels not yet migrated to BaseViewModel
-                    vm.getClass().getMethod("dispose").invoke(vm);
-                }
-            } catch (Exception e) {
-                logWarn("Failed to dispose ViewModel: {}", vm.getClass().getSimpleName(), e);
+            if (vm instanceof BaseViewModel bvm) {
+                bvm.dispose();
+                return;
             }
+
+            String typeName = vm.getClass().getName();
+            throw new IllegalStateException("Cached ViewModel does not extend BaseViewModel: " + typeName);
         });
 
         viewModelCache.clear();
@@ -372,12 +377,6 @@ public class ViewModelFactory {
     private void logError(String message, Object... args) {
         if (logger.isErrorEnabled()) {
             logger.error(message, args);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
         }
     }
 }

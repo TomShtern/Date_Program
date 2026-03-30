@@ -7,86 +7,60 @@ import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.ui.NavigationService;
-import datingapp.ui.UiPreferencesStore;
 import datingapp.ui.UiPreferencesStore.ThemeMode;
-import datingapp.ui.async.AsyncErrorRouter;
-import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.UiThemeService;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.async.ViewModelAsyncScope;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the Preferences screen.
- * Handles loading and saving user discovery MatchPreferences.
+ * Handles loading and saving user discovery preferences.
  */
-public class PreferencesViewModel {
-    private static final Logger logger = LoggerFactory.getLogger(PreferencesViewModel.class);
+public class PreferencesViewModel extends BaseViewModel {
 
     private final AppConfig config;
     private final AppSession session;
     private final UiUserStore userStore;
     private final ProfileUseCases profileUseCases;
-    private final UiPreferencesStore uiPreferencesStore;
-    private final ViewModelAsyncScope asyncScope;
+    private final UiThemeService uiThemeService;
     private User currentUser;
 
-    // UI-specific enum for single-selection preference
     public static enum GenderPreference {
         MEN,
         WOMEN,
         EVERYONE
     }
 
-    // Properties bound to UI
     private final IntegerProperty minAge = new SimpleIntegerProperty(18);
     private final IntegerProperty maxAge = new SimpleIntegerProperty(99);
     private final IntegerProperty maxDistance = new SimpleIntegerProperty(50);
     private final ObjectProperty<GenderPreference> interestedIn = new SimpleObjectProperty<>(GenderPreference.EVERYONE);
     private final ObjectProperty<ThemeMode> themeMode = new SimpleObjectProperty<>(ThemeMode.DARK);
-    private final BooleanProperty loading = new SimpleBooleanProperty(false);
-
-    /** Track disposed state to prevent operations after cleanup. */
-    private final AtomicBoolean disposed = new AtomicBoolean(false);
-
-    public PreferencesViewModel(UiUserStore userStore, AppConfig config, AppSession session) {
-        this(userStore, null, new UiPreferencesStore(), config, session, new JavaFxUiThreadDispatcher());
-    }
-
-    public PreferencesViewModel(
-            UiUserStore userStore, ProfileUseCases profileUseCases, AppConfig config, AppSession session) {
-        this(userStore, profileUseCases, new UiPreferencesStore(), config, session, new JavaFxUiThreadDispatcher());
-    }
 
     public PreferencesViewModel(
             UiUserStore userStore,
             ProfileUseCases profileUseCases,
-            UiPreferencesStore uiPreferencesStore,
+            UiThemeService uiThemeService,
             AppConfig config,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
+        super("preferences", uiDispatcher);
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.profileUseCases = profileUseCases;
-        this.uiPreferencesStore = Objects.requireNonNull(uiPreferencesStore, "uiPreferencesStore cannot be null");
+        this.uiThemeService = Objects.requireNonNull(uiThemeService, "uiThemeService cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
-        this.asyncScope = createAsyncScope(uiDispatcher);
     }
 
     public void initialize() {
-        if (disposed.get()) {
+        if (isDisposed()) {
             return;
         }
         asyncScope.runLatest("preferences-load", "load preferences", this::loadSnapshot, this::applySnapshot);
@@ -94,7 +68,7 @@ public class PreferencesViewModel {
 
     private PreferencesSnapshot loadSnapshot() {
         User user = session.getCurrentUser();
-        ThemeMode storedThemeMode = uiPreferencesStore.loadThemeMode();
+        ThemeMode storedThemeMode = uiThemeService.loadThemeMode();
         if (user == null) {
             return PreferencesSnapshot.empty(storedThemeMode);
         }
@@ -107,12 +81,12 @@ public class PreferencesViewModel {
 
     private void applySnapshot(PreferencesSnapshot snapshot) {
         currentUser = snapshot.user();
-        minAge.set(snapshot.minAge());
-        maxAge.set(snapshot.maxAge());
-        maxDistance.set(snapshot.maxDistance());
+        minAge.set(snapshot.minAgeValue());
+        maxAge.set(snapshot.maxAgeValue());
+        maxDistance.set(snapshot.maxDistanceValue());
         interestedIn.set(snapshot.genderPreference());
-        themeMode.set(snapshot.themeMode());
-        NavigationService.getInstance().setThemeMode(snapshot.themeMode());
+        themeMode.set(snapshot.loadedThemeMode());
+        uiThemeService.setThemeMode(snapshot.loadedThemeMode());
 
         if (currentUser == null) {
             return;
@@ -142,7 +116,7 @@ public class PreferencesViewModel {
     }
 
     public void updateThemeMode(ThemeMode newThemeMode) {
-        if (disposed.get()) {
+        if (isDisposed()) {
             return;
         }
         ThemeMode resolvedThemeMode = newThemeMode == null ? ThemeMode.DARK : newThemeMode;
@@ -150,12 +124,11 @@ public class PreferencesViewModel {
             return;
         }
         themeMode.set(resolvedThemeMode);
-        NavigationService.getInstance().setThemeMode(resolvedThemeMode);
-        asyncScope.runFireAndForget("save theme preference", () -> uiPreferencesStore.saveThemeMode(resolvedThemeMode));
+        asyncScope.runFireAndForget("save theme preference", () -> uiThemeService.setThemeMode(resolvedThemeMode));
     }
 
     public void savePreferences() {
-        if (disposed.get() || currentUser == null) {
+        if (isDisposed() || currentUser == null) {
             return;
         }
 
@@ -189,7 +162,6 @@ public class PreferencesViewModel {
                 config.validation().maxAge());
         currentUser.setMaxDistanceKm(maxDistVal, config.matching().maxDistanceKm());
 
-        // Map UI GenderPreference to Set<Gender>
         final Set<Gender> newInterests = EnumSet.noneOf(Gender.class);
         GenderPreference preference = interestedIn.get();
         if (preference == null) {
@@ -214,14 +186,13 @@ public class PreferencesViewModel {
         }
         currentUser.setInterestedIn(newInterests);
         final ThemeMode selectedThemeMode = themeMode.get() == null ? ThemeMode.DARK : themeMode.get();
-        NavigationService.getInstance().setThemeMode(selectedThemeMode);
 
         asyncScope.runLatest(
                 "preferences-save",
                 "save preferences",
                 () -> {
                     persistDiscoveryPreferences(minAgeVal, maxAgeVal, maxDistVal, newInterests);
-                    uiPreferencesStore.saveThemeMode(selectedThemeMode);
+                    uiThemeService.setThemeMode(selectedThemeMode);
                     return selectedThemeMode;
                 },
                 themeMode::set);
@@ -243,20 +214,6 @@ public class PreferencesViewModel {
         return themeMode.get() == null ? ThemeMode.DARK : themeMode.get();
     }
 
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
-        }
-    }
-
-    // --- Property Getters ---
-
     public IntegerProperty minAgeProperty() {
         return minAge;
     }
@@ -277,34 +234,13 @@ public class PreferencesViewModel {
         return themeMode;
     }
 
-    public BooleanProperty loadingProperty() {
-        return loading;
-    }
-
-    /**
-     * Disposes resources held by this ViewModel.
-     * Should be called when the ViewModel is no longer needed.
-     */
-    public void dispose() {
-        disposed.set(true);
-        asyncScope.dispose();
-    }
-
-    private ViewModelAsyncScope createAsyncScope(UiThreadDispatcher uiDispatcher) {
-        UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
-        ViewModelAsyncScope scope = new ViewModelAsyncScope(
-                "preferences", dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> null));
-        scope.setLoadingStateConsumer(loading::set);
-        return scope;
-    }
-
     private record PreferencesSnapshot(
             User user,
-            int minAge,
-            int maxAge,
-            int maxDistance,
+            int minAgeValue,
+            int maxAgeValue,
+            int maxDistanceValue,
             GenderPreference genderPreference,
-            ThemeMode themeMode) {
+            ThemeMode loadedThemeMode) {
         private static PreferencesSnapshot empty(ThemeMode themeMode) {
             return new PreferencesSnapshot(null, 18, 99, 50, GenderPreference.EVERYONE, themeMode);
         }

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -13,6 +14,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import java.io.StringReader;
 import java.util.ArrayList;
@@ -60,7 +62,14 @@ class ProfileCreateSelectTest {
         // tests
         // since they aren't used by these methods
         ProfileUseCases profileUseCases = new ProfileUseCases(
-                userStorage, null, null, null, null, AppConfig.defaults(), new ProfileActivationPolicy(), null);
+                userStorage,
+                null,
+                null,
+                null,
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new ProfileActivationPolicy(),
+                new TestEventBus());
         return new ProfileHandler(
                 userStorage,
                 new ValidationService(AppConfig.defaults()),

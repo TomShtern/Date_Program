@@ -7,10 +7,12 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
@@ -65,10 +67,16 @@ class StatsHandlerTest {
                 achievementService,
                 null,
                 statsService,
-                null,
+                new DefaultAchievementService(
+                        AppConfig.defaults(),
+                        analyticsStorage,
+                        interactionStorage,
+                        trustSafetyStorage,
+                        userStorage,
+                        achievementService),
                 AppConfig.defaults(),
                 new ProfileActivationPolicy(),
-                null);
+                new InProcessAppEventBus());
         return new StatsHandler(profileUseCases, session, inputReader);
     }
 

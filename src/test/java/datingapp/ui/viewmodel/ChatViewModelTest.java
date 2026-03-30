@@ -21,6 +21,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.viewmodel.UiDataAdapters.PresenceStatus;
@@ -95,7 +96,7 @@ class ChatViewModelTest {
                 profileService,
                 null,
                 null,
-                null,
+                TestAchievementService.empty(),
                 config,
                 new datingapp.core.workflow.ProfileActivationPolicy(),
                 eventBus);
@@ -247,7 +248,10 @@ class ChatViewModelTest {
         viewModel.selectedConversationProperty().set(otherUserConv);
         viewModel.selectedConversationProperty().set(user3Conv);
 
-        assertTrue(waitUntil(() -> viewModel.getActiveMessages().size() == 1, 5000));
+        assertTrue(waitUntil(
+                () -> viewModel.getActiveMessages().size() == 1
+                        && !viewModel.loadingProperty().get(),
+                5000));
 
         // The active messages should reflect the 2nd (User3) conversation only
         assertEquals(1, viewModel.getActiveMessages().size());
@@ -295,7 +299,7 @@ class ChatViewModelTest {
                 profileService,
                 null,
                 null,
-                null,
+                TestAchievementService.empty(),
                 AppConfig.defaults(),
                 new datingapp.core.workflow.ProfileActivationPolicy(),
                 eventBus);
@@ -568,7 +572,7 @@ class ChatViewModelTest {
                 profileService,
                 null,
                 null,
-                null,
+                TestAchievementService.empty(),
                 AppConfig.defaults(),
                 new datingapp.core.workflow.ProfileActivationPolicy(),
                 eventBus);

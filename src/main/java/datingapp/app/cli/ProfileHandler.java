@@ -166,38 +166,7 @@ public class ProfileHandler implements LoggingSupport {
     }
 
     private static User copyForProfileEditing(User source) {
-        User.StorageBuilder builder = User.StorageBuilder.create(
-                        source.getId(), source.getName(), source.getCreatedAt())
-                .bio(source.getBio())
-                .birthDate(source.getBirthDate())
-                .gender(source.getGender())
-                .interestedIn(source.getInterestedIn())
-                .location(source.getLat(), source.getLon())
-                .hasLocationSet(source.hasLocationSet())
-                .maxDistanceKm(source.getMaxDistanceKm())
-                .ageRange(source.getMinAge(), source.getMaxAge())
-                .state(source.getState())
-                .verified(source.isVerified())
-                .verificationMethod(source.getVerificationMethod())
-                .verificationCode(source.getVerificationCode())
-                .verificationSentAt(source.getVerificationSentAt())
-                .verifiedAt(source.getVerifiedAt())
-                .updatedAt(source.getUpdatedAt())
-                .deletedAt(source.getDeletedAt())
-                .photoUrls(source.getPhotoUrls())
-                .interests(source.getInterests())
-                .smoking(source.getSmoking())
-                .drinking(source.getDrinking())
-                .wantsKids(source.getWantsKids())
-                .lookingFor(source.getLookingFor())
-                .education(source.getEducation())
-                .heightCm(source.getHeightCm())
-                .email(source.getEmail())
-                .phone(source.getPhone())
-                .pacePreferences(source.getPacePreferences());
-        User copy = builder.build();
-        copy.setDealbreakers(source.getDealbreakers());
-        return copy;
+        return source.copy();
     }
 
     /**
@@ -1124,10 +1093,12 @@ public class ProfileHandler implements LoggingSupport {
         if ("y".equalsIgnoreCase(confirm)) {
             var result = profileUseCases.deleteProfileNote(
                     new ProfileUseCases.DeleteProfileNoteCommand(UserContext.cli(authorId), subjectId));
-            if (result.success() && result.data()) {
+            if (result.success()) {
                 logInfo("✅ Note deleted.\n");
-            } else {
+            } else if (result.error().code() == datingapp.app.usecase.common.UseCaseError.Code.NOT_FOUND) {
                 logInfo("⚠️  Note not found.\n");
+            } else {
+                logInfo(ERROR_MESSAGE_FORMAT, result.error().message());
             }
         } else {
             logInfo("Cancelled.\n");

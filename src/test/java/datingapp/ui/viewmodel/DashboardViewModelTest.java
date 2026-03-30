@@ -11,11 +11,13 @@ import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.RecommendationService;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
@@ -24,6 +26,7 @@ import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -48,6 +51,7 @@ class DashboardViewModelTest {
     private TestStorages.Analytics analyticsStorage;
     private TestStorages.Communications communications;
     private RecommendationService dailyService;
+    private AchievementService achievementService;
     private TestUiThreadDispatcher uiDispatcher;
 
     private DashboardViewModel viewModel;
@@ -89,13 +93,14 @@ class DashboardViewModelTest {
                 .build();
 
         UiMatchDataAccess matchData = new StorageUiMatchDataAccess(interactions, trustSafetyStorage);
+        achievementService = TestAchievementService.empty();
 
         ConnectionService messagingService = new ConnectionService(config, communications, interactions, users);
         uiDispatcher = new TestUiThreadDispatcher();
 
         viewModel = new DashboardViewModel(
                 new DashboardViewModel.Dependencies(
-                        dailyService, matchData, profileService, messagingService, profileService, config),
+                        dailyService, matchData, achievementService, messagingService, profileService, config),
                 AppSession.getInstance(),
                 uiDispatcher);
 
@@ -208,6 +213,13 @@ class DashboardViewModelTest {
 
         assertEquals("Not Logged In", viewModel.userNameProperty().get());
         assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("dependencies no longer expose a secondary fromServices composition root")
+    void dependenciesNoLongerExposeSecondaryFromServicesCompositionRoot() {
+        assertFalse(Arrays.stream(DashboardViewModel.Dependencies.class.getDeclaredMethods())
+                .anyMatch(method -> method.getName().equals("fromServices")));
     }
 
     private void performRefreshAndDrainUntilIdle() throws InterruptedException {

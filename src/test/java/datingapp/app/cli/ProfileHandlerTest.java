@@ -9,6 +9,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.profile.ProfileUseCases;
@@ -20,7 +21,9 @@ import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.testutil.TestUserFactory;
 import java.io.StringReader;
 import java.lang.reflect.Method;
 import java.time.Clock;
@@ -46,6 +49,11 @@ class ProfileHandlerTest {
     private ValidationService validationService;
     private ProfileUseCases profileUseCases;
 
+    private interface Cleanup extends AutoCloseable {
+        @Override
+        void close();
+    }
+
     @BeforeEach
     void setUp() {
         userStorage = new TestStorages.Users();
@@ -57,10 +65,10 @@ class ProfileHandlerTest {
                 null,
                 validationService,
                 null,
-                null,
+                TestAchievementService.empty(),
                 AppConfig.defaults(),
                 new datingapp.core.workflow.ProfileActivationPolicy(),
-                null);
+                new TestEventBus());
     }
 
     @Test
@@ -106,10 +114,10 @@ class ProfileHandlerTest {
                 null,
                 customValidationService,
                 null,
-                null,
+                TestAchievementService.empty(),
                 customConfig,
                 new datingapp.core.workflow.ProfileActivationPolicy(),
-                null);
+                new TestEventBus());
         InputReader inputReader = new InputReader(new Scanner(new StringReader(repeat('n', 6) + "\n")));
         ProfileHandler handler = new ProfileHandler(
                 userStorage, customValidationService, customProfileUseCases, customConfig, session, inputReader);
@@ -139,10 +147,10 @@ class ProfileHandlerTest {
                         null,
                         validationService,
                         null,
-                        null,
+                        TestAchievementService.empty(),
                         AppConfig.defaults(),
                         new datingapp.core.workflow.ProfileActivationPolicy(),
-                        null) {
+                        new TestEventBus()) {
                     @Override
                     public UseCaseResult<ProfileUseCases.ProfileSaveResult> saveProfile(
                             ProfileUseCases.SaveProfileCommand command) {
@@ -162,7 +170,7 @@ class ProfileHandlerTest {
 
     @Test
     @DisplayName("previewProfile uses the configured zone for age display")
-    void previewProfileUsesConfiguredZoneForAgeDisplay() throws Exception {
+    void previewProfileUsesConfiguredZoneForAgeDisplay() {
         AppConfig config =
                 AppConfig.builder().userTimeZone(ZoneId.of("Pacific/Honolulu")).build();
         TestStorages.Users previewUsers = new TestStorages.Users();
@@ -175,10 +183,10 @@ class ProfileHandlerTest {
                 profileService,
                 validationService,
                 null,
-                null,
+                TestAchievementService.empty(),
                 config,
                 new datingapp.core.workflow.ProfileActivationPolicy(),
-                null);
+                new TestEventBus());
 
         User user = createEditableUser();
         user.setBio("Preview bio");
@@ -198,7 +206,14 @@ class ProfileHandlerTest {
         appender.start();
         handlerLogger.addAppender(appender);
 
-        try {
+        try (Cleanup cleanup = () -> {
+            handlerLogger.detachAppender(appender);
+            handlerLogger.setLevel(previousLevel);
+            appender.stop();
+            TimeZone.setDefault(originalZone);
+            AppClock.reset();
+        }) {
+            cleanup.getClass();
             ProfileHandler handler = new ProfileHandler(
                     previewUsers,
                     validationService,
@@ -212,12 +227,6 @@ class ProfileHandlerTest {
             assertTrue(appender.list.stream()
                     .map(ILoggingEvent::getFormattedMessage)
                     .anyMatch(message -> message.contains("25 years old")));
-        } finally {
-            handlerLogger.detachAppender(appender);
-            handlerLogger.setLevel(previousLevel);
-            appender.stop();
-            TimeZone.setDefault(originalZone);
-            AppClock.reset();
         }
     }
 
@@ -284,7 +293,9 @@ class ProfileHandlerTest {
     }
 
     private static User createEditableUser() {
-        User user = new User(UUID.randomUUID(), "Test User");
+        User user = TestUserFactory.createActiveUser("Test User");
+        user.setBio(null);
+        user.setPhotoUrls(java.util.List.of());
         user.setPacePreferences(new PacePreferences(
                 PacePreferences.MessagingFrequency.OFTEN,
                 PacePreferences.TimeToFirstDate.FEW_DAYS,

@@ -23,6 +23,8 @@ import datingapp.core.model.User.UserState;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.PageData;
 import datingapp.core.storage.UserStorage;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,23 +37,6 @@ import java.util.UUID;
 public class MatchingUseCases {
 
     private static final String CONTEXT_REQUIRED = "Context is required";
-    private static final AppEventBus NO_OP_EVENT_BUS = new AppEventBus() {
-        @Override
-        public void publish(AppEvent event) {
-            // no-op: optional event bus substitution intentionally drops events.
-        }
-
-        @Override
-        public <T extends AppEvent> void subscribe(Class<T> eventType, AppEventBus.AppEventHandler<T> handler) {
-            // no-op: optional event bus substitution intentionally ignores subscriptions.
-        }
-
-        @Override
-        public <T extends AppEvent> void subscribe(
-                Class<T> eventType, AppEventBus.AppEventHandler<T> handler, AppEventBus.HandlerPolicy policy) {
-            // no-op: optional event bus substitution intentionally ignores subscriptions.
-        }
-    };
     private static final DailyLimitService NO_OP_DAILY_LIMIT_SERVICE = new DailyLimitService() {
         @Override
         public boolean canLike(UUID userId) {
@@ -74,12 +59,12 @@ public class MatchingUseCases {
         }
 
         @Override
-        public java.time.Duration getTimeUntilReset() {
-            return java.time.Duration.ZERO;
+        public Duration getTimeUntilReset() {
+            return Duration.ZERO;
         }
 
         @Override
-        public String formatDuration(java.time.Duration duration) {
+        public String formatDuration(Duration duration) {
             return RecommendationService.formatDuration(duration);
         }
     };
@@ -131,6 +116,7 @@ public class MatchingUseCases {
     private final UserStorage userStorage;
     private final MatchQualityService matchQualityService;
     private final AppEventBus eventBus;
+    private final RecommendationService recommendationService;
 
     public static Builder builder() {
         return new Builder();
@@ -147,7 +133,8 @@ public class MatchingUseCases {
             InteractionStorage interactionStorage,
             UserStorage userStorage,
             MatchQualityService matchQualityService,
-            AppEventBus eventBus) {
+            AppEventBus eventBus,
+            RecommendationService recommendationService) {
         this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
         this.matchingService = Objects.requireNonNull(matchingService, "matchingService cannot be null");
         this.dailyLimitService = Objects.requireNonNull(dailyLimitService, "dailyLimitService cannot be null");
@@ -157,7 +144,9 @@ public class MatchingUseCases {
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.matchQualityService = Objects.requireNonNull(matchQualityService, "matchQualityService cannot be null");
-        this.eventBus = eventBus == null ? NO_OP_EVENT_BUS : eventBus;
+        this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
+        this.recommendationService =
+                Objects.requireNonNull(recommendationService, "recommendationService cannot be null");
     }
 
     public static final class Builder {
@@ -171,6 +160,7 @@ public class MatchingUseCases {
         private UserStorage userStorage;
         private MatchQualityService matchQualityService;
         private AppEventBus eventBus;
+        private RecommendationService recommendationService;
 
         private Builder() {}
 
@@ -185,6 +175,7 @@ public class MatchingUseCases {
         }
 
         public Builder recommendationService(RecommendationService recommendationService) {
+            this.recommendationService = recommendationService;
             this.dailyLimitService = wrapDailyLimitService(recommendationService);
             this.dailyPickService = wrapDailyPickService(recommendationService);
             this.standoutService = wrapStandoutService(recommendationService);
@@ -232,17 +223,37 @@ public class MatchingUseCases {
         }
 
         public MatchingUseCases build() {
+            CandidateFinder resolvedCandidateFinder =
+                    Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
+            MatchingService resolvedMatchingService =
+                    Objects.requireNonNull(matchingService, "matchingService cannot be null");
+            DailyLimitService resolvedDailyLimitService =
+                    Objects.requireNonNull(dailyLimitService, "dailyLimitService cannot be null");
+            DailyPickService resolvedDailyPickService =
+                    Objects.requireNonNull(dailyPickService, "dailyPickService cannot be null");
+            StandoutService resolvedStandoutService =
+                    Objects.requireNonNull(standoutService, "standoutService cannot be null");
+            UndoService resolvedUndoService = Objects.requireNonNull(undoService, "undoService cannot be null");
+            InteractionStorage resolvedInteractionStorage =
+                    Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+            UserStorage resolvedUserStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+            MatchQualityService resolvedMatchQualityService =
+                    Objects.requireNonNull(matchQualityService, "matchQualityService cannot be null");
+            AppEventBus resolvedEventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
+            RecommendationService resolvedRecommendationService =
+                    Objects.requireNonNull(recommendationService, "recommendationService cannot be null");
             return new MatchingUseCases(
-                    candidateFinder,
-                    matchingService,
-                    dailyLimitService,
-                    dailyPickService,
-                    standoutService,
-                    undoService,
-                    interactionStorage,
-                    userStorage,
-                    matchQualityService,
-                    eventBus);
+                    resolvedCandidateFinder,
+                    resolvedMatchingService,
+                    resolvedDailyLimitService,
+                    resolvedDailyPickService,
+                    resolvedStandoutService,
+                    resolvedUndoService,
+                    resolvedInteractionStorage,
+                    resolvedUserStorage,
+                    resolvedMatchQualityService,
+                    resolvedEventBus,
+                    resolvedRecommendationService);
         }
     }
 
@@ -270,7 +281,7 @@ public class MatchingUseCases {
         }
     }
 
-    public UseCaseResult<MatchingService.SwipeResult> processSwipe(ProcessSwipeCommand command) {
+    public UseCaseResult<SwipeOutcome> processSwipe(ProcessSwipeCommand command) {
         if (command == null
                 || command.context() == null
                 || command.currentUser() == null
@@ -312,7 +323,7 @@ public class MatchingUseCases {
                             m.getId(), result.like().whoLikes(), result.like().whoGotLiked(), AppClock.now()));
                 }
             }
-            return UseCaseResult.success(result);
+            return UseCaseResult.success(SwipeOutcome.from(result));
         } catch (Exception e) {
             String errorMessage =
                     e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
@@ -320,7 +331,7 @@ public class MatchingUseCases {
         }
     }
 
-    public UseCaseResult<UndoService.UndoResult> undoSwipe(UndoSwipeCommand command) {
+    public UseCaseResult<UndoOutcome> undoSwipe(UndoSwipeCommand command) {
         if (command == null || command.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
@@ -334,7 +345,7 @@ public class MatchingUseCases {
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.message()));
             }
-            return UseCaseResult.success(result);
+            return UseCaseResult.success(UndoOutcome.from(result));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to undo swipe: " + e.getMessage()));
         }
@@ -472,7 +483,7 @@ public class MatchingUseCases {
         }
     }
 
-    public UseCaseResult<MatchQualityService.MatchQuality> matchQuality(MatchQualityQuery query) {
+    public UseCaseResult<MatchQualitySnapshot> matchQuality(MatchQualityQuery query) {
         if (query == null || query.context() == null || query.match() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and match are required"));
         }
@@ -482,13 +493,13 @@ public class MatchingUseCases {
             if (quality.isEmpty()) {
                 return UseCaseResult.failure(UseCaseError.notFound("Match quality unavailable"));
             }
-            return UseCaseResult.success(quality.get());
+            return UseCaseResult.success(MatchQualitySnapshot.from(quality.get()));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to compute match quality: " + e.getMessage()));
         }
     }
 
-    public UseCaseResult<MatchQualityService.MatchQuality> getMatchQuality(MatchQualityByIdQuery query) {
+    public UseCaseResult<MatchQualitySnapshot> getMatchQuality(MatchQualityByIdQuery query) {
         if (query == null || query.context() == null || query.matchId() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and matchId are required"));
         }
@@ -521,6 +532,35 @@ public class MatchingUseCases {
         }
     }
 
+    public UseCaseResult<DailyStatusResult> getDailyStatus(DailyStatusQuery query) {
+        if (query == null || query.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        try {
+            UUID userId = query.context().userId();
+            RecommendationService.DailyStatus status = recommendationService.getStatus(userId);
+            String timeUntilReset = RecommendationService.formatDuration(recommendationService.getTimeUntilReset());
+            return UseCaseResult.success(new DailyStatusResult(
+                    status.likesUsed(), status.likesRemaining(), status.hasUnlimitedLikes(), timeUntilReset));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to get daily status: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<UndoAvailabilityResult> getUndoAvailability(UndoAvailabilityQuery query) {
+        if (query == null || query.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        try {
+            UUID userId = query.context().userId();
+            boolean canUndo = undoService.canUndo(userId);
+            int secondsRemaining = canUndo ? undoService.getSecondsRemaining(userId) : 0;
+            return UseCaseResult.success(new UndoAvailabilityResult(canUndo, secondsRemaining));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to get undo availability: " + e.getMessage()));
+        }
+    }
+
     public static record BrowseCandidatesCommand(UserContext context, User currentUser) {}
 
     public static record BrowseCandidatesResult(
@@ -534,7 +574,19 @@ public class MatchingUseCases {
             boolean superLike,
             boolean markDailyPickViewed) {}
 
+    public static record SwipeOutcome(boolean matched, Match match, Like like, String message) {
+        static SwipeOutcome from(MatchingService.SwipeResult result) {
+            return new SwipeOutcome(result.matched(), result.match(), result.like(), result.message());
+        }
+    }
+
     public static record UndoSwipeCommand(UserContext context) {}
+
+    public static record UndoOutcome(Like undoneSwipe, boolean matchDeleted, String message) {
+        static UndoOutcome from(UndoService.UndoResult result) {
+            return new UndoOutcome(result.undoneSwipe(), result.matchDeleted(), result.message());
+        }
+    }
 
     public static record ListActiveMatchesQuery(UserContext context) {}
 
@@ -559,11 +611,86 @@ public class MatchingUseCases {
 
     public static record MatchQualityQuery(UserContext context, Match match) {}
 
+    public static record MatchQualitySnapshot(
+            String matchId,
+            UUID perspectiveUserId,
+            UUID otherUserId,
+            Instant computedAt,
+            double distanceScore,
+            double ageScore,
+            double interestScore,
+            double lifestyleScore,
+            double paceScore,
+            double responseScore,
+            double distanceKm,
+            int ageDifference,
+            List<String> sharedInterests,
+            List<String> lifestyleMatches,
+            Duration timeBetweenLikes,
+            String paceSyncLevel,
+            int compatibilityScore,
+            String compatibilityLabel,
+            String starDisplay,
+            String shortSummary,
+            List<String> highlights) {
+        public MatchQualitySnapshot {
+            sharedInterests = sharedInterests == null ? List.of() : List.copyOf(sharedInterests);
+            lifestyleMatches = lifestyleMatches == null ? List.of() : List.copyOf(lifestyleMatches);
+            highlights = highlights == null ? List.of() : List.copyOf(highlights);
+        }
+
+        static MatchQualitySnapshot from(MatchQualityService.MatchQuality quality) {
+            return new MatchQualitySnapshot(
+                    quality.matchId(),
+                    quality.perspectiveUserId(),
+                    quality.otherUserId(),
+                    quality.computedAt(),
+                    quality.distanceScore(),
+                    quality.ageScore(),
+                    quality.interestScore(),
+                    quality.lifestyleScore(),
+                    quality.paceScore(),
+                    quality.responseScore(),
+                    quality.distanceKm(),
+                    quality.ageDifference(),
+                    quality.sharedInterests(),
+                    quality.lifestyleMatches(),
+                    quality.timeBetweenLikes(),
+                    quality.paceSyncLevel(),
+                    quality.compatibilityScore(),
+                    quality.getCompatibilityLabel(),
+                    quality.getStarDisplay(),
+                    quality.getShortSummary(),
+                    quality.highlights());
+        }
+
+        public String getCompatibilityLabel() {
+            return compatibilityLabel;
+        }
+
+        public String getStarDisplay() {
+            return starDisplay;
+        }
+
+        public String getShortSummary() {
+            return shortSummary;
+        }
+    }
+
     public static record MatchQualityByIdQuery(UserContext context, String matchId) {}
 
     public static record ArchiveMatchCommand(UserContext context, String matchId) {}
 
     public static record ListPagedMatchesQuery(UserContext context, int limit, int offset) {}
+
+    public static record DailyStatusQuery(UserContext context) {}
+
+    public static record DailyStatusResult(
+            int likesUsed, int likesRemaining, boolean hasUnlimitedLikes, String timeUntilReset) {}
+
+    public static record UndoAvailabilityQuery(UserContext context) {}
+
+    public static record UndoAvailabilityResult(boolean canUndo, int secondsRemaining) {}
 
     public static DailyLimitService wrapDailyLimitService(RecommendationService recommendationService) {
         if (recommendationService == null) {
@@ -600,12 +727,12 @@ public class MatchingUseCases {
             }
 
             @Override
-            public java.time.Duration getTimeUntilReset() {
+            public Duration getTimeUntilReset() {
                 return recommendationService.getTimeUntilReset();
             }
 
             @Override
-            public String formatDuration(java.time.Duration duration) {
+            public String formatDuration(Duration duration) {
                 return RecommendationService.formatDuration(duration);
             }
         };

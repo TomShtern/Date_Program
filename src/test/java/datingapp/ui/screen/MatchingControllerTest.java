@@ -18,6 +18,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
@@ -349,7 +350,7 @@ class MatchingControllerTest {
                     noteProfileService,
                     null,
                     null,
-                    null,
+                    TestAchievementService.empty(),
                     config,
                     new datingapp.core.workflow.ProfileActivationPolicy(),
                     eventBus);
@@ -373,7 +374,8 @@ class MatchingControllerTest {
                                     interactions,
                                     users,
                                     new MatchQualityService(users, interactions, config),
-                                    eventBus),
+                                    eventBus,
+                                    recommendationService),
                             new datingapp.app.usecase.social.SocialUseCases(trustSafetyService),
                             new UseCaseUiProfileNoteDataAccess(noteUseCases)),
                     AppSession.getInstance(),

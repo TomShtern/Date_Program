@@ -5,6 +5,7 @@ import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.async.ViewModelAsyncScope;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import org.slf4j.Logger;
@@ -19,6 +20,7 @@ public abstract class BaseViewModel {
     protected final ViewModelAsyncScope asyncScope;
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final AtomicBoolean disposed = new AtomicBoolean(false);
+    private final AtomicReference<ViewModelErrorSink> errorSink = new AtomicReference<>();
 
     /**
      * Initializes the BaseViewModel with a default error router.
@@ -40,10 +42,21 @@ public abstract class BaseViewModel {
     protected BaseViewModel(String scopeName, UiThreadDispatcher uiDispatcher, ViewModelErrorSink errorSink) {
         Objects.requireNonNull(scopeName, "scopeName cannot be null");
         UiThreadDispatcher dispatcher = Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null");
+        this.errorSink.set(errorSink);
 
         this.asyncScope = new ViewModelAsyncScope(
-                scopeName, dispatcher, new AsyncErrorRouter(logger, dispatcher, () -> errorSink));
+                scopeName, dispatcher, new AsyncErrorRouter(logger, dispatcher, this.errorSink::get));
         this.asyncScope.setLoadingStateConsumer(this.loading::set);
+    }
+
+    /** Allows controllers or factories to bind the error sink after construction. */
+    public final void setErrorSink(ViewModelErrorSink errorSink) {
+        this.errorSink.set(errorSink);
+    }
+
+    /** Returns true when an error sink is currently bound. */
+    protected final boolean hasErrorSink() {
+        return errorSink.get() != null;
     }
 
     /**
@@ -51,6 +64,22 @@ public abstract class BaseViewModel {
      */
     public final BooleanProperty loadingProperty() {
         return loading;
+    }
+
+    /**
+     * Delivers a user-facing error message to the currently bound sink, if any.
+     * The sink is resolved at call time so late-bound handlers still receive
+     * future failures.
+     */
+    protected final void notifyError(String userMessage, Throwable error) {
+        ViewModelErrorSink sink = errorSink.get();
+        if (sink == null) {
+            return;
+        }
+
+        String detail = error != null ? error.getMessage() : null;
+        String message = detail == null || detail.isBlank() ? userMessage : userMessage + ": " + detail;
+        asyncScope.dispatchToUi(() -> sink.onError(message));
     }
 
     /**

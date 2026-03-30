@@ -3,12 +3,9 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 
+import datingapp.app.usecase.matching.MatchingUseCases.SwipeOutcome;
 import datingapp.core.connection.ConnectionModels.Like;
-import datingapp.core.matching.MatchingService;
-import datingapp.core.matching.RecommendationService;
 import datingapp.core.model.Match;
-import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -28,7 +25,7 @@ class MatchingCliPresenterTest {
         UUID second = UUID.randomUUID();
         Like like = Like.create(first, second, Like.Direction.LIKE);
         Match match = Match.create(first, second);
-        MatchingService.SwipeResult result = new MatchingService.SwipeResult(true, true, match, like, "It's a match!");
+        SwipeOutcome result = new SwipeOutcome(true, match, like, "It's a match!");
 
         assertIterableEquals(
                 List.of("", "🎉🎉🎉 IT'S A MATCH! 🎉🎉🎉", "You and Riley like each other!", ""),
@@ -38,10 +35,7 @@ class MatchingCliPresenterTest {
     @Test
     @DisplayName("renders daily limit panel using localized lines")
     void rendersDailyLimitPanelUsingLocalizedLines() {
-        RecommendationService.DailyStatus status = new RecommendationService.DailyStatus(
-                7, 0, 0, 999, 0, 999, LocalDate.now(), Instant.now().plusSeconds(3600));
-
-        List<String> lines = presenter.dailyLimitReachedLines(status, "1h 0m");
+        List<String> lines = presenter.dailyLimitReachedLines(7, "1h 0m");
 
         assertEquals("         💔 DAILY LIMIT REACHED", lines.get(2));
         assertEquals("   You've used all 7 likes for today!", lines.get(5));

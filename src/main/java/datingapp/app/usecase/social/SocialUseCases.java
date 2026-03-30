@@ -14,6 +14,7 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.Match;
 import datingapp.core.storage.CommunicationStorage;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,28 @@ public class SocialUseCases {
     private static final String CONTEXT_REQUIRED = "Context is required";
     private static final String CONTEXT_AND_TARGET_REQUIRED = "Context and target user are required";
     private static final String CONNECTION_SERVICE_NOT_CONFIGURED = "ConnectionService is not configured";
+
+    private enum CompatibilityMode {
+        COMPATIBILITY
+    }
+
+    private static final AppEventBus COMPATIBILITY_NO_OP_EVENT_BUS = new AppEventBus() {
+        @Override
+        public void publish(AppEvent event) {
+            // Compatibility shim for non-production construction paths.
+        }
+
+        @Override
+        public <T extends AppEvent> void subscribe(Class<T> eventType, AppEventHandler<T> handler) {
+            // Compatibility shim for non-production construction paths.
+        }
+
+        @Override
+        public <T extends AppEvent> void subscribe(
+                Class<T> eventType, AppEventHandler<T> handler, HandlerPolicy policy) {
+            // Compatibility shim for non-production construction paths.
+        }
+    };
 
     private enum RelationshipTransitionState {
         MATCHED,
@@ -41,18 +64,28 @@ public class SocialUseCases {
     private final AppEventBus eventBus;
 
     public SocialUseCases(ConnectionService connectionService, TrustSafetyService trustSafetyService) {
-        this(connectionService, trustSafetyService, null, null);
+        this(
+                connectionService,
+                trustSafetyService,
+                null,
+                COMPATIBILITY_NO_OP_EVENT_BUS,
+                CompatibilityMode.COMPATIBILITY);
     }
 
     public SocialUseCases(TrustSafetyService trustSafetyService) {
-        this(null, trustSafetyService, null, null);
+        this(null, trustSafetyService, null, COMPATIBILITY_NO_OP_EVENT_BUS, CompatibilityMode.COMPATIBILITY);
     }
 
     public SocialUseCases(
             ConnectionService connectionService,
             TrustSafetyService trustSafetyService,
             CommunicationStorage communicationStorage) {
-        this(connectionService, trustSafetyService, communicationStorage, null);
+        this(
+                connectionService,
+                trustSafetyService,
+                communicationStorage,
+                COMPATIBILITY_NO_OP_EVENT_BUS,
+                CompatibilityMode.COMPATIBILITY);
     }
 
     public SocialUseCases(
@@ -60,6 +93,19 @@ public class SocialUseCases {
             TrustSafetyService trustSafetyService,
             CommunicationStorage communicationStorage,
             AppEventBus eventBus) {
+        this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
+        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
+        this.communicationStorage = Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
+        this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
+    }
+
+    private SocialUseCases(
+            ConnectionService connectionService,
+            TrustSafetyService trustSafetyService,
+            CommunicationStorage communicationStorage,
+            AppEventBus eventBus,
+            CompatibilityMode compatibilityMode) {
+        Objects.requireNonNull(compatibilityMode, "compatibilityMode cannot be null");
         this.connectionService = connectionService;
         this.trustSafetyService = trustSafetyService;
         this.communicationStorage = communicationStorage;
@@ -89,7 +135,7 @@ public class SocialUseCases {
         }
     }
 
-    public UseCaseResult<TrustSafetyService.ReportResult> reportUser(ReportCommand command) {
+    public UseCaseResult<ReportOutcome> reportUser(ReportCommand command) {
         if (command == null
                 || command.context() == null
                 || command.targetUserId() == null
@@ -123,13 +169,13 @@ public class SocialUseCases {
                             command.blockUser(),
                             false,
                             AppClock.now()));
-            return UseCaseResult.success(result);
+            return UseCaseResult.success(ReportOutcome.from(result, command.blockUser()));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to report user: " + e.getMessage()));
         }
     }
 
-    public UseCaseResult<ConnectionService.TransitionResult> unmatch(RelationshipCommand command) {
+    public UseCaseResult<RelationshipTransitionOutcome> unmatch(RelationshipCommand command) {
         if (command == null || command.context() == null || command.targetUserId() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_TARGET_REQUIRED));
         }
@@ -147,13 +193,13 @@ public class SocialUseCases {
                     command.targetUserId(),
                     RelationshipTransitionState.MATCHED,
                     RelationshipTransitionState.UNMATCHED);
-            return UseCaseResult.success(result);
+            return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to unmatch users: " + e.getMessage()));
         }
     }
 
-    public UseCaseResult<ConnectionService.TransitionResult> requestFriendZone(RelationshipCommand command) {
+    public UseCaseResult<RelationshipTransitionOutcome> requestFriendZone(RelationshipCommand command) {
         if (command == null || command.context() == null || command.targetUserId() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_TARGET_REQUIRED));
         }
@@ -171,14 +217,14 @@ public class SocialUseCases {
                     command.targetUserId(),
                     RelationshipTransitionState.MATCHED,
                     RelationshipTransitionState.FRIEND_ZONE_REQUESTED);
-            return UseCaseResult.success(result);
+            return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
             return UseCaseResult.failure(
                     UseCaseError.internal("Failed to request friend-zone transition: " + e.getMessage()));
         }
     }
 
-    public UseCaseResult<ConnectionService.TransitionResult> gracefulExit(RelationshipCommand command) {
+    public UseCaseResult<RelationshipTransitionOutcome> gracefulExit(RelationshipCommand command) {
         if (command == null || command.context() == null || command.targetUserId() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_TARGET_REQUIRED));
         }
@@ -196,7 +242,7 @@ public class SocialUseCases {
                     command.targetUserId(),
                     RelationshipTransitionState.ACTIVE,
                     RelationshipTransitionState.GRACEFUL_EXIT);
-            return UseCaseResult.success(result);
+            return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
             return UseCaseResult.failure(
                     UseCaseError.internal("Failed to gracefully exit relationship: " + e.getMessage()));
@@ -219,8 +265,7 @@ public class SocialUseCases {
         }
     }
 
-    public UseCaseResult<ConnectionService.TransitionResult> respondToFriendRequest(
-            RespondFriendRequestCommand command) {
+    public UseCaseResult<RelationshipTransitionOutcome> respondToFriendRequest(RespondFriendRequestCommand command) {
         if (command == null || command.context() == null || command.requestId() == null || command.action() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context, requestId and action are required"));
         }
@@ -248,7 +293,7 @@ public class SocialUseCases {
                         new AppEvent.FriendRequestAccepted(
                                 req.id(), req.fromUserId(), req.toUserId(), matchId, AppClock.now()));
             }
-            return UseCaseResult.success(result);
+            return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
             return UseCaseResult.failure(
                     UseCaseError.internal("Failed to respond to friend request: " + e.getMessage()));
@@ -335,9 +380,6 @@ public class SocialUseCases {
     }
 
     private void publishEvent(String eventName, AppEvent event) {
-        if (eventBus == null) {
-            return;
-        }
         try {
             eventBus.publish(event);
         } catch (Exception e) {
@@ -352,6 +394,16 @@ public class SocialUseCases {
     public static record ReportCommand(
             UserContext context, UUID targetUserId, Report.Reason reason, String description, boolean blockUser) {}
 
+    public static record ReportOutcome(boolean autoBanned, boolean blockedByReporter) {
+        static ReportOutcome from(TrustSafetyService.ReportResult result, boolean blockedByReporter) {
+            return new ReportOutcome(result.userWasBanned(), blockedByReporter);
+        }
+
+        public boolean userWasBanned() {
+            return autoBanned;
+        }
+    }
+
     public static record FriendRequestsQuery(UserContext context) {}
 
     public static enum FriendRequestAction {
@@ -360,6 +412,16 @@ public class SocialUseCases {
     }
 
     public static record RespondFriendRequestCommand(UserContext context, UUID requestId, FriendRequestAction action) {}
+
+    public static record RelationshipTransitionOutcome(FriendRequest friendRequest) {
+        static RelationshipTransitionOutcome from(ConnectionService.TransitionResult result) {
+            return new RelationshipTransitionOutcome(result.friendRequest());
+        }
+
+        public UUID friendRequestId() {
+            return friendRequest != null ? friendRequest.id() : null;
+        }
+    }
 
     public static record NotificationsQuery(UserContext context, boolean unreadOnly) {}
 

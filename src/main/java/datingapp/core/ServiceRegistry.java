@@ -4,6 +4,7 @@ import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.messaging.MessagingUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
@@ -68,6 +69,7 @@ public final class ServiceRegistry {
     private final MessagingUseCases messagingUseCases;
     private final MatchingUseCases matchingUseCases;
     private final ProfileUseCases profileUseCases;
+    private final VerificationUseCases verificationUseCases;
     private final SocialUseCases socialUseCases;
 
     public static Builder builder() {
@@ -111,7 +113,7 @@ public final class ServiceRegistry {
         this.activationPolicy = Objects.requireNonNull(builder.activationPolicy, "activationPolicy cannot be null");
         this.workflowPolicy = Objects.requireNonNull(builder.workflowPolicy, "workflowPolicy cannot be null");
 
-        this.messagingUseCases = new MessagingUseCases(this.connectionService, this.eventBus);
+        this.messagingUseCases = new MessagingUseCases(this.connectionService, this.validationService, this.eventBus);
         this.matchingUseCases = MatchingUseCases.builder()
                 .candidateFinder(this.candidateFinder)
                 .matchingService(this.matchingService)
@@ -133,6 +135,7 @@ public final class ServiceRegistry {
                 .activationPolicy(this.activationPolicy)
                 .eventBus(this.eventBus)
                 .build();
+        this.verificationUseCases = new VerificationUseCases(this.userStorage, this.trustSafetyService);
         this.socialUseCases = new SocialUseCases(
                 this.connectionService, this.trustSafetyService, this.communicationStorage, this.eventBus);
     }
@@ -394,6 +397,10 @@ public final class ServiceRegistry {
 
     public ProfileUseCases getProfileUseCases() {
         return profileUseCases;
+    }
+
+    public VerificationUseCases getVerificationUseCases() {
+        return verificationUseCases;
     }
 
     public SocialUseCases getSocialUseCases() {

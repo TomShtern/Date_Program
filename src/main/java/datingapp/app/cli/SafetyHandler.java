@@ -2,6 +2,10 @@ package datingapp.app.cli;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.VerificationUseCases;
+import datingapp.app.usecase.profile.VerificationUseCases.ConfirmVerificationCommand;
+import datingapp.app.usecase.profile.VerificationUseCases.StartVerificationCommand;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
@@ -14,7 +18,6 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.model.User.VerificationMethod;
-import datingapp.core.storage.UserStorage;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -34,24 +37,28 @@ import org.slf4j.LoggerFactory;
  */
 public class SafetyHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(SafetyHandler.class);
+    private static final String ERROR_MESSAGE_FORMAT = "❌ {}\n";
 
-    private final UserStorage userStorage;
     private final TrustSafetyService trustSafetyService;
     private final SocialUseCases socialUseCases;
+    private final ProfileUseCases profileUseCases;
+    private final VerificationUseCases verificationUseCases;
     private final AppSession session;
     private final InputReader inputReader;
     private final AppConfig config;
 
     public SafetyHandler(
-            UserStorage userStorage,
             TrustSafetyService trustSafetyService,
             SocialUseCases socialUseCases,
+            ProfileUseCases profileUseCases,
+            VerificationUseCases verificationUseCases,
             AppSession session,
             InputReader inputReader,
             AppConfig config) {
-        this.userStorage = Objects.requireNonNull(userStorage);
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
         this.socialUseCases = Objects.requireNonNull(socialUseCases);
+        this.profileUseCases = Objects.requireNonNull(profileUseCases);
+        this.verificationUseCases = Objects.requireNonNull(verificationUseCases);
         this.session = Objects.requireNonNull(session);
         this.inputReader = Objects.requireNonNull(inputReader);
         this.config = Objects.requireNonNull(config);
@@ -60,9 +67,10 @@ public class SafetyHandler implements LoggingSupport {
     public static SafetyHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
         Objects.requireNonNull(services, "services cannot be null");
         return new SafetyHandler(
-                services.getUserStorage(),
                 services.getTrustSafetyService(),
                 services.getSocialUseCases(),
+                services.getProfileUseCases(),
+                services.getVerificationUseCases(),
                 session,
                 inputReader,
                 services.getConfig());
@@ -98,7 +106,7 @@ public class SafetyHandler implements LoggingSupport {
                 if (result.success()) {
                     logInfo("🚫 [SIMULATED] Blocked {}.", toBlock.getName());
                 } else {
-                    logInfo("❌ {}\n", result.error().message());
+                    logInfo(ERROR_MESSAGE_FORMAT, result.error().message());
                 }
             } else {
                 logInfo(CliTextAndInput.CANCELLED);
@@ -213,7 +221,7 @@ public class SafetyHandler implements LoggingSupport {
     }
 
     private List<User> getBlockableUsers(User currentUser) {
-        List<User> allUsers = userStorage.findAll();
+        List<User> allUsers = loadSelectableUsers();
         Set<UUID> alreadyBlocked = trustSafetyService.getBlockedUsers(currentUser.getId()).stream()
                 .map(User::getId)
                 .collect(java.util.stream.Collectors.toCollection(HashSet::new));
@@ -225,9 +233,18 @@ public class SafetyHandler implements LoggingSupport {
     }
 
     private List<User> getReportableUsers(User currentUser) {
-        return userStorage.findAll().stream()
+        return loadSelectableUsers().stream()
                 .filter(u -> !u.getId().equals(currentUser.getId()))
                 .toList();
+    }
+
+    private List<User> loadSelectableUsers() {
+        var result = profileUseCases.listUsers();
+        if (!result.success()) {
+            logInfo(ERROR_MESSAGE_FORMAT, result.error().message());
+            return List.of();
+        }
+        return result.data();
     }
 
     @Nullable
@@ -244,13 +261,13 @@ public class SafetyHandler implements LoggingSupport {
     }
 
     private void handleReportResult(
-            datingapp.app.usecase.common.UseCaseResult<TrustSafetyService.ReportResult> result, User reportedUser) {
+            datingapp.app.usecase.common.UseCaseResult<SocialUseCases.ReportOutcome> result, User reportedUser) {
         if (!result.success()) {
             logInfo("\n❌ {}\n", result.error().message());
             return;
         }
 
-        TrustSafetyService.ReportResult reportResult = result.data();
+        SocialUseCases.ReportOutcome reportResult = result.data();
         logInfo("\n✅ [SIMULATED] Report submitted. {} has been blocked.", reportedUser.getName());
         if (reportResult.userWasBanned()) {
             logInfo("⚠️  This user has been automatically BANNED due to multiple reports.");
@@ -325,40 +342,27 @@ public class SafetyHandler implements LoggingSupport {
      * @param method The verification method (email or phone)
      */
     private void startVerification(User user, VerificationMethod method) {
-        if (method == VerificationMethod.EMAIL) {
-            String email = inputReader.readLine("Email: ");
-            if (email == null || email.isBlank()) {
-                logInfo("❌ Email required.\n");
-                return;
-            }
-            user.setEmail(email.trim());
-        } else {
-            String phone = inputReader.readLine("Phone: ");
-            if (phone == null || phone.isBlank()) {
-                logInfo("❌ Phone required.\n");
-                return;
-            }
-            user.setPhone(phone.trim());
-        }
-
-        String generatedCode = trustSafetyService.generateVerificationCode();
-        user.startVerification(method, generatedCode);
-        userStorage.save(user);
-
-        logInfo("\n[SIMULATED DELIVERY] Your verification code is: {}\n", generatedCode);
-
-        String inputCode = inputReader.readLine("Enter the code: ");
-        if (!trustSafetyService.verifyCode(user, inputCode)) {
-            if (trustSafetyService.isExpired(user.getVerificationSentAt())) {
-                logInfo("❌ Code expired. Please try again.\n");
-            } else {
-                logInfo("❌ Incorrect code.\n");
-            }
+        String contactPrompt = method == VerificationMethod.EMAIL ? "Email: " : "Phone: ";
+        String contact = inputReader.readLine(contactPrompt);
+        var startResult = verificationUseCases.startVerification(
+                new StartVerificationCommand(UserContext.cli(user.getId()), method, contact));
+        if (!startResult.success()) {
+            logInfo(ERROR_MESSAGE_FORMAT, startResult.error().message());
             return;
         }
 
-        user.markVerified();
-        userStorage.save(user);
+        logInfo(
+                "\n[SIMULATED DELIVERY] Your verification code is: {}\n",
+                startResult.data().generatedCode());
+
+        String inputCode = inputReader.readLine("Enter the code: ");
+        var confirmResult = verificationUseCases.confirmVerification(
+                new ConfirmVerificationCommand(UserContext.cli(user.getId()), inputCode));
+        if (!confirmResult.success()) {
+            logInfo(ERROR_MESSAGE_FORMAT, confirmResult.error().message());
+            return;
+        }
+
         logInfo("✅ [SIMULATED] Profile verified!\n");
     }
 }

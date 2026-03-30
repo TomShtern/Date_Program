@@ -3,10 +3,12 @@ package datingapp.app.usecase.messaging;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
+import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.messaging.MessagingUseCases.ArchiveConversationCommand;
@@ -59,7 +61,7 @@ class MessagingUseCasesTest {
 
         ConnectionService connectionService =
                 new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
-        useCases = new MessagingUseCases(connectionService, null);
+        useCases = new MessagingUseCases(connectionService, new TestEventBus());
     }
 
     @Test
@@ -232,6 +234,18 @@ class MessagingUseCasesTest {
     }
 
     @Test
+    @DisplayName("constructor requires non-null event bus")
+    void constructorRequiresNonNullEventBus() {
+        ConnectionService connectionService =
+                new ConnectionService(AppConfig.defaults(), communicationStorage, interactionStorage, userStorage);
+
+        NullPointerException exception =
+                assertThrows(NullPointerException.class, () -> new MessagingUseCases(connectionService, null));
+
+        assertEquals("eventBus cannot be null", exception.getMessage());
+    }
+
+    @Test
     @DisplayName("deleteConversation removes conversation and messages")
     void deleteConversationRemovesConversationAndMessages() {
         var sendResult = useCases.sendMessage(
@@ -261,7 +275,7 @@ class MessagingUseCasesTest {
                         throw new IllegalStateException("simulated lock timeout");
                     }
                 };
-        MessagingUseCases flakyUseCases = new MessagingUseCases(flakyService, null);
+        MessagingUseCases flakyUseCases = new MessagingUseCases(flakyService, new TestEventBus());
 
         var loadResult = flakyUseCases.loadConversation(
                 new LoadConversationQuery(UserContext.cli(recipient.getId()), sender.getId(), 50, 0, true));

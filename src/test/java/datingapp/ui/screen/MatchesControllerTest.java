@@ -152,7 +152,8 @@ class MatchesControllerTest {
                     interactions,
                     users,
                     matchQualityService,
-                    new datingapp.app.event.InProcessAppEventBus());
+                    new datingapp.app.event.InProcessAppEventBus(),
+                    dailyService);
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                             trustSafetyStorage, interactions, users, config, communications)
                     .build();

@@ -279,14 +279,13 @@ public final class DevDataSeeder {
         communicationStorage.saveConversation(convo);
 
         Message msg1 = Message.create(convo.getId(), avitalId, "Hey Adam! I saw you like hiking too");
-        communicationStorage.saveMessage(msg1);
+        communicationStorage.saveMessageAndUpdateConversationLastMessageAt(msg1);
 
         Message msg2 = Message.create(convo.getId(), adamId, "Haha yeah! We should grab coffee sometime.");
-        communicationStorage.saveMessage(msg2);
+        communicationStorage.saveMessageAndUpdateConversationLastMessageAt(msg2);
 
         Message msg3 = Message.create(convo.getId(), avitalId, "Sounds perfect! When are you free?");
-        communicationStorage.saveMessage(msg3);
-        communicationStorage.updateConversationLastMessageAt(convo.getId(), msg3.createdAt());
+        communicationStorage.saveMessageAndUpdateConversationLastMessageAt(msg3);
 
         LOG.info("DevDataSeeder: seed matches and sample conversation inserted.");
     }
@@ -1190,9 +1189,7 @@ public final class DevDataSeeder {
      * system limit is required. Throws if the profile is still incomplete when
      * {@code activate()} is called — surfaces misconfigured seed entries early.
      *
-     * @deprecated Use {@link #build(SeedUserDefinition)} with builder pattern instead
      */
-    @Deprecated(since = "2026-03", forRemoval = true)
     @SuppressWarnings({"checkstyle:ParameterNumber", "PMD.ExcessiveParameterList"})
     private static User build(
             UUID id,
@@ -1214,48 +1211,21 @@ public final class DevDataSeeder {
             int heightCm,
             Set<Interest> interests,
             PacePreferences pace) {
-
-        User user = new User(id, name);
-        user.setBio(bio);
-        user.setBirthDate(birthDate);
-        user.setGender(gender);
-        user.setInterestedIn(interestedIn);
-        user.setLocation(lat, lon);
-
-        // Clamp to system-enforced upper limit (500 km)
-        user.setMaxDistanceKm(Math.min(maxDistanceKm, 500), 500);
-
-        // Use two-arg variant with system bounds (18–120)
-        user.setAgeRange(Math.max(minAge, 18), Math.min(maxAge, 120), 18, 120);
-
-        user.setSmoking(smoking);
-        user.setDrinking(drinking);
-        user.setWantsKids(wantsKids);
-        user.setLookingFor(lookingFor);
-        user.setEducation(education);
-        user.setHeightCm(heightCm);
-        user.setInterests(interests);
-        user.setPacePreferences(pace);
-
-        // Assign 3 deterministic, gender-appropriate portrait photos per user.
-        // randomuser.me serves stable portraits indexed 0-99 by gender path.
-        // The index math below keeps values in the safe 5-94 range.
-        int photoBase = Math.floorMod(id.getLeastSignificantBits(), 85) + 5;
-        String portraitGender =
-                switch (gender) {
-                    case MALE -> "men";
-                    case FEMALE -> "women";
-                    case OTHER -> (Math.floorMod(id.getLeastSignificantBits(), 2) == 0) ? "men" : "women";
-                };
-        String portraitBaseUrl = "https://randomuser.me/api/portraits/" + portraitGender + "/";
-        user.addPhotoUrl(portraitBaseUrl + photoBase + ".jpg");
-        user.addPhotoUrl(portraitBaseUrl + ((photoBase + 12) % 90 + 5) + ".jpg");
-        user.addPhotoUrl(portraitBaseUrl + ((photoBase + 27) % 90 + 5) + ".jpg");
-
-        // Activate immediately — will throw if any required field is still absent,
-        // making bad seed entries fail loudly at startup rather than silently.
-        user.activate();
-        return user;
+        return build(SeedUserDefinition.builder(id, name, birthDate, gender)
+                .interestedIn(interestedIn)
+                .bio(bio)
+                .location(lat, lon)
+                .maxDistanceKm(maxDistanceKm)
+                .ageRange(minAge, maxAge)
+                .smoking(smoking)
+                .drinking(drinking)
+                .wantsKids(wantsKids)
+                .lookingFor(lookingFor)
+                .education(education)
+                .heightCm(heightCm)
+                .interests(interests)
+                .pace(pace)
+                .build());
     }
 
     /** Builds a {@link Set} of genders from varargs. */

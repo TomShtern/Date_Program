@@ -9,8 +9,10 @@ import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
@@ -82,14 +84,16 @@ class ProfileControllerTest {
             users.save(currentUser);
             AppSession.getInstance().setCurrentUser(currentUser);
 
-            ProfileViewModel viewModel = new ProfileViewModel(
+            ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
                     new StorageUiUserStore(users),
                     profileService,
                     null,
                     config,
                     AppSession.getInstance(),
+                    new ValidationService(config),
+                    new LocationService(new ValidationService(config)),
                     TEST_DISPATCHER,
-                    new datingapp.core.workflow.ProfileActivationPolicy());
+                    new datingapp.core.workflow.ProfileActivationPolicy()));
 
             JavaFxTestSupport.LoadedFxml loaded =
                     JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> new ProfileController(viewModel));
@@ -152,14 +156,16 @@ class ProfileControllerTest {
             users.save(currentUser);
             AppSession.getInstance().setCurrentUser(currentUser);
 
-            ProfileViewModel viewModel = new ProfileViewModel(
+            ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
                     new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                     profileService,
                     null,
                     config,
                     AppSession.getInstance(),
+                    new ValidationService(config),
+                    new LocationService(new ValidationService(config)),
                     TEST_DISPATCHER,
-                    new datingapp.core.workflow.ProfileActivationPolicy());
+                    new datingapp.core.workflow.ProfileActivationPolicy()));
 
             JavaFxTestSupport.LoadedFxml loaded =
                     JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> new ProfileController(viewModel));

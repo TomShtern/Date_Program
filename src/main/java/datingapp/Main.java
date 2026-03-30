@@ -9,11 +9,15 @@ import datingapp.app.cli.MessagingHandler;
 import datingapp.app.cli.ProfileHandler;
 import datingapp.app.cli.SafetyHandler;
 import datingapp.app.cli.StatsHandler;
+import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.matching.MatchingUseCases.DailyStatusQuery;
+import datingapp.app.usecase.matching.MatchingUseCases.DailyStatusResult;
+import datingapp.app.usecase.profile.ProfileUseCases.SessionSummaryQuery;
+import datingapp.app.usecase.profile.ProfileUseCases.SessionSummaryResult;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.matching.RecommendationService;
-import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.User;
 import java.io.PrintStream;
 import java.lang.foreign.Arena;
@@ -22,9 +26,12 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -196,30 +203,13 @@ public final class Main {
 
         if (currentUser != null) {
             logInfo("  Current User: {} ({})", currentUser.getName(), currentUser.getState());
-
-            // Show active session info
-            ActivityMetricsService sessionService = services.getActivityMetricsService();
-            sessionService
-                    .getCurrentSession(currentUser.getId())
-                    .ifPresent(sessionInfo -> logInfo(
-                            "  Session: {} swipes ({} likes, {} passes) | {} elapsed",
-                            sessionInfo.getSwipeCount(),
-                            sessionInfo.getLikeCount(),
-                            sessionInfo.getPassCount(),
-                            sessionInfo.getFormattedDuration()));
-
-            // Show daily likes
-            RecommendationService dailyService = services.getRecommendationService();
-            RecommendationService.DailyStatus dailyStatus = dailyService.getStatus(currentUser.getId());
-            if (dailyStatus.hasUnlimitedLikes()) {
-                logInfo("  💝 Daily Likes: unlimited");
-            } else {
-                logInfo(
-                        "  💝 Daily Likes: {}/{} remaining",
-                        dailyStatus.likesRemaining(),
-                        services.getConfig().matching().dailyLikeLimit());
+            for (String line : buildCurrentUserStatusLines(
+                    currentUser,
+                    services.getProfileUseCases()::getSessionSummary,
+                    services.getMatchingUseCases()::getDailyStatus,
+                    services.getConfig().matching().dailyLikeLimit())) {
+                logInfo(line);
             }
-
         } else {
             logInfo("  Current User: [None]");
         }
@@ -228,5 +218,44 @@ public final class Main {
             logInfo(line);
         }
         logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
+    }
+
+    static List<String> buildCurrentUserStatusLines(
+            User currentUser,
+            Function<SessionSummaryQuery, UseCaseResult<SessionSummaryResult>> sessionSummaryLookup,
+            Function<DailyStatusQuery, UseCaseResult<DailyStatusResult>> dailyStatusLookup,
+            int dailyLikeLimit) {
+        List<String> lines = new ArrayList<>();
+        if (currentUser == null) {
+            return lines;
+        }
+
+        UserContext context = UserContext.cli(currentUser.getId());
+        UseCaseResult<SessionSummaryResult> sessionSummaryResult =
+                sessionSummaryLookup.apply(new SessionSummaryQuery(context));
+        if (sessionSummaryResult.success()) {
+            sessionSummaryResult
+                    .data()
+                    .currentSession()
+                    .ifPresent(sessionInfo -> lines.add(String.format(
+                            "  Session: %d swipes (%d likes, %d passes) | %s elapsed",
+                            sessionInfo.swipeCount(),
+                            sessionInfo.likeCount(),
+                            sessionInfo.passCount(),
+                            sessionInfo.formattedDuration())));
+        }
+
+        UseCaseResult<DailyStatusResult> dailyStatusResult = dailyStatusLookup.apply(new DailyStatusQuery(context));
+        if (!dailyStatusResult.success()) {
+            lines.add("  💝 Daily Likes: --");
+        } else if (dailyStatusResult.data().hasUnlimitedLikes()) {
+            lines.add("  💝 Daily Likes: unlimited");
+        } else {
+            lines.add(String.format(
+                    "  💝 Daily Likes: %d/%d remaining",
+                    dailyStatusResult.data().likesRemaining(), dailyLikeLimit));
+        }
+
+        return lines;
     }
 }
