@@ -4,18 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import datingapp.storage.DatabaseManager;
+import datingapp.storage.StorageFactory;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-
-import datingapp.storage.DatabaseManager;
-import datingapp.storage.StorageFactory;
 
 /**
  * Tests for ServiceRegistry - central dependency registry and service wiring.

@@ -6,6 +6,17 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.model.ProfileNote;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
+import datingapp.core.profile.MatchPreferences.Dealbreakers;
+import datingapp.core.profile.MatchPreferences.Interest;
+import datingapp.core.profile.MatchPreferences.Lifestyle;
+import datingapp.core.storage.PageData;
+import datingapp.core.testutil.TestClock;
+import datingapp.storage.DatabaseManager;
+import datingapp.storage.DevDataSeeder;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -19,7 +30,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 import org.junit.jupiter.api.AfterEach;
@@ -27,18 +37,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-
-import datingapp.core.model.ProfileNote;
-import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
-import datingapp.core.profile.MatchPreferences.Dealbreakers;
-import datingapp.core.profile.MatchPreferences.Interest;
-import datingapp.core.profile.MatchPreferences.Lifestyle;
-import datingapp.core.storage.PageData;
-import datingapp.core.testutil.TestClock;
-import datingapp.storage.DatabaseManager;
-import datingapp.storage.DevDataSeeder;
 
 /**
  * Tests for normalized table DAO methods in {@link JdbiUserStorage} (V3

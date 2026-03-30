@@ -2,10 +2,13 @@ package datingapp.storage.jdbi;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.connection.ConnectionModels.Block;
+import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.connection.ConnectionModels.Report;
+import datingapp.storage.DatabaseManager;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
-
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 import org.junit.jupiter.api.AfterEach;
@@ -13,11 +16,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-
-import datingapp.core.connection.ConnectionModels.Block;
-import datingapp.core.connection.ConnectionModels.Like;
-import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.storage.DatabaseManager;
 
 /**
  * Tests for record binding in JDBI DAOs. Validates that records bound with
