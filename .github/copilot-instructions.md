@@ -63,297 +63,86 @@ Max nesting depth: ≤ 4.
 Cyclomatic complexity per function: ≤ 9.
 One responsibility per function/module (SRP).
 
-# Dating App - AI Agent Instructions
 
-**Platform:** Windows 11 | PowerShell 7.5.x | VS Code Insiders | Java 25 (preview enabled) | JavaFX 25.0.2
-**Verified snapshot (2026-03-11):** 140 main + 107 test Java files (247 total) | 66,698 LOC / 52,170 code | JaCoCo line coverage gate: 60%
+# Dating App - Copilot Instructions
 
-**SOURCE-OF-TRUTH RULE:** If any document conflicts with code, trust `src/main/java`, `src/test/java`, and `pom.xml`.
+> **Updated:** 2026-03-30
+> **Role in the instruction stack:** highest-level repo guidance.
+> **Hierarchy:** `.github/copilot-instructions.md` → `CLAUDE.md` → `AGENTS.md`.
 
-## Archived reference
+## Source of truth
 
-| Issue                       | Wrong                                           | Correct                                                                 |
-|-----------------------------|-------------------------------------------------|-------------------------------------------------------------------------|
-| Non-static nested type      | `public record SendResult(...) {}` inside class | `public static record SendResult(...) {}`                               |
-| Model enum import           | `import datingapp.core.model.Gender`            | `import datingapp.core.model.User.Gender`                               |
-| `ProfileNote` import        | `import datingapp.core.model.User.ProfileNote`  | `import datingapp.core.model.ProfileNote`                               |
-| Clock usage                 | `Instant.now()` in domain/service logic         | `AppClock.now()` (testable via `TestClock`)                             |
-| Service error flow          | `throw new ...` for business failure            | Return `*Result.failure(...)` record                                    |
-| Pair IDs                    | `a + "_" + b`                                   | lexicographically sorted deterministic ID (`generateId(a, b)`)          |
-| EnumSet null crash          | `EnumSet.copyOf(possiblyNull)`                  | `EnumSetUtil.safeCopy(...)` or null-safe conditional                    |
-| Mutable collection exposure | `return internalSet;`                           | Return defensive copy / unmodifiable view                               |
-| Legacy bootstrap references | `AppBootstrap`, `HandlerFactory`                | `ApplicationStartup` + service-based `fromServices(...)` handler wiring |
-| Legacy UI references        | `ui/controller`, `Toast`, `UiSupport`           | `ui/screen`, `ui/popup`, `UiFeedbackService`, `UiComponents`            |
+If any instruction file disagrees with the codebase, trust:
 
-**Config access pattern:** use injected `AppConfig` from `ServiceRegistry` for runtime behavior; keep `AppConfig.defaults()` at composition/bootstrap/test boundaries only.
+- `src/main/java`
+- `src/test/java`
+- `pom.xml`
 
-**Config JSON loading:** `ApplicationStartup.applyJsonConfig()` uses Jackson databinding (`readerForUpdating(builder).readValue(json)`) via a `BuilderMixin` — no annotations in `core/`. Adding a new config property only requires a field + setter in `AppConfig.Builder` and an entry in `app-config.json`. No `ApplicationStartup` edits needed.
+Use the lower-level docs only to explain or operationalize what the code already does.
 
-> Note: `ConnectionService.SendResult.ErrorCode` is currently declared as `public enum` inside a `public static record`; Java treats nested enums as implicitly static.
+## Environment defaults
 
-## Archived architecture snapshot
+- Windows 11
+- PowerShell 7.6
+- VS Code Insiders (sometimes IntelliJ)
+- Java 25 with preview enabled
+- JavaFX 25.0.2
+- Maven
+- Palantir Java Format / Spotless
+- Java by Red Hat extension
 
-```text
-datingapp/
-  Main.java
-  app/
-    api/RestApiServer.java
-    bootstrap/ApplicationStartup.java
-    cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
-    error/{AppError,AppResult}.java
-    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
-    usecase/
-      common/{UseCaseError,UseCaseResult,UserContext}.java
-      matching/MatchingUseCases.java
-      messaging/MessagingUseCases.java
-      profile/ProfileUseCases.java
-      social/SocialUseCases.java
-  core/
-    AppClock,AppConfig,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil
-    model/{User,Match,ProfileNote}
-    connection/{ConnectionModels,ConnectionService}
-    matching/{CandidateFinder,CompatibilityScoring,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}
-    metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
-    profile/{MatchPreferences,ProfileService,ValidationService}
-    storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
-    time/{DefaultTimePolicy,TimePolicy}
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
-  storage/
-    DatabaseManager.java
-    StorageFactory.java
-    jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
-    schema/{MigrationRunner,SchemaInitializer}.java
-  ui/
-    DatingApp,NavigationService,ImageCache,UiAnimations,UiComponents,UiConstants,UiFeedbackService,UiUtils
-    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
-    popup/{MatchPopupController,MilestonePopupController}
-    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,PreferencesController,ProfileController,SocialController,StandoutsController,StatsController}
-    viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,PreferencesViewModel,ProfileViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
-```
+Use PowerShell-friendly commands. When Maven test selection uses a comma-separated `-Dtest=...,...` list, prefer:
 
-## Archived correctness rules
+`mvn --% ...`
 
-1. Use nested model enums from owners:
-   - `User.Gender`, `User.UserState`, `User.VerificationMethod`
-   - `Match.MatchState`, `Match.MatchArchiveReason`
-2. `ProfileNote` is standalone: `datingapp.core.model.ProfileNote`.
-3. Use `AppClock.now()` in domain/service logic (not `Instant.now()`).
-4. Use deterministic pair IDs (`generateId(UUID a, UUID b)`) for two-user aggregates.
-5. Service business failures should return result records when provided (do not throw flow exceptions).
-6. ViewModels should use shared async abstractions in `ui/async` instead of ad-hoc thread/lifecycle patterns.
-7. ViewModels must use `UiDataAdapters` interfaces (avoid direct `core.storage` imports).
+## Always-on repo rules
 
-## Archived build and test commands
+- Keep `core/` framework-agnostic. No UI, database, REST, or Jackson annotations in domain/core types.
+- Treat `ServiceRegistry` and `ViewModelFactory` as the production composition roots.
+- Prefer `app/usecase/*` as the application boundary for business flows.
+- Use `AppClock` as the authoritative time source in domain and service logic: prefer `AppClock.now()` / `AppClock.today()`, or inject `AppClock.clock()` when a service is intentionally clock-based.
+- Use deterministic pair IDs via `generateId(UUID a, UUID b)` for two-user aggregates.
+- `ProfileNote` is standalone: `datingapp.core.model.ProfileNote`.
+- Import nested enums from owner types:
+  - `User.Gender`, `User.UserState`, `User.VerificationMethod`
+  - `Match.MatchState`, `Match.MatchArchiveReason`
+- Use injected `AppConfig` in runtime code; keep `AppConfig.defaults()` at bootstrap/composition/test boundaries.
+- Record-typed JDBI parameters should use `@BindMethods`, not `@BindBean`.
+- ViewModels should use `BaseViewModel`, `ui/async/*`, and `UiDataAdapters` instead of ad-hoc threading or direct storage coupling.
 
-Use the commands already wired in `pom.xml`:
+## Search, edit, and execution defaults
 
-```bash
-mvn test
-mvn -Ptest-output-verbose test
+- Prefer `ast-grep` / syntax-aware search when code structure matters.
+- Use focused subagents for independent read-only investigation or execution batches.
+- Make the smallest correct change first.
+- Avoid unrelated refactors while implementing a task.
+
+## Verification standard
+
+Before claiming work is complete:
+
+1. Check touched files for errors.
+2. Run targeted tests for the changed area.
+3. Run broader smoke coverage if multiple subsystems changed.
+4. Run `mvn spotless:apply verify` before concluding substantial work.
+
+## Canonical commands
+
+```powershell
+# Build and run CLI
 mvn compile && mvn exec:exec
+
+# Run JavaFX UI
 mvn javafx:run
+
+# Run the full test suite
+mvn test
+
+# Final repo-wide quality gate
 mvn spotless:apply verify
 ```
 
-Notes:
+## Read next
 
-- `validate` runs Checkstyle.
-- `verify` runs Spotless, PMD, and JaCoCo.
-- The JaCoCo bundle line-coverage gate is `0.60`.
-- Preview and native-access flags are required; do not remove them casually.
-
-## Archived architecture notes
-
-- `src/main/java/datingapp/core/**` is the framework-agnostic domain layer. Do not import UI, database, or web-framework types into `core/`.
-- `src/main/java/datingapp/app/**` contains adapters and orchestration: bootstrap, CLI, REST API, event bus, and app-level use cases.
-- `src/main/java/datingapp/storage/**` contains concrete storage implementations, schema setup, and database management.
-- `src/main/java/datingapp/ui/**` contains the JavaFX application, screens, popups, async utilities, and view models.
-- Shared bootstrapping goes through `datingapp.app.bootstrap.ApplicationStartup` and `datingapp.core.ServiceRegistry`.
-- Entrypoints are `src/main/java/datingapp/Main.java` for the CLI and `src/main/java/datingapp/ui/DatingApp.java` for JavaFX.
-
-## Archived conventions
-
-- Import nested enums from their owner types:
-  - `User.Gender`, `User.UserState`, `User.VerificationMethod`
-  - `Match.MatchState`, `Match.MatchArchiveReason`
-- `ProfileNote` is a standalone type: `datingapp.core.model.ProfileNote`.
-- Use `AppClock.now()` in domain and service logic; do not use `Instant.now()` there.
-- Use deterministic pair IDs via `generateId(UUID a, UUID b)` for two-user aggregates.
-- Prefer result records such as `*Result.failure(...)` for business-flow failures when that pattern already exists; avoid introducing flow-control exceptions.
-- Return defensive copies or unmodifiable views instead of exposing mutable internal collections.
-- Use `EnumSetUtil.safeCopy(...)` or equivalent null-safe handling for `EnumSet` values.
-- Use injected runtime config from `ServiceRegistry`; keep `AppConfig.defaults()` at bootstrap, composition, or test boundaries only.
-- Configuration JSON loading is handled in `ApplicationStartup` via Jackson mix-ins. When adding a config field, update `AppConfig.Builder` and `config/app-config.json`; do not add Jackson annotations in `core/`.
-- Do not reintroduce removed names or packages such as `AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`, or legacy `ui/controller` references.
-
-## Archived UI and async notes
-
-- View models should use the shared async abstractions in `src/main/java/datingapp/ui/async/**`.
-- Prefer `ViewModelAsyncScope`, `UiThreadDispatcher`, and `AsyncErrorRouter` over ad-hoc `Thread.ofVirtual()` or direct `Platform.runLater()` orchestration.
-- View models should depend on `UiDataAdapters` interfaces rather than concrete `core.storage` implementations.
-
-## Archived key pattern files
-
-- `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java` - bootstrap, config loading, and Jackson mix-in pattern.
-- `src/main/java/datingapp/core/ServiceRegistry.java` - central service and use-case wiring.
-- `src/main/java/datingapp/Main.java` - CLI composition root and handler factory usage.
-- `src/main/java/datingapp/ui/DatingApp.java` - JavaFX composition root.
-- `src/main/java/datingapp/ui/viewmodel/ChatViewModel.java` and `MatchesViewModel.java` - current async ViewModel patterns.
-
-## Archived caveats
-
-- Treat `PROJECT_STRUCTURE_GUIDE.md` as historical/deprecated for current structure.
-- When docs disagree, prefer `pom.xml` and the current source tree.
-
-## Tooling and MCP inventory
-
-Use the smallest tool that gives the needed answer. Prefer structure-aware tools first, then fall back to text search.
-
-### Local code search and refactors
-
-- `ast-grep` (`sg`) for syntax-aware search and transformations; use this first for code structure queries.
-- `search_subagent` for fast read-only codebase exploration.
-- `semantic_search` when you need broad workspace context and exact wording is uncertain.
-- `grep_search` for exact text searches and `file_search` for path existence checks.
-- `vscode_listCodeUsages` and `vscode_renameSymbol` for symbol-safe navigation and refactors.
-
-### Workspace editing and orchestration
-
-- `apply_patch` for file edits.
-- `create_file`, `create_directory`, and `list_dir` for scaffolding or file creation.
-- `runSubagent` for isolated analysis tasks that should return one consolidated result.
-- `multi_tool_use.parallel` for independent read-only lookups that can run together.
-- `manage_todo_list` to keep multi-step work explicit and current.
-
-### Commands, tasks, and execution
-
-- `run_in_terminal` for direct shell commands when you need full command output.
-- `execution_subagent` for execution-focused shell work that should be summarized.
-- `run_task` and `create_and_run_task` for repo task execution through VS Code.
-- `get_task_output`, `get_terminal_output`, `terminal_last_command`, and `terminal_selection` for follow-up inspection.
-- `kill_terminal` to clean up long-running or stale processes.
-
-### Validation and debugging
-
-- `runTests` for targeted or full test execution.
-- `get_errors` after edits to catch compile or lint issues quickly.
-- `sonarqube_analyze_file` for deep file-level analysis when needed.
-- Java debug tools: `debug_java_application`, `get_debug_session_info`, `get_debug_threads`, `get_debug_stack_trace`, `get_debug_variables`, `evaluate_debug_expression`, `set_java_breakpoint`, `debug_step_operation`, `remove_java_breakpoints`, and `stop_debug_session`.
-- `get_changed_files` when you need the active git diff.
-
-### External research and documentation
-
-- `fetch_webpage` for user-provided URLs and any linked pages that matter.
-- `mcp_exa_web_search_exa` and `mcp_exa_get_code_context_exa` for current web and code examples.
-- `mcp_upstash_conte_resolve-library-id` and `mcp_upstash_conte_query-docs` for library documentation lookups.
-- `get_vscode_api` for VS Code extension API questions.
-- `vscode-websearchforcopilot_webSearch` for quick web search inside the editor experience.
-
-### Memory and clarifying questions
-
-- `memory` for durable user, session, and repository notes.
-- `resolve_memory_file_uri` when a memory file URI is needed elsewhere.
-- `vscode_askQuestions` when a small clarification would prevent guesswork.
-
-### Practical usage rules
-
-- For syntax-aware code questions, default to `ast-grep` before plain-text search.
-- For independent reads, batch tools in parallel instead of serially.
-- For changes that touch several symbols, prefer symbol-aware rename/usages tools over manual find/replace.
-- After edits, verify the touched files before broad test runs.
-
-## Verified source tree snapshot
-
-```text
-datingapp/
-  Main.java
-  app/
-    api/{RestApiDtos,RestApiServer}.java
-    bootstrap/ApplicationStartup.java
-    cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
-    error/{AppError,AppResult}.java
-    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
-    event/handlers/{AchievementEventHandler,MetricsEventHandler,NotificationEventHandler}.java
-    usecase/
-      common/{UseCaseError,UseCaseResult,UserContext}.java
-      matching/MatchingUseCases.java
-      messaging/MessagingUseCases.java
-      profile/ProfileUseCases.java
-      social/SocialUseCases.java
-  core/
-    AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil
-    model/{User,Match,ProfileNote}
-    connection/{ConnectionModels,ConnectionService}
-    matching/{CandidateFinder,CompatibilityScoring,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}
-    metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
-    profile/{LocationService,MatchPreferences,ProfileCompletionSupport,ProfileService,ValidationService}
-    storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
-    time/{DefaultTimePolicy,TimePolicy}
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
-  storage/
-    DatabaseManager.java
-    DevDataSeeder.java
-    StorageFactory.java
-    jdbi/{JdbiAccountCleanupStorage,JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
-    schema/{MigrationRunner,SchemaInitializer}.java
-  ui/
-    DatingApp,NavigationService,ImageCache,UiAnimations,UiComponents,UiConstants,UiFeedbackService,UiUtils
-    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,PollingTaskHandle,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
-    popup/{MilestonePopupController}.java
-    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,ProfileViewController,SafetyController,SocialController,StandoutsController,StatsController}.java
-    viewmodel/{BaseViewModel,ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,NotesViewModel,PreferencesViewModel,ProfileReadOnlyViewModel,ProfileViewModel,SafetyViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
-```
-
-## High-friction conventions
-
-- Build wiring should flow through `ServiceRegistry` and `fromServices(...)`; avoid direct cross-layer construction in callers.
-- ViewModels should use `ViewModelAsyncScope`, `PollingTaskHandle`, `AsyncErrorRouter`, and `UiDataAdapters`; avoid ad-hoc threading and direct storage coupling.
-- Use `AppClock.now()` in domain and service logic; do not introduce `Instant.now()` in those layers.
-- Use deterministic pair IDs with `generateId(UUID a, UUID b)` for two-user aggregates.
-- Keep `ProfileNote` as the standalone model type: `datingapp.core.model.ProfileNote`.
-- Prefer result records for business failures when that pattern already exists.
-- Return defensive copies or unmodifiable views instead of exposing mutable internal collections.
-- Use `EnumSetUtil.safeCopy(...)` or equivalent null-safe handling for `EnumSet` values.
-- Keep runtime config injection on `AppConfig` from `ServiceRegistry`; reserve `AppConfig.defaults()` for bootstrap, composition, or tests.
-
-## Location feature parity
-
-- `src/main/java/datingapp/core/profile/LocationService.java` is the single shared location engine. Keep country/city/ZIP search, selection resolution, reverse-selection seeds, approximate ZIP fallback, and display formatting there rather than duplicating rules in adapters.
-- Keep location behavior aligned across JavaFX (`ui/screen/LocationSelectionDialog` + `ProfileController`), CLI (`app/cli/ProfileHandler`), and REST (`app/api/RestApiServer` + `RestApiDtos`). If one surface changes, review the other two.
-- API clients can use `GET /api/location/countries`, `GET /api/location/cities`, and `POST /api/location/resolve`; profile updates support a nested `location` selection object in addition to legacy `latitude` / `longitude`.
-- For user-facing output, prefer `locationService.formatForDisplay(...)`; do not reintroduce coarse or raw coordinate display when a supported location label exists.
-- Only Israel (`IL`) is selectable today; other countries are listed but unavailable. Valid-but-unsupported Israeli ZIP codes can fall back to `Approximate area in Israel` when the caller or user opts in.
-
-## Runtime gotchas
-
-- `RestApiServer` binds to loopback only by design; do not assume external host access.
-- `DevDataSeeder` is env-gated and idempotent; it should remain safe to call during startup.
-- Record-typed JDBI parameters should use `@BindMethods`, not `@BindBean`.
-- Keep date/time formatting locale-explicit when user-facing text depends on month names or weekday names.
-- `POST /api/location/resolve` is treated as a read-only lookup route and is intentionally exempt from the mutating-route `X-User-Id` requirement.
-
-## Build and verification order
-
-1. Make the smallest correct edit.
-2. Run `get_errors` on the touched file(s).
-3. Run targeted tests for the affected area.
-4. Use `mvn test` for broader confirmation when needed.
-5. Reserve `mvn spotless:apply verify` for final quality-gate checks or broader refactors.
-
-## Key pattern files
-
-- `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java` - bootstrap, config loading, and Jackson mix-in pattern.
-- `src/main/java/datingapp/app/api/RestApiServer.java` and `src/main/java/datingapp/app/api/RestApiDtos.java` - REST route patterns, including location metadata/resolve endpoints and selection-based profile update contracts.
-- `src/main/java/datingapp/core/ServiceRegistry.java` - central service and use-case wiring.
-- `src/main/java/datingapp/core/profile/LocationService.java` - shared built-in location dataset, selection/fallback behavior, reverse lookup, and friendly display formatting.
-- `src/main/java/datingapp/Main.java` - CLI composition root and handler wiring.
-- `src/main/java/datingapp/ui/DatingApp.java` - JavaFX composition root.
-- `src/main/java/datingapp/ui/screen/LocationSelectionDialog.java` - shared JavaFX location selection helper used by `ProfileController`.
-- `src/main/java/datingapp/ui/viewmodel/ChatViewModel.java`, `MatchesViewModel.java`, and `ProfileViewModel.java` - current async ViewModel patterns.
-
-## Keep these out of new work
-
-- Historical or removed names such as `AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`, and `ui/controller`.
-- Stale architecture docs when they conflict with the source tree.
-- New direct dependencies from `core/` into UI, database, or web-framework types.
-
+- `CLAUDE.md` — verified repo map, architecture snapshot, gotchas, and key files
+- `AGENTS.md` — execution workflow, tool discipline, and validation order

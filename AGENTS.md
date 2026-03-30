@@ -1,156 +1,93 @@
+# AGENTS.md
 
-> 🚀 **VERIFIED & UPDATED: 2026-03-11**
-> This document has been programmatically verified against the codebase as of this date.
+> **Updated:** 2026-03-30
+> **Role in the instruction stack:** lowest-level workflow guide for agents working in this repo.
+> **Hierarchy:** `.github/copilot-instructions.md` → `CLAUDE.md` → `AGENTS.md`.
 
-# AGENTS.md - Source-of-Truth Development Guide
+This file is intentionally **not** a second copy of the architecture snapshot in `CLAUDE.md`.
+Use it for execution discipline, tool choice, validation order, and doc-maintenance rules.
 
-## Verified Environment Snapshot
+## Source of truth
 
-- **OS:** Windows 11
-- **Shell:** PowerShell 7.x
-- **IDE:** VS Code Insiders (Java by Red Hat extension)
-- **Java:** 25 (preview enabled)
-- **JavaFX:** 25.0.2
-- **Build:** Maven
+If any markdown guidance and the code disagree, trust:
 
-## Verified Codebase Snapshot (from source)
+- `src/main/java`
+- `src/test/java`
+- `pom.xml`
 
-- **Total Java files:** **247**
-- `tokei` (Java only):
-  - **Total lines:** 66,698
-  - **Code lines:** 52,170
-  - **Blank lines:** 9,728
-  - **Comment lines:** 4,800
+## Working mode for agents
 
-If a markdown doc and code diverge, always trust current code in `src/main/java`, `src/test/java`, and build config in `pom.xml`.
+1. Start from current code and current build config, not historical docs.
+2. For multi-step work, keep an explicit todo list with exactly one step in progress.
+3. Read the relevant files fully before editing them.
+4. Prefer one coordinator for shared files and only parallelize independent work.
+5. Keep diffs small, contract-driven, and easy to verify.
 
-## Required Build / Test Commands
+## Search and tool discipline
 
-```bash
-# Build and run
-mvn compile && mvn exec:exec
-mvn javafx:run
+- Prefer syntax-aware search (`ast-grep`) when code structure matters.
+- Use read-only subagents for focused codebase exploration.
+- Use execution-oriented helpers for long Maven/test runs rather than manually chaining shell commands.
+- Prefer symbol-aware rename/usages tools when changing names across files.
+- On Windows PowerShell, use `mvn --% ...` when Maven arguments contain commas or special characters that PowerShell might parse.
 
-# Tests
-mvn test
-mvn -Ptest-output-verbose test
-mvn -Ptest-output-verbose -Dtest=StatsHandlerTest test
-mvn -Ptest-output-verbose -Dtest="StatsHandlerTest#displaysUnlockedAchievements" test
+## Editing discipline
 
-# Quality gate
+- Preserve layer boundaries:
+  - `core/` stays framework-free
+  - `app/usecase/*` stays the app boundary
+  - `ui/viewmodel/*` should go through `BaseViewModel`, `ui/async/*`, and `UiDataAdapters`
+- Do not reintroduce removed legacy names such as `AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`, or `ui/controller` references.
+- Prefer the canonical helpers already in the repo:
+  - `AppClock.now()` / `AppClock.today()` / `AppClock.clock()` depending on whether the code consumes instants, dates, or an injected `Clock`
+  - `Match.generateId(...)` / `Conversation.generateId(...)`
+  - `User.copy()`
+  - `EnumSetUtil.safeCopy(...)`
+- Treat any remaining convenience constructors outside `ViewModelFactory` as compatibility/test shims, not the production composition path.
+
+## Verification discipline
+
+Run verification in this order unless the task clearly needs a different sequence:
+
+1. Check touched files for errors.
+2. Run focused tests for the changed area.
+3. Run a broader smoke suite if multiple subsystems changed.
+4. Run the full quality gate before claiming completion:
+
+```powershell
 mvn spotless:apply verify
 ```
 
-## Architecture (Code-Verified)
+Use targeted Maven test selection for faster iteration, e.g.:
 
-```text
-datingapp/
-  Main.java
-  app/
-    api/RestApiServer.java
-    bootstrap/ApplicationStartup.java
-    cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
-    error/{AppError,AppResult}.java
-    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
-    usecase/
-      common/{UseCaseError,UseCaseResult,UserContext}.java
-      matching/MatchingUseCases.java
-      messaging/MessagingUseCases.java
-      profile/ProfileUseCases.java
-      social/SocialUseCases.java
-  core/
-    AppClock,AppConfig,AppSession,EnumSetUtil,LoggingSupport,PerformanceMonitor,ServiceRegistry,TextUtil
-    model/{User,Match,ProfileNote}
-    connection/{ConnectionModels,ConnectionService}
-    matching/{CandidateFinder,CompatibilityScoring,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}
-    metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
-    profile/{MatchPreferences,ProfileService,ValidationService}
-    storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
-    time/{DefaultTimePolicy,TimePolicy}
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
-  storage/
-    DatabaseManager.java
-    StorageFactory.java
-    jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
-    schema/{MigrationRunner,SchemaInitializer}.java
-  ui/
-    DatingApp,NavigationService,ImageCache,UiAnimations,UiComponents,UiConstants,UiFeedbackService,UiUtils
-    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
-    popup/{MatchPopupController,MilestonePopupController}
-    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,PreferencesController,ProfileController,SocialController,StandoutsController,StatsController}
-    viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,PreferencesViewModel,ProfileViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
+```powershell
+mvn --% -Dcheckstyle.skip=true -Dtest=ProfileUseCasesTest,MatchingUseCasesTest test
 ```
 
-## Entry Points and Wiring
+## Documentation maintenance rules
 
-### Shared bootstrap
+- Keep the instruction hierarchy non-redundant:
+  - `copilot-instructions.md` = highest-level always-on rules
+  - `CLAUDE.md` = verified repo map and current gotchas
+  - `AGENTS.md` = execution workflow and verification discipline
+- `GEMINI.md` and `QWEN.md` should roughly mirror each other and serve as merged model-specific guides.
+- Update counts, package snapshots, commands, and gotchas only from current source/build output.
+- If a doc stops matching the code, fix the doc or remove the stale claim.
 
-```java
-ServiceRegistry services = ApplicationStartup.initialize();
-AppSession session = AppSession.getInstance();
-```
+## Practical defaults for this repo
 
-### CLI (`Main.java`)
+- Prefer targeted tests during implementation.
+- Prefer the full quality gate before final handoff.
+- Use shared test helpers when available:
+  - `JavaFxTestSupport`
+  - `UiAsyncTestSupport`
+  - `RestApiTestFixture`
+  - `TestUserFactory`
+  - `TestEventBus`
+  - `TestAchievementService`
 
-```java
-InputReader inputReader = new CliTextAndInput.InputReader(scanner);
-ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
-MatchingHandler matching = new MatchingHandler(
-  MatchingHandler.Dependencies.fromServices(services, session, inputReader, profile::completeProfile));
-SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
-StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
-MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);
-```
+## When in doubt
 
-### JavaFX (`DatingApp.java`)
-
-```java
-ViewModelFactory vmFactory = new ViewModelFactory(services);
-NavigationService nav = NavigationService.getInstance();
-nav.setViewModelFactory(vmFactory);
-nav.initialize(primaryStage);
-```
-
-## Core Rules (Do / Don’t)
-
-### Do
-
-- Keep `core/` free from framework/DB/UI imports.
-- Use `AppClock.now()` for domain/service time.
-- Use deterministic pair IDs via `generateId(UUID a, UUID b)`.
-- Use `EnumSetUtil.safeCopy(...)` for EnumSet safety.
-- Return result records for business-flow failures.
-- In ViewModels, use shared async abstraction under `ui/async` (`ViewModelAsyncScope`, `AsyncErrorRouter`, dispatcher abstractions).
-- Use `UiDataAdapters` interfaces in ViewModels (not direct `core.storage` imports).
-
-### Don’t
-
-- Don’t import removed standalone enums (`core.model.Gender`, `core.model.UserState`, etc.).
-- Don’t use `AppBootstrap`, `HandlerFactory`, `Toast`, or `UiSupport`.
-- Don’t expose mutable internal collections directly.
-- Don’t forget entity `touch()` updates in mutating setters.
-- Don’t use ad-hoc threading patterns in ViewModels where shared async scope applies.
-
-## Current Model Ownership
-
-- `User` + nested enums: `User.Gender`, `User.UserState`, `User.VerificationMethod`
-- `Match` + nested enums: `Match.MatchState`, `Match.MatchArchiveReason`
-- `ProfileNote`: standalone record in `core/model/ProfileNote.java`
-
-## Quality Gates (from `pom.xml`)
-
-- Java compiler release 25 + preview enabled
-- Surefire with preview/native-access args
-- Spotless (Palantir Java Format) bound to `verify`
-- Checkstyle bound to `validate`
-- PMD bound to `verify`
-- JaCoCo check bound to `verify` with line coverage minimum 0.60
-
-## Useful System Tools
-
-- `sg` (ast-grep): structural code search
-- `rg`: fast text search
-- `fd`: file discovery
-- `tokei`: source metrics
-
-Prefer `ast-grep` for syntax-aware code queries.
+- Follow `.github/copilot-instructions.md` first.
+- Use `CLAUDE.md` for verified repo details.
+- Use this file to decide **how** to execute the work cleanly.

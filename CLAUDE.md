@@ -1,6 +1,5 @@
-
-> 🚀 **VERIFIED & UPDATED: 2026-03-13**
-> This document has been programmatically verified against the codebase as of this date.
+> 🚀 **VERIFIED & UPDATED: 2026-03-30**
+> This document has been refreshed against the current codebase and build output as of this date.
 
 <!--AGENT-DOCSYNC:ON-->
 # ChangeStamp format: SEQ|YYYY-MM-DD HH:MM:SS|agent:<id>|scope:<tag>|summary|files
@@ -12,22 +11,26 @@
 
 # CLAUDE.md
 
-Guidance for AI coding agents working in this repository.
+Second-level guidance for AI coding agents working in this repository.
 
+> **Hierarchy:** `.github/copilot-instructions.md` → `CLAUDE.md` → `AGENTS.md`
+>
 > **Source of truth:** code only (`src/main/java`, `src/test/java`, `pom.xml`).
+
+<!--ARCHIVE:32:agent:github_copilot:scope:docs-hierarchy-refresh--> Replaced the stale source snapshot and operational guidance with a current hierarchy-aware repo map based on the 2026-03-30 codebase and build output.
 
 ## Environment
 
 - Windows 11
-- PowerShell
+- PowerShell 7.x
 - VS Code Insiders (sometimes IntelliJ)
-- Java 25 + JavaFX 25
+- Java 25 + JavaFX 25.0.2
 - Maven
 
-## Verified Source Snapshot (2026-03-13)
+## Verified Source Snapshot (2026-03-30)
 
-- Java files: **267 total** (`fd -e java . src/` — includes `src/main` + `src/test`)
-- Java LOC (`tokei src/`): **73,830 total / 58,653 code / 10,562 blank / 4,615 comments**
+- Java files: **320 total** (`147` main / `173` test)
+- Java LOC (`tokei src`, Java only): **93,412 total / 75,136 code / 13,289 blank / 4,987 comments**
 
 ## Architecture (code-verified)
 
@@ -35,8 +38,8 @@ Guidance for AI coding agents working in this repository.
 datingapp/
   Main.java
   app/
-    api/RestApiServer.java
-    bootstrap/ApplicationStartup.java
+    api/{RestApiDtos,RestApiServer}.java
+    bootstrap/{ApplicationStartup,CleanupScheduler}.java
     cli/{CliTextAndInput,MainMenuRegistry,MatchingCliPresenter,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
     error/{AppError,AppResult}.java
     event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
@@ -45,107 +48,107 @@ datingapp/
       common/{UseCaseError,UseCaseResult,UserContext}.java
       matching/MatchingUseCases.java
       messaging/MessagingUseCases.java
-      profile/ProfileUseCases.java
+      profile/{ProfileUseCases,VerificationUseCases}.java
       social/SocialUseCases.java
   core/
-    AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil
-    model/{User,Match,ProfileNote,LocationModels}
-    connection/{ConnectionModels,ConnectionService}
-    matching/{CandidateFinder,CompatibilityCalculator,DefaultCompatibilityCalculator,DailyLimitService,DefaultDailyLimitService,DailyPickService,DefaultDailyPickService,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,StandoutService,DefaultStandoutService,TrustSafetyService,UndoService}
-    metrics/{AchievementService,ActivityMetricsService,DefaultAchievementService,EngagementDomain,SwipeState}
-    profile/{MatchPreferences,ProfileCompletionSupport,ProfileService,ValidationService,LocationService}
-    storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
-    time/{DefaultTimePolicy,TimePolicy}
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
+    {AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil}.java
+    connection/{ConnectionModels,ConnectionService}.java
+    i18n/I18n.java
+    matching/{CandidateFinder,CompatibilityCalculator,DailyLimitService,DailyPickService,DefaultCompatibilityCalculator,DefaultDailyLimitService,DefaultDailyPickService,DefaultStandoutService,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,ModerationAuditEvent,ModerationAuditLogger,RecommendationService,Standout,StandoutService,TrustSafetyService,UndoService}.java
+    metrics/{AchievementService,ActivityMetricsService,DefaultAchievementService,EngagementDomain,SwipeState}.java
+    model/{LocationModels,Match,ProfileNote,User}.java
+    profile/{LocationService,MatchPreferences,ProfileCompletionSupport,ProfileService,SanitizerUtils,ValidationService}.java
+    storage/{AccountCleanupStorage,AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}.java
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}.java
   storage/
-    DatabaseManager.java
-    StorageFactory.java
-    DevDataSeeder.java
-    jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
+    {DatabaseManager,DevDataSeeder,StorageFactory}.java
+    jdbi/{JdbiAccountCleanupStorage,JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
     schema/{MigrationRunner,SchemaInitializer}.java
   ui/
-    DatingApp,NavigationService,ImageCache,UiAnimations,UiComponents,UiConstants,UiFeedbackService,UiUtils
-    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
-    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,SafetyController,SocialController,StandoutsController,StatsController}
-    viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,PreferencesViewModel,ProfileViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
+    {DatingApp,ImageCache,LocalPhotoStore,NavigationService,UiAnimations,UiComponents,UiConstants,UiDialogs,UiFeedbackService,UiPreferencesStore,UiThemeService,UiUtils}.java
+    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,PollingTaskHandle,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}.java
+    screen/{BaseController,ChatController,DashboardController,LocationSelectionDialog,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,ProfileFormValidator,ProfileViewController,SafetyController,SocialController,StandoutsController,StatsController}.java
+    viewmodel/{BaseViewModel,ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,NotesViewModel,PreferencesViewModel,ProfileReadOnlyViewModel,ProfileViewModel,SafetyViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}.java
 ```
 
 ## Critical Gotchas
 
-| Gotcha                     | Wrong                                                          | Correct                                         |
-|----------------------------|----------------------------------------------------------------|-------------------------------------------------|
-| User enum imports          | `core.model.Gender`                                            | `User.Gender`                                   |
-| Match enum imports         | `core.model.MatchState`                                        | `Match.MatchState`                              |
-| ProfileNote import         | `User.ProfileNote`                                             | `core.model.ProfileNote`                        |
-| Domain clock               | `Instant.now()`                                                | `AppClock.now()`                                |
-| Pair IDs                   | `a + "_" + b`                                                  | deterministic `generateId(a,b)`                 |
-| ViewModel threading        | ad-hoc `Thread.ofVirtual()` + `Platform.runLater()` everywhere | shared `ui/async` scope (`ViewModelAsyncScope`) |
-| ViewModel storage coupling | direct `core.storage.*` imports                                | `UiDataAdapters` interfaces                     |
-| Legacy bootstrap names     | `AppBootstrap`, `HandlerFactory`                               | `ApplicationStartup` + `fromServices(...)`      |
-| Use-case construction      | `new MatchingUseCases(...)` in callers                         | `services.getMatchingUseCases()` from registry  |
-| Config access              | `AppConfig.defaults()` in runtime code                         | injected `AppConfig` via `ServiceRegistry`      |
-| Achievement popup loading  | Manual `Dialog` in MatchingController for match popup          | Load `/fxml/achievement_popup.fxml` via `FXMLLoader`, add root to `NavigationService.getRootStack()`, call `popup.showAchievement(Achievement)` |
-| Session timeout scope      | Assuming `sessionTimeoutMinutes` auto-logs-out users           | Only expires **swipe/metrics sessions** in `ActivityMetricsService`; `AppSession` (login) has no auto-logout |
-| JDBI record binding        | `@BindBean ProfileNote note` in JDBI SQL objects               | `@BindMethods ProfileNote note` — `@BindBean` uses Java Beans `getX()` introspection which fails on records; `@BindMethods` works with record accessor names |
-| Date formatter locale      | `DateTimeFormatter.ofPattern("dd MMM")`                        | `DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH)` — JVM default locale renders Hebrew/other month names on non-English systems |
-| LocationService scope      | Treating all 5 listed countries as available                   | Only Israel (`IL`) is production-ready; US/GB/CA/AU listed as coming soon — `country.available()` returns false for them; reverse-lookup only works for Israeli coordinates |
-| RestApiServer binding      | Assuming server binds to all interfaces (0.0.0.0)             | Server binds **loopback only** (`127.0.0.1`) — not accessible from external hosts by design |
+| Gotcha                  | Wrong                                                                  | Correct                                                                                                                    |
+|-------------------------|------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| User enum imports       | `datingapp.core.model.Gender`                                          | `datingapp.core.model.User.Gender`                                                                                         |
+| Match enum imports      | `datingapp.core.model.MatchState`                                      | `datingapp.core.model.Match.MatchState`                                                                                    |
+| `ProfileNote` ownership | `User.ProfileNote`                                                     | `datingapp.core.model.ProfileNote`                                                                                         |
+| Domain clock            | `Instant.now()` in services/domain                                     | Use `AppClock` as the time source: `AppClock.now()` / `AppClock.today()` or `AppClock.clock()` for clock-injected services |
+| Pair IDs                | `a + "_" + b`                                                          | deterministic `generateId(a, b)`                                                                                           |
+| Event publication       | null/no-op bus in production paths                                     | real injected `AppEventBus`                                                                                                |
+| Runtime config          | `AppConfig.defaults()` in service code                                 | injected `AppConfig` via `ServiceRegistry`                                                                                 |
+| JDBI record binding     | `@BindBean` on records                                                 | `@BindMethods` on records                                                                                                  |
+| Date formatting         | locale-implicit month/day names                                        | `Locale.ENGLISH` for user-facing month/day names                                                                           |
+| ViewModel threading     | ad-hoc `Thread.ofVirtual()` / `Platform.runLater()` in normal UI flows | `BaseViewModel` + `ViewModelAsyncScope` + dispatcher abstractions                                                          |
+| UI paging boundary      | expose `core.storage.PageData` to ViewModels                           | use `UiDataAdapters.UiPage<T>`                                                                                             |
+| REST binding            | assume external host access                                            | loopback-only binding in `RestApiServer`                                                                                   |
+| Location availability   | treat all listed countries as available                                | only `IL` is currently selectable/fully supported                                                                          |
 
 ## Entrypoints and wiring
 
+### Shared bootstrap
+
 ```java
-// Shared bootstrap
 ServiceRegistry services = ApplicationStartup.initialize();
 AppSession session = AppSession.getInstance();
+```
 
-// CLI wiring (Main.java)
+### CLI (`Main.java`)
+
+```java
 InputReader inputReader = new CliTextAndInput.InputReader(scanner);
 ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
-MatchingHandler matching = new MatchingHandler(MatchingHandler.Dependencies.fromServices(services, session, inputReader, profile::completeProfile));
+MatchingHandler matching = new MatchingHandler(
+    MatchingHandler.Dependencies.fromServices(services, session, inputReader, profile::completeProfile));
 SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
 StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
 MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);
+```
 
-// JavaFX wiring (DatingApp.java)
+### JavaFX (`DatingApp.java`)
+
+```java
 ViewModelFactory vmFactory = new ViewModelFactory(services);
 NavigationService nav = NavigationService.getInstance();
 nav.setViewModelFactory(vmFactory);
+nav.setPreferencesStore(vmFactory.getPreferencesStore());
 nav.initialize(primaryStage);
 ```
 
-## Use-Case Layer and Event Bus
+## Use-case layer and event bus
 
-`ServiceRegistry` internally constructs use-case instances from its core services:
-- `getMatchingUseCases()`, `getMessagingUseCases()`, `getProfileUseCases()`, `getSocialUseCases()`
+`ServiceRegistry` constructs and owns the app-layer bundles:
 
-Callers (CLI handlers, REST API, ViewModels) should obtain use cases from the registry — never construct them directly.
+- `getMatchingUseCases()`
+- `getMessagingUseCases()`
+- `getProfileUseCases()`
+- `getVerificationUseCases()`
+- `getSocialUseCases()`
 
-`RestApiServer` delegates most write operations through the use-case layer. However, 5 endpoints currently call core services directly and bypass the use-case layer: `GET /api/users`, `GET /api/users/{id}`, `GET /api/users/{id}/candidates`, `GET /api/users/{id}/matches`, and `GET /api/conversations/{id}/messages`. Prefer routing new endpoints through the use-case layer.
+Callers should obtain use cases from the registry rather than constructing them directly.
 
-`ProfileUseCases` now exposes: `updateProfile(UpdateProfileCommand)`, `getAchievements(AchievementsQuery)` → `AchievementSnapshot`, `getOrComputeStats(StatsQuery)` → `UserStats`. Use these instead of calling `AchievementService` or `ActivityMetricsService` directly from UI code.
+`AppEventBus` / `InProcessAppEventBus` provides in-process domain event dispatching. Event handlers in `app/event/handlers/` own cross-cutting concerns like achievements, metrics, and notifications.
 
-`AppEventBus` / `InProcessAppEventBus` provides in-process domain event dispatching. Event handlers live in `app/event/handlers/` and handle cross-cutting concerns (achievements, metrics, notifications).
+The current deliberate direct-read exception remains the candidates route in `RestApiServer`; keep that exception explicit instead of letting adapters drift back into raw service orchestration.
 
-## Async ViewModel Standard (current)
+## Current architecture notes
 
-Use `ui/async` package primitives:
-
-- `UiThreadDispatcher`
-- `JavaFxUiThreadDispatcher`
-- `ViewModelAsyncScope`
-- `TaskPolicy`
-- `TaskHandle`
-- `AsyncErrorRouter`
-
-This is now the shared pattern for ViewModel background work, loading-state tracking, latest-wins semantics, error routing, and disposal cancellation.
-
-## Known Flaky Tests
-
-- `ChatControllerTest#selectionTogglesChatStateAndNoteButtonsRemainWired` — fails intermittently in full suite (JavaFX thread ordering); passes in isolation. Pre-existing, not caused by typical code changes.
+- `VerificationUseCases` owns email/phone verification flows so adapters do not mutate verification state directly.
+- All current production ViewModels extend `BaseViewModel`.
+- `UiThemeService` is the ViewModel-facing theme facade.
+- `LocationService` is the single shared location engine across CLI, JavaFX, and REST.
+- `RestApiTestFixture` is the shared `ServiceRegistry` builder for targeted REST/API tests.
+- `UiAsyncTestSupport` complements `JavaFxTestSupport` for shared async ViewModel test helpers.
+- `DevDataSeeder` remains environment-gated (`DATING_APP_SEED_DATA=true`) and idempotent.
 
 ## Build & Quality Commands
 
-```bash
+```powershell
 mvn compile && mvn exec:exec
 mvn javafx:run
 mvn test
@@ -153,57 +156,37 @@ mvn -Ptest-output-verbose test
 mvn spotless:apply verify
 ```
 
+When selecting multiple tests from PowerShell, prefer `mvn --% ...` so comma-separated `-Dtest=` values are passed through intact.
+
 ## Build constraints from `pom.xml`
 
 - Java release `25` with preview enabled
+- Surefire test JVMs use preview/native-access flags
 - Spotless (Palantir Java Format) checked in `verify`
 - Checkstyle in `validate`
 - PMD in `verify`
 - JaCoCo line coverage gate in `verify` (minimum `0.60`)
 
-## Never do these
+## Key pattern files
 
-- Import framework/DB APIs in `core/`
-- Reintroduce removed legacy names (`AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`)
-- Import removed standalone enums (`core.model.Gender`, etc.)
-- Return mutable internals directly
-- Forget `touch()` updates on mutable entities
-- Use `Instant.now()` in domain/service code
-- Bypass `ui/async` abstractions in ViewModels for routine async flows
-- Construct use-case classes directly — obtain them from `ServiceRegistry`
-- Use `AppConfig.defaults()` in runtime service code — inject via `ServiceRegistry`
+- `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java` — bootstrap, config loading, and Jackson mix-in pattern
+- `src/main/java/datingapp/core/ServiceRegistry.java` — central service and use-case wiring
+- `src/main/java/datingapp/app/api/RestApiServer.java` and `RestApiDtos.java` — REST route and DTO patterns
+- `src/main/java/datingapp/core/profile/LocationService.java` — shared location dataset and formatting rules
+- `src/main/java/datingapp/ui/viewmodel/BaseViewModel.java` — shared ViewModel lifecycle shell
+- `src/main/java/datingapp/ui/viewmodel/UiDataAdapters.java` — UI boundary adapters
+- `src/test/java/datingapp/ui/JavaFxTestSupport.java` and `src/test/java/datingapp/ui/async/UiAsyncTestSupport.java` — shared UI test helpers
+- `src/test/java/datingapp/app/api/RestApiTestFixture.java` — shared REST/API test graph builder
 
-## Recent Updates (2026-03-13)
+## Keep these out of new work
 
-### Location Feature (`core/model/LocationModels`, `core/profile/LocationService`)
-- **New domain model**: `LocationModels` record types — `Country`, `City`, `ZipRange`, `ResolvedLocation` (with `Precision` enum: CITY/ZIP). Static `formatCoordinates()` utility.
-- **New service**: `LocationService` wired via `ServiceRegistry.getLocationService()`. Provides city/ZIP lookup, reverse-lookup, and country listing.
-- **Israel-first**: 5 countries listed (IL, US, GB, CA, AU) but only IL is `available=true`. Reverse-lookup only supported for Israeli coordinates. Check `country.available()` before offering to users.
-- **No DB persistence**: Location data is in-memory (hardcoded lists). Not stored in schema.
+- `AppBootstrap`, `HandlerFactory`, `Toast`, `UiSupport`, and `ui/controller` references
+- stale architecture docs when they conflict with source
+- new direct framework/database/web dependencies from `core/`
 
-### REST API Expansion (`app/api/RestApiServer`)
-- Now **33 endpoints** (was ~15). Route groups: health, users, matching, social, messaging, profile-notes.
-- **Localhost-only**: Binds to `InetAddress.getLoopbackAddress()` (127.0.0.1). Not reachable from external hosts.
-- **Rate limiting**: `LocalRateLimiter` — 240 requests/minute per IP, applied via `beforeMatched()` guard.
-- **New endpoints**: `PUT /api/users/{id}/profile`, `GET /api/users/{id}/stats`, `GET /api/users/{id}/achievements`, notifications CRUD, friend-request flows, conversation archive/delete, message delete.
-- 5 read endpoints still bypass the use-case layer (unchanged, see Use-Case Layer section).
+## Instruction-stack note
 
-### Dev Data Seeder (`storage/DevDataSeeder`)
-- Seeds 30 stable-UUID users (10 M/F/Other) + sample matches + conversation.
-- **Environment-gated**: only runs when `DATING_APP_SEED_DATA=true` env var is set (checked via `ApplicationStartup.isDevDataSeedingEnabled()`).
-- **Idempotent**: sentinel UUID check (`11111111-1111-1111-1111-000000000001`) prevents duplicate inserts. Safe to call on every startup.
-
-### ProfileUseCases Additions
-- `updateProfile(UpdateProfileCommand)` — updates profile fields via use-case layer.
-- `getAchievements(AchievementsQuery)` → `AchievementSnapshot` — preferred over calling `AchievementService` directly.
-- `getOrComputeStats(StatsQuery)` → `UserStats` — preferred over calling `ActivityMetricsService` directly.
-
-### Chat UI Phase 2 Fixes (commits `a99771b`, `31396c9`)
-- **CRITICAL**: `@BindBean` on Java records fails in JDBI — replaced with `@BindMethods` for `ProfileNote` binding. Every record-typed JDBI parameter needs `@BindMethods`.
-- **Locale fix**: `DateTimeFormatter` now uses `Locale.ENGLISH` explicitly — system Hebrew locale was rendering Hebrew month names.
-- **Note status**: Raw exception text no longer propagated to UI; sanitized to short user-facing strings.
-- **Chat stability**: `listConversations` failures no longer clear `selectedConversation` (was causing "send message exits chat" regression).
-- **`markAsRead` is best-effort**: failures are logged, do not fail message loading.
+Use `.github/copilot-instructions.md` for the shortest always-on rules. Use this file for the verified repo map and current gotchas. Use `AGENTS.md` for execution workflow and validation discipline.
 
 ## Agent Changelog (append-only)
 ---AGENT-LOG-START---
@@ -231,4 +214,5 @@ mvn spotless:apply verify
 29|2026-03-07 00:00:00|agent:claude_code|scope:source-truth-sync|Added event handlers subpackage, InterestMatcher, use-case wiring docs, config access gotcha, updated LOC|CLAUDE.md
 30|2026-03-11 00:00:00|agent:claude_code|scope:architecture-corrections|Removed non-existent PerformanceMonitor and CompatibilityScoring; fixed popup package (MatchPopupController removed, MilestonePopupController moved to screen); added SafetyController and NotesController to screen list; added MatchingCliPresenter to cli list; added Default* matching impls, AchievementService, ProfileCompletionSupport; corrected false RestApiServer claim; added 2 new gotchas (AchievementType enum split, sessionTimeout scope)|CLAUDE.md
 31|2026-03-13 00:00:00|agent:claude_code|scope:code-verified-sync|Updated snapshot (267 files, 73830 LOC via tokei/fd); added LocationModels+LocationService to arch; added DevDataSeeder to storage; added 4 new gotchas (@BindMethods, Locale.ENGLISH, LocationService scope, RestApiServer localhost-only); documented 33 REST endpoints, rate limiter, localhost bind; added ProfileUseCases new commands; added Recent Updates section|CLAUDE.md
+32|2026-03-30 15:15:00|agent:github_copilot|scope:docs-hierarchy-refresh|Refreshed CLAUDE.md to current source snapshot, clarified instruction hierarchy, and updated repo-specific gotchas, patterns, and verification notes|CLAUDE.md
 ---AGENT-LOG-END---

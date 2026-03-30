@@ -1,208 +1,178 @@
-> 🚀 **VERIFIED & UPDATED: 2026-03-25**
-> This document is the definitive, line-by-line source of truth for the project's logic, architecture, and constraints. **Do not deviate from these patterns.**
+> 🚀 **VERIFIED & UPDATED: 2026-03-30**
+> This document merges the repo-wide rules from `.github/copilot-instructions.md`, the verified repo map from `CLAUDE.md`, and the workflow discipline from `AGENTS.md`.
 
-# GEMINI.md (App Architecture & AI Agent Cookbook)
+# GEMINI.md — Merged Repo Guide
 
-## 0. Verified Environment Snapshot
+## 1. Hierarchy and source of truth
 
-- **OS:** Windows 11
-- **Shell:** PowerShell 7.x
-- **IDE:** VS Code Insiders (Java by Red Hat extension)
-- **Java:** 25 (preview enabled)
-- **JavaFX:** 25.0.2
-- **Build:** Maven
+Use this file as a model-specific merged guide, but keep the repo hierarchy in mind:
 
-## 1. Verified Codebase Snapshot (from source)
+1. `.github/copilot-instructions.md` — highest-level always-on rules
+2. `CLAUDE.md` — verified repo map and current gotchas
+3. `AGENTS.md` — execution workflow and validation discipline
 
-- **Total Java files:** **296**
-- `tokei` (Java only):
-  - **Total lines:** ~80,000+
-  - **Code lines:** ~60,000+
+If any markdown guidance conflicts with the implementation, trust:
 
-*This is a massive repository.* If a markdown doc and code diverge, always trust current code in `src/main/java`, `src/test/java`, and build config in `pom.xml`. To search this codebase efficiently, **prioritize using `sg` (ast-grep) and `rg`** rather than attempting to read entire files.
+- `src/main/java`
+- `src/test/java`
+- `pom.xml`
 
-## 2. Required Build / Test Commands
+## 2. Verified environment
 
-```bash
-# Build and run CLI
-mvn compile && mvn exec:exec
+- Windows 11
+- PowerShell 7.x
+- VS Code Insiders (sometimes IntelliJ)
+- Java 25 with preview enabled
+- JavaFX 25.0.2
+- Maven
+- Palantir Java Format / Spotless
+- Java by Red Hat extension
 
-# Build and run JavaFX UI
-mvn javafx:run
+PowerShell note: when Maven uses a comma-separated `-Dtest=...,...` list, prefer `mvn --% ...`.
 
-# Tests
-mvn test
-mvn -Ptest-output-verbose test
-mvn -Ptest-output-verbose -Dtest="MatchingUseCasesTest#processSwipe_mutuallyLiked_createsMatch" test
+## 3. Verified codebase snapshot (2026-03-30)
 
-# Quality gate (MUST run before concluding feature work)
-mvn spotless:apply verify
-```
+- Java files: **320 total** (`147` main / `173` test)
+- Java LOC (`tokei src`, Java only): **93,412 total / 75,136 code / 13,289 blank / 4,987 comments**
 
-## 3. Architecture Overview (Code-Verified)
+## 4. Architecture snapshot
 
 ```text
 datingapp/
+  Main.java
   app/
-    api/RestApiServer.java
-    bootstrap/ApplicationStartup.java
-    cli/         # Console navigation and input handling
-    event/       # InProcessAppEventBus and AppEvent sealed records
-    usecase/     # Business logic orchestrators. Returns UseCaseResult<T>
+    api/{RestApiDtos,RestApiServer}.java
+    bootstrap/{ApplicationStartup,CleanupScheduler}.java
+    cli/{CliTextAndInput,MainMenuRegistry,MatchingCliPresenter,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
+    error/{AppError,AppResult}.java
+    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
+    event/handlers/{AchievementEventHandler,MetricsEventHandler,NotificationEventHandler}.java
+    usecase/
+      common/{UseCaseError,UseCaseResult,UserContext}.java
+      matching/MatchingUseCases.java
+      messaging/MessagingUseCases.java
+      profile/{ProfileUseCases,VerificationUseCases}.java
+      social/SocialUseCases.java
   core/
-    AppClock, AppConfig, AppSession, ServiceRegistry
-    model/       # Pure Domain POJOs (User, Match, ProfileNote)
-    connection/  # Connection models & services
-    matching/    # Recommendations, Scoring, Standouts, Constraints
-    profile/     # Preferences, ValidationService
-    storage/
-        jdbi/        # H2 / JDBC implementations.
-    schema/      # Migration runner
+    {AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil}.java
+    connection/{ConnectionModels,ConnectionService}.java
+    i18n/I18n.java
+    matching/{CandidateFinder,CompatibilityCalculator,DailyLimitService,DailyPickService,DefaultCompatibilityCalculator,DefaultDailyLimitService,DefaultDailyPickService,DefaultStandoutService,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,ModerationAuditEvent,ModerationAuditLogger,RecommendationService,Standout,StandoutService,TrustSafetyService,UndoService}.java
+    metrics/{AchievementService,ActivityMetricsService,DefaultAchievementService,EngagementDomain,SwipeState}.java
+    model/{LocationModels,Match,ProfileNote,User}.java
+    profile/{LocationService,MatchPreferences,ProfileCompletionSupport,ProfileService,SanitizerUtils,ValidationService}.java
+    storage/{AccountCleanupStorage,AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}.java
+    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}.java
+  storage/
+    {DatabaseManager,DevDataSeeder,StorageFactory}.java
+    jdbi/{JdbiAccountCleanupStorage,JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
+    schema/{MigrationRunner,SchemaInitializer}.java
   ui/
-    async/       # ViewModelAsyncScope, TaskPolicy, UiThreadDispatcher
-    screen/      # JavaFX Controllers
-    viewmodel/   # UI Logic and Virtual Thread dispatching
+    {DatingApp,ImageCache,LocalPhotoStore,NavigationService,UiAnimations,UiComponents,UiConstants,UiDialogs,UiFeedbackService,UiPreferencesStore,UiThemeService,UiUtils}.java
+    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,PollingTaskHandle,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}.java
+    screen/{BaseController,ChatController,DashboardController,LocationSelectionDialog,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,ProfileFormValidator,ProfileViewController,SafetyController,SocialController,StandoutsController,StatsController}.java
+    viewmodel/{BaseViewModel,ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,NotesViewModel,PreferencesViewModel,ProfileReadOnlyViewModel,ProfileViewModel,SafetyViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}.java
 ```
 
-## 4. Entry Points and Wiring
+## 5. Composition roots and boundaries
 
-*   **Shared Bootstrap:**
-    ```java
-    ServiceRegistry services = ApplicationStartup.initialize();
-    AppSession session = AppSession.getInstance();
-    ```
-*   **CLI (`Main.java`):** Bootstraps `ServiceRegistry`, constructs handlers (e.g., `ProfileHandler`, `MatchingHandler`), and kicks off the `MainMenuRegistry`.
-*   **JavaFX (`DatingApp.java`):** Bootstraps `ViewModelFactory` injected with `ServiceRegistry`, and initializes `NavigationService.getInstance().initialize(primaryStage)`.
-
-## 5. Core Rules (Do / Don’t)
-
-### DO
-- **Domain Purity:** Keep `core/` completely free from `javafx.*`, `java.sql.*`, `io.javalin.*`, or Jackson UI imports.
-- **Time Management:** Use `AppClock.now()` for testing determinism.
-- **Unique Edges:** Use deterministic pair IDs via `Match.generateId(UUID a, UUID b)` so order does not matter.
-- **Envelopes:** Return properly typed `UseCaseResult<T>` containing data or `UseCaseError` from `app/usecase/`.
-- **Async UI:** In ViewModels, use the shared async abstraction: `launch(TaskPolicy.LATEST_WINS, () -> { ... })` inherited from `ViewModelAsyncScope`. Virtual threads handle the blocking.
-- **Enum Mutability:** Use `EnumSetUtil.safeCopy(...)` to return defensive copies from entity getters.
-
-### DON'T
-- **Don’t** use `Instant.now()`, `LocalDate.now()`, or `new Date()`.
-- **Don’t** publish `AppEvent` messages *inside* `JDBI.inTransaction(...)` closures (to avoid phantom events during rollbacks).
-- **Don’t** use JavaFX's native `javafx.concurrent.Task` or raw `Thread.start()`.
-- **Don’t** forget to invoke `.touch()` inside mutating setters on `User` and `Match` models to update timestamps.
-
-## 6. AppEvent Ledger (Pub/Sub Truth)
-
-All telemetry and side-effects must plug into `InProcessAppEventBus` listening for these exact `sealed` records from `datingapp.app.event.AppEvent`:
-
-*   **`SwipeRecorded`**: `(UUID swiperId, UUID targetId, String direction, boolean resultedInMatch, Instant occurredAt)`
-*   **`MatchCreated`**: `(String matchId, UUID userA, UUID userB, Instant occurredAt)`
-*   **`ProfileSaved`**: `(UUID userId, boolean activated, Instant occurredAt)`
-*   **`ProfileCompleted`**: `(UUID userId, Instant occurredAt)`
-*   **`ProfileNoteSaved`**: `(UUID authorId, UUID subjectId, int contentLength, Instant occurredAt)`
-*   **`ProfileNoteDeleted`**: `(UUID authorId, UUID subjectId, Instant occurredAt)`
-*   **`ConversationArchived`**: `(String conversationId, UUID archivedByUserId, Instant occurredAt)`
-*   **`LocationUpdated`**: `(UUID userId, double latitude, double longitude, Instant occurredAt)`
-*   **`DailyLimitReset`**: `(UUID userId, Instant occurredAt)`
-*   **`MatchExpired`**: `(String matchId, UUID userA, UUID userB, Instant occurredAt)`
-*   **`AccountDeleted`**: `(UUID userId, DeletionReason reason, Instant occurredAt)`
-*   **`FriendRequestAccepted`**: `(UUID requestId, UUID fromUserId, UUID toUserId, String matchId, Instant occurredAt)`
-*   **`RelationshipTransitioned`**: `(String matchId, UUID initiatorId, UUID targetId, String fromState, String toState, Instant occurredAt)`
-*   **`MessageSent`**: `(UUID senderId, UUID recipientId, UUID messageId, Instant occurredAt)`
-*   **`UserBlocked`**: `(UUID blockerId, UUID blockedUserId, Instant occurredAt)`
-*   **`UserReported`**: `(UUID reporterId, UUID reportedUserId, String reason, boolean blockedUser, Instant occurredAt)`
-
-## 7. Domain State Macros (The Enums)
-
-Agents must utilize these exact enums when mutating core model states. **Do not hallucinate string literals.**
-
-### `datingapp.core.model.User`
-*   **`Gender`**: `MALE`, `FEMALE`, `OTHER`
-*   **`UserState`**: `INCOMPLETE`, `ACTIVE`, `PAUSED`, `BANNED`.
-*   **`VerificationMethod`**: `EMAIL`, `PHONE`
-
-### `datingapp.core.model.Match`
-*   **`MatchState`**: `ACTIVE` (Standard match), `FRIENDS` (Platonic transition), `UNMATCHED` (Terminal), `GRACEFUL_EXIT` (Terminal), `BLOCKED` (Terminal).
-*   **`MatchArchiveReason`**: `FRIEND_ZONE`, `GRACEFUL_EXIT`, `UNMATCH`, `BLOCK`.
-
-### `datingapp.core.matching.ModerationAuditEvent`
-*   **`Action`**: `REPORT`, `BLOCK`, `UNBLOCK`, `AUTO_BAN`.
-*   **`Outcome`**: `SUCCESS`, `FAILURE`.
-
-## 8. AI Agent Cookbook: Code Synthesis Patterns
-
-When generating new features, **strictly copy these boilerplate patterns**. Do not invent new dispatch engines, use case wrappers, or transaction builders.
-
-### Pattern 1: Writing a UseCase (The Only Way to Expose Logic)
+### Shared bootstrap
 
 ```java
-public UseCaseResult<MyDto> doAction(MyCommand command) {
-    try {
-        // 1. Validation (Defensive)
-        if (!validationService.isValid(command.input())) {
-            return UseCaseResult.failure(UseCaseError.validation("Invalid input"));
-        }
-
-        // 2. Application Logic + Storage
-        MyEntity entity = storage.executeWrite(command.input());
-
-        // 3. Side-Effects (AFTER storage succeeds)
-        eventBus.publish(new AppEvent.MyActionOccurred(entity.id(), AppClock.now()));
-
-        // 4. Return Data Payload
-        return UseCaseResult.success(new MyDto(entity));
-    } catch (IllegalArgumentException e) {
-        return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
-    } catch (Exception e) {
-        logger.error("Failed action", e);
-        return UseCaseResult.failure(UseCaseError.internal("Unexpected error"));
-    }
-}
+ServiceRegistry services = ApplicationStartup.initialize();
+AppSession session = AppSession.getInstance();
 ```
 
-### Pattern 2: Dispatching from JavaFX UI (Virtual Threading)
+### Production composition roots
 
-```java
-public class MyViewModel extends ViewModelAsyncScope {
+- `ApplicationStartup.initialize()`
+- `ServiceRegistry`
+- `ViewModelFactory`
 
-    public void onSaveClicked(String input) {
-        // 'LATEST_WINS' aborts previous save clicks if spammed.
-        // 'STANDARD' blocks new clicks until done.
-        launch(TaskPolicy.LATEST_WINS, () -> {
-            var result = myUseCase.doAction(new MyCommand(input));
+### Boundary rules
 
-            // UI Thread continuation is automatic simply by returning or throwing
-            if (result.success()) {
-                viewState.update(result.data());
-            } else {
-                errorSink.notifyError(result.error().message());
-            }
-        });
-    }
-}
+- `core/` stays framework-agnostic.
+- `app/usecase/*` is the application boundary for business flows.
+- ViewModels go through `BaseViewModel`, `ui/async/*`, and `UiDataAdapters`.
+- Adapters should not drift back into direct service/storage orchestration when a use-case seam exists.
+
+## 6. Critical correctness rules
+
+- Use nested enums from owner types:
+  - `User.Gender`, `User.UserState`, `User.VerificationMethod`
+  - `Match.MatchState`, `Match.MatchArchiveReason`
+- `ProfileNote` is standalone: `datingapp.core.model.ProfileNote`
+- Use `AppClock` as the repo time source: prefer `AppClock.now()` / `AppClock.today()`, or inject `AppClock.clock()` when a service intentionally works with a `Clock`
+- Use deterministic pair IDs via `generateId(UUID a, UUID b)`
+- Use injected `AppConfig` at runtime; reserve `AppConfig.defaults()` for bootstrap/composition/tests
+- Record-typed JDBI parameters should use `@BindMethods`, not `@BindBean`
+- Use `Locale.ENGLISH` for user-facing date formatters when month/day names are rendered
+- `RestApiServer` is loopback-only; do not assume external host access
+- `LocationService` is the single location engine; only `IL` is fully supported/selectable today
+- `UiDataAdapters.UiPage<T>` is the UI paging boundary; do not leak `PageData` into ViewModels
+- All current production ViewModels extend `BaseViewModel`
+
+## 7. Current repo-specific notes
+
+- `VerificationUseCases` owns email/phone verification flows.
+- `UiThemeService` is the ViewModel-facing theme facade.
+- `RestApiTestFixture` is the shared `ServiceRegistry` builder for REST/API tests.
+- `UiAsyncTestSupport` complements `JavaFxTestSupport` for async UI tests.
+- `DevDataSeeder` is environment-gated (`DATING_APP_SEED_DATA=true`) and idempotent.
+- The candidates route in `RestApiServer` remains the explicit direct-read exception.
+
+## 8. Build, test, and quality commands
+
+```powershell
+mvn compile && mvn exec:exec
+mvn javafx:run
+mvn test
+mvn -Ptest-output-verbose test
+mvn spotless:apply verify
 ```
 
-### Pattern 3: JDBI Transaction Boundaries
+`pom.xml` quality gates:
 
-```java
-import datingapp.storage.jdbi.JdbiConnectionStorage;
+- Java 25 with preview enabled
+- Surefire preview/native-access args
+- Checkstyle in `validate`
+- Spotless in `verify`
+- PMD in `verify`
+- JaCoCo line coverage minimum `0.60`
 
-public MyEntity executeWrite(String input) {
-    return jdbi.inTransaction(handle -> {
-        // 1. Write Parent
-        long id = handle.createUpdate("INSERT INTO parent (val) VALUES (:v)")
-            .bind("v", input)
-            .executeAndReturnGeneratedKeys()
-            .mapTo(Long.class).one();
+## 9. Agent workflow defaults
 
-        // 2. Write Child (Atomically safe inside `inTransaction`)
-        handle.createUpdate("INSERT INTO child (pid) VALUES (:pid)")
-            .bind("pid", id)
-            .execute();
+- Prefer `ast-grep` when structure matters; use plain-text search only when structure is irrelevant.
+- Use read-only subagents for isolated codebase investigation.
+- Use execution helpers for Maven/test runs and summarize the result back into the main workflow.
+- Keep a todo list for multi-step work.
+- Read the relevant files fully before editing them.
+- Keep diffs small and avoid unrelated refactors.
+- Verify in this order:
+  1. touched-file errors
+  2. targeted tests
+  3. broader smoke tests if needed
+  4. full `mvn spotless:apply verify` before completion claims
 
-        return fetchById(handle, id);
-    });
-}
-```
+## 10. Shared test support to prefer
+
+- `src/test/java/datingapp/ui/JavaFxTestSupport.java`
+- `src/test/java/datingapp/ui/async/UiAsyncTestSupport.java`
+- `src/test/java/datingapp/app/api/RestApiTestFixture.java`
+- `src/test/java/datingapp/core/testutil/TestUserFactory.java`
+- `src/test/java/datingapp/app/testutil/TestEventBus.java`
+- `src/test/java/datingapp/core/testutil/TestAchievementService.java`
+
+## 11. Key pattern files
+
+- `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java`
+- `src/main/java/datingapp/core/ServiceRegistry.java`
+- `src/main/java/datingapp/app/api/RestApiServer.java`
+- `src/main/java/datingapp/core/profile/LocationService.java`
+- `src/main/java/datingapp/ui/viewmodel/BaseViewModel.java`
+- `src/main/java/datingapp/ui/viewmodel/UiDataAdapters.java`
+- `src/test/java/datingapp/ui/JavaFxTestSupport.java`
+- `src/test/java/datingapp/app/api/RestApiTestFixture.java`
 
 ## Agent Changelog (append-only)
 ---AGENT-LOG-START---
@@ -211,4 +181,5 @@ public MyEntity executeWrite(String input) {
 1|2026-01-30 18:50:00|agent:antigravity|docs|Update GEMINI.md to reflect current tech stack (JDBI, Jackson, JavaFX 25) and architecture|GEMINI.md
 2|2026-03-25 15:58:00|agent:antigravity|docs-source-truth-sync|MASSIVE EXHAUSTIVE EXPANSION: Created the ultimate definitive source of truth file mapped via an AST extraction script|GEMINI.md
 3|2026-03-25 16:15:00|agent:antigravity|docs-ai-optimization|TRANSFORMATION: Recognized 1000-line AST dump as bloat for AI agents. Replaced it with structural copy-paste Cookbooks, Event Ledgers, and Domain Constants. Reduced parsing context load and supercharged synthesis speed.|GEMINI.md
+4|2026-03-30 15:20:00|agent:github_copilot|scope:docs-hierarchy-refresh|Rewrote GEMINI.md as a merged repo guide aligned with copilot-instructions, CLAUDE.md, AGENTS.md, and current source/build facts|GEMINI.md
 ---AGENT-LOG-END---
