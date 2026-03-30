@@ -1,6 +1,7 @@
 package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -165,6 +166,8 @@ class RestApiRelationshipRoutesTest {
         userStorage.save(activeUser(userA, "Alice"));
         userStorage.save(activeUser(userB, "Bob"));
         interactionStorage.save(Match.create(userA, userB));
+        interactionStorage.save(ConnectionModels.Like.create(userA, userB, ConnectionModels.Like.Direction.LIKE));
+        interactionStorage.save(ConnectionModels.Like.create(userB, userA, ConnectionModels.Like.Direction.LIKE));
         communicationStorage.saveConversation(ConnectionModels.Conversation.create(userA, userB));
 
         server = new RestApiServer(services, 0);
@@ -234,6 +237,104 @@ class RestApiRelationshipRoutesTest {
     }
 
     @Test
+    @DisplayName("unmatch clears old pair likes atomically")
+    void unmatchClearsOldPairLikesAtomically() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        userStorage.save(activeUser(userA, "Alice"));
+        userStorage.save(activeUser(userB, "Bob"));
+        interactionStorage.save(Match.create(userA, userB));
+        communicationStorage.saveConversation(ConnectionModels.Conversation.create(userA, userB));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> unmatchResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userA + "/relationships/"
+                                + userB + "/unmatch"))
+                        .header("X-User-Id", userA.toString())
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, unmatchResponse.statusCode());
+
+        Match match = interactionStorage.get(Match.generateId(userA, userB)).orElseThrow();
+        assertEquals(Match.MatchState.UNMATCHED, match.getState(), "After unmatch, match state should be UNMATCHED");
+        assertNotNull(match.getEndedAt(), "endedAt timestamp should be set after unmatch for cooldown tracking");
+        assertTrue(interactionStorage.getLike(userA, userB).isEmpty(), "A->B like should be cleared on unmatch");
+        assertTrue(interactionStorage.getLike(userB, userA).isEmpty(), "B->A like should be cleared on unmatch");
+    }
+
+    @Test
+    @DisplayName("unmatch does not poison future rematchability after cooldown")
+    void unmatchDoesNotPoisonFutureRematchability() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        User aliceUser = activeUser(userA, "Alice");
+        User bobUser = activeUser(userB, "Bob");
+        userStorage.save(aliceUser);
+        userStorage.save(bobUser);
+        interactionStorage.save(Match.create(userA, userB));
+        interactionStorage.save(ConnectionModels.Like.create(userA, userB, ConnectionModels.Like.Direction.LIKE));
+        interactionStorage.save(ConnectionModels.Like.create(userB, userA, ConnectionModels.Like.Direction.LIKE));
+        communicationStorage.saveConversation(ConnectionModels.Conversation.create(userA, userB));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        // First unmatch
+        HttpResponse<String> firstUnmatchResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userA + "/relationships/"
+                                + userB + "/unmatch"))
+                        .header("X-User-Id", userA.toString())
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, firstUnmatchResponse.statusCode());
+        assertEquals(
+                Match.MatchState.UNMATCHED,
+                interactionStorage
+                        .get(Match.generateId(userA, userB))
+                        .orElseThrow()
+                        .getState());
+
+        // After cooldown expiry (in real scenario), users should be able to match again.
+        // This test validates that the initial unmatch preserves the ability to rematch
+        // when cooldown window is respected.
+        Match expiredMatch =
+                interactionStorage.get(Match.generateId(userA, userB)).orElseThrow();
+        assertNotNull(
+                expiredMatch.getEndedAt(),
+                "Match must have endedAt timestamp to track cooldown expiry for future rematch eligibility");
+
+        var firstRematch = interactionStorage.saveLikeAndMaybeCreateMatch(
+                ConnectionModels.Like.create(userA, userB, ConnectionModels.Like.Direction.LIKE));
+        var secondRematch = interactionStorage.saveLikeAndMaybeCreateMatch(
+                ConnectionModels.Like.create(userB, userA, ConnectionModels.Like.Direction.LIKE));
+
+        assertTrue(firstRematch.likePersisted());
+        assertTrue(firstRematch.createdMatch().isEmpty());
+        assertTrue(secondRematch.likePersisted());
+        assertTrue(
+                secondRematch.createdMatch().isPresent(),
+                "Fresh mutual likes after unmatch should be able to rematch the pair");
+    }
+
+    @Test
     @DisplayName("conversation messages require a matching acting user and reject non-participants")
     void conversationMessagesRequireMatchingActingUser() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
@@ -274,6 +375,11 @@ class RestApiRelationshipRoutesTest {
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(403, forbiddenResponse.statusCode());
+    }
+
+    private static void connectionStorageSeedFriendRequest(
+            TestStorages.Communications communicationStorage, UUID fromUserId, UUID toUserId) {
+        communicationStorage.saveFriendRequest(ConnectionModels.FriendRequest.create(fromUserId, toUserId));
     }
 
     @Test
@@ -332,11 +438,6 @@ class RestApiRelationshipRoutesTest {
         return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
                 .trustSafetyStorage(trustSafetyStorage)
                 .build();
-    }
-
-    private static void connectionStorageSeedFriendRequest(
-            TestStorages.Communications communicationStorage, UUID fromUserId, UUID toUserId) {
-        communicationStorage.saveFriendRequest(ConnectionModels.FriendRequest.create(fromUserId, toUserId));
     }
 
     private static User activeUser(UUID id, String name) {

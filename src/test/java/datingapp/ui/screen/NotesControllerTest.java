@@ -118,6 +118,15 @@ class NotesControllerTest {
                 5000));
 
         JavaFxTestSupport.runOnFxAndWait(() -> notesListView.getSelectionModel().selectFirst());
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(deleteSelectedNoteButton::isDisabled);
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
         assertFalse(JavaFxTestSupport.callOnFxAndWait(deleteSelectedNoteButton::isDisabled));
 
         JavaFxTestSupport.runOnFxAndWait(deleteSelectedNoteButton::fire);

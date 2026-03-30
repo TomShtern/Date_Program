@@ -5,8 +5,7 @@ You are operating in an environment where ast-grep is installed. For any code se
 
 Deploy multiple parallel subagents for different tasks when needed, and coordinate their work through a parent agent. Use the `agent` tool to invoke subagents with specific instructions and context. For example, you might have one subagent focused on code analysis using ast-grep, while another handles code edits or refactoring. The parent agent can manage the overall workflow, ensuring that each subagent has the information it needs to perform its task effectively while keeping the process organized and efficient.
 The goal is to have you, the parent agent, orchestrate the work of multiple specialized subagents to achieve complex tasks that require different types of expertise or operations, such as code analysis, refactoring, testing, and documentation. Each subagent can focus on its specific area while you coordinate their efforts to ensure a cohesive and efficient workflow.
-Dont forget to use the specialized agents when appropriate, such as the executionSubagent for executing shell commands or the searchSubagent, or the runSubagent command.
-You should use the 'gpt-5.4-mini' model for subagents as it is optimized for fast, focused tasks that benefit from lower latency and cost.
+Dont forget to use the specialized agents when appropriate, such as the executionSubagent for executing shell commands, or the runSubagent command. For read-only codebase exploration, prefer a similar available agent such as `Explore` first, and `codebase-context-gatherer` second, instead of retrying a flaky helper path.
 
 <system_tools>
 
@@ -109,13 +108,27 @@ Use PowerShell-friendly commands. When Maven test selection uses a comma-separat
 - Use injected `AppConfig` in runtime code; keep `AppConfig.defaults()` at bootstrap/composition/test boundaries.
 - Record-typed JDBI parameters should use `@BindMethods`, not `@BindBean`.
 - ViewModels should use `BaseViewModel`, `ui/async/*`, and `UiDataAdapters` instead of ad-hoc threading or direct storage coupling.
+- When behavior is config-driven, update all config surfaces together: `AppConfig`, `AppConfigValidator`, runtime config files under `config/`, and the relevant config loader/tests.
+- When changing behavior that exists in both in-memory test storage and JDBI storage, keep both implementations semantically aligned and verify both paths instead of fixing only one side.
+- When changing relationship, matching, or candidate-eligibility behavior, verify the full seam set in one pass when relevant: core service/policy, use-case layer, REST adapter, and the most relevant storage-backed tests.
 
 ## Search, edit, and execution defaults
 
 - Prefer `ast-grep` / syntax-aware search when code structure matters.
 - Use focused subagents for independent read-only investigation or execution batches.
+- If one search/exploration helper path fails because of model or environment instability, switch immediately to a similar available agent instead of retrying the same failing path.
 - Make the smallest correct change first.
 - Avoid unrelated refactors while implementing a task.
+
+## Planning, review, and meta-workflow defaults
+
+- For planning, documentation, workflow-analysis, and other non-implementation deliverables, prefer exact match to the source code over assumptions.
+- Only make simple harmless assumptions when they are directly stated by the user or are explicitly labeled as low-risk assumptions.
+- Use a full targeted context pass first: exact seam confirmation, symbol existence, test surfaces, composition-root paths, targeted searching, and selective reads.
+- Read full files only for a small number of especially important relevant files when doing so is clearly beneficial.
+- Before opening another review loop, first aggregate what else can be checked in that same pass: related blockers, related improvements, adjacent risks, and useful notes that can save time later.
+- Distinguish clearly between fixes and improvements. Fixes are critical blockers and should not be postponed. Improvements are optional. If only optional improvements remain, gather them all and present them together at the end instead of opening another review cycle for each one separately.
+- Before starting a third independent review pass for a planning, documentation, or meta-workflow deliverable, summarize the reasons and expected value, then ask the user via `vscode_askQuestions` whether to proceed.
 
 ## Verification standard
 

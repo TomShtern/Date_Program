@@ -16,6 +16,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequenc
 import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.EnumSet;
@@ -176,11 +177,14 @@ class CandidateFinderTest {
 
         finder.findCandidatesForUser(cachedSeeker);
         finder.findCandidatesForUser(cachedSeeker);
-        assertEquals(1, userStorage.findCandidatesCallCount());
+        assertEquals(
+                2,
+                userStorage.findCandidatesCallCount(),
+                "cache hits should refresh candidates from fresh storage state");
 
         finder.invalidateCacheFor(cachedSeeker.getId());
         finder.findCandidatesForUser(cachedSeeker);
-        assertEquals(2, userStorage.findCandidatesCallCount());
+        assertEquals(3, userStorage.findCandidatesCallCount());
     }
 
     @Test
@@ -194,7 +198,9 @@ class CandidateFinderTest {
         finder.findCandidatesForUser(cachedSeeker);
         finder.findCandidatesForUser(cachedSeeker);
         assertEquals(
-                1, userStorage.findCandidatesCallCount(), "second call should use cache before preference changes");
+                2,
+                userStorage.findCandidatesCallCount(),
+                "second call should revalidate cached candidates against fresh storage state");
 
         cachedSeeker.setDealbreakers(
                 Dealbreakers.builder().acceptSmoking(Lifestyle.Smoking.NEVER).build());
@@ -207,7 +213,7 @@ class CandidateFinderTest {
 
         finder.findCandidatesForUser(cachedSeeker);
         assertEquals(
-                2,
+                3,
                 userStorage.findCandidatesCallCount(),
                 "preference changes must invalidate fingerprint-equivalent cache entries");
     }
@@ -268,6 +274,91 @@ class CandidateFinderTest {
         List<User> result = finder.findCandidates(seekerAll, List.of(candidateAll), Set.of());
 
         assertEquals(1, result.size(), "When both users are open to everyone, they should mutually match");
+    }
+
+    // =========================================================================
+    // Phase 1a Candidate Truthfulness: Failing Characterization Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("Phase 1a: excludes reverse-direction blocks (candidate blocks seeker)")
+    void phase1aReverseDirectionBlockExclusion() {
+        User browsingSeeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
+        User candidate = createUser("BlockingCandidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.09, 34.79);
+
+        // Candidate blocks seeker (reverse direction)
+        trustSafetyStorage.save(
+                datingapp.core.connection.ConnectionModels.Block.create(candidate.getId(), browsingSeeker.getId()));
+
+        List<User> result = finder.findCandidates(browsingSeeker, List.of(candidate), Set.of());
+
+        assertTrue(result.isEmpty(), "Reverse-direction block should exclude candidate from seeker's view");
+    }
+
+    @Test
+    @DisplayName("Phase 1a: excludes candidates within rematch cooldown period")
+    void phase1aRematchCooldownExclusion() {
+        User browsingSeeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
+        User candidate = createUser("ExCandidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.09, 34.79);
+
+        // Simulate previous match that ended within cooldown period
+        datingapp.core.model.Match previousMatch =
+                datingapp.core.model.Match.create(browsingSeeker.getId(), candidate.getId());
+        // End the match just now (within cooldown window regardless of config duration)
+        previousMatch.unmatch(browsingSeeker.getId());
+        interactionStorage.save(previousMatch);
+
+        List<User> result = finder.findCandidates(browsingSeeker, List.of(candidate), Set.of());
+
+        assertTrue(result.isEmpty(), "Candidate should be excluded during rematch cooldown period");
+    }
+
+    @Test
+    @DisplayName("Phase 1a: reappears after rematch cooldown expires")
+    void phase1aCooldownExpiryReappearance() {
+        User browsingSeeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
+        User candidate = createUser("ExCandidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.09, 34.79);
+
+        // Match ended well before current time
+        Instant farPastUnmatch = FIXED_INSTANT.minus(Duration.ofHours(169));
+        TestClock.setFixed(farPastUnmatch);
+        datingapp.core.model.Match previousMatch =
+                datingapp.core.model.Match.create(browsingSeeker.getId(), candidate.getId());
+        previousMatch.unmatch(browsingSeeker.getId());
+        interactionStorage.save(previousMatch);
+        TestClock.setFixed(FIXED_INSTANT); // Restore to present
+
+        // Verify that after cooldown expires, candidate reappears
+        List<User> result = finder.findCandidates(browsingSeeker, List.of(candidate), Set.of());
+
+        assertEquals(1, result.size(), "Candidate should reappear after rematch cooldown expires");
+    }
+
+    @Test
+    @DisplayName("Phase 1a: cache staleness detects user state changes via detached snapshots")
+    void phase1aStaleCacheTruthWithDetachedSnapshots() {
+        User browsingSeeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
+        User candidate = createUser("Candidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.09, 34.79);
+
+        // Use snapshotting storage that returns detached copies
+        SnapshotingUsers snapshotUsers = new SnapshotingUsers();
+        snapshotUsers.save(browsingSeeker);
+        snapshotUsers.save(candidate);
+
+        CandidateFinder filterFinder = new CandidateFinder(snapshotUsers, interactionStorage, trustSafetyStorage, ZONE);
+
+        // First call to findCandidatesForUser gets snapshot
+        List<User> firstResult = filterFinder.findCandidatesForUser(browsingSeeker);
+        assertEquals(1, firstResult.size(), "First call should return candidate");
+
+        // Modify live candidate to PAUSED state
+        candidate.pause();
+
+        // Second call should revalidate cached candidates against fresh state and drop the paused user.
+        List<User> secondResult = filterFinder.findCandidatesForUser(browsingSeeker);
+        assertTrue(
+                secondResult.isEmpty(),
+                "Revalidated cached candidates should drop a candidate that paused after the snapshot was cached");
     }
 
     private User createUser(String name, Gender gender, Set<Gender> interestedIn, int age, double lat, double lon) {
@@ -386,6 +477,56 @@ class CandidateFinderTest {
             // 1 degree latitude ≈ 111km, so 0.001 degrees ≈ 111m
             double distance = GeoUtils.distanceKm(32.0853, 34.7818, 32.0862, 34.7818);
             assertEquals(0.1, distance, 0.02); // 100m ± 20m
+        }
+    }
+
+    private static final class SnapshotingUsers extends TestStorages.Users {
+        /**
+         * Returns detached User copies from findCandidates to simulate cache staleness. This allows
+         * tests to verify that stale snapshots don't reflect live state changes.
+         */
+        @Override
+        public List<User> findCandidates(
+                UUID excludeId,
+                Set<Gender> genders,
+                int minAge,
+                int maxAge,
+                double seekerLat,
+                double seekerLon,
+                int maxDistanceKm) {
+            List<User> originals =
+                    super.findCandidates(excludeId, genders, minAge, maxAge, seekerLat, seekerLon, maxDistanceKm);
+            // Return detached snapshots that won't reflect live state changes
+            return originals.stream().map(this::createDetachedCopy).toList();
+        }
+
+        @Override
+        public java.util.Map<UUID, User> findByIds(Set<UUID> ids) {
+            return super.findByIds(ids).entrySet().stream()
+                    .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                            java.util.Map.Entry::getKey, entry -> createDetachedCopy(entry.getValue())));
+        }
+
+        private User createDetachedCopy(User original) {
+            User copy = new User(original.getId(), original.getName());
+            copy.setBio(original.getBio());
+            copy.setBirthDate(original.getBirthDate());
+            copy.setGender(original.getGender());
+            copy.setInterestedIn(original.getInterestedIn());
+            copy.setLocation(original.getLat(), original.getLon());
+            copy.setMaxDistanceKm(original.getMaxDistanceKm(), 300);
+            copy.setAgeRange(
+                    original.getMinAge(),
+                    original.getMaxAge(),
+                    AppConfig.defaults().validation().minAge(),
+                    AppConfig.defaults().validation().maxAge());
+            original.getPhotoUrls().forEach(copy::addPhotoUrl);
+            copy.setPacePreferences(original.getPacePreferences());
+            // Snapshot the current state: if original is active, activate the copy
+            if (original.getState() == User.UserState.ACTIVE) {
+                copy.activate();
+            }
+            return copy;
         }
     }
 

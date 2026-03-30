@@ -6,17 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.model.ProfileNote;
-import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
-import datingapp.core.profile.MatchPreferences.Dealbreakers;
-import datingapp.core.profile.MatchPreferences.Interest;
-import datingapp.core.profile.MatchPreferences.Lifestyle;
-import datingapp.core.storage.PageData;
-import datingapp.core.testutil.TestClock;
-import datingapp.storage.DatabaseManager;
-import datingapp.storage.DevDataSeeder;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -30,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 import org.junit.jupiter.api.AfterEach;
@@ -37,6 +27,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+
+import datingapp.core.model.ProfileNote;
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
+import datingapp.core.profile.MatchPreferences.Dealbreakers;
+import datingapp.core.profile.MatchPreferences.Interest;
+import datingapp.core.profile.MatchPreferences.Lifestyle;
+import datingapp.core.storage.PageData;
+import datingapp.core.testutil.TestClock;
+import datingapp.storage.DatabaseManager;
+import datingapp.storage.DevDataSeeder;
 
 /**
  * Tests for normalized table DAO methods in {@link JdbiUserStorage} (V3
@@ -49,6 +51,7 @@ class JdbiUserStorageNormalizationTest {
     private static final String ACTIVE_OLD_PHOTO_URL = "https://example.com/active-old.jpg";
     private static final String ACTIVE_NEW_PHOTO_URL = "https://example.com/active-new.jpg";
     private static final String PAUSED_NEWEST_PHOTO_URL = "https://example.com/paused-newest.jpg";
+    private static final String PROFILE_PROPERTY = "datingapp.db.profile";
 
     private JdbiUserStorage storage;
     private Jdbi jdbi;
@@ -57,6 +60,7 @@ class JdbiUserStorageNormalizationTest {
 
     @BeforeEach
     void setUp() {
+        System.setProperty(PROFILE_PROPERTY, "test");
         String dbName = "testdb_" + UUID.randomUUID().toString().replace("-", "");
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1");
         DatabaseManager dbManager = DatabaseManager.getInstance();
@@ -83,6 +87,7 @@ class JdbiUserStorageNormalizationTest {
 
     @AfterEach
     void tearDown() {
+        System.clearProperty(PROFILE_PROPERTY);
         TestClock.reset();
         storage.clearCache();
         DatabaseManager.resetInstance();

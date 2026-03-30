@@ -194,6 +194,18 @@ public class Match {
         touch();
     }
 
+    /** Reactivates a previously unmatched pair after fresh mutual likes. */
+    public void reactivateFromUnmatch() {
+        if (this.state != MatchState.UNMATCHED) {
+            throw new IllegalStateException("Can only reactivate from UNMATCHED state, current: " + this.state);
+        }
+        this.state = MatchState.ACTIVE;
+        this.endedAt = null;
+        this.endedBy = null;
+        this.endReason = null;
+        touch();
+    }
+
     /** gracefulExit - ends the match kindly. */
     public void gracefulExit(UUID initiatorId) {
         if (isInvalidTransition(this.state, MatchState.GRACEFUL_EXIT)) {

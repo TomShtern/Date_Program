@@ -45,6 +45,7 @@ class MatchingUseCasesTest {
 
     private TestStorages.Users userStorage;
     private TestStorages.Interactions interactionStorage;
+    private TestStorages.TrustSafety trustSafetyStorage;
     private CandidateFinder candidateFinder;
     private DailyLimitService dailyLimitService;
     private DailyPickService dailyPickService;
@@ -61,7 +62,7 @@ class MatchingUseCasesTest {
         var config = AppConfig.defaults();
         userStorage = new TestStorages.Users();
         interactionStorage = new TestStorages.Interactions();
-        var trustSafetyStorage = new TestStorages.TrustSafety();
+        trustSafetyStorage = new TestStorages.TrustSafety();
         var undoStorage = new TestStorages.Undos();
         dailyLimitService = alwaysAllowDailyLimitService();
         dailyPickService = noDailyPickService();
@@ -234,7 +235,7 @@ class MatchingUseCasesTest {
     @DisplayName("processSwipe should not include literal null when exception message is missing")
     void processSwipeShouldNotIncludeLiteralNullWhenExceptionMessageMissing() {
         var config = AppConfig.defaults();
-        var trustSafetyStorage = new TestStorages.TrustSafety();
+        var localTrustSafetyStorage = new TestStorages.TrustSafety();
         var undoStorage = new TestStorages.Undos();
         DailyLimitService failingDailyLimitService = alwaysAllowDailyLimitService();
         DailyPickService failingDailyPickService = noDailyPickService();
@@ -253,12 +254,12 @@ class MatchingUseCasesTest {
         var failingCandidateFinder = new CandidateFinder(
                 userStorage,
                 failingInteractionStorage,
-                trustSafetyStorage,
+                localTrustSafetyStorage,
                 config.safety().userTimeZone());
         var failingUndoService = new UndoService(failingInteractionStorage, undoStorage, config);
         var failingMatchingService = MatchingService.builder()
                 .interactionStorage(failingInteractionStorage)
-                .trustSafetyStorage(trustSafetyStorage)
+                .trustSafetyStorage(localTrustSafetyStorage)
                 .userStorage(userStorage)
                 .undoService(failingUndoService)
                 .dailyService(recommendationService)
@@ -341,6 +342,97 @@ class MatchingUseCasesTest {
         assertNotNull(wrappedService);
         assertEquals(0, wrappedService.getStandouts(currentUser).standouts().size());
         assertEquals(0, wrappedService.resolveUsers(List.of()).size());
+    }
+
+    @Test
+    @DisplayName("browseCandidates excludes symmetrically blocked users")
+    void browseCandidatesExcludesSymmetricallyBlockedUsers() {
+        var blockedCandidate = TestUserFactory.createActiveUser(UUID.randomUUID(), "BlockedCandidate");
+        blockedCandidate.setGender(User.Gender.FEMALE);
+        blockedCandidate.setInterestedIn(Set.of(User.Gender.MALE));
+        userStorage.save(blockedCandidate);
+        trustSafetyStorage.save(
+                datingapp.core.connection.ConnectionModels.Block.create(blockedCandidate.getId(), currentUser.getId()));
+
+        var result = useCases.browseCandidates(
+                new BrowseCandidatesCommand(UserContext.cli(currentUser.getId()), currentUser));
+
+        assertTrue(result.success());
+        assertTrue(
+                result.data().candidates().stream().noneMatch(c -> c.getId().equals(blockedCandidate.getId())),
+                "Blocked user should not appear in browse candidates");
+    }
+
+    @Test
+    @DisplayName("browseCandidates excludes recently unmatched users within cooldown window")
+    void browseCandidatesExcludesRecentlyUnmatchedUsers() {
+        var unmatched = TestUserFactory.createActiveUser(UUID.randomUUID(), "RecentlyUnmatched");
+        unmatched.setGender(User.Gender.FEMALE);
+        unmatched.setInterestedIn(Set.of(User.Gender.MALE));
+        userStorage.save(unmatched);
+
+        var match = Match.create(currentUser.getId(), unmatched.getId());
+        match.unmatch(currentUser.getId());
+        interactionStorage.save(match);
+
+        var result = useCases.browseCandidates(
+                new BrowseCandidatesCommand(UserContext.cli(currentUser.getId()), currentUser));
+
+        assertTrue(result.success());
+        assertTrue(
+                result.data().candidates().stream().noneMatch(c -> c.getId().equals(unmatched.getId())),
+                "Recently unmatched user should not appear within cooldown window");
+    }
+
+    @Test
+    @DisplayName("browseCandidates permits rematch after cooldown expires")
+    void browseCandidatesPermitsRematchAfterCooldownExpires() {
+        var previouslyUnmatched = TestUserFactory.createActiveUser(UUID.randomUUID(), "PreviouslyUnmatched");
+        previouslyUnmatched.setGender(User.Gender.FEMALE);
+        previouslyUnmatched.setInterestedIn(Set.of(User.Gender.MALE));
+        userStorage.save(previouslyUnmatched);
+
+        try {
+            AppClock.setFixed(AppClock.now().minus(Duration.ofHours(169)));
+            var expiredMatch = Match.create(currentUser.getId(), previouslyUnmatched.getId());
+            expiredMatch.unmatch(currentUser.getId());
+            interactionStorage.save(expiredMatch);
+        } finally {
+            AppClock.reset();
+        }
+
+        var result = useCases.browseCandidates(
+                new BrowseCandidatesCommand(UserContext.cli(currentUser.getId()), currentUser));
+
+        assertTrue(result.success());
+        assertTrue(
+                result.data().candidates().stream().anyMatch(c -> c.getId().equals(previouslyUnmatched.getId())),
+                "User should reappear after cooldown expires");
+    }
+
+    @Test
+    @DisplayName("browseCandidates still preserves locationMissing contract after filtering")
+    void browseCandidatesPreservesLocationMissingContractAfterFiltering() {
+        User noLocationUser = new User(UUID.randomUUID(), "NoLocationFiltering");
+        noLocationUser.setBirthDate(AppClock.today().minusYears(27));
+        noLocationUser.setGender(User.Gender.MALE);
+        noLocationUser.setInterestedIn(Set.of(User.Gender.FEMALE));
+        noLocationUser.setAgeRange(20, 45, 18, 120);
+        noLocationUser.setMaxDistanceKm(100, AppConfig.defaults().matching().maxDistanceKm());
+        noLocationUser.addPhotoUrl("http://example.com/no-location-filter.jpg");
+        noLocationUser.setBio("No location but otherwise complete");
+        noLocationUser.setPacePreferences(currentUser.getPacePreferences());
+        noLocationUser.activate();
+        userStorage.save(noLocationUser);
+
+        var result = useCases.browseCandidates(
+                new BrowseCandidatesCommand(UserContext.cli(noLocationUser.getId()), noLocationUser));
+
+        assertTrue(result.success());
+        assertTrue(
+                result.data().locationMissing(),
+                "locationMissing must remain true for seeker without location, even with new filtering");
+        assertTrue(result.data().candidates().isEmpty(), "Candidates list must be empty when location is missing");
     }
 
     @Test

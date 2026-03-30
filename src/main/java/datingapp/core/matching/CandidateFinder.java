@@ -1,6 +1,9 @@
 package datingapp.core.matching;
 
+import datingapp.core.AppConfig;
 import datingapp.core.LoggingSupport;
+import datingapp.core.model.Match;
+import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
@@ -30,6 +33,7 @@ public class CandidateFinder implements LoggingSupport {
     private final TrustSafetyStorage trustSafetyStorage;
     private final java.time.ZoneId timezone;
     private final Clock clock;
+    private final Duration rematchCooldown;
     private final ConcurrentHashMap<UUID, CacheEntry> candidateCache = new ConcurrentHashMap<>();
 
     private static final Duration CANDIDATE_CACHE_TTL = Duration.ofMinutes(5);
@@ -49,7 +53,28 @@ public class CandidateFinder implements LoggingSupport {
             InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
             java.time.ZoneId timezone) {
-        this(userStorage, interactionStorage, trustSafetyStorage, timezone, datingapp.core.AppClock.clock());
+        this(
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                timezone,
+                datingapp.core.AppClock.clock(),
+                Duration.ofHours(AppConfig.DEFAULT_REMATCH_COOLDOWN_HOURS));
+    }
+
+    public CandidateFinder(
+            UserStorage userStorage,
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            java.time.ZoneId timezone,
+            Duration rematchCooldown) {
+        this(
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                timezone,
+                datingapp.core.AppClock.clock(),
+                rematchCooldown);
     }
 
     public CandidateFinder(
@@ -58,15 +83,36 @@ public class CandidateFinder implements LoggingSupport {
             TrustSafetyStorage trustSafetyStorage,
             java.time.ZoneId timezone,
             Clock clock) {
+        this(
+                userStorage,
+                interactionStorage,
+                trustSafetyStorage,
+                timezone,
+                clock,
+                Duration.ofHours(AppConfig.DEFAULT_REMATCH_COOLDOWN_HOURS));
+    }
+
+    public CandidateFinder(
+            UserStorage userStorage,
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            java.time.ZoneId timezone,
+            Clock clock,
+            Duration rematchCooldown) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
         this.timezone = Objects.requireNonNull(timezone, "timezone cannot be null");
         this.clock = Objects.requireNonNull(clock, "clock cannot be null");
+        this.rematchCooldown = Objects.requireNonNull(rematchCooldown, "rematchCooldown cannot be null");
     }
 
     public java.time.ZoneId getTimezone() {
         return timezone;
+    }
+
+    public Duration getRematchCooldown() {
+        return rematchCooldown;
     }
 
     /** Geographic utility functions. Pure Java - no external dependencies. */
@@ -121,6 +167,7 @@ public class CandidateFinder implements LoggingSupport {
      */
     public List<User> findCandidates(User seeker, List<User> allActive, Set<UUID> alreadyInteracted) {
         Set<Gender> seekerInterestedIn = seeker.getInterestedIn();
+        Set<UUID> recentlyUnmatchedCounterpartIds = recentlyUnmatchedCounterpartIds(seeker.getId());
         logDebug(
                 "Finding candidates for {} (state={}, gender={}, interestedIn={}, age={}, minAge={}, maxAge={})",
                 userRef(seeker),
@@ -137,6 +184,8 @@ public class CandidateFinder implements LoggingSupport {
                 .filter(candidate -> isNotSelf(seeker, candidate))
                 .filter(this::isActiveCandidate)
                 .filter(candidate -> notAlreadyInteracted(candidate, alreadyInteracted))
+                .filter(candidate -> notBlockedEitherDirection(seeker, candidate))
+                .filter(candidate -> notInRecentUnmatchCooldown(candidate, recentlyUnmatchedCounterpartIds))
                 .filter(candidate -> matchesGenderPreferences(seeker, candidate, seekerInterestedIn))
                 .filter(candidate -> matchesAgePreferences(seeker, candidate))
                 .filter(candidate -> isWithinDistanceWithLogging(seeker, candidate))
@@ -169,7 +218,6 @@ public class CandidateFinder implements LoggingSupport {
      * @return list of candidate users sorted by distance
      */
     public List<User> findCandidatesForUser(User currentUser) {
-        long startTime = System.nanoTime();
         if (!currentUser.hasLocationSet()) {
             if (logger.isTraceEnabled()) {
                 logger.trace(
@@ -180,21 +228,37 @@ public class CandidateFinder implements LoggingSupport {
         }
 
         Set<UUID> excluded = new HashSet<>(interactionStorage.getLikedOrPassedUserIds(currentUser.getId()));
-        excluded.addAll(trustSafetyStorage.getBlockedUserIds(currentUser.getId()));
 
         int fingerprint = candidateFingerprint(currentUser, excluded);
         CacheEntry cached = candidateCache.get(currentUser.getId());
         if (cached != null && !cached.isExpired(clock.instant()) && cached.fingerprint() == fingerprint) {
-            return cached.candidates();
+            return refreshCachedCandidates(currentUser, excluded, fingerprint);
         }
 
+        return refreshCachedCandidates(currentUser, excluded, fingerprint);
+    }
+
+    private List<User> refreshCachedCandidates(User currentUser, Set<UUID> excluded, int fingerprint) {
+        List<User> preFiltered = findFreshPrefilteredCandidates(currentUser);
+        List<User> candidates = findCandidates(currentUser, preFiltered, excluded);
+        candidateCache.put(currentUser.getId(), new CacheEntry(clock.instant(), fingerprint, List.copyOf(candidates)));
+        if (logger.isTraceEnabled()) {
+            logger.trace(
+                    "CandidateFinder refreshed candidates for {} with {} results",
+                    currentUser.getId(),
+                    candidates.size());
+        }
+        return candidates;
+    }
+
+    private List<User> findFreshPrefilteredCandidates(User currentUser) {
         // When a seeker is open to everyone (all genders selected), pass the full
         // Gender enum to the DB pre-filter so the SQL `gender IN (...)` clause does
         // not exclude candidates by gender before the in-memory check runs.
         Set<Gender> gendersForQuery =
                 currentUser.isInterestedInEveryone() ? User.matchableGenders() : currentUser.getInterestedIn();
 
-        List<User> preFiltered = userStorage.findCandidates(
+        return userStorage.findCandidates(
                 currentUser.getId(),
                 gendersForQuery,
                 currentUser.getMinAge(),
@@ -202,14 +266,6 @@ public class CandidateFinder implements LoggingSupport {
                 currentUser.getLat(),
                 currentUser.getLon(),
                 currentUser.getMaxDistanceKm());
-
-        List<User> candidates = findCandidates(currentUser, preFiltered, excluded);
-        candidateCache.put(currentUser.getId(), new CacheEntry(clock.instant(), fingerprint, List.copyOf(candidates)));
-        if (logger.isTraceEnabled()) {
-            long durationMs = (System.nanoTime() - startTime) / 1_000_000;
-            logger.trace("CandidateFinder.findCandidatesForUser completed in {}ms", durationMs);
-        }
-        return candidates;
     }
 
     public void invalidateCacheFor(UUID userId) {
@@ -274,6 +330,22 @@ public class CandidateFinder implements LoggingSupport {
             logTrace("Rejecting {}: ALREADY INTERACTED", userRef(candidate));
         }
         return notInteracted;
+    }
+
+    private boolean notBlockedEitherDirection(User seeker, User candidate) {
+        boolean notBlocked = !trustSafetyStorage.isBlocked(seeker.getId(), candidate.getId());
+        if (!notBlocked) {
+            logDebug("Rejecting {}: BLOCKED IN EITHER DIRECTION", userRef(candidate));
+        }
+        return notBlocked;
+    }
+
+    private boolean notInRecentUnmatchCooldown(User candidate, Set<UUID> recentlyUnmatchedCounterpartIds) {
+        boolean outsideCooldown = !recentlyUnmatchedCounterpartIds.contains(candidate.getId());
+        if (!outsideCooldown) {
+            logDebug("Rejecting {}: RECENTLY UNMATCHED DURING COOLDOWN", userRef(candidate));
+        }
+        return outsideCooldown;
     }
 
     private boolean matchesGenderPreferences(User seeker, User candidate, Set<Gender> seekerInterestedIn) {
@@ -400,6 +472,30 @@ public class CandidateFinder implements LoggingSupport {
 
     private boolean hasLocation(User user) {
         return user.hasLocationSet();
+    }
+
+    private Set<UUID> recentlyUnmatchedCounterpartIds(UUID seekerId) {
+        if (rematchCooldown.isZero()) {
+            return Set.of();
+        }
+        Instant cutoff = clock.instant().minus(rematchCooldown);
+        return interactionStorage.getAllMatchesFor(seekerId).stream()
+                .filter(match -> match.getEndReason() == MatchArchiveReason.UNMATCH)
+                .filter(match -> match.getEndedAt() != null)
+                .filter(match -> match.getEndedAt().isAfter(cutoff))
+                .map(match -> counterpartId(match, seekerId))
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    private static UUID counterpartId(Match match, UUID seekerId) {
+        if (match.getUserA().equals(seekerId)) {
+            return match.getUserB();
+        }
+        if (match.getUserB().equals(seekerId)) {
+            return match.getUserA();
+        }
+        return null;
     }
 
     private String formatLatLon(User user) {

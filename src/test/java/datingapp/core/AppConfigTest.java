@@ -36,6 +36,8 @@ class AppConfigTest {
             assertEquals(100, defaults.matching().dailyLikeLimit(), "Default daily like limit should be 100");
             assertEquals(1, defaults.matching().dailySuperLikeLimit(), "Default super like limit should be 1");
             assertEquals(
+                    168, defaults.matching().rematchCooldownHours(), "Default rematch cooldown hours should be 168");
+            assertEquals(
                     3,
                     defaults.matching().sharedInterestsPreviewCount(),
                     "Default shared interests preview count should be 3");
@@ -80,6 +82,7 @@ class AppConfigTest {
                     .autoBanThreshold(5)
                     .dailyLikeLimit(50)
                     .dailySuperLikeLimit(3)
+                    .rematchCooldownHours(72)
                     .sharedInterestsPreviewCount(4)
                     .maxInterests(10)
                     .build();
@@ -87,6 +90,7 @@ class AppConfigTest {
             assertEquals(5, config.safety().autoBanThreshold());
             assertEquals(50, config.matching().dailyLikeLimit());
             assertEquals(3, config.matching().dailySuperLikeLimit());
+            assertEquals(72, config.matching().rematchCooldownHours());
             assertEquals(4, config.matching().sharedInterestsPreviewCount());
             assertEquals(10, config.validation().maxInterests());
         }
@@ -112,6 +116,7 @@ class AppConfigTest {
             assertSame(builder, builder.autoBanThreshold(1));
             assertSame(builder, builder.dailyLikeLimit(1));
             assertSame(builder, builder.dailySuperLikeLimit(1));
+            assertSame(builder, builder.rematchCooldownHours(1));
             assertSame(builder, builder.sharedInterestsPreviewCount(1));
             assertSame(builder, builder.suspiciousSwipeVelocityBlockingEnabled(true));
             assertSame(builder, builder.maxInterests(1));
@@ -136,6 +141,7 @@ class AppConfigTest {
 
             assertEquals(111, config.matching().dailyLikeLimit());
             assertEquals(7, config.matching().dailySuperLikeLimit());
+            assertEquals(36, config.matching().rematchCooldownHours());
             assertEquals(222, config.matching().dailyPassLimit());
             assertEquals(333, config.matching().maxSwipesPerSession());
             assertEquals(4.5, config.matching().suspiciousSwipeVelocity(), 0.001);
@@ -269,6 +275,7 @@ class AppConfigTest {
             return AppConfig.builder()
                     .dailyLikeLimit(111)
                     .dailySuperLikeLimit(7)
+                    .rematchCooldownHours(36)
                     .dailyPassLimit(222)
                     .maxSwipesPerSession(333)
                     .suspiciousSwipeVelocity(4.5)

@@ -17,7 +17,9 @@ import datingapp.app.usecase.social.SocialUseCases.NotificationsQuery;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.app.usecase.social.SocialUseCases.RespondFriendRequestCommand;
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.connection.ConnectionService;
@@ -26,17 +28,22 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("SocialUseCases")
 class SocialUseCasesTest {
+
+    private static final Instant FIXED_NOW = Instant.parse("2026-03-30T00:00:00Z");
 
     private TestStorages.Interactions interactionStorage;
     private TrackingCommunications communicationStorage;
@@ -49,6 +56,7 @@ class SocialUseCasesTest {
 
     @BeforeEach
     void setUp() {
+        AppClock.setFixed(FIXED_NOW);
         var config = AppConfig.defaults();
         var userStorage = new TestStorages.Users();
         communicationStorage = new TrackingCommunications();
@@ -70,6 +78,11 @@ class SocialUseCasesTest {
                         trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)
                 .build();
         useCases = createUseCases(eventBus);
+    }
+
+    @AfterEach
+    void tearDown() {
+        AppClock.reset();
     }
 
     @Test
@@ -135,6 +148,39 @@ class SocialUseCasesTest {
                 userB.getId(),
                 "MATCHED",
                 "UNMATCHED");
+    }
+
+    @Test
+    @DisplayName("unmatch leaves the pair eligible for rematch after cooldown expires")
+    void unmatchLeavesPairEligibleForRematchAfterCooldownExpires() {
+        var result = useCases.unmatch(new RelationshipCommand(UserContext.cli(userA.getId()), userB.getId()));
+
+        assertTrue(result.success());
+        assertEquals(
+                Match.MatchState.UNMATCHED,
+                interactionStorage
+                        .get(Match.generateId(userA.getId(), userB.getId()))
+                        .orElseThrow()
+                        .getState());
+
+        AppClock.setFixed(AppClock.now().plus(Duration.ofHours(169)));
+
+        Like firstFreshLike = Like.create(userA.getId(), userB.getId(), Like.Direction.LIKE);
+        Like secondFreshLike = Like.create(userB.getId(), userA.getId(), Like.Direction.LIKE);
+
+        var firstResult = interactionStorage.saveLikeAndMaybeCreateMatch(firstFreshLike);
+        var secondResult = interactionStorage.saveLikeAndMaybeCreateMatch(secondFreshLike);
+
+        assertTrue(firstResult.likePersisted());
+        assertTrue(firstResult.createdMatch().isEmpty());
+        assertTrue(secondResult.likePersisted());
+        assertTrue(secondResult.createdMatch().isPresent());
+        assertEquals(
+                Match.MatchState.ACTIVE,
+                interactionStorage
+                        .get(Match.generateId(userA.getId(), userB.getId()))
+                        .orElseThrow()
+                        .getState());
     }
 
     @Test

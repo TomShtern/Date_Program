@@ -515,6 +515,7 @@ public final class TestStorages {
 
         @Override
         public boolean unmatchTransition(Match updatedMatch, Optional<Conversation> archivedConversation) {
+            deletePairLikes(updatedMatch.getUserA(), updatedMatch.getUserB());
             update(updatedMatch);
             return true;
         }

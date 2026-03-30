@@ -96,13 +96,29 @@ public interface InteractionStorage {
             }
 
             String matchId = Match.generateId(like.whoLikes(), like.whoGotLiked());
-            if (exists(matchId)) {
+            Optional<Match> existingMatch = get(matchId);
+            if (existingMatch.isPresent()) {
+                Match match = existingMatch.get();
+                if (match.getState() == Match.MatchState.UNMATCHED) {
+                    match.reactivateFromUnmatch();
+                    update(match);
+                    return LikeMatchWriteResult.likeAndMatch(match);
+                }
                 return LikeMatchWriteResult.likeOnly();
             }
 
             Match match = Match.create(like.whoLikes(), like.whoGotLiked());
             save(match);
             return LikeMatchWriteResult.likeAndMatch(match);
+        }
+    }
+
+    default void deletePairLikes(UUID userA, UUID userB) {
+        Objects.requireNonNull(userA, "userA cannot be null");
+        Objects.requireNonNull(userB, "userB cannot be null");
+        synchronized (this) {
+            getLike(userA, userB).ifPresent(like -> delete(like.id()));
+            getLike(userB, userA).ifPresent(like -> delete(like.id()));
         }
     }
 

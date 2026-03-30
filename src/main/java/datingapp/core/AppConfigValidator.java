@@ -13,7 +13,11 @@ final class AppConfigValidator {
     private AppConfigValidator() {}
 
     static void validateMatchingLimits(
-            int dailyLikeLimit, int dailySuperLikeLimit, int dailyPassLimit, int maxSwipesPerSession) {
+            int dailyLikeLimit,
+            int dailySuperLikeLimit,
+            int dailyPassLimit,
+            int maxSwipesPerSession,
+            int rematchCooldownHours) {
         if (dailyLikeLimit < -1) {
             throw new IllegalArgumentException("dailyLikeLimit must be >= -1");
         }
@@ -22,6 +26,7 @@ final class AppConfigValidator {
         }
         requireNonNegative("dailySuperLikeLimit", dailySuperLikeLimit);
         requireNonNegative("maxSwipesPerSession", maxSwipesPerSession);
+        requireNonNegative("rematchCooldownHours", rematchCooldownHours);
     }
 
     static void validateMatchingWeights(

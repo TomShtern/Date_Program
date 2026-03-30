@@ -19,6 +19,8 @@ public record AppConfig(
         StorageConfig storage,
         SafetyConfig safety) {
 
+    public static final int DEFAULT_REMATCH_COOLDOWN_HOURS = 168;
+
     // ========================================================================
     // Sub-record: MatchingConfig
     // ========================================================================
@@ -28,6 +30,7 @@ public record AppConfig(
             int dailySuperLikeLimit,
             int dailyPassLimit,
             int maxSwipesPerSession,
+            int rematchCooldownHours,
             double suspiciousSwipeVelocity,
             boolean suspiciousSwipeVelocityBlockingEnabled,
             double distanceWeight,
@@ -41,7 +44,7 @@ public record AppConfig(
             int maxDistanceKm) {
         public MatchingConfig {
             AppConfigValidator.validateMatchingLimits(
-                    dailyLikeLimit, dailySuperLikeLimit, dailyPassLimit, maxSwipesPerSession);
+                    dailyLikeLimit, dailySuperLikeLimit, dailyPassLimit, maxSwipesPerSession, rematchCooldownHours);
             AppConfigValidator.validateMatchingWeights(
                     suspiciousSwipeVelocity,
                     distanceWeight,
@@ -253,6 +256,7 @@ public record AppConfig(
         private int dailySuperLikeLimit = 1;
         private int dailyPassLimit = -1;
         private int maxSwipesPerSession = 500;
+        private int rematchCooldownHours = DEFAULT_REMATCH_COOLDOWN_HOURS;
         private double suspiciousSwipeVelocity = 30.0;
         private boolean suspiciousSwipeVelocityBlockingEnabled = true;
         private double distanceWeight = 0.15;
@@ -382,6 +386,11 @@ public record AppConfig(
 
         public Builder maxSwipesPerSession(int v) {
             this.maxSwipesPerSession = v;
+            return this;
+        }
+
+        public Builder rematchCooldownHours(int v) {
+            this.rematchCooldownHours = v;
             return this;
         }
 
@@ -695,6 +704,7 @@ public record AppConfig(
                     dailySuperLikeLimit,
                     dailyPassLimit,
                     maxSwipesPerSession,
+                    rematchCooldownHours,
                     suspiciousSwipeVelocity,
                     suspiciousSwipeVelocityBlockingEnabled,
                     distanceWeight,

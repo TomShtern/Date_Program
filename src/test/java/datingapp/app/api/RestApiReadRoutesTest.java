@@ -1,12 +1,14 @@
 package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.AppClock;
 import datingapp.core.ServiceRegistry;
+import datingapp.core.connection.ConnectionModels;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
@@ -194,6 +196,188 @@ class RestApiReadRoutesTest {
         assertTrue(browseJson.has("locationMissing"));
         assertTrue(candidatesJson.isArray());
         assertEquals(candidateId.toString(), candidatesJson.get(0).get("id").asText());
+    }
+
+    @Test
+    @DisplayName("/browse endpoint excludes symmetrically blocked users")
+    void browseExcludesSymmetricallyBlockedUsers() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .build();
+
+        UUID seekerId = UUID.randomUUID();
+        UUID blockedId = UUID.randomUUID();
+        User seeker = activeUser(seekerId, "Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        seeker.setLocation(32.0853, 34.7818);
+        User blocked = activeUser(blockedId, "Blocked", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        blocked.setLocation(32.0870, 34.8877);
+        userStorage.save(seeker);
+        userStorage.save(blocked);
+        trustSafetyStorage.save(ConnectionModels.Block.create(blockedId, seekerId));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> browseResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + seekerId + "/browse"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, browseResponse.statusCode());
+        JsonNode browseJson = MAPPER.readTree(browseResponse.body());
+
+        assertTrue(browseJson.get("candidates").isArray());
+        for (JsonNode candidate : browseJson.get("candidates")) {
+            assertNotEquals(
+                    blockedId.toString(),
+                    candidate.get("id").asText(),
+                    "Symmetrically blocked user should not appear in /browse");
+        }
+    }
+
+    @Test
+    @DisplayName("/browse endpoint excludes recently unmatched users within cooldown")
+    void browseExcludesRecentlyUnmatchedUsers() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .build();
+
+        UUID seekerId = UUID.randomUUID();
+        UUID unmatchedId = UUID.randomUUID();
+        User seeker = activeUser(seekerId, "Seeker", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        seeker.setLocation(32.0853, 34.7818);
+        User recentlyUnmatched = activeUser(unmatchedId, "RecentlyUnmatched", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        recentlyUnmatched.setLocation(32.0870, 34.8877);
+        userStorage.save(seeker);
+        userStorage.save(recentlyUnmatched);
+        Match recentlyEndedMatch = Match.create(seekerId, unmatchedId);
+        recentlyEndedMatch.unmatch(seekerId);
+        interactionStorage.save(recentlyEndedMatch);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> browseResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + seekerId + "/browse"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, browseResponse.statusCode());
+        JsonNode browseJson = MAPPER.readTree(browseResponse.body());
+
+        assertTrue(browseJson.get("candidates").isArray());
+        for (JsonNode candidate : browseJson.get("candidates")) {
+            assertNotEquals(
+                    unmatchedId.toString(),
+                    candidate.get("id").asText(),
+                    "Recently unmatched user should not appear within cooldown window");
+        }
+    }
+
+    @Test
+    @DisplayName("/browse endpoint still reports locationMissing when seeker has no location")
+    void browseReportsLocationMissingWhenSeekerHasNoLocation() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .build();
+
+        UUID noLocationId = UUID.randomUUID();
+        UUID candidateId = UUID.randomUUID();
+        User noLocation = User.StorageBuilder.create(noLocationId, "NoLocation", AppClock.now())
+                .state(UserState.ACTIVE)
+                .birthDate(LocalDate.of(1998, 1, 1))
+                .gender(Gender.FEMALE)
+                .interestedIn(EnumSet.of(Gender.MALE))
+                .build();
+        User candidate = activeUser(candidateId, "Candidate", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        candidate.setLocation(32.0870, 34.8877);
+        userStorage.save(noLocation);
+        userStorage.save(candidate);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> browseResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + noLocationId + "/browse"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, browseResponse.statusCode());
+        JsonNode browseJson = MAPPER.readTree(browseResponse.body());
+
+        assertTrue(
+                browseJson.get("locationMissing").asBoolean(),
+                "locationMissing must be true when seeker has no location");
+        assertEquals(0, browseJson.get("candidates").size(), "Candidates list must be empty when location is missing");
+    }
+
+    @Test
+    @DisplayName("/candidates endpoint also excludes blocked and recently unmatched users")
+    void candidatesEndpointExcludesBlockedAndUnmatchedUsers() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .build();
+
+        UUID seekerId = UUID.randomUUID();
+        UUID eligibleId = UUID.randomUUID();
+        UUID blockedId = UUID.randomUUID();
+        UUID unmatchedId = UUID.randomUUID();
+
+        User seeker = activeUser(seekerId, "Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User eligible = activeUser(eligibleId, "Eligible", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        User blocked = activeUser(blockedId, "Blocked", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        User unmatched = activeUser(unmatchedId, "Unmatched", Gender.FEMALE, EnumSet.of(Gender.MALE));
+
+        userStorage.save(seeker);
+        userStorage.save(eligible);
+        userStorage.save(blocked);
+        userStorage.save(unmatched);
+
+        trustSafetyStorage.save(ConnectionModels.Block.create(blockedId, seekerId));
+        Match recentlyEndedMatch = Match.create(seekerId, unmatchedId);
+        recentlyEndedMatch.unmatch(seekerId);
+        interactionStorage.save(recentlyEndedMatch);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> candidatesResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/api/users/" + seekerId + "/candidates"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, candidatesResponse.statusCode());
+        JsonNode candidatesJson = MAPPER.readTree(candidatesResponse.body());
+
+        assertTrue(candidatesJson.isArray());
+        for (JsonNode candidate : candidatesJson) {
+            String id = candidate.get("id").asText();
+            assertEquals(eligibleId.toString(), id, "Eligible candidate should remain visible");
+            assertNotEquals(blockedId.toString(), id, "Blocked user should not appear in /candidates");
+            assertNotEquals(unmatchedId.toString(), id, "Recently unmatched user should not appear in /candidates");
+        }
     }
 
     @Test

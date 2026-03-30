@@ -107,6 +107,28 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
             WHERE id = :id AND deleted_at IS NULL
             """;
 
+    private static final String SQL_ACTIVE_MATCH_STATE =
+            "SELECT state FROM matches WHERE id = :id AND deleted_at IS NULL";
+
+    private static final String SQL_REACTIVATE_UNMATCHED_MATCH = """
+                UPDATE matches
+                SET state = 'ACTIVE',
+                updated_at = :updatedAt,
+                ended_at = NULL,
+                ended_by = NULL,
+                end_reason = NULL,
+                deleted_at = NULL
+                WHERE id = :id AND state = 'UNMATCHED' AND deleted_at IS NULL
+                """;
+
+    private static final String SQL_SOFT_DELETE_PAIR_LIKES = """
+                UPDATE likes
+                SET deleted_at = :deletedAt
+                WHERE ((who_likes = :userA AND who_got_liked = :userB)
+                OR (who_likes = :userB AND who_got_liked = :userA))
+                  AND deleted_at IS NULL
+                """;
+
     private static final String SQL_ACCEPT_FRIEND_REQUEST = """
             UPDATE friend_requests
             SET status = :status,
@@ -164,68 +186,116 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         try {
             return jdbi.inTransaction(handle -> {
-                boolean likeAlreadyExists = handle.createQuery(SQL_ACTIVE_LIKE_EXISTS)
-                        .bind(PARAM_WHO_LIKES, like.whoLikes())
-                        .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
-                        .mapTo(Boolean.class)
-                        .one();
-                if (likeAlreadyExists) {
+                if (activeLikeExists(handle, like)) {
                     return LikeMatchWriteResult.duplicateLike();
                 }
 
-                handle.createUpdate(SQL_UPSERT_LIKE)
-                        .bind(PARAM_ID, like.id())
-                        .bind(PARAM_WHO_LIKES, like.whoLikes())
-                        .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
-                        .bind(PARAM_DIRECTION, like.direction().name())
-                        .bind(PARAM_CREATED_AT, like.createdAt())
-                        .execute();
+                saveLike(handle, like);
 
                 if (!isPositiveLikeDirection(like.direction())) {
                     return LikeMatchWriteResult.likeOnly();
                 }
 
-                boolean mutualLikeExists = handle.createQuery(SQL_MUTUAL_LIKE_EXISTS)
-                        .bind(PARAM_WHO_LIKES, like.whoLikes())
-                        .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
-                        .mapTo(Boolean.class)
-                        .one();
-                if (!mutualLikeExists) {
+                if (!mutualLikeExists(handle, like)) {
                     return LikeMatchWriteResult.likeOnly();
                 }
 
                 String matchId = Match.generateId(like.whoLikes(), like.whoGotLiked());
-                boolean activeMatchExists = handle.createQuery(SQL_ACTIVE_MATCH_EXISTS)
-                        .bind(PARAM_ID, matchId)
-                        .mapTo(Boolean.class)
-                        .one();
-                if (activeMatchExists) {
-                    return LikeMatchWriteResult.likeOnly();
+                Optional<LikeMatchWriteResult> existingMatchResult = handleExistingMatch(handle, like, matchId);
+                if (existingMatchResult.isPresent()) {
+                    return existingMatchResult.get();
                 }
 
-                Match match = Match.create(like.whoLikes(), like.whoGotLiked());
-                handle.createUpdate(SQL_UPSERT_MATCH)
-                        .bind(PARAM_ID, match.getId())
-                        .bind("userA", match.getUserA())
-                        .bind("userB", match.getUserB())
-                        .bind(PARAM_CREATED_AT, match.getCreatedAt())
-                        .bind(PARAM_UPDATED_AT, match.getUpdatedAt())
-                        .bind(PARAM_STATE, match.getState().name())
-                        .bind(PARAM_ENDED_AT, match.getEndedAt())
-                        .bind(PARAM_ENDED_BY, match.getEndedBy())
-                        .bind(
-                                PARAM_END_REASON,
-                                match.getEndReason() != null
-                                        ? match.getEndReason().name()
-                                        : null)
-                        .bind(PARAM_DELETED_AT, match.getDeletedAt())
-                        .execute();
-
-                return LikeMatchWriteResult.likeAndMatch(match);
+                return createFreshMatch(handle, like);
             });
         } catch (Exception e) {
             throw new StorageException("Atomic like->match persistence failed", e);
         }
+    }
+
+    private static boolean activeLikeExists(org.jdbi.v3.core.Handle handle, Like like) {
+        try (var query = handle.createQuery(SQL_ACTIVE_LIKE_EXISTS)) {
+            return query.bind(PARAM_WHO_LIKES, like.whoLikes())
+                    .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
+                    .mapTo(Boolean.class)
+                    .one();
+        }
+    }
+
+    private static void saveLike(org.jdbi.v3.core.Handle handle, Like like) {
+        try (var update = handle.createUpdate(SQL_UPSERT_LIKE)) {
+            update.bind(PARAM_ID, like.id())
+                    .bind(PARAM_WHO_LIKES, like.whoLikes())
+                    .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
+                    .bind(PARAM_DIRECTION, like.direction().name())
+                    .bind(PARAM_CREATED_AT, like.createdAt())
+                    .execute();
+        }
+    }
+
+    private static boolean mutualLikeExists(org.jdbi.v3.core.Handle handle, Like like) {
+        try (var query = handle.createQuery(SQL_MUTUAL_LIKE_EXISTS)) {
+            return query.bind(PARAM_WHO_LIKES, like.whoLikes())
+                    .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
+                    .mapTo(Boolean.class)
+                    .one();
+        }
+    }
+
+    private static Optional<LikeMatchWriteResult> handleExistingMatch(
+            org.jdbi.v3.core.Handle handle, Like like, String matchId) {
+        boolean activeMatchExists;
+        try (var query = handle.createQuery(SQL_ACTIVE_MATCH_EXISTS)) {
+            activeMatchExists =
+                    query.bind(PARAM_ID, matchId).mapTo(Boolean.class).one();
+        }
+        if (!activeMatchExists) {
+            return Optional.empty();
+        }
+
+        String existingState;
+        try (var query = handle.createQuery(SQL_ACTIVE_MATCH_STATE)) {
+            existingState =
+                    query.bind(PARAM_ID, matchId).mapTo(String.class).findOne().orElseThrow();
+        }
+        if (!MatchState.UNMATCHED.name().equals(existingState)) {
+            return Optional.of(LikeMatchWriteResult.likeOnly());
+        }
+
+        int reactivatedRows;
+        try (var update = handle.createUpdate(SQL_REACTIVATE_UNMATCHED_MATCH)) {
+            reactivatedRows = update.bind(PARAM_ID, matchId)
+                    .bind(PARAM_UPDATED_AT, like.createdAt())
+                    .execute();
+        }
+        if (reactivatedRows != 1) {
+            throw new StorageException("Failed to reactivate unmatched pair atomically");
+        }
+
+        Match reactivatedMatch = handle.attach(MatchDao.class)
+                .get(matchId)
+                .orElseThrow(() -> new StorageException("Reactivated match was not found"));
+        return Optional.of(LikeMatchWriteResult.likeAndMatch(reactivatedMatch));
+    }
+
+    private static LikeMatchWriteResult createFreshMatch(org.jdbi.v3.core.Handle handle, Like like) {
+        Match match = Match.create(like.whoLikes(), like.whoGotLiked());
+        try (var update = handle.createUpdate(SQL_UPSERT_MATCH)) {
+            update.bind(PARAM_ID, match.getId())
+                    .bind("userA", match.getUserA())
+                    .bind("userB", match.getUserB())
+                    .bind(PARAM_CREATED_AT, match.getCreatedAt())
+                    .bind(PARAM_UPDATED_AT, match.getUpdatedAt())
+                    .bind(PARAM_STATE, match.getState().name())
+                    .bind(PARAM_ENDED_AT, match.getEndedAt())
+                    .bind(PARAM_ENDED_BY, match.getEndedBy())
+                    .bind(
+                            PARAM_END_REASON,
+                            match.getEndReason() != null ? match.getEndReason().name() : null)
+                    .bind(PARAM_DELETED_AT, match.getDeletedAt())
+                    .execute();
+        }
+        return LikeMatchWriteResult.likeAndMatch(match);
     }
 
     @Override
@@ -497,6 +567,12 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         try {
             return jdbi.inTransaction(handle -> {
+                handle.createUpdate(SQL_SOFT_DELETE_PAIR_LIKES)
+                        .bind("userA", updatedMatch.getUserA())
+                        .bind("userB", updatedMatch.getUserB())
+                        .bind("deletedAt", updatedMatch.getUpdatedAt())
+                        .execute();
+
                 int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
                         .bind(PARAM_ID, updatedMatch.getId())
                         .bind(PARAM_STATE, updatedMatch.getState().name())

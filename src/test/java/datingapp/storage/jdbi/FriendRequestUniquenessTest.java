@@ -4,12 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.connection.ConnectionModels.FriendRequest;
-import datingapp.storage.DatabaseManager;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
@@ -20,6 +19,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import datingapp.core.connection.ConnectionModels.FriendRequest;
+import datingapp.storage.DatabaseManager;
+
 /**
  * Tests for friend request uniqueness constraint and deterministic query behavior.
  *
@@ -27,6 +29,8 @@ import org.junit.jupiter.api.Timeout;
  */
 @Timeout(10)
 class FriendRequestUniquenessTest {
+
+    private static final String PROFILE_PROPERTY = "datingapp.db.profile";
 
     private DatabaseManager dbManager;
     private Jdbi jdbi;
@@ -36,6 +40,7 @@ class FriendRequestUniquenessTest {
 
     @BeforeEach
     void setUp() {
+        System.setProperty(PROFILE_PROPERTY, "test");
         String dbName = "friend_req_test_" + UUID.randomUUID().toString().replace("-", "");
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1");
         dbManager = DatabaseManager.getInstance();
@@ -85,6 +90,7 @@ class FriendRequestUniquenessTest {
 
     @AfterEach
     void tearDown() {
+        System.clearProperty(PROFILE_PROPERTY);
         if (dbManager != null) {
             dbManager.shutdown();
             DatabaseManager.resetInstance();

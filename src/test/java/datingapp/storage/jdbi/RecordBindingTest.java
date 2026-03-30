@@ -2,13 +2,10 @@ package datingapp.storage.jdbi;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.connection.ConnectionModels.Block;
-import datingapp.core.connection.ConnectionModels.Like;
-import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.storage.DatabaseManager;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
+
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 import org.junit.jupiter.api.AfterEach;
@@ -16,6 +13,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+
+import datingapp.core.connection.ConnectionModels.Block;
+import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.connection.ConnectionModels.Report;
+import datingapp.storage.DatabaseManager;
 
 /**
  * Tests for record binding in JDBI DAOs. Validates that records bound with
@@ -26,6 +28,8 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(10)
 class RecordBindingTest {
 
+    private static final String PROFILE_PROPERTY = "datingapp.db.profile";
+
     private DatabaseManager dbManager;
     private Jdbi jdbi;
     private JdbiMatchmakingStorage matchmakingStorage;
@@ -33,6 +37,7 @@ class RecordBindingTest {
 
     @BeforeEach
     void setUp() {
+        System.setProperty(PROFILE_PROPERTY, "test");
         String dbName = "record_binding_test_" + UUID.randomUUID().toString().replace("-", "");
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1");
         dbManager = DatabaseManager.getInstance();
@@ -80,6 +85,7 @@ class RecordBindingTest {
 
     @AfterEach
     void tearDown() {
+        System.clearProperty(PROFILE_PROPERTY);
         if (dbManager != null) {
             dbManager.shutdown();
             DatabaseManager.resetInstance();

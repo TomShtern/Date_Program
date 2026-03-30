@@ -5,6 +5,19 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.UUID;
+
+import org.jdbi.v3.core.Jdbi;
+import org.jdbi.v3.sqlobject.SqlObjectPlugin;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
 import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Like;
@@ -21,21 +34,12 @@ import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.schema.MigrationRunner;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.UUID;
-import org.jdbi.v3.core.Jdbi;
-import org.jdbi.v3.sqlobject.SqlObjectPlugin;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 @Timeout(10)
 @DisplayName("JdbiAccountCleanupStorage")
 class JdbiAccountCleanupStorageTest {
+
+    private static final String PROFILE_PROPERTY = "datingapp.db.profile";
 
     private DatabaseManager dbManager;
     private Jdbi jdbi;
@@ -55,6 +59,7 @@ class JdbiAccountCleanupStorageTest {
 
     @BeforeEach
     void setUp() {
+        System.setProperty(PROFILE_PROPERTY, "test");
         String dbName = "cleanupdb_" + UUID.randomUUID().toString().replace("-", "");
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1");
         dbManager = DatabaseManager.getInstance();
@@ -191,6 +196,7 @@ class JdbiAccountCleanupStorageTest {
 
     @AfterEach
     void tearDown() {
+        System.clearProperty(PROFILE_PROPERTY);
         if (dbManager != null) {
             dbManager.shutdown();
             DatabaseManager.resetInstance();

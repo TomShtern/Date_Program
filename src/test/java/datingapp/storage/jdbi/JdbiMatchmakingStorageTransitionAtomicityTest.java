@@ -6,18 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.connection.ConnectionModels.Conversation;
-import datingapp.core.connection.ConnectionModels.FriendRequest;
-import datingapp.core.connection.ConnectionModels.Like;
-import datingapp.core.model.Match;
-import datingapp.core.model.Match.MatchArchiveReason;
-import datingapp.core.model.Match.MatchState;
-import datingapp.core.model.User;
-import datingapp.storage.DatabaseManager;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 import org.junit.jupiter.api.AfterEach;
@@ -26,9 +19,20 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import datingapp.core.connection.ConnectionModels.Conversation;
+import datingapp.core.connection.ConnectionModels.FriendRequest;
+import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.model.Match;
+import datingapp.core.model.Match.MatchArchiveReason;
+import datingapp.core.model.Match.MatchState;
+import datingapp.core.model.User;
+import datingapp.storage.DatabaseManager;
+
 @Timeout(10)
 @DisplayName("JdbiMatchmakingStorage atomic transition rollback")
 class JdbiMatchmakingStorageTransitionAtomicityTest {
+
+    private static final String PROFILE_PROPERTY = "datingapp.db.profile";
 
     private DatabaseManager dbManager;
     private JdbiMatchmakingStorage interactionStorage;
@@ -39,6 +43,7 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
 
     @BeforeEach
     void setUp() {
+        System.setProperty(PROFILE_PROPERTY, "test");
         String dbName = "testdb_" + UUID.randomUUID().toString().replace("-", "");
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1");
         dbManager = DatabaseManager.getInstance();
@@ -73,6 +78,7 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
 
     @AfterEach
     void tearDown() {
+        System.clearProperty(PROFILE_PROPERTY);
         if (dbManager != null) {
             dbManager.shutdown();
             DatabaseManager.resetInstance();
@@ -190,6 +196,45 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
         Match persisted = interactionStorage.get(match.getId()).orElseThrow();
         assertEquals(MatchState.ACTIVE, persisted.getState());
         assertTrue(persisted.getEndedBy() == null || !persisted.getEndedBy().equals(userA));
+    }
+
+    @Test
+    @DisplayName("unmatchTransition clears stale likes and allows the ended pair to rematch")
+    void unmatchTransitionClearsStaleLikesAndAllowsEndedPairToRematch() {
+        Like firstLike = Like.create(userA, userB, Like.Direction.LIKE);
+        Like secondLike = Like.create(userB, userA, Like.Direction.LIKE);
+
+        var firstResult = interactionStorage.saveLikeAndMaybeCreateMatch(firstLike);
+        var secondResult = interactionStorage.saveLikeAndMaybeCreateMatch(secondLike);
+
+        assertTrue(firstResult.likePersisted());
+        assertTrue(secondResult.createdMatch().isPresent());
+
+        Match matched = interactionStorage.get(Match.generateId(userA, userB)).orElseThrow();
+        matched.unmatch(userA);
+
+        assertTrue(interactionStorage.unmatchTransition(matched, Optional.empty()));
+        assertEquals(0, interactionStorage.countByDirection(userA, Like.Direction.LIKE));
+        assertEquals(0, interactionStorage.countByDirection(userB, Like.Direction.LIKE));
+        assertTrue(interactionStorage.getLike(userA, userB).isEmpty());
+        assertTrue(interactionStorage.getLike(userB, userA).isEmpty());
+
+        Like rematchLikeA = Like.create(userA, userB, Like.Direction.LIKE);
+        Like rematchLikeB = Like.create(userB, userA, Like.Direction.LIKE);
+
+        var rematchResultA = interactionStorage.saveLikeAndMaybeCreateMatch(rematchLikeA);
+        var rematchResultB = interactionStorage.saveLikeAndMaybeCreateMatch(rematchLikeB);
+
+        assertTrue(rematchResultA.likePersisted());
+        assertTrue(rematchResultA.createdMatch().isEmpty());
+        assertTrue(rematchResultB.likePersisted());
+        assertTrue(rematchResultB.createdMatch().isPresent());
+        assertEquals(
+                MatchState.ACTIVE,
+                interactionStorage
+                        .get(Match.generateId(userA, userB))
+                        .orElseThrow()
+                        .getState());
     }
 
     private Match createPersistedActiveMatchWithOldTimestamp() {

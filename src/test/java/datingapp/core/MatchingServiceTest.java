@@ -376,6 +376,8 @@ class MatchingServiceTest {
         void duplicateProcessSwipeIsIdempotentAndPreservesUndoState() {
             User activeUser = activeUser(UUID.randomUUID(), "Alice");
             User candidate = activeUser(UUID.randomUUID(), "Bob");
+            userStorage.save(activeUser);
+            userStorage.save(candidate);
 
             MatchingService.SwipeResult first = matchingService.processSwipe(activeUser, candidate, true);
             assertTrue(first.success());
@@ -431,6 +433,111 @@ class MatchingServiceTest {
             NullPointerException finderError =
                     assertThrows(NullPointerException.class, missingCandidateFinderBuilder::build);
             assertEquals("candidateFinder cannot be null", finderError.getMessage());
+        }
+
+        // =====================================================================
+        // Phase 1a Candidate Truthfulness: Failing Transactional Safety Tests
+        // =====================================================================
+
+        @Test
+        @DisplayName("Phase 1a: processSwipe should reject if current user pauses between snapshot and commit")
+        void phase1aRejectWhenCurrentUserPausesBetweenSnapshotAndCommit() {
+            User activeUser = activeUser(UUID.randomUUID(), "Alice");
+            User candidate = activeUser(UUID.randomUUID(), "Bob");
+            userStorage.save(activeUser);
+            userStorage.save(candidate);
+
+            // Use slow storage that allows us to pause user between snapshot and commit
+            TransactionInterceptionUsers txnUsers = new TransactionInterceptionUsers();
+            txnUsers.save(activeUser);
+            txnUsers.save(candidate);
+
+            MatchingService txnService = MatchingService.builder()
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(txnUsers)
+                    .undoService(new UndoService(interactionStorage, new TestStorages.Undos(), AppConfig.defaults()))
+                    .dailyService(new RecommendationService(
+                            alwaysAllowDailyLimitService(), noDailyPickService(), noStandoutService()))
+                    .candidateFinder(candidateFinder)
+                    .build();
+
+            txnUsers.setPauseHook(activeUser::pause);
+
+            MatchingService.SwipeResult result = txnService.processSwipe(activeUser, candidate, true);
+
+            // The swipe should either be rejected or not persisted when user pauses
+            assertFalse(
+                    result.success() && interactionStorage.exists(activeUser.getId(), candidate.getId()),
+                    "Swipe should not succeed and persist when current user pauses between snapshot and commit");
+        }
+
+        @Test
+        @DisplayName("Phase 1a: processSwipe should reject if candidate pauses between snapshot and commit")
+        void phase1aRejectWhenCandidatePausesBetweenSnapshotAndCommit() {
+            User activeUser = activeUser(UUID.randomUUID(), "Alice");
+            User candidate = activeUser(UUID.randomUUID(), "Bob");
+            userStorage.save(activeUser);
+            userStorage.save(candidate);
+
+            TransactionInterceptionUsers txnUsers = new TransactionInterceptionUsers();
+            txnUsers.save(activeUser);
+            txnUsers.save(candidate);
+
+            MatchingService txnService = MatchingService.builder()
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(txnUsers)
+                    .undoService(new UndoService(interactionStorage, new TestStorages.Undos(), AppConfig.defaults()))
+                    .dailyService(new RecommendationService(
+                            alwaysAllowDailyLimitService(), noDailyPickService(), noStandoutService()))
+                    .candidateFinder(candidateFinder)
+                    .build();
+
+            txnUsers.setPauseHook(candidate::pause);
+
+            MatchingService.SwipeResult result = txnService.processSwipe(activeUser, candidate, true);
+
+            // The swipe should either be rejected or not persisted when candidate pauses
+            assertFalse(
+                    result.success() && interactionStorage.exists(activeUser.getId(), candidate.getId()),
+                    "Swipe should not succeed and persist when candidate pauses between snapshot and commit");
+        }
+
+        @Test
+        @DisplayName("Phase 1a: processSwipe should reject if block created between snapshot and commit")
+        void phase1aRejectWhenBlockCreatedBetweenSnapshotAndCommit() {
+            User activeUser = activeUser(UUID.randomUUID(), "Alice");
+            User candidate = activeUser(UUID.randomUUID(), "Bob");
+            userStorage.save(activeUser);
+            userStorage.save(candidate);
+
+            TransactionInterceptionUsers txnUsers = new TransactionInterceptionUsers();
+            txnUsers.save(activeUser);
+            txnUsers.save(candidate);
+
+            MatchingService txnService = MatchingService.builder()
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(txnUsers)
+                    .undoService(new UndoService(interactionStorage, new TestStorages.Undos(), AppConfig.defaults()))
+                    .dailyService(new RecommendationService(
+                            alwaysAllowDailyLimitService(), noDailyPickService(), noStandoutService()))
+                    .candidateFinder(new CandidateFinder(
+                            txnUsers,
+                            interactionStorage,
+                            trustSafetyStorage,
+                            AppConfig.defaults().safety().userTimeZone()))
+                    .build();
+
+            txnUsers.setPauseHook(() -> trustSafetyStorage.save(Block.create(activeUser.getId(), candidate.getId())));
+
+            MatchingService.SwipeResult result = txnService.processSwipe(activeUser, candidate, true);
+
+            // The swipe should either be rejected or not persisted when block created between snapshot and commit
+            assertFalse(
+                    result.success() && interactionStorage.exists(activeUser.getId(), candidate.getId()),
+                    "Swipe should not succeed and persist when block created between snapshot and commit");
         }
     }
 
@@ -516,6 +623,9 @@ class MatchingServiceTest {
             User alice = activeUser(UUID.randomUUID(), "Alice");
             User bob = activeUser(UUID.randomUUID(), "Bob");
             User carol = activeUser(UUID.randomUUID(), "Carol");
+            userStorage.save(alice);
+            userStorage.save(bob);
+            userStorage.save(carol);
 
             CountDownLatch ready = new CountDownLatch(2);
             CountDownLatch start = new CountDownLatch(1);
@@ -705,6 +815,23 @@ class MatchingServiceTest {
                 return java.util.Map.of();
             }
         };
+    }
+
+    private static final class TransactionInterceptionUsers extends TestStorages.Users {
+        private Runnable pauseHook;
+
+        void setPauseHook(Runnable hook) {
+            this.pauseHook = hook;
+        }
+
+        @Override
+        public synchronized void executeWithUserLock(UUID userId, Runnable operation) {
+            if (pauseHook != null) {
+                pauseHook.run();
+                pauseHook = null;
+            }
+            super.executeWithUserLock(userId, operation);
+        }
     }
 
     private static final class TrackingCandidateFinder extends CandidateFinder {

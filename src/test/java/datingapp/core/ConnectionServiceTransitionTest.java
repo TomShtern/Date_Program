@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
@@ -91,6 +92,8 @@ class ConnectionServiceTransitionTest {
         UUID userB = UUID.randomUUID();
         Match match = Match.create(userA, userB);
         interactions.save(match);
+        interactions.save(Like.create(userA, userB, Like.Direction.LIKE));
+        interactions.save(Like.create(userB, userA, Like.Direction.LIKE));
 
         ConnectionModels.Conversation conversation = ConnectionModels.Conversation.create(userA, userB);
         communications.saveConversation(conversation);
@@ -106,6 +109,10 @@ class ConnectionServiceTransitionTest {
         Match updated = interactions.get(Match.generateId(userA, userB)).orElseThrow();
         assertEquals(MatchState.UNMATCHED, updated.getState());
         assertEquals(MatchArchiveReason.UNMATCH, updated.getEndReason());
+        assertEquals(0, interactions.countByDirection(userA, Like.Direction.LIKE));
+        assertEquals(0, interactions.countByDirection(userB, Like.Direction.LIKE));
+        assertTrue(interactions.getLike(userA, userB).isEmpty());
+        assertTrue(interactions.getLike(userB, userA).isEmpty());
 
         assertTrue(interactions.archivedConversation.isPresent());
         ConnectionModels.Conversation archived = interactions.archivedConversation.orElseThrow();
@@ -157,6 +164,7 @@ class ConnectionServiceTransitionTest {
                 Match updatedMatch, Optional<ConnectionModels.Conversation> archivedConversation) {
             this.unmatchTransitionCalled = true;
             this.archivedConversation = archivedConversation;
+            super.deletePairLikes(updatedMatch.getUserA(), updatedMatch.getUserB());
             super.update(updatedMatch);
             return true;
         }

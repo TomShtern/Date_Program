@@ -166,13 +166,8 @@ public final class MatchingService {
     }
 
     private boolean isDirectLikeAllowed(Like like) {
-        if (like.whoLikes().equals(like.whoGotLiked())) {
-            return false;
-        }
-        if (trustSafetyStorage.isBlocked(like.whoLikes(), like.whoGotLiked())) {
-            return false;
-        }
-        if (!isActiveUser(like.whoLikes()) || !isActiveUser(like.whoGotLiked())) {
+        if (validatePersistedSwipeEligibility(like.whoLikes(), like.whoGotLiked())
+                .isPresent()) {
             return false;
         }
         return switch (like.direction()) {
@@ -180,13 +175,6 @@ public final class MatchingService {
             case SUPER_LIKE -> dailyService.canSuperLike(like.whoLikes());
             case PASS -> dailyService.canPass(like.whoLikes());
         };
-    }
-
-    private boolean isActiveUser(UUID userId) {
-        return userStorage
-                .get(userId)
-                .map(user -> user.getState() == UserState.ACTIVE)
-                .orElse(false);
     }
 
     public List<Match> getMatchesForUser(UUID userId) {
@@ -284,8 +272,10 @@ public final class MatchingService {
     }
 
     private SwipeResult processSwipeWithinLock(User currentUser, User candidate, boolean liked, boolean superLike) {
-        if (trustSafetyStorage.isBlocked(currentUser.getId(), candidate.getId())) {
-            return SwipeResult.configError(BLOCKED_SWIPE_MESSAGE);
+        Optional<String> persistedEligibilityError =
+                validatePersistedSwipeEligibility(currentUser.getId(), candidate.getId());
+        if (persistedEligibilityError.isPresent()) {
+            return SwipeResult.configError(persistedEligibilityError.orElseThrow());
         }
 
         if (superLike && !dailyService.canSuperLike(currentUser.getId())) {
@@ -314,6 +304,28 @@ public final class MatchingService {
             return SwipeResult.matched(match.get(), like);
         }
         return liked ? SwipeResult.liked(like) : SwipeResult.passed(like);
+    }
+
+    private Optional<String> validatePersistedSwipeEligibility(UUID currentUserId, UUID candidateId) {
+        if (currentUserId.equals(candidateId)) {
+            return Optional.of("Cannot swipe on yourself.");
+        }
+
+        Optional<User> persistedCurrentUser = userStorage.get(currentUserId);
+        if (persistedCurrentUser.isEmpty() || persistedCurrentUser.get().getState() != UserState.ACTIVE) {
+            return Optional.of("Current user must be ACTIVE to swipe.");
+        }
+
+        Optional<User> persistedCandidate = userStorage.get(candidateId);
+        if (persistedCandidate.isEmpty() || persistedCandidate.get().getState() != UserState.ACTIVE) {
+            return Optional.of("Candidate must be ACTIVE to receive swipes.");
+        }
+
+        if (trustSafetyStorage.isBlocked(currentUserId, candidateId)) {
+            return Optional.of(BLOCKED_SWIPE_MESSAGE);
+        }
+
+        return Optional.empty();
     }
 
     private static Like.Direction resolveDirection(boolean liked, boolean superLike) {

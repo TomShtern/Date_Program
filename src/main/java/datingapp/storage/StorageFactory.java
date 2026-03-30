@@ -45,6 +45,7 @@ import datingapp.storage.jdbi.JdbiTrustSafetyStorage;
 import datingapp.storage.jdbi.JdbiTypeCodecs;
 import datingapp.storage.jdbi.JdbiUserStorage;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import org.jdbi.v3.core.Jdbi;
@@ -94,7 +95,8 @@ public final class StorageFactory {
                 userStorage,
                 interactionStorage,
                 trustSafetyStorage,
-                config.safety().userTimeZone());
+                config.safety().userTimeZone(),
+                Duration.ofHours(config.matching().rematchCooldownHours()));
         ProfileService profileService =
                 new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
 

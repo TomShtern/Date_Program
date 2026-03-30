@@ -18,7 +18,8 @@ class AppConfigValidatorTest {
     void validateMatchingRejectsInvalidWeightSum() {
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> new AppConfig.MatchingConfig(10, 2, 10, 100, 3.0, true, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 1, 3, 500));
+                () -> new AppConfig.MatchingConfig(
+                        10, 2, 10, 100, 168, 3.0, true, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 1, 3, 500));
         org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("sum to 1.0"));
     }
 
@@ -28,14 +29,23 @@ class AppConfigValidatorTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> new AppConfig.MatchingConfig(
-                        10, 2, 10, 100, 3.0, true, 0.3, 0.3, 0.2, 0.1, 0.05, 0.05, 1, 0, 500));
+                        10, 2, 10, 100, 168, 3.0, true, 0.3, 0.3, 0.2, 0.1, 0.05, 0.05, 1, 0, 500));
     }
 
     @Test
     @DisplayName("validateMatching accepts configured preview count")
     void validateMatchingAcceptsPreviewCount() {
-        assertDoesNotThrow(() ->
-                new AppConfig.MatchingConfig(10, 2, 10, 100, 3.0, true, 0.3, 0.3, 0.2, 0.1, 0.05, 0.05, 1, 3, 500));
+        assertDoesNotThrow(() -> new AppConfig.MatchingConfig(
+                10, 2, 10, 100, 168, 3.0, true, 0.3, 0.3, 0.2, 0.1, 0.05, 0.05, 1, 3, 500));
+    }
+
+    @Test
+    @DisplayName("validateMatching rejects negative rematch cooldown")
+    void validateMatchingRejectsNegativeRematchCooldown() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new AppConfig.MatchingConfig(
+                        10, 2, 10, 100, -1, 3.0, true, 0.3, 0.3, 0.2, 0.1, 0.05, 0.05, 1, 3, 500));
     }
 
     @Test

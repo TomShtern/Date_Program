@@ -1,8 +1,11 @@
 package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.model.Match;
+import datingapp.core.model.Match.MatchState;
 import datingapp.core.storage.InteractionStorage.LikeMatchWriteResult;
 import datingapp.core.testutil.TestStorages;
 import java.util.List;
@@ -51,6 +54,32 @@ class InteractionStorageAtomicityTest {
             executor.shutdownNow();
             executor.awaitTermination(2, TimeUnit.SECONDS);
         }
+    }
+
+    @Test
+    @DisplayName("default saveLikeAndMaybeCreateMatch can reactivate an ended unmatched pair")
+    void defaultSaveLikeAndMaybeCreateMatchReactivatesEndedUnmatchedPair() {
+        SlowInteractions storage = new SlowInteractions();
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+
+        Match endedMatch = Match.create(userA, userB);
+        endedMatch.unmatch(userA);
+        storage.save(endedMatch);
+
+        Like firstFreshLike = Like.create(userA, userB, Like.Direction.LIKE);
+        Like secondFreshLike = Like.create(userB, userA, Like.Direction.LIKE);
+
+        LikeMatchWriteResult firstResult = storage.saveLikeAndMaybeCreateMatch(firstFreshLike);
+        LikeMatchWriteResult secondResult = storage.saveLikeAndMaybeCreateMatch(secondFreshLike);
+
+        assertTrue(firstResult.likePersisted());
+        assertTrue(firstResult.createdMatch().isEmpty());
+        assertTrue(secondResult.likePersisted());
+        assertTrue(secondResult.createdMatch().isPresent());
+        assertEquals(
+                MatchState.ACTIVE,
+                storage.get(Match.generateId(userA, userB)).orElseThrow().getState());
     }
 
     private static final class SlowInteractions extends TestStorages.Interactions {

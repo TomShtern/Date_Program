@@ -1,6 +1,10 @@
 package datingapp.app;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.bootstrap.ApplicationStartup;
 import datingapp.core.AppConfig;
@@ -82,6 +86,7 @@ class ConfigLoaderTest {
                       "autoBanThreshold": 10,
                       "dailyLikeLimit": 50,
                       "dailySuperLikeLimit": 3,
+                      "rematchCooldownHours": 24,
                       "dailyPassLimit": 200,
                       "sharedInterestsPreviewCount": 4,
                       "maxInterests": 15,
@@ -97,6 +102,7 @@ class ConfigLoaderTest {
             assertEquals(10, config.safety().autoBanThreshold());
             assertEquals(50, config.matching().dailyLikeLimit());
             assertEquals(3, config.matching().dailySuperLikeLimit());
+            assertEquals(24, config.matching().rematchCooldownHours());
             assertEquals(200, config.matching().dailyPassLimit());
             assertEquals(4, config.matching().sharedInterestsPreviewCount());
             assertEquals(15, config.validation().maxInterests());
@@ -242,6 +248,9 @@ class ConfigLoaderTest {
             AppConfig defaults = AppConfig.defaults();
 
             assertEquals(defaults.matching().dailyLikeLimit(), config.matching().dailyLikeLimit());
+            assertEquals(
+                    defaults.matching().rematchCooldownHours(),
+                    config.matching().rematchCooldownHours());
             assertEquals(
                     defaults.matching().sharedInterestsPreviewCount(),
                     config.matching().sharedInterestsPreviewCount());

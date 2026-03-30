@@ -4,16 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import datingapp.storage.DatabaseManager;
-import datingapp.storage.StorageFactory;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+
+import datingapp.storage.DatabaseManager;
+import datingapp.storage.StorageFactory;
 
 /**
  * Tests for ServiceRegistry - central dependency registry and service wiring.
@@ -27,11 +29,14 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class ServiceRegistryTest {
 
+    private static final String PROFILE_PROPERTY = "datingapp.db.profile";
+
     private static DatabaseManager dbManager;
     private static ServiceRegistry registry;
 
     @BeforeAll
     static void setUpOnce() {
+        System.setProperty(PROFILE_PROPERTY, "test");
         // Use in-memory H2 database for testing
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:test_service_registry_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
         DatabaseManager.resetInstance();
@@ -41,6 +46,7 @@ class ServiceRegistryTest {
 
     @AfterAll
     static void tearDownOnce() {
+        System.clearProperty(PROFILE_PROPERTY);
         DatabaseManager.resetInstance();
     }
 

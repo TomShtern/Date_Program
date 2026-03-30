@@ -12,6 +12,7 @@ import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases;
 import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
+import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
@@ -44,6 +45,8 @@ import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestStorages;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -108,6 +111,72 @@ class MatchingFlowIntegrationTest {
         assertTrue(thread.data().canMessage());
         assertEquals(1, thread.data().messages().size());
         assertEquals("Hi Bob!", thread.data().messages().getFirst().content());
+    }
+
+    @Test
+    @DisplayName("match then unmatch then rematch after cooldown succeeds end-to-end")
+    void matchThenUnmatchThenRematchAfterCooldownSucceedsEndToEnd() {
+        AppClock.setFixed(Instant.parse("2026-03-30T00:00:00Z"));
+        try {
+            TestStorages.Users userStorage = new TestStorages.Users();
+            TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
+            TestStorages.Communications communicationStorage = new TestStorages.Communications();
+            TestStorages.Standouts standoutStorage = new TestStorages.Standouts();
+            AppConfig config = AppConfig.defaults();
+
+            UUID aliceId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+            UUID bobId = UUID.fromString("22222222-2222-2222-2222-222222222222");
+            User alice = activeUser(aliceId, "Alice", Gender.FEMALE, Set.of(Gender.MALE));
+            User bob = activeUser(bobId, "Bob", Gender.MALE, Set.of(Gender.FEMALE));
+            userStorage.save(alice);
+            userStorage.save(bob);
+
+            ServiceRegistry services =
+                    createServices(config, userStorage, interactionStorage, communicationStorage, standoutStorage);
+
+            MatchingUseCases matchingUseCases = services.getMatchingUseCases();
+            SocialUseCases socialUseCases = services.getSocialUseCases();
+            MessagingUseCases messagingUseCases = services.getMessagingUseCases();
+
+            var aliceLike = matchingUseCases.recordLike(
+                    new RecordLikeCommand(UserContext.cli(aliceId), bobId, Like.Direction.LIKE, true));
+            assertTrue(aliceLike.success());
+            assertFalse(aliceLike.data().match().isPresent());
+
+            var bobLike = matchingUseCases.recordLike(
+                    new RecordLikeCommand(UserContext.cli(bobId), aliceId, Like.Direction.LIKE, true));
+            assertTrue(bobLike.success());
+            assertTrue(bobLike.data().match().isPresent());
+
+            var unmatch =
+                    socialUseCases.unmatch(new SocialUseCases.RelationshipCommand(UserContext.cli(aliceId), bobId));
+            assertTrue(unmatch.success());
+            assertEquals(
+                    datingapp.core.model.Match.MatchState.UNMATCHED,
+                    interactionStorage
+                            .get(datingapp.core.model.Match.generateId(aliceId, bobId))
+                            .orElseThrow()
+                            .getState());
+
+            AppClock.setFixed(AppClock.now().plus(Duration.ofHours(169)));
+
+            var aliceRematch = matchingUseCases.recordLike(
+                    new RecordLikeCommand(UserContext.cli(aliceId), bobId, Like.Direction.LIKE, true));
+            assertTrue(aliceRematch.success());
+            assertFalse(aliceRematch.data().match().isPresent());
+
+            var bobRematch = matchingUseCases.recordLike(
+                    new RecordLikeCommand(UserContext.cli(bobId), aliceId, Like.Direction.LIKE, true));
+            assertTrue(bobRematch.success());
+            assertTrue(bobRematch.data().match().isPresent());
+
+            var send = messagingUseCases.sendMessage(
+                    new SendMessageCommand(UserContext.cli(aliceId), bobId, "We meet again!"));
+            assertTrue(send.success());
+            assertTrue(send.data().success());
+        } finally {
+            AppClock.reset();
+        }
     }
 
     private static ServiceRegistry createServices(

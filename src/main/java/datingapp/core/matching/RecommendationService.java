@@ -99,7 +99,8 @@ public final class RecommendationService {
                         Objects.requireNonNull(userStorage, "userStorage cannot be null"),
                         Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null"),
                         Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null"),
-                        resolvedConfig.safety().userTimeZone());
+                        resolvedConfig.safety().userTimeZone(),
+                        Duration.ofHours(resolvedConfig.matching().rematchCooldownHours()));
             }
             CompatibilityCalculator calculator = new DefaultCompatibilityCalculator(resolvedConfig, resolvedClock);
             DailyLimitService dailyLimitService =

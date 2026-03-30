@@ -4,7 +4,7 @@ description: "Use for deep analysis, root-cause reasoning, ambiguity resolution,
 tools: [read, search, web, todo, agent]
 agents: [codebase-context-gatherer, mcp-context-researcher]
 argument-hint: "Describe the problem, constraints, evidence, and decision you want help with"
-model: GPT-5.4 (copilot)
+model: GPT-5.4
 user-invocable: false
 disable-model-invocation: false
 ---

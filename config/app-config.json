@@ -2,6 +2,7 @@
   "dailyLikeLimit": 100,
   "dailySuperLikeLimit": 1,
   "dailyPassLimit": -1,
+  "rematchCooldownHours": 168,
   "minAge": 18,
   "maxAge": 120,
   "minHeightCm": 50,
